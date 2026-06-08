@@ -15,6 +15,8 @@ export interface TakeVideoPlayerProps
   mirror?: boolean
   /** Call video.load() on mount so WebKit eagerly fetches #t= poster frames. */
   eagerLoad?: boolean
+  /** Vault list tile — muted poster only; never inline audio. */
+  thumbnailPreview?: boolean
   preload?: 'auto' | 'metadata' | 'none'
 }
 
@@ -32,6 +34,7 @@ export default function TakeVideoPlayer({
   controls = true,
   mirror = false,
   eagerLoad = false,
+  thumbnailPreview = false,
   preload = 'metadata',
   style,
   ...rest
@@ -54,6 +57,21 @@ export default function TakeVideoPlayer({
     video.muted = true
     video.currentTime = 0
   }, [videoSrc, videoRef])
+
+  useEffect(() => {
+    if (!thumbnailPreview) return
+    const video = videoRef.current
+    if (!video) return
+
+    const enforceSilentPreview = () => {
+      video.muted = true
+    }
+
+    video.addEventListener('volumechange', enforceSilentPreview)
+    return () => {
+      video.removeEventListener('volumechange', enforceSilentPreview)
+    }
+  }, [thumbnailPreview, videoSrc, videoRef])
 
   useEffect(() => {
     return () => {
@@ -82,8 +100,9 @@ export default function TakeVideoPlayer({
         'webkit-playsinline': 'true',
       } as VideoHTMLAttributes<HTMLVideoElement>)}
       muted
+      autoPlay={false}
       disablePictureInPicture
-      controls={mirror ? false : controls}
+      controls={thumbnailPreview ? false : mirror ? false : controls}
       preload={preload}
     />
   )

@@ -59,10 +59,11 @@ export function VaultTakeVideo({
       className={className}
       poster={take.thumbnailUrl || undefined}
       loadingClassName="h-full w-full animate-pulse bg-stone-200"
-      controls={!thumbnail}
+      controls={false}
       mirror
+      thumbnailPreview={thumbnail}
       eagerLoad={thumbnail}
-      preload={thumbnail ? 'auto' : 'metadata'}
+      preload="metadata"
     />
   )
 }
