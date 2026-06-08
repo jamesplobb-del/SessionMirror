@@ -1,3 +1,4 @@
+import { blockTouchBubble } from '../utils/eventBubbling'
 import { Pause, Play, Volume2 } from 'lucide-react'
 
 interface MiniPipControlsProps {
@@ -17,7 +18,16 @@ export default function MiniPipControls({
     <div className="flex items-center gap-1.5">
       <button
         type="button"
-        onClick={onTogglePlay}
+        onPointerDown={blockTouchBubble}
+        onTouchStart={blockTouchBubble}
+        onClick={(e) => {
+          blockTouchBubble(e)
+          onTogglePlay()
+        }}
+        onTouchEnd={(e) => {
+          blockTouchBubble(e)
+          onTogglePlay()
+        }}
         className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white"
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >

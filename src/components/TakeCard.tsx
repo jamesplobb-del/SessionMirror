@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Pin, StickyNote, Trash2 } from 'lucide-react'
+import { blockTouchBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
 
@@ -66,7 +67,10 @@ export default function TakeCard({
         {thumbnailVideo ? (
           <button
             type="button"
-            onClick={onOpenTake}
+            onClick={(e) => {
+              blockTouchBubble(e)
+              onOpenTake?.()
+            }}
             className="block h-full w-full overflow-hidden"
             aria-label={`Open ${take.name} in full screen`}
           >
@@ -75,7 +79,10 @@ export default function TakeCard({
         ) : take.thumbnailUrl ? (
           <button
             type="button"
-            onClick={onOpenTake}
+            onClick={(e) => {
+              blockTouchBubble(e)
+              onOpenTake?.()
+            }}
             className="block h-full w-full"
             aria-label={`Open ${take.name} in full screen`}
           >
@@ -89,7 +96,10 @@ export default function TakeCard({
         ) : (
           <button
             type="button"
-            onClick={onOpenTake}
+            onClick={(e) => {
+              blockTouchBubble(e)
+              onOpenTake?.()
+            }}
             className="block h-full w-full animate-pulse bg-stone-200"
             aria-label={`Open ${take.name} in full screen`}
           />
@@ -190,10 +200,10 @@ export default function TakeCard({
           <button
             type="button"
             onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
+              blockTouchBubble(e)
               onPinBenchmark()
             }}
+            {...touchBubbleBlockProps()}
             className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
               isBenchmark
                 ? 'border-amber-300 bg-amber-100 text-amber-800'
@@ -206,10 +216,10 @@ export default function TakeCard({
           <button
             type="button"
             onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
+              blockTouchBubble(e)
               onPinChallenger()
             }}
+            {...touchBubbleBlockProps()}
             className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
               isChallenger
                 ? 'border-sky-300 bg-sky-100 text-sky-800'

@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
-import { Play, Upload, X } from 'lucide-react'
+import { useCallback, useEffect } from 'react'
+import { Maximize2, Pause, Play, Upload, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
+import { blockTouchBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { resetVideoPlayback } from '../utils/videoPlayback'
 
 interface PipWindowProps {
@@ -18,7 +19,7 @@ interface PipWindowProps {
   videoRef?: React.RefObject<HTMLVideoElement | null>
   onUnpin: () => void
   onExpand?: () => void
-  onUpload?: (file: File) => void
+  onUpload?: () => void
   className?: string
 }
 
@@ -38,7 +39,6 @@ export default function PipWindow({
   onUpload,
   className = '',
 }: PipWindowProps) {
-  const uploadInputRef = useRef<HTMLInputElement>(null)
   const playbackKey = `${filePath}|${src ?? ''}`
   const internalPlayback = useVideoPlayback(playbackKey, externalVideoRef)
   const videoRef = internalPlayback.videoRef
@@ -60,20 +60,43 @@ export default function PipWindow({
     }
   }, [playbackKey, videoRef])
 
+  const runInlinePlayToggle = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.muted = true
+    togglePlay()
+  }, [togglePlay, videoRef])
+
+  const toggleInlinePlay = useCallback(
+    (event: React.MouseEvent | React.TouchEvent) => {
+      blockTouchBubble(event)
+      runInlinePlayToggle()
+    },
+    [runInlinePlayToggle],
+  )
+
+  const handleExpand = useCallback(
+    (event: React.MouseEvent | React.TouchEvent) => {
+      blockTouchBubble(event)
+      onExpand?.()
+    },
+    [onExpand],
+  )
+
+  const handleUploadClick = useCallback(
+    (event: React.MouseEvent | React.TouchEvent) => {
+      blockTouchBubble(event)
+      onUpload?.()
+    },
+    [onUpload],
+  )
+
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
   const badgeClass =
     variant === 'benchmark'
       ? 'bg-amber-400/90 text-white'
       : 'bg-sky-500/90 text-white'
-
-  const handleUploadChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (file && onUpload) {
-      onUpload(file)
-    }
-  }
 
   return (
     <div
@@ -87,36 +110,24 @@ export default function PipWindow({
         </span>
         <div className="flex items-center gap-1">
           {variant === 'benchmark' && onUpload && (
-            <>
-              <input
-                ref={uploadInputRef}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={handleUploadChange}
-              />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  uploadInputRef.current?.click()
-                }}
-                className="relative z-10 flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
-                aria-label="Upload benchmark video"
-              >
-                <Upload className="h-2.5 w-2.5" />
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={handleUploadClick}
+              {...touchBubbleBlockProps()}
+              className="relative z-10 flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
+              aria-label="Upload benchmark video"
+            >
+              <Upload className="h-2.5 w-2.5" />
+            </button>
           )}
           {src && (
             <button
               type="button"
               onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
+                blockTouchBubble(e)
                 onUnpin()
               }}
+              {...touchBubbleBlockProps()}
               className="relative z-10 flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
               aria-label={`Unload ${label}`}
             >
@@ -126,23 +137,7 @@ export default function PipWindow({
         </div>
       </div>
 
-      <div
-        className={`relative aspect-video bg-black/30 ${src && onExpand ? 'cursor-pointer' : ''}`}
-        onClick={src && onExpand ? onExpand : undefined}
-        onKeyDown={
-          src && onExpand
-            ? (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  onExpand()
-                }
-              }
-            : undefined
-        }
-        role={src && onExpand ? 'button' : undefined}
-        tabIndex={src && onExpand ? 0 : undefined}
-        aria-label={src && onExpand ? `Expand ${label} to full screen` : undefined}
-      >
+      <div className="relative aspect-video bg-black/30">
         {src ? (
           <>
             <TakeVideoPlayer
@@ -151,31 +146,59 @@ export default function PipWindow({
               videoUrl={src}
               mimeType={mimeType}
               videoRef={videoRef}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover pointer-events-none"
               loadingClassName="h-full w-full bg-black/30"
               mirror={mirror}
               controls={false}
             />
-            {onExpand && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-70 transition-opacity group-hover:opacity-0">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-black/35 backdrop-blur-sm">
-                  <Play className="h-3 w-3 fill-white text-white" />
-                </div>
-              </div>
-            )}
+
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              {onExpand && (
+                <button
+                  type="button"
+                  onPointerDown={blockTouchBubble}
+                  onTouchStart={blockTouchBubble}
+                  onClick={handleExpand}
+                  onTouchEnd={handleExpand}
+                  className="pointer-events-auto absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70"
+                  aria-label={`Expand ${label} to full screen`}
+                >
+                  <Maximize2 className="h-3 w-3" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onPointerDown={blockTouchBubble}
+                onTouchStart={blockTouchBubble}
+                onClick={toggleInlinePlay}
+                onTouchEnd={toggleInlinePlay}
+                className="pointer-events-auto absolute bottom-1 left-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70"
+                aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
+              >
+                {isPlaying ? (
+                  <Pause className="h-3 w-3 fill-white" />
+                ) : (
+                  <Play className="h-3 w-3 fill-white" />
+                )}
+              </button>
+            </div>
+
             {takeName && (
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1 pt-4">
-                <p className="truncate text-[9px] font-medium text-white">{takeName}</p>
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[5] bg-gradient-to-t from-black/70 to-transparent px-2 pb-1 pt-4">
+                <p className="truncate text-[9px] font-medium text-white pl-7">{takeName}</p>
               </div>
             )}
+
             <div
-              className="absolute inset-x-0 bottom-0 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
+              className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
               onClick={(e) => e.stopPropagation()}
+              {...touchBubbleBlockProps()}
             >
               <MiniPipControls
                 isPlaying={isPlaying}
                 volume={volume}
-                onTogglePlay={togglePlay}
+                onTogglePlay={runInlinePlayToggle}
                 onVolumeChange={handleVolume}
               />
             </div>
@@ -188,11 +211,8 @@ export default function PipWindow({
             {variant === 'benchmark' && onUpload && (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  uploadInputRef.current?.click()
-                }}
+                onClick={handleUploadClick}
+                {...touchBubbleBlockProps()}
                 className="pointer-events-auto flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25"
               >
                 <Upload className="h-3 w-3" />

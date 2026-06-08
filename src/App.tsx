@@ -19,6 +19,7 @@ import {
   type RecordingCompletePayload,
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
+import { pickBenchmarkVideo } from './utils/pickBenchmarkVideo'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
 import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
 
@@ -155,49 +156,49 @@ export default function App() {
     pausePipVideos()
   }, [pausePipVideos])
 
-  const handleUploadBenchmark = useCallback(
-    (file: File) => {
-      pausePipVideos()
+  const handleUploadBenchmark = useCallback(() => {
+    pausePipVideos()
 
-      void (async () => {
-        const takeId = crypto.randomUUID()
-        const mimeType = file.type || NATIVE_VIDEO_MIME
-        const persisted = await persistUploadedVideo(file, takeId, mimeType)
-        const safeVideoUrl = await resolveTakePlaybackUrl(
+    void (async () => {
+      const picked = await pickBenchmarkVideo()
+      if (!picked) return
+
+      const takeId = crypto.randomUUID()
+      const mimeType = picked.mimeType || NATIVE_VIDEO_MIME
+      const persisted = await persistUploadedVideo(picked.blob, takeId, mimeType)
+      const safeVideoUrl = await resolveTakePlaybackUrl(
+        persisted.filePath,
+        persisted.videoUrl,
+      )
+
+      const uploadedTake: Take = {
+        ...createTake(
+          takeId,
+          takes.length + 1,
+          safeVideoUrl,
           persisted.filePath,
-          persisted.videoUrl,
-        )
+          mimeType,
+        ),
+        name: 'Uploaded Benchmark',
+        mirrorPlayback: false,
+      }
 
-        const uploadedTake: Take = {
-          ...createTake(
-            takeId,
-            takes.length + 1,
-            safeVideoUrl,
-            persisted.filePath,
-            mimeType,
-          ),
-          name: 'Uploaded Benchmark',
-          mirrorPlayback: false,
-        }
+      setTakes((prev) => [...prev, uploadedTake])
+      setBenchmarkId(takeId)
 
-        setTakes((prev) => [...prev, uploadedTake])
-        setBenchmarkId(takeId)
-
-        void generateThumbnailFromUrl(safeVideoUrl)
-          .then((thumbnailUrl) => {
-            setTakes((current) =>
-              current.map((take) =>
-                take.id === takeId ? { ...take, thumbnailUrl } : take,
-              ),
-            )
-          })
-          .catch(() => {
-            /* PiP shows placeholder until thumbnail is ready */
-          })
-      })()
-    },
-    [pausePipVideos, takes.length],
-  )
+      void generateThumbnailFromUrl(safeVideoUrl)
+        .then((thumbnailUrl) => {
+          setTakes((current) =>
+            current.map((take) =>
+              take.id === takeId ? { ...take, thumbnailUrl } : take,
+            ),
+          )
+        })
+        .catch(() => {
+          /* PiP shows placeholder until thumbnail is ready */
+        })
+    })()
+  }, [pausePipVideos, takes.length])
 
   const handleUpdateTake = useCallback((id: string, updates: TakeUpdate) => {
     setTakes((prev) =>
