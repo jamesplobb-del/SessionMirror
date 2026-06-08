@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, type ChangeEvent } from 'react'
 import { Maximize2, Pause, Play, Upload, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import TakeVideoPlayer from './TakeVideoPlayer'
@@ -19,7 +19,7 @@ interface PipWindowProps {
   videoRef?: React.RefObject<HTMLVideoElement | null>
   onUnpin: () => void
   onExpand?: () => void
-  onUpload?: () => void
+  onUpload?: (file: File) => void
   className?: string
 }
 
@@ -83,13 +83,21 @@ export default function PipWindow({
     [onExpand],
   )
 
-  const handleUploadClick = useCallback(
-    (event: React.MouseEvent | React.TouchEvent) => {
-      blockTouchBubble(event)
-      onUpload?.()
+  const handleFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      event.target.value = ''
+      if (file) {
+        onUpload?.(file)
+      }
     },
     [onUpload],
   )
+
+  const uploadLabelClass =
+    variant === 'benchmark' && !src
+      ? 'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
+      : 'relative z-10 flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white'
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -110,15 +118,27 @@ export default function PipWindow({
         </span>
         <div className="flex items-center gap-1">
           {variant === 'benchmark' && onUpload && (
-            <button
-              type="button"
-              onClick={handleUploadClick}
-              {...touchBubbleBlockProps()}
-              className="relative z-10 flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
-              aria-label="Upload benchmark video"
-            >
-              <Upload className="h-2.5 w-2.5" />
-            </button>
+            <>
+              <input
+                type="file"
+                accept="video/*"
+                id="benchmark-upload"
+                onChange={handleFileChange}
+                className="sr-only"
+                aria-hidden
+                tabIndex={-1}
+              />
+              {src && (
+                <label
+                  htmlFor="benchmark-upload"
+                  {...touchBubbleBlockProps()}
+                  className={uploadLabelClass}
+                  aria-label="Upload benchmark video"
+                >
+                  <Upload className="h-2.5 w-2.5" />
+                </label>
+              )}
+            </>
           )}
           {src && (
             <button
@@ -209,15 +229,10 @@ export default function PipWindow({
               {emptyMessage}
             </p>
             {variant === 'benchmark' && onUpload && (
-              <button
-                type="button"
-                onClick={handleUploadClick}
-                {...touchBubbleBlockProps()}
-                className="pointer-events-auto flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25"
-              >
+              <label htmlFor="benchmark-upload" className={uploadLabelClass}>
                 <Upload className="h-3 w-3" />
                 Upload Benchmark
-              </button>
+              </label>
             )}
           </div>
         )}
