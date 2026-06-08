@@ -81,9 +81,16 @@ export default function TakeVideoPlayer({
       video.muted = true
     }
 
+    const blockInlinePlayback = () => {
+      video.pause()
+      video.muted = true
+    }
+
     video.addEventListener('volumechange', enforceSilentPreview)
+    video.addEventListener('play', blockInlinePlayback)
     return () => {
       video.removeEventListener('volumechange', enforceSilentPreview)
+      video.removeEventListener('play', blockInlinePlayback)
     }
   }, [thumbnailPreview, videoSrc, videoRef])
 

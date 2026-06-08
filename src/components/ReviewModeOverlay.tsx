@@ -67,6 +67,7 @@ export default function ReviewModeOverlay({
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
   const swipeCommitted = useRef(false)
+  const reviewAutoplayEnabledRef = useRef(false)
 
   const isVault = context === 'vault'
   const vaultTake = isVault ? vaultTakes[vaultIndex] ?? null : null
@@ -157,7 +158,7 @@ export default function ReviewModeOverlay({
   )
 
   const startReviewPlayback = useCallback(() => {
-    if (isScrubbingRef.current) return
+    if (!reviewAutoplayEnabledRef.current || isScrubbingRef.current) return
     const video = getActiveVideo()
     if (!video) return
     video.muted = false
@@ -165,6 +166,16 @@ export default function ReviewModeOverlay({
       revealPlayOverlay(false)
     })
   }, [getActiveVideo, revealPlayOverlay])
+
+  const handleCloseClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      reviewAutoplayEnabledRef.current = false
+      pauseAllReviewVideos()
+      onClose()
+    },
+    [onClose, pauseAllReviewVideos],
+  )
 
   const togglePlayPause = useCallback(() => {
     const video = getActiveVideo()
@@ -185,17 +196,21 @@ export default function ReviewModeOverlay({
   const hasMedia = isVault ? vaultTakes.length > 0 : hasBenchmark || hasChallenger
 
   useEffect(() => {
+    reviewAutoplayEnabledRef.current = isOpen
+
     if (!isOpen) {
       pauseAllReviewVideos()
+      return
     }
 
     return () => {
+      reviewAutoplayEnabledRef.current = false
       pauseAllReviewVideosSafe()
     }
   }, [isOpen, pauseAllReviewVideos, pauseAllReviewVideosSafe])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !reviewAutoplayEnabledRef.current) return
 
     if (!isVault) {
       if (activeSlot === 'benchmark') {
@@ -214,6 +229,7 @@ export default function ReviewModeOverlay({
     setShowPlayOverlay(true)
 
     const playWhenReady = () => {
+      if (!reviewAutoplayEnabledRef.current) return
       startReviewPlayback()
     }
 
@@ -423,24 +439,7 @@ export default function ReviewModeOverlay({
           </div>
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              const video = getActiveVideo()
-              if (video) {
-                video.pause()
-                video.removeAttribute('src')
-                video.load()
-              }
-              for (const ref of [benchmarkVideoRef, challengerVideoRef, vaultVideoRef]) {
-                const inactive = ref.current
-                if (inactive && inactive !== video) {
-                  inactive.pause()
-                  inactive.removeAttribute('src')
-                  inactive.load()
-                }
-              }
-              onClose()
-            }}
+            onClick={handleCloseClick}
             className="pointer-events-auto absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/25"
             aria-label="Done"
           >
@@ -450,7 +449,7 @@ export default function ReviewModeOverlay({
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {!isVault && (canSwipeLeft || canSwipeRight) && (
+        {isOpen && !isVault && (canSwipeLeft || canSwipeRight) && (
           <div className="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center">
             <p className="rounded-full bg-black/40 px-3 py-1 text-[10px] text-white/50 backdrop-blur-sm">
               {canSwipeLeft && canSwipeRight
@@ -462,7 +461,7 @@ export default function ReviewModeOverlay({
           </div>
         )}
 
-        {isVault && vaultTake ? (
+        {isOpen && isVault && vaultTake ? (
           <div
             className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
             style={swipeLayerStyle}
@@ -480,14 +479,13 @@ export default function ReviewModeOverlay({
                 userSelect: 'auto',
               }}
               controls={false}
-              onLoadedData={startReviewPlayback}
               onPointerDown={handleVideoPointerDown}
               onPointerMove={handleVideoPointerMove}
               onPointerUp={handleVideoPointerUp}
               onPointerCancel={handleVideoPointerUp}
             />
           </div>
-        ) : (
+        ) : isOpen ? (
           <>
             {hasBenchmark && (
               <div
@@ -511,9 +509,6 @@ export default function ReviewModeOverlay({
                     userSelect: 'auto',
                   }}
                   controls={false}
-                  onLoadedData={
-                    activeSlot === 'benchmark' ? startReviewPlayback : undefined
-                  }
                   onPointerDown={
                     activeSlot === 'benchmark' ? handleVideoPointerDown : undefined
                   }
@@ -552,9 +547,6 @@ export default function ReviewModeOverlay({
                     userSelect: 'auto',
                   }}
                   controls={false}
-                  onLoadedData={
-                    activeSlot === 'challenger' ? startReviewPlayback : undefined
-                  }
                   onPointerDown={
                     activeSlot === 'challenger' ? handleVideoPointerDown : undefined
                   }
@@ -571,8 +563,9 @@ export default function ReviewModeOverlay({
               </div>
             )}
           </>
-        )}
+        ) : null}
 
+        {isOpen && (
         <button
           type="button"
           data-play-overlay
@@ -593,6 +586,7 @@ export default function ReviewModeOverlay({
             <Play className="h-8 w-8 fill-white text-white" />
           )}
         </button>
+        )}
       </div>
 
       <div

@@ -17,3 +17,10 @@ export function pauseVideosInContainer(container: HTMLElement | null | undefined
     element.pause()
   })
 }
+
+/** Fully silence every video under a container (vault pin / drawer close). */
+export function resetVideosInContainer(container: HTMLElement | null | undefined): void {
+  container?.querySelectorAll('video').forEach((element) => {
+    resetVideoPlayback(element)
+  })
+}

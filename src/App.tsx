@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
@@ -151,7 +151,12 @@ export default function App() {
 
   const handleCloseReview = useCallback(() => {
     setReviewSlot(null)
-    setReviewContext('compare')
+    setReviewContext((context) => {
+      if (context === 'vault') {
+        setIsVaultOpen(true)
+      }
+      return 'compare'
+    })
     pausePipVideos()
   }, [pausePipVideos])
 
@@ -236,13 +241,9 @@ export default function App() {
     }
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     for (const ref of [benchmarkPipVideoRef, challengerPipVideoRef]) {
-      const video = ref.current
-      if (!video) continue
-      video.pause()
-      video.currentTime = 0
-      video.muted = true
+      resetVideoPlayback(ref.current)
     }
   }, [
     benchmarkId,

@@ -5,7 +5,7 @@ import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
-import { pauseVideosInContainer } from '../utils/videoPlayback'
+import { resetVideosInContainer } from '../utils/videoPlayback'
 import type { SortMode, Take, TakeUpdate } from '../types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
@@ -86,21 +86,21 @@ export default function TakeVaultDrawer({
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  const pauseAllVaultVideos = useCallback(() => {
-    pauseVideosInContainer(drawerRef.current)
+  const silenceAllVaultVideos = useCallback(() => {
+    resetVideosInContainer(drawerRef.current)
   }, [])
 
   useEffect(() => {
     if (!isOpen) {
-      pauseAllVaultVideos()
+      silenceAllVaultVideos()
     }
-  }, [isOpen, pauseAllVaultVideos])
+  }, [isOpen, silenceAllVaultVideos])
 
   useEffect(() => {
     return () => {
-      pauseAllVaultVideos()
+      silenceAllVaultVideos()
     }
-  }, [pauseAllVaultVideos])
+  }, [silenceAllVaultVideos])
 
   return (
     <>
@@ -152,31 +152,32 @@ export default function TakeVaultDrawer({
                 takeCount={takes.length}
               />
               <div className="flex gap-4 overflow-x-auto pb-2">
-                {sortedTakes.map((take) => (
-                  <TakeCard
-                    key={take.id}
-                    take={take}
-                    isBenchmark={take.id === benchmarkId}
-                    isChallenger={take.id === challengerId}
-                    onOpenTake={() => {
-                      pauseAllVaultVideos()
-                      onOpenTake(take)
-                    }}
-                    onPinBenchmark={() => {
-                      onBeforePin?.()
-                      pauseAllVaultVideos()
-                      onPinBenchmark(take.id)
-                    }}
-                    onPinChallenger={() => {
-                      onBeforePin?.()
-                      pauseAllVaultVideos()
-                      onPinChallenger(take.id)
-                    }}
-                    onUpdate={(updates) => onUpdateTake(take.id, updates)}
-                    onDelete={() => onDeleteTake(take.id)}
-                    thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
-                  />
-                ))}
+                {isOpen &&
+                  sortedTakes.map((take) => (
+                    <TakeCard
+                      key={take.id}
+                      take={take}
+                      isBenchmark={take.id === benchmarkId}
+                      isChallenger={take.id === challengerId}
+                      onOpenTake={() => {
+                        silenceAllVaultVideos()
+                        onOpenTake(take)
+                      }}
+                      onPinBenchmark={() => {
+                        onBeforePin?.()
+                        silenceAllVaultVideos()
+                        onPinBenchmark(take.id)
+                      }}
+                      onPinChallenger={() => {
+                        onBeforePin?.()
+                        silenceAllVaultVideos()
+                        onPinChallenger(take.id)
+                      }}
+                      onUpdate={(updates) => onUpdateTake(take.id, updates)}
+                      onDelete={() => onDeleteTake(take.id)}
+                      thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
+                    />
+                  ))}
               </div>
             </>
           )}
