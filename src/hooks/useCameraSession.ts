@@ -13,7 +13,12 @@ import {
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
   enabled?: boolean
+  /** Bump when returning to the camera screen to force a fresh stream. */
+  initKey?: number
 }
+
+const CAMERA_INIT_MAX_ATTEMPTS = 3
+const CAMERA_INIT_RETRY_MS = 450
 
 function detachRecorder(recorder: MediaRecorder) {
   recorder.ondataavailable = null
@@ -24,6 +29,7 @@ function detachRecorder(recorder: MediaRecorder) {
 export function useCameraSession({
   onRecordingComplete,
   enabled = true,
+  initKey = 0,
 }: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -46,20 +52,49 @@ export function useCameraSession({
     writerRef.current = null
     activeTakeIdRef.current = null
     if (writer) {
-      await writer.abort()
+      try {
+        await writer.abort()
+      } catch {
+        /* filesystem errors must not block camera recovery */
+      }
     }
   }, [])
 
-  const releaseStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop())
+  const forceClearCameraState = useCallback(() => {
+    if (recorderRef.current?.state === 'recording') {
+      try {
+        recorderRef.current.stop()
+      } catch {
+        /* ignore */
+      }
+    }
+    if (recorderRef.current) {
+      detachRecorder(recorderRef.current)
+    }
+    recorderRef.current = null
+    chunksRef.current = []
+    writerRef.current = null
+    activeTakeIdRef.current = null
+
+    streamRef.current?.getTracks().forEach((track) => {
+      try {
+        track.stop()
+      } catch {
+        /* ignore */
+      }
+    })
     streamRef.current = null
     setStream(null)
     setReady(false)
 
     const video = previewRef.current
     if (video) {
-      video.pause()
-      video.srcObject = null
+      try {
+        video.pause()
+        video.srcObject = null
+      } catch {
+        /* ignore */
+      }
     }
   }, [])
 
@@ -80,7 +115,7 @@ export function useCameraSession({
   }, [])
 
   const restartCameraAfterRecording = useCallback(async () => {
-    releaseStream()
+    forceClearCameraState()
     try {
       await acquireStream()
     } catch (err) {
@@ -91,27 +126,35 @@ export function useCameraSession({
       )
       setReady(false)
     }
-  }, [acquireStream, releaseStream])
+  }, [acquireStream, forceClearCameraState])
 
   useEffect(() => {
     if (!enabled) {
-      if (recorderRef.current?.state === 'recording') {
-        recorderRef.current.stop()
-      }
-      recorderRef.current = null
-      chunksRef.current = []
-      void abortActiveWriter()
-      releaseStream()
+      void abortActiveWriter().catch(() => {})
+      forceClearCameraState()
       return
     }
 
     let cancelled = false
+    let retryTimer: number | null = null
 
-    const start = async () => {
+    const startWithRecovery = async (attempt = 0) => {
+      forceClearCameraState()
+
       try {
         await acquireStream(() => cancelled)
       } catch (err) {
         if (cancelled) return
+
+        if (attempt + 1 < CAMERA_INIT_MAX_ATTEMPTS) {
+          retryTimer = window.setTimeout(() => {
+            void startWithRecovery(attempt + 1).catch(() => {
+              /* retried inside startWithRecovery */
+            })
+          }, CAMERA_INIT_RETRY_MS)
+          return
+        }
+
         setError(
           err instanceof Error
             ? err.message
@@ -121,19 +164,25 @@ export function useCameraSession({
       }
     }
 
-    void start()
+    void startWithRecovery().catch(() => {
+      /* startWithRecovery handles its own errors */
+    })
 
     return () => {
       cancelled = true
-      if (recorderRef.current?.state === 'recording') {
-        recorderRef.current.stop()
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
       }
-      recorderRef.current = null
-      chunksRef.current = []
-      void abortActiveWriter()
-      releaseStream()
+      void abortActiveWriter().catch(() => {})
+      forceClearCameraState()
     }
-  }, [enabled, abortActiveWriter, acquireStream, releaseStream])
+  }, [
+    enabled,
+    initKey,
+    abortActiveWriter,
+    acquireStream,
+    forceClearCameraState,
+  ])
 
   useEffect(() => {
     if (!isRecording) return
@@ -167,7 +216,7 @@ export function useCameraSession({
 
           if (writerRef.current) {
             void writerRef.current.enqueue(event.data).catch(async () => {
-              await abortActiveWriter()
+              await abortActiveWriter().catch(() => {})
               if (recorderRef.current?.state === 'recording') {
                 recorderRef.current.stop()
               }
@@ -222,20 +271,27 @@ export function useCameraSession({
               }
             } catch {
               if (activeWriter) {
-                await activeWriter.abort()
+                await activeWriter.abort().catch(() => {})
               }
             } finally {
               setIsRecording(false)
               if (Capacitor.isNativePlatform() && enabled) {
-                await restartCameraAfterRecording()
+                try {
+                  await restartCameraAfterRecording()
+                } catch {
+                  forceClearCameraState()
+                }
               }
             }
-          })()
+          })().catch(() => {
+            setIsRecording(false)
+            forceClearCameraState()
+          })
         }
 
         recorder.onerror = () => {
           chunksRef.current = []
-          void abortActiveWriter()
+          void abortActiveWriter().catch(() => {})
           if (recorderRef.current) {
             detachRecorder(recorderRef.current)
           }
@@ -248,14 +304,23 @@ export function useCameraSession({
         setElapsed(0)
       } catch {
         chunksRef.current = []
-        await writer?.abort()
+        await writer?.abort().catch(() => {})
         writerRef.current = null
         activeTakeIdRef.current = null
         recorderRef.current = null
         setIsRecording(false)
       }
-    })()
-  }, [abortActiveWriter, enabled, isRecording, restartCameraAfterRecording])
+    })().catch(() => {
+      chunksRef.current = []
+      setIsRecording(false)
+    })
+  }, [
+    abortActiveWriter,
+    enabled,
+    forceClearCameraState,
+    isRecording,
+    restartCameraAfterRecording,
+  ])
 
   const stopRecording = useCallback(() => {
     setIsRecording(false)

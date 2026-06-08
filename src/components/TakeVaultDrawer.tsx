@@ -5,7 +5,7 @@ import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { iosReplayVideoProps } from '../utils/mobileVideo'
-import { resolveTakePlaybackUrl } from '../utils/takeStorage'
+import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import type { SortMode, Take, TakeUpdate } from '../types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
@@ -16,7 +16,10 @@ export async function resolveVaultVideoSrc(
   if (!Capacitor.isNativePlatform()) {
     return fallbackUrl
   }
-  return resolveTakePlaybackUrl(filePath, fallbackUrl)
+  if (filePath) {
+    return toCapacitorPlaybackSrc(filePath)
+  }
+  return toCapacitorPlaybackSrc(fallbackUrl)
 }
 
 interface TakeVaultDrawerProps {
@@ -43,15 +46,20 @@ export function VaultTakeVideo({
   take,
   className = 'h-full w-full object-cover',
 }: VaultTakeVideoProps) {
-  const src = useCapacitorVideoSrc(take.filePath, take.videoUrl)
+  const resolvedSrc = useCapacitorVideoSrc(take.filePath, take.videoUrl)
 
-  if (!src) {
+  const playbackSrc =
+    resolvedSrc?.startsWith('file://') && Capacitor.isNativePlatform()
+      ? Capacitor.convertFileSrc(resolvedSrc)
+      : resolvedSrc
+
+  if (!playbackSrc) {
     return <div className="h-full w-full animate-pulse bg-stone-200" />
   }
 
   return (
     <video
-      src={src}
+      src={playbackSrc}
       className={className}
       poster={take.thumbnailUrl || undefined}
       {...iosReplayVideoProps}

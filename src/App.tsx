@@ -22,6 +22,19 @@ export default function App() {
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
+  const [cameraInitKey, setCameraInitKey] = useState(0)
+  const prevCameraActiveRef = useRef<boolean | null>(null)
+
+  const isReviewOpen = reviewSlot !== null
+  const isCameraActive = !isVaultOpen && !isReviewOpen
+
+  useEffect(() => {
+    const wasInactive = prevCameraActiveRef.current === false
+    prevCameraActiveRef.current = isCameraActive
+    if (isCameraActive && wasInactive) {
+      setCameraInitKey((key) => key + 1)
+    }
+  }, [isCameraActive])
 
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
     const { takeId, mimeType, filePath, videoUrl, blob } = payload
@@ -61,9 +74,6 @@ export default function App() {
       })
   }, [])
 
-  const isReviewOpen = reviewSlot !== null
-  const isCameraActive = !isVaultOpen && !isReviewOpen
-
   const {
     previewRef,
     stream,
@@ -75,6 +85,7 @@ export default function App() {
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     enabled: isCameraActive,
+    initKey: cameraInitKey,
   })
 
   const benchmarkTake = useMemo(

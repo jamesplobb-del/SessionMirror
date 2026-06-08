@@ -23,6 +23,32 @@ function extensionForMime(mimeType: string): string {
   return 'mp4'
 }
 
+function isAlreadyExistsError(err: unknown): boolean {
+  if (err == null) return false
+
+  if (typeof err === 'string') {
+    const lower = err.toLowerCase()
+    return lower.includes('already exists') || err.includes('OS-PLUG-FILE-0010')
+  }
+
+  if (typeof err === 'object') {
+    const e = err as {
+      code?: string
+      message?: string
+      errorMessage?: string
+    }
+    const code = e.code ?? ''
+    const message = `${e.message ?? ''} ${e.errorMessage ?? ''}`.toLowerCase()
+    return (
+      code === 'OS-PLUG-FILE-0010' ||
+      message.includes('already exists') ||
+      message.includes('os-plug-file-0010')
+    )
+  }
+
+  return false
+}
+
 async function ensureTakesDirectory(): Promise<void> {
   try {
     await Filesystem.mkdir({
@@ -30,9 +56,51 @@ async function ensureTakesDirectory(): Promise<void> {
       directory: Directory.Data,
       recursive: true,
     })
-  } catch {
-    /* directory may already exist */
+  } catch (err) {
+    if (isAlreadyExistsError(err)) {
+      return
+    }
+    /* Non-fatal — proceed even if mkdir fails; writes may still succeed */
   }
+}
+
+/** True when the URL is already safe for WebView `<video src>`. */
+function isConvertedPlaybackUrl(url: string): boolean {
+  return (
+    url.startsWith('blob:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.includes('_capacitor_file_') ||
+    url.startsWith('capacitor://')
+  )
+}
+
+/**
+ * Always returns a WebView-safe playback URL on native.
+ * Handles relative paths, raw file:/// URIs, and pre-converted URLs.
+ */
+export async function toCapacitorPlaybackSrc(
+  uriOrPath: string,
+): Promise<string> {
+  if (!uriOrPath) return ''
+
+  if (!Capacitor.isNativePlatform()) {
+    return uriOrPath
+  }
+
+  if (isConvertedPlaybackUrl(uriOrPath)) {
+    return uriOrPath
+  }
+
+  if (uriOrPath.startsWith('file://')) {
+    return Capacitor.convertFileSrc(uriOrPath)
+  }
+
+  const { uri } = await Filesystem.getUri({
+    path: uriOrPath,
+    directory: Directory.Data,
+  })
+  return Capacitor.convertFileSrc(uri)
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -53,11 +121,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 async function toPlaybackUrl(filePath: string): Promise<string> {
-  const { uri } = await Filesystem.getUri({
-    path: filePath,
-    directory: Directory.Data,
-  })
-  return Capacitor.convertFileSrc(uri)
+  return toCapacitorPlaybackSrc(filePath)
 }
 
 /**
@@ -212,10 +276,19 @@ export async function resolveTakePlaybackUrl(
   filePath: string,
   fallbackUrl: string,
 ): Promise<string> {
-  if (!filePath || !Capacitor.isNativePlatform()) {
+  if (!Capacitor.isNativePlatform()) {
     return fallbackUrl
   }
-  return toPlaybackUrl(filePath)
+
+  if (filePath) {
+    return toCapacitorPlaybackSrc(filePath)
+  }
+
+  if (fallbackUrl) {
+    return toCapacitorPlaybackSrc(fallbackUrl)
+  }
+
+  return fallbackUrl
 }
 
 export async function deleteTakeFile(filePath: string): Promise<void> {
