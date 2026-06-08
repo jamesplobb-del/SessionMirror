@@ -164,6 +164,48 @@ export function convertFileSrcIfNeeded(uri: string): string {
   return applyStrictPlaybackSrc(uri)
 }
 
+/** In-memory cache so PiP / vault players don't hammer Filesystem.getUri. */
+const playbackSrcCache = new Map<string, string>()
+
+/**
+ * Resolve playback URL for native takes — cached, prefers already-converted videoUrl.
+ */
+export async function resolveNativeVideoPlaybackSrc(
+  filePath: string,
+  fallbackUrl: string,
+): Promise<string | null> {
+  if (!Capacitor.isNativePlatform()) {
+    return fallbackUrl || null
+  }
+
+  if (isConvertedPlaybackUrl(fallbackUrl)) {
+    return sanitizeNativeVideoSrc(fallbackUrl)
+  }
+
+  const cacheKey = filePath || fallbackUrl
+  if (cacheKey) {
+    const cached = playbackSrcCache.get(cacheKey)
+    if (cached) {
+      return sanitizeNativeVideoSrc(cached)
+    }
+  }
+
+  let resolved = ''
+  if (filePath) {
+    resolved = await toCapacitorPlaybackSrc(filePath)
+  } else if (fallbackUrl) {
+    resolved = await toCapacitorPlaybackSrc(fallbackUrl)
+  } else {
+    return null
+  }
+
+  if (cacheKey && resolved) {
+    playbackSrcCache.set(cacheKey, resolved)
+  }
+
+  return sanitizeNativeVideoSrc(resolved)
+}
+
 /**
  * Always returns a WebView-safe playback URL on native.
  * Handles relative paths, raw file:/// URIs, and pre-converted URLs.
@@ -181,15 +223,29 @@ export async function toCapacitorPlaybackSrc(
     return uriOrPath
   }
 
-  if (uriOrPath.startsWith('file://')) {
-    return Capacitor.convertFileSrc(uriOrPath)
+  const cached = playbackSrcCache.get(uriOrPath)
+  if (cached) {
+    return cached
   }
 
-  const { uri } = await Filesystem.getUri({
-    path: uriOrPath,
-    directory: Directory.Data,
-  })
-  return Capacitor.convertFileSrc(uri)
+  let converted = uriOrPath
+
+  if (uriOrPath.startsWith('file://')) {
+    converted = Capacitor.convertFileSrc(uriOrPath)
+  } else {
+    const { uri } = await Filesystem.getUri({
+      path: uriOrPath,
+      directory: Directory.Data,
+    })
+    converted = Capacitor.convertFileSrc(uri)
+  }
+
+  if (converted.startsWith('file://')) {
+    converted = Capacitor.convertFileSrc(converted)
+  }
+
+  playbackSrcCache.set(uriOrPath, converted)
+  return converted
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -389,14 +445,7 @@ export async function resolveTakePlaybackUrl(
     return fallbackUrl
   }
 
-  let resolved = fallbackUrl
-  if (filePath) {
-    resolved = await toCapacitorPlaybackSrc(filePath)
-  } else if (fallbackUrl) {
-    resolved = await toCapacitorPlaybackSrc(fallbackUrl)
-  }
-
-  return sanitizeNativeVideoSrc(resolved) ?? resolved
+  return (await resolveNativeVideoPlaybackSrc(filePath, fallbackUrl)) ?? fallbackUrl
 }
 
 export async function deleteTakeFile(filePath: string): Promise<void> {

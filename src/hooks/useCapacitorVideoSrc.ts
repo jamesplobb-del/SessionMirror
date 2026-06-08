@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import {
-  applyStrictPlaybackSrc,
+  isConvertedPlaybackUrl,
+  resolveNativeVideoPlaybackSrc,
   sanitizeNativeVideoSrc,
-  toCapacitorPlaybackSrc,
 } from '../utils/takeStorage'
 
-/** Resolve a native file path or raw file:/// URI to a WebView-safe playback URL. */
+/**
+ * Resolve a native file path or video URL once for `<video src>`.
+ * Skips Filesystem.getUri when the fallback URL is already converted.
+ * Dedupes state updates to avoid re-render / getUri loops.
+ */
 export function useCapacitorVideoSrc(
   filePath: string,
   fallbackUrl: string,
@@ -15,44 +19,26 @@ export function useCapacitorVideoSrc(
     if (!Capacitor.isNativePlatform()) {
       return fallbackUrl || null
     }
-    if (filePath || fallbackUrl.startsWith('file://')) {
-      return null
+    if (isConvertedPlaybackUrl(fallbackUrl)) {
+      return sanitizeNativeVideoSrc(fallbackUrl)
     }
-    return sanitizeNativeVideoSrc(fallbackUrl)
+    return null
   })
 
   useEffect(() => {
-    let cancelled = false
-
-    const resolve = async (): Promise<string | null> => {
-      try {
-        if (!Capacitor.isNativePlatform()) {
-          return fallbackUrl || null
-        }
-
-        let resolved: string | null = null
-
-        if (filePath) {
-          resolved = await toCapacitorPlaybackSrc(filePath)
-        } else if (fallbackUrl) {
-          resolved = await toCapacitorPlaybackSrc(fallbackUrl)
-        }
-
-        return sanitizeNativeVideoSrc(resolved)
-      } catch {
-        if (fallbackUrl.startsWith('file://')) {
-          return sanitizeNativeVideoSrc(Capacitor.convertFileSrc(fallbackUrl))
-        }
-        return sanitizeNativeVideoSrc(
-          fallbackUrl ? applyStrictPlaybackSrc(fallbackUrl) : null,
-        )
-      }
+    if (!Capacitor.isNativePlatform()) {
+      setSrc((current) => {
+        const next = fallbackUrl || null
+        return current === next ? current : next
+      })
+      return
     }
 
-    void resolve().then((resolved) => {
-      if (!cancelled) {
-        setSrc(resolved)
-      }
+    let cancelled = false
+
+    void resolveNativeVideoPlaybackSrc(filePath, fallbackUrl).then((resolved) => {
+      if (cancelled) return
+      setSrc((current) => (current === resolved ? current : resolved))
     })
 
     return () => {

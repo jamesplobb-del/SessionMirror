@@ -1,6 +1,5 @@
 import { Play, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
-import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 
@@ -29,9 +28,9 @@ export default function PipWindow({
   onExpand,
   className = '',
 }: PipWindowProps) {
-  const resolvedSrc = useCapacitorVideoSrc(filePath, src ?? '')
+  const playbackKey = `${filePath}|${src ?? ''}`
   const { videoRef, isPlaying, volume, togglePlay, handleVolume } =
-    useVideoPlayback(resolvedSrc)
+    useVideoPlayback(playbackKey)
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -85,6 +84,7 @@ export default function PipWindow({
         {src ? (
           <>
             <TakeVideoPlayer
+              key={playbackKey}
               filePath={filePath}
               videoUrl={src}
               mimeType={mimeType}
