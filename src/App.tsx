@@ -54,6 +54,9 @@ export default function App() {
       })
   }, [])
 
+  const isReviewOpen = reviewSlot !== null
+  const isCameraActive = !isVaultOpen && !isReviewOpen
+
   const {
     previewRef,
     stream,
@@ -62,7 +65,10 @@ export default function App() {
     isRecording,
     elapsed,
     toggleRecording,
-  } = useCameraSession({ onRecordingComplete: handleSaveTake })
+  } = useCameraSession({
+    onRecordingComplete: handleSaveTake,
+    enabled: isCameraActive,
+  })
 
   const benchmarkTake = useMemo(
     () => takes.find((t) => t.id === benchmarkId) ?? null,
@@ -132,15 +138,15 @@ export default function App() {
     }
   }, [])
 
-  const isReviewOpen = reviewSlot !== null
-
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-stone-900">
-      <LiveCameraBackground
-        previewRef={previewRef}
-        stream={stream}
-        error={cameraError}
-      />
+    <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black">
+      {isCameraActive && (
+        <LiveCameraBackground
+          previewRef={previewRef}
+          stream={stream}
+          error={cameraError}
+        />
+      )}
 
       {!isReviewOpen && <HudHeader />}
 
@@ -148,6 +154,7 @@ export default function App() {
         <PipWindow
           className="pointer-events-auto absolute bottom-16 left-3 z-20 sm:left-4"
           src={benchmarkTake?.videoUrl ?? null}
+          filePath={benchmarkTake?.filePath}
           takeName={benchmarkTake?.name}
           label="Benchmark"
           variant="benchmark"
@@ -165,9 +172,11 @@ export default function App() {
         <PipWindow
           className="pointer-events-auto absolute bottom-16 right-3 z-20 sm:right-4"
           src={challengerTake?.videoUrl ?? null}
+          filePath={challengerTake?.filePath}
           takeName={challengerTake?.name}
           label="Challenger"
           variant="challenger"
+          autoPlay
           emptyMessage="Pin a challenger take from the vault."
           onUnpin={() => setChallengerId(null)}
           onExpand={
@@ -179,7 +188,10 @@ export default function App() {
       )}
 
       {!isReviewOpen && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-30"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
           <ControlDeck
             isRecording={isRecording}
             elapsed={elapsed}
@@ -196,6 +208,8 @@ export default function App() {
           activeSlot={reviewSlot}
           benchmarkSrc={benchmarkTake?.videoUrl ?? null}
           challengerSrc={challengerTake?.videoUrl ?? null}
+          benchmarkFilePath={benchmarkTake?.filePath}
+          challengerFilePath={challengerTake?.filePath}
           benchmarkName={benchmarkTake?.name}
           challengerName={challengerTake?.name}
           videoMimeType={

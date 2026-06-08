@@ -10,14 +10,17 @@
 html,
 body,
 #root {
-  height: 100%;
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  background: #000;
 }
 
 body {
-  padding-top: var(--safe-top);
-  padding-left: var(--safe-left);
-  padding-right: var(--safe-right);
   -webkit-tap-highlight-color: transparent;
 }
 

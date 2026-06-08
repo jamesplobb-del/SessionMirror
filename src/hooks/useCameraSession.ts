@@ -11,9 +11,13 @@ import {
 
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
+  enabled?: boolean
 }
 
-export function useCameraSession({ onRecordingComplete }: UseCameraSessionOptions) {
+export function useCameraSession({
+  onRecordingComplete,
+  enabled = true,
+}: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -40,6 +44,26 @@ export function useCameraSession({ onRecordingComplete }: UseCameraSessionOption
   }, [])
 
   useEffect(() => {
+    if (!enabled) {
+      if (recorderRef.current?.state === 'recording') {
+        recorderRef.current.stop()
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+      setStream(null)
+      setReady(false)
+      recorderRef.current = null
+      chunksRef.current = []
+      void abortActiveWriter()
+
+      const video = previewRef.current
+      if (video) {
+        video.pause()
+        video.srcObject = null
+      }
+      return
+    }
+
     let cancelled = false
 
     const start = async () => {
@@ -86,7 +110,7 @@ export function useCameraSession({ onRecordingComplete }: UseCameraSessionOption
         video.srcObject = null
       }
     }
-  }, [abortActiveWriter])
+  }, [enabled, abortActiveWriter])
 
   useEffect(() => {
     if (!isRecording) return

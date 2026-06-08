@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import { mobileVideoProps } from '../utils/mobileVideo'
+import { useCapacitorVideoSrc } from './TakeVaultDrawer'
 import type { ReviewSlot } from '../types'
 
 const SWIPE_THRESHOLD = 60
@@ -11,6 +12,8 @@ interface ReviewModeOverlayProps {
   activeSlot: ReviewSlot
   benchmarkSrc: string | null
   challengerSrc: string | null
+  benchmarkFilePath?: string
+  challengerFilePath?: string
   benchmarkName?: string
   challengerName?: string
   videoMimeType: string
@@ -22,6 +25,8 @@ export default function ReviewModeOverlay({
   activeSlot,
   benchmarkSrc,
   challengerSrc,
+  benchmarkFilePath = '',
+  challengerFilePath = '',
   benchmarkName,
   challengerName,
   videoMimeType,
@@ -46,6 +51,9 @@ export default function ReviewModeOverlay({
   const swipeCommitted = useRef(false)
 
   const activeSrc = activeSlot === 'benchmark' ? benchmarkSrc : challengerSrc
+  const activeFilePath =
+    activeSlot === 'benchmark' ? benchmarkFilePath : challengerFilePath
+  const playbackSrc = useCapacitorVideoSrc(activeFilePath, activeSrc ?? '')
   const activeName = activeSlot === 'benchmark' ? benchmarkName : challengerName
   const activeLabel = activeSlot === 'benchmark' ? 'Benchmark' : 'Challenger'
 
@@ -103,16 +111,16 @@ export default function ReviewModeOverlay({
   const startReviewPlayback = useCallback(() => {
     if (isScrubbingRef.current) return
     const video = videoRef.current
-    if (!video || !activeSrc) return
+    if (!video || !playbackSrc) return
     video.muted = false
     void video.play().catch(() => {
       revealPlayOverlay(false)
     })
-  }, [activeSrc, revealPlayOverlay])
+  }, [playbackSrc, revealPlayOverlay])
 
   const togglePlayPause = useCallback(() => {
     const video = videoRef.current
-    if (!video || !activeSrc) return
+    if (!video || !playbackSrc) return
 
     video.muted = false
 
@@ -122,11 +130,11 @@ export default function ReviewModeOverlay({
       video.pause()
       revealPlayOverlay(false)
     }
-  }, [activeSrc, revealPlayOverlay])
+  }, [playbackSrc, revealPlayOverlay])
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !activeSrc) return
+    if (!video || !playbackSrc) return
 
     setCurrentTime(0)
     setDuration(0)
@@ -143,7 +151,7 @@ export default function ReviewModeOverlay({
     return () => {
       video.removeEventListener('loadeddata', playWhenReady)
     }
-  }, [activeSrc, activeSlot, startReviewPlayback])
+  }, [playbackSrc, activeSlot, startReviewPlayback])
 
   useEffect(() => {
     const video = videoRef.current
@@ -184,7 +192,7 @@ export default function ReviewModeOverlay({
       video.removeEventListener('pause', onPause)
       video.removeEventListener('ended', onEnded)
     }
-  }, [activeSrc, scheduleTimeUpdate, revealPlayOverlay])
+  }, [playbackSrc, scheduleTimeUpdate, revealPlayOverlay])
 
   const handleScrubStart = useCallback(() => {
     const video = videoRef.current
@@ -276,33 +284,35 @@ export default function ReviewModeOverlay({
     setSwipeOffset(0)
   }
 
-  if (!activeSrc) return null
+  if (!playbackSrc) return null
 
   return (
-    <div className="review-overlay fixed inset-0 z-50 flex flex-col bg-black">
+    <div className="review-overlay fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-black">
       <div
-        className="absolute inset-x-0 top-0 z-40 flex items-center justify-between bg-black/50 px-5 pb-4 backdrop-blur-md"
-        style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+        className="pointer-events-none absolute inset-x-0 top-0 z-40 bg-gradient-to-b from-black/55 to-transparent px-5 pb-3"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
-            {activeLabel}
-          </p>
-          {activeName && (
-            <p className="text-sm font-medium text-white">{activeName}</p>
-          )}
+        <div className="relative">
+          <div className="pr-14">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              {activeLabel}
+            </p>
+            {activeName && (
+              <p className="text-sm font-medium text-white">{activeName}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="pointer-events-auto absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/25"
+            aria-label="Done"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/25"
-          aria-label="Done"
-        >
-          <X className="h-5 w-5" />
-        </button>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {(canSwipeLeft || canSwipeRight) && (
           <div className="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center">
             <p className="rounded-full bg-black/40 px-3 py-1 text-[10px] text-white/50 backdrop-blur-sm">
@@ -317,7 +327,7 @@ export default function ReviewModeOverlay({
 
         <video
           ref={videoRef}
-          key={activeSrc}
+          key={playbackSrc}
           className="custom-video-player h-full w-full object-cover transition-all duration-200 ease-out"
           style={{
             transform:
@@ -343,7 +353,7 @@ export default function ReviewModeOverlay({
           onPointerUp={handleVideoPointerUp}
           onPointerCancel={handleVideoPointerUp}
         >
-          <source src={activeSrc} type={videoMimeType} />
+          <source src={playbackSrc} type={videoMimeType} />
         </video>
 
         <button
@@ -369,7 +379,7 @@ export default function ReviewModeOverlay({
       </div>
 
       <div
-        className="border-t border-white/10"
+        className="shrink-0 border-t border-white/10"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <ReviewTimeline

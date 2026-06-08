@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
@@ -7,6 +7,9 @@ interface TakeCardProps {
   take: Take
   isBenchmark: boolean
   isChallenger: boolean
+  isPreviewing?: boolean
+  previewVideo?: ReactNode
+  onPreview?: () => void
   onPinBenchmark: () => void
   onPinChallenger: () => void
   onUpdate: (updates: TakeUpdate) => void
@@ -17,6 +20,9 @@ export default function TakeCard({
   take,
   isBenchmark,
   isChallenger,
+  isPreviewing = false,
+  previewVideo,
+  onPreview,
   onPinBenchmark,
   onPinChallenger,
   onUpdate,
@@ -58,16 +64,39 @@ export default function TakeCard({
             : 'border-stone-200'
       }`}
     >
-      <div className="relative aspect-video bg-stone-100">
-        {take.thumbnailUrl ? (
-          <img
-            src={take.thumbnailUrl}
-            alt={take.name}
-            className="h-full w-full object-cover"
-            draggable={false}
-          />
+      <div className="relative aspect-video bg-stone-900">
+        {previewVideo ? (
+          previewVideo
+        ) : take.thumbnailUrl ? (
+          <button
+            type="button"
+            onClick={onPreview}
+            className="block h-full w-full"
+            aria-label={`Preview ${take.name}`}
+          >
+            <img
+              src={take.thumbnailUrl}
+              alt={take.name}
+              className="h-full w-full object-cover"
+              draggable={false}
+            />
+          </button>
         ) : (
-          <div className="h-full w-full animate-pulse bg-stone-200" />
+          <button
+            type="button"
+            onClick={onPreview}
+            className="block h-full w-full animate-pulse bg-stone-200"
+            aria-label={`Preview ${take.name}`}
+          />
+        )}
+        {isPreviewing && onPreview && (
+          <button
+            type="button"
+            onClick={onPreview}
+            className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+          >
+            Close preview
+          </button>
         )}
         {(isBenchmark || isChallenger) && (
           <div className="absolute left-2 top-2 flex gap-1">

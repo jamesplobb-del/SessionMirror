@@ -1,6 +1,10 @@
+import { useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Directory, Filesystem } from '@capacitor/filesystem'
 import { X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
+import { mobileVideoProps } from '../utils/mobileVideo'
 import type { SortMode, Take, TakeUpdate } from '../types'
 
 interface TakeVaultDrawerProps {
@@ -18,6 +22,89 @@ interface TakeVaultDrawerProps {
   onDeleteTake: (id: string) => void
 }
 
+/** Resolve a take file to a WebView-safe playback URL on iOS / native. */
+export async function resolveCapacitorVideoSrc(
+  filePath: string,
+  fallbackUrl: string,
+): Promise<string> {
+  if (!filePath || !Capacitor.isNativePlatform()) {
+    return fallbackUrl
+  }
+
+  const { uri } = await Filesystem.getUri({
+    path: filePath,
+    directory: Directory.Data,
+  })
+  return Capacitor.convertFileSrc(uri)
+}
+
+/** Hook — re-resolves native file paths each mount (stored blob URLs are web-only). */
+export function useCapacitorVideoSrc(
+  filePath: string,
+  fallbackUrl: string,
+): string | null {
+  const [src, setSrc] = useState<string | null>(fallbackUrl || null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const resolved = await resolveCapacitorVideoSrc(filePath, fallbackUrl)
+        if (!cancelled) {
+          setSrc(resolved || null)
+        }
+      } catch {
+        if (!cancelled) {
+          setSrc(fallbackUrl || null)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [filePath, fallbackUrl])
+
+  return src
+}
+
+interface VaultTakeVideoProps {
+  take: Take
+  className?: string
+  autoPlay?: boolean
+  muted?: boolean
+  controls?: boolean
+}
+
+export function VaultTakeVideo({
+  take,
+  className = 'h-full w-full object-cover',
+  autoPlay = false,
+  muted = true,
+  controls = false,
+}: VaultTakeVideoProps) {
+  const src = useCapacitorVideoSrc(take.filePath, take.videoUrl)
+
+  if (!src) {
+    return <div className="h-full w-full animate-pulse bg-stone-200" />
+  }
+
+  return (
+    <video
+      src={src}
+      className={className}
+      poster={take.thumbnailUrl || undefined}
+      preload="metadata"
+      playsInline
+      {...mobileVideoProps}
+      muted={muted}
+      controls={controls}
+      autoPlay={autoPlay}
+    />
+  )
+}
+
 export default function TakeVaultDrawer({
   isOpen,
   onClose,
@@ -32,6 +119,14 @@ export default function TakeVaultDrawer({
   onUpdateTake,
   onDeleteTake,
 }: TakeVaultDrawerProps) {
+  const [previewTakeId, setPreviewTakeId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPreviewTakeId(null)
+    }
+  }, [isOpen])
+
   return (
     <>
       <div
@@ -87,10 +182,21 @@ export default function TakeVaultDrawer({
                     take={take}
                     isBenchmark={take.id === benchmarkId}
                     isChallenger={take.id === challengerId}
+                    isPreviewing={previewTakeId === take.id}
+                    onPreview={() =>
+                      setPreviewTakeId((current) =>
+                        current === take.id ? null : take.id,
+                      )
+                    }
                     onPinBenchmark={() => onPinBenchmark(take.id)}
                     onPinChallenger={() => onPinChallenger(take.id)}
                     onUpdate={(updates) => onUpdateTake(take.id, updates)}
                     onDelete={() => onDeleteTake(take.id)}
+                    previewVideo={
+                      previewTakeId === take.id ? (
+                        <VaultTakeVideo take={take} controls muted={false} />
+                      ) : null
+                    }
                   />
                 ))}
               </div>

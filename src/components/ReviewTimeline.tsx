@@ -1,8 +1,6 @@
 import type { RefObject } from 'react'
 import { formatTime } from '../hooks/useVideoPlayback'
 
-const TICK_COUNT = 48
-
 interface ReviewTimelineProps {
   trackRef: RefObject<HTMLDivElement | null>
   currentTime: number
@@ -45,14 +43,9 @@ export default function ReviewTimeline({
 
   return (
     <div
-      className="touch-none border-t border-white/10 bg-black/60 px-4 py-3 backdrop-blur-md"
+      className="touch-none bg-gradient-to-t from-black via-black/95 to-black/80 px-5 pb-2 pt-4"
       style={{ touchAction: 'none' }}
     >
-      <div className="mb-2 flex items-center justify-between text-[11px] tabular-nums text-white/60">
-        <span>{formatTime(currentTime)}</span>
-        <span>{formatTime(duration)}</span>
-      </div>
-
       <div
         ref={trackRef}
         role="slider"
@@ -60,33 +53,45 @@ export default function ReviewTimeline({
         aria-valuemax={duration}
         aria-valuenow={currentTime}
         aria-label="Video timeline"
-        className="relative h-11 cursor-pointer touch-none select-none overflow-hidden rounded-lg bg-black/40 px-1"
+        className="group relative h-9 cursor-pointer touch-none select-none"
         style={{ touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <div className="absolute inset-x-1 inset-y-0 flex items-center justify-between">
-          {Array.from({ length: TICK_COUNT }, (_, i) => (
+        <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/15">
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-white/90 transition-[width] duration-75 ease-out"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+
+        <div
+          className="pointer-events-none absolute top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-white shadow-[0_0_12px_rgba(255,255,255,0.45)] transition-[left] duration-75 ease-out group-active:scale-110"
+          style={{ left: `${percent}%` }}
+        />
+
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between px-0.5">
+          {Array.from({ length: 24 }, (_, i) => (
             <div
               key={i}
-              className={`w-px shrink-0 bg-white/50 ${
-                i % 10 === 0 ? 'h-7' : i % 5 === 0 ? 'h-5' : 'h-3'
+              className={`w-px rounded-full bg-white/25 ${
+                i % 6 === 0 ? 'h-3' : 'h-1.5'
               }`}
             />
           ))}
         </div>
+      </div>
 
-        <div
-          className="pointer-events-none absolute bottom-0 top-0 z-10 w-[2px] bg-[#FFD60A] shadow-[0_0_10px_rgba(255,214,10,0.8)]"
-          style={{ left: `${percent}%`, transform: 'translateX(-50%)' }}
-        />
-
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 bg-white/[0.06]"
-          style={{ width: `${percent}%` }}
-        />
+      <div className="mt-3 flex items-center justify-between tabular-nums">
+        <span className="text-sm font-medium tracking-tight text-white">
+          {formatTime(currentTime)}
+        </span>
+        <span className="text-xs text-white/45">/</span>
+        <span className="text-sm font-medium tracking-tight text-white/55">
+          {formatTime(duration)}
+        </span>
       </div>
     </div>
   )

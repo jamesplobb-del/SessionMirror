@@ -1,10 +1,12 @@
 import { Play, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import { mobileVideoProps } from '../utils/mobileVideo'
+import { useCapacitorVideoSrc } from './TakeVaultDrawer'
 import MiniPipControls from './MiniPipControls'
 
 interface PipWindowProps {
   src: string | null
+  filePath?: string
   label: string
   takeName?: string
   variant: 'benchmark' | 'challenger'
@@ -17,6 +19,7 @@ interface PipWindowProps {
 
 export default function PipWindow({
   src,
+  filePath = '',
   label,
   takeName,
   variant,
@@ -26,8 +29,9 @@ export default function PipWindow({
   onExpand,
   className = '',
 }: PipWindowProps) {
+  const playbackSrc = useCapacitorVideoSrc(filePath, src ?? '')
   const { videoRef, isPlaying, volume, togglePlay, handleVolume } =
-    useVideoPlayback(src)
+    useVideoPlayback(playbackSrc)
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -78,13 +82,14 @@ export default function PipWindow({
         tabIndex={src && onExpand ? 0 : undefined}
         aria-label={src && onExpand ? `Expand ${label} to full screen` : undefined}
       >
-        {src ? (
+        {playbackSrc ? (
           <>
             <video
               ref={videoRef}
-              src={src}
+              src={playbackSrc}
               className="h-full w-full object-cover"
               {...mobileVideoProps}
+              playsInline
               preload="metadata"
               muted={false}
               controls={false}

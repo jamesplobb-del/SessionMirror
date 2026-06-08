@@ -22,6 +22,11 @@ export default function LiveCameraBackground({
     void video.play().catch(() => {
       /* autoplay may need a user gesture in some browsers */
     })
+
+    return () => {
+      stream.getTracks().forEach((track) => track.stop())
+      video.srcObject = null
+    }
   }, [previewRef, stream])
 
   return (
