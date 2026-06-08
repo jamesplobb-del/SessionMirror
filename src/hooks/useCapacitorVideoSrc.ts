@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import {
   applyStrictPlaybackSrc,
+  sanitizeNativeVideoSrc,
   toCapacitorPlaybackSrc,
 } from '../utils/takeStorage'
 
@@ -17,7 +18,7 @@ export function useCapacitorVideoSrc(
     if (filePath || fallbackUrl.startsWith('file://')) {
       return null
     }
-    return fallbackUrl ? applyStrictPlaybackSrc(fallbackUrl) : null
+    return sanitizeNativeVideoSrc(fallbackUrl)
   })
 
   useEffect(() => {
@@ -29,26 +30,28 @@ export function useCapacitorVideoSrc(
           return fallbackUrl || null
         }
 
+        let resolved: string | null = null
+
         if (filePath) {
-          return await toCapacitorPlaybackSrc(filePath)
+          resolved = await toCapacitorPlaybackSrc(filePath)
+        } else if (fallbackUrl) {
+          resolved = await toCapacitorPlaybackSrc(fallbackUrl)
         }
 
-        if (fallbackUrl) {
-          return await toCapacitorPlaybackSrc(fallbackUrl)
-        }
-
-        return null
+        return sanitizeNativeVideoSrc(resolved)
       } catch {
         if (fallbackUrl.startsWith('file://')) {
-          return Capacitor.convertFileSrc(fallbackUrl)
+          return sanitizeNativeVideoSrc(Capacitor.convertFileSrc(fallbackUrl))
         }
-        return fallbackUrl || null
+        return sanitizeNativeVideoSrc(
+          fallbackUrl ? applyStrictPlaybackSrc(fallbackUrl) : null,
+        )
       }
     }
 
     void resolve().then((resolved) => {
       if (!cancelled) {
-        setSrc(resolved ? applyStrictPlaybackSrc(resolved) : null)
+        setSrc(resolved)
       }
     })
 

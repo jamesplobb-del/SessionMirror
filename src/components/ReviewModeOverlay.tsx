@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
-import { mobileVideoProps } from '../utils/mobileVideo'
 import type { ReviewSlot } from '../types'
 
 const SWIPE_THRESHOLD = 60
@@ -342,11 +341,7 @@ export default function ReviewModeOverlay({
             WebkitTouchCallout: 'default',
             userSelect: 'auto',
           }}
-          {...mobileVideoProps}
-          playsInline
           controls={false}
-          preload="metadata"
-          disablePictureInPicture
           onLoadedData={startReviewPlayback}
           onPointerDown={handleVideoPointerDown}
           onPointerMove={handleVideoPointerMove}

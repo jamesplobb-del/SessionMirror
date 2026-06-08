@@ -1,3 +1,6 @@
+import { Capacitor } from '@capacitor/core'
+import { sanitizeNativeVideoSrc, toCapacitorPlaybackSrc } from './takeStorage'
+
 const THUMBNAIL_SEEK_SECONDS = 0.1
 
 export function generateThumbnailFromBlob(blob: Blob): Promise<string> {
@@ -7,8 +10,16 @@ export function generateThumbnailFromBlob(blob: Blob): Promise<string> {
   })
 }
 
-export function generateThumbnailFromUrl(videoUrl: string): Promise<string> {
-  return captureThumbnailFromVideoUrl(videoUrl)
+export async function generateThumbnailFromUrl(videoUrl: string): Promise<string> {
+  const url = Capacitor.isNativePlatform()
+    ? (sanitizeNativeVideoSrc(await toCapacitorPlaybackSrc(videoUrl)) ?? '')
+    : videoUrl
+
+  if (!url) {
+    throw new Error('Unable to resolve native video URL for thumbnail')
+  }
+
+  return captureThumbnailFromVideoUrl(url)
 }
 
 function captureThumbnailFromVideoUrl(url: string): Promise<string> {
@@ -17,12 +28,20 @@ function captureThumbnailFromVideoUrl(url: string): Promise<string> {
     video.muted = true
     video.playsInline = true
     video.setAttribute('webkit-playsinline', 'true')
-    video.preload = 'auto'
-    video.crossOrigin = 'anonymous'
+    video.disablePictureInPicture = true
+    video.preload = 'metadata'
+
+    if (url.startsWith('file://')) {
+      reject(new Error('Refusing raw file:// URL for thumbnail capture'))
+      return
+    }
+
     video.src = url
 
     const cleanup = () => {
-      video.src = ''
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
       video.remove()
     }
 

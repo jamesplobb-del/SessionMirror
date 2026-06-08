@@ -54,8 +54,6 @@ export function VaultTakeVideo({
       poster={take.thumbnailUrl || undefined}
       loadingClassName="h-full w-full animate-pulse bg-stone-200"
       controls
-      playsInline
-      preload="metadata"
     />
   )
 }

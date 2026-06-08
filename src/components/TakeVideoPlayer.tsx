@@ -1,7 +1,7 @@
 import type { RefObject, VideoHTMLAttributes } from 'react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
-import { applyStrictPlaybackSrc, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { mobileVideoProps } from '../utils/mobileVideo'
+import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
+import { iosTakeVideoProps } from '../utils/mobileVideo'
 
 export interface TakeVideoPlayerProps
   extends Omit<VideoHTMLAttributes<HTMLVideoElement>, 'src'> {
@@ -13,21 +13,20 @@ export interface TakeVideoPlayerProps
 }
 
 /**
- * Renders a saved take with a WebView-safe URI and iOS-required playback attrs.
- * Uses `<source type="video/mp4">` so WebKit recognizes native recordings.
+ * Renders a saved take with a Capacitor WebView-safe URI on `<video src>`.
+ * Raw file:/// paths are blocked — only capacitor:// / _capacitor_file_ URLs mount.
  */
 export default function TakeVideoPlayer({
   filePath,
   videoUrl,
-  mimeType = NATIVE_VIDEO_MIME,
+  mimeType: _mimeType = NATIVE_VIDEO_MIME,
   videoRef,
   className,
   loadingClassName = 'h-full w-full animate-pulse bg-stone-900',
   controls = true,
   ...rest
 }: TakeVideoPlayerProps) {
-  const resolved = useCapacitorVideoSrc(filePath, videoUrl)
-  const playbackSrc = resolved ? applyStrictPlaybackSrc(resolved) : null
+  const playbackSrc = useCapacitorVideoSrc(filePath, videoUrl)
 
   if (!playbackSrc) {
     return <div className={loadingClassName} aria-hidden />
@@ -37,13 +36,17 @@ export default function TakeVideoPlayer({
     <video
       ref={videoRef}
       className={className}
+      src={playbackSrc}
+      {...rest}
+      {...iosTakeVideoProps}
       playsInline
+      {...({
+        'webkit-playsinline': 'true',
+      } as VideoHTMLAttributes<HTMLVideoElement>)}
+      muted
+      disablePictureInPicture
       controls={controls}
       preload="metadata"
-      {...mobileVideoProps}
-      {...rest}
-    >
-      <source src={playbackSrc} type={mimeType} />
-    </video>
+    />
   )
 }

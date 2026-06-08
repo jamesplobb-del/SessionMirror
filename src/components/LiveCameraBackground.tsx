@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, type RefObject, type VideoHTMLAttributes } from 'react'
 import { mobileVideoProps } from '../utils/mobileVideo'
 
 interface LiveCameraBackgroundProps {
@@ -35,7 +35,12 @@ export default function LiveCameraBackground({
         ref={previewRef}
         autoPlay
         muted
+        playsInline
+        disablePictureInPicture
         {...mobileVideoProps}
+        {...({
+          'webkit-playsinline': 'true',
+        } as VideoHTMLAttributes<HTMLVideoElement>)}
         className="absolute inset-0 z-0 h-[100dvh] w-full object-cover"
       />
       {error && (

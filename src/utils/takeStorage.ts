@@ -115,20 +115,21 @@ async function ensureTakesDirectory(): Promise<void> {
   }
 }
 
-/** True when the URL is already safe for WebView `<video src>`. */
-function isConvertedPlaybackUrl(url: string): boolean {
+/** True when the URL is a WebView-safe Capacitor playback URL (never raw file://). */
+export function isConvertedPlaybackUrl(url: string): boolean {
+  if (!url || url.startsWith('file://')) {
+    return false
+  }
   return (
     url.startsWith('blob:') ||
-    url.startsWith('http://') ||
-    url.startsWith('https://') ||
     url.includes('_capacitor_file_') ||
-    url.startsWith('capacitor://localhost')
+    url.startsWith('capacitor://')
   )
 }
 
 /**
  * Strict final pass — every native file URI must go through convertFileSrc
- * before reaching `<video>` / `<source>`.
+ * before reaching `<video src>`. Never returns a raw file:// path.
  */
 export function applyStrictPlaybackSrc(uri: string): string {
   if (!uri || !Capacitor.isNativePlatform()) {
@@ -139,7 +140,23 @@ export function applyStrictPlaybackSrc(uri: string): string {
     return uri
   }
 
-  return Capacitor.convertFileSrc(uri)
+  const converted = Capacitor.convertFileSrc(uri)
+  if (converted.startsWith('file://')) {
+    return Capacitor.convertFileSrc(converted)
+  }
+  return converted
+}
+
+/** Returns null if the URL is still an unsafe raw file path on native. */
+export function sanitizeNativeVideoSrc(url: string | null): string | null {
+  if (!url) return null
+  if (!Capacitor.isNativePlatform()) return url
+
+  const safe = applyStrictPlaybackSrc(url)
+  if (safe.startsWith('file://') || !isConvertedPlaybackUrl(safe)) {
+    return null
+  }
+  return safe
 }
 
 /** @deprecated Use applyStrictPlaybackSrc */
@@ -372,15 +389,14 @@ export async function resolveTakePlaybackUrl(
     return fallbackUrl
   }
 
+  let resolved = fallbackUrl
   if (filePath) {
-    return toCapacitorPlaybackSrc(filePath)
+    resolved = await toCapacitorPlaybackSrc(filePath)
+  } else if (fallbackUrl) {
+    resolved = await toCapacitorPlaybackSrc(fallbackUrl)
   }
 
-  if (fallbackUrl) {
-    return applyStrictPlaybackSrc(await toCapacitorPlaybackSrc(fallbackUrl))
-  }
-
-  return fallbackUrl
+  return sanitizeNativeVideoSrc(resolved) ?? resolved
 }
 
 export async function deleteTakeFile(filePath: string): Promise<void> {

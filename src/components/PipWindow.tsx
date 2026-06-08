@@ -92,8 +92,6 @@ export default function PipWindow({
               className="h-full w-full object-cover"
               loadingClassName="h-full w-full bg-black/30"
               controls
-              playsInline
-              preload="metadata"
             />
             {onExpand && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-70 transition-opacity group-hover:opacity-0">
