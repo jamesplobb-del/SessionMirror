@@ -103,6 +103,11 @@ export default function PipWindow({
       ? 'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
       : 'relative z-10 flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white'
 
+  const pipTouchTargetClass =
+    'pointer-events-auto z-30 flex min-h-11 min-w-11 items-center justify-center p-3'
+  const pipTouchIconClass =
+    'flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70'
+
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
   const badgeClass =
@@ -176,7 +181,7 @@ export default function PipWindow({
               controls={false}
             />
 
-            <div className="absolute inset-0 z-10 pointer-events-none">
+            <div className="absolute inset-0 z-20 pointer-events-none">
               {onExpand && (
                 <button
                   type="button"
@@ -184,10 +189,12 @@ export default function PipWindow({
                   onTouchStart={blockTouchBubble}
                   onClick={handleExpand}
                   onTouchEnd={handleExpand}
-                  className="pointer-events-auto absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70"
+                  className={`${pipTouchTargetClass} absolute right-0 top-0`}
                   aria-label={`Expand ${label} to full screen`}
                 >
-                  <Maximize2 className="h-3 w-3" />
+                  <span className={pipTouchIconClass}>
+                    <Maximize2 className="h-3 w-3" />
+                  </span>
                 </button>
               )}
 
@@ -197,20 +204,22 @@ export default function PipWindow({
                 onTouchStart={blockTouchBubble}
                 onClick={toggleInlinePlay}
                 onTouchEnd={toggleInlinePlay}
-                className="pointer-events-auto absolute bottom-1 left-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70"
+                className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >
-                {isPlaying ? (
-                  <Pause className="h-3 w-3 fill-white" />
-                ) : (
-                  <Play className="h-3 w-3 fill-white" />
-                )}
+                <span className={pipTouchIconClass}>
+                  {isPlaying ? (
+                    <Pause className="h-3 w-3 fill-white" />
+                  ) : (
+                    <Play className="h-3 w-3 fill-white" />
+                  )}
+                </span>
               </button>
             </div>
 
             {takeName && (
               <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[5] bg-gradient-to-t from-black/70 to-transparent px-2 pb-1 pt-4">
-                <p className="truncate text-[9px] font-medium text-white pl-7">{takeName}</p>
+                <p className="truncate text-[9px] font-medium text-white">{takeName}</p>
               </div>
             )}
 
