@@ -24,6 +24,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Prevent iOS Safari from auto-zooming focused form fields */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
 /* Hide native iOS/WebKit video chrome — we render custom controls */
 .custom-video-player::-webkit-media-controls,
 .custom-video-player::-webkit-media-controls-enclosure,

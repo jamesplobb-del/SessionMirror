@@ -36,5 +36,5 @@ export function withWebKitThumbnailHint(src: string): string {
   if (!src || src.includes('#t=')) {
     return src
   }
-  return `${src}#t=0.001`
+  return `${src}#t=0.1`
 }

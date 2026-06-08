@@ -1,4 +1,4 @@
-import { useEffect, type RefObject, type VideoHTMLAttributes } from 'react'
+import { useEffect, useRef, type RefObject, type VideoHTMLAttributes } from 'react'
 import { mobileVideoProps } from '../utils/mobileVideo'
 
 interface LiveCameraBackgroundProps {
@@ -7,11 +7,15 @@ interface LiveCameraBackgroundProps {
   error: string | null
 }
 
+const CAMERA_HARDWARE_RELEASE_MS = 400
+
 export default function LiveCameraBackground({
   previewRef,
   stream,
   error,
 }: LiveCameraBackgroundProps) {
+  const releaseTimerRef = useRef<number | null>(null)
+
   useEffect(() => {
     const video = previewRef.current
     if (!video || !stream) return
@@ -25,7 +29,29 @@ export default function LiveCameraBackground({
 
     return () => {
       video.pause()
-      video.srcObject = null
+
+      if (releaseTimerRef.current !== null) {
+        window.clearTimeout(releaseTimerRef.current)
+      }
+
+      const tracks = stream.getTracks()
+      const videoEl = video
+      const boundStream = stream
+
+      releaseTimerRef.current = window.setTimeout(() => {
+        releaseTimerRef.current = null
+
+        if (videoEl.srcObject !== boundStream) {
+          return
+        }
+
+        tracks.forEach((track) => {
+          if (track.readyState !== 'ended') {
+            track.stop()
+          }
+        })
+        videoEl.srcObject = null
+      }, CAMERA_HARDWARE_RELEASE_MS)
     }
   }, [previewRef, stream])
 
@@ -41,7 +67,7 @@ export default function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        style={{ transform: 'scaleX(1)' }}
+        style={{ transform: 'scaleX(-1)' }}
         className="absolute inset-0 z-0 h-[100dvh] w-full object-cover transition-opacity duration-200 ease-in"
       />
       {error && (
