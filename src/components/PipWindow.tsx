@@ -1,7 +1,7 @@
 import { Play, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
-import { mobileVideoProps } from '../utils/mobileVideo'
-import { useCapacitorVideoSrc } from './TakeVaultDrawer'
+import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
+import { iosReplayVideoProps } from '../utils/mobileVideo'
 import MiniPipControls from './MiniPipControls'
 
 interface PipWindowProps {
@@ -11,7 +11,6 @@ interface PipWindowProps {
   takeName?: string
   variant: 'benchmark' | 'challenger'
   emptyMessage: string
-  autoPlay?: boolean
   onUnpin: () => void
   onExpand?: () => void
   className?: string
@@ -24,7 +23,6 @@ export default function PipWindow({
   takeName,
   variant,
   emptyMessage,
-  autoPlay = false,
   onUnpin,
   onExpand,
   className = '',
@@ -88,18 +86,8 @@ export default function PipWindow({
               ref={videoRef}
               src={playbackSrc}
               className="h-full w-full object-cover"
-              {...mobileVideoProps}
+              {...iosReplayVideoProps}
               playsInline
-              preload="metadata"
-              muted={false}
-              controls={false}
-              onLoadedData={() => {
-                if (!autoPlay) return
-                const video = videoRef.current
-                if (!video) return
-                video.muted = false
-                void video.play()
-              }}
             />
             {onExpand && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-70 transition-opacity group-hover:opacity-0">

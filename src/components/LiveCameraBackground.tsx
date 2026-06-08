@@ -24,7 +24,7 @@ export default function LiveCameraBackground({
     })
 
     return () => {
-      stream.getTracks().forEach((track) => track.stop())
+      video.pause()
       video.srcObject = null
     }
   }, [previewRef, stream])

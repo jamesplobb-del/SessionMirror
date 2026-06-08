@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
 import PipWindow from './components/PipWindow'
@@ -10,7 +11,7 @@ import {
   generateThumbnailFromUrl,
 } from './utils/generateThumbnail'
 import { createTake, sortTakes } from './utils/takes'
-import { deleteTakeFile, type RecordingCompletePayload } from './utils/takeStorage'
+import { deleteTakeFile, resolveTakePlaybackUrl, type RecordingCompletePayload } from './utils/takeStorage'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
 import type { ReviewSlot, SortMode, Take, TakeUpdate } from './types'
 
@@ -39,7 +40,13 @@ export default function App() {
 
     const thumbnailPromise = blob
       ? generateThumbnailFromBlob(blob)
-      : generateThumbnailFromUrl(videoUrl)
+      : (async () => {
+          if (Capacitor.isNativePlatform()) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1200))
+          }
+          const playbackUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
+          return generateThumbnailFromUrl(playbackUrl)
+        })()
 
     void thumbnailPromise
       .then((thumbnailUrl) => {
@@ -151,47 +158,44 @@ export default function App() {
       {!isReviewOpen && <HudHeader />}
 
       {!isReviewOpen && (
-        <PipWindow
-          className="pointer-events-auto absolute bottom-16 left-3 z-20 sm:left-4"
-          src={benchmarkTake?.videoUrl ?? null}
-          filePath={benchmarkTake?.filePath}
-          takeName={benchmarkTake?.name}
-          label="Benchmark"
-          variant="benchmark"
-          emptyMessage="Pin a benchmark take from the vault."
-          onUnpin={() => setBenchmarkId(null)}
-          onExpand={
-            benchmarkTake?.videoUrl
-              ? () => setReviewSlot('benchmark')
-              : undefined
-          }
-        />
-      )}
-
-      {!isReviewOpen && (
-        <PipWindow
-          className="pointer-events-auto absolute bottom-16 right-3 z-20 sm:right-4"
-          src={challengerTake?.videoUrl ?? null}
-          filePath={challengerTake?.filePath}
-          takeName={challengerTake?.name}
-          label="Challenger"
-          variant="challenger"
-          autoPlay
-          emptyMessage="Pin a challenger take from the vault."
-          onUnpin={() => setChallengerId(null)}
-          onExpand={
-            challengerTake?.videoUrl
-              ? () => setReviewSlot('challenger')
-              : undefined
-          }
-        />
-      )}
-
-      {!isReviewOpen && (
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-30"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
         >
+          <div className="flex items-end justify-between gap-3 px-3 sm:px-4">
+            <PipWindow
+              className="pointer-events-auto shrink-0"
+              src={benchmarkTake?.videoUrl ?? null}
+              filePath={benchmarkTake?.filePath}
+              takeName={benchmarkTake?.name}
+              label="Benchmark"
+              variant="benchmark"
+              emptyMessage="Pin a benchmark take from the vault."
+              onUnpin={() => setBenchmarkId(null)}
+              onExpand={
+                benchmarkTake?.videoUrl
+                  ? () => setReviewSlot('benchmark')
+                  : undefined
+              }
+            />
+
+            <PipWindow
+              className="pointer-events-auto shrink-0"
+              src={challengerTake?.videoUrl ?? null}
+              filePath={challengerTake?.filePath}
+              takeName={challengerTake?.name}
+              label="Challenger"
+              variant="challenger"
+              emptyMessage="Pin a challenger take from the vault."
+              onUnpin={() => setChallengerId(null)}
+              onExpand={
+                challengerTake?.videoUrl
+                  ? () => setReviewSlot('challenger')
+                  : undefined
+              }
+            />
+          </div>
+
           <ControlDeck
             isRecording={isRecording}
             elapsed={elapsed}
@@ -212,11 +216,6 @@ export default function App() {
           challengerFilePath={challengerTake?.filePath}
           benchmarkName={benchmarkTake?.name}
           challengerName={challengerTake?.name}
-          videoMimeType={
-            (reviewSlot === 'benchmark'
-              ? benchmarkTake?.videoMimeType
-              : challengerTake?.videoMimeType) || 'video/mp4'
-          }
           onClose={() => setReviewSlot(null)}
           onSlotChange={setReviewSlot}
         />

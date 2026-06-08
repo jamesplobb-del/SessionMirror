@@ -73,11 +73,15 @@ export class StreamingTakeWriter {
   private chunkCount = 0
   private closed = false
   private aborted = false
+  /** iOS mp4 must be written as one file — appended fragments won't play back */
+  private readonly bufferChunks: Blob[] = []
+  private readonly useBufferedWrite: boolean
 
   private constructor(takeId: string, filePath: string, mimeType: string) {
     this.takeId = takeId
     this.filePath = filePath
     this.mimeType = mimeType
+    this.useBufferedWrite = mimeType.includes('mp4')
   }
 
   static async open(
@@ -101,6 +105,12 @@ export class StreamingTakeWriter {
   /** Queue a recorder chunk for sequential disk write; resolves when flushed. */
   enqueue(chunk: Blob): Promise<void> {
     if (this.closed || this.aborted || chunk.size === 0) {
+      return Promise.resolve()
+    }
+
+    if (this.useBufferedWrite) {
+      this.bufferChunks.push(chunk)
+      this.chunkCount += 1
       return Promise.resolve()
     }
 
@@ -146,6 +156,28 @@ export class StreamingTakeWriter {
       throw new Error('Recording contained no data')
     }
 
+    if (this.useBufferedWrite) {
+      const blob = new Blob(this.bufferChunks, { type: this.mimeType })
+      this.bufferChunks.length = 0
+
+      if (blob.size === 0) {
+        await deleteTakeFile(this.filePath)
+        throw new Error('Recording contained no data')
+      }
+
+      const base64 = await blobToBase64(blob)
+      await Filesystem.writeFile({
+        path: this.filePath,
+        data: base64,
+        directory: Directory.Data,
+      })
+
+      return {
+        filePath: this.filePath,
+        videoUrl: await toPlaybackUrl(this.filePath),
+      }
+    }
+
     return {
       filePath: this.filePath,
       videoUrl: await toPlaybackUrl(this.filePath),
@@ -158,6 +190,7 @@ export class StreamingTakeWriter {
 
     this.aborted = true
     this.closed = true
+    this.bufferChunks.length = 0
     await this.writeChain.catch(() => {})
     await deleteTakeFile(this.filePath)
   }

@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { Directory, Filesystem } from '@capacitor/filesystem'
 import { X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
-import { mobileVideoProps } from '../utils/mobileVideo'
+import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
+import { iosReplayVideoProps } from '../utils/mobileVideo'
+import { resolveTakePlaybackUrl } from '../utils/takeStorage'
 import type { SortMode, Take, TakeUpdate } from '../types'
+
+/** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
+export async function resolveVaultVideoSrc(
+  filePath: string,
+  fallbackUrl: string,
+): Promise<string> {
+  if (!Capacitor.isNativePlatform()) {
+    return fallbackUrl
+  }
+  return resolveTakePlaybackUrl(filePath, fallbackUrl)
+}
 
 interface TakeVaultDrawerProps {
   isOpen: boolean
@@ -22,67 +34,14 @@ interface TakeVaultDrawerProps {
   onDeleteTake: (id: string) => void
 }
 
-/** Resolve a take file to a WebView-safe playback URL on iOS / native. */
-export async function resolveCapacitorVideoSrc(
-  filePath: string,
-  fallbackUrl: string,
-): Promise<string> {
-  if (!filePath || !Capacitor.isNativePlatform()) {
-    return fallbackUrl
-  }
-
-  const { uri } = await Filesystem.getUri({
-    path: filePath,
-    directory: Directory.Data,
-  })
-  return Capacitor.convertFileSrc(uri)
-}
-
-/** Hook — re-resolves native file paths each mount (stored blob URLs are web-only). */
-export function useCapacitorVideoSrc(
-  filePath: string,
-  fallbackUrl: string,
-): string | null {
-  const [src, setSrc] = useState<string | null>(fallbackUrl || null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    void (async () => {
-      try {
-        const resolved = await resolveCapacitorVideoSrc(filePath, fallbackUrl)
-        if (!cancelled) {
-          setSrc(resolved || null)
-        }
-      } catch {
-        if (!cancelled) {
-          setSrc(fallbackUrl || null)
-        }
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [filePath, fallbackUrl])
-
-  return src
-}
-
 interface VaultTakeVideoProps {
   take: Take
   className?: string
-  autoPlay?: boolean
-  muted?: boolean
-  controls?: boolean
 }
 
 export function VaultTakeVideo({
   take,
   className = 'h-full w-full object-cover',
-  autoPlay = false,
-  muted = true,
-  controls = false,
 }: VaultTakeVideoProps) {
   const src = useCapacitorVideoSrc(take.filePath, take.videoUrl)
 
@@ -95,12 +54,8 @@ export function VaultTakeVideo({
       src={src}
       className={className}
       poster={take.thumbnailUrl || undefined}
-      preload="metadata"
+      {...iosReplayVideoProps}
       playsInline
-      {...mobileVideoProps}
-      muted={muted}
-      controls={controls}
-      autoPlay={autoPlay}
     />
   )
 }
@@ -194,7 +149,7 @@ export default function TakeVaultDrawer({
                     onDelete={() => onDeleteTake(take.id)}
                     previewVideo={
                       previewTakeId === take.id ? (
-                        <VaultTakeVideo take={take} controls muted={false} />
+                        <VaultTakeVideo take={take} />
                       ) : null
                     }
                   />
@@ -207,3 +162,5 @@ export default function TakeVaultDrawer({
     </>
   )
 }
+
+export { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'

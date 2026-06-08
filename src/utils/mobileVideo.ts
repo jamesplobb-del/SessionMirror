@@ -6,6 +6,14 @@ export const mobileVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
   ...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>),
 }
 
+/** iOS-friendly attributes for replaying saved local takes */
+export const iosReplayVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
+  ...mobileVideoProps,
+  muted: true,
+  controls: true,
+  preload: 'metadata',
+}
+
 export function getRecorderMimeType(): string {
   return MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm'
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import {
   getRecorderMimeType,
   RECORDING_TIMESLICE_MS,
@@ -12,6 +13,12 @@ import {
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
   enabled?: boolean
+}
+
+function detachRecorder(recorder: MediaRecorder) {
+  recorder.ondataavailable = null
+  recorder.onstop = null
+  recorder.onerror = null
 }
 
 export function useCameraSession({
@@ -43,44 +50,68 @@ export function useCameraSession({
     }
   }, [])
 
+  const releaseStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    setStream(null)
+    setReady(false)
+
+    const video = previewRef.current
+    if (video) {
+      video.pause()
+      video.srcObject = null
+    }
+  }, [])
+
+  const acquireStream = useCallback(async (cancelled?: () => boolean) => {
+    setError(null)
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    })
+    if (cancelled?.()) {
+      mediaStream.getTracks().forEach((track) => track.stop())
+      return null
+    }
+    streamRef.current = mediaStream
+    setStream(mediaStream)
+    setReady(true)
+    return mediaStream
+  }, [])
+
+  const restartCameraAfterRecording = useCallback(async () => {
+    releaseStream()
+    try {
+      await acquireStream()
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to restart camera after recording.',
+      )
+      setReady(false)
+    }
+  }, [acquireStream, releaseStream])
+
   useEffect(() => {
     if (!enabled) {
       if (recorderRef.current?.state === 'recording') {
         recorderRef.current.stop()
       }
-      streamRef.current?.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-      setStream(null)
-      setReady(false)
       recorderRef.current = null
       chunksRef.current = []
       void abortActiveWriter()
-
-      const video = previewRef.current
-      if (video) {
-        video.pause()
-        video.srcObject = null
-      }
+      releaseStream()
       return
     }
 
     let cancelled = false
 
     const start = async () => {
-      setError(null)
       try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        })
-        if (cancelled) {
-          mediaStream.getTracks().forEach((track) => track.stop())
-          return
-        }
-        streamRef.current = mediaStream
-        setStream(mediaStream)
-        setReady(true)
+        await acquireStream(() => cancelled)
       } catch (err) {
+        if (cancelled) return
         setError(
           err instanceof Error
             ? err.message
@@ -97,20 +128,12 @@ export function useCameraSession({
       if (recorderRef.current?.state === 'recording') {
         recorderRef.current.stop()
       }
-      streamRef.current?.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-      setStream(null)
       recorderRef.current = null
       chunksRef.current = []
       void abortActiveWriter()
-
-      const video = previewRef.current
-      if (video) {
-        video.pause()
-        video.srcObject = null
-      }
+      releaseStream()
     }
-  }, [enabled, abortActiveWriter])
+  }, [enabled, abortActiveWriter, acquireStream, releaseStream])
 
   useEffect(() => {
     if (!isRecording) return
@@ -157,6 +180,13 @@ export function useCameraSession({
 
         recorder.onstop = () => {
           void (async () => {
+            const recorderInstance = recorderRef.current
+            if (recorderInstance) {
+              detachRecorder(recorderInstance)
+            }
+            recorderRef.current = null
+            chunksRef.current = []
+
             const activeWriter = writerRef.current
             writerRef.current = null
             const stoppedTakeId = activeTakeIdRef.current ?? takeId
@@ -195,14 +225,21 @@ export function useCameraSession({
                 await activeWriter.abort()
               }
             } finally {
-              recorderRef.current = null
               setIsRecording(false)
+              if (Capacitor.isNativePlatform() && enabled) {
+                await restartCameraAfterRecording()
+              }
             }
           })()
         }
 
         recorder.onerror = () => {
+          chunksRef.current = []
           void abortActiveWriter()
+          if (recorderRef.current) {
+            detachRecorder(recorderRef.current)
+          }
+          recorderRef.current = null
           setIsRecording(false)
         }
 
@@ -218,14 +255,26 @@ export function useCameraSession({
         setIsRecording(false)
       }
     })()
-  }, [abortActiveWriter, isRecording])
+  }, [abortActiveWriter, enabled, isRecording, restartCameraAfterRecording])
 
   const stopRecording = useCallback(() => {
-    if (recorderRef.current?.state === 'recording') {
-      recorderRef.current.stop()
-    } else {
-      setIsRecording(false)
+    setIsRecording(false)
+    chunksRef.current = []
+
+    const recorder = recorderRef.current
+    if (!recorder || recorder.state === 'inactive') {
+      return
     }
+
+    try {
+      if (recorder.state === 'recording') {
+        recorder.requestData()
+      }
+    } catch {
+      /* requestData may throw if already stopping */
+    }
+
+    recorder.stop()
   }, [])
 
   const toggleRecording = useCallback(() => {

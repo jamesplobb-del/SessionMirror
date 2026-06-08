@@ -25,7 +25,7 @@ export default function ControlDeck({
 }: ControlDeckProps) {
   return (
     <div
-      className="pointer-events-auto flex justify-center px-4 pb-4 pt-2"
+      className="pointer-events-auto flex justify-center px-4 pb-2 pt-3"
     >
       <div className="flex items-center gap-3 rounded-full border border-white/15 bg-black/45 px-4 py-2.5 shadow-xl backdrop-blur-md">
         <button

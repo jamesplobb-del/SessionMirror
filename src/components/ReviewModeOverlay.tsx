@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
+import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { mobileVideoProps } from '../utils/mobileVideo'
-import { useCapacitorVideoSrc } from './TakeVaultDrawer'
 import type { ReviewSlot } from '../types'
 
 const SWIPE_THRESHOLD = 60
@@ -16,7 +16,6 @@ interface ReviewModeOverlayProps {
   challengerFilePath?: string
   benchmarkName?: string
   challengerName?: string
-  videoMimeType: string
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
 }
@@ -29,7 +28,6 @@ export default function ReviewModeOverlay({
   challengerFilePath = '',
   benchmarkName,
   challengerName,
-  videoMimeType,
   onClose,
   onSlotChange,
 }: ReviewModeOverlayProps) {
@@ -328,6 +326,7 @@ export default function ReviewModeOverlay({
         <video
           ref={videoRef}
           key={playbackSrc}
+          src={playbackSrc}
           className="custom-video-player h-full w-full object-cover transition-all duration-200 ease-out"
           style={{
             transform:
@@ -341,20 +340,17 @@ export default function ReviewModeOverlay({
             userSelect: 'auto',
           }}
           {...mobileVideoProps}
-          preload="metadata"
-          muted={false}
           playsInline
+          muted
           controls={false}
-          controlsList="nodownload noplaybackrate noremoteplayback"
+          preload="metadata"
           disablePictureInPicture
           onLoadedData={startReviewPlayback}
           onPointerDown={handleVideoPointerDown}
           onPointerMove={handleVideoPointerMove}
           onPointerUp={handleVideoPointerUp}
           onPointerCancel={handleVideoPointerUp}
-        >
-          <source src={playbackSrc} type={videoMimeType} />
-        </video>
+        />
 
         <button
           type="button"
