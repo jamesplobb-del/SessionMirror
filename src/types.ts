@@ -10,6 +10,8 @@ export interface Take {
   timestamp: number
   rating: number
   notes: string
+  /** Recorded takes mirror on playback; uploads show true perspective. */
+  mirrorPlayback?: boolean
 }
 
 export type SortMode = 'newest' | 'highest-rated'
@@ -17,3 +19,5 @@ export type SortMode = 'newest' | 'highest-rated'
 export type TakeUpdate = Partial<Pick<Take, 'name' | 'rating' | 'notes'>>
 
 export type ReviewSlot = 'benchmark' | 'challenger'
+
+export type ReviewContext = 'vault' | 'compare'

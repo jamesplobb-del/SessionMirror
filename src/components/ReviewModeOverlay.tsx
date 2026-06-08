@@ -3,14 +3,17 @@ import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { resetVideoPlayback } from '../utils/videoPlayback'
-import type { ReviewSlot, Take } from '../types'
+import type { ReviewContext, ReviewSlot, Take } from '../types'
 
 const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 1000
 
 interface ReviewModeOverlayProps {
+  context: ReviewContext
   activeSlot: ReviewSlot
-  soloTake?: Take | null
+  vaultTakes: Take[]
+  vaultIndex: number
+  onVaultIndexChange: (index: number) => void
   benchmarkSrc: string | null
   challengerSrc: string | null
   benchmarkFilePath?: string
@@ -19,14 +22,19 @@ interface ReviewModeOverlayProps {
   challengerName?: string
   benchmarkMimeType?: string
   challengerMimeType?: string
+  benchmarkMirror?: boolean
+  challengerMirror?: boolean
   isOpen: boolean
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
 }
 
 export default function ReviewModeOverlay({
+  context,
   activeSlot,
-  soloTake = null,
+  vaultTakes,
+  vaultIndex,
+  onVaultIndexChange,
   benchmarkSrc,
   challengerSrc,
   benchmarkFilePath = '',
@@ -35,13 +43,15 @@ export default function ReviewModeOverlay({
   challengerName,
   benchmarkMimeType = 'video/mp4',
   challengerMimeType = 'video/mp4',
+  benchmarkMirror = true,
+  challengerMirror = true,
   isOpen,
   onClose,
   onSlotChange,
 }: ReviewModeOverlayProps) {
   const benchmarkVideoRef = useRef<HTMLVideoElement>(null)
   const challengerVideoRef = useRef<HTMLVideoElement>(null)
-  const soloVideoRef = useRef<HTMLVideoElement>(null)
+  const vaultVideoRef = useRef<HTMLVideoElement>(null)
   const timelineTrackRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
   const hideOverlayTimerRef = useRef<number | null>(null)
@@ -58,34 +68,39 @@ export default function ReviewModeOverlay({
   const isTrackingPointer = useRef(false)
   const swipeCommitted = useRef(false)
 
-  const isSolo = soloTake !== null
+  const isVault = context === 'vault'
+  const vaultTake = isVault ? vaultTakes[vaultIndex] ?? null : null
 
-  const activeName = isSolo
-    ? soloTake.name
+  const activeName = isVault
+    ? vaultTake?.name
     : activeSlot === 'benchmark'
       ? benchmarkName
       : challengerName
-  const activeLabel = isSolo
-    ? 'Take'
+  const activeLabel = isVault
+    ? 'Take Vault'
     : activeSlot === 'benchmark'
       ? 'Benchmark'
       : 'Challenger'
 
-  const canSwipeLeft = !isSolo && activeSlot === 'benchmark' && challengerSrc !== null
-  const canSwipeRight = !isSolo && activeSlot === 'challenger' && benchmarkSrc !== null
+  const canSwipeLeft = isVault
+    ? vaultIndex < vaultTakes.length - 1
+    : activeSlot === 'benchmark' && challengerSrc !== null
+  const canSwipeRight = isVault
+    ? vaultIndex > 0
+    : activeSlot === 'challenger' && benchmarkSrc !== null
 
   const pauseAllReviewVideos = useCallback(() => {
     resetVideoPlayback(benchmarkVideoRef.current)
     resetVideoPlayback(challengerVideoRef.current)
-    resetVideoPlayback(soloVideoRef.current)
+    resetVideoPlayback(vaultVideoRef.current)
   }, [])
 
   const getActiveVideo = useCallback((): HTMLVideoElement | null => {
-    if (isSolo) return soloVideoRef.current
+    if (isVault) return vaultVideoRef.current
     return activeSlot === 'benchmark'
       ? benchmarkVideoRef.current
       : challengerVideoRef.current
-  }, [activeSlot, isSolo])
+  }, [activeSlot, isVault])
 
   const scheduleHideOverlay = useCallback(() => {
     if (hideOverlayTimerRef.current !== null) {
@@ -161,7 +176,7 @@ export default function ReviewModeOverlay({
 
   const hasBenchmark = Boolean(benchmarkSrc || benchmarkFilePath)
   const hasChallenger = Boolean(challengerSrc || challengerFilePath)
-  const hasMedia = isSolo ? Boolean(soloTake) : hasBenchmark || hasChallenger
+  const hasMedia = isVault ? vaultTakes.length > 0 : hasBenchmark || hasChallenger
 
   useEffect(() => {
     if (!isOpen) {
@@ -176,7 +191,7 @@ export default function ReviewModeOverlay({
   useEffect(() => {
     if (!isOpen) return
 
-    if (!isSolo) {
+    if (!isVault) {
       if (activeSlot === 'benchmark') {
         resetVideoPlayback(challengerVideoRef.current)
       } else {
@@ -206,7 +221,15 @@ export default function ReviewModeOverlay({
     return () => {
       video.removeEventListener('loadeddata', playWhenReady)
     }
-  }, [activeSlot, getActiveVideo, isOpen, isSolo, soloTake?.id, startReviewPlayback])
+  }, [
+    activeSlot,
+    getActiveVideo,
+    isOpen,
+    isVault,
+    startReviewPlayback,
+    vaultTake?.id,
+    vaultIndex,
+  ])
 
   useEffect(() => {
     const video = getActiveVideo()
@@ -247,7 +270,15 @@ export default function ReviewModeOverlay({
       video.removeEventListener('pause', onPause)
       video.removeEventListener('ended', onEnded)
     }
-  }, [activeSlot, getActiveVideo, isSolo, revealPlayOverlay, scheduleTimeUpdate, soloTake?.id])
+  }, [
+    activeSlot,
+    getActiveVideo,
+    isVault,
+    revealPlayOverlay,
+    scheduleTimeUpdate,
+    vaultTake?.id,
+    vaultIndex,
+  ])
 
   const handleScrubStart = useCallback(() => {
     const video = getActiveVideo()
@@ -266,20 +297,28 @@ export default function ReviewModeOverlay({
   const completeSwipe = useCallback(
     (direction: 'left' | 'right') => {
       resetVideoPlayback(getActiveVideo())
-      const nextSlot: ReviewSlot =
-        direction === 'left' ? 'challenger' : 'benchmark'
       setSlideDirection(direction)
       setSwipeOffset(0)
       isTrackingPointer.current = false
       swipeCommitted.current = false
 
       window.setTimeout(() => {
-        onSlotChange(nextSlot)
+        if (isVault) {
+          if (direction === 'left') {
+            onVaultIndexChange(Math.min(vaultIndex + 1, vaultTakes.length - 1))
+          } else {
+            onVaultIndexChange(Math.max(vaultIndex - 1, 0))
+          }
+        } else {
+          const nextSlot: ReviewSlot =
+            direction === 'left' ? 'challenger' : 'benchmark'
+          onSlotChange(nextSlot)
+        }
         setSlideDirection(null)
         setCurrentTime(0)
       }, 220)
     },
-    [getActiveVideo, onSlotChange],
+    [getActiveVideo, isVault, onSlotChange, onVaultIndexChange, vaultIndex, vaultTakes.length],
   )
 
   const swipeLayerStyle = {
@@ -302,7 +341,7 @@ export default function ReviewModeOverlay({
   }
 
   const handleVideoPointerMove = (e: React.PointerEvent<HTMLVideoElement>) => {
-    if (!isTrackingPointer.current || isSolo) return
+    if (!isTrackingPointer.current) return
 
     const deltaX = e.clientX - pointerStart.current.x
     const deltaY = e.clientY - pointerStart.current.y
@@ -333,7 +372,7 @@ export default function ReviewModeOverlay({
     if (!isTrackingPointer.current) return
     isTrackingPointer.current = false
 
-    if (!swipeCommitted.current || isSolo) return
+    if (!swipeCommitted.current) return
 
     swipeCommitted.current = false
     const deltaX = e.clientX - pointerStart.current.x
@@ -388,7 +427,7 @@ export default function ReviewModeOverlay({
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {(canSwipeLeft || canSwipeRight) && (
+        {!isVault && (canSwipeLeft || canSwipeRight) && (
           <div className="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center">
             <p className="rounded-full bg-black/40 px-3 py-1 text-[10px] text-white/50 backdrop-blur-sm">
               {canSwipeLeft && canSwipeRight
@@ -400,22 +439,29 @@ export default function ReviewModeOverlay({
           </div>
         )}
 
-        {isSolo && soloTake ? (
-          <div className="absolute inset-0 h-full w-full">
+        {isVault && vaultTake ? (
+          <div
+            className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
+            style={swipeLayerStyle}
+          >
             <TakeVideoPlayer
-              key={`solo-${soloTake.id}`}
-              filePath={soloTake.filePath}
-              videoUrl={soloTake.videoUrl}
-              mimeType={soloTake.videoMimeType || 'video/mp4'}
-              videoRef={soloVideoRef}
+              key={`vault-${vaultTake.id}`}
+              filePath={vaultTake.filePath}
+              videoUrl={vaultTake.videoUrl}
+              mimeType={vaultTake.videoMimeType || 'video/mp4'}
+              videoRef={vaultVideoRef}
               className="custom-video-player h-full w-full object-cover"
-              mirror
+              mirror={vaultTake.mirrorPlayback !== false}
               style={{
                 WebkitTouchCallout: 'default',
                 userSelect: 'auto',
               }}
               controls={false}
               onLoadedData={startReviewPlayback}
+              onPointerDown={handleVideoPointerDown}
+              onPointerMove={handleVideoPointerMove}
+              onPointerUp={handleVideoPointerUp}
+              onPointerCancel={handleVideoPointerUp}
             />
           </div>
         ) : (
@@ -436,7 +482,7 @@ export default function ReviewModeOverlay({
                   mimeType={benchmarkMimeType}
                   videoRef={benchmarkVideoRef}
                   className="custom-video-player h-full w-full object-cover"
-                  mirror
+                  mirror={benchmarkMirror}
                   style={{
                     WebkitTouchCallout: 'default',
                     userSelect: 'auto',
@@ -477,7 +523,7 @@ export default function ReviewModeOverlay({
                   mimeType={challengerMimeType}
                   videoRef={challengerVideoRef}
                   className="custom-video-player h-full w-full object-cover"
-                  mirror
+                  mirror={challengerMirror}
                   style={{
                     WebkitTouchCallout: 'default',
                     userSelect: 'auto',

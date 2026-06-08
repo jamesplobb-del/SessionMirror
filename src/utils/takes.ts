@@ -17,6 +17,7 @@ export function createTake(
     timestamp: Date.now(),
     rating: 0,
     notes: '',
+    mirrorPlayback: true,
   }
 }
 

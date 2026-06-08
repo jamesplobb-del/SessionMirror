@@ -11,9 +11,16 @@ import {
   generateThumbnailFromUrl,
 } from './utils/generateThumbnail'
 import { createTake, sortTakes } from './utils/takes'
-import { deleteTakeFile, resolveTakePlaybackUrl, type RecordingCompletePayload } from './utils/takeStorage'
+import {
+  deleteTakeFile,
+  NATIVE_VIDEO_MIME,
+  persistUploadedVideo,
+  resolveTakePlaybackUrl,
+  type RecordingCompletePayload,
+} from './utils/takeStorage'
+import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
-import type { ReviewSlot, SortMode, Take, TakeUpdate } from './types'
+import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
 
 export default function App() {
   const [takes, setTakes] = useState<Take[]>([])
@@ -21,10 +28,19 @@ export default function App() {
   const [challengerId, setChallengerId] = useState<string | null>(null)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
-  const [soloReviewTake, setSoloReviewTake] = useState<Take | null>(null)
+  const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
+  const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
 
+  const benchmarkPipVideoRef = useRef<HTMLVideoElement>(null)
+  const challengerPipVideoRef = useRef<HTMLVideoElement>(null)
+
   const isReviewOpen = reviewSlot !== null
+
+  const pausePipVideos = useCallback(() => {
+    resetVideoPlayback(benchmarkPipVideoRef.current)
+    resetVideoPlayback(challengerPipVideoRef.current)
+  }, [])
 
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
     const { takeId, mimeType, filePath, videoUrl, blob } = payload
@@ -98,6 +114,7 @@ export default function App() {
 
   const handlePinBenchmark = useCallback(
     (id: string) => {
+      pausePipVideos()
       setBenchmarkId(id)
       setChallengerId((current) => {
         if (current && current !== id) return current
@@ -105,34 +122,82 @@ export default function App() {
         return other?.id ?? null
       })
     },
-    [takes],
+    [pausePipVideos, takes],
   )
 
-  const handlePinChallenger = useCallback((id: string) => {
-    setChallengerId(id)
-  }, [])
+  const handlePinChallenger = useCallback(
+    (id: string) => {
+      pausePipVideos()
+      setChallengerId(id)
+    },
+    [pausePipVideos],
+  )
 
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
+      const index = sortedTakes.findIndex((entry) => entry.id === take.id)
+      setVaultReviewIndex(index >= 0 ? index : 0)
+      setReviewContext('vault')
+      setReviewSlot('benchmark')
       setIsVaultOpen(false)
-      setSoloReviewTake(null)
-
-      if (take.id === benchmarkId) {
-        setReviewSlot('benchmark')
-      } else if (take.id === challengerId) {
-        setReviewSlot('challenger')
-      } else {
-        setSoloReviewTake(take)
-        setReviewSlot('benchmark')
-      }
     },
-    [benchmarkId, challengerId],
+    [sortedTakes],
   )
+
+  const handleOpenCompareReview = useCallback((slot: ReviewSlot) => {
+    setReviewContext('compare')
+    setReviewSlot(slot)
+  }, [])
 
   const handleCloseReview = useCallback(() => {
     setReviewSlot(null)
-    setSoloReviewTake(null)
-  }, [])
+    setReviewContext('compare')
+    pausePipVideos()
+  }, [pausePipVideos])
+
+  const handleUploadBenchmark = useCallback(
+    (file: File) => {
+      pausePipVideos()
+
+      void (async () => {
+        const takeId = crypto.randomUUID()
+        const mimeType = file.type || NATIVE_VIDEO_MIME
+        const persisted = await persistUploadedVideo(file, takeId, mimeType)
+        const safeVideoUrl = await resolveTakePlaybackUrl(
+          persisted.filePath,
+          persisted.videoUrl,
+        )
+
+        const uploadedTake: Take = {
+          ...createTake(
+            takeId,
+            takes.length + 1,
+            safeVideoUrl,
+            persisted.filePath,
+            mimeType,
+          ),
+          name: 'Uploaded Benchmark',
+          mirrorPlayback: false,
+        }
+
+        setTakes((prev) => [...prev, uploadedTake])
+        setBenchmarkId(takeId)
+
+        void generateThumbnailFromUrl(safeVideoUrl)
+          .then((thumbnailUrl) => {
+            setTakes((current) =>
+              current.map((take) =>
+                take.id === takeId ? { ...take, thumbnailUrl } : take,
+              ),
+            )
+          })
+          .catch(() => {
+            /* PiP shows placeholder until thumbnail is ready */
+          })
+      })()
+    },
+    [pausePipVideos, takes.length],
+  )
 
   const handleUpdateTake = useCallback((id: string, updates: TakeUpdate) => {
     setTakes((prev) =>
@@ -198,15 +263,15 @@ export default function App() {
               takeName={benchmarkTake?.name}
               label="Benchmark"
               variant="benchmark"
-              emptyMessage="Pin a benchmark take from the vault."
+              emptyMessage="Pin or upload a benchmark take."
+              mirror={benchmarkTake?.mirrorPlayback !== false}
               suspendPlayback={suspendPipPlayback}
+              videoRef={benchmarkPipVideoRef}
               onUnpin={() => setBenchmarkId(null)}
+              onUpload={handleUploadBenchmark}
               onExpand={
                 benchmarkTake?.videoUrl
-                  ? () => {
-                      setSoloReviewTake(null)
-                      setReviewSlot('benchmark')
-                    }
+                  ? () => handleOpenCompareReview('benchmark')
                   : undefined
               }
             />
@@ -220,14 +285,13 @@ export default function App() {
               label="Challenger"
               variant="challenger"
               emptyMessage="Pin a challenger take from the vault."
+              mirror={challengerTake?.mirrorPlayback !== false}
               suspendPlayback={suspendPipPlayback}
+              videoRef={challengerPipVideoRef}
               onUnpin={() => setChallengerId(null)}
               onExpand={
                 challengerTake?.videoUrl
-                  ? () => {
-                      setSoloReviewTake(null)
-                      setReviewSlot('challenger')
-                    }
+                  ? () => handleOpenCompareReview('challenger')
                   : undefined
               }
             />
@@ -245,8 +309,11 @@ export default function App() {
       </div>
 
       <ReviewModeOverlay
+        context={reviewContext}
         activeSlot={reviewSlot ?? 'benchmark'}
-        soloTake={soloReviewTake}
+        vaultTakes={sortedTakes}
+        vaultIndex={vaultReviewIndex}
+        onVaultIndexChange={setVaultReviewIndex}
         benchmarkSrc={benchmarkTake?.videoUrl ?? null}
         challengerSrc={challengerTake?.videoUrl ?? null}
         benchmarkFilePath={benchmarkTake?.filePath}
@@ -255,10 +322,12 @@ export default function App() {
         challengerName={challengerTake?.name}
         benchmarkMimeType={benchmarkTake?.videoMimeType ?? 'video/mp4'}
         challengerMimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
+        benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
+        challengerMirror={challengerTake?.mirrorPlayback !== false}
         isOpen={isReviewOpen}
         onClose={handleCloseReview}
         onSlotChange={(slot) => {
-          setSoloReviewTake(null)
+          setReviewContext('compare')
           setReviewSlot(slot)
         }}
       />
@@ -274,6 +343,7 @@ export default function App() {
         challengerId={challengerId}
         onPinBenchmark={handlePinBenchmark}
         onPinChallenger={handlePinChallenger}
+        onBeforePin={pausePipVideos}
         onUpdateTake={handleUpdateTake}
         onDeleteTake={handleDeleteTake}
         onOpenTake={handleOpenVaultTake}

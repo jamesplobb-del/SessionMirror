@@ -190,6 +190,7 @@ export default function TakeCard({
           <button
             type="button"
             onClick={(e) => {
+              e.preventDefault()
               e.stopPropagation()
               onPinBenchmark()
             }}
@@ -205,6 +206,7 @@ export default function TakeCard({
           <button
             type="button"
             onClick={(e) => {
+              e.preventDefault()
               e.stopPropagation()
               onPinChallenger()
             }}

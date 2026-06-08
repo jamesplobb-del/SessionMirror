@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
 export function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
@@ -7,8 +7,12 @@ export function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function useVideoPlayback(src: string | null) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+export function useVideoPlayback(
+  src: string | null,
+  externalRef?: RefObject<HTMLVideoElement | null>,
+) {
+  const internalRef = useRef<HTMLVideoElement>(null)
+  const videoRef = externalRef ?? internalRef
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
 

@@ -46,6 +46,14 @@ export default function TakeVideoPlayer({
     videoRef.current?.load()
   }, [eagerLoad, videoSrc, videoRef])
 
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !videoSrc) return
+    video.pause()
+    video.muted = true
+    video.currentTime = 0
+  }, [videoSrc, videoRef])
+
   if (!videoSrc) {
     return <div className={loadingClassName} aria-hidden />
   }

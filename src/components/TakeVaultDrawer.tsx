@@ -33,6 +33,7 @@ interface TakeVaultDrawerProps {
   challengerId: string | null
   onPinBenchmark: (id: string) => void
   onPinChallenger: (id: string) => void
+  onBeforePin?: () => void
   onUpdateTake: (id: string, updates: TakeUpdate) => void
   onDeleteTake: (id: string) => void
   onOpenTake: (take: Take) => void
@@ -77,6 +78,7 @@ export default function TakeVaultDrawer({
   challengerId,
   onPinBenchmark,
   onPinChallenger,
+  onBeforePin,
   onUpdateTake,
   onDeleteTake,
   onOpenTake,
@@ -159,8 +161,16 @@ export default function TakeVaultDrawer({
                       pauseAllVaultVideos()
                       onOpenTake(take)
                     }}
-                    onPinBenchmark={() => onPinBenchmark(take.id)}
-                    onPinChallenger={() => onPinChallenger(take.id)}
+                    onPinBenchmark={() => {
+                      onBeforePin?.()
+                      pauseAllVaultVideos()
+                      onPinBenchmark(take.id)
+                    }}
+                    onPinChallenger={() => {
+                      onBeforePin?.()
+                      pauseAllVaultVideos()
+                      onPinChallenger(take.id)
+                    }}
                     onUpdate={(updates) => onUpdateTake(take.id, updates)}
                     onDelete={() => onDeleteTake(take.id)}
                     thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}

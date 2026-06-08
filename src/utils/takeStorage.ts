@@ -437,6 +437,48 @@ export async function persistRecordingBlob(
   }
 }
 
+/** Save a user-picked video to disk (native) or blob URL (web). */
+export async function persistUploadedVideo(
+  blob: Blob,
+  takeId: string,
+  mimeType: string,
+): Promise<PersistedTakeVideo> {
+  const writeMime = mimeType.includes('mp4') ? NATIVE_VIDEO_MIME : mimeType
+  const normalized =
+    blob.type === writeMime ? blob : new Blob([blob], { type: writeMime })
+
+  if (!Capacitor.isNativePlatform()) {
+    return {
+      filePath: '',
+      videoUrl: URL.createObjectURL(normalized),
+    }
+  }
+
+  await ensureTakesDirectory()
+
+  const ext = extensionForMime(mimeType)
+  const filePath = `${TAKES_DIR}/${takeId}.${ext}`
+
+  await deleteTakeFile(filePath)
+
+  const base64 = await blobToBase64(normalized)
+  await Filesystem.writeFile({
+    path: filePath,
+    data: base64,
+    directory: Directory.Data,
+  })
+
+  const { uri } = await Filesystem.getUri({
+    path: filePath,
+    directory: Directory.Data,
+  })
+
+  return {
+    filePath,
+    videoUrl: Capacitor.convertFileSrc(uri),
+  }
+}
+
 export async function resolveTakePlaybackUrl(
   filePath: string,
   fallbackUrl: string,
