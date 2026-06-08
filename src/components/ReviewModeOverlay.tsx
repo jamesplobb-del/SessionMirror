@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
-import { resetVideoPlayback } from '../utils/videoPlayback'
+import { purgeVideoElement } from '../utils/videoPlayback'
 import type { ReviewContext, ReviewSlot, Take } from '../types'
 
 const SWIPE_THRESHOLD = 60
@@ -90,9 +90,9 @@ export default function ReviewModeOverlay({
     : activeSlot === 'challenger' && benchmarkSrc !== null
 
   const pauseAllReviewVideos = useCallback(() => {
-    resetVideoPlayback(benchmarkVideoRef.current)
-    resetVideoPlayback(challengerVideoRef.current)
-    resetVideoPlayback(vaultVideoRef.current)
+    purgeVideoElement(benchmarkVideoRef.current)
+    purgeVideoElement(challengerVideoRef.current)
+    purgeVideoElement(vaultVideoRef.current)
   }, [])
 
   const getActiveVideo = useCallback((): HTMLVideoElement | null => {
@@ -193,9 +193,9 @@ export default function ReviewModeOverlay({
 
     if (!isVault) {
       if (activeSlot === 'benchmark') {
-        resetVideoPlayback(challengerVideoRef.current)
+        purgeVideoElement(challengerVideoRef.current)
       } else {
-        resetVideoPlayback(benchmarkVideoRef.current)
+        purgeVideoElement(benchmarkVideoRef.current)
       }
     }
 
@@ -296,7 +296,7 @@ export default function ReviewModeOverlay({
 
   const completeSwipe = useCallback(
     (direction: 'left' | 'right') => {
-      resetVideoPlayback(getActiveVideo())
+      purgeVideoElement(getActiveVideo())
       setSlideDirection(direction)
       setSwipeOffset(0)
       isTrackingPointer.current = false

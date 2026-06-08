@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type RefObject, type VideoHTMLAt
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosTakeVideoProps, withWebKitThumbnailHint } from '../utils/mobileVideo'
+import { purgeVideoElement } from '../utils/videoPlayback'
 
 export interface TakeVideoPlayerProps
   extends Omit<VideoHTMLAttributes<HTMLVideoElement>, 'src'> {
@@ -52,6 +53,12 @@ export default function TakeVideoPlayer({
     video.pause()
     video.muted = true
     video.currentTime = 0
+  }, [videoSrc, videoRef])
+
+  useEffect(() => {
+    return () => {
+      purgeVideoElement(videoRef.current)
+    }
   }, [videoSrc, videoRef])
 
   if (!videoSrc) {

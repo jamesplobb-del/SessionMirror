@@ -4,7 +4,7 @@ import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { blockTouchBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { resetVideoPlayback } from '../utils/videoPlayback'
+import { resetVideoPlayback, purgeVideoElement } from '../utils/videoPlayback'
 
 interface PipWindowProps {
   src: string | null
@@ -42,7 +42,7 @@ export default function PipWindow({
   const playbackKey = `${filePath}|${src ?? ''}`
   const internalPlayback = useVideoPlayback(playbackKey, externalVideoRef)
   const videoRef = internalPlayback.videoRef
-  const { isPlaying, volume, togglePlay, handleVolume } = internalPlayback
+  const { isPlaying, volume, handleVolume } = internalPlayback
 
   useEffect(() => {
     resetVideoPlayback(videoRef.current)
@@ -56,16 +56,20 @@ export default function PipWindow({
 
   useEffect(() => {
     return () => {
-      resetVideoPlayback(videoRef.current)
+      purgeVideoElement(videoRef.current)
     }
   }, [playbackKey, videoRef])
 
   const runInlinePlayToggle = useCallback(() => {
     const video = videoRef.current
     if (!video) return
-    video.muted = true
-    togglePlay()
-  }, [togglePlay, videoRef])
+    if (video.paused) {
+      video.muted = false
+      void video.play()
+    } else {
+      video.pause()
+    }
+  }, [videoRef])
 
   const toggleInlinePlay = useCallback(
     (event: React.MouseEvent | React.TouchEvent) => {
