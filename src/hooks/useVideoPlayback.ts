@@ -30,34 +30,23 @@ export function useVideoPlayback(
       video.removeEventListener('play', onPlay)
       video.removeEventListener('pause', onPause)
     }
-  }, [src])
+  }, [src, videoRef])
 
   useEffect(() => {
     setIsPlaying(false)
   }, [src])
-
-  const togglePlay = useCallback(() => {
-    const video = videoRef.current
-    if (!video) return
-    if (video.paused) {
-      void video.play()
-    } else {
-      video.pause()
-    }
-  }, [])
 
   const handleVolume = useCallback((value: number) => {
     const video = videoRef.current
     if (!video) return
     video.volume = value
     setVolume(value)
-  }, [])
+  }, [videoRef])
 
   return {
     videoRef,
     isPlaying,
     volume,
-    togglePlay,
     handleVolume,
   }
 }

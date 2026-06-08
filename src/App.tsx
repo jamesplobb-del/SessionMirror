@@ -236,6 +236,23 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    for (const ref of [benchmarkPipVideoRef, challengerPipVideoRef]) {
+      const video = ref.current
+      if (!video) continue
+      video.pause()
+      video.currentTime = 0
+      video.muted = true
+    }
+  }, [
+    benchmarkId,
+    challengerId,
+    benchmarkTake?.videoUrl,
+    benchmarkTake?.filePath,
+    challengerTake?.videoUrl,
+    challengerTake?.filePath,
+  ])
+
   return (
     <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black">
       <LiveCameraBackground

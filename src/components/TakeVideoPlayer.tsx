@@ -17,6 +17,8 @@ export interface TakeVideoPlayerProps
   eagerLoad?: boolean
   /** Vault list tile — muted poster only; never inline audio. */
   thumbnailPreview?: boolean
+  /** PiP / HUD — never autoplay; play only via explicit user control. */
+  manualPlayOnly?: boolean
   preload?: 'auto' | 'metadata' | 'none'
 }
 
@@ -35,6 +37,7 @@ export default function TakeVideoPlayer({
   mirror = false,
   eagerLoad = false,
   thumbnailPreview = false,
+  manualPlayOnly = false,
   preload = 'metadata',
   style,
   ...rest
@@ -54,9 +57,9 @@ export default function TakeVideoPlayer({
     const video = videoRef.current
     if (!video || !videoSrc) return
     video.pause()
-    video.muted = true
     video.currentTime = 0
-  }, [videoSrc, videoRef])
+    video.muted = true
+  }, [videoSrc, videoRef, manualPlayOnly])
 
   useEffect(() => {
     if (!thumbnailPreview) return

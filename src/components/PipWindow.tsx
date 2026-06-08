@@ -1,10 +1,10 @@
-import { useCallback, useEffect, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, type ChangeEvent } from 'react'
 import { Maximize2, Pause, Play, Upload, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { blockTouchBubble, stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
+import { pauseVideoElement } from '../utils/videoPlayback'
 
 interface PipWindowProps {
   src: string | null
@@ -40,17 +40,42 @@ export default function PipWindow({
   className = '',
 }: PipWindowProps) {
   const playbackKey = `${filePath}|${src ?? ''}`
+  const userPlayIntentRef = useRef(false)
   const internalPlayback = useVideoPlayback(playbackKey, externalVideoRef)
   const videoRef = internalPlayback.videoRef
   const { isPlaying, volume, handleVolume } = internalPlayback
 
   useEffect(() => {
-    resetVideoPlayback(videoRef.current)
-  }, [playbackKey, videoRef])
+    userPlayIntentRef.current = false
+    const video = videoRef.current
+    if (!video) return
+
+    video.pause()
+    video.currentTime = 0
+    video.muted = true
+
+    const guardAutoplay = () => {
+      if (!userPlayIntentRef.current) {
+        video.pause()
+        video.currentTime = 0
+        video.muted = true
+      }
+    }
+
+    video.addEventListener('play', guardAutoplay)
+    return () => {
+      video.removeEventListener('play', guardAutoplay)
+    }
+  }, [playbackKey, src, filePath, videoRef])
 
   useEffect(() => {
     if (suspendPlayback || !src) {
-      resetVideoPlayback(videoRef.current)
+      userPlayIntentRef.current = false
+      const video = videoRef.current
+      if (!video) return
+      video.pause()
+      video.currentTime = 0
+      video.muted = true
     }
   }, [suspendPlayback, src, playbackKey, videoRef])
 
@@ -66,17 +91,27 @@ export default function PipWindow({
       const video = videoRef.current
       if (!video) return
       if (video.paused) {
+        userPlayIntentRef.current = true
         video.muted = false
-        void video.play()
+        void video.play().catch(() => {
+          userPlayIntentRef.current = false
+          video.muted = true
+        })
       } else {
+        userPlayIntentRef.current = false
         video.pause()
+        video.muted = true
       }
     },
     [videoRef],
   )
 
   const handleInlinePauseOnly = useCallback(() => {
-    videoRef.current?.pause()
+    userPlayIntentRef.current = false
+    const video = videoRef.current
+    if (!video) return
+    video.pause()
+    video.muted = true
   }, [videoRef])
 
   const handleExpand = useCallback(
@@ -179,6 +214,7 @@ export default function PipWindow({
               loadingClassName="h-full w-full bg-black/30"
               mirror={mirror}
               controls={false}
+              manualPlayOnly
             />
 
             <div className="absolute inset-0 z-20 pointer-events-none">
