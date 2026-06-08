@@ -5,7 +5,7 @@ import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
-import { purgeVideosInContainer } from '../utils/videoPlayback'
+import { pauseVideosInContainer } from '../utils/videoPlayback'
 import type { SortMode, Take, TakeUpdate } from '../types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
@@ -86,7 +86,7 @@ export default function TakeVaultDrawer({
   const drawerRef = useRef<HTMLDivElement>(null)
 
   const pauseAllVaultVideos = useCallback(() => {
-    purgeVideosInContainer(drawerRef.current)
+    pauseVideosInContainer(drawerRef.current)
   }, [])
 
   useEffect(() => {

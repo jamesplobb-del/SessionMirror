@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
-import { purgeVideoElement } from '../utils/videoPlayback'
+import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import type { ReviewContext, ReviewSlot, Take } from '../types'
 
 const SWIPE_THRESHOLD = 60
@@ -90,9 +90,15 @@ export default function ReviewModeOverlay({
     : activeSlot === 'challenger' && benchmarkSrc !== null
 
   const pauseAllReviewVideos = useCallback(() => {
-    purgeVideoElement(benchmarkVideoRef.current)
-    purgeVideoElement(challengerVideoRef.current)
-    purgeVideoElement(vaultVideoRef.current)
+    resetVideoPlayback(benchmarkVideoRef.current)
+    resetVideoPlayback(challengerVideoRef.current)
+    resetVideoPlayback(vaultVideoRef.current)
+  }, [])
+
+  const pauseAllReviewVideosSafe = useCallback(() => {
+    pauseVideoElement(benchmarkVideoRef.current)
+    pauseVideoElement(challengerVideoRef.current)
+    pauseVideoElement(vaultVideoRef.current)
   }, [])
 
   const getActiveVideo = useCallback((): HTMLVideoElement | null => {
@@ -184,18 +190,18 @@ export default function ReviewModeOverlay({
     }
 
     return () => {
-      pauseAllReviewVideos()
+      pauseAllReviewVideosSafe()
     }
-  }, [isOpen, pauseAllReviewVideos])
+  }, [isOpen, pauseAllReviewVideos, pauseAllReviewVideosSafe])
 
   useEffect(() => {
     if (!isOpen) return
 
     if (!isVault) {
       if (activeSlot === 'benchmark') {
-        purgeVideoElement(challengerVideoRef.current)
+        resetVideoPlayback(challengerVideoRef.current)
       } else {
-        purgeVideoElement(benchmarkVideoRef.current)
+        resetVideoPlayback(benchmarkVideoRef.current)
       }
     }
 
@@ -296,7 +302,7 @@ export default function ReviewModeOverlay({
 
   const completeSwipe = useCallback(
     (direction: 'left' | 'right') => {
-      purgeVideoElement(getActiveVideo())
+      resetVideoPlayback(getActiveVideo())
       setSlideDirection(direction)
       setSwipeOffset(0)
       isTrackingPointer.current = false

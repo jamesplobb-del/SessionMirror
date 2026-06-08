@@ -3,8 +3,8 @@ import { Maximize2, Pause, Play, Upload, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
-import { blockTouchBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { resetVideoPlayback, purgeVideoElement } from '../utils/videoPlayback'
+import { blockTouchBubble, stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
+import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 
 interface PipWindowProps {
   src: string | null
@@ -56,28 +56,28 @@ export default function PipWindow({
 
   useEffect(() => {
     return () => {
-      purgeVideoElement(videoRef.current)
+      pauseVideoElement(videoRef.current)
     }
   }, [playbackKey, videoRef])
 
-  const runInlinePlayToggle = useCallback(() => {
-    const video = videoRef.current
-    if (!video) return
-    if (video.paused) {
-      video.muted = false
-      void video.play()
-    } else {
-      video.pause()
-    }
-  }, [videoRef])
-
-  const toggleInlinePlay = useCallback(
-    (event: React.MouseEvent | React.TouchEvent) => {
+  const handleInlinePlayClick = useCallback(
+    (event: React.MouseEvent) => {
       blockTouchBubble(event)
-      runInlinePlayToggle()
+      const video = videoRef.current
+      if (!video) return
+      if (video.paused) {
+        video.muted = false
+        void video.play()
+      } else {
+        video.pause()
+      }
     },
-    [runInlinePlayToggle],
+    [videoRef],
   )
+
+  const handleInlinePauseOnly = useCallback(() => {
+    videoRef.current?.pause()
+  }, [videoRef])
 
   const handleExpand = useCallback(
     (event: React.MouseEvent | React.TouchEvent) => {
@@ -200,10 +200,10 @@ export default function PipWindow({
 
               <button
                 type="button"
-                onPointerDown={blockTouchBubble}
-                onTouchStart={blockTouchBubble}
-                onClick={toggleInlinePlay}
-                onTouchEnd={toggleInlinePlay}
+                onPointerDown={stopEventBubble}
+                onTouchStart={stopEventBubble}
+                onTouchEnd={stopEventBubble}
+                onClick={handleInlinePlayClick}
                 className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >
@@ -231,7 +231,8 @@ export default function PipWindow({
               <MiniPipControls
                 isPlaying={isPlaying}
                 volume={volume}
-                onTogglePlay={runInlinePlayToggle}
+                onPlayClick={handleInlinePlayClick}
+                onPauseClick={handleInlinePauseOnly}
                 onVolumeChange={handleVolume}
               />
             </div>

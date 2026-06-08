@@ -1,4 +1,4 @@
-/** Stop playback and reset a video element (e.g. when pausing an still-mounted PiP). */
+/** Stop playback and reset a video element (e.g. when pausing a still-mounted PiP). */
 export function resetVideoPlayback(video: HTMLVideoElement | null | undefined): void {
   if (!video) return
   video.pause()
@@ -6,17 +6,14 @@ export function resetVideoPlayback(video: HTMLVideoElement | null | undefined): 
   video.muted = true
 }
 
-/** Fully detach media from a video element — required on iOS to kill phantom audio. */
-export function purgeVideoElement(video: HTMLVideoElement | null | undefined): void {
-  if (!video) return
-  video.pause()
-  video.removeAttribute('src')
-  video.load()
+/** Safe unmount / teardown — pause only; never mutate src (React owns the attribute). */
+export function pauseVideoElement(video: HTMLVideoElement | null | undefined): void {
+  video?.pause()
 }
 
-/** Pause and purge every video under a container. */
-export function purgeVideosInContainer(container: HTMLElement | null | undefined): void {
+/** Pause every video under a container without touching src. */
+export function pauseVideosInContainer(container: HTMLElement | null | undefined): void {
   container?.querySelectorAll('video').forEach((element) => {
-    purgeVideoElement(element)
+    element.pause()
   })
 }
