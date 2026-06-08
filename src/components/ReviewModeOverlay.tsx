@@ -16,6 +16,7 @@ interface ReviewModeOverlayProps {
   benchmarkName?: string
   challengerName?: string
   videoMimeType?: string
+  isOpen: boolean
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
 }
@@ -29,6 +30,7 @@ export default function ReviewModeOverlay({
   benchmarkName,
   challengerName,
   videoMimeType = 'video/mp4',
+  isOpen,
   onClose,
   onSlotChange,
 }: ReviewModeOverlayProps) {
@@ -130,9 +132,17 @@ export default function ReviewModeOverlay({
     }
   }, [activeSrc, revealPlayOverlay])
 
+  const hasMedia = Boolean(activeSrc || activeFilePath)
+
+  useEffect(() => {
+    if (!isOpen) {
+      videoRef.current?.pause()
+    }
+  }, [isOpen])
+
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !activeSrc) return
+    if (!isOpen || !video || !activeSrc) return
 
     setCurrentTime(0)
     setDuration(0)
@@ -149,7 +159,7 @@ export default function ReviewModeOverlay({
     return () => {
       video.removeEventListener('loadeddata', playWhenReady)
     }
-  }, [activeSrc, activeSlot, startReviewPlayback])
+  }, [activeSrc, activeSlot, isOpen, startReviewPlayback])
 
   useEffect(() => {
     const video = videoRef.current
@@ -282,10 +292,19 @@ export default function ReviewModeOverlay({
     setSwipeOffset(0)
   }
 
-  if (!activeSrc && !activeFilePath) return null
+  if (!hasMedia) {
+    return null
+  }
 
   return (
-    <div className="review-overlay fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-black">
+    <div
+      className={`review-overlay fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-black transition-opacity duration-200 ease-in ${
+        isOpen
+          ? 'pointer-events-auto opacity-100'
+          : 'pointer-events-none invisible opacity-0'
+      }`}
+      aria-hidden={!isOpen}
+    >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 z-40 bg-gradient-to-b from-black/55 to-transparent px-5 pb-3"
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}

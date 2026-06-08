@@ -12,9 +12,6 @@ import {
 
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
-  enabled?: boolean
-  /** Bump when returning to the camera screen to force a fresh stream. */
-  initKey?: number
 }
 
 const CAMERA_INIT_MAX_ATTEMPTS = 3
@@ -29,8 +26,6 @@ function detachRecorder(recorder: MediaRecorder) {
 
 export function useCameraSession({
   onRecordingComplete,
-  enabled = true,
-  initKey = 0,
 }: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -122,12 +117,6 @@ export function useCameraSession({
   }, [])
 
   useEffect(() => {
-    if (!enabled) {
-      void abortActiveWriter().catch(() => {})
-      scheduleReleaseCameraState()
-      return
-    }
-
     let cancelled = false
     let retryTimer: number | null = null
 
@@ -170,13 +159,25 @@ export function useCameraSession({
       scheduleReleaseCameraState()
     }
   }, [
-    enabled,
-    initKey,
     abortActiveWriter,
     acquireStream,
     forceClearCameraState,
     scheduleReleaseCameraState,
   ])
+
+  useEffect(() => {
+    const video = previewRef.current
+    if (!video || !stream) return
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+    }
+    video.muted = true
+
+    void video.play().catch(() => {
+      /* autoplay may need a user gesture in some browsers */
+    })
+  }, [stream])
 
   useEffect(() => {
     if (!isRecording) return
@@ -303,7 +304,6 @@ export function useCameraSession({
     })
   }, [
     abortActiveWriter,
-    enabled,
     isRecording,
   ])
 

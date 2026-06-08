@@ -22,36 +22,8 @@ export default function App() {
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
-  const [cameraInitKey, setCameraInitKey] = useState(0)
-  const prevCameraActiveRef = useRef<boolean | null>(null)
 
   const isReviewOpen = reviewSlot !== null
-  const isCameraActive = !isVaultOpen && !isReviewOpen
-  const [cameraSessionEnabled, setCameraSessionEnabled] = useState(isCameraActive)
-  const [renderCamera, setRenderCamera] = useState(isCameraActive)
-
-  useEffect(() => {
-    if (isCameraActive) {
-      setRenderCamera(true)
-      setCameraSessionEnabled(true)
-      return
-    }
-
-    const releaseTimer = window.setTimeout(() => {
-      setCameraSessionEnabled(false)
-      setRenderCamera(false)
-    }, 700)
-
-    return () => window.clearTimeout(releaseTimer)
-  }, [isCameraActive])
-
-  useEffect(() => {
-    const wasInactive = prevCameraActiveRef.current === false
-    prevCameraActiveRef.current = isCameraActive
-    if (isCameraActive && wasInactive) {
-      setCameraInitKey((key) => key + 1)
-    }
-  }, [isCameraActive])
 
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
     const { takeId, mimeType, filePath, videoUrl, blob } = payload
@@ -96,7 +68,6 @@ export default function App() {
 
   const {
     previewRef,
-    stream,
     error: cameraError,
     ready,
     isRecording,
@@ -104,8 +75,6 @@ export default function App() {
     toggleRecording,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
-    enabled: cameraSessionEnabled,
-    initKey: cameraInitKey,
   })
 
   const benchmarkTake = useMemo(
@@ -178,20 +147,14 @@ export default function App() {
 
   return (
     <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black">
-      {renderCamera && (
-        <div className="absolute inset-0 z-0">
-          <LiveCameraBackground
-            previewRef={previewRef}
-            stream={stream}
-            error={cameraError}
-            isActive={isCameraActive}
-          />
-        </div>
-      )}
+      <LiveCameraBackground previewRef={previewRef} error={cameraError} />
 
-      {!isReviewOpen && <HudHeader />}
+      <div
+        className={`absolute inset-0 z-10 ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
+        aria-hidden={isReviewOpen}
+      >
+        <HudHeader />
 
-      {!isReviewOpen && (
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4 transition-opacity duration-200 ease-in"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
@@ -241,26 +204,25 @@ export default function App() {
             takeCount={takes.length}
           />
         </div>
-      )}
+      </div>
 
-      {isReviewOpen && reviewSlot && (
-        <ReviewModeOverlay
-          activeSlot={reviewSlot}
-          benchmarkSrc={benchmarkTake?.videoUrl ?? null}
-          challengerSrc={challengerTake?.videoUrl ?? null}
-          benchmarkFilePath={benchmarkTake?.filePath}
-          challengerFilePath={challengerTake?.filePath}
-          benchmarkName={benchmarkTake?.name}
-          challengerName={challengerTake?.name}
-          videoMimeType={
-            (reviewSlot === 'benchmark'
-              ? benchmarkTake?.videoMimeType
-              : challengerTake?.videoMimeType) || 'video/mp4'
-          }
-          onClose={() => setReviewSlot(null)}
-          onSlotChange={setReviewSlot}
-        />
-      )}
+      <ReviewModeOverlay
+        activeSlot={reviewSlot ?? 'benchmark'}
+        benchmarkSrc={benchmarkTake?.videoUrl ?? null}
+        challengerSrc={challengerTake?.videoUrl ?? null}
+        benchmarkFilePath={benchmarkTake?.filePath}
+        challengerFilePath={challengerTake?.filePath}
+        benchmarkName={benchmarkTake?.name}
+        challengerName={challengerTake?.name}
+        videoMimeType={
+          (reviewSlot === 'benchmark'
+            ? benchmarkTake?.videoMimeType
+            : challengerTake?.videoMimeType) || 'video/mp4'
+        }
+        isOpen={isReviewOpen}
+        onClose={() => setReviewSlot(null)}
+        onSlotChange={setReviewSlot}
+      />
 
       <TakeVaultDrawer
         isOpen={isVaultOpen}
