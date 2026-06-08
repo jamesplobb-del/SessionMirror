@@ -26,9 +26,21 @@ function extensionForMime(mimeType: string): string {
 function isAlreadyExistsError(err: unknown): boolean {
   if (err == null) return false
 
+  const serialized = (() => {
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return String(err)
+    }
+  })()
+
+  if (serialized.includes('OS-PLUG-FILE-0010')) {
+    return true
+  }
+
   if (typeof err === 'string') {
     const lower = err.toLowerCase()
-    return lower.includes('already exists') || err.includes('OS-PLUG-FILE-0010')
+    return lower.includes('already exists')
   }
 
   if (typeof err === 'object') {
@@ -36,20 +48,27 @@ function isAlreadyExistsError(err: unknown): boolean {
       code?: string
       message?: string
       errorMessage?: string
+      error?: { code?: string; message?: string }
     }
-    const code = e.code ?? ''
-    const message = `${e.message ?? ''} ${e.errorMessage ?? ''}`.toLowerCase()
-    return (
-      code === 'OS-PLUG-FILE-0010' ||
-      message.includes('already exists') ||
-      message.includes('os-plug-file-0010')
-    )
+    const code = e.code ?? e.error?.code ?? ''
+    const message = `${e.message ?? ''} ${e.errorMessage ?? ''} ${e.error?.message ?? ''}`.toLowerCase()
+    return code === 'OS-PLUG-FILE-0010' || message.includes('already exists')
   }
 
   return false
 }
 
 async function ensureTakesDirectory(): Promise<void> {
+  try {
+    await Filesystem.stat({
+      path: TAKES_DIR,
+      directory: Directory.Data,
+    })
+    return
+  } catch {
+    /* directory missing — create below */
+  }
+
   try {
     await Filesystem.mkdir({
       path: TAKES_DIR,
@@ -101,6 +120,23 @@ export async function toCapacitorPlaybackSrc(
     directory: Directory.Data,
   })
   return Capacitor.convertFileSrc(uri)
+}
+
+/** Synchronous guard — wraps raw file:/// URIs before they reach `<video src>`. */
+export function convertFileSrcIfNeeded(uri: string): string {
+  if (!uri || !Capacitor.isNativePlatform()) {
+    return uri
+  }
+
+  if (isConvertedPlaybackUrl(uri)) {
+    return uri
+  }
+
+  if (uri.startsWith('file://') || uri.startsWith('capacitor://')) {
+    return Capacitor.convertFileSrc(uri)
+  }
+
+  return uri
 }
 
 function blobToBase64(blob: Blob): Promise<string> {

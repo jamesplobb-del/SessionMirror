@@ -39,39 +39,42 @@ export default function App() {
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
     const { takeId, mimeType, filePath, videoUrl, blob } = payload
 
-    setTakes((prev) => {
-      const next = createTake(
-        takeId,
-        prev.length + 1,
-        videoUrl,
-        filePath,
-        mimeType,
-      )
-      setChallengerId(next.id)
-      return [...prev, next]
-    })
+    void (async () => {
+      const safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
 
-    const thumbnailPromise = blob
-      ? generateThumbnailFromBlob(blob)
-      : (async () => {
-          if (Capacitor.isNativePlatform()) {
-            await new Promise((resolve) => window.setTimeout(resolve, 1200))
-          }
-          const playbackUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
-          return generateThumbnailFromUrl(playbackUrl)
-        })()
-
-    void thumbnailPromise
-      .then((thumbnailUrl) => {
-        setTakes((current) =>
-          current.map((take) =>
-            take.id === takeId ? { ...take, thumbnailUrl } : take,
-          ),
+      setTakes((prev) => {
+        const next = createTake(
+          takeId,
+          prev.length + 1,
+          safeVideoUrl,
+          filePath,
+          mimeType,
         )
+        setChallengerId(next.id)
+        return [...prev, next]
       })
-      .catch(() => {
-        /* vault falls back to placeholder until thumbnail is ready */
-      })
+
+      const thumbnailPromise = blob
+        ? generateThumbnailFromBlob(blob)
+        : (async () => {
+            if (Capacitor.isNativePlatform()) {
+              await new Promise((resolve) => window.setTimeout(resolve, 1200))
+            }
+            return generateThumbnailFromUrl(safeVideoUrl)
+          })()
+
+      void thumbnailPromise
+        .then((thumbnailUrl) => {
+          setTakes((current) =>
+            current.map((take) =>
+              take.id === takeId ? { ...take, thumbnailUrl } : take,
+            ),
+          )
+        })
+        .catch(() => {
+          /* vault falls back to placeholder until thumbnail is ready */
+        })
+    })()
   }, [])
 
   const {

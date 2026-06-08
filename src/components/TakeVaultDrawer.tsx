@@ -4,8 +4,8 @@ import { X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
+import { convertFileSrcIfNeeded, toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import { iosReplayVideoProps } from '../utils/mobileVideo'
-import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import type { SortMode, Take, TakeUpdate } from '../types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
@@ -47,11 +47,7 @@ export function VaultTakeVideo({
   className = 'h-full w-full object-cover',
 }: VaultTakeVideoProps) {
   const resolvedSrc = useCapacitorVideoSrc(take.filePath, take.videoUrl)
-
-  const playbackSrc =
-    resolvedSrc?.startsWith('file://') && Capacitor.isNativePlatform()
-      ? Capacitor.convertFileSrc(resolvedSrc)
-      : resolvedSrc
+  const playbackSrc = resolvedSrc ? convertFileSrcIfNeeded(resolvedSrc) : null
 
   if (!playbackSrc) {
     return <div className="h-full w-full animate-pulse bg-stone-200" />

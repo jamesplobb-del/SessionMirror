@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
+import { convertFileSrcIfNeeded } from '../utils/takeStorage'
 import { mobileVideoProps } from '../utils/mobileVideo'
 import type { ReviewSlot } from '../types'
 
@@ -51,7 +52,8 @@ export default function ReviewModeOverlay({
   const activeSrc = activeSlot === 'benchmark' ? benchmarkSrc : challengerSrc
   const activeFilePath =
     activeSlot === 'benchmark' ? benchmarkFilePath : challengerFilePath
-  const playbackSrc = useCapacitorVideoSrc(activeFilePath, activeSrc ?? '')
+  const resolvedSrc = useCapacitorVideoSrc(activeFilePath, activeSrc ?? '')
+  const playbackSrc = resolvedSrc ? convertFileSrcIfNeeded(resolvedSrc) : null
   const activeName = activeSlot === 'benchmark' ? benchmarkName : challengerName
   const activeLabel = activeSlot === 'benchmark' ? 'Benchmark' : 'Challenger'
 

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
+import {
+  convertFileSrcIfNeeded,
+  toCapacitorPlaybackSrc,
+} from '../utils/takeStorage'
 
 /** Resolve a native file path or raw file:/// URI to a WebView-safe playback URL. */
 export function useCapacitorVideoSrc(
@@ -14,13 +17,13 @@ export function useCapacitorVideoSrc(
     if (filePath || fallbackUrl.startsWith('file://')) {
       return null
     }
-    return fallbackUrl || null
+    return convertFileSrcIfNeeded(fallbackUrl) || null
   })
 
   useEffect(() => {
     let cancelled = false
 
-    const resolve = async () => {
+    const resolve = async (): Promise<string | null> => {
       try {
         if (!Capacitor.isNativePlatform()) {
           return fallbackUrl || null
@@ -36,23 +39,13 @@ export function useCapacitorVideoSrc(
 
         return null
       } catch {
-        if (!Capacitor.isNativePlatform()) {
-          return fallbackUrl || null
-        }
-        if (fallbackUrl.startsWith('file://')) {
-          try {
-            return Capacitor.convertFileSrc(fallbackUrl)
-          } catch {
-            return null
-          }
-        }
-        return fallbackUrl || null
+        return convertFileSrcIfNeeded(fallbackUrl) || null
       }
     }
 
     void resolve().then((resolved) => {
       if (!cancelled) {
-        setSrc(resolved || null)
+        setSrc(resolved ? convertFileSrcIfNeeded(resolved) : null)
       }
     })
 

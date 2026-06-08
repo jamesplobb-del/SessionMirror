@@ -1,6 +1,7 @@
 import { Play, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
+import { convertFileSrcIfNeeded } from '../utils/takeStorage'
 import { iosReplayVideoProps } from '../utils/mobileVideo'
 import MiniPipControls from './MiniPipControls'
 
@@ -27,7 +28,8 @@ export default function PipWindow({
   onExpand,
   className = '',
 }: PipWindowProps) {
-  const playbackSrc = useCapacitorVideoSrc(filePath, src ?? '')
+  const resolvedSrc = useCapacitorVideoSrc(filePath, src ?? '')
+  const playbackSrc = resolvedSrc ? convertFileSrcIfNeeded(resolvedSrc) : null
   const { videoRef, isPlaying, volume, togglePlay, handleVolume } =
     useVideoPlayback(playbackSrc)
 
