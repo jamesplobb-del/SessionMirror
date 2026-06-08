@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 
 const TAKES_DIR = 'takes'
+export const NATIVE_VIDEO_MIME = 'video/mp4'
 
 export interface PersistedTakeVideo {
   filePath: string
@@ -23,24 +24,23 @@ function extensionForMime(mimeType: string): string {
   return 'mp4'
 }
 
+function serializeError(err: unknown): string {
+  try {
+    return JSON.stringify(err)
+  } catch {
+    return String(err)
+  }
+}
+
 function isAlreadyExistsError(err: unknown): boolean {
   if (err == null) return false
 
-  const serialized = (() => {
-    try {
-      return JSON.stringify(err)
-    } catch {
-      return String(err)
-    }
-  })()
-
-  if (serialized.includes('OS-PLUG-FILE-0010')) {
+  if (serializeError(err).includes('OS-PLUG-FILE-0010')) {
     return true
   }
 
   if (typeof err === 'string') {
-    const lower = err.toLowerCase()
-    return lower.includes('already exists')
+    return err.toLowerCase().includes('already exists')
   }
 
   if (typeof err === 'object') {
@@ -53,6 +53,38 @@ function isAlreadyExistsError(err: unknown): boolean {
     const code = e.code ?? e.error?.code ?? ''
     const message = `${e.message ?? ''} ${e.errorMessage ?? ''} ${e.error?.message ?? ''}`.toLowerCase()
     return code === 'OS-PLUG-FILE-0010' || message.includes('already exists')
+  }
+
+  return false
+}
+
+function isDoesNotExistError(err: unknown): boolean {
+  if (err == null) return false
+
+  const serialized = serializeError(err)
+  if (serialized.includes('OS-PLUG-FILE-0008')) {
+    return true
+  }
+
+  if (typeof err === 'string') {
+    const lower = err.toLowerCase()
+    return lower.includes('does not exist') || lower.includes('not found')
+  }
+
+  if (typeof err === 'object') {
+    const e = err as {
+      code?: string
+      message?: string
+      errorMessage?: string
+      error?: { code?: string; message?: string }
+    }
+    const code = e.code ?? e.error?.code ?? ''
+    const message = `${e.message ?? ''} ${e.errorMessage ?? ''} ${e.error?.message ?? ''}`.toLowerCase()
+    return (
+      code === 'OS-PLUG-FILE-0008' ||
+      message.includes('does not exist') ||
+      message.includes('not found')
+    )
   }
 
   return false
@@ -90,8 +122,29 @@ function isConvertedPlaybackUrl(url: string): boolean {
     url.startsWith('http://') ||
     url.startsWith('https://') ||
     url.includes('_capacitor_file_') ||
-    url.startsWith('capacitor://')
+    url.startsWith('capacitor://localhost')
   )
+}
+
+/**
+ * Strict final pass — every native file URI must go through convertFileSrc
+ * before reaching `<video>` / `<source>`.
+ */
+export function applyStrictPlaybackSrc(uri: string): string {
+  if (!uri || !Capacitor.isNativePlatform()) {
+    return uri
+  }
+
+  if (isConvertedPlaybackUrl(uri)) {
+    return uri
+  }
+
+  return Capacitor.convertFileSrc(uri)
+}
+
+/** @deprecated Use applyStrictPlaybackSrc */
+export function convertFileSrcIfNeeded(uri: string): string {
+  return applyStrictPlaybackSrc(uri)
 }
 
 /**
@@ -122,23 +175,6 @@ export async function toCapacitorPlaybackSrc(
   return Capacitor.convertFileSrc(uri)
 }
 
-/** Synchronous guard — wraps raw file:/// URIs before they reach `<video src>`. */
-export function convertFileSrcIfNeeded(uri: string): string {
-  if (!uri || !Capacitor.isNativePlatform()) {
-    return uri
-  }
-
-  if (isConvertedPlaybackUrl(uri)) {
-    return uri
-  }
-
-  if (uri.startsWith('file://') || uri.startsWith('capacitor://')) {
-    return Capacitor.convertFileSrc(uri)
-  }
-
-  return uri
-}
-
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -156,13 +192,9 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-async function toPlaybackUrl(filePath: string): Promise<string> {
-  return toCapacitorPlaybackSrc(filePath)
-}
-
 /**
  * Streams MediaRecorder chunks to disk while recording (native only).
- * Chunks are appended sequentially so memory stays flat on long takes.
+ * On iOS, chunks are assembled into a single mp4 Blob before writeFile.
  */
 export class StreamingTakeWriter {
   readonly takeId: string
@@ -173,15 +205,19 @@ export class StreamingTakeWriter {
   private chunkCount = 0
   private closed = false
   private aborted = false
-  /** iOS mp4 must be written as one file — appended fragments won't play back */
   private readonly bufferChunks: Blob[] = []
   private readonly useBufferedWrite: boolean
 
-  private constructor(takeId: string, filePath: string, mimeType: string) {
+  private constructor(
+    takeId: string,
+    filePath: string,
+    mimeType: string,
+    useBufferedWrite: boolean,
+  ) {
     this.takeId = takeId
     this.filePath = filePath
     this.mimeType = mimeType
-    this.useBufferedWrite = mimeType.includes('mp4')
+    this.useBufferedWrite = useBufferedWrite
   }
 
   static async open(
@@ -199,10 +235,13 @@ export class StreamingTakeWriter {
 
     await deleteTakeFile(filePath)
 
-    return new StreamingTakeWriter(takeId, filePath, mimeType)
+    const useBufferedWrite =
+      mimeType.includes('mp4') || Capacitor.getPlatform() === 'ios'
+
+    return new StreamingTakeWriter(takeId, filePath, mimeType, useBufferedWrite)
   }
 
-  /** Queue a recorder chunk for sequential disk write; resolves when flushed. */
+  /** Queue a recorder chunk; on iOS/mp4 they are buffered until finalize. */
   enqueue(chunk: Blob): Promise<void> {
     if (this.closed || this.aborted || chunk.size === 0) {
       return Promise.resolve()
@@ -257,7 +296,10 @@ export class StreamingTakeWriter {
     }
 
     if (this.useBufferedWrite) {
-      const blob = new Blob(this.bufferChunks, { type: this.mimeType })
+      const writeMime = this.mimeType.includes('mp4')
+        ? NATIVE_VIDEO_MIME
+        : this.mimeType
+      const blob = new Blob(this.bufferChunks, { type: writeMime })
       this.bufferChunks.length = 0
 
       if (blob.size === 0) {
@@ -272,15 +314,25 @@ export class StreamingTakeWriter {
         directory: Directory.Data,
       })
 
+      const { uri } = await Filesystem.getUri({
+        path: this.filePath,
+        directory: Directory.Data,
+      })
+
       return {
         filePath: this.filePath,
-        videoUrl: await toPlaybackUrl(this.filePath),
+        videoUrl: Capacitor.convertFileSrc(uri),
       }
     }
 
+    const { uri } = await Filesystem.getUri({
+      path: this.filePath,
+      directory: Directory.Data,
+    })
+
     return {
       filePath: this.filePath,
-      videoUrl: await toPlaybackUrl(this.filePath),
+      videoUrl: Capacitor.convertFileSrc(uri),
     }
   }
 
@@ -300,11 +352,15 @@ export class StreamingTakeWriter {
 export async function persistRecordingBlob(
   blob: Blob,
   _takeId: string,
-  _mimeType: string,
+  mimeType: string,
 ): Promise<PersistedTakeVideo> {
+  const writeMime = mimeType.includes('mp4') ? NATIVE_VIDEO_MIME : mimeType
+  const normalized =
+    blob.type === writeMime ? blob : new Blob([blob], { type: writeMime })
+
   return {
     filePath: '',
-    videoUrl: URL.createObjectURL(blob),
+    videoUrl: URL.createObjectURL(normalized),
   }
 }
 
@@ -321,7 +377,7 @@ export async function resolveTakePlaybackUrl(
   }
 
   if (fallbackUrl) {
-    return toCapacitorPlaybackSrc(fallbackUrl)
+    return applyStrictPlaybackSrc(await toCapacitorPlaybackSrc(fallbackUrl))
   }
 
   return fallbackUrl
@@ -335,7 +391,10 @@ export async function deleteTakeFile(filePath: string): Promise<void> {
       path: filePath,
       directory: Directory.Data,
     })
-  } catch {
-    /* file may already be gone */
+  } catch (err) {
+    if (isDoesNotExistError(err)) {
+      return
+    }
+    /* file may already be gone or delete is best-effort */
   }
 }

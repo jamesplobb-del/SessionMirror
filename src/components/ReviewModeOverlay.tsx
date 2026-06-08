@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
-import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
-import { convertFileSrcIfNeeded } from '../utils/takeStorage'
+import TakeVideoPlayer from './TakeVideoPlayer'
 import { mobileVideoProps } from '../utils/mobileVideo'
 import type { ReviewSlot } from '../types'
 
@@ -17,6 +16,7 @@ interface ReviewModeOverlayProps {
   challengerFilePath?: string
   benchmarkName?: string
   challengerName?: string
+  videoMimeType?: string
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
 }
@@ -29,6 +29,7 @@ export default function ReviewModeOverlay({
   challengerFilePath = '',
   benchmarkName,
   challengerName,
+  videoMimeType = 'video/mp4',
   onClose,
   onSlotChange,
 }: ReviewModeOverlayProps) {
@@ -52,8 +53,6 @@ export default function ReviewModeOverlay({
   const activeSrc = activeSlot === 'benchmark' ? benchmarkSrc : challengerSrc
   const activeFilePath =
     activeSlot === 'benchmark' ? benchmarkFilePath : challengerFilePath
-  const resolvedSrc = useCapacitorVideoSrc(activeFilePath, activeSrc ?? '')
-  const playbackSrc = resolvedSrc ? convertFileSrcIfNeeded(resolvedSrc) : null
   const activeName = activeSlot === 'benchmark' ? benchmarkName : challengerName
   const activeLabel = activeSlot === 'benchmark' ? 'Benchmark' : 'Challenger'
 
@@ -111,16 +110,16 @@ export default function ReviewModeOverlay({
   const startReviewPlayback = useCallback(() => {
     if (isScrubbingRef.current) return
     const video = videoRef.current
-    if (!video || !playbackSrc) return
+    if (!video || !activeSrc) return
     video.muted = false
     void video.play().catch(() => {
       revealPlayOverlay(false)
     })
-  }, [playbackSrc, revealPlayOverlay])
+  }, [activeSrc, revealPlayOverlay])
 
   const togglePlayPause = useCallback(() => {
     const video = videoRef.current
-    if (!video || !playbackSrc) return
+    if (!video || !activeSrc) return
 
     video.muted = false
 
@@ -130,11 +129,11 @@ export default function ReviewModeOverlay({
       video.pause()
       revealPlayOverlay(false)
     }
-  }, [playbackSrc, revealPlayOverlay])
+  }, [activeSrc, revealPlayOverlay])
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !playbackSrc) return
+    if (!video || !activeSrc) return
 
     setCurrentTime(0)
     setDuration(0)
@@ -151,7 +150,7 @@ export default function ReviewModeOverlay({
     return () => {
       video.removeEventListener('loadeddata', playWhenReady)
     }
-  }, [playbackSrc, activeSlot, startReviewPlayback])
+  }, [activeSrc, activeSlot, startReviewPlayback])
 
   useEffect(() => {
     const video = videoRef.current
@@ -192,7 +191,7 @@ export default function ReviewModeOverlay({
       video.removeEventListener('pause', onPause)
       video.removeEventListener('ended', onEnded)
     }
-  }, [playbackSrc, scheduleTimeUpdate, revealPlayOverlay])
+  }, [activeSrc, scheduleTimeUpdate, revealPlayOverlay])
 
   const handleScrubStart = useCallback(() => {
     const video = videoRef.current
@@ -284,7 +283,7 @@ export default function ReviewModeOverlay({
     setSwipeOffset(0)
   }
 
-  if (!playbackSrc) return null
+  if (!activeSrc && !activeFilePath) return null
 
   return (
     <div className="review-overlay fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-black">
@@ -325,10 +324,12 @@ export default function ReviewModeOverlay({
           </div>
         )}
 
-        <video
-          ref={videoRef}
-          key={playbackSrc}
-          src={playbackSrc}
+        <TakeVideoPlayer
+          key={`${activeSlot}-${activeFilePath}-${activeSrc}`}
+          filePath={activeFilePath}
+          videoUrl={activeSrc ?? ''}
+          mimeType={videoMimeType}
+          videoRef={videoRef}
           className="custom-video-player h-full w-full object-cover transition-all duration-200 ease-out"
           style={{
             transform:
@@ -343,7 +344,6 @@ export default function ReviewModeOverlay({
           }}
           {...mobileVideoProps}
           playsInline
-          muted
           controls={false}
           preload="metadata"
           disablePictureInPicture

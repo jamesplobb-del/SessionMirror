@@ -9,7 +9,6 @@ export const mobileVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
 /** iOS-friendly attributes for replaying saved local takes */
 export const iosReplayVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
   ...mobileVideoProps,
-  muted: true,
   controls: true,
   preload: 'metadata',
 }

@@ -181,6 +181,7 @@ export default function App() {
               className="pointer-events-auto shrink-0"
               src={benchmarkTake?.videoUrl ?? null}
               filePath={benchmarkTake?.filePath}
+              mimeType={benchmarkTake?.videoMimeType ?? 'video/mp4'}
               takeName={benchmarkTake?.name}
               label="Benchmark"
               variant="benchmark"
@@ -197,6 +198,7 @@ export default function App() {
               className="pointer-events-auto shrink-0"
               src={challengerTake?.videoUrl ?? null}
               filePath={challengerTake?.filePath}
+              mimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
               takeName={challengerTake?.name}
               label="Challenger"
               variant="challenger"
@@ -230,6 +232,11 @@ export default function App() {
           challengerFilePath={challengerTake?.filePath}
           benchmarkName={benchmarkTake?.name}
           challengerName={challengerTake?.name}
+          videoMimeType={
+            (reviewSlot === 'benchmark'
+              ? benchmarkTake?.videoMimeType
+              : challengerTake?.videoMimeType) || 'video/mp4'
+          }
           onClose={() => setReviewSlot(null)}
           onSlotChange={setReviewSlot}
         />

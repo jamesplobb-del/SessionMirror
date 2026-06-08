@@ -5,6 +5,7 @@ import {
   RECORDING_TIMESLICE_MS,
 } from '../utils/mobileVideo'
 import {
+  NATIVE_VIDEO_MIME,
   persistRecordingBlob,
   StreamingTakeWriter,
   type RecordingCompletePayload,
@@ -253,9 +254,10 @@ export function useCameraSession({
               } else {
                 const parts = chunksRef.current
                 chunksRef.current = []
-                const blob = new Blob(parts, {
-                  type: recorderMimeTypeRef.current,
-                })
+                const writeMime = recorderMimeTypeRef.current.includes('mp4')
+                  ? NATIVE_VIDEO_MIME
+                  : recorderMimeTypeRef.current
+                const blob = new Blob(parts, { type: writeMime })
                 const persisted = await persistRecordingBlob(
                   blob,
                   stoppedTakeId,

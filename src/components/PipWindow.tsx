@@ -1,13 +1,13 @@
 import { Play, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
-import { convertFileSrcIfNeeded } from '../utils/takeStorage'
-import { iosReplayVideoProps } from '../utils/mobileVideo'
+import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 
 interface PipWindowProps {
   src: string | null
   filePath?: string
+  mimeType?: string
   label: string
   takeName?: string
   variant: 'benchmark' | 'challenger'
@@ -20,6 +20,7 @@ interface PipWindowProps {
 export default function PipWindow({
   src,
   filePath = '',
+  mimeType = 'video/mp4',
   label,
   takeName,
   variant,
@@ -29,9 +30,8 @@ export default function PipWindow({
   className = '',
 }: PipWindowProps) {
   const resolvedSrc = useCapacitorVideoSrc(filePath, src ?? '')
-  const playbackSrc = resolvedSrc ? convertFileSrcIfNeeded(resolvedSrc) : null
   const { videoRef, isPlaying, volume, togglePlay, handleVolume } =
-    useVideoPlayback(playbackSrc)
+    useVideoPlayback(resolvedSrc)
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -82,14 +82,18 @@ export default function PipWindow({
         tabIndex={src && onExpand ? 0 : undefined}
         aria-label={src && onExpand ? `Expand ${label} to full screen` : undefined}
       >
-        {playbackSrc ? (
+        {src ? (
           <>
-            <video
-              ref={videoRef}
-              src={playbackSrc}
+            <TakeVideoPlayer
+              filePath={filePath}
+              videoUrl={src}
+              mimeType={mimeType}
+              videoRef={videoRef}
               className="h-full w-full object-cover"
-              {...iosReplayVideoProps}
+              loadingClassName="h-full w-full bg-black/30"
+              controls
               playsInline
+              preload="metadata"
             />
             {onExpand && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-70 transition-opacity group-hover:opacity-0">
