@@ -1,20 +1,17 @@
 import { stopEventBubble } from '../utils/eventBubbling'
 import { Pause, Play, Volume2 } from 'lucide-react'
-import type { MouseEvent } from 'react'
 
 interface MiniPipControlsProps {
   isPlaying: boolean
   volume: number
-  onPlayClick: (event: MouseEvent<HTMLButtonElement>) => void
-  onPauseClick: () => void
+  onTogglePlay: () => void
   onVolumeChange: (value: number) => void
 }
 
 export default function MiniPipControls({
   isPlaying,
   volume,
-  onPlayClick,
-  onPauseClick,
+  onTogglePlay,
   onVolumeChange,
 }: MiniPipControlsProps) {
   return (
@@ -25,12 +22,8 @@ export default function MiniPipControls({
         onTouchStart={stopEventBubble}
         onTouchEnd={stopEventBubble}
         onClick={(e) => {
-          if (isPlaying) {
-            stopEventBubble(e)
-            onPauseClick()
-          } else {
-            onPlayClick(e)
-          }
+          stopEventBubble(e)
+          onTogglePlay()
         }}
         className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white"
         aria-label={isPlaying ? 'Pause' : 'Play'}

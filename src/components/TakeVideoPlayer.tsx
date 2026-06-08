@@ -86,9 +86,10 @@ export default function TakeVideoPlayer({
     return <div className={loadingClassName} aria-hidden />
   }
 
-  const videoStyle: CSSProperties = mirror
-    ? { transform: 'scaleX(-1)' }
-    : { ...style }
+  const videoStyle: CSSProperties = {
+    pointerEvents: thumbnailPreview ? 'none' : undefined,
+    ...(mirror ? { transform: 'scaleX(-1)' } : style),
+  }
 
   const videoElement = (
     <video

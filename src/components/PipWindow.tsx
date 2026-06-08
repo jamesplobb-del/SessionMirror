@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Maximize2, Pause, Play, Upload, X } from 'lucide-react'
-import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { blockTouchBubble, stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
@@ -40,44 +39,42 @@ export default function PipWindow({
   className = '',
 }: PipWindowProps) {
   const playbackKey = `${filePath}|${src ?? ''}`
-  const userPlayIntentRef = useRef(false)
-  const internalPlayback = useVideoPlayback(playbackKey, externalVideoRef)
-  const videoRef = internalPlayback.videoRef
-  const { isPlaying, volume, handleVolume } = internalPlayback
+  const internalVideoRef = useRef<HTMLVideoElement>(null)
+  const videoRef = externalVideoRef ?? internalVideoRef
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [volume, setVolume] = useState(1)
 
   useEffect(() => {
-    userPlayIntentRef.current = false
+    setIsPlaying(false)
     const video = videoRef.current
-    if (!video) return
-
-    video.pause()
-    video.currentTime = 0
-    video.muted = true
-
-    const guardAutoplay = () => {
-      if (!userPlayIntentRef.current) {
-        video.pause()
-        video.currentTime = 0
-        video.muted = true
-      }
-    }
-
-    video.addEventListener('play', guardAutoplay)
-    return () => {
-      video.removeEventListener('play', guardAutoplay)
-    }
-  }, [playbackKey, src, filePath, videoRef])
-
-  useEffect(() => {
-    if (suspendPlayback || !src) {
-      userPlayIntentRef.current = false
-      const video = videoRef.current
-      if (!video) return
+    if (video) {
       video.pause()
       video.currentTime = 0
       video.muted = true
     }
-  }, [suspendPlayback, src, playbackKey, videoRef])
+  }, [playbackKey, src, filePath, videoRef])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (isPlaying) {
+      video.muted = false
+      void video.play().catch(() => {
+        setIsPlaying(false)
+        video.muted = true
+      })
+    } else {
+      video.pause()
+      video.muted = true
+    }
+  }, [isPlaying, videoRef])
+
+  useEffect(() => {
+    if (!suspendPlayback && src) return
+    setIsPlaying(false)
+    videoRef.current?.pause()
+  }, [suspendPlayback, src, videoRef])
 
   useEffect(() => {
     return () => {
@@ -85,34 +82,19 @@ export default function PipWindow({
     }
   }, [playbackKey, videoRef])
 
-  const handleInlinePlayClick = useCallback(
-    (event: React.MouseEvent) => {
-      blockTouchBubble(event)
+  const togglePlaying = useCallback(() => {
+    setIsPlaying((prev) => !prev)
+  }, [])
+
+  const handleVolume = useCallback(
+    (value: number) => {
       const video = videoRef.current
       if (!video) return
-      if (video.paused) {
-        userPlayIntentRef.current = true
-        video.muted = false
-        void video.play().catch(() => {
-          userPlayIntentRef.current = false
-          video.muted = true
-        })
-      } else {
-        userPlayIntentRef.current = false
-        video.pause()
-        video.muted = true
-      }
+      video.volume = value
+      setVolume(value)
     },
     [videoRef],
   )
-
-  const handleInlinePauseOnly = useCallback(() => {
-    userPlayIntentRef.current = false
-    const video = videoRef.current
-    if (!video) return
-    video.pause()
-    video.muted = true
-  }, [videoRef])
 
   const handleExpand = useCallback(
     (event: React.MouseEvent | React.TouchEvent) => {
@@ -239,7 +221,10 @@ export default function PipWindow({
                 onPointerDown={stopEventBubble}
                 onTouchStart={stopEventBubble}
                 onTouchEnd={stopEventBubble}
-                onClick={handleInlinePlayClick}
+                onClick={(e) => {
+                  stopEventBubble(e)
+                  togglePlaying()
+                }}
                 className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >
@@ -267,8 +252,7 @@ export default function PipWindow({
               <MiniPipControls
                 isPlaying={isPlaying}
                 volume={volume}
-                onPlayClick={handleInlinePlayClick}
-                onPauseClick={handleInlinePauseOnly}
+                onTogglePlay={togglePlaying}
                 onVolumeChange={handleVolume}
               />
             </div>
