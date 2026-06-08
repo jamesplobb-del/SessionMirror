@@ -6,6 +6,7 @@ import GallerySortStrip from './GallerySortStrip'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import { resetVideosInContainer } from '../utils/videoPlayback'
+import { shareTakeVideo } from '../utils/shareTakeVideo'
 import type { SortMode, Take, TakeUpdate } from '../types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
@@ -172,6 +173,10 @@ export default function TakeVaultDrawer({
                         onBeforePin?.()
                         silenceAllVaultVideos()
                         onPinChallenger(take.id)
+                      }}
+                      onExport={() => {
+                        silenceAllVaultVideos()
+                        void shareTakeVideo(take)
                       }}
                       onUpdate={(updates) => onUpdateTake(take.id, updates)}
                       onDelete={() => onDeleteTake(take.id)}

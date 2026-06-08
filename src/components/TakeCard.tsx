@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
-import { ChevronDown, ChevronUp, Pin, StickyNote, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Pin, Share2, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
 
@@ -11,6 +11,7 @@ interface TakeCardProps {
   onOpenTake?: () => void
   onPinBenchmark: () => void
   onPinChallenger: () => void
+  onExport?: () => void
   onUpdate: (updates: TakeUpdate) => void
   onDelete: () => void
 }
@@ -23,6 +24,7 @@ export default function TakeCard({
   onOpenTake,
   onPinBenchmark,
   onPinChallenger,
+  onExport,
   onUpdate,
   onDelete,
 }: TakeCardProps) {
@@ -255,6 +257,22 @@ export default function TakeCard({
             <Pin className="h-3.5 w-3.5" />
             Load Take
           </button>
+          {onExport && (
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                onExport()
+              }}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Export
+            </button>
+          )}
         </div>
       </div>
     </div>
