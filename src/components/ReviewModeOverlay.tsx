@@ -95,17 +95,6 @@ export default function ReviewModeOverlay({
     resetVideoPlayback(vaultVideoRef.current)
   }, [])
 
-  const handleCloseClick = useCallback(() => {
-    for (const ref of [benchmarkVideoRef, challengerVideoRef, vaultVideoRef]) {
-      const video = ref.current
-      if (video) {
-        video.pause()
-        video.currentTime = 0
-      }
-    }
-    onClose()
-  }, [onClose])
-
   const pauseAllReviewVideosSafe = useCallback(() => {
     pauseVideoElement(benchmarkVideoRef.current)
     pauseVideoElement(challengerVideoRef.current)
@@ -434,7 +423,24 @@ export default function ReviewModeOverlay({
           </div>
           <button
             type="button"
-            onClick={handleCloseClick}
+            onClick={(e) => {
+              e.stopPropagation()
+              const video = getActiveVideo()
+              if (video) {
+                video.pause()
+                video.removeAttribute('src')
+                video.load()
+              }
+              for (const ref of [benchmarkVideoRef, challengerVideoRef, vaultVideoRef]) {
+                const inactive = ref.current
+                if (inactive && inactive !== video) {
+                  inactive.pause()
+                  inactive.removeAttribute('src')
+                  inactive.load()
+                }
+              }
+              onClose()
+            }}
             className="pointer-events-auto absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/25"
             aria-label="Done"
           >

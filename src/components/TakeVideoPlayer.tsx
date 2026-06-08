@@ -19,6 +19,8 @@ export interface TakeVideoPlayerProps
   thumbnailPreview?: boolean
   /** PiP / HUD — never autoplay; play only via explicit user control. */
   manualPlayOnly?: boolean
+  /** Forces a full <video> remount when the take source changes (PiP). */
+  videoSourceKey?: string
   preload?: 'auto' | 'metadata' | 'none'
 }
 
@@ -38,6 +40,7 @@ export default function TakeVideoPlayer({
   eagerLoad = false,
   thumbnailPreview = false,
   manualPlayOnly = false,
+  videoSourceKey,
   preload = 'metadata',
   style,
   ...rest
@@ -54,11 +57,19 @@ export default function TakeVideoPlayer({
   }, [eagerLoad, videoSrc, videoRef])
 
   useEffect(() => {
+    if (manualPlayOnly) return
     const video = videoRef.current
     if (!video || !videoSrc) return
     video.pause()
     video.currentTime = 0
     video.muted = true
+  }, [videoSrc, videoRef, manualPlayOnly])
+
+  useEffect(() => {
+    if (manualPlayOnly) return
+    return () => {
+      pauseVideoElement(videoRef.current)
+    }
   }, [videoSrc, videoRef, manualPlayOnly])
 
   useEffect(() => {
@@ -76,12 +87,6 @@ export default function TakeVideoPlayer({
     }
   }, [thumbnailPreview, videoSrc, videoRef])
 
-  useEffect(() => {
-    return () => {
-      pauseVideoElement(videoRef.current)
-    }
-  }, [videoSrc, videoRef])
-
   if (!videoSrc) {
     return <div className={loadingClassName} aria-hidden />
   }
@@ -93,6 +98,7 @@ export default function TakeVideoPlayer({
 
   const videoElement = (
     <video
+      key={videoSourceKey ?? videoSrc ?? 'empty'}
       ref={videoRef}
       className={`${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
       src={videoSrc}
