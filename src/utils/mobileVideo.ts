@@ -30,3 +30,11 @@ export function getRecorderMimeType(): string {
 
 /** MediaRecorder timeslice — flush a chunk to disk every N ms on native */
 export const RECORDING_TIMESLICE_MS = 1000
+
+/** WebKit hack — forces the first frame to render as an inline poster/thumbnail. */
+export function withWebKitThumbnailHint(src: string): string {
+  if (!src || src.includes('#t=')) {
+    return src
+  }
+  return `${src}#t=0.001`
+}

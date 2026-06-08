@@ -30,7 +30,7 @@ export default function LiveCameraBackground({
   }, [previewRef, stream])
 
   return (
-    <>
+    <div className="absolute inset-0 z-0 transition-opacity duration-200 ease-in">
       <video
         ref={previewRef}
         autoPlay
@@ -41,7 +41,8 @@ export default function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        className="absolute inset-0 z-0 h-[100dvh] w-full object-cover"
+        style={{ transform: 'scaleX(1)' }}
+        className="absolute inset-0 z-0 h-[100dvh] w-full object-cover transition-opacity duration-200 ease-in"
       />
       {error && (
         <div className="absolute inset-0 z-0 flex items-center justify-center bg-stone-900">
@@ -49,6 +50,6 @@ export default function LiveCameraBackground({
         </div>
       )}
       <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/25 via-transparent to-black/45" />
-    </>
+    </div>
   )
 }

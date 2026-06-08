@@ -83,7 +83,7 @@ export default function TakeVaultDrawer({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 ease-in ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
@@ -91,8 +91,8 @@ export default function TakeVaultDrawer({
       />
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 max-h-[75vh] transform rounded-t-3xl border border-white/20 bg-white/90 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out ${
-          isOpen ? 'translate-y-0' : 'translate-y-full'
+        className={`fixed inset-x-0 bottom-0 z-50 max-h-[75vh] rounded-t-3xl border border-white/20 bg-white/90 shadow-2xl backdrop-blur-xl transition-[transform,opacity] duration-200 ease-in ${
+          isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
         }`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         role="dialog"

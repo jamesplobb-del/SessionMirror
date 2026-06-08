@@ -1,7 +1,7 @@
 import type { RefObject, VideoHTMLAttributes } from 'react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { iosTakeVideoProps } from '../utils/mobileVideo'
+import { iosTakeVideoProps, withWebKitThumbnailHint } from '../utils/mobileVideo'
 
 export interface TakeVideoPlayerProps
   extends Omit<VideoHTMLAttributes<HTMLVideoElement>, 'src'> {
@@ -32,11 +32,13 @@ export default function TakeVideoPlayer({
     return <div className={loadingClassName} aria-hidden />
   }
 
+  const videoSrc = withWebKitThumbnailHint(playbackSrc)
+
   return (
     <video
       ref={videoRef}
-      className={className}
-      src={playbackSrc}
+      className={`${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
+      src={videoSrc}
       {...rest}
       {...iosTakeVideoProps}
       playsInline

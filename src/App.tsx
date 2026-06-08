@@ -27,6 +27,23 @@ export default function App() {
 
   const isReviewOpen = reviewSlot !== null
   const isCameraActive = !isVaultOpen && !isReviewOpen
+  const [cameraSessionEnabled, setCameraSessionEnabled] = useState(isCameraActive)
+  const [renderCamera, setRenderCamera] = useState(isCameraActive)
+
+  useEffect(() => {
+    if (isCameraActive) {
+      setRenderCamera(true)
+      setCameraSessionEnabled(true)
+      return
+    }
+
+    const releaseTimer = window.setTimeout(() => {
+      setCameraSessionEnabled(false)
+      setRenderCamera(false)
+    }, 220)
+
+    return () => window.clearTimeout(releaseTimer)
+  }, [isCameraActive])
 
   useEffect(() => {
     const wasInactive = prevCameraActiveRef.current === false
@@ -87,7 +104,7 @@ export default function App() {
     toggleRecording,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
-    enabled: isCameraActive,
+    enabled: cameraSessionEnabled,
     initKey: cameraInitKey,
   })
 
@@ -161,19 +178,25 @@ export default function App() {
 
   return (
     <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black">
-      {isCameraActive && (
-        <LiveCameraBackground
-          previewRef={previewRef}
-          stream={stream}
-          error={cameraError}
-        />
+      {renderCamera && (
+        <div
+          className={`absolute inset-0 z-0 transition-opacity duration-200 ease-in ${
+            isCameraActive ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+        >
+          <LiveCameraBackground
+            previewRef={previewRef}
+            stream={stream}
+            error={cameraError}
+          />
+        </div>
       )}
 
       {!isReviewOpen && <HudHeader />}
 
       {!isReviewOpen && (
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4 transition-opacity duration-200 ease-in"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
         >
           <div className="flex items-end justify-between gap-3 px-3 sm:px-4">

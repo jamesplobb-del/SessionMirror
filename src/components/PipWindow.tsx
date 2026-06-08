@@ -41,7 +41,7 @@ export default function PipWindow({
 
   return (
     <div
-      className={`group w-32 overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-lg shadow-black/50 ring-1 backdrop-blur-md sm:w-36 ${accentRing} ${className}`}
+      className={`group w-32 overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-opacity duration-200 ease-in sm:w-36 ${accentRing} ${src ? 'opacity-100' : 'opacity-90'} ${className}`}
     >
       <div className="flex items-center justify-between px-2 py-1">
         <span

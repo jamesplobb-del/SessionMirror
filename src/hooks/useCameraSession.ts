@@ -20,6 +20,7 @@ interface UseCameraSessionOptions {
 
 const CAMERA_INIT_MAX_ATTEMPTS = 3
 const CAMERA_INIT_RETRY_MS = 450
+const CAMERA_RELEASE_DELAY_MS = 220
 
 function detachRecorder(recorder: MediaRecorder) {
   recorder.ondataavailable = null
@@ -99,6 +100,12 @@ export function useCameraSession({
     }
   }, [])
 
+  const scheduleReleaseCameraState = useCallback(() => {
+    window.setTimeout(() => {
+      forceClearCameraState()
+    }, CAMERA_RELEASE_DELAY_MS)
+  }, [forceClearCameraState])
+
   const acquireStream = useCallback(async (cancelled?: () => boolean) => {
     setError(null)
     const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -132,7 +139,7 @@ export function useCameraSession({
   useEffect(() => {
     if (!enabled) {
       void abortActiveWriter().catch(() => {})
-      forceClearCameraState()
+      scheduleReleaseCameraState()
       return
     }
 
@@ -175,7 +182,7 @@ export function useCameraSession({
         window.clearTimeout(retryTimer)
       }
       void abortActiveWriter().catch(() => {})
-      forceClearCameraState()
+      scheduleReleaseCameraState()
     }
   }, [
     enabled,
@@ -183,6 +190,7 @@ export function useCameraSession({
     abortActiveWriter,
     acquireStream,
     forceClearCameraState,
+    scheduleReleaseCameraState,
   ])
 
   useEffect(() => {
