@@ -23,7 +23,9 @@ export default function LiveCameraBackground({
     const video = previewRef.current
     if (!video || !stream) return
 
-    video.srcObject = stream
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+    }
     video.muted = true
 
     void video.play().catch(() => {
@@ -37,23 +39,15 @@ export default function LiveCameraBackground({
         window.clearTimeout(releaseTimerRef.current)
       }
 
-      const tracks = stream.getTracks()
       const videoEl = video
       const boundStream = stream
 
       releaseTimerRef.current = window.setTimeout(() => {
         releaseTimerRef.current = null
 
-        if (videoEl.srcObject !== boundStream) {
-          return
+        if (videoEl.srcObject === boundStream) {
+          videoEl.srcObject = null
         }
-
-        tracks.forEach((track) => {
-          if (track.readyState !== 'ended') {
-            track.stop()
-          }
-        })
-        videoEl.srcObject = null
       }, CAMERA_HARDWARE_RELEASE_MS)
     }
   }, [previewRef, stream])

@@ -330,6 +330,7 @@ export default function ReviewModeOverlay({
           mimeType={videoMimeType}
           videoRef={videoRef}
           className="custom-video-player h-full w-full object-cover transition-all duration-200 ease-out"
+          mirror
           style={{
             transform:
               slideDirection === 'left'

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Capacitor } from '@capacitor/core'
 import {
   getRecorderMimeType,
   RECORDING_TIMESLICE_MS,
@@ -121,20 +120,6 @@ export function useCameraSession({
     setReady(true)
     return mediaStream
   }, [])
-
-  const restartCameraAfterRecording = useCallback(async () => {
-    forceClearCameraState()
-    try {
-      await acquireStream()
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to restart camera after recording.',
-      )
-      setReady(false)
-    }
-  }, [acquireStream, forceClearCameraState])
 
   useEffect(() => {
     if (!enabled) {
@@ -285,17 +270,9 @@ export function useCameraSession({
               }
             } finally {
               setIsRecording(false)
-              if (Capacitor.isNativePlatform() && enabled) {
-                try {
-                  await restartCameraAfterRecording()
-                } catch {
-                  forceClearCameraState()
-                }
-              }
             }
           })().catch(() => {
             setIsRecording(false)
-            forceClearCameraState()
           })
         }
 
@@ -327,9 +304,7 @@ export function useCameraSession({
   }, [
     abortActiveWriter,
     enabled,
-    forceClearCameraState,
     isRecording,
-    restartCameraAfterRecording,
   ])
 
   const stopRecording = useCallback(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject, type VideoHTMLAttributes } from 'react'
+import { useEffect, useRef, type CSSProperties, type RefObject, type VideoHTMLAttributes } from 'react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosTakeVideoProps, withWebKitThumbnailHint } from '../utils/mobileVideo'
@@ -15,6 +15,22 @@ export interface TakeVideoPlayerProps
   /** Call video.load() on mount so WebKit eagerly fetches #t= poster frames. */
   eagerLoad?: boolean
   preload?: 'auto' | 'metadata' | 'none'
+}
+
+function withMirrorTransform(
+  style: CSSProperties | undefined,
+  mirror: boolean,
+): CSSProperties | undefined {
+  if (!mirror) {
+    return style
+  }
+
+  const mirrorTransform = 'scaleX(-1)'
+  if (!style?.transform || style.transform === 'none') {
+    return { ...style, transform: mirrorTransform }
+  }
+
+  return { ...style, transform: `${mirrorTransform} ${style.transform}` }
 }
 
 /**
@@ -55,10 +71,7 @@ export default function TakeVideoPlayer({
       ref={videoRef}
       className={`${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
       src={videoSrc}
-      style={{
-        ...style,
-        ...(mirror ? { transform: 'scaleX(-1)' } : undefined),
-      }}
+      style={withMirrorTransform(style, mirror)}
       {...rest}
       {...iosTakeVideoProps}
       playsInline
