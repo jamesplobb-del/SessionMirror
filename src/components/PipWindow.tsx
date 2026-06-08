@@ -91,6 +91,7 @@ export default function PipWindow({
               videoRef={videoRef}
               className="h-full w-full object-cover"
               loadingClassName="h-full w-full bg-black/30"
+              mirror
               controls
             />
             {onExpand && (

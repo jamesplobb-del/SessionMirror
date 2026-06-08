@@ -1,18 +1,21 @@
 import { useEffect, useRef, type RefObject, type VideoHTMLAttributes } from 'react'
 import { mobileVideoProps } from '../utils/mobileVideo'
 
+const CAMERA_HARDWARE_RELEASE_MS = 700
+
 interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
   stream: MediaStream | null
   error: string | null
+  /** When false, hide instantly so CSS exit transitions never race hardware teardown. */
+  isActive?: boolean
 }
-
-const CAMERA_HARDWARE_RELEASE_MS = 400
 
 export default function LiveCameraBackground({
   previewRef,
   stream,
   error,
+  isActive = true,
 }: LiveCameraBackgroundProps) {
   const releaseTimerRef = useRef<number | null>(null)
 
@@ -56,7 +59,13 @@ export default function LiveCameraBackground({
   }, [previewRef, stream])
 
   return (
-    <div className="absolute inset-0 z-0 transition-opacity duration-200 ease-in">
+    <div
+      className={`absolute inset-0 z-0 ${
+        isActive
+          ? 'opacity-100 transition-opacity duration-200 ease-in'
+          : 'pointer-events-none opacity-0 transition-none'
+      }`}
+    >
       <video
         ref={previewRef}
         autoPlay

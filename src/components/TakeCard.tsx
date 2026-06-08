@@ -8,6 +8,7 @@ interface TakeCardProps {
   isBenchmark: boolean
   isChallenger: boolean
   isPreviewing?: boolean
+  thumbnailVideo?: ReactNode
   previewVideo?: ReactNode
   onPreview?: () => void
   onPinBenchmark: () => void
@@ -21,6 +22,7 @@ export default function TakeCard({
   isBenchmark,
   isChallenger,
   isPreviewing = false,
+  thumbnailVideo,
   previewVideo,
   onPreview,
   onPinBenchmark,
@@ -65,8 +67,17 @@ export default function TakeCard({
       }`}
     >
       <div className="relative aspect-video bg-stone-900">
-        {previewVideo ? (
+        {isPreviewing && previewVideo ? (
           previewVideo
+        ) : thumbnailVideo ? (
+          <button
+            type="button"
+            onClick={onPreview}
+            className="block h-full w-full overflow-hidden"
+            aria-label={`Preview ${take.name}`}
+          >
+            {thumbnailVideo}
+          </button>
         ) : take.thumbnailUrl ? (
           <button
             type="button"

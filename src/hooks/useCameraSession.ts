@@ -20,7 +20,7 @@ interface UseCameraSessionOptions {
 
 const CAMERA_INIT_MAX_ATTEMPTS = 3
 const CAMERA_INIT_RETRY_MS = 450
-const CAMERA_RELEASE_DELAY_MS = 220
+const CAMERA_RELEASE_DELAY_MS = 700
 
 function detachRecorder(recorder: MediaRecorder) {
   recorder.ondataavailable = null

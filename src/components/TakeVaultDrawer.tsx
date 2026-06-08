@@ -39,11 +39,14 @@ interface TakeVaultDrawerProps {
 interface VaultTakeVideoProps {
   take: Take
   className?: string
+  /** List tile — eager WebKit thumbnail fetch, no controls. */
+  thumbnail?: boolean
 }
 
 export function VaultTakeVideo({
   take,
   className = 'h-full w-full object-cover',
+  thumbnail = false,
 }: VaultTakeVideoProps) {
   return (
     <TakeVideoPlayer
@@ -53,7 +56,10 @@ export function VaultTakeVideo({
       className={className}
       poster={take.thumbnailUrl || undefined}
       loadingClassName="h-full w-full animate-pulse bg-stone-200"
-      controls
+      controls={!thumbnail}
+      mirror
+      eagerLoad={thumbnail}
+      preload={thumbnail ? 'auto' : 'metadata'}
     />
   )
 }
@@ -145,6 +151,7 @@ export default function TakeVaultDrawer({
                     onPinChallenger={() => onPinChallenger(take.id)}
                     onUpdate={(updates) => onUpdateTake(take.id, updates)}
                     onDelete={() => onDeleteTake(take.id)}
+                    thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
                     previewVideo={
                       previewTakeId === take.id ? (
                         <VaultTakeVideo take={take} />

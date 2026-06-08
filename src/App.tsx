@@ -40,7 +40,7 @@ export default function App() {
     const releaseTimer = window.setTimeout(() => {
       setCameraSessionEnabled(false)
       setRenderCamera(false)
-    }, 220)
+    }, 700)
 
     return () => window.clearTimeout(releaseTimer)
   }, [isCameraActive])
@@ -179,15 +179,12 @@ export default function App() {
   return (
     <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black">
       {renderCamera && (
-        <div
-          className={`absolute inset-0 z-0 transition-opacity duration-200 ease-in ${
-            isCameraActive ? 'opacity-100' : 'pointer-events-none opacity-0'
-          }`}
-        >
+        <div className="absolute inset-0 z-0">
           <LiveCameraBackground
             previewRef={previewRef}
             stream={stream}
             error={cameraError}
+            isActive={isCameraActive}
           />
         </div>
       )}

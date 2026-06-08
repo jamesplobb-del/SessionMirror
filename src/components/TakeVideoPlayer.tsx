@@ -1,4 +1,4 @@
-import type { RefObject, VideoHTMLAttributes } from 'react'
+import { useEffect, useRef, type RefObject, type VideoHTMLAttributes } from 'react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosTakeVideoProps, withWebKitThumbnailHint } from '../utils/mobileVideo'
@@ -10,6 +10,11 @@ export interface TakeVideoPlayerProps
   mimeType?: string
   videoRef?: RefObject<HTMLVideoElement | null>
   loadingClassName?: string
+  /** Mirror playback to match the live camera preview (scaleX(-1)). */
+  mirror?: boolean
+  /** Call video.load() on mount so WebKit eagerly fetches #t= poster frames. */
+  eagerLoad?: boolean
+  preload?: 'auto' | 'metadata' | 'none'
 }
 
 /**
@@ -20,25 +25,40 @@ export default function TakeVideoPlayer({
   filePath,
   videoUrl,
   mimeType: _mimeType = NATIVE_VIDEO_MIME,
-  videoRef,
+  videoRef: externalVideoRef,
   className,
   loadingClassName = 'h-full w-full animate-pulse bg-stone-900',
   controls = true,
+  mirror = false,
+  eagerLoad = false,
+  preload = 'metadata',
+  style,
   ...rest
 }: TakeVideoPlayerProps) {
+  const internalRef = useRef<HTMLVideoElement>(null)
+  const videoRef = externalVideoRef ?? internalRef
   const playbackSrc = useCapacitorVideoSrc(filePath, videoUrl)
 
-  if (!playbackSrc) {
+  const videoSrc = playbackSrc ? withWebKitThumbnailHint(playbackSrc) : null
+
+  useEffect(() => {
+    if (!eagerLoad || !videoSrc) return
+    videoRef.current?.load()
+  }, [eagerLoad, videoSrc, videoRef])
+
+  if (!videoSrc) {
     return <div className={loadingClassName} aria-hidden />
   }
-
-  const videoSrc = withWebKitThumbnailHint(playbackSrc)
 
   return (
     <video
       ref={videoRef}
       className={`${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
       src={videoSrc}
+      style={{
+        ...style,
+        ...(mirror ? { transform: 'scaleX(-1)' } : undefined),
+      }}
       {...rest}
       {...iosTakeVideoProps}
       playsInline
@@ -48,7 +68,7 @@ export default function TakeVideoPlayer({
       muted
       disablePictureInPicture
       controls={controls}
-      preload="metadata"
+      preload={preload}
     />
   )
 }
