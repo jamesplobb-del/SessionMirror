@@ -10,27 +10,11 @@ export interface TakeVideoPlayerProps
   mimeType?: string
   videoRef?: RefObject<HTMLVideoElement | null>
   loadingClassName?: string
-  /** Mirror playback to match the live camera preview (scaleX(-1)). */
+  /** Mirror only the raw <video> pixels (scaleX(-1)); never flips sibling UI overlays. */
   mirror?: boolean
   /** Call video.load() on mount so WebKit eagerly fetches #t= poster frames. */
   eagerLoad?: boolean
   preload?: 'auto' | 'metadata' | 'none'
-}
-
-function withMirrorTransform(
-  style: CSSProperties | undefined,
-  mirror: boolean,
-): CSSProperties | undefined {
-  if (!mirror) {
-    return style
-  }
-
-  const mirrorTransform = 'scaleX(-1)'
-  if (!style?.transform || style.transform === 'none') {
-    return { ...style, transform: mirrorTransform }
-  }
-
-  return { ...style, transform: `${mirrorTransform} ${style.transform}` }
 }
 
 /**
@@ -66,12 +50,16 @@ export default function TakeVideoPlayer({
     return <div className={loadingClassName} aria-hidden />
   }
 
-  return (
+  const videoStyle: CSSProperties = mirror
+    ? { transform: 'scaleX(-1)' }
+    : { ...style }
+
+  const videoElement = (
     <video
       ref={videoRef}
       className={`${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
       src={videoSrc}
-      style={withMirrorTransform(style, mirror)}
+      style={videoStyle}
       {...rest}
       {...iosTakeVideoProps}
       playsInline
@@ -80,8 +68,18 @@ export default function TakeVideoPlayer({
       } as VideoHTMLAttributes<HTMLVideoElement>)}
       muted
       disablePictureInPicture
-      controls={controls}
+      controls={mirror ? false : controls}
       preload={preload}
     />
   )
+
+  if (mirror && style) {
+    return (
+      <div className="h-full w-full" style={style}>
+        {videoElement}
+      </div>
+    )
+  }
+
+  return videoElement
 }

@@ -68,6 +68,7 @@ export default function App() {
 
   const {
     previewRef,
+    streamRef,
     error: cameraError,
     ready,
     isRecording,
@@ -76,6 +77,8 @@ export default function App() {
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
   })
+
+  const suspendPipPlayback = isVaultOpen || isReviewOpen
 
   const benchmarkTake = useMemo(
     () => takes.find((t) => t.id === benchmarkId) ?? null,
@@ -147,7 +150,11 @@ export default function App() {
 
   return (
     <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black">
-      <LiveCameraBackground previewRef={previewRef} error={cameraError} />
+      <LiveCameraBackground
+        previewRef={previewRef}
+        streamRef={streamRef}
+        error={cameraError}
+      />
 
       <div
         className={`absolute inset-0 z-10 ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
@@ -169,6 +176,7 @@ export default function App() {
               label="Benchmark"
               variant="benchmark"
               emptyMessage="Pin a benchmark take from the vault."
+              suspendPlayback={suspendPipPlayback}
               onUnpin={() => setBenchmarkId(null)}
               onExpand={
                 benchmarkTake?.videoUrl
@@ -186,6 +194,7 @@ export default function App() {
               label="Challenger"
               variant="challenger"
               emptyMessage="Pin a challenger take from the vault."
+              suspendPlayback={suspendPipPlayback}
               onUnpin={() => setChallengerId(null)}
               onExpand={
                 challengerTake?.videoUrl

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
+import { resetVideosInContainer } from '../utils/videoPlayback'
 import type { SortMode, Take, TakeUpdate } from '../types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
@@ -79,12 +80,24 @@ export default function TakeVaultDrawer({
   onDeleteTake,
 }: TakeVaultDrawerProps) {
   const [previewTakeId, setPreviewTakeId] = useState<string | null>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
+
+  const pauseAllVaultVideos = useCallback(() => {
+    resetVideosInContainer(drawerRef.current)
+  }, [])
 
   useEffect(() => {
     if (!isOpen) {
       setPreviewTakeId(null)
+      pauseAllVaultVideos()
     }
-  }, [isOpen])
+  }, [isOpen, pauseAllVaultVideos])
+
+  useEffect(() => {
+    return () => {
+      pauseAllVaultVideos()
+    }
+  }, [pauseAllVaultVideos])
 
   return (
     <>
@@ -97,6 +110,7 @@ export default function TakeVaultDrawer({
       />
 
       <div
+        ref={drawerRef}
         className={`fixed inset-x-0 bottom-0 z-50 max-h-[75vh] rounded-t-3xl border border-white/20 bg-white/90 shadow-2xl backdrop-blur-xl transition-[transform,opacity] duration-200 ease-in ${
           isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
         }`}

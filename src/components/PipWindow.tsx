@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { Play, X } from 'lucide-react'
 import { useVideoPlayback } from '../hooks/useVideoPlayback'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
+import { resetVideoPlayback } from '../utils/videoPlayback'
 
 interface PipWindowProps {
   src: string | null
@@ -11,6 +13,7 @@ interface PipWindowProps {
   takeName?: string
   variant: 'benchmark' | 'challenger'
   emptyMessage: string
+  suspendPlayback?: boolean
   onUnpin: () => void
   onExpand?: () => void
   className?: string
@@ -24,6 +27,7 @@ export default function PipWindow({
   takeName,
   variant,
   emptyMessage,
+  suspendPlayback = false,
   onUnpin,
   onExpand,
   className = '',
@@ -31,6 +35,18 @@ export default function PipWindow({
   const playbackKey = `${filePath}|${src ?? ''}`
   const { videoRef, isPlaying, volume, togglePlay, handleVolume } =
     useVideoPlayback(playbackKey)
+
+  useEffect(() => {
+    if (suspendPlayback || !src) {
+      resetVideoPlayback(videoRef.current)
+    }
+  }, [suspendPlayback, src, playbackKey, videoRef])
+
+  useEffect(() => {
+    return () => {
+      resetVideoPlayback(videoRef.current)
+    }
+  }, [playbackKey, videoRef])
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -92,7 +108,7 @@ export default function PipWindow({
               className="h-full w-full object-cover"
               loadingClassName="h-full w-full bg-black/30"
               mirror
-              controls
+              controls={false}
             />
             {onExpand && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-70 transition-opacity group-hover:opacity-0">

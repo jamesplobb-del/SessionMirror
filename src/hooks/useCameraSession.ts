@@ -37,7 +37,6 @@ export function useCameraSession({
   const onCompleteRef = useRef(onRecordingComplete)
   onCompleteRef.current = onRecordingComplete
 
-  const [stream, setStream] = useState<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -80,7 +79,6 @@ export function useCameraSession({
       }
     })
     streamRef.current = null
-    setStream(null)
     setReady(false)
 
     const video = previewRef.current
@@ -111,7 +109,6 @@ export function useCameraSession({
       return null
     }
     streamRef.current = mediaStream
-    setStream(mediaStream)
     setReady(true)
     return mediaStream
   }, [])
@@ -164,20 +161,6 @@ export function useCameraSession({
     forceClearCameraState,
     scheduleReleaseCameraState,
   ])
-
-  useEffect(() => {
-    const video = previewRef.current
-    if (!video || !stream) return
-
-    if (video.srcObject !== stream) {
-      video.srcObject = stream
-    }
-    video.muted = true
-
-    void video.play().catch(() => {
-      /* autoplay may need a user gesture in some browsers */
-    })
-  }, [stream])
 
   useEffect(() => {
     if (!isRecording) return
@@ -337,7 +320,7 @@ export function useCameraSession({
 
   return {
     previewRef,
-    stream,
+    streamRef,
     error,
     ready,
     isRecording,

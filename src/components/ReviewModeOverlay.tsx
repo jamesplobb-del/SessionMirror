@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
+import { resetVideoPlayback } from '../utils/videoPlayback'
 import type { ReviewSlot } from '../types'
 
 const SWIPE_THRESHOLD = 60
@@ -57,8 +58,8 @@ export default function ReviewModeOverlay({
   const activeName = activeSlot === 'benchmark' ? benchmarkName : challengerName
   const activeLabel = activeSlot === 'benchmark' ? 'Benchmark' : 'Challenger'
 
-  const canSwipeLeft = activeSlot === 'benchmark' && challengerSrc !== null
-  const canSwipeRight = activeSlot === 'challenger' && benchmarkSrc !== null
+  const canSwipeLeft = activeSlot === 'challenger' && benchmarkSrc !== null
+  const canSwipeRight = activeSlot === 'benchmark' && challengerSrc !== null
 
   const scheduleHideOverlay = useCallback(() => {
     if (hideOverlayTimerRef.current !== null) {
@@ -136,7 +137,11 @@ export default function ReviewModeOverlay({
 
   useEffect(() => {
     if (!isOpen) {
-      videoRef.current?.pause()
+      resetVideoPlayback(videoRef.current)
+    }
+
+    return () => {
+      resetVideoPlayback(videoRef.current)
     }
   }, [isOpen])
 
@@ -219,7 +224,7 @@ export default function ReviewModeOverlay({
   const completeSwipe = useCallback(
     (direction: 'left' | 'right') => {
       const nextSlot: ReviewSlot =
-        direction === 'left' ? 'challenger' : 'benchmark'
+        direction === 'left' ? 'benchmark' : 'challenger'
       setSlideDirection(direction)
       setSwipeOffset(0)
       isTrackingPointer.current = false
@@ -336,20 +341,14 @@ export default function ReviewModeOverlay({
               {canSwipeLeft && canSwipeRight
                 ? 'Swipe to compare takes'
                 : canSwipeLeft
-                  ? 'Swipe left for challenger'
-                  : 'Swipe right for benchmark'}
+                  ? 'Swipe left for benchmark'
+                  : 'Swipe right for challenger'}
             </p>
           </div>
         )}
 
-        <TakeVideoPlayer
-          key={`${activeSlot}-${activeFilePath}-${activeSrc}`}
-          filePath={activeFilePath}
-          videoUrl={activeSrc ?? ''}
-          mimeType={videoMimeType}
-          videoRef={videoRef}
-          className="custom-video-player h-full w-full object-cover transition-all duration-200 ease-out"
-          mirror
+        <div
+          className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
           style={{
             transform:
               slideDirection === 'left'
@@ -358,16 +357,28 @@ export default function ReviewModeOverlay({
                   ? 'translateX(100%)'
                   : `translateX(${swipeOffset}px)`,
             opacity: slideDirection ? 0 : 1,
-            WebkitTouchCallout: 'default',
-            userSelect: 'auto',
           }}
-          controls={false}
-          onLoadedData={startReviewPlayback}
-          onPointerDown={handleVideoPointerDown}
-          onPointerMove={handleVideoPointerMove}
-          onPointerUp={handleVideoPointerUp}
-          onPointerCancel={handleVideoPointerUp}
-        />
+        >
+          <TakeVideoPlayer
+            key={`${activeSlot}-${activeFilePath}-${activeSrc}`}
+            filePath={activeFilePath}
+            videoUrl={activeSrc ?? ''}
+            mimeType={videoMimeType}
+            videoRef={videoRef}
+            className="custom-video-player h-full w-full object-cover"
+            mirror
+            style={{
+              WebkitTouchCallout: 'default',
+              userSelect: 'auto',
+            }}
+            controls={false}
+            onLoadedData={startReviewPlayback}
+            onPointerDown={handleVideoPointerDown}
+            onPointerMove={handleVideoPointerMove}
+            onPointerUp={handleVideoPointerUp}
+            onPointerCancel={handleVideoPointerUp}
+          />
+        </div>
 
         <button
           type="button"
