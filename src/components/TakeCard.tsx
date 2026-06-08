@@ -130,12 +130,12 @@ export default function TakeCard({
           <div className="absolute left-2 top-2 flex gap-1">
             {isBenchmark && (
               <span className="rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                Benchmark
+                Best Take
               </span>
             )}
             {isChallenger && (
               <span className="rounded-md bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                Challenger
+                {take.name}
               </span>
             )}
           </div>
@@ -235,7 +235,7 @@ export default function TakeCard({
             }`}
           >
             <Pin className="h-3.5 w-3.5" />
-            Pin Benchmark
+            Set BestTake
           </button>
           <button
             type="button"
@@ -253,7 +253,7 @@ export default function TakeCard({
             }`}
           >
             <Pin className="h-3.5 w-3.5" />
-            Pin Challenger
+            Load Take
           </button>
         </div>
       </div>

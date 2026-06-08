@@ -139,7 +139,7 @@ export default function PipWindow({
                   htmlFor="benchmark-upload"
                   {...touchBubbleBlockProps()}
                   className={uploadLabelClass}
-                  aria-label="Upload benchmark video"
+                  aria-label="Upload best take video"
                 >
                   <Upload className="h-2.5 w-2.5" />
                 </label>
@@ -242,7 +242,7 @@ export default function PipWindow({
             {variant === 'benchmark' && onUpload && (
               <label htmlFor="benchmark-upload" className={uploadLabelClass}>
                 <Upload className="h-3 w-3" />
-                Upload Benchmark
+                Upload Best Take
               </label>
             )}
           </div>

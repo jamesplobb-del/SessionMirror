@@ -181,7 +181,7 @@ export default function App() {
             persisted.filePath,
             mimeType,
           ),
-          name: 'Uploaded Benchmark',
+          name: 'Uploaded Best Take',
           mirrorPlayback: false,
         }
 
@@ -279,9 +279,9 @@ export default function App() {
               filePath={benchmarkTake?.filePath}
               mimeType={benchmarkTake?.videoMimeType ?? 'video/mp4'}
               takeName={benchmarkTake?.name}
-              label="Benchmark"
+              label="Best Take"
               variant="benchmark"
-              emptyMessage="Pin or upload a benchmark take."
+              emptyMessage="Set or upload a Best Take."
               mirror={benchmarkTake?.mirrorPlayback !== false}
               suspendPlayback={suspendPipPlayback}
               videoRef={benchmarkPipVideoRef}
@@ -300,9 +300,9 @@ export default function App() {
               filePath={challengerTake?.filePath}
               mimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
               takeName={challengerTake?.name}
-              label="Challenger"
+              label={challengerTake?.name ?? 'Current Take'}
               variant="challenger"
-              emptyMessage="Pin a challenger take from the vault."
+              emptyMessage="Load a take from the vault."
               mirror={challengerTake?.mirrorPlayback !== false}
               suspendPlayback={suspendPipPlayback}
               videoRef={challengerPipVideoRef}

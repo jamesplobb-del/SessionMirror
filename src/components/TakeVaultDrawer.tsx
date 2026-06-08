@@ -125,7 +125,7 @@ export default function TakeVaultDrawer({
         <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
-            <p className="text-xs text-stone-500">Pin takes to the HUD windows above</p>
+            <p className="text-xs text-stone-500">Set your Best Take and load a take to the HUD</p>
           </div>
           <button
             type="button"

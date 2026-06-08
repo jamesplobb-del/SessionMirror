@@ -80,8 +80,10 @@ export default function ReviewModeOverlay({
   const activeLabel = isVault
     ? 'Take Vault'
     : activeSlot === 'benchmark'
-      ? 'Benchmark'
-      : 'Challenger'
+      ? 'Best Take'
+      : challengerName ?? 'Current Take'
+
+  const dynamicTakeLabel = challengerName ?? 'Current Take'
 
   const canSwipeLeft = isVault
     ? vaultIndex < vaultTakes.length - 1
@@ -455,8 +457,8 @@ export default function ReviewModeOverlay({
               {canSwipeLeft && canSwipeRight
                 ? 'Swipe to compare takes'
                 : canSwipeLeft
-                  ? 'Swipe left for challenger'
-                  : 'Swipe right for benchmark'}
+                  ? `Swipe left for ${dynamicTakeLabel}`
+                  : 'Swipe right for Best Take'}
             </p>
           </div>
         )}
