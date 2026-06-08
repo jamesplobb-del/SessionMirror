@@ -7,10 +7,8 @@ interface TakeCardProps {
   take: Take
   isBenchmark: boolean
   isChallenger: boolean
-  isPreviewing?: boolean
   thumbnailVideo?: ReactNode
-  previewVideo?: ReactNode
-  onPreview?: () => void
+  onOpenTake?: () => void
   onPinBenchmark: () => void
   onPinChallenger: () => void
   onUpdate: (updates: TakeUpdate) => void
@@ -21,10 +19,8 @@ export default function TakeCard({
   take,
   isBenchmark,
   isChallenger,
-  isPreviewing = false,
   thumbnailVideo,
-  previewVideo,
-  onPreview,
+  onOpenTake,
   onPinBenchmark,
   onPinChallenger,
   onUpdate,
@@ -67,23 +63,21 @@ export default function TakeCard({
       }`}
     >
       <div className="relative aspect-video bg-stone-900">
-        {isPreviewing && previewVideo ? (
-          previewVideo
-        ) : thumbnailVideo ? (
+        {thumbnailVideo ? (
           <button
             type="button"
-            onClick={onPreview}
+            onClick={onOpenTake}
             className="block h-full w-full overflow-hidden"
-            aria-label={`Preview ${take.name}`}
+            aria-label={`Open ${take.name} in full screen`}
           >
             {thumbnailVideo}
           </button>
         ) : take.thumbnailUrl ? (
           <button
             type="button"
-            onClick={onPreview}
+            onClick={onOpenTake}
             className="block h-full w-full"
-            aria-label={`Preview ${take.name}`}
+            aria-label={`Open ${take.name} in full screen`}
           >
             <img
               src={take.thumbnailUrl}
@@ -95,19 +89,10 @@ export default function TakeCard({
         ) : (
           <button
             type="button"
-            onClick={onPreview}
+            onClick={onOpenTake}
             className="block h-full w-full animate-pulse bg-stone-200"
-            aria-label={`Preview ${take.name}`}
+            aria-label={`Open ${take.name} in full screen`}
           />
-        )}
-        {isPreviewing && onPreview && (
-          <button
-            type="button"
-            onClick={onPreview}
-            className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
-          >
-            Close preview
-          </button>
         )}
         {(isBenchmark || isChallenger) && (
           <div className="absolute left-2 top-2 flex gap-1">
@@ -125,7 +110,10 @@ export default function TakeCard({
         )}
         <button
           type="button"
-          onClick={onDelete}
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
           className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 opacity-0 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
           aria-label={`Delete ${take.name}`}
         >
@@ -201,7 +189,10 @@ export default function TakeCard({
         <div className="flex flex-col gap-2">
           <button
             type="button"
-            onClick={onPinBenchmark}
+            onClick={(e) => {
+              e.stopPropagation()
+              onPinBenchmark()
+            }}
             className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
               isBenchmark
                 ? 'border-amber-300 bg-amber-100 text-amber-800'
@@ -213,7 +204,10 @@ export default function TakeCard({
           </button>
           <button
             type="button"
-            onClick={onPinChallenger}
+            onClick={(e) => {
+              e.stopPropagation()
+              onPinChallenger()
+            }}
             className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
               isChallenger
                 ? 'border-sky-300 bg-sky-100 text-sky-800'

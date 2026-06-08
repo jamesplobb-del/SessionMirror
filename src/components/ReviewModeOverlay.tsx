@@ -3,20 +3,22 @@ import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { resetVideoPlayback } from '../utils/videoPlayback'
-import type { ReviewSlot } from '../types'
+import type { ReviewSlot, Take } from '../types'
 
 const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 1000
 
 interface ReviewModeOverlayProps {
   activeSlot: ReviewSlot
+  soloTake?: Take | null
   benchmarkSrc: string | null
   challengerSrc: string | null
   benchmarkFilePath?: string
   challengerFilePath?: string
   benchmarkName?: string
   challengerName?: string
-  videoMimeType?: string
+  benchmarkMimeType?: string
+  challengerMimeType?: string
   isOpen: boolean
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
@@ -24,18 +26,22 @@ interface ReviewModeOverlayProps {
 
 export default function ReviewModeOverlay({
   activeSlot,
+  soloTake = null,
   benchmarkSrc,
   challengerSrc,
   benchmarkFilePath = '',
   challengerFilePath = '',
   benchmarkName,
   challengerName,
-  videoMimeType = 'video/mp4',
+  benchmarkMimeType = 'video/mp4',
+  challengerMimeType = 'video/mp4',
   isOpen,
   onClose,
   onSlotChange,
 }: ReviewModeOverlayProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const benchmarkVideoRef = useRef<HTMLVideoElement>(null)
+  const challengerVideoRef = useRef<HTMLVideoElement>(null)
+  const soloVideoRef = useRef<HTMLVideoElement>(null)
   const timelineTrackRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
   const hideOverlayTimerRef = useRef<number | null>(null)
@@ -52,14 +58,34 @@ export default function ReviewModeOverlay({
   const isTrackingPointer = useRef(false)
   const swipeCommitted = useRef(false)
 
-  const activeSrc = activeSlot === 'benchmark' ? benchmarkSrc : challengerSrc
-  const activeFilePath =
-    activeSlot === 'benchmark' ? benchmarkFilePath : challengerFilePath
-  const activeName = activeSlot === 'benchmark' ? benchmarkName : challengerName
-  const activeLabel = activeSlot === 'benchmark' ? 'Benchmark' : 'Challenger'
+  const isSolo = soloTake !== null
 
-  const canSwipeLeft = activeSlot === 'challenger' && benchmarkSrc !== null
-  const canSwipeRight = activeSlot === 'benchmark' && challengerSrc !== null
+  const activeName = isSolo
+    ? soloTake.name
+    : activeSlot === 'benchmark'
+      ? benchmarkName
+      : challengerName
+  const activeLabel = isSolo
+    ? 'Take'
+    : activeSlot === 'benchmark'
+      ? 'Benchmark'
+      : 'Challenger'
+
+  const canSwipeLeft = !isSolo && activeSlot === 'benchmark' && challengerSrc !== null
+  const canSwipeRight = !isSolo && activeSlot === 'challenger' && benchmarkSrc !== null
+
+  const pauseAllReviewVideos = useCallback(() => {
+    resetVideoPlayback(benchmarkVideoRef.current)
+    resetVideoPlayback(challengerVideoRef.current)
+    resetVideoPlayback(soloVideoRef.current)
+  }, [])
+
+  const getActiveVideo = useCallback((): HTMLVideoElement | null => {
+    if (isSolo) return soloVideoRef.current
+    return activeSlot === 'benchmark'
+      ? benchmarkVideoRef.current
+      : challengerVideoRef.current
+  }, [activeSlot, isSolo])
 
   const scheduleHideOverlay = useCallback(() => {
     if (hideOverlayTimerRef.current !== null) {
@@ -96,7 +122,7 @@ export default function ReviewModeOverlay({
 
   const scrubToClientX = useCallback(
     (clientX: number) => {
-      const video = videoRef.current
+      const video = getActiveVideo()
       const track = timelineTrackRef.current
       if (!video || !track || !duration) return
 
@@ -106,22 +132,22 @@ export default function ReviewModeOverlay({
       video.currentTime = time
       scheduleTimeUpdate(time)
     },
-    [duration, scheduleTimeUpdate],
+    [duration, getActiveVideo, scheduleTimeUpdate],
   )
 
   const startReviewPlayback = useCallback(() => {
     if (isScrubbingRef.current) return
-    const video = videoRef.current
-    if (!video || !activeSrc) return
+    const video = getActiveVideo()
+    if (!video) return
     video.muted = false
     void video.play().catch(() => {
       revealPlayOverlay(false)
     })
-  }, [activeSrc, revealPlayOverlay])
+  }, [getActiveVideo, revealPlayOverlay])
 
   const togglePlayPause = useCallback(() => {
-    const video = videoRef.current
-    if (!video || !activeSrc) return
+    const video = getActiveVideo()
+    if (!video) return
 
     video.muted = false
 
@@ -131,23 +157,35 @@ export default function ReviewModeOverlay({
       video.pause()
       revealPlayOverlay(false)
     }
-  }, [activeSrc, revealPlayOverlay])
+  }, [getActiveVideo, revealPlayOverlay])
 
-  const hasMedia = Boolean(activeSrc || activeFilePath)
+  const hasBenchmark = Boolean(benchmarkSrc || benchmarkFilePath)
+  const hasChallenger = Boolean(challengerSrc || challengerFilePath)
+  const hasMedia = isSolo ? Boolean(soloTake) : hasBenchmark || hasChallenger
 
   useEffect(() => {
     if (!isOpen) {
-      resetVideoPlayback(videoRef.current)
+      pauseAllReviewVideos()
     }
 
     return () => {
-      resetVideoPlayback(videoRef.current)
+      pauseAllReviewVideos()
     }
-  }, [isOpen])
+  }, [isOpen, pauseAllReviewVideos])
 
   useEffect(() => {
-    const video = videoRef.current
-    if (!isOpen || !video || !activeSrc) return
+    if (!isOpen) return
+
+    if (!isSolo) {
+      if (activeSlot === 'benchmark') {
+        resetVideoPlayback(challengerVideoRef.current)
+      } else {
+        resetVideoPlayback(benchmarkVideoRef.current)
+      }
+    }
+
+    const video = getActiveVideo()
+    if (!video) return
 
     setCurrentTime(0)
     setDuration(0)
@@ -159,15 +197,19 @@ export default function ReviewModeOverlay({
     }
 
     video.addEventListener('loadeddata', playWhenReady, { once: true })
-    video.load()
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      playWhenReady()
+    } else {
+      video.load()
+    }
 
     return () => {
       video.removeEventListener('loadeddata', playWhenReady)
     }
-  }, [activeSrc, activeSlot, isOpen, startReviewPlayback])
+  }, [activeSlot, getActiveVideo, isOpen, isSolo, soloTake?.id, startReviewPlayback])
 
   useEffect(() => {
-    const video = videoRef.current
+    const video = getActiveVideo()
     if (!video) return
 
     const onTimeUpdate = () => {
@@ -205,16 +247,16 @@ export default function ReviewModeOverlay({
       video.removeEventListener('pause', onPause)
       video.removeEventListener('ended', onEnded)
     }
-  }, [activeSrc, scheduleTimeUpdate, revealPlayOverlay])
+  }, [activeSlot, getActiveVideo, isSolo, revealPlayOverlay, scheduleTimeUpdate, soloTake?.id])
 
   const handleScrubStart = useCallback(() => {
-    const video = videoRef.current
+    const video = getActiveVideo()
     if (video) {
       video.pause()
     }
     isScrubbingRef.current = true
     revealPlayOverlay(false)
-  }, [revealPlayOverlay])
+  }, [getActiveVideo, revealPlayOverlay])
 
   const handleScrubEnd = useCallback(() => {
     isScrubbingRef.current = false
@@ -223,8 +265,9 @@ export default function ReviewModeOverlay({
 
   const completeSwipe = useCallback(
     (direction: 'left' | 'right') => {
+      resetVideoPlayback(getActiveVideo())
       const nextSlot: ReviewSlot =
-        direction === 'left' ? 'benchmark' : 'challenger'
+        direction === 'left' ? 'challenger' : 'benchmark'
       setSlideDirection(direction)
       setSwipeOffset(0)
       isTrackingPointer.current = false
@@ -236,8 +279,18 @@ export default function ReviewModeOverlay({
         setCurrentTime(0)
       }, 220)
     },
-    [onSlotChange],
+    [getActiveVideo, onSlotChange],
   )
+
+  const swipeLayerStyle = {
+    transform:
+      slideDirection === 'left'
+        ? 'translateX(-100%)'
+        : slideDirection === 'right'
+          ? 'translateX(100%)'
+          : `translateX(${swipeOffset}px)`,
+    opacity: slideDirection ? 0 : 1,
+  }
 
   const handleVideoPointerDown = (e: React.PointerEvent<HTMLVideoElement>) => {
     if ((e.target as HTMLElement).closest('[data-play-overlay]')) return
@@ -249,7 +302,7 @@ export default function ReviewModeOverlay({
   }
 
   const handleVideoPointerMove = (e: React.PointerEvent<HTMLVideoElement>) => {
-    if (!isTrackingPointer.current) return
+    if (!isTrackingPointer.current || isSolo) return
 
     const deltaX = e.clientX - pointerStart.current.x
     const deltaY = e.clientY - pointerStart.current.y
@@ -280,7 +333,7 @@ export default function ReviewModeOverlay({
     if (!isTrackingPointer.current) return
     isTrackingPointer.current = false
 
-    if (!swipeCommitted.current) return
+    if (!swipeCommitted.current || isSolo) return
 
     swipeCommitted.current = false
     const deltaX = e.clientX - pointerStart.current.x
@@ -341,44 +394,115 @@ export default function ReviewModeOverlay({
               {canSwipeLeft && canSwipeRight
                 ? 'Swipe to compare takes'
                 : canSwipeLeft
-                  ? 'Swipe left for benchmark'
-                  : 'Swipe right for challenger'}
+                  ? 'Swipe left for challenger'
+                  : 'Swipe right for benchmark'}
             </p>
           </div>
         )}
 
-        <div
-          className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
-          style={{
-            transform:
-              slideDirection === 'left'
-                ? 'translateX(-100%)'
-                : slideDirection === 'right'
-                  ? 'translateX(100%)'
-                  : `translateX(${swipeOffset}px)`,
-            opacity: slideDirection ? 0 : 1,
-          }}
-        >
-          <TakeVideoPlayer
-            key={`${activeSlot}-${activeFilePath}-${activeSrc}`}
-            filePath={activeFilePath}
-            videoUrl={activeSrc ?? ''}
-            mimeType={videoMimeType}
-            videoRef={videoRef}
-            className="custom-video-player h-full w-full object-cover"
-            mirror
-            style={{
-              WebkitTouchCallout: 'default',
-              userSelect: 'auto',
-            }}
-            controls={false}
-            onLoadedData={startReviewPlayback}
-            onPointerDown={handleVideoPointerDown}
-            onPointerMove={handleVideoPointerMove}
-            onPointerUp={handleVideoPointerUp}
-            onPointerCancel={handleVideoPointerUp}
-          />
-        </div>
+        {isSolo && soloTake ? (
+          <div className="absolute inset-0 h-full w-full">
+            <TakeVideoPlayer
+              key={`solo-${soloTake.id}`}
+              filePath={soloTake.filePath}
+              videoUrl={soloTake.videoUrl}
+              mimeType={soloTake.videoMimeType || 'video/mp4'}
+              videoRef={soloVideoRef}
+              className="custom-video-player h-full w-full object-cover"
+              mirror
+              style={{
+                WebkitTouchCallout: 'default',
+                userSelect: 'auto',
+              }}
+              controls={false}
+              onLoadedData={startReviewPlayback}
+            />
+          </div>
+        ) : (
+          <>
+            {hasBenchmark && (
+              <div
+                className={`absolute inset-0 h-full w-full transition-all duration-200 ease-out ${
+                  activeSlot === 'benchmark'
+                    ? 'z-[1] opacity-100'
+                    : 'pointer-events-none z-0 opacity-0'
+                }`}
+                style={activeSlot === 'benchmark' ? swipeLayerStyle : undefined}
+              >
+                <TakeVideoPlayer
+                  key={`benchmark-${benchmarkFilePath}-${benchmarkSrc}`}
+                  filePath={benchmarkFilePath}
+                  videoUrl={benchmarkSrc ?? ''}
+                  mimeType={benchmarkMimeType}
+                  videoRef={benchmarkVideoRef}
+                  className="custom-video-player h-full w-full object-cover"
+                  mirror
+                  style={{
+                    WebkitTouchCallout: 'default',
+                    userSelect: 'auto',
+                  }}
+                  controls={false}
+                  onLoadedData={
+                    activeSlot === 'benchmark' ? startReviewPlayback : undefined
+                  }
+                  onPointerDown={
+                    activeSlot === 'benchmark' ? handleVideoPointerDown : undefined
+                  }
+                  onPointerMove={
+                    activeSlot === 'benchmark' ? handleVideoPointerMove : undefined
+                  }
+                  onPointerUp={
+                    activeSlot === 'benchmark' ? handleVideoPointerUp : undefined
+                  }
+                  onPointerCancel={
+                    activeSlot === 'benchmark' ? handleVideoPointerUp : undefined
+                  }
+                />
+              </div>
+            )}
+
+            {hasChallenger && (
+              <div
+                className={`absolute inset-0 h-full w-full transition-all duration-200 ease-out ${
+                  activeSlot === 'challenger'
+                    ? 'z-[1] opacity-100'
+                    : 'pointer-events-none z-0 opacity-0'
+                }`}
+                style={activeSlot === 'challenger' ? swipeLayerStyle : undefined}
+              >
+                <TakeVideoPlayer
+                  key={`challenger-${challengerFilePath}-${challengerSrc}`}
+                  filePath={challengerFilePath}
+                  videoUrl={challengerSrc ?? ''}
+                  mimeType={challengerMimeType}
+                  videoRef={challengerVideoRef}
+                  className="custom-video-player h-full w-full object-cover"
+                  mirror
+                  style={{
+                    WebkitTouchCallout: 'default',
+                    userSelect: 'auto',
+                  }}
+                  controls={false}
+                  onLoadedData={
+                    activeSlot === 'challenger' ? startReviewPlayback : undefined
+                  }
+                  onPointerDown={
+                    activeSlot === 'challenger' ? handleVideoPointerDown : undefined
+                  }
+                  onPointerMove={
+                    activeSlot === 'challenger' ? handleVideoPointerMove : undefined
+                  }
+                  onPointerUp={
+                    activeSlot === 'challenger' ? handleVideoPointerUp : undefined
+                  }
+                  onPointerCancel={
+                    activeSlot === 'challenger' ? handleVideoPointerUp : undefined
+                  }
+                />
+              </div>
+            )}
+          </>
+        )}
 
         <button
           type="button"
@@ -387,7 +511,7 @@ export default function ReviewModeOverlay({
             e.stopPropagation()
             togglePlayPause()
           }}
-          className={`pointer-events-auto absolute z-20 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-white/30 bg-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300 active:scale-95 ${
+          className={`pointer-events-auto absolute left-1/2 top-1/2 z-20 flex h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300 active:scale-95 ${
             showPlayOverlay
               ? 'scale-100 opacity-100'
               : 'pointer-events-none scale-90 opacity-0'

@@ -21,6 +21,7 @@ export default function App() {
   const [challengerId, setChallengerId] = useState<string | null>(null)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
+  const [soloReviewTake, setSoloReviewTake] = useState<Take | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
 
   const isReviewOpen = reviewSlot !== null
@@ -111,6 +112,28 @@ export default function App() {
     setChallengerId(id)
   }, [])
 
+  const handleOpenVaultTake = useCallback(
+    (take: Take) => {
+      setIsVaultOpen(false)
+      setSoloReviewTake(null)
+
+      if (take.id === benchmarkId) {
+        setReviewSlot('benchmark')
+      } else if (take.id === challengerId) {
+        setReviewSlot('challenger')
+      } else {
+        setSoloReviewTake(take)
+        setReviewSlot('benchmark')
+      }
+    },
+    [benchmarkId, challengerId],
+  )
+
+  const handleCloseReview = useCallback(() => {
+    setReviewSlot(null)
+    setSoloReviewTake(null)
+  }, [])
+
   const handleUpdateTake = useCallback((id: string, updates: TakeUpdate) => {
     setTakes((prev) =>
       prev.map((take) => (take.id === id ? { ...take, ...updates } : take)),
@@ -180,7 +203,10 @@ export default function App() {
               onUnpin={() => setBenchmarkId(null)}
               onExpand={
                 benchmarkTake?.videoUrl
-                  ? () => setReviewSlot('benchmark')
+                  ? () => {
+                      setSoloReviewTake(null)
+                      setReviewSlot('benchmark')
+                    }
                   : undefined
               }
             />
@@ -198,7 +224,10 @@ export default function App() {
               onUnpin={() => setChallengerId(null)}
               onExpand={
                 challengerTake?.videoUrl
-                  ? () => setReviewSlot('challenger')
+                  ? () => {
+                      setSoloReviewTake(null)
+                      setReviewSlot('challenger')
+                    }
                   : undefined
               }
             />
@@ -217,20 +246,21 @@ export default function App() {
 
       <ReviewModeOverlay
         activeSlot={reviewSlot ?? 'benchmark'}
+        soloTake={soloReviewTake}
         benchmarkSrc={benchmarkTake?.videoUrl ?? null}
         challengerSrc={challengerTake?.videoUrl ?? null}
         benchmarkFilePath={benchmarkTake?.filePath}
         challengerFilePath={challengerTake?.filePath}
         benchmarkName={benchmarkTake?.name}
         challengerName={challengerTake?.name}
-        videoMimeType={
-          (reviewSlot === 'benchmark'
-            ? benchmarkTake?.videoMimeType
-            : challengerTake?.videoMimeType) || 'video/mp4'
-        }
+        benchmarkMimeType={benchmarkTake?.videoMimeType ?? 'video/mp4'}
+        challengerMimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
         isOpen={isReviewOpen}
-        onClose={() => setReviewSlot(null)}
-        onSlotChange={setReviewSlot}
+        onClose={handleCloseReview}
+        onSlotChange={(slot) => {
+          setSoloReviewTake(null)
+          setReviewSlot(slot)
+        }}
       />
 
       <TakeVaultDrawer
@@ -246,6 +276,7 @@ export default function App() {
         onPinChallenger={handlePinChallenger}
         onUpdateTake={handleUpdateTake}
         onDeleteTake={handleDeleteTake}
+        onOpenTake={handleOpenVaultTake}
       />
     </div>
   )

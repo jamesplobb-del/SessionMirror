@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { X } from 'lucide-react'
 import TakeCard from './TakeCard'
@@ -35,6 +35,7 @@ interface TakeVaultDrawerProps {
   onPinChallenger: (id: string) => void
   onUpdateTake: (id: string, updates: TakeUpdate) => void
   onDeleteTake: (id: string) => void
+  onOpenTake: (take: Take) => void
 }
 
 interface VaultTakeVideoProps {
@@ -46,7 +47,7 @@ interface VaultTakeVideoProps {
 
 export function VaultTakeVideo({
   take,
-  className = 'h-full w-full object-cover',
+  className = 'h-full w-full object-cover pointer-events-none',
   thumbnail = false,
 }: VaultTakeVideoProps) {
   return (
@@ -78,8 +79,8 @@ export default function TakeVaultDrawer({
   onPinChallenger,
   onUpdateTake,
   onDeleteTake,
+  onOpenTake,
 }: TakeVaultDrawerProps) {
-  const [previewTakeId, setPreviewTakeId] = useState<string | null>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
 
   const pauseAllVaultVideos = useCallback(() => {
@@ -88,7 +89,6 @@ export default function TakeVaultDrawer({
 
   useEffect(() => {
     if (!isOpen) {
-      setPreviewTakeId(null)
       pauseAllVaultVideos()
     }
   }, [isOpen, pauseAllVaultVideos])
@@ -155,22 +155,15 @@ export default function TakeVaultDrawer({
                     take={take}
                     isBenchmark={take.id === benchmarkId}
                     isChallenger={take.id === challengerId}
-                    isPreviewing={previewTakeId === take.id}
-                    onPreview={() =>
-                      setPreviewTakeId((current) =>
-                        current === take.id ? null : take.id,
-                      )
-                    }
+                    onOpenTake={() => {
+                      pauseAllVaultVideos()
+                      onOpenTake(take)
+                    }}
                     onPinBenchmark={() => onPinBenchmark(take.id)}
                     onPinChallenger={() => onPinChallenger(take.id)}
                     onUpdate={(updates) => onUpdateTake(take.id, updates)}
                     onDelete={() => onDeleteTake(take.id)}
                     thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
-                    previewVideo={
-                      previewTakeId === take.id ? (
-                        <VaultTakeVideo take={take} />
-                      ) : null
-                    }
                   />
                 ))}
               </div>
