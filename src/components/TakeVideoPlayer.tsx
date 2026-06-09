@@ -16,6 +16,10 @@ export interface TakeVideoPlayerProps
   eagerLoad?: boolean
   thumbnailPreview?: boolean
   manualPlayOnly?: boolean
+  /** Play audio through the device speaker (default muted for PiP previews). */
+  audible?: boolean
+  /** Show native controls on mirrored recorded takes. */
+  mirroredControls?: boolean
   videoSourceKey?: string
   preload?: 'auto' | 'metadata' | 'none'
 }
@@ -32,6 +36,8 @@ export default function TakeVideoPlayer({
   eagerLoad = false,
   thumbnailPreview = false,
   manualPlayOnly = false,
+  audible = false,
+  mirroredControls = false,
   videoSourceKey,
   preload = 'metadata',
   style,
@@ -114,7 +120,7 @@ export default function TakeVideoPlayer({
           src={mediaSrc}
           preload={preload}
           {...audioRest}
-          muted
+          muted={!audible}
           autoPlay={false}
         />
         <div
@@ -147,10 +153,12 @@ export default function TakeVideoPlayer({
       {...({
         'webkit-playsinline': 'true',
       } as VideoHTMLAttributes<HTMLVideoElement>)}
-      muted
+      muted={!audible}
       autoPlay={false}
       disablePictureInPicture
-      controls={thumbnailPreview ? false : mirror ? false : controls}
+      controls={
+        thumbnailPreview ? false : mirror && !mirroredControls ? false : controls
+      }
       preload={preload}
     />
   )

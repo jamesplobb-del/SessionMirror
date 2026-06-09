@@ -24,6 +24,7 @@ import {
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
+import PitchAnalysis from './components/PitchAnalysis'
 import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
@@ -69,6 +70,7 @@ export default function App() {
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [windowHeight, setWindowHeight] = useState(() => window.innerHeight)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isPitchAnalysisOpen, setIsPitchAnalysisOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
     isDragging: false,
     isArming: false,
@@ -314,7 +316,7 @@ export default function App() {
   })
 
   const autoMonitoringAllowed =
-    !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
+    !isVaultOpen && !isSettingsOpen && !isReviewOpen && !isPitchAnalysisOpen && ready
 
   useAutoSoundRecording({
     enabled: settings.autoSoundRecording,
@@ -425,7 +427,7 @@ export default function App() {
     }
   }, [ready])
 
-  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
+  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen || isPitchAnalysisOpen
 
   const benchmarkTake = useMemo(
     () => takes.find((t) => t.id === benchmarkId) ?? null,
@@ -492,6 +494,31 @@ export default function App() {
     })
     pausePipVideos()
   }, [pausePipVideos])
+
+  const handleOpenPitchAnalysis = useCallback(() => {
+    pausePipVideos()
+    setReviewSlot(null)
+    setIsVaultOpen(false)
+    setIsPitchAnalysisOpen(true)
+  }, [pausePipVideos])
+
+  const handleClosePitchAnalysis = useCallback(() => {
+    setIsPitchAnalysisOpen(false)
+    pausePipVideos()
+  }, [pausePipVideos])
+
+  const canOpenPitchAnalysis = Boolean(
+    benchmarkTake?.videoUrl &&
+      challengerTake?.videoUrl &&
+      !isAudioTake(benchmarkTake) &&
+      !isAudioTake(challengerTake),
+  )
+
+  useEffect(() => {
+    if (isPitchAnalysisOpen && !canOpenPitchAnalysis) {
+      setIsPitchAnalysisOpen(false)
+    }
+  }, [isPitchAnalysisOpen, canOpenPitchAnalysis])
 
   const handleUploadBenchmark = useCallback(
     (file: File) => {
@@ -655,8 +682,8 @@ export default function App() {
       />
 
       <div
-        className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
-        aria-hidden={isReviewOpen}
+        className={`app-ui-overlay ${isReviewOpen || isPitchAnalysisOpen ? 'pointer-events-none invisible' : ''}`}
+        aria-hidden={isReviewOpen || isPitchAnalysisOpen}
       >
         <HudHeader
           sessionName={activeProject?.name ?? 'BestTake'}
@@ -730,7 +757,17 @@ export default function App() {
           setReviewContext('compare')
           setReviewSlot(slot)
         }}
+        onOpenPitchAnalysis={canOpenPitchAnalysis ? handleOpenPitchAnalysis : undefined}
       />
+
+      {benchmarkTake && challengerTake && (
+        <PitchAnalysis
+          isOpen={isPitchAnalysisOpen}
+          onClose={handleClosePitchAnalysis}
+          currentTake={challengerTake}
+          bestTake={benchmarkTake}
+        />
+      )}
 
       <TakeVaultDrawer
         isOpen={isVaultOpen}

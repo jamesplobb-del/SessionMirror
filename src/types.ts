@@ -2,6 +2,13 @@ export type MediaType = 'video' | 'audio'
 
 export type RecordingMode = 'video' | 'audio'
 
+export interface PitchSample {
+  /** Seconds from the start of the take */
+  time: number
+  /** Detected fundamental frequency in Hz */
+  frequencyHz: number
+}
+
 export interface Take {
   id: string
   name: string
@@ -18,6 +25,8 @@ export interface Take {
   mediaType?: MediaType
   /** Recorded takes mirror on playback; uploads show true perspective. */
   mirrorPlayback?: boolean
+  /** Optional pitch contour from offline or live analysis */
+  pitchSeries?: PitchSample[]
 }
 
 export type SortMode = 'newest' | 'highest-rated'

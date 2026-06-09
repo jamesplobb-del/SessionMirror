@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pause, Play, X } from 'lucide-react'
+import { Pause, Play, AudioLines, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
@@ -28,6 +28,7 @@ interface ReviewModeOverlayProps {
   isOpen: boolean
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
+  onOpenPitchAnalysis?: () => void
 }
 
 export default function ReviewModeOverlay({
@@ -49,6 +50,7 @@ export default function ReviewModeOverlay({
   isOpen,
   onClose,
   onSlotChange,
+  onOpenPitchAnalysis,
 }: ReviewModeOverlayProps) {
   const benchmarkVideoRef = useRef<HTMLMediaElement>(null)
   const challengerVideoRef = useRef<HTMLMediaElement>(null)
@@ -510,12 +512,25 @@ export default function ReviewModeOverlay({
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
         <div className="relative">
-          <div className="pr-14">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
-              {activeLabel}
-            </p>
-            {activeName && (
-              <p className="text-sm font-medium text-white">{activeName}</p>
+          <div className="flex items-start gap-2 pr-24">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                {activeLabel}
+              </p>
+              {activeName && (
+                <p className="text-sm font-medium text-white">{activeName}</p>
+              )}
+            </div>
+            {onOpenPitchAnalysis && !isVault && (
+              <button
+                type="button"
+                onClick={onOpenPitchAnalysis}
+                className="pointer-events-auto flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 text-white backdrop-blur-md transition hover:bg-white/25"
+                aria-label="Open pitch analysis"
+              >
+                <AudioLines className="h-4 w-4" />
+                <span className="text-xs font-medium">Pitch</span>
+              </button>
             )}
           </div>
           <button
