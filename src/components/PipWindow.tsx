@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseE
 import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
-import { blockTouchBubble, stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
+import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 
 interface PipWindowProps {
   src: string | null
@@ -22,7 +22,7 @@ interface PipWindowProps {
 }
 
 const FLOAT_BADGE =
-  'pointer-events-auto absolute z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
+  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
 
 export default function PipWindow({
   src,
@@ -115,7 +115,7 @@ export default function PipWindow({
 
   return (
     <div
-      className={`pip-video-container group relative aspect-video w-36 min-h-[5.0625rem] min-w-[9rem] sm:w-40 sm:min-h-[5.625rem] sm:min-w-[10rem] ${className}`}
+      className={`pip-video-container group relative aspect-video w-[8.25rem] min-h-[4.640625rem] min-w-[8.25rem] sm:w-[9.25rem] sm:min-h-[5.203125rem] sm:min-w-[9.25rem] ${className}`}
     >
       {variant === 'benchmark' && onUpload && (
         <input
@@ -129,36 +129,8 @@ export default function PipWindow({
         />
       )}
 
-      {showUploadBadge && (
-        <label
-          htmlFor="benchmark-upload"
-          {...touchBubbleBlockProps()}
-          className={FLOAT_BADGE}
-          style={{ top: -12, left: -12 }}
-          aria-label="Upload best take video"
-        >
-          <Upload className="h-3 w-3" />
-        </label>
-      )}
-
-      {src && (
-        <button
-          type="button"
-          onClick={(e) => {
-            blockTouchBubble(e)
-            onUnpin()
-          }}
-          {...touchBubbleBlockProps()}
-          className={FLOAT_BADGE}
-          style={{ top: -12, right: -12 }}
-          aria-label={`Unload ${label}`}
-        >
-          <X className="h-3 w-3" />
-        </button>
-      )}
-
       <div
-        className={`relative h-full w-full overflow-hidden rounded-xl border border-white/15 bg-stone-900 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-opacity duration-200 ease-in ${accentRing} ${src ? 'opacity-100' : 'opacity-90'}`}
+        className={`relative z-0 h-full w-full overflow-hidden rounded-xl border border-white/15 bg-stone-900 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-opacity duration-200 ease-in ${accentRing} ${src ? 'opacity-100' : 'opacity-90'}`}
       >
         <span
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
@@ -238,6 +210,39 @@ export default function PipWindow({
           </div>
         )}
       </div>
+
+      {showUploadBadge && (
+        <label
+          htmlFor="benchmark-upload"
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={stopEventBubble}
+          className={FLOAT_BADGE}
+          style={{ top: -12, left: -12 }}
+          aria-label="Upload best take video"
+        >
+          <Upload className="h-3 w-3" />
+        </label>
+      )}
+
+      {src && (
+        <button
+          type="button"
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={(e) => {
+            e.stopPropagation()
+            onUnpin()
+          }}
+          className={FLOAT_BADGE}
+          style={{ top: -12, right: -12 }}
+          aria-label={`Unload ${label}`}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   )
 }
