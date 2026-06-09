@@ -80,7 +80,7 @@ select {
   display: flex;
   flex-direction: column;
   padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   pointer-events: none;
   background: transparent !important;
 }
@@ -95,7 +95,7 @@ select {
 }
 
 .control-deck {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: 0;
 }
 
 /* Landscape — portrait layout unchanged; only applies when rotated */
@@ -251,76 +251,37 @@ select {
 
 .camera-background {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 0;
   overflow: hidden;
   background: transparent;
-  aspect-ratio: auto !important;
+  padding: 0;
 }
 
-.camera-preview {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  min-width: 100vw;
-  min-height: 100vh;
-  min-height: calc(100vh + env(safe-area-inset-bottom, 0px));
-  transform: translate(-50%, -50%) translate3d(0, 0, 0);
-  object-fit: cover;
-  z-index: 0;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+video.camera-preview {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  top: auto !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  transform: none !important;
+  object-fit: cover !important;
+  object-position: bottom center !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
 }
 
-.camera-preview--mirror {
-  transform: translate(-50%, -50%) translate3d(0, 0, 0) scaleX(-1);
+video.camera-preview.camera-preview--mirror {
+  transform: scaleX(-1) !important;
+  transform-origin: bottom center !important;
 }
 
-.camera-preview--hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* Portrait — force native full-fill, ignore letterboxing */
-@media screen and (orientation: portrait) {
-  .camera-background,
-  .app-shell {
-    aspect-ratio: auto !important;
-  }
-
-  video.camera-preview {
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100dvh !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    transform: none !important;
-    object-fit: cover !important;
-    aspect-ratio: 9 / 19.5 !important;
-  }
-
-  video.camera-preview.camera-preview--mirror {
-    transform: scaleX(-1) !important;
-  }
-}
-
-/* Landscape — keep full-bleed fill */
-@media screen and (orientation: landscape) {
-  .camera-background,
-  .app-shell {
-    aspect-ratio: auto !important;
-  }
-
-  video.camera-preview {
-    width: 100vw !important;
-    height: 100dvh !important;
-    object-fit: cover !important;
-    aspect-ratio: auto !important;
-  }
+video.camera-preview.camera-preview--hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .camera-background-overlay {
@@ -339,5 +300,4 @@ select {
   min-height: var(--app-height, 100%);
   overflow: hidden;
   background-color: transparent;
-  aspect-ratio: auto !important;
 }
