@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { RecordingMode } from '../types'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
@@ -7,8 +7,11 @@ const POLL_INTERVAL_MS = 8
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 180
 const MONITOR_WARMUP_MS = 280
-const START_LATCH_MS = 3000
+const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
+const HEALTH_CHECK_MS = 2500
+const STALL_RECOVERY_MS = 2200
+const START_FAILURE_CLEAR_MS = 450
 const QUIET_EMA_ALPHA = 0.03
 
 interface UseAutoSoundRecordingOptions {
@@ -28,6 +31,7 @@ interface UseAutoSoundRecordingOptions {
   warmRecorder: () => void
   disarmRecorder: () => void
   onAutoRecordingFinished: () => void
+  onMonitorStalled?: () => void
 }
 
 function percentile(sorted: number[], ratio: number): number {
@@ -48,6 +52,14 @@ function computeEffectiveGate(profile: AutoRecordProfile, quietRms: number): num
   return Math.min(merged, cap)
 }
 
+function isStreamAudioLive(stream: MediaStream | null): boolean {
+  return Boolean(
+    stream?.getAudioTracks().some(
+      (track) => track.readyState === 'live' && track.enabled,
+    ),
+  )
+}
+
 export function useAutoSoundRecording({
   enabled,
   monitoringAllowed,
@@ -64,6 +76,7 @@ export function useAutoSoundRecording({
   warmRecorder,
   disarmRecorder,
   onAutoRecordingFinished,
+  onMonitorStalled,
 }: UseAutoSoundRecordingOptions) {
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
@@ -71,6 +84,8 @@ export function useAutoSoundRecording({
   const sampleBufferRef = useRef<Float32Array | null>(null)
   const pollTimerRef = useRef<number | null>(null)
   const warmRetryTimerRef = useRef<number | null>(null)
+  const healthTimerRef = useRef<number | null>(null)
+  const startFailureTimerRef = useRef<number | null>(null)
   const silenceSinceRef = useRef<number | null>(null)
   const loudSinceRef = useRef<number | null>(null)
   const attackSinceRef = useRef<number | null>(null)
@@ -82,6 +97,8 @@ export function useAutoSoundRecording({
   const cooldownUntilRef = useRef(0)
   const quietRmsEmaRef = useRef(0)
   const effectiveGateRef = useRef(0)
+  const lastTickAtRef = useRef(0)
+  const [monitorEpoch, setMonitorEpoch] = useState(0)
   const suppressStartRef = useRef(suppressStart)
   const isRecordingRef = useRef(isRecording)
   const startRecordingRef = useRef(startRecording)
@@ -89,6 +106,7 @@ export function useAutoSoundRecording({
   const warmRecorderRef = useRef(warmRecorder)
   const disarmRecorderRef = useRef(disarmRecorder)
   const onFinishedRef = useRef(onAutoRecordingFinished)
+  const onMonitorStalledRef = useRef(onMonitorStalled)
   const profileRef = useRef(getAutoRecordProfile(volumeThreshold))
   const silenceMsRef = useRef(silenceMs)
   const wasRecordingRef = useRef(isRecording)
@@ -100,6 +118,7 @@ export function useAutoSoundRecording({
   warmRecorderRef.current = warmRecorder
   disarmRecorderRef.current = disarmRecorder
   onFinishedRef.current = onAutoRecordingFinished
+  onMonitorStalledRef.current = onMonitorStalled
   profileRef.current = getAutoRecordProfile(volumeThreshold)
   silenceMsRef.current = silenceMs
   effectiveGateRef.current = computeEffectiveGate(
@@ -110,7 +129,15 @@ export function useAutoSoundRecording({
   const shouldMonitor =
     enabled && monitoringAllowed && recordingMode === 'audio' && ready
 
+  const clearStartFailureTimer = () => {
+    if (startFailureTimerRef.current !== null) {
+      window.clearTimeout(startFailureTimerRef.current)
+      startFailureTimerRef.current = null
+    }
+  }
+
   const clearStartLatch = () => {
+    clearStartFailureTimer()
     startLatchRef.current = false
     if (startLatchTimerRef.current !== null) {
       window.clearTimeout(startLatchTimerRef.current)
@@ -128,6 +155,18 @@ export function useAutoSoundRecording({
     }, START_LATCH_MS)
   }
 
+  const scheduleStartFailureRecovery = () => {
+    clearStartFailureTimer()
+    startFailureTimerRef.current = window.setTimeout(() => {
+      startFailureTimerRef.current = null
+      if (!isRecordingRef.current) {
+        autoTriggeredRef.current = false
+        clearStartLatch()
+        void warmRecorderRef.current()
+      }
+    }, START_FAILURE_CLEAR_MS)
+  }
+
   const triggerAutoStart = () => {
     if (
       startLatchRef.current ||
@@ -141,7 +180,12 @@ export function useAutoSoundRecording({
     loudSinceRef.current = null
     attackSinceRef.current = null
     armStartLatch()
+    scheduleStartFailureRecovery()
     startRecordingRef.current()
+  }
+
+  const bumpMonitorEpoch = () => {
+    setMonitorEpoch((epoch) => epoch + 1)
   }
 
   const teardownMonitor = () => {
@@ -153,6 +197,11 @@ export function useAutoSoundRecording({
     if (warmRetryTimerRef.current !== null) {
       window.clearInterval(warmRetryTimerRef.current)
       warmRetryTimerRef.current = null
+    }
+
+    if (healthTimerRef.current !== null) {
+      window.clearInterval(healthTimerRef.current)
+      healthTimerRef.current = null
     }
 
     clearStartLatch()
@@ -180,6 +229,7 @@ export function useAutoSoundRecording({
     monitorWarmUntilRef.current = 0
     quietRmsEmaRef.current = 0
     effectiveGateRef.current = profileRef.current.gate
+    lastTickAtRef.current = 0
     void disarmRecorderRef.current()
   }
 
@@ -210,19 +260,26 @@ export function useAutoSoundRecording({
     if (!shouldMonitor) return
 
     const stream = streamRef.current
-    if (!stream || stream.getAudioTracks().every((track) => track.readyState !== 'live')) {
+    if (!isStreamAudioLive(stream)) {
       return
     }
 
     let cancelled = false
     const calibrationSamples: number[] = []
     let calibrated = false
+    const setupEpoch = monitorEpoch
 
     const setup = async () => {
       teardownMonitor()
 
+      const streamAtSetup = streamRef.current
+      if (!isStreamAudioLive(streamAtSetup)) {
+        onMonitorStalledRef.current?.()
+        return
+      }
+
       const audioContext = new AudioContext()
-      if (cancelled) {
+      if (cancelled || setupEpoch !== monitorEpoch) {
         await audioContext.close().catch(() => {})
         return
       }
@@ -231,7 +288,7 @@ export function useAutoSoundRecording({
         await audioContext.resume().catch(() => {})
       }
 
-      if (cancelled) {
+      if (cancelled || setupEpoch !== monitorEpoch) {
         await audioContext.close().catch(() => {})
         return
       }
@@ -240,13 +297,14 @@ export function useAutoSoundRecording({
       analyser.fftSize = 128
       analyser.smoothingTimeConstant = 0.08
 
-      const source = audioContext.createMediaStreamSource(stream)
+      const source = audioContext.createMediaStreamSource(streamAtSetup!)
       source.connect(analyser)
 
       audioContextRef.current = audioContext
       analyserRef.current = analyser
       sourceRef.current = source
       sampleBufferRef.current = new Float32Array(analyser.fftSize)
+      lastTickAtRef.current = performance.now()
 
       monitorWarmUntilRef.current = performance.now() + MONITOR_WARMUP_MS
       void warmRecorderRef.current()
@@ -254,7 +312,8 @@ export function useAutoSoundRecording({
       const tick = () => {
         if (cancelled || !analyserRef.current || !sampleBufferRef.current) return
 
-        const now = performance.now()
+        lastTickAtRef.current = performance.now()
+        const now = lastTickAtRef.current
         if (now < cooldownUntilRef.current && !isRecordingRef.current) return
 
         const ctx = audioContextRef.current
@@ -262,12 +321,20 @@ export function useAutoSoundRecording({
           void ctx.resume().catch(() => {})
         }
 
+        if (!isStreamAudioLive(streamRef.current)) {
+          onMonitorStalledRef.current?.()
+          return
+        }
+
         const profile = profileRef.current
         const metrics = readAnalyserMetrics(analyserRef.current, sampleBufferRef.current)
         const gateLevel = profile.usePeak
-          ? combinedGateLevel(metrics)
+          ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
           : metrics.rms
-        const stopGate = Math.max(profile.gate * profile.stopGateRatio, effectiveGateRef.current * 0.55)
+        const stopGate = Math.max(
+          profile.gate * profile.stopGateRatio,
+          effectiveGateRef.current * 0.55,
+        )
 
         if (now < monitorWarmUntilRef.current) {
           calibrationSamples.push(metrics.rms)
@@ -379,6 +446,29 @@ export function useAutoSoundRecording({
         if (cancelled || isRecordingRef.current || startLatchRef.current) return
         void warmRecorderRef.current()
       }, WARM_RETRY_MS)
+
+      healthTimerRef.current = window.setInterval(() => {
+        if (cancelled || isRecordingRef.current) return
+
+        const now = performance.now()
+        const ctx = audioContextRef.current
+        const tickStale = now - lastTickAtRef.current > STALL_RECOVERY_MS
+        const contextSuspended = ctx?.state === 'suspended'
+        const streamDead = !isStreamAudioLive(streamRef.current)
+
+        if (streamDead) {
+          onMonitorStalledRef.current?.()
+          return
+        }
+
+        if (contextSuspended) {
+          void ctx?.resume().catch(() => {})
+        }
+
+        if (tickStale) {
+          bumpMonitorEpoch()
+        }
+      }, HEALTH_CHECK_MS)
     }
 
     void setup()
@@ -387,7 +477,22 @@ export function useAutoSoundRecording({
       cancelled = true
       teardownMonitor()
     }
-  }, [shouldMonitor, streamGeneration, streamRef])
+  }, [shouldMonitor, streamGeneration, streamRef, monitorEpoch])
+
+  useEffect(() => {
+    if (!shouldMonitor) return
+
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      bumpMonitorEpoch()
+      void warmRecorderRef.current()
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [shouldMonitor])
 
   return { teardownMonitor }
 }

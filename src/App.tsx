@@ -338,6 +338,9 @@ export default function App() {
     onAutoRecordingFinished: () => {
       pendingAutoPlaybackRef.current = true
     },
+    onMonitorStalled: () => {
+      void refreshCameraSession()
+    },
   })
 
   useEffect(() => {
@@ -354,6 +357,19 @@ export default function App() {
       }
     }
   }, [stopAutoPlaybackAudio])
+
+  useEffect(() => {
+    if (!autoRecordStartSuppressed) return
+
+    const failsafe = window.setTimeout(() => {
+      setAutoRecordStartSuppressed(false)
+      stopAutoPlaybackAudio()
+    }, 10000)
+
+    return () => {
+      window.clearTimeout(failsafe)
+    }
+  }, [autoRecordStartSuppressed, stopAutoPlaybackAudio])
 
   const autoSoundListening =
     settings.autoSoundRecording &&

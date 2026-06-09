@@ -62,7 +62,7 @@ export function saveAppSettings(settings: AppSettings): void {
 export function volumeThresholdToLevel(sliderValue: number): number {
   const t = clamp(sliderValue, 1, 100)
   const minLevel = 0.0006
-  const maxLevel = 0.055
+  const maxLevel = 0.042
   const normalized = (t - 1) / 99
   const logMin = Math.log(minLevel)
   const logMax = Math.log(maxLevel)
@@ -88,6 +88,8 @@ export interface AutoRecordProfile {
   gateCapMultiplier: number
   /** Silence stop threshold as fraction of user gate. */
   stopGateRatio: number
+  /** Peak weight in combined gate level (loud mode uses higher for brass). */
+  peakWeight?: number
 }
 
 /** Per-slider detection profile — loud mode rejects peak-only spikes; sensitive mode triggers fast. */
@@ -98,14 +100,15 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
   if (t >= 75) {
     return {
       gate,
-      usePeak: false,
-      holdMs: 56,
-      attackHoldMs: 0,
-      noiseHeadroom: 2.2,
-      noiseMargin: 0.0004,
-      attackPeakRatio: 0,
-      gateCapMultiplier: 2.5,
-      stopGateRatio: 0.45,
+      usePeak: true,
+      holdMs: 36,
+      attackHoldMs: 14,
+      noiseHeadroom: 1.45,
+      noiseMargin: 0.00008,
+      attackPeakRatio: 1.35,
+      gateCapMultiplier: 1.55,
+      stopGateRatio: 0.4,
+      peakWeight: 0.58,
     }
   }
 
