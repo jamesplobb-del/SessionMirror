@@ -236,8 +236,10 @@ export default function App() {
     recordingMode,
     changeRecordingMode,
     toggleRecording,
-    startRecording,
+    startAutoAudioRecording,
     stopRecording,
+    warmAutoAudioRecorder,
+    disarmAutoAudioRecorder,
     refreshCameraSession,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
@@ -256,8 +258,14 @@ export default function App() {
     streamGeneration,
     silenceMs: settings.soundSilenceSeconds * 1000,
     volumeThreshold: settings.soundVolumeThreshold,
-    startRecording,
+    startRecording: startAutoAudioRecording,
     stopRecording,
+    warmRecorder: () => {
+      void warmAutoAudioRecorder()
+    },
+    disarmRecorder: () => {
+      void disarmAutoAudioRecorder()
+    },
     onAutoRecordingFinished: () => {
       pendingAutoPlaybackRef.current = true
     },

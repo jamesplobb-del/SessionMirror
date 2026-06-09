@@ -102,6 +102,13 @@ export function useCameraSession({
   const releaseTimerRef = useRef<number | null>(null)
   const elapsedRef = useRef(0)
   const onCompleteRef = useRef(onRecordingComplete)
+  const armedAutoAudioRef = useRef<{
+    recorder: MediaRecorder
+    writer: StreamingTakeWriter
+    takeId: string
+    mimeType: string
+  } | null>(null)
+  const warmAutoAudioInFlightRef = useRef(false)
   onCompleteRef.current = onRecordingComplete
 
   const [error, setError] = useState<string | null>(null)
@@ -339,6 +346,156 @@ export function useCameraSession({
     return () => window.clearInterval(interval)
   }, [isRecording])
 
+  const bindRecordingHandlers = useCallback(
+    (recorder: MediaRecorder, takeId: string) => {
+      recorder.ondataavailable = (event) => {
+        if (event.data.size === 0) return
+
+        if (writerRef.current) {
+          void writerRef.current.enqueue(event.data).catch(async () => {
+            await abortActiveWriter().catch(() => {})
+            if (recorderRef.current?.state === 'recording') {
+              recorderRef.current.stop()
+            }
+          })
+          return
+        }
+
+        chunksRef.current.push(event.data)
+      }
+
+      recorder.onstop = () => {
+        void (async () => {
+          const recorderInstance = recorderRef.current
+          if (recorderInstance) {
+            detachRecorder(recorderInstance)
+          }
+          recorderRef.current = null
+
+          const capturedChunks = [...chunksRef.current]
+          chunksRef.current = []
+
+          const activeWriter = writerRef.current
+          writerRef.current = null
+          const stoppedTakeId = activeTakeIdRef.current ?? takeId
+          activeTakeIdRef.current = null
+          const completedMode = recordingModeRef.current
+          const durationSeconds = elapsedRef.current
+
+          try {
+            if (activeWriter) {
+              const persisted = await activeWriter.finalize()
+              onCompleteRef.current({
+                takeId: stoppedTakeId,
+                mimeType: recorderMimeTypeRef.current,
+                mediaType: completedMode,
+                filePath: persisted.filePath,
+                videoUrl: persisted.videoUrl,
+                durationSeconds,
+              })
+            } else {
+              const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
+              const blob = new Blob(capturedChunks, { type: writeMime })
+              const persisted = await persistRecordingBlob(
+                blob,
+                stoppedTakeId,
+                recorderMimeTypeRef.current,
+              )
+              onCompleteRef.current({
+                takeId: stoppedTakeId,
+                mimeType: recorderMimeTypeRef.current,
+                mediaType: completedMode,
+                filePath: persisted.filePath,
+                videoUrl: persisted.videoUrl,
+                durationSeconds,
+                blob,
+              })
+            }
+          } catch {
+            if (activeWriter) {
+              await activeWriter.abort().catch(() => {})
+            }
+          } finally {
+            setIsRecording(false)
+          }
+        })().catch(() => {
+          setIsRecording(false)
+        })
+      }
+
+      recorder.onerror = () => {
+        chunksRef.current = []
+        void abortActiveWriter().catch(() => {})
+        if (recorderRef.current) {
+          detachRecorder(recorderRef.current)
+        }
+        recorderRef.current = null
+        setIsRecording(false)
+      }
+    },
+    [abortActiveWriter],
+  )
+
+  const disarmAutoAudioRecorder = useCallback(async () => {
+    const armed = armedAutoAudioRef.current
+    armedAutoAudioRef.current = null
+    if (!armed) return
+
+    detachRecorder(armed.recorder)
+    try {
+      await armed.writer.abort()
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const warmAutoAudioRecorder = useCallback(async () => {
+    if (
+      recordingModeRef.current !== 'audio' ||
+      isRecordingRef.current ||
+      armedAutoAudioRef.current ||
+      warmAutoAudioInFlightRef.current
+    ) {
+      return
+    }
+
+    warmAutoAudioInFlightRef.current = true
+    try {
+      const stream = await ensureRecordableStream()
+      if (
+        !stream ||
+        recordingModeRef.current !== 'audio' ||
+        isRecordingRef.current ||
+        armedAutoAudioRef.current
+      ) {
+        return
+      }
+
+      const takeId = crypto.randomUUID()
+      const mimeType = getRecorderMimeTypeForMode('audio')
+      const writer = await StreamingTakeWriter.open(takeId, mimeType)
+      if (!writer) return
+
+      if (
+        isRecordingRef.current ||
+        recordingModeRef.current !== 'audio' ||
+        armedAutoAudioRef.current
+      ) {
+        await writer.abort().catch(() => {})
+        return
+      }
+
+      const recorder = new MediaRecorder(stream, { mimeType })
+      bindRecordingHandlers(recorder, takeId)
+
+      armedAutoAudioRef.current = { recorder, writer, takeId, mimeType }
+    } catch {
+      /* cold start on trigger if warm fails */
+    } finally {
+      warmAutoAudioInFlightRef.current = false
+    }
+  }, [bindRecordingHandlers, ensureRecordableStream])
+
   const startRecording = useCallback(() => {
     if (isRecording) return
 
@@ -360,91 +517,7 @@ export function useCameraSession({
 
         const recorder = new MediaRecorder(currentStream, { mimeType })
         recorderRef.current = recorder
-
-        recorder.ondataavailable = (event) => {
-          if (event.data.size === 0) return
-
-          if (writerRef.current) {
-            void writerRef.current.enqueue(event.data).catch(async () => {
-              await abortActiveWriter().catch(() => {})
-              if (recorderRef.current?.state === 'recording') {
-                recorderRef.current.stop()
-              }
-            })
-            return
-          }
-
-          chunksRef.current.push(event.data)
-        }
-
-        recorder.onstop = () => {
-          void (async () => {
-            const recorderInstance = recorderRef.current
-            if (recorderInstance) {
-              detachRecorder(recorderInstance)
-            }
-            recorderRef.current = null
-
-            const capturedChunks = [...chunksRef.current]
-            chunksRef.current = []
-
-            const activeWriter = writerRef.current
-            writerRef.current = null
-            const stoppedTakeId = activeTakeIdRef.current ?? takeId
-            activeTakeIdRef.current = null
-            const completedMode = recordingModeRef.current
-            const durationSeconds = elapsedRef.current
-
-            try {
-              if (activeWriter) {
-                const persisted = await activeWriter.finalize()
-                onCompleteRef.current({
-                  takeId: stoppedTakeId,
-                  mimeType: recorderMimeTypeRef.current,
-                  mediaType: completedMode,
-                  filePath: persisted.filePath,
-                  videoUrl: persisted.videoUrl,
-                  durationSeconds,
-                })
-              } else {
-                const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
-                const blob = new Blob(capturedChunks, { type: writeMime })
-                const persisted = await persistRecordingBlob(
-                  blob,
-                  stoppedTakeId,
-                  recorderMimeTypeRef.current,
-                )
-                onCompleteRef.current({
-                  takeId: stoppedTakeId,
-                  mimeType: recorderMimeTypeRef.current,
-                  mediaType: completedMode,
-                  filePath: persisted.filePath,
-                  videoUrl: persisted.videoUrl,
-                  durationSeconds,
-                  blob,
-                })
-              }
-            } catch {
-              if (activeWriter) {
-                await activeWriter.abort().catch(() => {})
-              }
-            } finally {
-              setIsRecording(false)
-            }
-          })().catch(() => {
-            setIsRecording(false)
-          })
-        }
-
-        recorder.onerror = () => {
-          chunksRef.current = []
-          void abortActiveWriter().catch(() => {})
-          if (recorderRef.current) {
-            detachRecorder(recorderRef.current)
-          }
-          recorderRef.current = null
-          setIsRecording(false)
-        }
+        bindRecordingHandlers(recorder, takeId)
 
         if (shouldUseRecordingTimeslice(mimeType)) {
           recorder.start(RECORDING_TIMESLICE_MS)
@@ -466,7 +539,37 @@ export function useCameraSession({
       chunksRef.current = []
       setIsRecording(false)
     })
-  }, [abortActiveWriter, ensureRecordableStream, isRecording])
+  }, [bindRecordingHandlers, ensureRecordableStream, isRecording])
+
+  const startAutoAudioRecording = useCallback(() => {
+    if (isRecordingRef.current) return
+
+    const armed = armedAutoAudioRef.current
+    if (armed?.recorder.state === 'inactive') {
+      armedAutoAudioRef.current = null
+      recorderRef.current = armed.recorder
+      writerRef.current = armed.writer
+      activeTakeIdRef.current = armed.takeId
+      recorderMimeTypeRef.current = armed.mimeType
+      chunksRef.current = []
+
+      try {
+        if (shouldUseRecordingTimeslice(armed.mimeType)) {
+          armed.recorder.start(RECORDING_TIMESLICE_MS)
+        } else {
+          armed.recorder.start()
+        }
+        setIsRecording(true)
+        setElapsed(0)
+        elapsedRef.current = 0
+        return
+      } catch {
+        void disarmAutoAudioRecorder()
+      }
+    }
+
+    startRecording()
+  }, [disarmAutoAudioRecorder, startRecording])
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current
@@ -502,12 +605,13 @@ export function useCameraSession({
       stopStreamTracks(streamRef.current)
       streamRef.current = null
       detachPreviewStream(previewRef.current)
+      void disarmAutoAudioRecorder()
       setReady(false)
       setStreamGeneration((generation) => generation + 1)
       setError(null)
       setRecordingMode(mode)
     },
-    [cancelScheduledRelease, isRecording, stopStreamTracks],
+    [cancelScheduledRelease, disarmAutoAudioRecorder, isRecording, stopStreamTracks],
   )
 
   const suspendCameraForBackground = useCallback(() => {
@@ -654,7 +758,10 @@ export function useCameraSession({
     changeRecordingMode,
     toggleRecording,
     startRecording,
+    startAutoAudioRecording,
     stopRecording,
+    warmAutoAudioRecorder,
+    disarmAutoAudioRecorder,
     refreshCameraSession,
   }
 }

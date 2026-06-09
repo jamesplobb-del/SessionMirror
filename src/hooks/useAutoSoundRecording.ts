@@ -3,9 +3,9 @@ import type { RecordingMode } from '../types'
 import { readAnalyserLevel } from '../utils/audioLevel'
 import { volumeThresholdToLevel } from '../utils/appSettings'
 
-const START_HOLD_MS = 120
+const POLL_INTERVAL_MS = 8
 const MIN_RECORDING_MS = 400
-const COOLDOWN_MS = 600
+const COOLDOWN_MS = 250
 
 interface UseAutoSoundRecordingOptions {
   enabled: boolean
@@ -19,6 +19,8 @@ interface UseAutoSoundRecordingOptions {
   volumeThreshold: number
   startRecording: () => void
   stopRecording: () => void
+  warmRecorder: () => void
+  disarmRecorder: () => void
   onAutoRecordingFinished: () => void
 }
 
@@ -34,13 +36,14 @@ export function useAutoSoundRecording({
   volumeThreshold,
   startRecording,
   stopRecording,
+  warmRecorder,
+  disarmRecorder,
   onAutoRecordingFinished,
 }: UseAutoSoundRecordingOptions) {
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
-  const rafRef = useRef<number | null>(null)
-  const loudSinceRef = useRef<number | null>(null)
+  const pollTimerRef = useRef<number | null>(null)
   const silenceSinceRef = useRef<number | null>(null)
   const recordingStartedAtRef = useRef<number | null>(null)
   const autoTriggeredRef = useRef(false)
@@ -48,13 +51,18 @@ export function useAutoSoundRecording({
   const isRecordingRef = useRef(isRecording)
   const startRecordingRef = useRef(startRecording)
   const stopRecordingRef = useRef(stopRecording)
+  const warmRecorderRef = useRef(warmRecorder)
+  const disarmRecorderRef = useRef(disarmRecorder)
   const onFinishedRef = useRef(onAutoRecordingFinished)
   const gateRef = useRef(volumeThresholdToLevel(volumeThreshold))
   const silenceMsRef = useRef(silenceMs)
+  const wasRecordingRef = useRef(isRecording)
 
   isRecordingRef.current = isRecording
   startRecordingRef.current = startRecording
   stopRecordingRef.current = stopRecording
+  warmRecorderRef.current = warmRecorder
+  disarmRecorderRef.current = disarmRecorder
   onFinishedRef.current = onAutoRecordingFinished
   gateRef.current = volumeThresholdToLevel(volumeThreshold)
   silenceMsRef.current = silenceMs
@@ -63,9 +71,9 @@ export function useAutoSoundRecording({
     enabled && monitoringAllowed && recordingMode === 'audio' && ready
 
   const teardownMonitor = () => {
-    if (rafRef.current !== null) {
-      window.cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
+    if (pollTimerRef.current !== null) {
+      window.clearInterval(pollTimerRef.current)
+      pollTimerRef.current = null
     }
 
     try {
@@ -82,16 +90,23 @@ export function useAutoSoundRecording({
       void ctx.close().catch(() => {})
     }
 
-    loudSinceRef.current = null
     silenceSinceRef.current = null
     recordingStartedAtRef.current = null
     autoTriggeredRef.current = false
+    void disarmRecorderRef.current()
   }
 
   useLayoutEffect(() => {
     if (shouldMonitor) return
     teardownMonitor()
   }, [shouldMonitor])
+
+  useEffect(() => {
+    if (wasRecordingRef.current && !isRecording && shouldMonitor) {
+      void warmRecorderRef.current()
+    }
+    wasRecordingRef.current = isRecording
+  }, [isRecording, shouldMonitor])
 
   useEffect(() => {
     if (!shouldMonitor) return
@@ -122,8 +137,8 @@ export function useAutoSoundRecording({
       }
 
       const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 2048
-      analyser.smoothingTimeConstant = 0.12
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0
 
       const source = audioContext.createMediaStreamSource(stream)
       source.connect(analyser)
@@ -132,14 +147,13 @@ export function useAutoSoundRecording({
       analyserRef.current = analyser
       sourceRef.current = source
 
+      void warmRecorderRef.current()
+
       const tick = () => {
         if (cancelled || !analyserRef.current) return
 
         const now = performance.now()
-        if (now < cooldownUntilRef.current) {
-          rafRef.current = window.requestAnimationFrame(tick)
-          return
-        }
+        if (now < cooldownUntilRef.current) return
 
         if (audioContextRef.current?.state === 'suspended') {
           void audioContextRef.current.resume().catch(() => {})
@@ -153,27 +167,14 @@ export function useAutoSoundRecording({
           recordingStartedAtRef.current = null
 
           if (aboveGate) {
-            if (loudSinceRef.current === null) {
-              loudSinceRef.current = now
-            } else if (now - loudSinceRef.current >= START_HOLD_MS) {
-              autoTriggeredRef.current = true
-              loudSinceRef.current = null
-              startRecordingRef.current()
-            }
-          } else {
-            loudSinceRef.current = null
+            autoTriggeredRef.current = true
+            startRecordingRef.current()
           }
 
-          rafRef.current = window.requestAnimationFrame(tick)
           return
         }
 
-        loudSinceRef.current = null
-
-        if (!autoTriggeredRef.current) {
-          rafRef.current = window.requestAnimationFrame(tick)
-          return
-        }
+        if (!autoTriggeredRef.current) return
 
         if (recordingStartedAtRef.current === null) {
           recordingStartedAtRef.current = now
@@ -195,11 +196,9 @@ export function useAutoSoundRecording({
             stopRecordingRef.current()
           }
         }
-
-        rafRef.current = window.requestAnimationFrame(tick)
       }
 
-      rafRef.current = window.requestAnimationFrame(tick)
+      pollTimerRef.current = window.setInterval(tick, POLL_INTERVAL_MS)
     }
 
     void setup()
