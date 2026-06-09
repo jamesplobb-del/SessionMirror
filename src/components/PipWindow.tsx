@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from 'react'
-import { Maximize2, Pause, Play, Upload, X } from 'lucide-react'
+import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { blockTouchBubble, stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
@@ -46,12 +46,16 @@ export default function PipWindow({
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
 
+  const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && Boolean(src)
+  const pillLeft = showUploadBadge ? 32 : 8
+
   useEffect(() => {
     setIsPlaying(false)
   }, [videoSourceKey])
 
   const handlePlayPauseClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
       stopEventBubble(event)
       const video = videoRef.current
       if (!video) return
@@ -79,13 +83,9 @@ export default function PipWindow({
     [videoRef],
   )
 
-  const handleExpand = useCallback(
-    (event: React.MouseEvent | React.TouchEvent) => {
-      blockTouchBubble(event)
-      onExpand?.()
-    },
-    [onExpand],
-  )
+  const handleVideoAreaClick = useCallback(() => {
+    onExpand?.()
+  }, [onExpand])
 
   const handleFileChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -115,7 +115,7 @@ export default function PipWindow({
 
   return (
     <div
-      className={`pip-video-container group relative aspect-video w-32 sm:w-36 ${className}`}
+      className={`pip-video-container group relative aspect-video w-36 min-h-[5.0625rem] min-w-[9rem] sm:w-40 sm:min-h-[5.625rem] sm:min-w-[10rem] ${className}`}
     >
       {variant === 'benchmark' && onUpload && (
         <input
@@ -129,7 +129,7 @@ export default function PipWindow({
         />
       )}
 
-      {variant === 'benchmark' && onUpload && src && (
+      {showUploadBadge && (
         <label
           htmlFor="benchmark-upload"
           {...touchBubbleBlockProps()}
@@ -162,7 +162,7 @@ export default function PipWindow({
       >
         <span
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
-          style={{ top: 8, left: 8 }}
+          style={{ top: 8, left: pillLeft }}
         >
           {label}
         </span>
@@ -185,16 +185,10 @@ export default function PipWindow({
             {onExpand && (
               <button
                 type="button"
-                onPointerDown={blockTouchBubble}
-                onTouchStart={blockTouchBubble}
-                onClick={handleExpand}
-                onTouchEnd={handleExpand}
-                className="pointer-events-auto absolute z-20 flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)] backdrop-blur-sm transition hover:bg-black/90"
-                style={{ top: 8, right: 8 }}
-                aria-label={`Expand ${label} to full screen`}
-              >
-                <Maximize2 className="h-3 w-3" />
-              </button>
+                className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
+                onClick={handleVideoAreaClick}
+                aria-label={`Open ${label} in full screen`}
+              />
             )}
 
             <div className="absolute inset-0 z-[5] pointer-events-none">

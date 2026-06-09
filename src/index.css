@@ -52,6 +52,17 @@ select {
 
 .pip-video-container {
   overflow: visible;
+  width: 9rem;
+  min-width: 9rem;
+  min-height: calc(9rem * 9 / 16);
+}
+
+@media (min-width: 640px) {
+  .pip-video-container {
+    width: 10rem;
+    min-width: 10rem;
+    min-height: calc(10rem * 9 / 16);
+  }
 }
 
 .app-shell,
@@ -100,7 +111,7 @@ select {
   }
 
   .app-pip-row > * {
-    width: 7.5rem;
+    min-width: 9rem;
     max-width: 30vw;
     overflow: visible;
   }
