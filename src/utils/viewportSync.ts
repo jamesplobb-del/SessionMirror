@@ -1,6 +1,17 @@
 import { Capacitor } from '@capacitor/core'
 
-/** iOS reports safe-area via env(); probe once per sync for JS height math. */
+export function isIOSNative(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
+}
+
+/** Tag the document so CSS can apply iOS WebKit fallbacks on every iPhone form factor. */
+function markPlatformClass(): void {
+  if (isIOSNative()) {
+    document.documentElement.classList.add('platform-ios')
+  }
+}
+
+/** iOS reports safe-area via env(); works for notch, Dynamic Island, and home-button iPhones. */
 function readSafeAreaInsets(): { top: number; bottom: number } {
   const probe = document.createElement('div')
   probe.setAttribute('aria-hidden', 'true')
@@ -39,6 +50,14 @@ export function readViewportSize(): { width: number; height: number } {
     vv?.width ?? 0,
   ].filter((value) => value > 0)
 
+  if (isIOSNative()) {
+    const inner = window.innerHeight
+    // outerHeight can help cold boot; ignore if it diverges (stale after backgrounding).
+    if (window.outerHeight > 0 && Math.abs(window.outerHeight - inner) <= 48) {
+      heightCandidates.push(window.outerHeight)
+    }
+  }
+
   return {
     width: Math.round(Math.max(...widthCandidates)),
     height: Math.round(Math.max(...heightCandidates)),
@@ -71,13 +90,41 @@ export function applyViewportCssVars(): number {
   return height
 }
 
+/** Run before React paint so every iPhone gets correct dimensions on cold launch. */
+export function bootstrapViewport(): void {
+  markPlatformClass()
+  applyViewportCssVars()
+}
+
+/** Clear stale inline sizes before measuring — prevents zoom/crop after app resume. */
+export function applyViewportCssVarsOnResume(): number {
+  document.body.style.width = ''
+  document.body.style.height = ''
+  void document.documentElement.offsetHeight
+  return applyViewportCssVars()
+}
+
 export function refreshCameraPreviewLayout(video: HTMLVideoElement | null): void {
   applyViewportCssVars()
   if (!video || !video.srcObject) return
   void video.play().catch(() => {})
 }
 
+/** iOS WKWebView keeps a stale video frame after backgrounding — rebind the stream. */
+export function rebindCameraPreviewStream(video: HTMLVideoElement): void {
+  const stream = video.srcObject
+  if (!(stream instanceof MediaStream)) return
+
+  applyViewportCssVarsOnResume()
+  video.srcObject = null
+  void video.offsetHeight
+  video.srcObject = stream
+  video.muted = true
+  void video.play().catch(() => {})
+}
+
 const BOOT_SYNC_DELAYS_MS = [0, 50, 100, 250, 500, 750, 1000, 1500, 2000]
+const RESUME_SYNC_DELAYS_MS = [0, 50, 100, 250, 500, 750]
 
 function syncWithRaf(sync: () => void): void {
   requestAnimationFrame(() => {
@@ -86,16 +133,16 @@ function syncWithRaf(sync: () => void): void {
   })
 }
 
-async function setupCapacitorResumeSync(sync: () => void): Promise<(() => void) | undefined> {
+async function setupCapacitorResumeSync(syncOnResume: () => void): Promise<(() => void) | undefined> {
   if (!Capacitor.isNativePlatform()) return undefined
 
   const { App } = await import('@capacitor/app')
   const sub = await App.addListener('appStateChange', ({ isActive }) => {
     if (!isActive) return
-    sync()
-    syncWithRaf(sync)
-    window.setTimeout(sync, 100)
-    window.setTimeout(sync, 300)
+
+    syncOnResume()
+    syncWithRaf(syncOnResume)
+    RESUME_SYNC_DELAYS_MS.forEach((delay) => window.setTimeout(syncOnResume, delay))
   })
 
   return () => {
@@ -104,7 +151,10 @@ async function setupCapacitorResumeSync(sync: () => void): Promise<(() => void) 
 }
 
 export function scheduleViewportSync(onHeightChange: (height: number) => void): () => void {
+  markPlatformClass()
+
   const sync = () => onHeightChange(applyViewportCssVars())
+  const syncOnResume = () => onHeightChange(applyViewportCssVarsOnResume())
 
   const timers = BOOT_SYNC_DELAYS_MS.map((delay) => window.setTimeout(sync, delay))
 
@@ -128,9 +178,10 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   window.addEventListener('focus', sync)
   window.visualViewport?.addEventListener('resize', sync)
   window.visualViewport?.addEventListener('scroll', sync)
+  screen.orientation?.addEventListener('change', onOrientationChange)
 
   let capCleanup: (() => void) | undefined
-  void setupCapacitorResumeSync(sync).then((cleanup) => {
+  void setupCapacitorResumeSync(syncOnResume).then((cleanup) => {
     capCleanup = cleanup
   })
 
@@ -142,6 +193,7 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
     window.removeEventListener('focus', sync)
     window.visualViewport?.removeEventListener('resize', sync)
     window.visualViewport?.removeEventListener('scroll', sync)
+    screen.orientation?.removeEventListener('change', onOrientationChange)
     capCleanup?.()
     rootCleanup()
   }

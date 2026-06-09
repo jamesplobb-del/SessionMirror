@@ -5,8 +5,10 @@ const config: CapacitorConfig = {
   appName: 'BestTake',
   webDir: 'dist',
   ios: {
-    // Edge-to-edge webview; HUD uses env(safe-area-inset-*) for Dynamic Island / home bar.
+    // Edge-to-edge on all iPhones; HUD uses env(safe-area-inset-*) for notch / island / home bar.
     contentInset: 'never',
+    backgroundColor: '#000000',
+    scrollEnabled: false,
   },
 }
 

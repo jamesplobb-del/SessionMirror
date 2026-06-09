@@ -18,6 +18,14 @@ body,
   background-color: #000;
 }
 
+/* iOS WebKit fallbacks — SE through Pro Max, home button through Dynamic Island. */
+html.platform-ios,
+html.platform-ios body,
+html.platform-ios #root {
+  height: -webkit-fill-available;
+  min-height: var(--app-height, -webkit-fill-available);
+}
+
 body {
   -webkit-tap-highlight-color: transparent;
 }
@@ -264,13 +272,18 @@ video.camera-preview {
   left: 0 !important;
   top: auto !important;
   width: var(--viewport-width, 100vw) !important;
+  /* Progressive fallbacks: legacy WebKit → dvh → synced JS height */
+  height: var(--camera-fill-height, 100vh) !important;
   height: var(
     --camera-fill-height,
     calc(100dvh + env(safe-area-inset-bottom, 0px))
   ) !important;
-  min-height: 100dvh !important;
   min-width: 0 !important;
-  min-height: 0 !important;
+  min-height: var(--camera-fill-height, 100vh) !important;
+  min-height: var(
+    --camera-fill-height,
+    calc(100dvh + env(safe-area-inset-bottom, 0px))
+  ) !important;
   transform: none !important;
   object-fit: cover !important;
   object-position: bottom center !important;
