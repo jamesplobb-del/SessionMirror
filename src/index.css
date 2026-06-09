@@ -262,7 +262,7 @@ select {
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: transparent;
+  background: #000;
   padding: 0;
 }
 
@@ -284,11 +284,17 @@ video.camera-preview {
     --camera-fill-height,
     calc(100dvh + env(safe-area-inset-bottom, 0px))
   ) !important;
+  opacity: 0;
+  transition: opacity 280ms ease;
   transform: none !important;
   object-fit: cover !important;
   object-position: bottom center !important;
   z-index: 0 !important;
   pointer-events: none !important;
+}
+
+video.camera-preview.camera-preview--live {
+  opacity: 1;
 }
 
 video.camera-preview.camera-preview--mirror {

@@ -241,7 +241,9 @@ export function useCameraSession({
 
     const startWithRecovery = async (attempt = 0) => {
       cancelScheduledRelease()
-      forceClearCameraState()
+      if (streamRef.current) {
+        forceClearCameraState()
+      }
 
       try {
         const mediaStream = await acquireStream(recordingMode, () => cancelled)

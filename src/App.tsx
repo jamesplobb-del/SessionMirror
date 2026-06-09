@@ -71,7 +71,9 @@ export default function App() {
   const isReviewOpen = reviewSlot !== null
 
   useLayoutEffect(() => {
-    return scheduleViewportSync(setWindowHeight)
+    return scheduleViewportSync((height) => {
+      setWindowHeight((prev) => (prev === height ? prev : height))
+    })
   }, [])
 
   const pausePipVideos = useCallback(() => {
@@ -220,17 +222,26 @@ export default function App() {
     setIsVaultOpen(false)
   }, [])
 
+  const handleOpenVault = useCallback(() => {
+    pausePipVideos()
+    setIsVaultOpen(true)
+  }, [pausePipVideos])
+
   useEffect(() => {
     if (!ready) return
 
-    const syncWhenCameraReady = () => setWindowHeight(applyViewportCssVars())
+    const syncWhenCameraReady = () => {
+      setWindowHeight((prev) => {
+        const next = applyViewportCssVars()
+        return prev === next ? prev : next
+      })
+    }
+
     syncWhenCameraReady()
-    const timers = [100, 300, 600].map((delay) =>
-      window.setTimeout(syncWhenCameraReady, delay),
-    )
+    const timer = window.setTimeout(syncWhenCameraReady, 150)
 
     return () => {
-      timers.forEach((timer) => window.clearTimeout(timer))
+      window.clearTimeout(timer)
     }
   }, [ready])
 
@@ -417,6 +428,7 @@ export default function App() {
         error={cameraError}
         recordingMode={recordingMode}
         isRecording={isRecording}
+        previewLive={ready}
         viewportKey={windowHeight}
       />
 
@@ -424,7 +436,10 @@ export default function App() {
         className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
         aria-hidden={isReviewOpen}
       >
-        <HudHeader sessionName={activeProject?.name ?? 'BestTake'} />
+        <HudHeader
+          sessionName={activeProject?.name ?? 'BestTake'}
+          onOpenVault={handleOpenVault}
+        />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
           <div className="app-pip-row">
@@ -477,7 +492,7 @@ export default function App() {
             recordingMode={recordingMode}
             onRecordingModeChange={changeRecordingMode}
             onToggleRecord={toggleRecording}
-            onOpenVault={() => setIsVaultOpen(true)}
+            onOpenVault={handleOpenVault}
             takeCount={takes.length}
           />
         </div>

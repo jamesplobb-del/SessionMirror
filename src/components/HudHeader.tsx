@@ -1,21 +1,28 @@
-import { FolderOpen } from 'lucide-react'
+import { ChevronDown, FolderOpen } from 'lucide-react'
 
 interface HudHeaderProps {
   sessionName: string
+  onOpenVault: () => void
 }
 
-export default function HudHeader({ sessionName }: HudHeaderProps) {
+export default function HudHeader({ sessionName, onOpenVault }: HudHeaderProps) {
   return (
     <header className="pointer-events-none flex shrink-0 justify-center px-4 pt-2">
-      <div className="pointer-events-auto flex max-w-[min(100%,16rem)] items-center gap-2 rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 shadow-lg backdrop-blur-md">
+      <button
+        type="button"
+        onClick={onOpenVault}
+        className="pointer-events-auto flex max-w-[min(100%,16rem)] items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 shadow-lg backdrop-blur-md transition hover:border-white/25 hover:bg-black/55 active:scale-[0.98]"
+        aria-label={`Open vault — current session: ${sessionName}`}
+      >
         <FolderOpen className="h-3.5 w-3.5 shrink-0 text-sky-300" />
-        <h1
+        <span
           className="truncate text-xs font-semibold tracking-tight text-white drop-shadow-sm"
           title={sessionName}
         >
           {sessionName}
-        </h1>
-      </div>
+        </span>
+        <ChevronDown className="h-3 w-3 shrink-0 text-white/55" aria-hidden />
+      </button>
     </header>
   )
 }

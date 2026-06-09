@@ -11,20 +11,30 @@ function markPlatformClass(): void {
   }
 }
 
-/** iOS reports safe-area via env(); works for notch, Dynamic Island, and home-button iPhones. */
+let cachedSafeAreaInsets: { top: number; bottom: number } | null = null
+let lastAppliedWidth = 0
+let lastAppliedHeight = 0
+
+function invalidateSafeAreaCache(): void {
+  cachedSafeAreaInsets = null
+}
+
+/** iOS reports safe-area via env(); cached to avoid layout thrash on every sync. */
 function readSafeAreaInsets(): { top: number; bottom: number } {
+  if (cachedSafeAreaInsets) return cachedSafeAreaInsets
+
   const probe = document.createElement('div')
   probe.setAttribute('aria-hidden', 'true')
   probe.style.cssText =
     'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
   document.documentElement.appendChild(probe)
   const style = getComputedStyle(probe)
-  const insets = {
+  cachedSafeAreaInsets = {
     top: parseFloat(style.paddingTop) || 0,
     bottom: parseFloat(style.paddingBottom) || 0,
   }
   document.documentElement.removeChild(probe)
-  return insets
+  return cachedSafeAreaInsets
 }
 
 export function readViewportSize(): { width: number; height: number } {
@@ -64,9 +74,16 @@ export function readViewportSize(): { width: number; height: number } {
   }
 }
 
-/** Apply live viewport dimensions — matches what iOS settles on after rotation. */
+/** Apply live viewport dimensions — skips DOM writes when size is unchanged. */
 export function applyViewportCssVars(): number {
   const { width, height } = readViewportSize()
+  if (width === lastAppliedWidth && height === lastAppliedHeight) {
+    return height
+  }
+
+  lastAppliedWidth = width
+  lastAppliedHeight = height
+
   const vv = window.visualViewport
   const root = document.documentElement
 
@@ -100,6 +117,8 @@ export function bootstrapViewport(): void {
 export function applyViewportCssVarsOnResume(): number {
   document.body.style.width = ''
   document.body.style.height = ''
+  lastAppliedWidth = 0
+  lastAppliedHeight = 0
   void document.documentElement.offsetHeight
   return applyViewportCssVars()
 }
@@ -110,8 +129,8 @@ export function refreshCameraPreviewLayout(video: HTMLVideoElement | null): void
   void video.play().catch(() => {})
 }
 
-const BOOT_SYNC_DELAYS_MS = [0, 50, 100, 250, 500, 750, 1000, 1500, 2000]
-const RESUME_SYNC_DELAYS_MS = [0, 50, 100, 250, 500, 750]
+const BOOT_SYNC_DELAYS_MS = [100, 300, 750]
+const RESUME_SYNC_DELAYS_MS = [0, 100, 250, 500]
 
 function syncWithRaf(sync: () => void): void {
   requestAnimationFrame(() => {
@@ -140,12 +159,19 @@ async function setupCapacitorResumeSync(syncOnResume: () => void): Promise<(() =
 export function scheduleViewportSync(onHeightChange: (height: number) => void): () => void {
   markPlatformClass()
 
-  const sync = () => onHeightChange(applyViewportCssVars())
-  const syncOnResume = () => onHeightChange(applyViewportCssVarsOnResume())
+  const sync = () => {
+    onHeightChange(applyViewportCssVars())
+  }
+  const syncOnResume = () => {
+    onHeightChange(applyViewportCssVarsOnResume())
+  }
 
   const timers = BOOT_SYNC_DELAYS_MS.map((delay) => window.setTimeout(sync, delay))
 
   const onOrientationChange = () => {
+    invalidateSafeAreaCache()
+    lastAppliedWidth = 0
+    lastAppliedHeight = 0
     sync()
     syncWithRaf(sync)
     window.setTimeout(sync, 100)
@@ -158,7 +184,6 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   }
 
   sync()
-  syncWithRaf(sync)
   window.addEventListener('resize', sync)
   window.addEventListener('orientationchange', onOrientationChange)
   window.addEventListener('pageshow', onPageShow)
@@ -198,4 +223,7 @@ function rootCleanup(): void {
   root.style.removeProperty('--safe-bottom-js')
   document.body.style.width = ''
   document.body.style.height = ''
+  lastAppliedWidth = 0
+  lastAppliedHeight = 0
+  cachedSafeAreaInsets = null
 }

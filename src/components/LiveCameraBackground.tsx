@@ -1,4 +1,4 @@
-import { memo, useEffect, type RefObject, type VideoHTMLAttributes } from 'react'
+import { memo, useEffect, useState, type RefObject, type VideoHTMLAttributes } from 'react'
 import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
 import { refreshCameraPreviewLayout } from '../utils/viewportSync'
@@ -11,6 +11,7 @@ interface LiveCameraBackgroundProps {
   error: string | null
   recordingMode: RecordingMode
   isRecording: boolean
+  previewLive?: boolean
   viewportKey?: number
 }
 
@@ -21,18 +22,37 @@ function LiveCameraBackground({
   error,
   recordingMode,
   isRecording,
+  previewLive = false,
   viewportKey,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
+  const [previewVisible, setPreviewVisible] = useState(false)
 
   useEffect(() => {
+    if (!previewLive || isAudioMode) {
+      setPreviewVisible(false)
+      return
+    }
+
     const video = previewRef.current
     if (!video) return
 
-    refreshCameraPreviewLayout(video)
+    const reveal = () => setPreviewVisible(true)
+    if (video.readyState >= 2) {
+      reveal()
+      return
+    }
 
-    if (recordingMode === 'audio') {
-      if (video.srcObject) {
+    video.addEventListener('loadeddata', reveal, { once: true })
+    return () => {
+      video.removeEventListener('loadeddata', reveal)
+    }
+  }, [previewLive, isAudioMode, previewRef, streamGeneration])
+
+  useEffect(() => {
+    const video = previewRef.current
+    if (!video || isAudioMode) {
+      if (video?.srcObject) {
         video.srcObject = null
       }
       return
@@ -46,15 +66,13 @@ function LiveCameraBackground({
     }
     video.muted = true
     void video.play().catch(() => {})
+  }, [previewRef, streamRef, recordingMode, streamGeneration, isAudioMode])
 
-    const timers = [100, 300].map((delay) =>
-      window.setTimeout(() => refreshCameraPreviewLayout(video), delay),
-    )
-
-    return () => {
-      timers.forEach((timer) => window.clearTimeout(timer))
-    }
-  }, [previewRef, streamRef, recordingMode, streamGeneration, viewportKey])
+  useEffect(() => {
+    const video = previewRef.current
+    if (!video || isAudioMode) return
+    refreshCameraPreviewLayout(video)
+  }, [previewRef, viewportKey, isAudioMode])
 
   return (
     <div className="camera-background" aria-hidden>
@@ -69,7 +87,11 @@ function LiveCameraBackground({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
         className={`camera-preview ${
-          isAudioMode ? 'camera-preview--hidden' : 'camera-preview--mirror'
+          isAudioMode
+            ? 'camera-preview--hidden'
+            : previewVisible
+              ? 'camera-preview--mirror camera-preview--live'
+              : 'camera-preview--mirror camera-preview--booting'
         }`}
       />
 
@@ -128,5 +150,6 @@ export default memo(
     prev.error === next.error &&
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
+    prev.previewLive === next.previewLive &&
     prev.viewportKey === next.viewportKey,
 )
