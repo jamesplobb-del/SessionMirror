@@ -96,6 +96,7 @@ export function useCameraSession({
   const foregroundRestartTokenRef = useRef(0)
   const foregroundRestartTimerRef = useRef<number | null>(null)
   const releaseTimerRef = useRef<number | null>(null)
+  const elapsedRef = useRef(0)
   const onCompleteRef = useRef(onRecordingComplete)
   onCompleteRef.current = onRecordingComplete
 
@@ -310,7 +311,11 @@ export function useCameraSession({
   useEffect(() => {
     if (!isRecording) return
     const interval = window.setInterval(() => {
-      setElapsed((prev) => prev + 1)
+      setElapsed((prev) => {
+        const next = prev + 1
+        elapsedRef.current = next
+        return next
+      })
     }, 1000)
     return () => window.clearInterval(interval)
   }, [isRecording])
@@ -369,6 +374,7 @@ export function useCameraSession({
             const stoppedTakeId = activeTakeIdRef.current ?? takeId
             activeTakeIdRef.current = null
             const completedMode = recordingModeRef.current
+            const durationSeconds = elapsedRef.current
 
             try {
               if (activeWriter) {
@@ -379,6 +385,7 @@ export function useCameraSession({
                   mediaType: completedMode,
                   filePath: persisted.filePath,
                   videoUrl: persisted.videoUrl,
+                  durationSeconds,
                 })
               } else {
                 const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
@@ -394,6 +401,7 @@ export function useCameraSession({
                   mediaType: completedMode,
                   filePath: persisted.filePath,
                   videoUrl: persisted.videoUrl,
+                  durationSeconds,
                   blob,
                 })
               }
@@ -426,6 +434,7 @@ export function useCameraSession({
         }
         setIsRecording(true)
         setElapsed(0)
+        elapsedRef.current = 0
       } catch {
         chunksRef.current = []
         await writer?.abort().catch(() => {})

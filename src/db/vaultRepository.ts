@@ -1,5 +1,5 @@
 import { getVaultDatabase, persistVaultWebStore } from './connection'
-import type { Project, VaultTake } from './types'
+import type { Project, SaveTakeInput, VaultTake, VaultTakeUpdate } from './types'
 
 type SqlRow = Record<string, unknown>
 
@@ -19,6 +19,11 @@ function mapTakeRow(row: SqlRow): VaultTake {
     duration: Number(row.duration),
     isBestTake: Number(row.is_best_take) === 1,
     createdAt: Number(row.created_at),
+    name: String(row.name ?? ''),
+    mimeType: String(row.mime_type ?? 'video/mp4'),
+    mediaType: String(row.media_type ?? 'video') === 'audio' ? 'audio' : 'video',
+    rating: Number(row.rating ?? 0),
+    notes: String(row.notes ?? ''),
   }
 }
 
@@ -55,37 +60,39 @@ export async function listProjects(): Promise<Project[]> {
   return (result.values ?? []).map((row) => mapProjectRow(row as SqlRow))
 }
 
-export async function saveTake(
-  projectId: string,
-  filePath: string,
-  duration: number,
-  takeId?: string,
-): Promise<VaultTake> {
+export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
   const db = getVaultDatabase()
-  const trimmedPath = filePath.trim()
+  const trimmedPath = input.filePath.trim()
   if (!trimmedPath) {
     throw new Error('Take file path cannot be empty.')
   }
 
   const projectCheck = await db.query('SELECT id FROM projects WHERE id = ? LIMIT 1', [
-    projectId,
+    input.projectId,
   ])
   if ((projectCheck.values ?? []).length === 0) {
-    throw new Error(`Project not found: ${projectId}`)
+    throw new Error(`Project not found: ${input.projectId}`)
   }
 
   const take: VaultTake = {
-    id: takeId ?? crypto.randomUUID(),
-    projectId,
+    id: input.takeId ?? crypto.randomUUID(),
+    projectId: input.projectId,
     filePath: trimmedPath,
-    duration: Math.max(0, Math.round(duration)),
+    duration: Math.max(0, Math.round(input.duration)),
     isBestTake: false,
     createdAt: Date.now(),
+    name: input.name?.trim() ?? '',
+    mimeType: input.mimeType ?? 'video/mp4',
+    mediaType: input.mediaType ?? 'video',
+    rating: 0,
+    notes: '',
   }
 
   await db.run(
-    `INSERT INTO takes (id, project_id, file_path, duration, is_best_take, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO takes (
+      id, project_id, file_path, duration, is_best_take, created_at,
+      name, mime_type, media_type, rating, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       take.id,
       take.projectId,
@@ -93,11 +100,47 @@ export async function saveTake(
       take.duration,
       take.isBestTake ? 1 : 0,
       take.createdAt,
+      take.name,
+      take.mimeType,
+      take.mediaType,
+      take.rating,
+      take.notes,
     ],
   )
 
   await persistWebStore()
   return take
+}
+
+export async function updateVaultTake(takeId: string, updates: VaultTakeUpdate): Promise<void> {
+  const db = getVaultDatabase()
+  const fields: string[] = []
+  const values: unknown[] = []
+
+  if (updates.name !== undefined) {
+    fields.push('name = ?')
+    values.push(updates.name)
+  }
+  if (updates.rating !== undefined) {
+    fields.push('rating = ?')
+    values.push(updates.rating)
+  }
+  if (updates.notes !== undefined) {
+    fields.push('notes = ?')
+    values.push(updates.notes)
+  }
+
+  if (fields.length === 0) return
+
+  values.push(takeId)
+  await db.run(`UPDATE takes SET ${fields.join(', ')} WHERE id = ?`, values)
+  await persistWebStore()
+}
+
+export async function deleteVaultTake(takeId: string): Promise<void> {
+  const db = getVaultDatabase()
+  await db.run('DELETE FROM takes WHERE id = ?', [takeId])
+  await persistWebStore()
 }
 
 export async function toggleBestTake(takeId: string): Promise<VaultTake> {
@@ -118,6 +161,14 @@ export async function toggleBestTake(takeId: string): Promise<VaultTake> {
     ...row,
     is_best_take: nextValue,
   })
+}
+
+/** Mark one take as Best Take for a session; clears the flag on siblings. */
+export async function setProjectBestTake(projectId: string, takeId: string): Promise<void> {
+  const db = getVaultDatabase()
+  await db.run('UPDATE takes SET is_best_take = 0 WHERE project_id = ?', [projectId])
+  await db.run('UPDATE takes SET is_best_take = 1 WHERE id = ?', [takeId])
+  await persistWebStore()
 }
 
 export async function getTakesByProject(projectId: string): Promise<VaultTake[]> {

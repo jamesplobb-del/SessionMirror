@@ -1,3 +1,5 @@
+import type { MediaType } from '../types'
+
 /** A user-created session / project folder in the vault. */
 export interface Project {
   id: string
@@ -16,4 +18,21 @@ export interface VaultTake {
   isBestTake: boolean
   /** Unix epoch milliseconds */
   createdAt: number
+  name: string
+  mimeType: string
+  mediaType: MediaType
+  rating: number
+  notes: string
 }
+
+export interface SaveTakeInput {
+  projectId: string
+  filePath: string
+  duration: number
+  takeId?: string
+  name?: string
+  mimeType?: string
+  mediaType?: MediaType
+}
+
+export type VaultTakeUpdate = Partial<Pick<VaultTake, 'name' | 'rating' | 'notes'>>

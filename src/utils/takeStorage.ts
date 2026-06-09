@@ -16,6 +16,8 @@ export interface RecordingCompletePayload {
   mediaType: 'video' | 'audio'
   filePath: string
   videoUrl: string
+  /** Recording length in whole seconds */
+  durationSeconds: number
   /** Only set on web dev fallback — native recordings are already on disk */
   blob?: Blob
 }

@@ -7,9 +7,11 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import VaultMediaSegment from './VaultMediaSegment'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import { resetVideosInContainer } from '../utils/videoPlayback'
+import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, shareTakeVideo } from '../utils/shareTakeVideo'
 import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, isAudioTake } from '../utils/mediaType'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
+import type { Project } from '../db/types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
 export async function resolveVaultVideoSrc(
@@ -28,6 +30,10 @@ export async function resolveVaultVideoSrc(
 interface TakeVaultDrawerProps {
   isOpen: boolean
   onClose: () => void
+  projects: Project[]
+  activeProject: Project | null
+  onSelectProject: (projectId: string) => void
+  onCreateProject: () => void
   takes: Take[]
   sortedTakes: Take[]
   sortMode: SortMode
@@ -79,6 +85,10 @@ export function VaultTakeVideo({
 export default function TakeVaultDrawer({
   isOpen,
   onClose,
+  projects,
+  activeProject,
+  onSelectProject,
+  onCreateProject,
   takes,
   sortedTakes,
   sortMode,
@@ -147,7 +157,11 @@ export default function TakeVaultDrawer({
         <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
-            <p className="text-xs text-stone-500">Set your Best Take and load a take to the HUD</p>
+            <p className="text-xs text-stone-500">
+              {activeProject
+                ? `Session: ${activeProject.name}`
+                : 'Set your Best Take and load a take to the HUD'}
+            </p>
           </div>
           <button
             type="button"
@@ -160,6 +174,12 @@ export default function TakeVaultDrawer({
         </div>
 
         <div className="overflow-y-auto px-6 pb-8 pt-4">
+          <ProjectSessionBar
+            projects={projects}
+            activeProjectId={activeProject?.id ?? null}
+            onSelectProject={onSelectProject}
+            onCreateProject={onCreateProject}
+          />
           {takes.length === 0 ? (
             <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
               <p className="text-sm text-stone-400">

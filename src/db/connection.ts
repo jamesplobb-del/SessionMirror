@@ -5,6 +5,7 @@ import {
   type SQLiteDBConnection,
 } from '@capacitor-community/sqlite'
 import { CREATE_SCHEMA_SQL, DB_NAME, DB_VERSION, DEFAULT_PROJECT_NAME } from './schema'
+import { migrateVaultSchema } from './migrations'
 
 let sqliteConnection: SQLiteConnection | null = null
 let dbConnection: SQLiteDBConnection | null = null
@@ -49,6 +50,7 @@ async function openVaultConnection(): Promise<SQLiteDBConnection> {
 
   await connection.open()
   await connection.execute(CREATE_SCHEMA_SQL)
+  await migrateVaultSchema(connection)
   await ensureDefaultProjectRow(connection)
 
   if (Capacitor.getPlatform() === 'web') {

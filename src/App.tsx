@@ -21,11 +21,39 @@ import {
 import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
 import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
-import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
+import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
+import {
+  createProject,
+  deleteVaultTake,
+  findBestTakeId,
+  getTakesByProject,
+  listProjects,
+  loadUiTakesForProject,
+  saveTake,
+  setProjectBestTake,
+  updateVaultTake,
+  type Project,
+} from './db'
+
+async function hydrateTakeThumbnails(takes: Take[]): Promise<Take[]> {
+  return Promise.all(
+    takes.map(async (take) => {
+      if (take.thumbnailUrl || isAudioTake(take)) return take
+      try {
+        const thumbnailUrl = await generateThumbnailFromUrl(take.videoUrl)
+        return { ...take, thumbnailUrl }
+      } catch {
+        return take
+      }
+    }),
+  )
+}
 
 export default function App() {
   const [takes, setTakes] = useState<Take[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [benchmarkId, setBenchmarkId] = useState<string | null>(null)
   const [challengerId, setChallengerId] = useState<string | null>(null)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
@@ -37,6 +65,8 @@ export default function App() {
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
+  const activeProjectIdRef = useRef<string | null>(null)
+  activeProjectIdRef.current = activeProjectId
 
   const isReviewOpen = reviewSlot !== null
 
@@ -49,16 +79,80 @@ export default function App() {
     resetVideoPlayback(challengerPipVideoRef.current)
   }, [])
 
+  const reloadProjectTakes = useCallback(async (projectId: string) => {
+    const loaded = await loadUiTakesForProject(projectId)
+    const withThumbs = await hydrateTakeThumbnails(loaded)
+    setTakes(withThumbs)
+
+    const rows = await getTakesByProject(projectId)
+    setBenchmarkId(findBestTakeId(rows))
+    setChallengerId((current) => {
+      if (current && rows.some((row) => row.id === current)) return current
+      return rows.find((row) => !row.isBestTake)?.id ?? null
+    })
+  }, [])
+
+  useEffect(() => {
+    void (async () => {
+      const projectList = await listProjects()
+      setProjects(projectList)
+      const initialId = projectList[0]?.id ?? null
+      setActiveProjectId(initialId)
+      if (initialId) {
+        await reloadProjectTakes(initialId)
+      }
+    })()
+  }, [reloadProjectTakes])
+
+  const handleSelectProject = useCallback(
+    async (projectId: string) => {
+      pausePipVideos()
+      setActiveProjectId(projectId)
+      await reloadProjectTakes(projectId)
+    },
+    [pausePipVideos, reloadProjectTakes],
+  )
+
+  const handleCreateProject = useCallback(async () => {
+    const name = window.prompt('Name this session', 'New Session')
+    if (!name?.trim()) return
+
+    const project = await createProject(name.trim())
+    setProjects((prev) => [project, ...prev])
+    setActiveProjectId(project.id)
+    setTakes([])
+    setBenchmarkId(null)
+    setChallengerId(null)
+  }, [])
+
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
-    const { takeId, mimeType, filePath, videoUrl, blob, mediaType } = payload
+    const { takeId, mimeType, filePath, videoUrl, blob, mediaType, durationSeconds } =
+      payload
 
     void (async () => {
       const safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
+      const projectId = activeProjectIdRef.current
+      let takeIndex = 1
+
+      if (projectId && filePath) {
+        const existing = await getTakesByProject(projectId)
+        takeIndex = existing.length + 1
+        await saveTake({
+          projectId,
+          filePath,
+          duration: durationSeconds,
+          takeId,
+          mimeType,
+          mediaType,
+          name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
+        })
+      }
 
       setTakes((prev) => {
+        const index = projectId ? takeIndex : prev.length + 1
         const next = createTake(
           takeId,
-          prev.length + 1,
+          index,
           safeVideoUrl,
           filePath,
           mimeType,
@@ -150,6 +244,9 @@ export default function App() {
     (id: string) => {
       pausePipVideos()
       setBenchmarkId(id)
+      if (activeProjectIdRef.current) {
+        void setProjectBestTake(activeProjectIdRef.current, id)
+      }
       setChallengerId((current) => {
         if (current && current !== id) return current
         const other = takes.find((t) => t.id !== id)
@@ -222,7 +319,22 @@ export default function App() {
           thumbnailUrl: mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : '',
         }
 
+        const projectId = activeProjectIdRef.current
+        if (projectId && persisted.filePath) {
+          await saveTake({
+            projectId,
+            filePath: persisted.filePath,
+            duration: 0,
+            takeId,
+            mimeType,
+            mediaType,
+            name: uploadedTake.name,
+          })
+          await setProjectBestTake(projectId, takeId)
+        }
+
         setTakes((prev) => [...prev, uploadedTake])
+
         setBenchmarkId(takeId)
 
         if (mediaType === 'audio') return
@@ -247,6 +359,7 @@ export default function App() {
     setTakes((prev) =>
       prev.map((take) => (take.id === id ? { ...take, ...updates } : take)),
     )
+    void updateVaultTake(id, updates)
   }, [])
 
   const handleDeleteTake = useCallback((id: string) => {
@@ -261,24 +374,15 @@ export default function App() {
       }
       return prev.filter((t) => t.id !== id)
     })
+    void deleteVaultTake(id)
     setBenchmarkId((current) => (current === id ? null : current))
     setChallengerId((current) => (current === id ? null : current))
   }, [])
 
-  const takesRef = useRef(takes)
-  takesRef.current = takes
-
-  useEffect(() => {
-    return () => {
-      takesRef.current.forEach((take) => {
-        if (take.filePath) {
-          void deleteTakeFile(take.filePath)
-        } else if (take.videoUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(take.videoUrl)
-        }
-      })
-    }
-  }, [])
+  const activeProject = useMemo(
+    () => projects.find((project) => project.id === activeProjectId) ?? null,
+    [projects, activeProjectId],
+  )
 
   useLayoutEffect(() => {
     for (const ref of [benchmarkPipVideoRef, challengerPipVideoRef]) {
@@ -395,6 +499,10 @@ export default function App() {
       <TakeVaultDrawer
         isOpen={isVaultOpen}
         onClose={() => setIsVaultOpen(false)}
+        projects={projects}
+        activeProject={activeProject}
+        onSelectProject={handleSelectProject}
+        onCreateProject={handleCreateProject}
         takes={takes}
         sortedTakes={sortedTakes}
         sortMode={sortMode}
