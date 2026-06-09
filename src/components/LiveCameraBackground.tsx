@@ -58,7 +58,7 @@ function LiveCameraBackground({
         style={{
           transform: isAudioMode ? undefined : 'scaleX(-1)',
           width: '100vw',
-          height: '100vh',
+          height: '100dvh',
           objectFit: 'cover',
         }}
         className={`camera-preview absolute inset-0 z-0 transition-opacity duration-300 ${

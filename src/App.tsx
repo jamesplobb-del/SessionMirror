@@ -292,7 +292,6 @@ export default function App() {
 
         <div
           className="app-hud-bottom pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4 transition-opacity duration-200 ease-in"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
           <div className="app-pip-row flex items-end justify-between gap-3 px-3 sm:px-4">
             <PipWindow
