@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { RecordingMode } from '../types'
-import { readAnalyserRms } from '../utils/audioLevel'
+import { readAnalyserLevel } from '../utils/audioLevel'
 import { volumeThresholdToLevel } from '../utils/appSettings'
 
 const START_HOLD_MS = 120
@@ -123,7 +123,7 @@ export function useAutoSoundRecording({
 
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 2048
-      analyser.smoothingTimeConstant = 0.35
+      analyser.smoothingTimeConstant = 0.12
 
       const source = audioContext.createMediaStreamSource(stream)
       source.connect(analyser)
@@ -145,7 +145,7 @@ export function useAutoSoundRecording({
           void audioContextRef.current.resume().catch(() => {})
         }
 
-        const level = readAnalyserRms(analyserRef.current)
+        const level = readAnalyserLevel(analyserRef.current)
         const aboveGate = level >= gateRef.current
 
         if (!isRecordingRef.current) {

@@ -12,7 +12,7 @@ export interface AppSettings {
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   autoSoundRecording: false,
   soundSilenceSeconds: 2,
-  soundVolumeThreshold: 30,
+  soundVolumeThreshold: 20,
   hapticFeedback: true,
 }
 
@@ -58,10 +58,13 @@ export function saveAppSettings(settings: AppSettings): void {
   }
 }
 
-/** Map slider 1–100 to RMS gate (lower slider = more sensitive). */
+/** Map slider 1–100 to RMS gate (lower slider = more sensitive). Log scale — most usable range on the left. */
 export function volumeThresholdToLevel(sliderValue: number): number {
-  const normalized = clamp(sliderValue, 1, 100) / 100
-  const maxLevel = 0.22
-  const minLevel = 0.006
-  return minLevel + normalized * (maxLevel - minLevel)
+  const t = clamp(sliderValue, 1, 100)
+  const minLevel = 0.0006
+  const maxLevel = 0.055
+  const normalized = (t - 1) / 99
+  const logMin = Math.log(minLevel)
+  const logMax = Math.log(maxLevel)
+  return Math.exp(logMin + normalized * (logMax - logMin))
 }

@@ -168,7 +168,7 @@ export default function SettingsDrawer({
 
                 <SettingSlider
                   label="Start Loudness"
-                  description="Left = picks up quiet playing. Right = only loud playing triggers recording."
+                  description="Left = quiet playing triggers. Right = only very loud playing. Most instruments work on the left half."
                   value={settings.soundVolumeThreshold}
                   min={1}
                   max={100}
