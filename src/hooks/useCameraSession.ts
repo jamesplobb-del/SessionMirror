@@ -502,7 +502,7 @@ export function useCameraSession({
     if (recordingModeRef.current !== 'audio') return
     window.setTimeout(() => {
       void warmAutoAudioRecorder()
-    }, 350)
+    }, 200)
   }
 
   const startRecording = useCallback(() => {

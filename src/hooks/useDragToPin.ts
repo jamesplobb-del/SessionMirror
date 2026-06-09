@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { triggerDragStartHaptic, triggerSelectionHaptic } from '../utils/haptics'
 
-const LONG_PRESS_MS = 280
+const LONG_PRESS_MS = 200
 const DRAG_THRESHOLD_PX = 8
 const MOVEMENT_CANCEL_PX = 12
 

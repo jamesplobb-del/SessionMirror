@@ -68,3 +68,60 @@ export function volumeThresholdToLevel(sliderValue: number): number {
   const logMax = Math.log(maxLevel)
   return Math.exp(logMin + normalized * (logMax - logMin))
 }
+
+export interface AutoRecordProfile {
+  /** User-configured minimum loudness (RMS scale). */
+  gate: number
+  /** Peak contributes to start detection — disabled for loud-only mode. */
+  usePeak: boolean
+  /** Sustained-above-gate hold before starting (ms). */
+  holdMs: number
+  /** Fast attack path hold when peak clearly exceeds gate (ms). 0 = disabled. */
+  attackHoldMs: number
+  /** Multiplier over tracked ambient noise floor. */
+  noiseHeadroom: number
+  /** Absolute floor added above ambient noise. */
+  noiseMargin: number
+  /** Peak must exceed effective gate by this factor for attack path. */
+  attackPeakRatio: number
+}
+
+/** Per-slider detection profile — loud mode rejects peak-only spikes; sensitive mode triggers fast. */
+export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
+  const gate = volumeThresholdToLevel(sliderValue)
+  const t = clamp(sliderValue, 1, 100)
+
+  if (t >= 75) {
+    return {
+      gate,
+      usePeak: false,
+      holdMs: 72,
+      attackHoldMs: 0,
+      noiseHeadroom: 3.5,
+      noiseMargin: 0.001,
+      attackPeakRatio: 0,
+    }
+  }
+
+  if (t <= 25) {
+    return {
+      gate,
+      usePeak: true,
+      holdMs: 28,
+      attackHoldMs: 12,
+      noiseHeadroom: 2.2,
+      noiseMargin: 0.00015,
+      attackPeakRatio: 1.75,
+    }
+  }
+
+  return {
+    gate,
+    usePeak: true,
+    holdMs: 44,
+    attackHoldMs: 20,
+    noiseHeadroom: 2.8,
+    noiseMargin: 0.00035,
+    attackPeakRatio: 1.9,
+  }
+}
