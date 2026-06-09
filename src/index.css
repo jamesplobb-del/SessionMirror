@@ -204,6 +204,11 @@ body.pip-drag-active * {
   display: none;
 }
 
+.vault-drawer-scroll {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
 .record-carousel-viewport {
   position: relative;
   width: 9.5rem;

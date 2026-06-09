@@ -259,15 +259,14 @@ export default function TakeVaultDrawer({
 
       <div
         ref={drawerRef}
-        className={`fixed inset-x-0 bottom-0 z-50 max-h-[75vh] rounded-t-3xl border border-white/20 bg-white/90 shadow-2xl backdrop-blur-xl transition-[transform,opacity] duration-200 ease-in ${
+        className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[min(75vh,100dvh)] flex-col overflow-hidden rounded-t-3xl border border-white/20 bg-white/90 shadow-2xl backdrop-blur-xl transition-[transform,opacity] duration-200 ease-in ${
           isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
         }`}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         role="dialog"
         aria-modal="true"
         aria-label="Take Vault"
       >
-        <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
             <p className="text-xs text-stone-500">
@@ -317,7 +316,7 @@ export default function TakeVaultDrawer({
           </div>
         </div>
 
-        <div className="overflow-y-auto px-6 pb-8 pt-4">
+        <div className="vault-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-4">
           <ProjectSessionBar
             projects={projects}
             activeProjectId={activeProject?.id ?? null}
@@ -362,7 +361,7 @@ export default function TakeVaultDrawer({
                       </button>
                     )}
                   </div>
-                  <div className="flex gap-4 overflow-x-auto pb-2">
+                  <div className="flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
                     {isOpen &&
                       filteredTakes.map((take) => (
                         <TakeCard
@@ -414,7 +413,7 @@ export default function TakeVaultDrawer({
 
         {selectionMode && selectedCount > 0 && (
           <div
-            className="flex gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
+            className="flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
             <button
@@ -439,7 +438,7 @@ export default function TakeVaultDrawer({
 
         {selectionMode && selectedCount === 0 && (
           <div
-            className="flex items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
+            className="flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
             <CheckSquare className="h-3.5 w-3.5" />
