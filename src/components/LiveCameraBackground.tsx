@@ -44,7 +44,7 @@ function LiveCameraBackground({
   }, [previewRef, streamRef, recordingMode, streamGeneration])
 
   return (
-    <div className="absolute inset-0 z-0">
+    <div className="camera-background">
       <video
         ref={previewRef}
         autoPlay
@@ -55,8 +55,13 @@ function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        style={{ transform: isAudioMode ? undefined : 'scaleX(-1)' }}
-        className={`absolute inset-0 z-0 h-[100dvh] w-full object-cover transition-opacity duration-300 ${
+        style={{
+          transform: isAudioMode ? undefined : 'scaleX(-1)',
+          width: '100vw',
+          height: '100vh',
+          objectFit: 'cover',
+        }}
+        className={`camera-preview absolute inset-0 z-0 transition-opacity duration-300 ${
           isAudioMode ? 'pointer-events-none opacity-0' : 'opacity-100'
         }`}
       />

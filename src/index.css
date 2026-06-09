@@ -13,9 +13,8 @@ body,
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100dvh;
-  min-height: 100dvh;
-  max-height: 100dvh;
+  height: 100vh;
+  min-height: 100vh;
   overflow: hidden;
   background: #000;
 }
@@ -100,7 +99,7 @@ select {
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .app-pip-row {
@@ -164,24 +163,47 @@ select {
 }
 
 .record-shutter {
-  width: 72px;
-  height: 72px;
-  min-width: 72px;
-  min-height: 72px;
-  max-width: 72px;
-  max-height: 72px;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  max-width: 56px;
+  max-height: 56px;
   box-sizing: border-box;
 }
 
 .record-shutter-dot {
-  width: 58px;
-  height: 58px;
-  min-width: 58px;
-  min-height: 58px;
-  max-width: 58px;
-  max-height: 58px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
 }
 
 .record-shutter:active:not(:disabled) {
   transform: scale(0.96);
+}
+
+.camera-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.camera-preview {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+}
+
+.app-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
 }
