@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type Touc
 import { ChevronDown, ChevronUp, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
+import { pinButtonBubbleProps } from '../utils/eventBubbling'
 
 interface TakeCardProps {
   take: Take
@@ -269,14 +270,12 @@ export default function TakeCard({
           {onExport && (
             <button
               type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onTouchEnd={(e) => e.stopPropagation()}
+              {...pinButtonBubbleProps()}
               onClick={(e) => {
                 e.stopPropagation()
                 onExport()
               }}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100"
+              className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100"
               aria-label={`Save ${take.name} to Photos`}
             >
               <Download className="h-3.5 w-3.5" />

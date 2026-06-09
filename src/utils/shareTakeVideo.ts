@@ -1,49 +1,149 @@
 import { Media } from '@capacitor-community/media'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
+import { getTakeMediaType } from './mediaType'
 import type { Take } from '../types'
 
-/** Native file URI for saving a take to the photo library. */
-async function resolveTakeSavePath(take: Take): Promise<string | null> {
-  if (Capacitor.isNativePlatform()) {
-    if (take.filePath) {
+const EXPORT_CACHE_DIR = 'export-cache'
+
+export type SaveTakeResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing_file' | 'permission_denied' | 'save_failed' | 'unsupported' }
+
+function classifySaveError(err: unknown): SaveTakeResult {
+  const message =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'object' && err !== null
+        ? JSON.stringify(err)
+        : String(err)
+
+  if (
+    message.includes('accessDenied') ||
+    message.toLowerCase().includes('not allowed') ||
+    message.toLowerCase().includes('permission')
+  ) {
+    return { ok: false, reason: 'permission_denied' }
+  }
+
+  return { ok: false, reason: 'save_failed' }
+}
+
+/** Copy take from app data to cache — Photos export needs a plain file:// URI. */
+async function copyTakeToExportCache(relativeFilePath: string): Promise<string> {
+  const fileName = relativeFilePath.split('/').pop() ?? `take-${Date.now()}.mp4`
+  const cachePath = `${EXPORT_CACHE_DIR}/${fileName}`
+
+  await Filesystem.mkdir({
+    path: EXPORT_CACHE_DIR,
+    directory: Directory.Cache,
+    recursive: true,
+  })
+
+  const { data } = await Filesystem.readFile({
+    path: relativeFilePath,
+    directory: Directory.Data,
+  })
+
+  await Filesystem.writeFile({
+    path: cachePath,
+    directory: Directory.Cache,
+    data,
+  })
+
+  const { uri } = await Filesystem.getUri({
+    path: cachePath,
+    directory: Directory.Cache,
+  })
+
+  return uri
+}
+
+/** Native file:// URI for Media.saveVideo — never pass capacitor:// playback URLs. */
+async function resolveNativeFileUri(take: Take): Promise<string | null> {
+  if (take.filePath) {
+    try {
+      await Filesystem.stat({
+        path: take.filePath,
+        directory: Directory.Data,
+      })
+
       const { uri } = await Filesystem.getUri({
         path: take.filePath,
         directory: Directory.Data,
       })
-      return uri
-    }
 
-    if (take.videoUrl && !take.videoUrl.startsWith('blob:')) {
-      return take.videoUrl
-    }
+      if (uri.startsWith('file://')) {
+        return uri
+      }
 
-    return null
+      return copyTakeToExportCache(take.filePath)
+    } catch {
+      return null
+    }
   }
 
-  return take.videoUrl || null
+  if (take.videoUrl?.startsWith('file://')) {
+    return take.videoUrl
+  }
+
+  return null
 }
 
-function downloadTakeOnWeb(take: Take, url: string): void {
+function downloadTakeOnWeb(take: Take, url: string): SaveTakeResult {
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = `${take.name.replace(/[^\w.-]+/g, '_') || 'take'}.mp4`
   anchor.click()
+  return { ok: true }
 }
 
-/** Saves the take video to the device photo library (native) or downloads it (web). */
-export async function shareTakeVideo(take: Take): Promise<void> {
-  const path = await resolveTakeSavePath(take)
-  if (!path) return
+export function describeSaveTakeResult(result: SaveTakeResult): string | null {
+  if (result.ok) return 'Saved to Photos.'
 
-  if (Capacitor.isNativePlatform()) {
-    try {
-      await Media.saveVideo({ path })
-    } catch {
-      /* Permission denied or save failed */
-    }
-    return
+  switch (result.reason) {
+    case 'permission_denied':
+      return 'Photos access is required. Open Settings → BestTake → Photos and allow Add Photos Only.'
+    case 'missing_file':
+      return 'This take could not be found on your device.'
+    case 'unsupported':
+      return 'Only video takes can be saved to Photos.'
+    default:
+      return 'Could not save video. Please try again.'
+  }
+}
+
+/** Saves a video take to the device photo library (native) or downloads it (web). */
+export async function shareTakeVideo(take: Take): Promise<SaveTakeResult> {
+  if (getTakeMediaType(take) !== 'video') {
+    return { ok: false, reason: 'unsupported' }
   }
 
-  downloadTakeOnWeb(take, path)
+  if (!Capacitor.isNativePlatform()) {
+    const url = take.videoUrl || null
+    if (!url) return { ok: false, reason: 'missing_file' }
+    return downloadTakeOnWeb(take, url)
+  }
+
+  const path = await resolveNativeFileUri(take)
+  if (!path) {
+    return { ok: false, reason: 'missing_file' }
+  }
+
+  try {
+    await Media.saveVideo({ path })
+    return { ok: true }
+  } catch (firstError) {
+    if (take.filePath) {
+      try {
+        const cacheUri = await copyTakeToExportCache(take.filePath)
+        await Media.saveVideo({ path: cacheUri })
+        return { ok: true }
+      } catch {
+        /* fall through to classified error */
+      }
+    }
+
+    return classifySaveError(firstError)
+  }
 }

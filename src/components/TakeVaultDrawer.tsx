@@ -7,7 +7,7 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import VaultMediaSegment from './VaultMediaSegment'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import { resetVideosInContainer } from '../utils/videoPlayback'
-import { shareTakeVideo } from '../utils/shareTakeVideo'
+import { describeSaveTakeResult, shareTakeVideo } from '../utils/shareTakeVideo'
 import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, isAudioTake } from '../utils/mediaType'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
 
@@ -209,10 +209,19 @@ export default function TakeVaultDrawer({
                             silenceAllVaultVideos()
                             onPinChallenger(take.id)
                           }}
-                          onExport={() => {
-                            silenceAllVaultVideos()
-                            void shareTakeVideo(take)
-                          }}
+                          onExport={
+                            getTakeMediaType(take) === 'video'
+                              ? () => {
+                                  silenceAllVaultVideos()
+                                  void shareTakeVideo(take).then((result) => {
+                                    const message = describeSaveTakeResult(result)
+                                    if (message) {
+                                      window.alert(message)
+                                    }
+                                  })
+                                }
+                              : undefined
+                          }
                           onUpdate={(updates) => onUpdateTake(take.id, updates)}
                           onDelete={() => onDeleteTake(take.id)}
                           thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
