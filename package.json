@@ -11,7 +11,7 @@
     "cap:sync": "npm run build && npx cap sync ios",
     "cap:icons": "npx @capacitor/assets generate --iconBackgroundColor \"#0c0a09\" --iconBackgroundColorDark \"#0c0a09\" --splashBackgroundColor \"#0c0a09\" --splashBackgroundColorDark \"#0c0a09\"",
     "cap:open": "npx cap open ios",
-    "ios:refresh": "npm install && npm run cap:icons && npx cap sync ios"
+    "ios:refresh": "npm run cap:icons && npm run build && npx cap sync ios"
   },
   "dependencies": {
     "@capacitor-community/media": "^8.0.1",

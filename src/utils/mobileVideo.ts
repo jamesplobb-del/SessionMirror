@@ -48,6 +48,81 @@ export function getRecorderMimeTypeForMode(mode: 'video' | 'audio'): string {
   return mode === 'audio' ? getAudioRecorderMimeType() : getRecorderMimeType()
 }
 
+export function isLandscapeViewport(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.innerWidth > window.innerHeight
+}
+
+/** Front-camera constraints tuned for portrait or landscape recording. */
+export function getVideoCaptureConstraints(): MediaTrackConstraints {
+  const landscape = isLandscapeViewport()
+
+  return {
+    facingMode: 'user',
+    width: { ideal: landscape ? 1920 : 1080, min: 720 },
+    height: { ideal: landscape ? 1080 : 1920, min: 720 },
+    frameRate: { ideal: 30, max: 30 },
+  }
+}
+
+export function getAudioCaptureConstraints(): MediaTrackConstraints {
+  return {
+    channelCount: { ideal: 1 },
+    sampleRate: { ideal: 48000 },
+    echoCancellation: { ideal: true },
+    noiseSuppression: { ideal: false },
+    autoGainControl: { ideal: false },
+  }
+}
+
+function estimateVideoBitrate(width: number, height: number): number {
+  const pixels = width * height
+  if (pixels >= 1920 * 1080) return 10_000_000
+  if (pixels >= 1280 * 720) return 8_000_000
+  if (pixels >= 960 * 540) return 5_500_000
+  return 3_500_000
+}
+
+export function createMediaRecorder(
+  stream: MediaStream,
+  mimeType: string,
+): MediaRecorder {
+  const isVideo = !isAudioMimeType(mimeType)
+
+  if (!isVideo) {
+    const audioOptions: MediaRecorderOptions = {
+      mimeType,
+      audioBitsPerSecond: 192_000,
+    }
+    try {
+      return new MediaRecorder(stream, audioOptions)
+    } catch {
+      return new MediaRecorder(stream, { mimeType })
+    }
+  }
+
+  const track = stream.getVideoTracks()[0]
+  const settings = track?.getSettings()
+  const width = settings?.width ?? (isLandscapeViewport() ? 1920 : 1080)
+  const height = settings?.height ?? (isLandscapeViewport() ? 1080 : 1920)
+
+  const qualityOptions: MediaRecorderOptions = {
+    mimeType,
+    videoBitsPerSecond: estimateVideoBitrate(width, height),
+    audioBitsPerSecond: 192_000,
+  }
+
+  try {
+    return new MediaRecorder(stream, qualityOptions)
+  } catch {
+    try {
+      return new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 192_000 })
+    } catch {
+      return new MediaRecorder(stream, { mimeType })
+    }
+  }
+}
+
 export function isAudioMimeType(mimeType: string): boolean {
   return mimeType.startsWith('audio/')
 }

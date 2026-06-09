@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import type { RecordingMode } from '../types'
 import {
+  createMediaRecorder,
+  getAudioCaptureConstraints,
   getRecorderMimeTypeForMode,
+  getVideoCaptureConstraints,
   RECORDING_TIMESLICE_MS,
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
@@ -209,10 +212,10 @@ export function useCameraSession({
 
       const constraints: MediaStreamConstraints =
         mode === 'audio'
-          ? { audio: true, video: false }
+          ? { audio: getAudioCaptureConstraints(), video: false }
           : {
-              audio: true,
-              video: { facingMode: 'user' },
+              audio: getAudioCaptureConstraints(),
+              video: getVideoCaptureConstraints(),
             }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -487,7 +490,7 @@ export function useCameraSession({
         return
       }
 
-      const recorder = new MediaRecorder(stream, { mimeType })
+      const recorder = createMediaRecorder(stream, mimeType)
       bindRecordingHandlers(recorder, takeId)
 
       armedAutoAudioRef.current = { recorder, writer, takeId, mimeType }
@@ -524,7 +527,7 @@ export function useCameraSession({
         writerRef.current = writer
         activeTakeIdRef.current = takeId
 
-        const recorder = new MediaRecorder(currentStream, { mimeType })
+        const recorder = createMediaRecorder(currentStream, mimeType)
         recorderRef.current = recorder
         bindRecordingHandlers(recorder, takeId)
 
@@ -704,6 +707,55 @@ export function useCameraSession({
     refreshCameraPreviewLayout(previewRef.current)
     setStreamGeneration((generation) => generation + 1)
   }, [cancelScheduledRelease, restartCameraAfterForeground])
+
+  useEffect(() => {
+    if (recordingMode !== 'video') return
+
+    let timer: number | null = null
+
+    const reacquireForOrientation = () => {
+      if (isRecordingRef.current || resumeInFlightRef.current) return
+
+      cancelScheduledRelease()
+      applyViewportCssVarsOnResume()
+      releaseLiveStream()
+
+      void (async () => {
+        if (Capacitor.isNativePlatform()) {
+          await new Promise((resolve) => window.setTimeout(resolve, 200))
+        }
+        if (isRecordingRef.current || recordingModeRef.current !== 'video') return
+
+        try {
+          await acquireStream('video')
+          refreshCameraPreviewLayout(previewRef.current)
+        } catch {
+          /* acquireStream sets error state */
+        }
+      })()
+    }
+
+    const onOrientationChange = () => {
+      if (timer !== null) {
+        window.clearTimeout(timer)
+      }
+      timer = window.setTimeout(() => {
+        timer = null
+        reacquireForOrientation()
+      }, 350)
+    }
+
+    window.addEventListener('orientationchange', onOrientationChange)
+    screen.orientation?.addEventListener('change', onOrientationChange)
+
+    return () => {
+      if (timer !== null) {
+        window.clearTimeout(timer)
+      }
+      window.removeEventListener('orientationchange', onOrientationChange)
+      screen.orientation?.removeEventListener('change', onOrientationChange)
+    }
+  }, [acquireStream, cancelScheduledRelease, recordingMode, releaseLiveStream])
 
   useEffect(() => {
     const bindAppLifecycle = async () => {
