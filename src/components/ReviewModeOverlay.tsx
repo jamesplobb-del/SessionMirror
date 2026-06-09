@@ -670,10 +670,7 @@ export default function ReviewModeOverlay({
         )}
 
         {isOpen && (
-          <div
-            className="review-timeline-overlay pointer-events-none absolute inset-x-0 bottom-0 z-30"
-            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-          >
+          <div className="review-timeline-overlay pointer-events-none absolute inset-x-0 bottom-0 z-30">
             <ReviewTimeline
               trackRef={timelineTrackRef}
               currentTime={currentTime}

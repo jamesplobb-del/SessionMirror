@@ -47,8 +47,11 @@ export default function ReviewTimeline({
 
   return (
     <div
-      className="pointer-events-auto w-full touch-none select-none bg-gradient-to-t from-black/35 via-transparent to-transparent px-5 pb-1 pt-14"
-      style={{ touchAction: 'none' }}
+      className="review-timeline pointer-events-auto w-full touch-none select-none bg-gradient-to-t from-black/45 via-black/20 to-transparent px-5 pt-14"
+      style={{
+        touchAction: 'none',
+        paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom, 0px))',
+      }}
     >
       <div
         ref={trackRef}

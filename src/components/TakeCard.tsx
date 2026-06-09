@@ -283,20 +283,6 @@ export default function TakeCard({
               Save Video
             </button>
           )}
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation()
-              handleDelete()
-            }}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 py-2 text-xs font-medium text-red-700 transition hover:border-red-300 hover:bg-red-100"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </button>
         </div>
       </div>
     </div>

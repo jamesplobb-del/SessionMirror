@@ -46,6 +46,20 @@ select {
   -webkit-touch-callout: default;
 }
 
+.app-shell,
+.app-hud-layer,
+.app-hud-bottom,
+.app-pip-row,
+.pip-video-container,
+.review-overlay,
+.review-overlay .custom-video-player {
+  transition: all 0.3s ease-in-out;
+}
+
+.review-timeline-overlay {
+  bottom: 0;
+}
+
 /* Landscape — portrait layout unchanged; only applies when rotated */
 @media (orientation: landscape) {
   .app-hud-layer {
