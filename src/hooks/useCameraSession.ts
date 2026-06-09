@@ -333,10 +333,13 @@ export function useCameraSession({
     }
   }, [isRecording, startRecording, stopRecording])
 
-  const toggleRecordingMode = useCallback(() => {
-    if (isRecording) return
-    setRecordingMode((mode) => (mode === 'video' ? 'audio' : 'video'))
-  }, [isRecording])
+  const changeRecordingMode = useCallback(
+    (mode: RecordingMode) => {
+      if (isRecording) return
+      setRecordingMode(mode)
+    },
+    [isRecording],
+  )
 
   return {
     previewRef,
@@ -346,7 +349,7 @@ export function useCameraSession({
     isRecording,
     elapsed,
     recordingMode,
-    toggleRecordingMode,
+    changeRecordingMode,
     toggleRecording,
   }
 }

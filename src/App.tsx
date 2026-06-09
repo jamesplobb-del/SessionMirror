@@ -102,7 +102,7 @@ export default function App() {
     isRecording,
     elapsed,
     recordingMode,
-    toggleRecordingMode,
+    changeRecordingMode,
     toggleRecording,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
@@ -340,7 +340,7 @@ export default function App() {
             elapsed={elapsed}
             ready={ready}
             recordingMode={recordingMode}
-            onToggleRecordingMode={toggleRecordingMode}
+            onRecordingModeChange={changeRecordingMode}
             onToggleRecord={toggleRecording}
             onOpenVault={() => setIsVaultOpen(true)}
             takeCount={takes.length}

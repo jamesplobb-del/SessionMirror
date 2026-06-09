@@ -120,7 +120,7 @@ export default function PipWindow({
       {variant === 'benchmark' && onUpload && (
         <input
           type="file"
-          accept="video/*,audio/*"
+          accept="video/*, audio/*, audio/mpeg, audio/mp4, .mp3, .m4a, .wav"
           id="benchmark-upload"
           onChange={handleFileChange}
           className="sr-only"

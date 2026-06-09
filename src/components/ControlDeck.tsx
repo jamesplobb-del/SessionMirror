@@ -1,12 +1,13 @@
-import { Circle, FolderOpen, Mic } from 'lucide-react'
+import { FolderOpen, Mic, Square } from 'lucide-react'
 import type { RecordingMode } from '../types'
+import RecordingModeCarousel from './RecordingModeCarousel'
 
 interface ControlDeckProps {
   isRecording: boolean
   elapsed: number
   ready: boolean
   recordingMode: RecordingMode
-  onToggleRecordingMode: () => void
+  onRecordingModeChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
   onOpenVault: () => void
   takeCount: number
@@ -23,7 +24,7 @@ export default function ControlDeck({
   elapsed,
   ready,
   recordingMode,
-  onToggleRecordingMode,
+  onRecordingModeChange,
   onToggleRecord,
   onOpenVault,
   takeCount,
@@ -31,54 +32,66 @@ export default function ControlDeck({
   const isAudioMode = recordingMode === 'audio'
 
   return (
-    <div className="pointer-events-auto flex justify-center px-4 pb-2 pt-3">
-      <div className="flex items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 py-2.5 shadow-xl backdrop-blur-md sm:gap-3 sm:px-4">
-        <button
-          type="button"
-          onClick={onToggleRecordingMode}
-          disabled={isRecording}
-          aria-pressed={isAudioMode}
-          aria-label={
-            isAudioMode ? 'Switch to video recording mode' : 'Switch to audio recording mode'
-          }
-          className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
-            isAudioMode
-              ? 'bg-sky-500/90 text-white shadow-[0_0_12px_rgba(56,189,248,0.45)]'
-              : 'bg-white/10 text-white/80 hover:bg-white/20 disabled:opacity-40'
-          }`}
-        >
-          <Mic className="h-4 w-4" />
-        </button>
+    <div className="pointer-events-auto flex w-full flex-col items-center px-4 pb-2 pt-2">
+      <RecordingModeCarousel
+        value={recordingMode}
+        onChange={onRecordingModeChange}
+        disabled={isRecording}
+      />
 
-        <button
-          type="button"
-          onClick={onToggleRecord}
-          disabled={!ready}
-          className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-            isRecording
-              ? 'bg-red-500/90 text-white'
-              : 'bg-white/15 text-white hover:bg-white/25 disabled:opacity-40'
-          }`}
-        >
-          <Circle
-            className={`h-3 w-3 ${isRecording ? 'fill-white animate-pulse' : 'fill-red-400'}`}
-          />
-          {isRecording ? formatElapsed(elapsed) : isAudioMode ? 'Record Audio' : 'Record'}
-        </button>
-
+      <div className="mt-3 flex w-full max-w-xs items-center justify-between">
         <button
           type="button"
           onClick={onOpenVault}
-          className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+          className="relative flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md transition hover:bg-black/55"
+          aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
-          <FolderOpen className="h-4 w-4" />
-          View Takes
+          <FolderOpen className="h-5 w-5" />
           {takeCount > 0 && (
-            <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
-              {takeCount}
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[9px] font-semibold text-stone-900">
+              {takeCount > 99 ? '99+' : takeCount}
             </span>
           )}
         </button>
+
+        <div className="flex flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleRecord}
+            disabled={!ready}
+            aria-label={
+              isRecording
+                ? 'Stop recording'
+                : isAudioMode
+                  ? 'Start audio recording'
+                  : 'Start video recording'
+            }
+            className={`record-shutter flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-[3px] transition disabled:opacity-40 ${
+              isRecording
+                ? 'border-white/90 bg-transparent'
+                : 'border-white/90 bg-white/10 backdrop-blur-sm hover:bg-white/15'
+            }`}
+          >
+            {isRecording ? (
+              <Square className="h-7 w-7 fill-red-500 text-red-500" />
+            ) : isAudioMode ? (
+              <Mic className="h-7 w-7 text-white" strokeWidth={2.25} />
+            ) : (
+              <span className="block h-[3.25rem] w-[3.25rem] rounded-full bg-red-500 shadow-[0_0_0_1px_rgba(255,255,255,0.15)]" />
+            )}
+          </button>
+
+          {isRecording && (
+            <span
+              className="text-xs font-medium tabular-nums tracking-wide text-white/90"
+              aria-live="polite"
+            >
+              {formatElapsed(elapsed)}
+            </span>
+          )}
+        </div>
+
+        <div className="h-11 w-11 shrink-0" aria-hidden />
       </div>
     </div>
   )
