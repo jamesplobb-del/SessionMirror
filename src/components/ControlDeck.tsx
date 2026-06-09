@@ -66,18 +66,18 @@ export default function ControlDeck({
                   ? 'Start audio recording'
                   : 'Start video recording'
             }
-            className={`record-shutter flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-[3px] transition disabled:opacity-40 ${
+            className={`record-shutter flex shrink-0 items-center justify-center rounded-full border-[3px] transition disabled:opacity-40 ${
               isRecording
                 ? 'border-white/90 bg-transparent'
                 : 'border-white/90 bg-white/10 backdrop-blur-sm hover:bg-white/15'
             }`}
           >
             {isRecording ? (
-              <Square className="h-7 w-7 fill-red-500 text-red-500" />
+              <Square className="h-6 w-6 fill-red-500 text-red-500" />
             ) : isAudioMode ? (
-              <Mic className="h-7 w-7 text-white" strokeWidth={2.25} />
+              <Mic className="h-6 w-6 text-white" strokeWidth={2.25} />
             ) : (
-              <span className="block h-[3.25rem] w-[3.25rem] rounded-full bg-red-500 shadow-[0_0_0_1px_rgba(255,255,255,0.15)]" />
+              <span className="record-shutter-dot block rounded-full bg-red-500 shadow-[0_0_0_1px_rgba(255,255,255,0.15)]" />
             )}
           </button>
 

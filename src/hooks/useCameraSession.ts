@@ -26,6 +26,27 @@ function detachRecorder(recorder: MediaRecorder) {
   recorder.onerror = null
 }
 
+function attachPreviewStream(
+  video: HTMLVideoElement | null,
+  stream: MediaStream | null,
+  mode: RecordingMode,
+) {
+  if (!video) return
+
+  if (!stream || mode === 'audio') {
+    if (video.srcObject) {
+      video.srcObject = null
+    }
+    return
+  }
+
+  if (video.srcObject !== stream) {
+    video.srcObject = stream
+  }
+  video.muted = true
+  void video.play().catch(() => {})
+}
+
 export function useCameraSession({
   onRecordingComplete,
 }: UseCameraSessionOptions) {
@@ -37,6 +58,7 @@ export function useCameraSession({
   const chunksRef = useRef<BlobPart[]>([])
   const recorderMimeTypeRef = useRef<string>('video/webm')
   const recordingModeRef = useRef<RecordingMode>('video')
+  const releaseTimerRef = useRef<number | null>(null)
   const onCompleteRef = useRef(onRecordingComplete)
   onCompleteRef.current = onRecordingComplete
 
@@ -45,8 +67,26 @@ export function useCameraSession({
   const [isRecording, setIsRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('video')
+  const [streamGeneration, setStreamGeneration] = useState(0)
 
   recordingModeRef.current = recordingMode
+
+  const cancelScheduledRelease = useCallback(() => {
+    if (releaseTimerRef.current !== null) {
+      window.clearTimeout(releaseTimerRef.current)
+      releaseTimerRef.current = null
+    }
+  }, [])
+
+  const stopStreamTracks = useCallback((stream: MediaStream | null) => {
+    stream?.getTracks().forEach((track) => {
+      try {
+        track.stop()
+      } catch {
+        /* ignore */
+      }
+    })
+  }, [])
 
   const abortActiveWriter = useCallback(async () => {
     const writer = writerRef.current
@@ -86,6 +126,7 @@ export function useCameraSession({
     })
     streamRef.current = null
     setReady(false)
+    setStreamGeneration((generation) => generation + 1)
 
     const video = previewRef.current
     if (video) {
@@ -99,10 +140,12 @@ export function useCameraSession({
   }, [])
 
   const scheduleReleaseCameraState = useCallback(() => {
-    window.setTimeout(() => {
+    cancelScheduledRelease()
+    releaseTimerRef.current = window.setTimeout(() => {
+      releaseTimerRef.current = null
       forceClearCameraState()
     }, CAMERA_RELEASE_DELAY_MS)
-  }, [forceClearCameraState])
+  }, [cancelScheduledRelease, forceClearCameraState])
 
   const acquireStream = useCallback(
     async (mode: RecordingMode, cancelled?: () => boolean) => {
@@ -118,6 +161,8 @@ export function useCameraSession({
         return null
       }
       streamRef.current = mediaStream
+      attachPreviewStream(previewRef.current, mediaStream, mode)
+      setStreamGeneration((generation) => generation + 1)
       setReady(true)
       return mediaStream
     },
@@ -127,12 +172,21 @@ export function useCameraSession({
   useEffect(() => {
     let cancelled = false
     let retryTimer: number | null = null
+    let activeStream: MediaStream | null = null
 
     const startWithRecovery = async (attempt = 0) => {
+      cancelScheduledRelease()
       forceClearCameraState()
 
       try {
-        await acquireStream(recordingMode, () => cancelled)
+        const mediaStream = await acquireStream(recordingMode, () => cancelled)
+        if (cancelled) {
+          if (mediaStream) {
+            stopStreamTracks(mediaStream)
+          }
+          return
+        }
+        activeStream = mediaStream
       } catch (err) {
         if (cancelled) return
 
@@ -162,19 +216,34 @@ export function useCameraSession({
 
     return () => {
       cancelled = true
+      cancelScheduledRelease()
       if (retryTimer !== null) {
         window.clearTimeout(retryTimer)
       }
       void abortActiveWriter().catch(() => {})
-      scheduleReleaseCameraState()
+
+      stopStreamTracks(activeStream)
+      if (streamRef.current === activeStream) {
+        streamRef.current = null
+      }
+      attachPreviewStream(previewRef.current, null, recordingMode)
+      setReady(false)
     }
   }, [
     abortActiveWriter,
     acquireStream,
+    cancelScheduledRelease,
     forceClearCameraState,
     recordingMode,
-    scheduleReleaseCameraState,
+    stopStreamTracks,
   ])
+
+  useEffect(() => {
+    return () => {
+      cancelScheduledRelease()
+      scheduleReleaseCameraState()
+    }
+  }, [cancelScheduledRelease, scheduleReleaseCameraState])
 
   useEffect(() => {
     if (!isRecording) return
@@ -344,6 +413,7 @@ export function useCameraSession({
   return {
     previewRef,
     streamRef,
+    streamGeneration,
     error,
     ready,
     isRecording,

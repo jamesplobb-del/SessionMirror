@@ -97,6 +97,7 @@ export default function App() {
   const {
     previewRef,
     streamRef,
+    streamGeneration,
     error: cameraError,
     ready,
     isRecording,
@@ -277,6 +278,7 @@ export default function App() {
       <LiveCameraBackground
         previewRef={previewRef}
         streamRef={streamRef}
+        streamGeneration={streamGeneration}
         error={cameraError}
         recordingMode={recordingMode}
         isRecording={isRecording}

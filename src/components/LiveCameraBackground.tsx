@@ -6,6 +6,7 @@ import { mobileVideoProps } from '../utils/mobileVideo'
 interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
   streamRef: RefObject<MediaStream | null>
+  streamGeneration: number
   error: string | null
   recordingMode: RecordingMode
   isRecording: boolean
@@ -14,6 +15,7 @@ interface LiveCameraBackgroundProps {
 function LiveCameraBackground({
   previewRef,
   streamRef,
+  streamGeneration,
   error,
   recordingMode,
   isRecording,
@@ -24,32 +26,22 @@ function LiveCameraBackground({
     const video = previewRef.current
     if (!video) return
 
-    let frameId = 0
-    let stopped = false
-
-    const attachStream = () => {
-      if (stopped) return
-
-      const stream = streamRef.current
-      if (stream && video.srcObject !== stream) {
-        video.srcObject = stream
-        video.muted = true
-        void video.play().catch(() => {})
-        return
+    if (recordingMode === 'audio') {
+      if (video.srcObject) {
+        video.srcObject = null
       }
-
-      if (!stream) {
-        frameId = requestAnimationFrame(attachStream)
-      }
+      return
     }
 
-    attachStream()
+    const stream = streamRef.current
+    if (!stream) return
 
-    return () => {
-      stopped = true
-      cancelAnimationFrame(frameId)
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
     }
-  }, [previewRef, streamRef, recordingMode])
+    video.muted = true
+    void video.play().catch(() => {})
+  }, [previewRef, streamRef, recordingMode, streamGeneration])
 
   return (
     <div className="absolute inset-0 z-0">
@@ -119,6 +111,7 @@ export default memo(
   (prev, next) =>
     prev.previewRef === next.previewRef &&
     prev.streamRef === next.streamRef &&
+    prev.streamGeneration === next.streamGeneration &&
     prev.error === next.error &&
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording,
