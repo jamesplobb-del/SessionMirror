@@ -10,6 +10,7 @@ interface LiveCameraBackgroundProps {
   error: string | null
   recordingMode: RecordingMode
   isRecording: boolean
+  viewportKey?: number
 }
 
 function LiveCameraBackground({
@@ -19,6 +20,7 @@ function LiveCameraBackground({
   error,
   recordingMode,
   isRecording,
+  viewportKey,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
 
@@ -41,7 +43,7 @@ function LiveCameraBackground({
     }
     video.muted = true
     void video.play().catch(() => {})
-  }, [previewRef, streamRef, recordingMode, streamGeneration])
+  }, [previewRef, streamRef, recordingMode, streamGeneration, viewportKey])
 
   return (
     <div className="camera-background" aria-hidden>
@@ -114,5 +116,6 @@ export default memo(
     prev.streamGeneration === next.streamGeneration &&
     prev.error === next.error &&
     prev.recordingMode === next.recordingMode &&
-    prev.isRecording === next.isRecording,
+    prev.isRecording === next.isRecording &&
+    prev.viewportKey === next.viewportKey,
 )

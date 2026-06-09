@@ -32,11 +32,47 @@ export default function App() {
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
+  const [windowHeight, setWindowHeight] = useState(() => window.innerHeight)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
 
   const isReviewOpen = reviewSlot !== null
+
+  useEffect(() => {
+    const syncViewport = () => {
+      const height = window.innerHeight
+      setWindowHeight(height)
+      document.documentElement.style.setProperty('--app-height', `${height}px`)
+      document.documentElement.style.height = `${height}px`
+      document.body.style.height = `${height}px`
+      // Nudge WebKit layout engine to recalculate after orientation changes.
+      void document.body.offsetHeight
+    }
+
+    const handleOrientationChange = () => {
+      syncViewport()
+      window.setTimeout(syncViewport, 100)
+      window.setTimeout(syncViewport, 300)
+    }
+
+    syncViewport()
+    window.addEventListener('resize', syncViewport)
+    window.addEventListener('orientationchange', handleOrientationChange)
+
+    return () => {
+      window.removeEventListener('resize', syncViewport)
+      window.removeEventListener('orientationchange', handleOrientationChange)
+      document.documentElement.style.removeProperty('--app-height')
+      document.documentElement.style.height = ''
+      document.body.style.height = ''
+    }
+  }, [])
+
+  const viewportShellStyle = {
+    height: windowHeight,
+    minHeight: windowHeight,
+  } as const
 
   const pausePipVideos = useCallback(() => {
     resetVideoPlayback(benchmarkPipVideoRef.current)
@@ -274,7 +310,7 @@ export default function App() {
   ])
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={viewportShellStyle}>
       <LiveCameraBackground
         previewRef={previewRef}
         streamRef={streamRef}
@@ -282,10 +318,12 @@ export default function App() {
         error={cameraError}
         recordingMode={recordingMode}
         isRecording={isRecording}
+        viewportKey={windowHeight}
       />
 
       <div
         className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
+        style={viewportShellStyle}
         aria-hidden={isReviewOpen}
       >
         <HudHeader />
