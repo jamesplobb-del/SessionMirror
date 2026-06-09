@@ -30,7 +30,7 @@ export default function ControlDeck({
   takeCount,
 }: ControlDeckProps) {
   return (
-    <div className="pointer-events-auto flex w-full flex-col items-center px-4">
+    <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
       <div className="relative flex w-full max-w-xs items-center justify-center">
         <button
           type="button"

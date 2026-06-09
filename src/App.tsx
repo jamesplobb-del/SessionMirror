@@ -69,11 +69,6 @@ export default function App() {
     }
   }, [])
 
-  const viewportShellStyle = {
-    height: windowHeight,
-    minHeight: windowHeight,
-  } as const
-
   const pausePipVideos = useCallback(() => {
     resetVideoPlayback(benchmarkPipVideoRef.current)
     resetVideoPlayback(challengerPipVideoRef.current)
@@ -310,7 +305,7 @@ export default function App() {
   ])
 
   return (
-    <div className="app-shell" style={viewportShellStyle}>
+    <div className="app-shell">
       <LiveCameraBackground
         previewRef={previewRef}
         streamRef={streamRef}
@@ -323,13 +318,12 @@ export default function App() {
 
       <div
         className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
-        style={viewportShellStyle}
         aria-hidden={isReviewOpen}
       >
         <HudHeader />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          <div className="app-pip-row flex items-end justify-center gap-3 px-3 sm:px-4">
+          <div className="app-pip-row">
             <PipWindow
               className="pointer-events-auto shrink-0"
               src={benchmarkTake?.videoUrl ?? null}
