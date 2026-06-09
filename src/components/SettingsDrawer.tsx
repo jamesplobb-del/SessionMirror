@@ -181,6 +181,12 @@ export default function SettingsDrawer({
                 />
               </div>
             )}
+            <SettingToggle
+              label="Live Pitch Tracker"
+              description="During playback, show a live A440 tuner for winds, brass, and strings. Audio takes show full-screen; video takes show a tuner below the video."
+              checked={settings.pitchTrackerEnabled}
+              onChange={(checked) => onUpdate({ pitchTrackerEnabled: checked })}
+            />
           </section>
 
           <section className="space-y-3">

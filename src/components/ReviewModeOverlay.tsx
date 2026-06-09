@@ -1,13 +1,131 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pause, Play, AudioLines, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
+import LivePitchTuner from './LivePitchTuner'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
+import { isAudioMimeType } from '../utils/mobileVideo'
 import type { ReviewContext, ReviewSlot, Take } from '../types'
 
 const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 1000
+
+interface ReviewTakeLayerProps {
+  takeKey: string
+  filePath: string
+  videoUrl: string
+  mimeType: string
+  mirror: boolean
+  takeName?: string
+  tunerLabel?: string
+  videoRef: RefObject<HTMLMediaElement | null>
+  pitchTrackerEnabled: boolean
+  isPlaying: boolean
+  isActive: boolean
+  swipeLayerStyle?: React.CSSProperties
+  onPointerDown?: React.PointerEventHandler<HTMLVideoElement>
+  onPointerMove?: React.PointerEventHandler<HTMLVideoElement>
+  onPointerUp?: React.PointerEventHandler<HTMLVideoElement>
+  onPointerCancel?: React.PointerEventHandler<HTMLVideoElement>
+}
+
+function ReviewTakeLayer({
+  takeKey,
+  filePath,
+  videoUrl,
+  mimeType,
+  mirror,
+  takeName,
+  tunerLabel,
+  videoRef,
+  pitchTrackerEnabled,
+  isPlaying,
+  isActive,
+  swipeLayerStyle,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+}: ReviewTakeLayerProps) {
+  const isAudio = isAudioMimeType(mimeType)
+  const showTuner = pitchTrackerEnabled
+  const fullScreenTuner = showTuner && isAudio
+  const splitVideoTuner = showTuner && !isAudio
+  const trackerPlaying = isPlaying && isActive
+
+  const mediaPlayer = (
+    <TakeVideoPlayer
+      key={takeKey}
+      filePath={filePath}
+      videoUrl={videoUrl}
+      mimeType={mimeType}
+      videoRef={videoRef}
+      className={
+        fullScreenTuner
+          ? 'sr-only'
+          : splitVideoTuner
+            ? 'h-full w-full object-contain'
+            : 'custom-video-player h-full w-full object-cover'
+      }
+      mirror={fullScreenTuner ? false : mirror}
+      audible
+      manualPlayOnly
+      style={
+        fullScreenTuner
+          ? undefined
+          : {
+              WebkitTouchCallout: 'default',
+              userSelect: 'auto',
+            }
+      }
+      controls={false}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    />
+  )
+
+  if (splitVideoTuner) {
+    return (
+      <div
+        className="absolute inset-0 flex h-full w-full flex-col bg-black transition-all duration-200 ease-out"
+        style={swipeLayerStyle}
+      >
+        <div className="relative min-h-0 flex-[3]">{mediaPlayer}</div>
+        <div className="min-h-0 flex-[2] border-t border-white/10">
+          <LivePitchTuner
+            mediaRef={videoRef}
+            isPlaying={trackerPlaying}
+            mediaKey={takeKey}
+            takeName={takeName}
+            label={tunerLabel}
+            compact
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
+      style={swipeLayerStyle}
+    >
+      {mediaPlayer}
+      {fullScreenTuner && (
+        <LivePitchTuner
+          mediaRef={videoRef}
+          isPlaying={trackerPlaying}
+          mediaKey={takeKey}
+          takeName={takeName}
+          label={tunerLabel}
+        />
+      )}
+    </div>
+  )
+}
 
 interface ReviewModeOverlayProps {
   context: ReviewContext
@@ -25,10 +143,10 @@ interface ReviewModeOverlayProps {
   challengerMimeType?: string
   benchmarkMirror?: boolean
   challengerMirror?: boolean
+  pitchTrackerEnabled?: boolean
   isOpen: boolean
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
-  onOpenPitchAnalysis?: () => void
 }
 
 export default function ReviewModeOverlay({
@@ -47,10 +165,10 @@ export default function ReviewModeOverlay({
   challengerMimeType = 'video/mp4',
   benchmarkMirror = true,
   challengerMirror = true,
+  pitchTrackerEnabled = false,
   isOpen,
   onClose,
   onSlotChange,
-  onOpenPitchAnalysis,
 }: ReviewModeOverlayProps) {
   const benchmarkVideoRef = useRef<HTMLMediaElement>(null)
   const challengerVideoRef = useRef<HTMLMediaElement>(null)
@@ -521,17 +639,6 @@ export default function ReviewModeOverlay({
             )}
           </div>
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
-            {onOpenPitchAnalysis && !isVault && (
-              <button
-                type="button"
-                onClick={onOpenPitchAnalysis}
-                className="flex h-11 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 text-white backdrop-blur-md transition hover:bg-white/25"
-                aria-label="Open pitch analysis"
-              >
-                <AudioLines className="h-4 w-4" />
-                <span className="text-xs font-medium">Pitch Analysis</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={handleCloseClick}
@@ -558,29 +665,24 @@ export default function ReviewModeOverlay({
         )}
 
         {isOpen && isVault && vaultTake ? (
-          <div
-            className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
-            style={swipeLayerStyle}
-          >
-            <TakeVideoPlayer
-              key={`vault-${vaultTake.id}`}
-              filePath={vaultTake.filePath}
-              videoUrl={vaultTake.videoUrl}
-              mimeType={vaultTake.videoMimeType || 'video/mp4'}
-              videoRef={vaultVideoRef}
-              className="custom-video-player h-full w-full object-cover"
-              mirror={vaultTake.mirrorPlayback !== false}
-              style={{
-                WebkitTouchCallout: 'default',
-                userSelect: 'auto',
-              }}
-              controls={false}
-              onPointerDown={handleVideoPointerDown}
-              onPointerMove={handleVideoPointerMove}
-              onPointerUp={handleVideoPointerUp}
-              onPointerCancel={handleVideoPointerUp}
-            />
-          </div>
+          <ReviewTakeLayer
+            takeKey={`vault-${vaultTake.id}`}
+            filePath={vaultTake.filePath}
+            videoUrl={vaultTake.videoUrl}
+            mimeType={vaultTake.videoMimeType || 'video/mp4'}
+            mirror={vaultTake.mirrorPlayback !== false}
+            takeName={vaultTake.name}
+            tunerLabel="Take Vault · Live Pitch"
+            videoRef={vaultVideoRef}
+            pitchTrackerEnabled={pitchTrackerEnabled}
+            isPlaying={isPlaying}
+            isActive
+            swipeLayerStyle={swipeLayerStyle}
+            onPointerDown={handleVideoPointerDown}
+            onPointerMove={handleVideoPointerMove}
+            onPointerUp={handleVideoPointerUp}
+            onPointerCancel={handleVideoPointerUp}
+          />
         ) : isOpen ? (
           <>
             {hasBenchmark && (
@@ -590,21 +692,22 @@ export default function ReviewModeOverlay({
                     ? 'z-[1] opacity-100'
                     : 'pointer-events-none z-0 opacity-0'
                 }`}
-                style={activeSlot === 'benchmark' ? swipeLayerStyle : undefined}
               >
-                <TakeVideoPlayer
-                  key={`benchmark-${benchmarkFilePath}-${benchmarkSrc}`}
+                <ReviewTakeLayer
+                  takeKey={`benchmark-${benchmarkFilePath}-${benchmarkSrc}`}
                   filePath={benchmarkFilePath}
                   videoUrl={benchmarkSrc ?? ''}
                   mimeType={benchmarkMimeType}
-                  videoRef={benchmarkVideoRef}
-                  className="custom-video-player h-full w-full object-cover"
                   mirror={benchmarkMirror}
-                  style={{
-                    WebkitTouchCallout: 'default',
-                    userSelect: 'auto',
-                  }}
-                  controls={false}
+                  takeName={benchmarkName}
+                  tunerLabel="Best Take · Live Pitch"
+                  videoRef={benchmarkVideoRef}
+                  pitchTrackerEnabled={pitchTrackerEnabled}
+                  isPlaying={isPlaying}
+                  isActive={activeSlot === 'benchmark'}
+                  swipeLayerStyle={
+                    activeSlot === 'benchmark' ? swipeLayerStyle : undefined
+                  }
                   onPointerDown={
                     activeSlot === 'benchmark' ? handleVideoPointerDown : undefined
                   }
@@ -628,21 +731,22 @@ export default function ReviewModeOverlay({
                     ? 'z-[1] opacity-100'
                     : 'pointer-events-none z-0 opacity-0'
                 }`}
-                style={activeSlot === 'challenger' ? swipeLayerStyle : undefined}
               >
-                <TakeVideoPlayer
-                  key={`challenger-${challengerFilePath}-${challengerSrc}`}
+                <ReviewTakeLayer
+                  takeKey={`challenger-${challengerFilePath}-${challengerSrc}`}
                   filePath={challengerFilePath}
                   videoUrl={challengerSrc ?? ''}
                   mimeType={challengerMimeType}
-                  videoRef={challengerVideoRef}
-                  className="custom-video-player h-full w-full object-cover"
                   mirror={challengerMirror}
-                  style={{
-                    WebkitTouchCallout: 'default',
-                    userSelect: 'auto',
-                  }}
-                  controls={false}
+                  takeName={challengerName}
+                  tunerLabel="Current Take · Live Pitch"
+                  videoRef={challengerVideoRef}
+                  pitchTrackerEnabled={pitchTrackerEnabled}
+                  isPlaying={isPlaying}
+                  isActive={activeSlot === 'challenger'}
+                  swipeLayerStyle={
+                    activeSlot === 'challenger' ? swipeLayerStyle : undefined
+                  }
                   onPointerDown={
                     activeSlot === 'challenger' ? handleVideoPointerDown : undefined
                   }

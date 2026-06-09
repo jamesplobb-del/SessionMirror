@@ -24,7 +24,6 @@ import {
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
-import PitchAnalysis from './components/PitchAnalysis'
 import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
@@ -70,7 +69,6 @@ export default function App() {
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [windowHeight, setWindowHeight] = useState(() => window.innerHeight)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isPitchAnalysisOpen, setIsPitchAnalysisOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
     isDragging: false,
     isArming: false,
@@ -316,7 +314,7 @@ export default function App() {
   })
 
   const autoMonitoringAllowed =
-    !isVaultOpen && !isSettingsOpen && !isReviewOpen && !isPitchAnalysisOpen && ready
+    !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
 
   useAutoSoundRecording({
     enabled: settings.autoSoundRecording,
@@ -427,7 +425,7 @@ export default function App() {
     }
   }, [ready])
 
-  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen || isPitchAnalysisOpen
+  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
 
   const benchmarkTake = useMemo(
     () => takes.find((t) => t.id === benchmarkId) ?? null,
@@ -470,19 +468,26 @@ export default function App() {
 
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
+      stopAutoPlaybackAudio()
+      pausePipVideos()
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
       setVaultReviewIndex(index >= 0 ? index : 0)
       setReviewContext('vault')
       setReviewSlot('benchmark')
       setIsVaultOpen(false)
     },
-    [sortedTakes],
+    [pausePipVideos, sortedTakes, stopAutoPlaybackAudio],
   )
 
-  const handleOpenCompareReview = useCallback((slot: ReviewSlot) => {
-    setReviewContext('compare')
-    setReviewSlot(slot)
-  }, [])
+  const handleOpenCompareReview = useCallback(
+    (slot: ReviewSlot) => {
+      stopAutoPlaybackAudio()
+      pausePipVideos()
+      setReviewContext('compare')
+      setReviewSlot(slot)
+    },
+    [pausePipVideos, stopAutoPlaybackAudio],
+  )
 
   const handleCloseReview = useCallback(() => {
     setReviewSlot(null)
@@ -493,43 +498,8 @@ export default function App() {
       return 'compare'
     })
     pausePipVideos()
-  }, [pausePipVideos])
-
-  const handleOpenPitchAnalysis = useCallback(() => {
-    pausePipVideos()
-    setIsPitchAnalysisOpen(true)
-  }, [pausePipVideos])
-
-  const handleClosePitchAnalysis = useCallback(() => {
-    setIsPitchAnalysisOpen(false)
-    pausePipVideos()
-  }, [pausePipVideos])
-
-  const pitchComparison = useMemo(() => {
-    const current = challengerTake
-    if (!current?.videoUrl || isAudioTake(current)) return null
-
-    let best = benchmarkTake
-    if (!best?.videoUrl || isAudioTake(best) || best.id === current.id) {
-      best =
-        takes.find(
-          (take) =>
-            take.id !== current.id && take.videoUrl && !isAudioTake(take),
-        ) ?? null
-    }
-
-    if (!best?.videoUrl || best.id === current.id) return null
-
-    return { currentTake: current, bestTake: best }
-  }, [benchmarkTake, challengerTake, takes])
-
-  const canOpenPitchAnalysis = pitchComparison != null
-
-  useEffect(() => {
-    if (isPitchAnalysisOpen && !canOpenPitchAnalysis) {
-      setIsPitchAnalysisOpen(false)
-    }
-  }, [isPitchAnalysisOpen, canOpenPitchAnalysis])
+    stopAutoPlaybackAudio()
+  }, [pausePipVideos, stopAutoPlaybackAudio])
 
   const handleUploadBenchmark = useCallback(
     (file: File) => {
@@ -693,8 +663,8 @@ export default function App() {
       />
 
       <div
-        className={`app-ui-overlay ${isReviewOpen || isPitchAnalysisOpen ? 'pointer-events-none invisible' : ''}`}
-        aria-hidden={isReviewOpen || isPitchAnalysisOpen}
+        className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
+        aria-hidden={isReviewOpen}
       >
         <HudHeader
           sessionName={activeProject?.name ?? 'BestTake'}
@@ -762,23 +732,14 @@ export default function App() {
         challengerMimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
         benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
         challengerMirror={challengerTake?.mirrorPlayback !== false}
+        pitchTrackerEnabled={settings.pitchTrackerEnabled}
         isOpen={isReviewOpen}
         onClose={handleCloseReview}
         onSlotChange={(slot) => {
           setReviewContext('compare')
           setReviewSlot(slot)
         }}
-        onOpenPitchAnalysis={canOpenPitchAnalysis ? handleOpenPitchAnalysis : undefined}
       />
-
-      {pitchComparison && (
-        <PitchAnalysis
-          isOpen={isPitchAnalysisOpen}
-          onClose={handleClosePitchAnalysis}
-          currentTake={pitchComparison.currentTake}
-          bestTake={pitchComparison.bestTake}
-        />
-      )}
 
       <TakeVaultDrawer
         isOpen={isVaultOpen}

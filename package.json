@@ -27,7 +27,6 @@
     "pitchy": "^4.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "recharts": "^3.8.1",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {

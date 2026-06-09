@@ -7,6 +7,8 @@ export interface AppSettings {
   soundVolumeThreshold: number
   /** Short vibration on long-press drag arm. */
   hapticFeedback: boolean
+  /** Audio mode playback: show live A440 pitch tracker instead of a blank screen. */
+  pitchTrackerEnabled: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -14,6 +16,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   soundSilenceSeconds: 2,
   soundVolumeThreshold: 20,
   hapticFeedback: true,
+  pitchTrackerEnabled: true,
 }
 
 const STORAGE_KEY = 'sessionmirror:settings'
@@ -44,6 +47,10 @@ export function loadAppSettings(): AppSettings {
         parsed.hapticFeedback !== undefined
           ? Boolean(parsed.hapticFeedback)
           : DEFAULT_APP_SETTINGS.hapticFeedback,
+      pitchTrackerEnabled:
+        parsed.pitchTrackerEnabled !== undefined
+          ? Boolean(parsed.pitchTrackerEnabled)
+          : DEFAULT_APP_SETTINGS.pitchTrackerEnabled,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }
