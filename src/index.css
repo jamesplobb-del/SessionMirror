@@ -45,3 +45,32 @@ select {
 .review-overlay video {
   -webkit-touch-callout: default;
 }
+
+/* Landscape — portrait layout unchanged; only applies when rotated */
+@media (orientation: landscape) {
+  .app-hud-bottom {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-pip-row {
+    flex: 0 1 auto;
+    justify-content: center;
+    gap: 0.625rem;
+  }
+
+  .app-pip-row > * {
+    width: 7.5rem;
+    max-width: 30vw;
+  }
+
+  .review-overlay .review-timeline-overlay {
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+}

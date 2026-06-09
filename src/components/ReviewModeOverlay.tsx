@@ -3,6 +3,7 @@ import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
+import { getPlayableDuration } from '../utils/videoDuration'
 import type { ReviewContext, ReviewSlot, Take } from '../types'
 
 const SWIPE_THRESHOLD = 60
@@ -54,11 +55,14 @@ export default function ReviewModeOverlay({
   const vaultVideoRef = useRef<HTMLVideoElement>(null)
   const timelineTrackRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
+  const progressLoopRef = useRef<number | null>(null)
   const hideOverlayTimerRef = useRef<number | null>(null)
   const isScrubbingRef = useRef(false)
+  const wasPlayingBeforeScrubRef = useRef(false)
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [isScrubbing, setIsScrubbing] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [showPlayOverlay, setShowPlayOverlay] = useState(true)
   const [swipeOffset, setSwipeOffset] = useState(0)
@@ -144,15 +148,52 @@ export default function ReviewModeOverlay({
     })
   }, [])
 
+  const syncDurationFromVideo = useCallback((video: HTMLVideoElement) => {
+    const playable = getPlayableDuration(video)
+    if (playable > 0) {
+      setDuration(playable)
+    }
+  }, [])
+
+  const stopProgressLoop = useCallback(() => {
+    if (progressLoopRef.current !== null) {
+      cancelAnimationFrame(progressLoopRef.current)
+      progressLoopRef.current = null
+    }
+  }, [])
+
+  const startProgressLoop = useCallback(() => {
+    stopProgressLoop()
+
+    const tick = () => {
+      const video = getActiveVideo()
+      if (!video || video.paused || isScrubbingRef.current) {
+        progressLoopRef.current = null
+        return
+      }
+
+      scheduleTimeUpdate(video.currentTime)
+      syncDurationFromVideo(video)
+      progressLoopRef.current = requestAnimationFrame(tick)
+    }
+
+    progressLoopRef.current = requestAnimationFrame(tick)
+  }, [getActiveVideo, scheduleTimeUpdate, stopProgressLoop, syncDurationFromVideo])
+
   const scrubToClientX = useCallback(
     (clientX: number) => {
       const video = getActiveVideo()
       const track = timelineTrackRef.current
-      if (!video || !track || !duration) return
+      if (!video || !track) return
+
+      const playableDuration = getPlayableDuration(video) || duration
+      if (playableDuration <= 0) return
 
       const rect = track.getBoundingClientRect()
+      if (rect.width <= 0) return
+
       const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-      const time = percent * duration
+      const time = percent * playableDuration
       video.currentTime = time
       scheduleTimeUpdate(time)
     },
@@ -264,35 +305,48 @@ export default function ReviewModeOverlay({
         scheduleTimeUpdate(video.currentTime)
       }
     }
-    const onDurationChange = () => setDuration(video.duration || 0)
-    const onLoadedMetadata = () => setDuration(video.duration || 0)
+    const onDurationChange = () => syncDurationFromVideo(video)
+    const onLoadedMetadata = () => syncDurationFromVideo(video)
+    const onSeeked = () => {
+      if (isScrubbingRef.current) {
+        scheduleTimeUpdate(video.currentTime)
+      }
+    }
     const onPlay = () => {
       setIsPlaying(true)
       revealPlayOverlay(true)
+      startProgressLoop()
     }
     const onPause = () => {
       setIsPlaying(false)
       revealPlayOverlay(false)
+      stopProgressLoop()
     }
     const onEnded = () => {
       setIsPlaying(false)
       revealPlayOverlay(false)
+      stopProgressLoop()
     }
 
     video.addEventListener('timeupdate', onTimeUpdate)
     video.addEventListener('durationchange', onDurationChange)
     video.addEventListener('loadedmetadata', onLoadedMetadata)
+    video.addEventListener('seeked', onSeeked)
     video.addEventListener('play', onPlay)
     video.addEventListener('pause', onPause)
     video.addEventListener('ended', onEnded)
+
+    syncDurationFromVideo(video)
 
     return () => {
       video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('durationchange', onDurationChange)
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
+      video.removeEventListener('seeked', onSeeked)
       video.removeEventListener('play', onPlay)
       video.removeEventListener('pause', onPause)
       video.removeEventListener('ended', onEnded)
+      stopProgressLoop()
     }
   }, [
     activeSlot,
@@ -300,6 +354,9 @@ export default function ReviewModeOverlay({
     isVault,
     revealPlayOverlay,
     scheduleTimeUpdate,
+    startProgressLoop,
+    stopProgressLoop,
+    syncDurationFromVideo,
     vaultTake?.id,
     vaultIndex,
   ])
@@ -307,16 +364,38 @@ export default function ReviewModeOverlay({
   const handleScrubStart = useCallback(() => {
     const video = getActiveVideo()
     if (video) {
+      wasPlayingBeforeScrubRef.current = !video.paused
       video.pause()
+      stopProgressLoop()
     }
     isScrubbingRef.current = true
+    setIsScrubbing(true)
     revealPlayOverlay(false)
-  }, [getActiveVideo, revealPlayOverlay])
+  }, [getActiveVideo, revealPlayOverlay, stopProgressLoop])
 
   const handleScrubEnd = useCallback(() => {
     isScrubbingRef.current = false
+    setIsScrubbing(false)
+
+    const video = getActiveVideo()
+    if (video) {
+      scheduleTimeUpdate(video.currentTime)
+      syncDurationFromVideo(video)
+
+      if (wasPlayingBeforeScrubRef.current) {
+        video.muted = false
+        void video.play().catch(() => revealPlayOverlay(false))
+      }
+    }
+
+    wasPlayingBeforeScrubRef.current = false
     revealPlayOverlay(false)
-  }, [revealPlayOverlay])
+  }, [
+    getActiveVideo,
+    revealPlayOverlay,
+    scheduleTimeUpdate,
+    syncDurationFromVideo,
+  ])
 
   const completeSwipe = useCallback(
     (direction: 'left' | 'right') => {
@@ -589,20 +668,23 @@ export default function ReviewModeOverlay({
           )}
         </button>
         )}
-      </div>
 
-      <div
-        className="shrink-0 border-t border-white/10"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-      >
-        <ReviewTimeline
-          trackRef={timelineTrackRef}
-          currentTime={currentTime}
-          duration={duration}
-          onScrubStart={handleScrubStart}
-          onScrub={scrubToClientX}
-          onScrubEnd={handleScrubEnd}
-        />
+        {isOpen && (
+          <div
+            className="review-timeline-overlay pointer-events-none absolute inset-x-0 bottom-0 z-30"
+            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+          >
+            <ReviewTimeline
+              trackRef={timelineTrackRef}
+              currentTime={currentTime}
+              duration={duration}
+              isScrubbing={isScrubbing}
+              onScrubStart={handleScrubStart}
+              onScrub={scrubToClientX}
+              onScrubEnd={handleScrubEnd}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

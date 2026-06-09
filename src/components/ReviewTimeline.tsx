@@ -5,6 +5,7 @@ interface ReviewTimelineProps {
   trackRef: RefObject<HTMLDivElement | null>
   currentTime: number
   duration: number
+  isScrubbing: boolean
   onScrubStart: () => void
   onScrub: (clientX: number) => void
   onScrubEnd: () => void
@@ -14,11 +15,12 @@ export default function ReviewTimeline({
   trackRef,
   currentTime,
   duration,
+  isScrubbing,
   onScrubStart,
   onScrub,
   onScrubEnd,
 }: ReviewTimelineProps) {
-  const percent = duration > 0 ? (currentTime / duration) * 100 : 0
+  const percent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -31,6 +33,7 @@ export default function ReviewTimeline({
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!trackRef.current?.hasPointerCapture(e.pointerId)) return
     e.preventDefault()
+    e.stopPropagation()
     onScrub(e.clientX)
   }
 
@@ -38,12 +41,13 @@ export default function ReviewTimeline({
     if (trackRef.current?.hasPointerCapture(e.pointerId)) {
       trackRef.current.releasePointerCapture(e.pointerId)
     }
+    e.stopPropagation()
     onScrubEnd()
   }
 
   return (
     <div
-      className="touch-none bg-gradient-to-t from-black via-black/95 to-black/80 px-5 pb-2 pt-4"
+      className="pointer-events-auto w-full touch-none select-none px-5 pb-1 pt-10"
       style={{ touchAction: 'none' }}
     >
       <div
@@ -53,43 +57,33 @@ export default function ReviewTimeline({
         aria-valuemax={duration}
         aria-valuenow={currentTime}
         aria-label="Video timeline"
-        className="group relative h-9 cursor-pointer touch-none select-none"
+        className="relative h-8 cursor-pointer touch-none"
         style={{ touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/15">
-          <div
-            className="absolute inset-y-0 left-0 rounded-full bg-white/90 transition-[width] duration-75 ease-out"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-
+        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/30" />
         <div
-          className="pointer-events-none absolute top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-white shadow-[0_0_12px_rgba(255,255,255,0.45)] transition-[left] duration-75 ease-out group-active:scale-110"
+          className={`absolute inset-y-0 left-0 top-1/2 h-px -translate-y-1/2 bg-white/85 ${
+            isScrubbing ? '' : 'transition-[width] duration-100 ease-linear'
+          }`}
+          style={{ width: `${percent}%` }}
+        />
+        <div
+          className={`pointer-events-none absolute top-1/2 z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/95 shadow-[0_0_8px_rgba(255,255,255,0.35)] ${
+            isScrubbing ? 'scale-125' : 'transition-[left] duration-100 ease-linear'
+          }`}
           style={{ left: `${percent}%` }}
         />
-
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between px-0.5">
-          {Array.from({ length: 24 }, (_, i) => (
-            <div
-              key={i}
-              className={`w-px rounded-full bg-white/25 ${
-                i % 6 === 0 ? 'h-3' : 'h-1.5'
-              }`}
-            />
-          ))}
-        </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between tabular-nums">
-        <span className="text-sm font-medium tracking-tight text-white">
+      <div className="mt-1 flex items-center justify-between tabular-nums">
+        <span className="text-[11px] font-medium tracking-tight text-white/70">
           {formatTime(currentTime)}
         </span>
-        <span className="text-xs text-white/45">/</span>
-        <span className="text-sm font-medium tracking-tight text-white/55">
+        <span className="text-[11px] font-medium tracking-tight text-white/45">
           {formatTime(duration)}
         </span>
       </div>

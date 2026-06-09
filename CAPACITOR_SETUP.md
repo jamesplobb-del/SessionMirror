@@ -16,10 +16,10 @@ npm install @capacitor/ios
 npx cap add ios
 ```
 
-Optional but recommended for camera/mic in the native WebView:
+Required for saving takes to the iOS Photos library:
 
 ```bash
-npm install @capacitor-community/media
+npm install @capacitor-community/media@^8.0.0
 ```
 
 ## 2. Build the web bundle
@@ -59,6 +59,8 @@ Add to `ios/App/App/Info.plist` if not already present:
 <string>BestTake needs the camera to record practice takes.</string>
 <key>NSMicrophoneUsageDescription</key>
 <string>BestTake needs the microphone to record audio with your takes.</string>
+<key>NSPhotoLibraryAddUsageDescription</key>
+<string>BestTake needs permission to save your takes to Photos.</string>
 ```
 
 ## 6. Safe area / notch

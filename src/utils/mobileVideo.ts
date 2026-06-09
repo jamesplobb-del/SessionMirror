@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import type { VideoHTMLAttributes } from 'react'
 
 /** Shared inline-playback attributes for iOS / mobile Safari (live camera). */
@@ -28,8 +29,22 @@ export function getRecorderMimeType(): string {
   return MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm'
 }
 
-/** MediaRecorder timeslice — flush a chunk to disk every N ms on native */
+/** MediaRecorder timeslice — used only when chunks can be appended safely (webm). */
 export const RECORDING_TIMESLICE_MS = 1000
+
+/**
+ * iOS/mp4 MediaRecorder emits fMP4 fragments; concatenating them corrupts A/V sync
+ * on longer takes. Record as a single blob instead.
+ */
+export function shouldUseRecordingTimeslice(mimeType: string): boolean {
+  if (!Capacitor.isNativePlatform()) {
+    return false
+  }
+  if (mimeType.includes('mp4') || Capacitor.getPlatform() === 'ios') {
+    return false
+  }
+  return true
+}
 
 /** WebKit hack — forces the first frame to render as an inline poster/thumbnail. */
 export function withWebKitThumbnailHint(src: string): string {

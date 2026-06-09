@@ -255,7 +255,7 @@ export default function App() {
   ])
 
   return (
-    <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black">
+    <div className="relative h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-black app-shell">
       <LiveCameraBackground
         previewRef={previewRef}
         streamRef={streamRef}
@@ -269,10 +269,10 @@ export default function App() {
         <HudHeader />
 
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4 transition-opacity duration-200 ease-in"
+          className="app-hud-bottom pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4 transition-opacity duration-200 ease-in"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
         >
-          <div className="flex items-end justify-between gap-3 px-3 sm:px-4">
+          <div className="app-pip-row flex items-end justify-between gap-3 px-3 sm:px-4">
             <PipWindow
               className="pointer-events-auto shrink-0"
               src={benchmarkTake?.videoUrl ?? null}

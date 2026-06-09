@@ -266,8 +266,9 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * Streams MediaRecorder chunks to disk while recording (native only).
- * On iOS, chunks are assembled into a single mp4 Blob before writeFile.
+ * Streams MediaRecorder output to disk on native.
+ * iOS/mp4: single blob on stop (fragment concat breaks A/V sync on long takes).
+ * Android webm: append chunks incrementally.
  */
 export class StreamingTakeWriter {
   readonly takeId: string

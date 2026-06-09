@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
-import { ChevronDown, ChevronUp, Pin, Share2, StickyNote, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
 
@@ -60,6 +60,12 @@ export default function TakeCard({
     if ((event.target as HTMLElement).closest('button')) return
     event.stopPropagation()
     onOpenTake?.()
+  }
+
+  const handleDelete = () => {
+    if (window.confirm(`Delete "${take.name}"? This cannot be undone.`)) {
+      onDelete()
+    }
   }
 
   return (
@@ -144,11 +150,14 @@ export default function TakeCard({
         )}
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
-            onDelete()
+            handleDelete()
           }}
-          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 opacity-0 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
           aria-label={`Delete ${take.name}`}
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -268,11 +277,26 @@ export default function TakeCard({
                 onExport()
               }}
               className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100"
+              aria-label={`Save ${take.name} to Photos`}
             >
-              <Share2 className="h-3.5 w-3.5" />
-              Export
+              <Download className="h-3.5 w-3.5" />
+              Save Video
             </button>
           )}
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleDelete()
+            }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 py-2 text-xs font-medium text-red-700 transition hover:border-red-300 hover:bg-red-100"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
         </div>
       </div>
     </div>

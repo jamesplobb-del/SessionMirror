@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getRecorderMimeType,
   RECORDING_TIMESLICE_MS,
+  shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
 import {
   NATIVE_VIDEO_MIME,
@@ -212,6 +213,8 @@ export function useCameraSession({
               detachRecorder(recorderInstance)
             }
             recorderRef.current = null
+
+            const capturedChunks = [...chunksRef.current]
             chunksRef.current = []
 
             const activeWriter = writerRef.current
@@ -229,12 +232,10 @@ export function useCameraSession({
                   videoUrl: persisted.videoUrl,
                 })
               } else {
-                const parts = chunksRef.current
-                chunksRef.current = []
                 const writeMime = recorderMimeTypeRef.current.includes('mp4')
                   ? NATIVE_VIDEO_MIME
                   : recorderMimeTypeRef.current
-                const blob = new Blob(parts, { type: writeMime })
+                const blob = new Blob(capturedChunks, { type: writeMime })
                 const persisted = await persistRecordingBlob(
                   blob,
                   stoppedTakeId,
@@ -270,7 +271,11 @@ export function useCameraSession({
           setIsRecording(false)
         }
 
-        recorder.start(RECORDING_TIMESLICE_MS)
+        if (shouldUseRecordingTimeslice(mimeType)) {
+          recorder.start(RECORDING_TIMESLICE_MS)
+        } else {
+          recorder.start()
+        }
         setIsRecording(true)
         setElapsed(0)
       } catch {
@@ -291,11 +296,9 @@ export function useCameraSession({
   ])
 
   const stopRecording = useCallback(() => {
-    setIsRecording(false)
-    chunksRef.current = []
-
     const recorder = recorderRef.current
     if (!recorder || recorder.state === 'inactive') {
+      setIsRecording(false)
       return
     }
 

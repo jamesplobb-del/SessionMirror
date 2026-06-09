@@ -11,6 +11,7 @@
     "cap:open": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/media": "^8.0.1",
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.2.0",
     "@capacitor/filesystem": "^7.1.1",
