@@ -274,7 +274,7 @@ export default function App() {
   ])
 
   return (
-    <div className="app-shell relative overflow-hidden bg-black">
+    <div className="app-shell">
       <LiveCameraBackground
         previewRef={previewRef}
         streamRef={streamRef}

@@ -55,8 +55,9 @@ function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        style={{ transform: isAudioMode ? undefined : 'scaleX(-1)' }}
-        className={`camera-preview ${isAudioMode ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+        className={`camera-preview ${
+          isAudioMode ? 'camera-preview--hidden' : 'camera-preview--mirror'
+        }`}
       />
 
       {isAudioMode && (
