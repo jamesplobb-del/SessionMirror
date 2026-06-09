@@ -22,7 +22,6 @@ import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
 import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
-import { syncViewportMetrics } from './utils/viewportMetrics'
 
 export default function App() {
   const [takes, setTakes] = useState<Take[]>([])
@@ -42,33 +41,30 @@ export default function App() {
 
   useEffect(() => {
     const syncViewport = () => {
-      const { height } = syncViewportMetrics()
+      const height = window.innerHeight
       setWindowHeight(height)
+      document.documentElement.style.setProperty('--app-height', `${height}px`)
+      document.documentElement.style.height = `${height}px`
+      document.body.style.height = `${height}px`
+      void document.body.offsetHeight
     }
 
     const handleOrientationChange = () => {
       syncViewport()
       window.setTimeout(syncViewport, 100)
       window.setTimeout(syncViewport, 300)
-      window.setTimeout(syncViewport, 600)
     }
 
     syncViewport()
     window.addEventListener('resize', syncViewport)
     window.addEventListener('orientationchange', handleOrientationChange)
-    window.visualViewport?.addEventListener('resize', syncViewport)
 
     return () => {
       window.removeEventListener('resize', syncViewport)
       window.removeEventListener('orientationchange', handleOrientationChange)
-      window.visualViewport?.removeEventListener('resize', syncViewport)
-      document.documentElement.style.removeProperty('--viewport-width')
-      document.documentElement.style.removeProperty('--viewport-height')
-      document.documentElement.style.removeProperty('--viewport-cover')
       document.documentElement.style.removeProperty('--app-height')
       document.documentElement.style.height = ''
       document.body.style.height = ''
-      document.body.style.width = ''
     }
   }, [])
 
