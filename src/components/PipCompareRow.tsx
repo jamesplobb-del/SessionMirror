@@ -16,6 +16,7 @@ interface PipCompareRowProps {
   onUploadBenchmark: (file: File) => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
+  hapticFeedback?: boolean
 }
 
 function PipDragGhost({
@@ -72,6 +73,7 @@ export default function PipCompareRow({
   onUploadBenchmark,
   onExpandBenchmark,
   onExpandChallenger,
+  hapticFeedback = true,
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
 
@@ -81,6 +83,7 @@ export default function PipCompareRow({
     onPin: onPinBenchmark,
     onTap: onExpandChallenger,
     enabled: Boolean(challengerTake?.videoUrl),
+    hapticFeedback,
   })
 
   return (

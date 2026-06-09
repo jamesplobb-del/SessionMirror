@@ -630,6 +630,8 @@ export function useCameraSession({
     recordingMode,
     changeRecordingMode,
     toggleRecording,
+    startRecording,
+    stopRecording,
     refreshCameraSession,
   }
 }

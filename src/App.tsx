@@ -5,7 +5,10 @@ import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import ControlDeck from './components/ControlDeck'
 import TakeVaultDrawer from './components/TakeVaultDrawer'
+import SettingsDrawer from './components/SettingsDrawer'
 import { useCameraSession } from './hooks/useCameraSession'
+import { useAppSettings } from './hooks/useAppSettings'
+import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import {
   generateThumbnailFromBlob,
   generateThumbnailFromUrl,
@@ -64,6 +67,10 @@ export default function App() {
   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [windowHeight, setWindowHeight] = useState(() => window.innerHeight)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
+  const { settings, updateSettings, resetSettings } = useAppSettings()
+  const pendingAutoPlaybackRef = useRef(false)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -223,10 +230,38 @@ export default function App() {
     recordingMode,
     changeRecordingMode,
     toggleRecording,
+    startRecording,
+    stopRecording,
     refreshCameraSession,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
   })
+
+  const autoMonitoringAllowed =
+    !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
+
+  useAutoSoundRecording({
+    enabled: settings.autoSoundRecording,
+    monitoringAllowed: autoMonitoringAllowed,
+    recordingMode,
+    ready,
+    isRecording,
+    streamRef,
+    streamGeneration,
+    silenceMs: settings.soundSilenceSeconds * 1000,
+    volumeThreshold: settings.soundVolumeThreshold,
+    startRecording,
+    stopRecording,
+    onAutoRecordingFinished: () => {
+      pendingAutoPlaybackRef.current = true
+    },
+  })
+
+  const autoSoundListening =
+    settings.autoSoundRecording &&
+    recordingMode === 'audio' &&
+    autoMonitoringAllowed &&
+    !isRecording
 
   const wasVaultOpenRef = useRef(false)
 
@@ -243,8 +278,19 @@ export default function App() {
 
   const handleOpenVault = useCallback(() => {
     pausePipVideos()
+    setIsSettingsOpen(false)
     setIsVaultOpen(true)
   }, [pausePipVideos])
+
+  const handleOpenSettings = useCallback(() => {
+    pausePipVideos()
+    setIsVaultOpen(false)
+    setIsSettingsOpen(true)
+  }, [pausePipVideos])
+
+  const handleCloseSettings = useCallback(() => {
+    setIsSettingsOpen(false)
+  }, [])
 
   useEffect(() => {
     if (!ready) return
@@ -264,7 +310,7 @@ export default function App() {
     }
   }, [ready])
 
-  const suspendPipPlayback = isVaultOpen || isReviewOpen
+  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
 
   const benchmarkTake = useMemo(
     () => takes.find((t) => t.id === benchmarkId) ?? null,
@@ -275,6 +321,23 @@ export default function App() {
     () => takes.find((t) => t.id === challengerId) ?? null,
     [takes, challengerId],
   )
+
+  useEffect(() => {
+    if (!pendingAutoPlaybackRef.current || isRecording) return
+    if (!challengerTake || challengerTake.mediaType !== 'audio') return
+
+    pendingAutoPlaybackRef.current = false
+    const timer = window.setTimeout(() => {
+      const media = challengerPipVideoRef.current
+      if (!media) return
+      media.muted = false
+      void media.play().catch(() => {})
+    }, 200)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [challengerTake, isRecording])
 
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),
@@ -515,6 +578,7 @@ export default function App() {
                 ? () => handleOpenCompareReview('challenger')
                 : undefined
             }
+            hapticFeedback={settings.hapticFeedback}
           />
 
           <ControlDeck
@@ -525,7 +589,9 @@ export default function App() {
             onRecordingModeChange={changeRecordingMode}
             onToggleRecord={toggleRecording}
             onOpenVault={handleOpenVault}
+            onOpenSettings={handleOpenSettings}
             takeCount={takes.length}
+            autoSoundListening={autoSoundListening}
           />
         </div>
       </div>
@@ -575,6 +641,15 @@ export default function App() {
         onDeleteTakes={handleDeleteTakes}
         onClearAllTakes={handleClearAllTakes}
         onOpenTake={handleOpenVaultTake}
+      />
+
+      <SettingsDrawer
+        isOpen={isSettingsOpen}
+        onClose={handleCloseSettings}
+        settings={settings}
+        onUpdate={updateSettings}
+        onReset={resetSettings}
+        recordingMode={recordingMode}
       />
     </div>
   )

@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from 'react'
 
-const LONG_PRESS_MS = 450
+const LONG_PRESS_MS = 280
 const DRAG_THRESHOLD_PX = 8
 const MOVEMENT_CANCEL_PX = 12
 
@@ -27,6 +27,7 @@ interface UseDragToPinOptions {
   onPin: (takeId: string) => void
   onTap?: () => void
   enabled: boolean
+  hapticFeedback?: boolean
 }
 
 export function useDragToPin({
@@ -35,6 +36,7 @@ export function useDragToPin({
   onPin,
   onTap,
   enabled,
+  hapticFeedback = true,
 }: UseDragToPinOptions) {
   const draggingRef = useRef(false)
   const armedRef = useRef(false)
@@ -86,12 +88,12 @@ export function useDragToPin({
       longPressTimerRef.current = window.setTimeout(() => {
         armedRef.current = true
         setIsArming(true)
-        if (navigator.vibrate) {
+        if (hapticFeedback && navigator.vibrate) {
           navigator.vibrate(12)
         }
       }, LONG_PRESS_MS)
     },
-    [clearLongPressTimer, enabled, sourceTakeId],
+    [clearLongPressTimer, enabled, hapticFeedback, sourceTakeId],
   )
 
   const handlePointerMove = useCallback(

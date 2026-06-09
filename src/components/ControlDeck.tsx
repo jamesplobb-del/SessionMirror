@@ -1,4 +1,4 @@
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, Settings } from 'lucide-react'
 import type { RecordingMode } from '../types'
 import RecordingModeCarousel from './RecordingModeCarousel'
 
@@ -10,7 +10,9 @@ interface ControlDeckProps {
   onRecordingModeChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
   onOpenVault: () => void
+  onOpenSettings: () => void
   takeCount: number
+  autoSoundListening?: boolean
 }
 
 function formatElapsed(seconds: number): string {
@@ -27,7 +29,9 @@ export default function ControlDeck({
   onRecordingModeChange,
   onToggleRecord,
   onOpenVault,
+  onOpenSettings,
   takeCount,
+  autoSoundListening = false,
 }: ControlDeckProps) {
   return (
     <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
@@ -46,6 +50,15 @@ export default function ControlDeck({
           )}
         </button>
 
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="absolute right-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md transition hover:bg-black/55"
+          aria-label="Open settings"
+        >
+          <Settings className="h-5 w-5" />
+        </button>
+
         <div className="flex flex-col items-center gap-1">
           <RecordingModeCarousel
             value={recordingMode}
@@ -54,6 +67,12 @@ export default function ControlDeck({
             isRecording={isRecording}
             ready={ready}
           />
+
+          {autoSoundListening && !isRecording && (
+            <span className="text-[10px] font-medium tracking-wide text-sky-300/90">
+              Listening…
+            </span>
+          )}
 
           {isRecording && (
             <span
