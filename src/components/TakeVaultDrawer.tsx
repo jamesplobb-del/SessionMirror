@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { X } from 'lucide-react'
+import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import TakeVideoPlayer from './TakeVideoPlayer'
@@ -8,7 +8,7 @@ import VaultMediaSegment from './VaultMediaSegment'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
 import ProjectSessionBar from './ProjectSessionBar'
-import { describeSaveTakeResult, shareTakeVideo } from '../utils/shareTakeVideo'
+import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, isAudioTake } from '../utils/mediaType'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
 import type { Project } from '../db/types'
@@ -45,6 +45,8 @@ interface TakeVaultDrawerProps {
   onBeforePin?: () => void
   onUpdateTake: (id: string, updates: TakeUpdate) => void
   onDeleteTake: (id: string) => void
+  onDeleteTakes: (ids: string[]) => void
+  onClearAllTakes: () => void
   onOpenTake: (take: Take) => void
 }
 
@@ -100,10 +102,15 @@ export default function TakeVaultDrawer({
   onBeforePin,
   onUpdateTake,
   onDeleteTake,
+  onDeleteTakes,
+  onClearAllTakes,
   onOpenTake,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
   const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const videoCount = useMemo(
     () => takes.filter((take) => getTakeMediaType(take) === 'video').length,
@@ -125,8 +132,112 @@ export default function TakeVaultDrawer({
   useEffect(() => {
     if (!isOpen) {
       teardownVideosInContainer(drawerRef.current)
+      setSelectionMode(false)
+      setSelectedIds(new Set())
     }
   }, [isOpen])
+
+  useEffect(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+  }, [activeProject?.id])
+
+  const selectedCount = selectedIds.size
+  const allFilteredSelected =
+    filteredTakes.length > 0 &&
+    filteredTakes.every((take) => selectedIds.has(take.id))
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+  }, [])
+
+  const toggleTakeSelection = useCallback((takeId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(takeId)) {
+        next.delete(takeId)
+      } else {
+        next.add(takeId)
+      }
+      return next
+    })
+  }, [])
+
+  const toggleSelectAllFiltered = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev)
+        for (const take of filteredTakes) {
+          next.delete(take.id)
+        }
+        return next
+      }
+
+      const next = new Set(prev)
+      for (const take of filteredTakes) {
+        next.add(take.id)
+      }
+      return next
+    })
+  }, [allFilteredSelected, filteredTakes])
+
+  const handleBulkSave = useCallback(() => {
+    const selectedTakes = takes.filter((take) => selectedIds.has(take.id))
+    if (selectedTakes.length === 0) return
+
+    setBulkSaving(true)
+    silenceAllVaultVideos()
+    void shareTakeVideos(selectedTakes)
+      .then((result) => {
+        const message = describeBulkSaveResult(result)
+        if (message) {
+          window.alert(message)
+        }
+      })
+      .finally(() => {
+        setBulkSaving(false)
+      })
+  }, [selectedIds, silenceAllVaultVideos, takes])
+
+  const handleBulkDelete = useCallback(() => {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+
+    if (
+      !window.confirm(
+        `Delete ${ids.length} selected take${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
+      )
+    ) {
+      return
+    }
+
+    silenceAllVaultVideos()
+    onDeleteTakes(ids)
+    exitSelectionMode()
+  }, [exitSelectionMode, onDeleteTakes, selectedIds, silenceAllVaultVideos])
+
+  const handleClearAll = useCallback(() => {
+    if (takes.length === 0) return
+    const sessionName = activeProject?.name ?? 'this session'
+    if (
+      !window.confirm(
+        `Delete all ${takes.length} takes in "${sessionName}"? This cannot be undone.`,
+      )
+    ) {
+      return
+    }
+
+    silenceAllVaultVideos()
+    onClearAllTakes()
+    exitSelectionMode()
+  }, [
+    activeProject?.name,
+    exitSelectionMode,
+    onClearAllTakes,
+    silenceAllVaultVideos,
+    takes.length,
+  ])
 
   useEffect(() => {
     return () => {
@@ -158,19 +269,50 @@ export default function TakeVaultDrawer({
           <div>
             <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
             <p className="text-xs text-stone-500">
-              {activeProject
-                ? `Session: ${activeProject.name}`
-                : 'Set your Best Take and load a take to the HUD'}
+              {selectionMode
+                ? `${selectedCount} selected`
+                : activeProject
+                  ? `Session: ${activeProject.name}`
+                  : 'Set your Best Take and load a take to the HUD'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"
-            aria-label="Close vault"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {takes.length > 0 && !selectionMode && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSelectionMode(true)}
+                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+                >
+                  Select
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                >
+                  Clear All
+                </button>
+              </>
+            )}
+            {selectionMode && (
+              <button
+                type="button"
+                onClick={exitSelectionMode}
+                className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"
+              aria-label="Close vault"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto px-6 pb-8 pt-4">
@@ -202,11 +344,22 @@ export default function TakeVaultDrawer({
                 </div>
               ) : (
                 <>
-                  <GallerySortStrip
-                    sortMode={sortMode}
-                    onSortChange={onSortChange}
-                    takeCount={filteredTakes.length}
-                  />
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <GallerySortStrip
+                      sortMode={sortMode}
+                      onSortChange={onSortChange}
+                      takeCount={filteredTakes.length}
+                    />
+                    {selectionMode && (
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllFiltered}
+                        className="shrink-0 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
+                      >
+                        {allFilteredSelected ? 'Deselect All' : 'Select All'}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-4 overflow-x-auto pb-2">
                     {isOpen &&
                       filteredTakes.map((take) => (
@@ -215,6 +368,9 @@ export default function TakeVaultDrawer({
                           take={take}
                           isBenchmark={take.id === benchmarkId}
                           isChallenger={take.id === challengerId}
+                          selectionMode={selectionMode}
+                          selected={selectedIds.has(take.id)}
+                          onToggleSelect={() => toggleTakeSelection(take.id)}
                           onOpenTake={() => {
                             silenceAllVaultVideos()
                             onOpenTake(take)
@@ -230,7 +386,7 @@ export default function TakeVaultDrawer({
                             onPinChallenger(take.id)
                           }}
                           onExport={
-                            getTakeMediaType(take) === 'video'
+                            !selectionMode && getTakeMediaType(take) === 'video'
                               ? () => {
                                   silenceAllVaultVideos()
                                   void shareTakeVideo(take).then((result) => {
@@ -253,6 +409,41 @@ export default function TakeVaultDrawer({
             </>
           )}
         </div>
+
+        {selectionMode && selectedCount > 0 && (
+          <div
+            className="flex gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <button
+              type="button"
+              disabled={bulkSaving}
+              onClick={handleBulkSave}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-800 transition hover:bg-stone-100 disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {bulkSaving ? 'Saving…' : `Save (${selectedCount})`}
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete ({selectedCount})
+            </button>
+          </div>
+        )}
+
+        {selectionMode && selectedCount === 0 && (
+          <div
+            className="flex items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <CheckSquare className="h-3.5 w-3.5" />
+            Tap takes to select, then save or delete
+          </div>
+        )}
       </div>
     </>
   )

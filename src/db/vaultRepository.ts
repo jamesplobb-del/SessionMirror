@@ -143,6 +143,12 @@ export async function deleteVaultTake(takeId: string): Promise<void> {
   await persistWebStore()
 }
 
+export async function deleteTakesByProject(projectId: string): Promise<void> {
+  const db = getVaultDatabase()
+  await db.run('DELETE FROM takes WHERE project_id = ?', [projectId])
+  await persistWebStore()
+}
+
 export async function toggleBestTake(takeId: string): Promise<VaultTake> {
   const db = getVaultDatabase()
 

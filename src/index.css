@@ -67,11 +67,34 @@ select {
   width: 8.25rem;
   min-width: 8.25rem;
   min-height: calc(8.25rem * 9 / 16);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .pip-drag-source--active {
   opacity: 0.45;
   transform: scale(0.96);
+}
+
+.pip-drag-source--arming {
+  transform: scale(0.97);
+  box-shadow:
+    0 0 0 2px rgba(56, 189, 248, 0.75),
+    0 4px 20px rgba(56, 189, 248, 0.2);
+}
+
+.pip-drag-layer {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.pip-drag-active,
+body.pip-drag-active * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
 }
 
 .pip-drop-target--active {

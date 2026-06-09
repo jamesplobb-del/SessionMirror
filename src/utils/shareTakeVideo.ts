@@ -113,6 +113,58 @@ export function describeSaveTakeResult(result: SaveTakeResult): string | null {
   }
 }
 
+export interface BulkSaveTakesResult {
+  saved: number
+  failed: number
+  skipped: number
+}
+
+/** Saves multiple video takes to Photos / downloads on web. */
+export async function shareTakeVideos(takes: Take[]): Promise<BulkSaveTakesResult> {
+  let saved = 0
+  let failed = 0
+  let skipped = 0
+
+  for (const take of takes) {
+    if (getTakeMediaType(take) !== 'video') {
+      skipped += 1
+      continue
+    }
+
+    const result = await shareTakeVideo(take)
+    if (result.ok) {
+      saved += 1
+    } else if (result.reason === 'unsupported') {
+      skipped += 1
+    } else {
+      failed += 1
+    }
+  }
+
+  return { saved, failed, skipped }
+}
+
+export function describeBulkSaveResult(result: BulkSaveTakesResult): string | null {
+  if (result.saved === 0 && result.failed === 0 && result.skipped === 0) {
+    return null
+  }
+
+  const parts: string[] = []
+  if (result.saved > 0) {
+    parts.push(
+      `Saved ${result.saved} video${result.saved === 1 ? '' : 's'} to Photos.`,
+    )
+  }
+  if (result.skipped > 0) {
+    parts.push(`Skipped ${result.skipped} audio take${result.skipped === 1 ? '' : 's'}.`)
+  }
+  if (result.failed > 0) {
+    parts.push(`${result.failed} could not be saved.`)
+  }
+
+  return parts.join(' ')
+}
+
 /** Saves a video take to the device photo library (native) or downloads it (web). */
 export async function shareTakeVideo(take: Take): Promise<SaveTakeResult> {
   if (getTakeMediaType(take) !== 'video') {

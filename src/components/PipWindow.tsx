@@ -21,6 +21,7 @@ interface PipWindowProps {
   className?: string
   dropHighlight?: boolean
   dragSourceActive?: boolean
+  dragSourceArming?: boolean
   dragSourceProps?: {
     onPointerDown: (event: PointerEvent<HTMLElement>) => void
     onPointerMove: (event: PointerEvent<HTMLElement>) => void
@@ -49,6 +50,7 @@ export default function PipWindow({
   className = '',
   dropHighlight = false,
   dragSourceActive = false,
+  dragSourceArming = false,
   dragSourceProps,
 }: PipWindowProps) {
   const videoSourceKey = src || filePath || 'empty'
@@ -145,7 +147,7 @@ export default function PipWindow({
           src ? 'opacity-100' : 'opacity-90'
         } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
           dragSourceActive ? 'pip-drag-source--active' : ''
-        }`}
+        } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`}
       >
         <span
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
@@ -174,8 +176,8 @@ export default function PipWindow({
                 <div
                   role="button"
                   tabIndex={0}
-                  className="absolute inset-0 z-[1] cursor-grab touch-none border-0 bg-transparent p-0 active:cursor-grabbing"
-                  aria-label={`Drag ${label} to Best Take or tap to open full screen`}
+                  className="pip-drag-layer absolute inset-0 z-[1] cursor-grab touch-none select-none border-0 bg-transparent p-0 active:cursor-grabbing"
+                  aria-label={`Hold then drag ${label} to Best Take, or tap to open full screen`}
                   {...dragSourceProps}
                 />
               ) : (

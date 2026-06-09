@@ -75,7 +75,7 @@ export default function PipCompareRow({
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
 
-  const { ghost, isDragging, dragSourceProps } = useDragToPin({
+  const { ghost, isDragging, isArming, dragSourceProps } = useDragToPin({
     sourceTakeId: challengerTake?.id ?? null,
     dropTargetRef: benchmarkDropRef,
     onPin: onPinBenchmark,
@@ -120,6 +120,7 @@ export default function PipCompareRow({
           onUnpin={onUnpinChallenger}
           onExpand={challengerTake?.videoUrl ? onExpandChallenger : undefined}
           dragSourceActive={isDragging}
+          dragSourceArming={isArming}
           dragSourceProps={
             challengerTake?.videoUrl ? dragSourceProps : undefined
           }

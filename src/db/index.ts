@@ -5,6 +5,7 @@ export { findBestTakeId, loadUiTakesForProject, vaultTakeToUiTake } from './take
 export {
   createProject,
   deleteVaultTake,
+  deleteTakesByProject,
   getTakesByProject,
   listProjects,
   saveTake,

@@ -26,6 +26,7 @@ import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync
 import {
   createProject,
   deleteVaultTake,
+  deleteTakesByProject,
   findBestTakeId,
   getTakesByProject,
   listProjects,
@@ -384,22 +385,55 @@ export default function App() {
     void updateVaultTake(id, updates)
   }, [])
 
-  const handleDeleteTake = useCallback((id: string) => {
-    setTakes((prev) => {
-      const target = prev.find((t) => t.id === id)
-      if (target) {
-        if (target.filePath) {
-          void deleteTakeFile(target.filePath)
-        } else if (target.videoUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(target.videoUrl)
-        }
-      }
-      return prev.filter((t) => t.id !== id)
-    })
-    void deleteVaultTake(id)
-    setBenchmarkId((current) => (current === id ? null : current))
-    setChallengerId((current) => (current === id ? null : current))
+  const removeTakeResources = useCallback((take: Take) => {
+    if (take.filePath) {
+      void deleteTakeFile(take.filePath)
+    } else if (take.videoUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(take.videoUrl)
+    }
   }, [])
+
+  const handleDeleteTakes = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return
+
+      const idSet = new Set(ids)
+      setTakes((prev) => {
+        for (const take of prev) {
+          if (idSet.has(take.id)) {
+            removeTakeResources(take)
+          }
+        }
+        return prev.filter((take) => !idSet.has(take.id))
+      })
+
+      void Promise.all(ids.map((id) => deleteVaultTake(id)))
+      setBenchmarkId((current) => (current && idSet.has(current) ? null : current))
+      setChallengerId((current) => (current && idSet.has(current) ? null : current))
+    },
+    [removeTakeResources],
+  )
+
+  const handleDeleteTake = useCallback(
+    (id: string) => {
+      handleDeleteTakes([id])
+    },
+    [handleDeleteTakes],
+  )
+
+  const handleClearAllTakes = useCallback(() => {
+    const projectId = activeProjectIdRef.current
+    if (!projectId || takes.length === 0) return
+
+    for (const take of takes) {
+      removeTakeResources(take)
+    }
+
+    void deleteTakesByProject(projectId)
+    setTakes([])
+    setBenchmarkId(null)
+    setChallengerId(null)
+  }, [removeTakeResources, takes])
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
@@ -519,6 +553,8 @@ export default function App() {
         onBeforePin={pausePipVideos}
         onUpdateTake={handleUpdateTake}
         onDeleteTake={handleDeleteTake}
+        onDeleteTakes={handleDeleteTakes}
+        onClearAllTakes={handleClearAllTakes}
         onOpenTake={handleOpenVaultTake}
       />
     </div>
