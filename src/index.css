@@ -46,6 +46,8 @@ select {
 
 .app-pip-row {
   overflow: visible;
+  justify-content: center;
+  margin-bottom: 0.125rem;
 }
 
 .pip-video-container {
@@ -81,6 +83,8 @@ select {
 .app-hud-bottom {
   margin-top: auto;
   width: 100%;
+  gap: 0.375rem;
+  padding-bottom: 0.25rem;
 }
 
 /* Landscape — portrait layout unchanged; only applies when rotated */
@@ -132,59 +136,105 @@ select {
   display: none;
 }
 
-.mode-selector {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2.25rem;
-  width: 100%;
-  max-width: 14rem;
+.record-carousel-viewport {
+  position: relative;
+  width: 9.5rem;
+  height: 56px;
   touch-action: pan-y;
 }
 
-.mode-selector-item {
-  border: 0;
-  background: transparent;
-  padding: 0.375rem 0.25rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.55);
-  opacity: 0.5;
-  transform: scale(0.88) translateY(2px);
-  transition:
-    color 180ms ease,
-    transform 180ms ease,
-    opacity 180ms ease;
+.record-carousel-viewport--locked {
+  opacity: 0.85;
 }
 
-.mode-selector-item--active {
-  color: #facc15;
-  opacity: 1;
-  transform: scale(1) translateY(0);
-}
-
-.record-shutter {
-  width: 56px;
-  height: 56px;
-  min-width: 56px;
-  min-height: 56px;
-  max-width: 56px;
-  max-height: 56px;
-  box-sizing: border-box;
-}
-
-.record-shutter-dot {
+.record-carousel-track {
+  position: relative;
   width: 100%;
   height: 100%;
-  min-width: 0;
-  min-height: 0;
-  max-width: none;
-  max-height: none;
 }
 
-.record-shutter:active:not(:disabled) {
-  transform: scale(0.96);
+.record-carousel-slot {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 0;
+  padding: 0;
+  transition:
+    width 220ms ease,
+    height 220ms ease,
+    left 220ms ease,
+    right 220ms ease,
+    opacity 220ms ease,
+    transform 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease;
+}
+
+.record-carousel-slot--center {
+  width: 56px;
+  height: 56px;
+  left: 50%;
+  opacity: 1;
+  transform: translate(-50%, -50%);
+  border: 3px solid rgba(255, 255, 255, 0.9);
+}
+
+.record-carousel-slot--left {
+  width: 40px;
+  height: 40px;
+  left: 0;
+  opacity: 0.5;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.record-carousel-slot--right {
+  width: 40px;
+  height: 40px;
+  right: 0;
+  left: auto;
+  opacity: 0.5;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.record-carousel-slot--video-active {
+  background: #ef4444;
+}
+
+.record-carousel-slot--recording {
+  background: transparent;
+}
+
+.record-carousel-slot--active:not(.record-carousel-slot--video-active):not(.record-carousel-slot--recording) {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+}
+
+.record-carousel-slot--inactive {
+  backdrop-filter: blur(4px);
+}
+
+.record-carousel-slot-dot {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+}
+
+.record-carousel-slot:active:not(:disabled) {
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+.record-carousel-slot--left:active:not(:disabled),
+.record-carousel-slot--right:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.96);
+}
+
+.record-carousel-slot:disabled {
+  opacity: 0.45;
 }
 
 .camera-background {

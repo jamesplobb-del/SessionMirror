@@ -1,4 +1,4 @@
-import { FolderOpen, Mic, Square } from 'lucide-react'
+import { FolderOpen } from 'lucide-react'
 import type { RecordingMode } from '../types'
 import RecordingModeCarousel from './RecordingModeCarousel'
 
@@ -29,21 +29,13 @@ export default function ControlDeck({
   onOpenVault,
   takeCount,
 }: ControlDeckProps) {
-  const isAudioMode = recordingMode === 'audio'
-
   return (
-    <div className="pointer-events-auto flex w-full flex-col items-center px-4 pt-2">
-      <RecordingModeCarousel
-        value={recordingMode}
-        onChange={onRecordingModeChange}
-        disabled={isRecording}
-      />
-
-      <div className="relative mt-3 flex w-full max-w-xs items-center justify-center">
+    <div className="pointer-events-auto flex w-full flex-col items-center px-4">
+      <div className="relative flex w-full max-w-xs items-center justify-center">
         <button
           type="button"
           onClick={onOpenVault}
-          className="absolute left-0 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md transition hover:bg-black/55"
+          className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md transition hover:bg-black/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
           <FolderOpen className="h-5 w-5" />
@@ -55,31 +47,13 @@ export default function ControlDeck({
         </button>
 
         <div className="flex flex-col items-center gap-1">
-          <button
-            type="button"
-            onClick={onToggleRecord}
-            disabled={!ready}
-            aria-label={
-              isRecording
-                ? 'Stop recording'
-                : isAudioMode
-                  ? 'Start audio recording'
-                  : 'Start video recording'
-            }
-            className={`record-shutter flex shrink-0 items-center justify-center rounded-full border-[3px] transition disabled:opacity-40 ${
-              isRecording
-                ? 'border-white/90 bg-transparent'
-                : isAudioMode
-                  ? 'border-white/90 bg-white/10 backdrop-blur-sm hover:bg-white/15'
-                  : 'border-white/90 bg-red-500 hover:bg-red-500'
-            }`}
-          >
-            {isRecording ? (
-              <Square className="h-5 w-5 fill-red-500 text-red-500" />
-            ) : isAudioMode ? (
-              <Mic className="h-5 w-5 text-white" strokeWidth={2.25} />
-            ) : null}
-          </button>
+          <RecordingModeCarousel
+            value={recordingMode}
+            onChange={onRecordingModeChange}
+            onToggleRecord={onToggleRecord}
+            isRecording={isRecording}
+            ready={ready}
+          />
 
           {isRecording && (
             <span

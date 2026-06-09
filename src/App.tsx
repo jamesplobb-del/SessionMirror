@@ -328,8 +328,8 @@ export default function App() {
       >
         <HudHeader />
 
-        <div className="app-hud-bottom pointer-events-none flex flex-col gap-4">
-          <div className="app-pip-row flex items-end justify-between gap-3 px-3 sm:px-4">
+        <div className="app-hud-bottom pointer-events-none flex flex-col">
+          <div className="app-pip-row flex items-end justify-center gap-3 px-3 sm:px-4">
             <PipWindow
               className="pointer-events-auto shrink-0"
               src={benchmarkTake?.videoUrl ?? null}

@@ -1,32 +1,105 @@
 import { useCallback, useRef } from 'react'
+import { Camera, Mic, Square } from 'lucide-react'
 import type { RecordingMode } from '../types'
-
-const MODES: { id: RecordingMode; label: string }[] = [
-  { id: 'video', label: 'VIDEO' },
-  { id: 'audio', label: 'AUDIO' },
-]
 
 const SWIPE_THRESHOLD_PX = 36
 
 interface RecordingModeCarouselProps {
   value: RecordingMode
   onChange: (mode: RecordingMode) => void
+  onToggleRecord: () => void
+  isRecording: boolean
+  ready: boolean
   disabled?: boolean
+}
+
+type SlotPosition = 'center' | 'left' | 'right'
+
+function slotPosition(mode: RecordingMode, active: RecordingMode): SlotPosition {
+  if (mode === active) return 'center'
+  return mode === 'video' ? 'left' : 'right'
+}
+
+interface ModeSlotProps {
+  mode: RecordingMode
+  position: SlotPosition
+  isRecording: boolean
+  ready: boolean
+  modeSwitchLocked: boolean
+  onActivate: () => void
+}
+
+function ModeSlot({
+  mode,
+  position,
+  isRecording,
+  ready,
+  modeSwitchLocked,
+  onActivate,
+}: ModeSlotProps) {
+  const isCenter = position === 'center'
+  const isVideo = mode === 'video'
+  const slotDisabled = isCenter ? !ready && !isRecording : modeSwitchLocked
+
+  const ariaLabel = isCenter
+    ? isRecording
+      ? 'Stop recording'
+      : isVideo
+        ? 'Start video recording'
+        : 'Start audio recording'
+    : isVideo
+      ? 'Switch to video mode'
+      : 'Switch to audio mode'
+
+  return (
+    <button
+      type="button"
+      disabled={slotDisabled}
+      aria-label={ariaLabel}
+      aria-pressed={isCenter}
+      onClick={onActivate}
+      className={`record-carousel-slot record-carousel-slot--${position} ${
+        isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
+      } ${isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
+        isCenter && isRecording ? 'record-carousel-slot--recording' : ''
+      }`}
+    >
+      {isCenter && isRecording ? (
+        <Square className="h-5 w-5 fill-red-500 text-red-500" />
+      ) : isCenter && isVideo ? (
+        <span className="record-carousel-slot-dot block rounded-full bg-red-500" aria-hidden />
+      ) : isCenter ? (
+        <Mic className="h-5 w-5 text-white" strokeWidth={2.25} />
+      ) : isVideo ? (
+        <Camera className="h-4 w-4 text-white" strokeWidth={2} />
+      ) : (
+        <Mic className="h-4 w-4 text-white" strokeWidth={2} />
+      )}
+    </button>
+  )
 }
 
 export default function RecordingModeCarousel({
   value,
   onChange,
+  onToggleRecord,
+  isRecording,
+  ready,
   disabled = false,
 }: RecordingModeCarouselProps) {
   const touchStartXRef = useRef(0)
+  const modeSwitchLocked = disabled || isRecording
 
-  const handleModeClick = useCallback(
+  const handleSlotActivate = useCallback(
     (mode: RecordingMode) => {
-      if (disabled || mode === value) return
+      if (mode === value) {
+        onToggleRecord()
+        return
+      }
+      if (modeSwitchLocked) return
       onChange(mode)
     },
-    [disabled, onChange, value],
+    [modeSwitchLocked, onChange, onToggleRecord, value],
   )
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
@@ -35,7 +108,7 @@ export default function RecordingModeCarousel({
 
   const handleTouchEnd = useCallback(
     (event: React.TouchEvent<HTMLDivElement>) => {
-      if (disabled) return
+      if (modeSwitchLocked) return
 
       const endX = event.changedTouches[0]?.clientX ?? 0
       const deltaX = endX - touchStartXRef.current
@@ -46,33 +119,35 @@ export default function RecordingModeCarousel({
         onChange('video')
       }
     },
-    [disabled, onChange, value],
+    [modeSwitchLocked, onChange, value],
   )
 
   return (
     <div
-      className={`mode-selector ${disabled ? 'pointer-events-none opacity-50' : ''}`}
-      role="tablist"
+      className={`record-carousel-viewport ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+      role="group"
       aria-label="Recording mode"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {MODES.map((mode) => {
-        const active = value === mode.id
-        return (
-          <button
-            key={mode.id}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            disabled={disabled}
-            onClick={() => handleModeClick(mode.id)}
-            className={`mode-selector-item ${active ? 'mode-selector-item--active' : ''}`}
-          >
-            {mode.label}
-          </button>
-        )
-      })}
+      <div className="record-carousel-track">
+        <ModeSlot
+          mode="video"
+          position={slotPosition('video', value)}
+          isRecording={isRecording && value === 'video'}
+          ready={ready}
+          modeSwitchLocked={modeSwitchLocked}
+          onActivate={() => handleSlotActivate('video')}
+        />
+        <ModeSlot
+          mode="audio"
+          position={slotPosition('audio', value)}
+          isRecording={isRecording && value === 'audio'}
+          ready={ready}
+          modeSwitchLocked={modeSwitchLocked}
+          onActivate={() => handleSlotActivate('audio')}
+        />
+      </div>
     </div>
   )
 }
