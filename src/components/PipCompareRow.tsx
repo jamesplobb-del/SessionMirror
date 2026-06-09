@@ -1,6 +1,6 @@
 import { useRef, type RefObject } from 'react'
 import PipWindow from './PipWindow'
-import { useDragToPin } from '../hooks/useDragToPin'
+import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 
@@ -10,12 +10,15 @@ interface PipCompareRowProps {
   suspendPipPlayback: boolean
   benchmarkPipVideoRef: RefObject<HTMLMediaElement | null>
   challengerPipVideoRef: RefObject<HTMLMediaElement | null>
+  deleteDropRef: RefObject<HTMLElement | null>
   onPinBenchmark: (takeId: string) => void
+  onDeleteTake: (takeId: string) => void
   onUnpinBenchmark: () => void
   onUnpinChallenger: () => void
   onUploadBenchmark: (file: File) => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
+  onDragStateChange?: (state: PipDragUiState) => void
   hapticFeedback?: boolean
 }
 
@@ -23,10 +26,12 @@ function PipDragGhost({
   take,
   x,
   y,
+  overDelete,
 }: {
   take: Take
   x: number
   y: number
+  overDelete: boolean
 }) {
   const poster =
     take.thumbnailUrl ||
@@ -42,7 +47,13 @@ function PipDragGhost({
       }}
       aria-hidden
     >
-      <div className="pip-drag-ghost-inner overflow-hidden rounded-xl border border-sky-400/60 bg-stone-900 shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ring-sky-400/40">
+      <div
+        className={`pip-drag-ghost-inner overflow-hidden rounded-xl border bg-stone-900 shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
+          overDelete
+            ? 'border-red-400/70 ring-red-400/50'
+            : 'border-sky-400/60 ring-sky-400/40'
+        }`}
+      >
         {poster ? (
           <img
             src={poster}
@@ -53,8 +64,12 @@ function PipDragGhost({
         ) : (
           <div className="h-full w-full bg-stone-800" />
         )}
-        <span className="absolute bottom-1 left-1 rounded bg-sky-500/90 px-1 py-px text-[7px] font-semibold uppercase tracking-wide text-white">
-          Pin
+        <span
+          className={`absolute bottom-1 left-1 rounded px-1 py-px text-[7px] font-semibold uppercase tracking-wide text-white ${
+            overDelete ? 'bg-red-500/90' : 'bg-sky-500/90'
+          }`}
+        >
+          {overDelete ? 'Delete' : 'Pin'}
         </span>
       </div>
     </div>
@@ -67,12 +82,15 @@ export default function PipCompareRow({
   suspendPipPlayback,
   benchmarkPipVideoRef,
   challengerPipVideoRef,
+  deleteDropRef,
   onPinBenchmark,
+  onDeleteTake,
   onUnpinBenchmark,
   onUnpinChallenger,
   onUploadBenchmark,
   onExpandBenchmark,
   onExpandChallenger,
+  onDragStateChange,
   hapticFeedback = true,
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
@@ -80,8 +98,11 @@ export default function PipCompareRow({
   const { ghost, isDragging, isArming, dragSourceProps } = useDragToPin({
     sourceTakeId: challengerTake?.id ?? null,
     dropTargetRef: benchmarkDropRef,
+    deleteDropTargetRef: deleteDropRef,
     onPin: onPinBenchmark,
+    onDelete: onDeleteTake,
     onTap: onExpandChallenger,
+    onDragStateChange,
     enabled: Boolean(challengerTake?.videoUrl),
     hapticFeedback,
   })
@@ -104,7 +125,7 @@ export default function PipCompareRow({
             onUnpin={onUnpinBenchmark}
             onUpload={onUploadBenchmark}
             onExpand={benchmarkTake?.videoUrl ? onExpandBenchmark : undefined}
-            dropHighlight={ghost?.overTarget ?? false}
+            dropHighlight={ghost?.overPin ?? false}
           />
         </div>
 
@@ -131,7 +152,12 @@ export default function PipCompareRow({
       </div>
 
       {ghost && challengerTake && (
-        <PipDragGhost take={challengerTake} x={ghost.x} y={ghost.y} />
+        <PipDragGhost
+          take={challengerTake}
+          x={ghost.x}
+          y={ghost.y}
+          overDelete={ghost.overDelete}
+        />
       )}
     </>
   )

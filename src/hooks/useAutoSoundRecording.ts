@@ -6,6 +6,8 @@ import { volumeThresholdToLevel } from '../utils/appSettings'
 const POLL_INTERVAL_MS = 8
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 250
+const START_LATCH_MS = 3000
+const WARM_RETRY_MS = 2000
 
 interface UseAutoSoundRecordingOptions {
   enabled: boolean
@@ -44,9 +46,12 @@ export function useAutoSoundRecording({
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const pollTimerRef = useRef<number | null>(null)
+  const warmRetryTimerRef = useRef<number | null>(null)
   const silenceSinceRef = useRef<number | null>(null)
   const recordingStartedAtRef = useRef<number | null>(null)
   const autoTriggeredRef = useRef(false)
+  const startLatchRef = useRef(false)
+  const startLatchTimerRef = useRef<number | null>(null)
   const cooldownUntilRef = useRef(0)
   const isRecordingRef = useRef(isRecording)
   const startRecordingRef = useRef(startRecording)
@@ -70,11 +75,36 @@ export function useAutoSoundRecording({
   const shouldMonitor =
     enabled && monitoringAllowed && recordingMode === 'audio' && ready
 
+  const clearStartLatch = () => {
+    startLatchRef.current = false
+    if (startLatchTimerRef.current !== null) {
+      window.clearTimeout(startLatchTimerRef.current)
+      startLatchTimerRef.current = null
+    }
+  }
+
+  const armStartLatch = () => {
+    clearStartLatch()
+    startLatchRef.current = true
+    startLatchTimerRef.current = window.setTimeout(() => {
+      startLatchRef.current = false
+      startLatchTimerRef.current = null
+      void warmRecorderRef.current()
+    }, START_LATCH_MS)
+  }
+
   const teardownMonitor = () => {
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
     }
+
+    if (warmRetryTimerRef.current !== null) {
+      window.clearInterval(warmRetryTimerRef.current)
+      warmRetryTimerRef.current = null
+    }
+
+    clearStartLatch()
 
     try {
       sourceRef.current?.disconnect()
@@ -102,9 +132,19 @@ export function useAutoSoundRecording({
   }, [shouldMonitor])
 
   useEffect(() => {
-    if (wasRecordingRef.current && !isRecording && shouldMonitor) {
-      void warmRecorderRef.current()
+    if (isRecording) {
+      clearStartLatch()
+      return
     }
+
+    if (wasRecordingRef.current && shouldMonitor) {
+      autoTriggeredRef.current = false
+      clearStartLatch()
+      window.setTimeout(() => {
+        void warmRecorderRef.current()
+      }, 350)
+    }
+
     wasRecordingRef.current = isRecording
   }, [isRecording, shouldMonitor])
 
@@ -155,8 +195,9 @@ export function useAutoSoundRecording({
         const now = performance.now()
         if (now < cooldownUntilRef.current) return
 
-        if (audioContextRef.current?.state === 'suspended') {
-          void audioContextRef.current.resume().catch(() => {})
+        const ctx = audioContextRef.current
+        if (ctx?.state === 'suspended') {
+          void ctx.resume().catch(() => {})
         }
 
         const level = readAnalyserLevel(analyserRef.current)
@@ -166,8 +207,9 @@ export function useAutoSoundRecording({
           silenceSinceRef.current = null
           recordingStartedAtRef.current = null
 
-          if (aboveGate) {
+          if (aboveGate && !startLatchRef.current) {
             autoTriggeredRef.current = true
+            armStartLatch()
             startRecordingRef.current()
           }
 
@@ -199,6 +241,11 @@ export function useAutoSoundRecording({
       }
 
       pollTimerRef.current = window.setInterval(tick, POLL_INTERVAL_MS)
+
+      warmRetryTimerRef.current = window.setInterval(() => {
+        if (cancelled || isRecordingRef.current || startLatchRef.current) return
+        void warmRecorderRef.current()
+      }, WARM_RETRY_MS)
     }
 
     void setup()

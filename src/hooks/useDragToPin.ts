@@ -19,14 +19,24 @@ function pointInRect(x: number, y: number, rect: DOMRect): boolean {
 export interface DragGhostState {
   x: number
   y: number
-  overTarget: boolean
+  overPin: boolean
+  overDelete: boolean
+}
+
+export interface PipDragUiState {
+  isDragging: boolean
+  isArming: boolean
+  overDelete: boolean
 }
 
 interface UseDragToPinOptions {
   sourceTakeId: string | null
   dropTargetRef: RefObject<HTMLElement | null>
+  deleteDropTargetRef?: RefObject<HTMLElement | null>
   onPin: (takeId: string) => void
+  onDelete?: (takeId: string) => void
   onTap?: () => void
+  onDragStateChange?: (state: PipDragUiState) => void
   enabled: boolean
   hapticFeedback?: boolean
 }
@@ -34,8 +44,11 @@ interface UseDragToPinOptions {
 export function useDragToPin({
   sourceTakeId,
   dropTargetRef,
+  deleteDropTargetRef,
   onPin,
+  onDelete,
   onTap,
+  onDragStateChange,
   enabled,
   hapticFeedback = true,
 }: UseDragToPinOptions) {
@@ -46,6 +59,19 @@ export function useDragToPin({
   const longPressTimerRef = useRef<number | null>(null)
   const [ghost, setGhost] = useState<DragGhostState | null>(null)
   const [isArming, setIsArming] = useState(false)
+  const onDragStateChangeRef = useRef(onDragStateChange)
+  onDragStateChangeRef.current = onDragStateChange
+
+  const emitDragState = useCallback(
+    (isDragging: boolean, isArmingState: boolean, overDelete: boolean) => {
+      onDragStateChangeRef.current?.({
+        isDragging,
+        isArming: isArmingState,
+        overDelete,
+      })
+    },
+    [],
+  )
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -61,7 +87,8 @@ export function useDragToPin({
     pointerIdRef.current = null
     setIsArming(false)
     setGhost(null)
-  }, [clearLongPressTimer])
+    emitDragState(false, false, false)
+  }, [clearLongPressTimer, emitDragState])
 
   useEffect(() => {
     if (!isArming && !ghost) return
@@ -71,6 +98,21 @@ export function useDragToPin({
       document.body.classList.remove('pip-drag-active')
     }
   }, [ghost, isArming])
+
+  const resolveDropTargets = useCallback(
+    (clientX: number, clientY: number) => {
+      const pinRect = dropTargetRef.current?.getBoundingClientRect()
+      const deleteRect = deleteDropTargetRef?.current?.getBoundingClientRect()
+      const overDelete = deleteRect
+        ? pointInRect(clientX, clientY, deleteRect)
+        : false
+      const overPin =
+        !overDelete && pinRect ? pointInRect(clientX, clientY, pinRect) : false
+
+      return { overPin, overDelete }
+    },
+    [deleteDropTargetRef, dropTargetRef],
+  )
 
   const handlePointerDown = useCallback(
     (event: PointerEvent<HTMLElement>) => {
@@ -89,12 +131,13 @@ export function useDragToPin({
       longPressTimerRef.current = window.setTimeout(() => {
         armedRef.current = true
         setIsArming(true)
+        emitDragState(false, true, false)
         if (hapticFeedback) {
           void triggerSelectionHaptic()
         }
       }, LONG_PRESS_MS)
     },
-    [clearLongPressTimer, enabled, hapticFeedback, sourceTakeId],
+    [clearLongPressTimer, emitDragState, enabled, hapticFeedback, sourceTakeId],
   )
 
   const handlePointerMove = useCallback(
@@ -127,18 +170,25 @@ export function useDragToPin({
 
       event.preventDefault()
 
-      const rect = dropTargetRef.current?.getBoundingClientRect()
-      const overTarget = rect
-        ? pointInRect(event.clientX, event.clientY, rect)
-        : false
+      const { overPin, overDelete } = resolveDropTargets(
+        event.clientX,
+        event.clientY,
+      )
 
       setGhost({
         x: event.clientX,
         y: event.clientY,
-        overTarget,
+        overPin,
+        overDelete,
       })
+      emitDragState(true, false, overDelete)
     },
-    [clearLongPressTimer, dropTargetRef, hapticFeedback],
+    [
+      clearLongPressTimer,
+      emitDragState,
+      hapticFeedback,
+      resolveDropTargets,
+    ],
   )
 
   const handlePointerEnd = useCallback(
@@ -156,11 +206,13 @@ export function useDragToPin({
       const distance = Math.hypot(deltaX, deltaY)
 
       if (draggingRef.current && sourceTakeId) {
-        const rect = dropTargetRef.current?.getBoundingClientRect()
-        const overTarget = rect
-          ? pointInRect(event.clientX, event.clientY, rect)
-          : false
-        if (overTarget) {
+        const { overPin, overDelete } = resolveDropTargets(
+          event.clientX,
+          event.clientY,
+        )
+        if (overDelete) {
+          onDelete?.(sourceTakeId)
+        } else if (overPin) {
           onPin(sourceTakeId)
         }
       } else if (
@@ -173,7 +225,15 @@ export function useDragToPin({
 
       reset()
     },
-    [clearLongPressTimer, dropTargetRef, onPin, onTap, reset, sourceTakeId],
+    [
+      clearLongPressTimer,
+      onDelete,
+      onPin,
+      onTap,
+      reset,
+      resolveDropTargets,
+      sourceTakeId,
+    ],
   )
 
   return {

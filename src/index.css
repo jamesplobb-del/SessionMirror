@@ -211,6 +211,19 @@ body.pip-drag-active * {
   touch-action: pan-y;
 }
 
+.record-delete-drop {
+  width: 9.5rem;
+  height: 56px;
+}
+
+.record-delete-drop--active {
+  pointer-events: none;
+}
+
+.record-delete-drop--hover {
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.45));
+}
+
 .record-carousel-viewport--locked {
   opacity: 0.85;
 }

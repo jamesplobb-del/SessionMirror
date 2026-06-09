@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
+import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
 import TakeVaultDrawer from './components/TakeVaultDrawer'
 import SettingsDrawer from './components/SettingsDrawer'
@@ -68,10 +69,16 @@ export default function App() {
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [windowHeight, setWindowHeight] = useState(() => window.innerHeight)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [pipDragState, setPipDragState] = useState<PipDragUiState>({
+    isDragging: false,
+    isArming: false,
+    overDelete: false,
+  })
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const pendingAutoPlaybackRef = useRef(false)
   const autoPlaybackTakeIdRef = useRef<string | null>(null)
+  const recordDeleteDropRef = useRef<HTMLDivElement>(null)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -527,6 +534,14 @@ export default function App() {
     [removeTakeResources, takes],
   )
 
+  const handleDragDeleteTake = useCallback(
+    (id: string) => {
+      pausePipVideos()
+      handleDeleteTakes([id])
+    },
+    [handleDeleteTakes, pausePipVideos],
+  )
+
   const handleDeleteTake = useCallback(
     (id: string) => {
       handleDeleteTakes([id])
@@ -598,7 +613,9 @@ export default function App() {
             suspendPipPlayback={suspendPipPlayback}
             benchmarkPipVideoRef={benchmarkPipVideoRef}
             challengerPipVideoRef={challengerPipVideoRef}
+            deleteDropRef={recordDeleteDropRef}
             onPinBenchmark={handlePinBenchmark}
+            onDeleteTake={handleDragDeleteTake}
             onUnpinBenchmark={() => setBenchmarkId(null)}
             onUnpinChallenger={() => setChallengerId(null)}
             onUploadBenchmark={handleUploadBenchmark}
@@ -612,6 +629,7 @@ export default function App() {
                 ? () => handleOpenCompareReview('challenger')
                 : undefined
             }
+            onDragStateChange={setPipDragState}
             hapticFeedback={settings.hapticFeedback}
           />
 
@@ -626,6 +644,9 @@ export default function App() {
             onOpenSettings={handleOpenSettings}
             takeCount={takes.length}
             autoSoundListening={autoSoundListening}
+            recordDropRef={recordDeleteDropRef}
+            dragDeleteActive={pipDragState.isDragging}
+            dragOverDelete={pipDragState.overDelete}
           />
         </div>
       </div>

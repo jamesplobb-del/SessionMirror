@@ -1,4 +1,5 @@
-import { FolderOpen, Settings } from 'lucide-react'
+import { FolderOpen, Settings, Trash2 } from 'lucide-react'
+import type { RefObject } from 'react'
 import type { RecordingMode } from '../types'
 import RecordingModeCarousel from './RecordingModeCarousel'
 
@@ -13,6 +14,9 @@ interface ControlDeckProps {
   onOpenSettings: () => void
   takeCount: number
   autoSoundListening?: boolean
+  recordDropRef?: RefObject<HTMLDivElement | null>
+  dragDeleteActive?: boolean
+  dragOverDelete?: boolean
 }
 
 function formatElapsed(seconds: number): string {
@@ -32,7 +36,12 @@ export default function ControlDeck({
   onOpenSettings,
   takeCount,
   autoSoundListening = false,
+  recordDropRef,
+  dragDeleteActive = false,
+  dragOverDelete = false,
 }: ControlDeckProps) {
+  const showDeleteDrop = dragDeleteActive && !isRecording
+
   return (
     <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
       <div className="relative flex w-full max-w-xs items-center justify-center">
@@ -60,15 +69,40 @@ export default function ControlDeck({
         </button>
 
         <div className="flex flex-col items-center gap-1">
-          <RecordingModeCarousel
-            value={recordingMode}
-            onChange={onRecordingModeChange}
-            onToggleRecord={onToggleRecord}
-            isRecording={isRecording}
-            ready={ready}
-          />
+          <div
+            ref={recordDropRef}
+            className={`record-delete-drop ${showDeleteDrop ? 'record-delete-drop--active' : ''} ${
+              dragOverDelete ? 'record-delete-drop--hover' : ''
+            }`}
+            aria-hidden={!showDeleteDrop}
+          >
+            {showDeleteDrop ? (
+              <div
+                className="record-carousel-viewport flex items-center justify-center pointer-events-none"
+                aria-label="Drop to delete take"
+              >
+                <div
+                  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition-transform duration-150 ${
+                    dragOverDelete
+                      ? 'scale-110 border-white/80 bg-red-600 shadow-[0_0_24px_rgba(239,68,68,0.55)]'
+                      : 'border-red-300/50 bg-red-500/85 shadow-lg'
+                  }`}
+                >
+                  <Trash2 className="h-6 w-6 text-white" strokeWidth={2.25} />
+                </div>
+              </div>
+            ) : (
+              <RecordingModeCarousel
+                value={recordingMode}
+                onChange={onRecordingModeChange}
+                onToggleRecord={onToggleRecord}
+                isRecording={isRecording}
+                ready={ready}
+              />
+            )}
+          </div>
 
-          {autoSoundListening && !isRecording && (
+          {autoSoundListening && !isRecording && !showDeleteDrop && (
             <span className="text-[10px] font-medium tracking-wide text-sky-300/90">
               Listening…
             </span>

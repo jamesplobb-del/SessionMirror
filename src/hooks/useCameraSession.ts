@@ -109,6 +109,7 @@ export function useCameraSession({
     mimeType: string
   } | null>(null)
   const warmAutoAudioInFlightRef = useRef(false)
+  const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
   onCompleteRef.current = onRecordingComplete
 
   const [error, setError] = useState<string | null>(null)
@@ -417,6 +418,7 @@ export function useCameraSession({
             }
           } finally {
             setIsRecording(false)
+            scheduleWarmAutoAudioRef.current()
           }
         })().catch(() => {
           setIsRecording(false)
@@ -496,6 +498,13 @@ export function useCameraSession({
     }
   }, [bindRecordingHandlers, ensureRecordableStream])
 
+  scheduleWarmAutoAudioRef.current = () => {
+    if (recordingModeRef.current !== 'audio') return
+    window.setTimeout(() => {
+      void warmAutoAudioRecorder()
+    }, 350)
+  }
+
   const startRecording = useCallback(() => {
     if (isRecording) return
 
@@ -565,11 +574,12 @@ export function useCameraSession({
         return
       } catch {
         void disarmAutoAudioRecorder()
+        void warmAutoAudioRecorder()
       }
     }
 
     startRecording()
-  }, [disarmAutoAudioRecorder, startRecording])
+  }, [disarmAutoAudioRecorder, startRecording, warmAutoAudioRecorder])
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current
