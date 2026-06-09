@@ -46,6 +46,14 @@ select {
   -webkit-touch-callout: default;
 }
 
+.app-pip-row {
+  overflow: visible;
+}
+
+.pip-video-container {
+  overflow: visible;
+}
+
 .app-shell,
 .app-hud-layer,
 .app-hud-bottom,
@@ -88,11 +96,13 @@ select {
     flex: 0 1 auto;
     justify-content: center;
     gap: 0.625rem;
+    overflow: visible;
   }
 
   .app-pip-row > * {
     width: 7.5rem;
     max-width: 30vw;
+    overflow: visible;
   }
 
   .review-overlay .review-timeline-overlay {

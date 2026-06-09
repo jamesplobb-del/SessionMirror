@@ -21,8 +21,8 @@ interface PipWindowProps {
   className?: string
 }
 
-/** Expands touch target to ~44px without shifting sibling layout. */
-const PIP_ICON_HIT = 'p-3 -m-3'
+const FLOAT_BADGE =
+  'pointer-events-auto absolute z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/80 text-white shadow-[0_2px_10px_rgba(0,0,0,0.5)] backdrop-blur-md transition hover:bg-black/95'
 
 export default function PipWindow({
   src,
@@ -98,13 +98,11 @@ export default function PipWindow({
     [onUpload],
   )
 
-  const uploadLabelClass =
-    variant === 'benchmark' && !src
-      ? 'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
-      : 'relative z-10 flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white'
+  const emptyUploadClass =
+    'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
 
   const pipTouchTargetClass =
-    'pointer-events-auto z-30 flex min-h-11 min-w-11 items-center justify-center p-3'
+    'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
   const pipTouchIconClass =
     'flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70'
 
@@ -117,72 +115,75 @@ export default function PipWindow({
 
   return (
     <div
-      className={`pip-video-container group w-32 overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-opacity duration-200 ease-in sm:w-36 ${accentRing} ${src ? 'opacity-100' : 'opacity-90'} ${className}`}
+      className={`pip-video-container group relative w-32 sm:w-36 ${className}`}
     >
-      <div className="flex items-center justify-between gap-1 px-2 py-1">
-        <span
-          className={`min-w-0 truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
+      {variant === 'benchmark' && onUpload && (
+        <input
+          type="file"
+          accept="video/*"
+          id="benchmark-upload"
+          onChange={handleFileChange}
+          className="sr-only"
+          aria-hidden
+          tabIndex={-1}
+        />
+      )}
+
+      {variant === 'benchmark' && onUpload && src && (
+        <label
+          htmlFor="benchmark-upload"
+          {...touchBubbleBlockProps()}
+          className={FLOAT_BADGE}
+          style={{ top: -12, left: -12 }}
+          aria-label="Upload best take video"
         >
-          {label}
-        </span>
-        <div className="flex shrink-0 items-center gap-1">
-          {variant === 'benchmark' && onUpload && (
-            <>
-              <input
-                type="file"
-                accept="video/*"
-                id="benchmark-upload"
-                onChange={handleFileChange}
-                className="sr-only"
-                aria-hidden
-                tabIndex={-1}
-              />
-              {src && (
-                <label
-                  htmlFor="benchmark-upload"
-                  {...touchBubbleBlockProps()}
-                  className={`${uploadLabelClass} ${PIP_ICON_HIT}`}
-                  aria-label="Upload best take video"
-                >
-                  <Upload className="h-2.5 w-2.5" />
-                </label>
-              )}
-            </>
-          )}
-          {src && (
-            <button
-              type="button"
-              onClick={(e) => {
-                blockTouchBubble(e)
-                onUnpin()
-              }}
-              {...touchBubbleBlockProps()}
-              className={`relative z-10 flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white ${PIP_ICON_HIT}`}
-              aria-label={`Unload ${label}`}
-            >
-              <X className="h-2.5 w-2.5" />
-            </button>
-          )}
+          <Upload className="h-3.5 w-3.5" />
+        </label>
+      )}
+
+      {src && (
+        <button
+          type="button"
+          onClick={(e) => {
+            blockTouchBubble(e)
+            onUnpin()
+          }}
+          {...touchBubbleBlockProps()}
+          className={FLOAT_BADGE}
+          style={{ top: -12, right: -12 }}
+          aria-label={`Unload ${label}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+
+      <div
+        className={`overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-opacity duration-200 ease-in ${accentRing} ${src ? 'opacity-100' : 'opacity-90'}`}
+      >
+        <div className="px-2 py-1">
+          <span
+            className={`inline-block max-w-full truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
+          >
+            {label}
+          </span>
         </div>
-      </div>
 
-      <div className="relative aspect-video bg-black/30">
-        {src ? (
-          <>
-            <TakeVideoPlayer
-              filePath={filePath}
-              videoUrl={src}
-              mimeType={mimeType}
-              videoRef={videoRef}
-              videoSourceKey={videoSourceKey}
-              className="h-full w-full object-cover pointer-events-none"
-              loadingClassName="h-full w-full bg-black/30"
-              mirror={mirror}
-              controls={false}
-              manualPlayOnly
-            />
+        <div className="relative aspect-video overflow-hidden bg-black/30">
+          {src ? (
+            <>
+              <TakeVideoPlayer
+                filePath={filePath}
+                videoUrl={src}
+                mimeType={mimeType}
+                videoRef={videoRef}
+                videoSourceKey={videoSourceKey}
+                className="h-full w-full object-cover pointer-events-none"
+                loadingClassName="h-full w-full bg-black/30"
+                mirror={mirror}
+                controls={false}
+                manualPlayOnly
+              />
 
-            <div className="absolute inset-0 z-20 pointer-events-none">
               {onExpand && (
                 <button
                   type="button"
@@ -190,66 +191,67 @@ export default function PipWindow({
                   onTouchStart={blockTouchBubble}
                   onClick={handleExpand}
                   onTouchEnd={handleExpand}
-                  className={`${pipTouchTargetClass} absolute right-0 top-0`}
+                  className="pointer-events-auto absolute z-20 flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)] backdrop-blur-sm transition hover:bg-black/90"
+                  style={{ top: 8, right: 8 }}
                   aria-label={`Expand ${label} to full screen`}
                 >
-                  <span className={pipTouchIconClass}>
-                    <Maximize2 className="h-3 w-3" />
-                  </span>
+                  <Maximize2 className="h-3 w-3" />
                 </button>
               )}
 
-              <button
-                type="button"
-                onPointerDown={stopEventBubble}
-                onTouchStart={stopEventBubble}
-                onTouchEnd={stopEventBubble}
-                onClick={handlePlayPauseClick}
-                className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
-                aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
-              >
-                <span className={pipTouchIconClass}>
-                  {isPlaying ? (
-                    <Pause className="h-3 w-3 fill-white" />
-                  ) : (
-                    <Play className="h-3 w-3 fill-white" />
-                  )}
-                </span>
-              </button>
-            </div>
-
-            {takeName && (
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[5] bg-gradient-to-t from-black/70 to-transparent px-2 pb-1 pt-4">
-                <p className="truncate text-[9px] font-medium text-white">{takeName}</p>
+              <div className="absolute inset-0 z-[5] pointer-events-none">
+                <button
+                  type="button"
+                  onPointerDown={stopEventBubble}
+                  onTouchStart={stopEventBubble}
+                  onTouchEnd={stopEventBubble}
+                  onClick={handlePlayPauseClick}
+                  className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+                  aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
+                >
+                  <span className={pipTouchIconClass}>
+                    {isPlaying ? (
+                      <Pause className="h-3 w-3 fill-white" />
+                    ) : (
+                      <Play className="h-3 w-3 fill-white" />
+                    )}
+                  </span>
+                </button>
               </div>
-            )}
 
-            <div
-              className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
-              onClick={(e) => e.stopPropagation()}
-              {...touchBubbleBlockProps()}
-            >
-              <MiniPipControls
-                isPlaying={isPlaying}
-                volume={volume}
-                onPlayPauseClick={handlePlayPauseClick}
-                onVolumeChange={handleVolume}
-              />
+              {takeName && (
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[4] bg-gradient-to-t from-black/70 to-transparent px-2 pb-1 pt-4">
+                  <p className="truncate text-[9px] font-medium text-white">{takeName}</p>
+                </div>
+              )}
+
+              <div
+                className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
+                onClick={(e) => e.stopPropagation()}
+                {...touchBubbleBlockProps()}
+              >
+                <MiniPipControls
+                  isPlaying={isPlaying}
+                  volume={volume}
+                  onPlayPauseClick={handlePlayPauseClick}
+                  onVolumeChange={handleVolume}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-2">
+              <p className="text-center text-[8px] leading-snug text-white/50">
+                {emptyMessage}
+              </p>
+              {variant === 'benchmark' && onUpload && (
+                <label htmlFor="benchmark-upload" className={emptyUploadClass}>
+                  <Upload className="h-3 w-3" />
+                  Upload Best Take
+                </label>
+              )}
             </div>
-          </>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-2">
-            <p className="text-center text-[8px] leading-snug text-white/50">
-              {emptyMessage}
-            </p>
-            {variant === 'benchmark' && onUpload && (
-              <label htmlFor="benchmark-upload" className={uploadLabelClass}>
-                <Upload className="h-3 w-3" />
-                Upload Best Take
-              </label>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
