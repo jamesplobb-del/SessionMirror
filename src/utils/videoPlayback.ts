@@ -26,3 +26,16 @@ export function resetVideosInContainer(container: HTMLElement | null | undefined
     resetVideoPlayback(element as HTMLMediaElement)
   })
 }
+
+/** Release vault decoders on iOS so the live camera can resume. */
+export function teardownVideosInContainer(container: HTMLElement | null | undefined): void {
+  container?.querySelectorAll('video, audio').forEach((element) => {
+    const media = element as HTMLMediaElement
+    media.pause()
+    media.removeAttribute('src')
+    if ('srcObject' in media) {
+      media.srcObject = null
+    }
+    media.load()
+  })
+}

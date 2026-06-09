@@ -6,7 +6,7 @@ import GallerySortStrip from './GallerySortStrip'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import VaultMediaSegment from './VaultMediaSegment'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
-import { resetVideosInContainer } from '../utils/videoPlayback'
+import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, shareTakeVideo } from '../utils/shareTakeVideo'
 import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, isAudioTake } from '../utils/mediaType'
@@ -33,7 +33,7 @@ interface TakeVaultDrawerProps {
   projects: Project[]
   activeProject: Project | null
   onSelectProject: (projectId: string) => void
-  onCreateProject: () => void
+  onCreateProject: (name: string) => void | Promise<void>
   takes: Take[]
   sortedTakes: Take[]
   sortMode: SortMode
@@ -124,15 +124,15 @@ export default function TakeVaultDrawer({
 
   useEffect(() => {
     if (!isOpen) {
-      silenceAllVaultVideos()
+      teardownVideosInContainer(drawerRef.current)
     }
-  }, [isOpen, silenceAllVaultVideos])
+  }, [isOpen])
 
   useEffect(() => {
     return () => {
-      silenceAllVaultVideos()
+      teardownVideosInContainer(drawerRef.current)
     }
-  }, [silenceAllVaultVideos])
+  }, [])
 
   return (
     <>

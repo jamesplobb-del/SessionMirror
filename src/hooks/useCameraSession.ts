@@ -26,6 +26,7 @@ const CAMERA_INIT_RETRY_MS = 450
 const CAMERA_RELEASE_DELAY_MS = 700
 const FOREGROUND_RESTART_DELAY_MS = 250
 const IOS_CAMERA_RELEASE_DELAY_MS = 250
+const BACKGROUND_SUSPEND_DELAY_MS = 500
 
 function detachPreviewStream(video: HTMLVideoElement | null) {
   if (!video) return
@@ -95,6 +96,7 @@ export function useCameraSession({
   const resumeInFlightRef = useRef(false)
   const foregroundRestartTokenRef = useRef(0)
   const foregroundRestartTimerRef = useRef<number | null>(null)
+  const backgroundSuspendTimerRef = useRef<number | null>(null)
   const releaseTimerRef = useRef<number | null>(null)
   const elapsedRef = useRef(0)
   const onCompleteRef = useRef(onRecordingComplete)
@@ -519,6 +521,11 @@ export function useCameraSession({
   }, [acquireStream, cancelScheduledRelease, releaseLiveStream])
 
   const scheduleForegroundRecovery = useCallback(() => {
+    if (backgroundSuspendTimerRef.current !== null) {
+      window.clearTimeout(backgroundSuspendTimerRef.current)
+      backgroundSuspendTimerRef.current = null
+    }
+
     if (foregroundRestartTimerRef.current !== null) {
       window.clearTimeout(foregroundRestartTimerRef.current)
     }
@@ -529,6 +536,36 @@ export function useCameraSession({
     }, FOREGROUND_RESTART_DELAY_MS)
   }, [restartCameraAfterForeground])
 
+  const scheduleBackgroundSuspend = useCallback(() => {
+    if (backgroundSuspendTimerRef.current !== null) {
+      window.clearTimeout(backgroundSuspendTimerRef.current)
+    }
+
+    backgroundSuspendTimerRef.current = window.setTimeout(() => {
+      backgroundSuspendTimerRef.current = null
+      suspendCameraForBackground()
+    }, BACKGROUND_SUSPEND_DELAY_MS)
+  }, [suspendCameraForBackground])
+
+  const refreshCameraSession = useCallback(async () => {
+    if (isRecordingRef.current || resumeInFlightRef.current) return
+
+    cancelScheduledRelease()
+    applyViewportCssVarsOnResume()
+
+    const mode = recordingModeRef.current
+    const stream = streamRef.current
+
+    if (!isStreamRecordable(stream, mode)) {
+      await restartCameraAfterForeground()
+      return
+    }
+
+    attachPreviewStream(previewRef.current, stream, mode)
+    refreshCameraPreviewLayout(previewRef.current)
+    setStreamGeneration((generation) => generation + 1)
+  }, [cancelScheduledRelease, restartCameraAfterForeground])
+
   useEffect(() => {
     const bindAppLifecycle = async () => {
       if (Capacitor.isNativePlatform()) {
@@ -538,7 +575,7 @@ export function useCameraSession({
             scheduleForegroundRecovery()
             return
           }
-          suspendCameraForBackground()
+          scheduleBackgroundSuspend()
         })
       }
 
@@ -547,7 +584,7 @@ export function useCameraSession({
           scheduleForegroundRecovery()
           return
         }
-        suspendCameraForBackground()
+        scheduleBackgroundSuspend()
       }
 
       document.addEventListener('visibilitychange', onVisibilityChange)
@@ -571,10 +608,14 @@ export function useCameraSession({
         window.clearTimeout(foregroundRestartTimerRef.current)
         foregroundRestartTimerRef.current = null
       }
+      if (backgroundSuspendTimerRef.current !== null) {
+        window.clearTimeout(backgroundSuspendTimerRef.current)
+        backgroundSuspendTimerRef.current = null
+      }
       foregroundRestartTokenRef.current += 1
       removeListener?.()
     }
-  }, [scheduleForegroundRecovery, suspendCameraForBackground])
+  }, [scheduleBackgroundSuspend, scheduleForegroundRecovery, suspendCameraForBackground])
 
   return {
     previewRef,
@@ -587,5 +628,6 @@ export function useCameraSession({
     recordingMode,
     changeRecordingMode,
     toggleRecording,
+    refreshCameraSession,
   }
 }

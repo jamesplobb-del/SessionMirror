@@ -113,10 +113,7 @@ export default function App() {
     [pausePipVideos, reloadProjectTakes],
   )
 
-  const handleCreateProject = useCallback(async () => {
-    const name = window.prompt('Name this session', 'New Session')
-    if (!name?.trim()) return
-
+  const handleCreateProject = useCallback(async (name: string) => {
     const project = await createProject(name.trim())
     setProjects((prev) => [project, ...prev])
     setActiveProjectId(project.id)
@@ -205,9 +202,23 @@ export default function App() {
     recordingMode,
     changeRecordingMode,
     toggleRecording,
+    refreshCameraSession,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
   })
+
+  const wasVaultOpenRef = useRef(false)
+
+  useEffect(() => {
+    if (wasVaultOpenRef.current && !isVaultOpen) {
+      void refreshCameraSession()
+    }
+    wasVaultOpenRef.current = isVaultOpen
+  }, [isVaultOpen, refreshCameraSession])
+
+  const handleCloseVault = useCallback(() => {
+    setIsVaultOpen(false)
+  }, [])
 
   useEffect(() => {
     if (!ready) return
@@ -413,7 +424,7 @@ export default function App() {
         className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
         aria-hidden={isReviewOpen}
       >
-        <HudHeader />
+        <HudHeader sessionName={activeProject?.name ?? 'BestTake'} />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
           <div className="app-pip-row">
@@ -498,7 +509,7 @@ export default function App() {
 
       <TakeVaultDrawer
         isOpen={isVaultOpen}
-        onClose={() => setIsVaultOpen(false)}
+        onClose={handleCloseVault}
         projects={projects}
         activeProject={activeProject}
         onSelectProject={handleSelectProject}
