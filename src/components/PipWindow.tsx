@@ -134,7 +134,7 @@ export default function PipWindow({
       >
         <span
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
-          style={{ top: 8, left: pillLeft }}
+          style={{ top: 4, left: pillLeft }}
         >
           {label}
         </span>
@@ -197,16 +197,18 @@ export default function PipWindow({
             </div>
           </>
         ) : (
-          <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center gap-2 bg-stone-800/90 px-2">
-            <p className="text-center text-[8px] leading-snug text-white/50">
-              {emptyMessage}
-            </p>
-            {variant === 'benchmark' && onUpload && (
-              <label htmlFor="benchmark-upload" className={emptyUploadClass}>
-                <Upload className="h-3 w-3" />
-                Upload Best Take
-              </label>
-            )}
+          <div className="absolute inset-0 flex flex-col bg-stone-800/90 px-2 pb-2 pt-6">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
+              <p className="text-center text-[8px] leading-snug text-white/50">
+                {emptyMessage}
+              </p>
+              {variant === 'benchmark' && onUpload && (
+                <label htmlFor="benchmark-upload" className={emptyUploadClass}>
+                  <Upload className="h-3 w-3" />
+                  Upload Best Take
+                </label>
+              )}
+            </div>
           </div>
         )}
       </div>
