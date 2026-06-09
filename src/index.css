@@ -258,6 +258,7 @@ select {
   z-index: 0;
   overflow: hidden;
   background: transparent;
+  aspect-ratio: auto !important;
 }
 
 .camera-preview {
@@ -283,6 +284,45 @@ select {
   pointer-events: none;
 }
 
+/* Portrait — force native full-fill, ignore letterboxing */
+@media screen and (orientation: portrait) {
+  .camera-background,
+  .app-shell {
+    aspect-ratio: auto !important;
+  }
+
+  video.camera-preview {
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    transform: none !important;
+    object-fit: cover !important;
+    aspect-ratio: 9 / 19.5 !important;
+  }
+
+  video.camera-preview.camera-preview--mirror {
+    transform: scaleX(-1) !important;
+  }
+}
+
+/* Landscape — keep full-bleed fill */
+@media screen and (orientation: landscape) {
+  .camera-background,
+  .app-shell {
+    aspect-ratio: auto !important;
+  }
+
+  video.camera-preview {
+    width: 100vw !important;
+    height: 100dvh !important;
+    object-fit: cover !important;
+    aspect-ratio: auto !important;
+  }
+}
+
 .camera-background-overlay {
   position: fixed;
   top: 0;
@@ -299,4 +339,5 @@ select {
   min-height: var(--app-height, 100%);
   overflow: hidden;
   background-color: transparent;
+  aspect-ratio: auto !important;
 }
