@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Capacitor } from '@capacitor/core'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
-import PipWindow from './components/PipWindow'
+import PipCompareRow from './components/PipCompareRow'
 import ControlDeck from './components/ControlDeck'
 import TakeVaultDrawer from './components/TakeVaultDrawer'
 import { useCameraSession } from './hooks/useCameraSession'
@@ -442,48 +442,27 @@ export default function App() {
         />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          <div className="app-pip-row">
-            <PipWindow
-              className="pointer-events-auto shrink-0"
-              src={benchmarkTake?.videoUrl ?? null}
-              filePath={benchmarkTake?.filePath}
-              mimeType={benchmarkTake?.videoMimeType ?? 'video/mp4'}
-              takeName={benchmarkTake?.name}
-              label="Best Take"
-              variant="benchmark"
-              emptyMessage="Set or upload a Best Take."
-              mirror={benchmarkTake?.mirrorPlayback !== false}
-              suspendPlayback={suspendPipPlayback}
-              videoRef={benchmarkPipVideoRef}
-              onUnpin={() => setBenchmarkId(null)}
-              onUpload={handleUploadBenchmark}
-              onExpand={
-                benchmarkTake?.videoUrl
-                  ? () => handleOpenCompareReview('benchmark')
-                  : undefined
-              }
-            />
-
-            <PipWindow
-              className="pointer-events-auto shrink-0"
-              src={challengerTake?.videoUrl ?? null}
-              filePath={challengerTake?.filePath}
-              mimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
-              takeName={challengerTake?.name}
-              label="Current Take"
-              variant="challenger"
-              emptyMessage="Load a take from the vault."
-              mirror={challengerTake?.mirrorPlayback !== false}
-              suspendPlayback={suspendPipPlayback}
-              videoRef={challengerPipVideoRef}
-              onUnpin={() => setChallengerId(null)}
-              onExpand={
-                challengerTake?.videoUrl
-                  ? () => handleOpenCompareReview('challenger')
-                  : undefined
-              }
-            />
-          </div>
+          <PipCompareRow
+            benchmarkTake={benchmarkTake}
+            challengerTake={challengerTake}
+            suspendPipPlayback={suspendPipPlayback}
+            benchmarkPipVideoRef={benchmarkPipVideoRef}
+            challengerPipVideoRef={challengerPipVideoRef}
+            onPinBenchmark={handlePinBenchmark}
+            onUnpinBenchmark={() => setBenchmarkId(null)}
+            onUnpinChallenger={() => setChallengerId(null)}
+            onUploadBenchmark={handleUploadBenchmark}
+            onExpandBenchmark={
+              benchmarkTake?.videoUrl
+                ? () => handleOpenCompareReview('benchmark')
+                : undefined
+            }
+            onExpandChallenger={
+              challengerTake?.videoUrl
+                ? () => handleOpenCompareReview('challenger')
+                : undefined
+            }
+          />
 
           <ControlDeck
             isRecording={isRecording}

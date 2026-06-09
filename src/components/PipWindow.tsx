@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
 import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
@@ -19,6 +19,14 @@ interface PipWindowProps {
   onExpand?: () => void
   onUpload?: (file: File) => void
   className?: string
+  dropHighlight?: boolean
+  dragSourceActive?: boolean
+  dragSourceProps?: {
+    onPointerDown: (event: PointerEvent<HTMLElement>) => void
+    onPointerMove: (event: PointerEvent<HTMLElement>) => void
+    onPointerUp: (event: PointerEvent<HTMLElement>) => void
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => void
+  }
 }
 
 const FLOAT_BADGE =
@@ -39,6 +47,9 @@ export default function PipWindow({
   onExpand,
   onUpload,
   className = '',
+  dropHighlight = false,
+  dragSourceActive = false,
+  dragSourceProps,
 }: PipWindowProps) {
   const videoSourceKey = src || filePath || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
@@ -130,7 +141,11 @@ export default function PipWindow({
       )}
 
       <div
-        className={`relative z-0 h-full w-full overflow-hidden rounded-xl border border-white/15 bg-stone-900 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-opacity duration-200 ease-in ${accentRing} ${src ? 'opacity-100' : 'opacity-90'}`}
+        className={`relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
+          src ? 'opacity-100' : 'opacity-90'
+        } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
+          dragSourceActive ? 'pip-drag-source--active' : ''
+        }`}
       >
         <span
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
@@ -155,12 +170,22 @@ export default function PipWindow({
             />
 
             {onExpand && (
-              <button
-                type="button"
-                className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
-                onClick={handleVideoAreaClick}
-                aria-label={`Open ${label} in full screen`}
-              />
+              dragSourceProps ? (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="absolute inset-0 z-[1] cursor-grab touch-none border-0 bg-transparent p-0 active:cursor-grabbing"
+                  aria-label={`Drag ${label} to Best Take or tap to open full screen`}
+                  {...dragSourceProps}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
+                  onClick={handleVideoAreaClick}
+                  aria-label={`Open ${label} in full screen`}
+                />
+              )
             )}
 
             <div className="absolute inset-0 z-[5] pointer-events-none">

@@ -69,6 +69,30 @@ select {
   min-height: calc(8.25rem * 9 / 16);
 }
 
+.pip-drag-source--active {
+  opacity: 0.45;
+  transform: scale(0.96);
+}
+
+.pip-drop-target--active {
+  transform: scale(1.04);
+  box-shadow:
+    0 0 0 2px rgba(251, 191, 36, 0.85),
+    0 8px 28px rgba(251, 191, 36, 0.25);
+}
+
+.pip-drag-ghost-inner {
+  width: 7rem;
+  aspect-ratio: 16 / 9;
+  position: relative;
+}
+
+@media (min-width: 640px) {
+  .pip-drag-ghost-inner {
+    width: 7.75rem;
+  }
+}
+
 @media (min-width: 640px) {
   .pip-video-container {
     width: 9.25rem;
