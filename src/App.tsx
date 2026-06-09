@@ -22,6 +22,7 @@ import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
 import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
+import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
 
 export default function App() {
   const [takes, setTakes] = useState<Take[]>([])
@@ -39,33 +40,8 @@ export default function App() {
 
   const isReviewOpen = reviewSlot !== null
 
-  useEffect(() => {
-    const syncViewport = () => {
-      const height = window.innerHeight
-      setWindowHeight(height)
-      document.documentElement.style.setProperty('--app-height', `${height}px`)
-      document.documentElement.style.height = `${height}px`
-      document.body.style.height = `${height}px`
-      void document.body.offsetHeight
-    }
-
-    const handleOrientationChange = () => {
-      syncViewport()
-      window.setTimeout(syncViewport, 100)
-      window.setTimeout(syncViewport, 300)
-    }
-
-    syncViewport()
-    window.addEventListener('resize', syncViewport)
-    window.addEventListener('orientationchange', handleOrientationChange)
-
-    return () => {
-      window.removeEventListener('resize', syncViewport)
-      window.removeEventListener('orientationchange', handleOrientationChange)
-      document.documentElement.style.removeProperty('--app-height')
-      document.documentElement.style.height = ''
-      document.body.style.height = ''
-    }
+  useLayoutEffect(() => {
+    return scheduleViewportSync(setWindowHeight)
   }, [])
 
   const pausePipVideos = useCallback(() => {
@@ -138,6 +114,20 @@ export default function App() {
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
   })
+
+  useEffect(() => {
+    if (!ready) return
+
+    const syncWhenCameraReady = () => setWindowHeight(applyViewportCssVars())
+    syncWhenCameraReady()
+    const timers = [100, 300, 600].map((delay) =>
+      window.setTimeout(syncWhenCameraReady, delay),
+    )
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [ready])
 
   const suspendPipPlayback = isVaultOpen || isReviewOpen
 

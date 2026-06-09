@@ -263,8 +263,12 @@ video.camera-preview {
   bottom: 0 !important;
   left: 0 !important;
   top: auto !important;
-  width: 100vw !important;
-  height: 100dvh !important;
+  width: var(--viewport-width, 100vw) !important;
+  height: var(
+    --camera-fill-height,
+    calc(100dvh + env(safe-area-inset-bottom, 0px))
+  ) !important;
+  min-height: 100dvh !important;
   min-width: 0 !important;
   min-height: 0 !important;
   transform: none !important;

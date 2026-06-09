@@ -1,6 +1,7 @@
 import { memo, useEffect, type RefObject, type VideoHTMLAttributes } from 'react'
 import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
+import { refreshCameraPreviewLayout } from '../utils/viewportSync'
 import { mobileVideoProps } from '../utils/mobileVideo'
 
 interface LiveCameraBackgroundProps {
@@ -28,6 +29,8 @@ function LiveCameraBackground({
     const video = previewRef.current
     if (!video) return
 
+    refreshCameraPreviewLayout(video)
+
     if (recordingMode === 'audio') {
       if (video.srcObject) {
         video.srcObject = null
@@ -43,6 +46,14 @@ function LiveCameraBackground({
     }
     video.muted = true
     void video.play().catch(() => {})
+
+    const timers = [100, 300].map((delay) =>
+      window.setTimeout(() => refreshCameraPreviewLayout(video), delay),
+    )
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
   }, [previewRef, streamRef, recordingMode, streamGeneration, viewportKey])
 
   return (

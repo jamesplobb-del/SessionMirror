@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'BestTake',
   webDir: 'dist',
   ios: {
-    contentInset: 'automatic',
+    // Edge-to-edge webview; HUD uses env(safe-area-inset-*) for Dynamic Island / home bar.
+    contentInset: 'never',
   },
 }
 
