@@ -48,20 +48,10 @@ export function getRecorderMimeTypeForMode(mode: 'video' | 'audio'): string {
   return mode === 'audio' ? getAudioRecorderMimeType() : getRecorderMimeType()
 }
 
-export function isLandscapeViewport(): boolean {
-  if (typeof window === 'undefined') return false
-  return window.innerWidth > window.innerHeight
-}
-
-/** Front-camera constraints tuned for portrait or landscape recording. */
+/** Full field-of-view front camera — no width/height locks (those crop/zoom on iOS). */
 export function getVideoCaptureConstraints(): MediaTrackConstraints {
-  const landscape = isLandscapeViewport()
-
   return {
     facingMode: 'user',
-    width: { ideal: landscape ? 1920 : 1080, min: 720 },
-    height: { ideal: landscape ? 1080 : 1920, min: 720 },
-    frameRate: { ideal: 30, max: 30 },
   }
 }
 
@@ -103,8 +93,8 @@ export function createMediaRecorder(
 
   const track = stream.getVideoTracks()[0]
   const settings = track?.getSettings()
-  const width = settings?.width ?? (isLandscapeViewport() ? 1920 : 1080)
-  const height = settings?.height ?? (isLandscapeViewport() ? 1080 : 1920)
+  const width = settings?.width ?? 1280
+  const height = settings?.height ?? 720
 
   const qualityOptions: MediaRecorderOptions = {
     mimeType,

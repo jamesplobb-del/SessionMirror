@@ -709,55 +709,6 @@ export function useCameraSession({
   }, [cancelScheduledRelease, restartCameraAfterForeground])
 
   useEffect(() => {
-    if (recordingMode !== 'video') return
-
-    let timer: number | null = null
-
-    const reacquireForOrientation = () => {
-      if (isRecordingRef.current || resumeInFlightRef.current) return
-
-      cancelScheduledRelease()
-      applyViewportCssVarsOnResume()
-      releaseLiveStream()
-
-      void (async () => {
-        if (Capacitor.isNativePlatform()) {
-          await new Promise((resolve) => window.setTimeout(resolve, 200))
-        }
-        if (isRecordingRef.current || recordingModeRef.current !== 'video') return
-
-        try {
-          await acquireStream('video')
-          refreshCameraPreviewLayout(previewRef.current)
-        } catch {
-          /* acquireStream sets error state */
-        }
-      })()
-    }
-
-    const onOrientationChange = () => {
-      if (timer !== null) {
-        window.clearTimeout(timer)
-      }
-      timer = window.setTimeout(() => {
-        timer = null
-        reacquireForOrientation()
-      }, 350)
-    }
-
-    window.addEventListener('orientationchange', onOrientationChange)
-    screen.orientation?.addEventListener('change', onOrientationChange)
-
-    return () => {
-      if (timer !== null) {
-        window.clearTimeout(timer)
-      }
-      window.removeEventListener('orientationchange', onOrientationChange)
-      screen.orientation?.removeEventListener('change', onOrientationChange)
-    }
-  }, [acquireStream, cancelScheduledRelease, recordingMode, releaseLiveStream])
-
-  useEffect(() => {
     const bindAppLifecycle = async () => {
       if (Capacitor.isNativePlatform()) {
         const { App } = await import('@capacitor/app')
