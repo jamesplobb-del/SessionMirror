@@ -1,6 +1,7 @@
 import { memo, useEffect, type RefObject, type VideoHTMLAttributes } from 'react'
 import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
+import { applyCameraPreviewCoverSize } from '../utils/viewportMetrics'
 import { mobileVideoProps } from '../utils/mobileVideo'
 
 interface LiveCameraBackgroundProps {
@@ -28,6 +29,8 @@ function LiveCameraBackground({
     const video = previewRef.current
     if (!video) return
 
+    applyCameraPreviewCoverSize(video)
+
     if (recordingMode === 'audio') {
       if (video.srcObject) {
         video.srcObject = null
@@ -44,6 +47,36 @@ function LiveCameraBackground({
     video.muted = true
     void video.play().catch(() => {})
   }, [previewRef, streamRef, recordingMode, streamGeneration, viewportKey])
+
+  useEffect(() => {
+    const video = previewRef.current
+    if (!video) return
+
+    const refreshPreview = () => {
+      applyCameraPreviewCoverSize(video)
+      if (recordingMode !== 'audio' && video.srcObject) {
+        void video.play().catch(() => {})
+      }
+    }
+
+    refreshPreview()
+    window.addEventListener('resize', refreshPreview)
+    window.addEventListener('orientationchange', refreshPreview)
+    window.visualViewport?.addEventListener('resize', refreshPreview)
+    window.visualViewport?.addEventListener('scroll', refreshPreview)
+
+    const timers = [0, 100, 300, 600].map((delay) =>
+      window.setTimeout(refreshPreview, delay),
+    )
+
+    return () => {
+      window.removeEventListener('resize', refreshPreview)
+      window.removeEventListener('orientationchange', refreshPreview)
+      window.visualViewport?.removeEventListener('resize', refreshPreview)
+      window.visualViewport?.removeEventListener('scroll', refreshPreview)
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [previewRef, recordingMode, viewportKey])
 
   return (
     <div className="camera-background" aria-hidden>
