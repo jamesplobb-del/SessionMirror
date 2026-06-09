@@ -77,9 +77,10 @@ export default function App() {
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const pendingAutoPlaybackRef = useRef(false)
+  const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
+  const playAutoTakeAudioRef = useRef<(playbackUrl: string) => void>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
-  const [autoPlaybackTargetId, setAutoPlaybackTargetId] = useState<string | null>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -99,6 +100,64 @@ export default function App() {
     resetVideoPlayback(benchmarkPipVideoRef.current)
     resetVideoPlayback(challengerPipVideoRef.current)
   }, [])
+
+  const releaseAutoRecordSuppress = useCallback((delayMs = 350) => {
+    if (autoPlaybackReleaseTimerRef.current !== null) {
+      window.clearTimeout(autoPlaybackReleaseTimerRef.current)
+      autoPlaybackReleaseTimerRef.current = null
+    }
+
+    if (delayMs <= 0) {
+      setAutoRecordStartSuppressed(false)
+      return
+    }
+
+    autoPlaybackReleaseTimerRef.current = window.setTimeout(() => {
+      autoPlaybackReleaseTimerRef.current = null
+      setAutoRecordStartSuppressed(false)
+    }, delayMs)
+  }, [])
+
+  const stopAutoPlaybackAudio = useCallback(() => {
+    const audio = autoPlaybackAudioRef.current
+    if (!audio) return
+
+    audio.onended = null
+    audio.onerror = null
+    audio.pause()
+    audio.removeAttribute('src')
+    audio.load()
+    autoPlaybackAudioRef.current = null
+  }, [])
+
+  const playAutoTakeAudio = useCallback(
+    (playbackUrl: string) => {
+      stopAutoPlaybackAudio()
+
+      const audio = new Audio()
+      autoPlaybackAudioRef.current = audio
+      audio.preload = 'auto'
+      audio.src = playbackUrl
+
+      const finish = () => {
+        stopAutoPlaybackAudio()
+        releaseAutoRecordSuppress(350)
+      }
+
+      setAutoRecordStartSuppressed(true)
+      audio.muted = false
+      audio.onended = finish
+      audio.onerror = finish
+
+      void audio.play().catch(() => {
+        stopAutoPlaybackAudio()
+        releaseAutoRecordSuppress(0)
+      })
+    },
+    [releaseAutoRecordSuppress, stopAutoPlaybackAudio],
+  )
+
+  playAutoTakeAudioRef.current = playAutoTakeAudio
 
   const applyTakeThumbnail = useCallback((takeId: string, thumbnailUrl: string) => {
     setTakes((prev) =>
@@ -199,7 +258,7 @@ export default function App() {
 
       if (mediaType === 'audio' && pendingAutoPlaybackRef.current) {
         pendingAutoPlaybackRef.current = false
-        setAutoPlaybackTargetId(takeId)
+        playAutoTakeAudioRef.current(safeVideoUrl)
       }
 
       if (mediaType === 'audio') {
@@ -278,9 +337,23 @@ export default function App() {
     },
     onAutoRecordingFinished: () => {
       pendingAutoPlaybackRef.current = true
-      setAutoRecordStartSuppressed(true)
     },
   })
+
+  useEffect(() => {
+    if (!isRecording) return
+    stopAutoPlaybackAudio()
+    releaseAutoRecordSuppress(0)
+  }, [isRecording, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+
+  useEffect(() => {
+    return () => {
+      stopAutoPlaybackAudio()
+      if (autoPlaybackReleaseTimerRef.current !== null) {
+        window.clearTimeout(autoPlaybackReleaseTimerRef.current)
+      }
+    }
+  }, [stopAutoPlaybackAudio])
 
   const autoSoundListening =
     settings.autoSoundRecording &&
@@ -347,157 +420,6 @@ export default function App() {
     () => takes.find((t) => t.id === challengerId) ?? null,
     [takes, challengerId],
   )
-
-  useEffect(() => {
-    if (!autoPlaybackTargetId) return
-    if (!challengerTake || challengerTake.id !== autoPlaybackTargetId) return
-
-    let cancelled = false
-    let detachPlaybackGuard: (() => void) | null = null
-    let attempts = 0
-
-    const clearReleaseTimer = () => {
-      if (autoPlaybackReleaseTimerRef.current !== null) {
-        window.clearTimeout(autoPlaybackReleaseTimerRef.current)
-        autoPlaybackReleaseTimerRef.current = null
-      }
-    }
-
-    const finishPlaybackCycle = () => {
-      clearReleaseTimer()
-      setAutoPlaybackTargetId(null)
-      autoPlaybackReleaseTimerRef.current = window.setTimeout(() => {
-        autoPlaybackReleaseTimerRef.current = null
-        setAutoRecordStartSuppressed(false)
-      }, 1200)
-    }
-
-    const attachPlaybackGuard = (media: HTMLMediaElement) => {
-      detachPlaybackGuard?.()
-
-      const onEnded = () => {
-        finishPlaybackCycle()
-      }
-
-      const onPause = () => {
-        if (media.ended || media.currentTime >= Math.max(media.duration - 0.05, 0)) {
-          finishPlaybackCycle()
-        }
-      }
-
-      media.addEventListener('ended', onEnded)
-      media.addEventListener('pause', onPause)
-
-      detachPlaybackGuard = () => {
-        media.removeEventListener('ended', onEnded)
-        media.removeEventListener('pause', onPause)
-      }
-    }
-
-    const waitForMediaReady = (media: HTMLMediaElement): Promise<boolean> =>
-      new Promise((resolve) => {
-        if (!media.src) {
-          resolve(false)
-          return
-        }
-
-        if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-          resolve(true)
-          return
-        }
-
-        let settled = false
-        const done = (ready: boolean) => {
-          if (settled) return
-          settled = true
-          media.removeEventListener('loadeddata', onReady)
-          media.removeEventListener('canplay', onReady)
-          window.clearTimeout(timeoutId)
-          resolve(ready)
-        }
-
-        const onReady = () => {
-          done(true)
-        }
-
-        const timeoutId = window.setTimeout(() => done(false), 2500)
-        media.addEventListener('loadeddata', onReady)
-        media.addEventListener('canplay', onReady)
-      })
-
-    const tryPlay = async () => {
-      if (cancelled) return
-      attempts += 1
-
-      const media = challengerPipVideoRef.current
-      if (!media) {
-        if (attempts < 20) {
-          window.setTimeout(() => {
-            void tryPlay()
-          }, 120)
-        } else {
-          finishPlaybackCycle()
-        }
-        return
-      }
-
-      const ready = await waitForMediaReady(media)
-      if (cancelled) return
-
-      if (!ready || !media.src) {
-        if (attempts < 20) {
-          window.setTimeout(() => {
-            void tryPlay()
-          }, 120)
-        } else {
-          finishPlaybackCycle()
-        }
-        return
-      }
-
-      attachPlaybackGuard(media)
-      media.currentTime = 0
-      media.muted = false
-
-      try {
-        await media.play()
-      } catch {
-        if (attempts < 20) {
-          window.setTimeout(() => {
-            void tryPlay()
-          }, 120)
-          return
-        }
-
-        detachPlaybackGuard?.()
-        detachPlaybackGuard = null
-        finishPlaybackCycle()
-      }
-    }
-
-    const timer = window.setTimeout(() => {
-      void tryPlay()
-    }, 120)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-      detachPlaybackGuard?.()
-    }
-  }, [autoPlaybackTargetId, challengerTake?.id, challengerTake?.videoUrl, challengerTake?.filePath])
-
-  useEffect(() => {
-    if (!autoRecordStartSuppressed) return
-
-    const failsafe = window.setTimeout(() => {
-      setAutoRecordStartSuppressed(false)
-      setAutoPlaybackTargetId(null)
-    }, 20000)
-
-    return () => {
-      window.clearTimeout(failsafe)
-    }
-  }, [autoRecordStartSuppressed])
 
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),

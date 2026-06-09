@@ -5,7 +5,7 @@ import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettin
 
 const POLL_INTERVAL_MS = 8
 const MIN_RECORDING_MS = 400
-const COOLDOWN_MS = 300
+const COOLDOWN_MS = 180
 const MONITOR_WARMUP_MS = 280
 const START_LATCH_MS = 3000
 const WARM_RETRY_MS = 800
