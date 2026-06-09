@@ -3,6 +3,7 @@ import { Directory, Filesystem } from '@capacitor/filesystem'
 
 const TAKES_DIR = 'takes'
 export const NATIVE_VIDEO_MIME = 'video/mp4'
+export const NATIVE_AUDIO_MIME = 'audio/mp4'
 
 export interface PersistedTakeVideo {
   filePath: string
@@ -12,6 +13,7 @@ export interface PersistedTakeVideo {
 export interface RecordingCompletePayload {
   takeId: string
   mimeType: string
+  mediaType: 'video' | 'audio'
   filePath: string
   videoUrl: string
   /** Only set on web dev fallback — native recordings are already on disk */
@@ -19,9 +21,18 @@ export interface RecordingCompletePayload {
 }
 
 function extensionForMime(mimeType: string): string {
+  if (mimeType.includes('audio/mp4') || mimeType.includes('m4a')) return 'm4a'
+  if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return 'mp3'
+  if (mimeType.includes('audio') && mimeType.includes('webm')) return 'webm'
   if (mimeType.includes('mp4')) return 'mp4'
   if (mimeType.includes('webm')) return 'webm'
   return 'mp4'
+}
+
+export function normalizeBlobMime(mimeType: string): string {
+  if (mimeType.includes('video/mp4')) return NATIVE_VIDEO_MIME
+  if (mimeType.includes('audio/mp4')) return NATIVE_AUDIO_MIME
+  return mimeType
 }
 
 function serializeError(err: unknown): string {
@@ -370,9 +381,7 @@ export class StreamingTakeWriter {
     }
 
     if (this.useBufferedWrite) {
-      const writeMime = this.mimeType.includes('mp4')
-        ? NATIVE_VIDEO_MIME
-        : this.mimeType
+      const writeMime = normalizeBlobMime(this.mimeType)
       const blob = new Blob(this.bufferChunks, { type: writeMime })
       this.bufferChunks.length = 0
 
@@ -428,7 +437,7 @@ export async function persistRecordingBlob(
   _takeId: string,
   mimeType: string,
 ): Promise<PersistedTakeVideo> {
-  const writeMime = mimeType.includes('mp4') ? NATIVE_VIDEO_MIME : mimeType
+  const writeMime = normalizeBlobMime(mimeType)
   const normalized =
     blob.type === writeMime ? blob : new Blob([blob], { type: writeMime })
 
@@ -444,7 +453,7 @@ export async function persistUploadedVideo(
   takeId: string,
   mimeType: string,
 ): Promise<PersistedTakeVideo> {
-  const writeMime = mimeType.includes('mp4') ? NATIVE_VIDEO_MIME : mimeType
+  const writeMime = normalizeBlobMime(mimeType)
   const normalized =
     blob.type === writeMime ? blob : new Blob([blob], { type: writeMime })
 

@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import TakeVideoPlayer from './TakeVideoPlayer'
+import VaultMediaSegment from './VaultMediaSegment'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import { resetVideosInContainer } from '../utils/videoPlayback'
 import { shareTakeVideo } from '../utils/shareTakeVideo'
-import type { SortMode, Take, TakeUpdate } from '../types'
+import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, isAudioTake } from '../utils/mediaType'
+import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
 
 /** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
 export async function resolveVaultVideoSrc(
@@ -52,18 +54,23 @@ export function VaultTakeVideo({
   className = 'h-full w-full object-cover pointer-events-none',
   thumbnail = false,
 }: VaultTakeVideoProps) {
+  const audio = isAudioTake(take)
   return (
     <TakeVideoPlayer
       filePath={take.filePath}
       videoUrl={take.videoUrl}
-      mimeType={take.videoMimeType || 'video/mp4'}
+      mimeType={take.videoMimeType || (audio ? 'audio/mp4' : 'video/mp4')}
       className={className}
-      poster={take.thumbnailUrl || undefined}
+      poster={
+        take.thumbnailUrl ||
+        (audio ? AUDIO_TAKE_THUMBNAIL : undefined) ||
+        undefined
+      }
       loadingClassName="h-full w-full animate-pulse bg-stone-200"
       controls={false}
-      mirror
+      mirror={!audio}
       thumbnailPreview={thumbnail}
-      eagerLoad={thumbnail}
+      eagerLoad={thumbnail && !audio}
       preload="metadata"
     />
   )
@@ -86,6 +93,20 @@ export default function TakeVaultDrawer({
   onOpenTake,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
+  const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
+
+  const videoCount = useMemo(
+    () => takes.filter((take) => getTakeMediaType(take) === 'video').length,
+    [takes],
+  )
+  const audioCount = useMemo(
+    () => takes.filter((take) => getTakeMediaType(take) === 'audio').length,
+    [takes],
+  )
+  const filteredTakes = useMemo(
+    () => sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab),
+    [sortedTakes, vaultMediaTab],
+  )
 
   const silenceAllVaultVideos = useCallback(() => {
     resetVideosInContainer(drawerRef.current)
@@ -147,43 +168,59 @@ export default function TakeVaultDrawer({
             </div>
           ) : (
             <>
-              <GallerySortStrip
-                sortMode={sortMode}
-                onSortChange={onSortChange}
-                takeCount={takes.length}
+              <VaultMediaSegment
+                value={vaultMediaTab}
+                onChange={setVaultMediaTab}
+                videoCount={videoCount}
+                audioCount={audioCount}
               />
-              <div className="flex gap-4 overflow-x-auto pb-2">
-                {isOpen &&
-                  sortedTakes.map((take) => (
-                    <TakeCard
-                      key={take.id}
-                      take={take}
-                      isBenchmark={take.id === benchmarkId}
-                      isChallenger={take.id === challengerId}
-                      onOpenTake={() => {
-                        silenceAllVaultVideos()
-                        onOpenTake(take)
-                      }}
-                      onPinBenchmark={() => {
-                        onBeforePin?.()
-                        silenceAllVaultVideos()
-                        onPinBenchmark(take.id)
-                      }}
-                      onPinChallenger={() => {
-                        onBeforePin?.()
-                        silenceAllVaultVideos()
-                        onPinChallenger(take.id)
-                      }}
-                      onExport={() => {
-                        silenceAllVaultVideos()
-                        void shareTakeVideo(take)
-                      }}
-                      onUpdate={(updates) => onUpdateTake(take.id, updates)}
-                      onDelete={() => onDeleteTake(take.id)}
-                      thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
-                    />
-                  ))}
-              </div>
+              {filteredTakes.length === 0 ? (
+                <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
+                  <p className="text-sm text-stone-400">
+                    No {vaultMediaTab} takes yet.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <GallerySortStrip
+                    sortMode={sortMode}
+                    onSortChange={onSortChange}
+                    takeCount={filteredTakes.length}
+                  />
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    {isOpen &&
+                      filteredTakes.map((take) => (
+                        <TakeCard
+                          key={take.id}
+                          take={take}
+                          isBenchmark={take.id === benchmarkId}
+                          isChallenger={take.id === challengerId}
+                          onOpenTake={() => {
+                            silenceAllVaultVideos()
+                            onOpenTake(take)
+                          }}
+                          onPinBenchmark={() => {
+                            onBeforePin?.()
+                            silenceAllVaultVideos()
+                            onPinBenchmark(take.id)
+                          }}
+                          onPinChallenger={() => {
+                            onBeforePin?.()
+                            silenceAllVaultVideos()
+                            onPinChallenger(take.id)
+                          }}
+                          onExport={() => {
+                            silenceAllVaultVideos()
+                            void shareTakeVideo(take)
+                          }}
+                          onUpdate={(updates) => onUpdateTake(take.id, updates)}
+                          onDelete={() => onDeleteTake(take.id)}
+                          thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
+                        />
+                      ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

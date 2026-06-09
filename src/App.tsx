@@ -21,6 +21,7 @@ import {
 import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
 import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
+import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
 
 export default function App() {
   const [takes, setTakes] = useState<Take[]>([])
@@ -32,8 +33,8 @@ export default function App() {
   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
 
-  const benchmarkPipVideoRef = useRef<HTMLVideoElement>(null)
-  const challengerPipVideoRef = useRef<HTMLVideoElement>(null)
+  const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
+  const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
 
   const isReviewOpen = reviewSlot !== null
 
@@ -43,7 +44,7 @@ export default function App() {
   }, [])
 
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
-    const { takeId, mimeType, filePath, videoUrl, blob } = payload
+    const { takeId, mimeType, filePath, videoUrl, blob, mediaType } = payload
 
     void (async () => {
       const safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
@@ -55,10 +56,20 @@ export default function App() {
           safeVideoUrl,
           filePath,
           mimeType,
+          mediaType,
         )
         setChallengerId(next.id)
         return [...prev, next]
       })
+
+      if (mediaType === 'audio') {
+        setTakes((current) =>
+          current.map((take) =>
+            take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take,
+          ),
+        )
+        return
+      }
 
       const thumbnailPromise = blob
         ? generateThumbnailFromBlob(blob)
@@ -90,6 +101,8 @@ export default function App() {
     ready,
     isRecording,
     elapsed,
+    recordingMode,
+    toggleRecordingMode,
     toggleRecording,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
@@ -167,6 +180,7 @@ export default function App() {
       void (async () => {
         const takeId = crypto.randomUUID()
         const mimeType = file.type || NATIVE_VIDEO_MIME
+        const mediaType = inferMediaTypeFromMime(mimeType)
         const persisted = await persistUploadedVideo(file, takeId, mimeType)
         const safeVideoUrl = await resolveTakePlaybackUrl(
           persisted.filePath,
@@ -180,13 +194,17 @@ export default function App() {
             safeVideoUrl,
             persisted.filePath,
             mimeType,
+            mediaType,
           ),
-          name: 'Uploaded Best Take',
+          name: mediaType === 'audio' ? 'Uploaded Audio' : 'Uploaded Best Take',
           mirrorPlayback: false,
+          thumbnailUrl: mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : '',
         }
 
         setTakes((prev) => [...prev, uploadedTake])
         setBenchmarkId(takeId)
+
+        if (mediaType === 'audio') return
 
         void generateThumbnailFromUrl(safeVideoUrl)
           .then((thumbnailUrl) => {
@@ -260,6 +278,8 @@ export default function App() {
         previewRef={previewRef}
         streamRef={streamRef}
         error={cameraError}
+        recordingMode={recordingMode}
+        isRecording={isRecording}
       />
 
       <div
@@ -319,6 +339,8 @@ export default function App() {
             isRecording={isRecording}
             elapsed={elapsed}
             ready={ready}
+            recordingMode={recordingMode}
+            onToggleRecordingMode={toggleRecordingMode}
             onToggleRecord={toggleRecording}
             onOpenVault={() => setIsVaultOpen(true)}
             takeCount={takes.length}

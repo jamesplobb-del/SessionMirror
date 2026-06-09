@@ -1,4 +1,4 @@
-import type { SortMode, Take } from '../types'
+import type { MediaType, SortMode, Take } from '../types'
 
 export function createTake(
   id: string,
@@ -6,10 +6,11 @@ export function createTake(
   videoUrl: string,
   filePath: string,
   videoMimeType: string,
+  mediaType: MediaType = 'video',
 ): Take {
   return {
     id,
-    name: `Take ${index}`,
+    name: mediaType === 'audio' ? `Audio ${index}` : `Take ${index}`,
     videoUrl,
     filePath,
     videoMimeType,
@@ -17,7 +18,8 @@ export function createTake(
     timestamp: Date.now(),
     rating: 0,
     notes: '',
-    mirrorPlayback: true,
+    mediaType,
+    mirrorPlayback: mediaType === 'video',
   }
 }
 

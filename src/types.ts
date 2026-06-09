@@ -1,3 +1,7 @@
+export type MediaType = 'video' | 'audio'
+
+export type RecordingMode = 'video' | 'audio'
+
 export interface Take {
   id: string
   name: string
@@ -10,6 +14,8 @@ export interface Take {
   timestamp: number
   rating: number
   notes: string
+  /** Defaults to video for legacy takes. */
+  mediaType?: MediaType
   /** Recorded takes mirror on playback; uploads show true perspective. */
   mirrorPlayback?: boolean
 }

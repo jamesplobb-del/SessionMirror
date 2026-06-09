@@ -1,7 +1,8 @@
-import { useEffect, useRef, type CSSProperties, type RefObject, type VideoHTMLAttributes } from 'react'
+import { useEffect, useRef, type CSSProperties, type PointerEventHandler, type RefObject, type VideoHTMLAttributes } from 'react'
+import { Mic } from 'lucide-react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { iosTakeVideoProps, withWebKitThumbnailHint } from '../utils/mobileVideo'
+import { iosTakeVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
 
 export interface TakeVideoPlayerProps
@@ -9,29 +10,20 @@ export interface TakeVideoPlayerProps
   filePath: string
   videoUrl: string
   mimeType?: string
-  videoRef?: RefObject<HTMLVideoElement | null>
+  videoRef?: RefObject<HTMLMediaElement | null>
   loadingClassName?: string
-  /** Mirror only the raw <video> pixels (scaleX(-1)); never flips sibling UI overlays. */
   mirror?: boolean
-  /** Call video.load() on mount so WebKit eagerly fetches #t= poster frames. */
   eagerLoad?: boolean
-  /** Vault list tile — muted poster only; never inline audio. */
   thumbnailPreview?: boolean
-  /** PiP / HUD — never autoplay; play only via explicit user control. */
   manualPlayOnly?: boolean
-  /** Forces a full <video> remount when the take source changes (PiP). */
   videoSourceKey?: string
   preload?: 'auto' | 'metadata' | 'none'
 }
 
-/**
- * Renders a saved take with a Capacitor WebView-safe URI on `<video src>`.
- * Raw file:/// paths are blocked — only capacitor:// / _capacitor_file_ URLs mount.
- */
 export default function TakeVideoPlayer({
   filePath,
   videoUrl,
-  mimeType: _mimeType = NATIVE_VIDEO_MIME,
+  mimeType: mimeTypeProp = NATIVE_VIDEO_MIME,
   videoRef: externalVideoRef,
   className,
   loadingClassName = 'h-full w-full animate-pulse bg-stone-900',
@@ -45,57 +37,96 @@ export default function TakeVideoPlayer({
   style,
   ...rest
 }: TakeVideoPlayerProps) {
-  const internalRef = useRef<HTMLVideoElement>(null)
-  const videoRef = externalVideoRef ?? internalRef
+  const internalRef = useRef<HTMLMediaElement>(null)
+  const mediaRef = externalVideoRef ?? internalRef
   const playbackSrc = useCapacitorVideoSrc(filePath, videoUrl)
+  const isAudio = isAudioMimeType(mimeTypeProp)
 
-  const videoSrc = playbackSrc ? withWebKitThumbnailHint(playbackSrc) : null
+  const mediaSrc = playbackSrc
+    ? isAudio
+      ? playbackSrc
+      : withWebKitThumbnailHint(playbackSrc)
+    : null
 
   useEffect(() => {
-    if (!eagerLoad || !videoSrc) return
-    videoRef.current?.load()
-  }, [eagerLoad, videoSrc, videoRef])
+    if (!eagerLoad || !mediaSrc) return
+    mediaRef.current?.load()
+  }, [eagerLoad, mediaSrc, mediaRef])
 
   useEffect(() => {
     if (manualPlayOnly) return
-    const video = videoRef.current
-    if (!video || !videoSrc) return
-    video.pause()
-    video.currentTime = 0
-    video.muted = true
-  }, [videoSrc, videoRef, manualPlayOnly])
+    const media = mediaRef.current
+    if (!media || !mediaSrc) return
+    media.pause()
+    media.currentTime = 0
+    if ('muted' in media) {
+      media.muted = true
+    }
+  }, [mediaSrc, mediaRef, manualPlayOnly])
 
   useEffect(() => {
     if (manualPlayOnly) return
     return () => {
-      pauseVideoElement(videoRef.current)
+      pauseVideoElement(mediaRef.current)
     }
-  }, [videoSrc, videoRef, manualPlayOnly])
+  }, [mediaSrc, mediaRef, manualPlayOnly])
 
   useEffect(() => {
     if (!thumbnailPreview) return
-    const video = videoRef.current
-    if (!video) return
+    const media = mediaRef.current
+    if (!media) return
 
     const enforceSilentPreview = () => {
-      video.muted = true
+      if ('muted' in media) media.muted = true
     }
 
     const blockInlinePlayback = () => {
-      video.pause()
-      video.muted = true
+      media.pause()
+      if ('muted' in media) media.muted = true
     }
 
-    video.addEventListener('volumechange', enforceSilentPreview)
-    video.addEventListener('play', blockInlinePlayback)
+    media.addEventListener('volumechange', enforceSilentPreview)
+    media.addEventListener('play', blockInlinePlayback)
     return () => {
-      video.removeEventListener('volumechange', enforceSilentPreview)
-      video.removeEventListener('play', blockInlinePlayback)
+      media.removeEventListener('volumechange', enforceSilentPreview)
+      media.removeEventListener('play', blockInlinePlayback)
     }
-  }, [thumbnailPreview, videoSrc, videoRef])
+  }, [thumbnailPreview, mediaSrc, mediaRef])
 
-  if (!videoSrc) {
+  if (!mediaSrc) {
     return <div className={loadingClassName} aria-hidden />
+  }
+
+  if (isAudio) {
+    const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, ...audioRest } = rest
+    return (
+      <div
+        className={`relative h-full w-full bg-stone-950 ${className ?? ''}`.trim()}
+        onPointerDown={onPointerDown as PointerEventHandler<HTMLDivElement> | undefined}
+        onPointerMove={onPointerMove as PointerEventHandler<HTMLDivElement> | undefined}
+        onPointerUp={onPointerUp as PointerEventHandler<HTMLDivElement> | undefined}
+        onPointerCancel={onPointerCancel as PointerEventHandler<HTMLDivElement> | undefined}
+      >
+        <audio
+          key={videoSourceKey ?? mediaSrc ?? 'empty-audio'}
+          ref={mediaRef as RefObject<HTMLAudioElement>}
+          className="sr-only"
+          src={mediaSrc}
+          preload={preload}
+          {...audioRest}
+          muted
+          autoPlay={false}
+        />
+        <div
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center ${
+            thumbnailPreview ? '' : ''
+          }`}
+          aria-hidden
+        >
+          <Mic className="h-8 w-8 text-stone-500/80" />
+        </div>
+      </div>
+    )
   }
 
   const videoStyle: CSSProperties = {
@@ -105,10 +136,10 @@ export default function TakeVideoPlayer({
 
   const videoElement = (
     <video
-      key={videoSourceKey ?? videoSrc ?? 'empty'}
-      ref={videoRef}
+      key={videoSourceKey ?? mediaSrc ?? 'empty'}
+      ref={mediaRef as RefObject<HTMLVideoElement>}
       className={`${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
-      src={videoSrc}
+      src={mediaSrc}
       style={videoStyle}
       {...rest}
       {...iosTakeVideoProps}

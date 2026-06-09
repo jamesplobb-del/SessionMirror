@@ -14,7 +14,7 @@ interface PipWindowProps {
   emptyMessage: string
   mirror?: boolean
   suspendPlayback?: boolean
-  videoRef?: React.RefObject<HTMLVideoElement | null>
+  videoRef?: React.RefObject<HTMLMediaElement | null>
   onUnpin: () => void
   onExpand?: () => void
   onUpload?: (file: File) => void
@@ -41,7 +41,7 @@ export default function PipWindow({
   className = '',
 }: PipWindowProps) {
   const videoSourceKey = src || filePath || 'empty'
-  const internalVideoRef = useRef<HTMLVideoElement>(null)
+  const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
@@ -120,7 +120,7 @@ export default function PipWindow({
       {variant === 'benchmark' && onUpload && (
         <input
           type="file"
-          accept="video/*"
+          accept="video/*,audio/*"
           id="benchmark-upload"
           onChange={handleFileChange}
           className="sr-only"
@@ -222,7 +222,7 @@ export default function PipWindow({
           onClick={stopEventBubble}
           className={FLOAT_BADGE}
           style={{ top: -12, left: -12 }}
-          aria-label="Upload best take video"
+          aria-label="Upload best take media"
         >
           <Upload className="h-3 w-3" />
         </label>

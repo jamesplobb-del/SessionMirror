@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { RecordingMode } from '../types'
 import {
-  getRecorderMimeType,
+  getRecorderMimeTypeForMode,
   RECORDING_TIMESLICE_MS,
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
 import {
-  NATIVE_VIDEO_MIME,
+  normalizeBlobMime,
   persistRecordingBlob,
   StreamingTakeWriter,
   type RecordingCompletePayload,
@@ -35,6 +36,7 @@ export function useCameraSession({
   const activeTakeIdRef = useRef<string | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const recorderMimeTypeRef = useRef<string>('video/webm')
+  const recordingModeRef = useRef<RecordingMode>('video')
   const onCompleteRef = useRef(onRecordingComplete)
   onCompleteRef.current = onRecordingComplete
 
@@ -42,6 +44,9 @@ export function useCameraSession({
   const [ready, setReady] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>('video')
+
+  recordingModeRef.current = recordingMode
 
   const abortActiveWriter = useCallback(async () => {
     const writer = writerRef.current
@@ -99,20 +104,25 @@ export function useCameraSession({
     }, CAMERA_RELEASE_DELAY_MS)
   }, [forceClearCameraState])
 
-  const acquireStream = useCallback(async (cancelled?: () => boolean) => {
-    setError(null)
-    const mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    })
-    if (cancelled?.()) {
-      mediaStream.getTracks().forEach((track) => track.stop())
-      return null
-    }
-    streamRef.current = mediaStream
-    setReady(true)
-    return mediaStream
-  }, [])
+  const acquireStream = useCallback(
+    async (mode: RecordingMode, cancelled?: () => boolean) => {
+      setError(null)
+      const constraints: MediaStreamConstraints =
+        mode === 'audio'
+          ? { audio: true, video: false }
+          : { audio: true, video: true }
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
+      if (cancelled?.()) {
+        mediaStream.getTracks().forEach((track) => track.stop())
+        return null
+      }
+      streamRef.current = mediaStream
+      setReady(true)
+      return mediaStream
+    },
+    [],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -122,7 +132,7 @@ export function useCameraSession({
       forceClearCameraState()
 
       try {
-        await acquireStream(() => cancelled)
+        await acquireStream(recordingMode, () => cancelled)
       } catch (err) {
         if (cancelled) return
 
@@ -138,7 +148,9 @@ export function useCameraSession({
         setError(
           err instanceof Error
             ? err.message
-            : 'Unable to access camera and microphone.',
+            : recordingMode === 'audio'
+              ? 'Unable to access microphone.'
+              : 'Unable to access camera and microphone.',
         )
         setReady(false)
       }
@@ -160,6 +172,7 @@ export function useCameraSession({
     abortActiveWriter,
     acquireStream,
     forceClearCameraState,
+    recordingMode,
     scheduleReleaseCameraState,
   ])
 
@@ -177,7 +190,8 @@ export function useCameraSession({
 
     void (async () => {
       const takeId = crypto.randomUUID()
-      const mimeType = getRecorderMimeType()
+      const mode = recordingModeRef.current
+      const mimeType = getRecorderMimeTypeForMode(mode)
       recorderMimeTypeRef.current = mimeType
       chunksRef.current = []
 
@@ -221,6 +235,7 @@ export function useCameraSession({
             writerRef.current = null
             const stoppedTakeId = activeTakeIdRef.current ?? takeId
             activeTakeIdRef.current = null
+            const completedMode = recordingModeRef.current
 
             try {
               if (activeWriter) {
@@ -228,13 +243,12 @@ export function useCameraSession({
                 onCompleteRef.current({
                   takeId: stoppedTakeId,
                   mimeType: recorderMimeTypeRef.current,
+                  mediaType: completedMode,
                   filePath: persisted.filePath,
                   videoUrl: persisted.videoUrl,
                 })
               } else {
-                const writeMime = recorderMimeTypeRef.current.includes('mp4')
-                  ? NATIVE_VIDEO_MIME
-                  : recorderMimeTypeRef.current
+                const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
                 const blob = new Blob(capturedChunks, { type: writeMime })
                 const persisted = await persistRecordingBlob(
                   blob,
@@ -244,6 +258,7 @@ export function useCameraSession({
                 onCompleteRef.current({
                   takeId: stoppedTakeId,
                   mimeType: recorderMimeTypeRef.current,
+                  mediaType: completedMode,
                   filePath: persisted.filePath,
                   videoUrl: persisted.videoUrl,
                   blob,
@@ -290,10 +305,7 @@ export function useCameraSession({
       chunksRef.current = []
       setIsRecording(false)
     })
-  }, [
-    abortActiveWriter,
-    isRecording,
-  ])
+  }, [abortActiveWriter, isRecording])
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current
@@ -321,6 +333,11 @@ export function useCameraSession({
     }
   }, [isRecording, startRecording, stopRecording])
 
+  const toggleRecordingMode = useCallback(() => {
+    if (isRecording) return
+    setRecordingMode((mode) => (mode === 'video' ? 'audio' : 'video'))
+  }, [isRecording])
+
   return {
     previewRef,
     streamRef,
@@ -328,6 +345,8 @@ export function useCameraSession({
     ready,
     isRecording,
     elapsed,
+    recordingMode,
+    toggleRecordingMode,
     toggleRecording,
   }
 }

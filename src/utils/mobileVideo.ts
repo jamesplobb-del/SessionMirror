@@ -29,6 +29,29 @@ export function getRecorderMimeType(): string {
   return MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm'
 }
 
+export function getAudioRecorderMimeType(): string {
+  const candidates = [
+    'audio/mp4',
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mpeg',
+  ]
+  for (const mime of candidates) {
+    if (MediaRecorder.isTypeSupported(mime)) {
+      return mime
+    }
+  }
+  return 'audio/webm'
+}
+
+export function getRecorderMimeTypeForMode(mode: 'video' | 'audio'): string {
+  return mode === 'audio' ? getAudioRecorderMimeType() : getRecorderMimeType()
+}
+
+export function isAudioMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('audio/')
+}
+
 /** MediaRecorder timeslice — used only when chunks can be appended safely (webm). */
 export const RECORDING_TIMESLICE_MS = 1000
 

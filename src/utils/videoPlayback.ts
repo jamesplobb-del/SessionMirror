@@ -1,26 +1,28 @@
-/** Stop playback and reset a video element (e.g. when pausing a still-mounted PiP). */
-export function resetVideoPlayback(video: HTMLVideoElement | null | undefined): void {
-  if (!video) return
-  video.pause()
-  video.currentTime = 0
-  video.muted = true
+/** Stop playback and reset a media element (e.g. when pausing a still-mounted PiP). */
+export function resetVideoPlayback(media: HTMLMediaElement | null | undefined): void {
+  if (!media) return
+  media.pause()
+  media.currentTime = 0
+  if ('muted' in media) {
+    media.muted = true
+  }
 }
 
 /** Safe unmount / teardown — pause only; never mutate src (React owns the attribute). */
-export function pauseVideoElement(video: HTMLVideoElement | null | undefined): void {
-  video?.pause()
+export function pauseVideoElement(media: HTMLMediaElement | null | undefined): void {
+  media?.pause()
 }
 
-/** Pause every video under a container without touching src. */
+/** Pause every video/audio under a container without touching src. */
 export function pauseVideosInContainer(container: HTMLElement | null | undefined): void {
-  container?.querySelectorAll('video').forEach((element) => {
-    element.pause()
+  container?.querySelectorAll('video, audio').forEach((element) => {
+    pauseVideoElement(element as HTMLMediaElement)
   })
 }
 
-/** Fully silence every video under a container (vault pin / drawer close). */
+/** Fully silence every video/audio under a container (vault pin / drawer close). */
 export function resetVideosInContainer(container: HTMLElement | null | undefined): void {
-  container?.querySelectorAll('video').forEach((element) => {
-    resetVideoPlayback(element)
+  container?.querySelectorAll('video, audio').forEach((element) => {
+    resetVideoPlayback(element as HTMLMediaElement)
   })
 }

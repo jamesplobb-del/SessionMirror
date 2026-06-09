@@ -50,9 +50,9 @@ export default function ReviewModeOverlay({
   onClose,
   onSlotChange,
 }: ReviewModeOverlayProps) {
-  const benchmarkVideoRef = useRef<HTMLVideoElement>(null)
-  const challengerVideoRef = useRef<HTMLVideoElement>(null)
-  const vaultVideoRef = useRef<HTMLVideoElement>(null)
+  const benchmarkVideoRef = useRef<HTMLMediaElement>(null)
+  const challengerVideoRef = useRef<HTMLMediaElement>(null)
+  const vaultVideoRef = useRef<HTMLMediaElement>(null)
   const timelineTrackRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
   const progressLoopRef = useRef<number | null>(null)
@@ -108,7 +108,7 @@ export default function ReviewModeOverlay({
     pauseVideoElement(vaultVideoRef.current)
   }, [])
 
-  const getActiveVideo = useCallback((): HTMLVideoElement | null => {
+  const getActiveVideo = useCallback((): HTMLMediaElement | null => {
     if (isVault) return vaultVideoRef.current
     return activeSlot === 'benchmark'
       ? benchmarkVideoRef.current
@@ -148,8 +148,8 @@ export default function ReviewModeOverlay({
     })
   }, [])
 
-  const syncDurationFromVideo = useCallback((video: HTMLVideoElement) => {
-    const playable = getPlayableDuration(video)
+  const syncDurationFromVideo = useCallback((media: HTMLMediaElement) => {
+    const playable = getPlayableDuration(media)
     if (playable > 0) {
       setDuration(playable)
     }
@@ -434,7 +434,7 @@ export default function ReviewModeOverlay({
     opacity: slideDirection ? 0 : 1,
   }
 
-  const handleVideoPointerDown = (e: React.PointerEvent<HTMLVideoElement>) => {
+  const handleVideoPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     if ((e.target as HTMLElement).closest('[data-play-overlay]')) return
 
     revealPlayOverlay(isPlaying)
@@ -443,7 +443,7 @@ export default function ReviewModeOverlay({
     swipeCommitted.current = false
   }
 
-  const handleVideoPointerMove = (e: React.PointerEvent<HTMLVideoElement>) => {
+  const handleVideoPointerMove = (e: React.PointerEvent<HTMLElement>) => {
     if (!isTrackingPointer.current) return
 
     const deltaX = e.clientX - pointerStart.current.x
@@ -471,7 +471,7 @@ export default function ReviewModeOverlay({
     setSwipeOffset(offset)
   }
 
-  const handleVideoPointerUp = (e: React.PointerEvent<HTMLVideoElement>) => {
+  const handleVideoPointerUp = (e: React.PointerEvent<HTMLElement>) => {
     if (!isTrackingPointer.current) return
     isTrackingPointer.current = false
 
