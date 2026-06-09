@@ -263,7 +263,7 @@ export default function App() {
       />
 
       <div
-        className={`absolute inset-0 z-10 ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
+        className={`app-hud-layer absolute inset-0 z-10 ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
         aria-hidden={isReviewOpen}
       >
         <HudHeader />

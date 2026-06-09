@@ -47,7 +47,7 @@ export default function ReviewTimeline({
 
   return (
     <div
-      className="pointer-events-auto w-full touch-none select-none px-5 pb-1 pt-10"
+      className="pointer-events-auto w-full touch-none select-none bg-gradient-to-t from-black/35 via-transparent to-transparent px-5 pb-1 pt-14"
       style={{ touchAction: 'none' }}
     >
       <div

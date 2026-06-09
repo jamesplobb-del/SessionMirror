@@ -48,13 +48,25 @@ select {
 
 /* Landscape — portrait layout unchanged; only applies when rotated */
 @media (orientation: landscape) {
+  .app-hud-layer {
+    top: env(safe-area-inset-top, 0px);
+    right: env(safe-area-inset-right, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
+    left: env(safe-area-inset-left, 0px);
+  }
+
+  .review-overlay {
+    top: env(safe-area-inset-top, 0px) !important;
+    right: env(safe-area-inset-right, 0px) !important;
+    bottom: env(safe-area-inset-bottom, 0px) !important;
+    left: env(safe-area-inset-left, 0px) !important;
+  }
+
   .app-hud-bottom {
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
 
