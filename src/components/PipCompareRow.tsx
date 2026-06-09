@@ -1,5 +1,4 @@
 import { useRef, type RefObject } from 'react'
-import { AudioLines } from 'lucide-react'
 import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
@@ -19,7 +18,6 @@ interface PipCompareRowProps {
   onUploadBenchmark: (file: File) => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
-  onOpenPitchAnalysis?: () => void
   onDragStateChange?: (state: PipDragUiState) => void
   hapticFeedback?: boolean
 }
@@ -92,7 +90,6 @@ export default function PipCompareRow({
   onUploadBenchmark,
   onExpandBenchmark,
   onExpandChallenger,
-  onOpenPitchAnalysis,
   onDragStateChange,
   hapticFeedback = true,
 }: PipCompareRowProps) {
@@ -112,20 +109,6 @@ export default function PipCompareRow({
 
   return (
     <>
-      {onOpenPitchAnalysis && (
-        <div className="pointer-events-auto mb-2 flex justify-center px-4">
-          <button
-            type="button"
-            onClick={onOpenPitchAnalysis}
-            className="flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md transition hover:border-sky-400/40 hover:bg-black/70 active:scale-[0.98]"
-            aria-label="Open pitch analysis"
-          >
-            <AudioLines className="h-4 w-4 text-sky-300" />
-            Pitch Analysis
-          </button>
-        </div>
-      )}
-
       <div className="app-pip-row">
         <div ref={benchmarkDropRef} className="pointer-events-auto shrink-0">
           <PipWindow

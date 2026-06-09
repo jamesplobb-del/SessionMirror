@@ -497,8 +497,6 @@ export default function App() {
 
   const handleOpenPitchAnalysis = useCallback(() => {
     pausePipVideos()
-    setReviewSlot(null)
-    setIsVaultOpen(false)
     setIsPitchAnalysisOpen(true)
   }, [pausePipVideos])
 
@@ -725,9 +723,6 @@ export default function App() {
               challengerTake?.videoUrl
                 ? () => handleOpenCompareReview('challenger')
                 : undefined
-            }
-            onOpenPitchAnalysis={
-              canOpenPitchAnalysis ? handleOpenPitchAnalysis : undefined
             }
             onDragStateChange={setPipDragState}
             hapticFeedback={settings.hapticFeedback}
