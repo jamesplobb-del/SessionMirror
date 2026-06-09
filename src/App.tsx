@@ -285,14 +285,12 @@ export default function App() {
       />
 
       <div
-        className={`app-hud-layer absolute inset-0 z-10 ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
+        className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
         aria-hidden={isReviewOpen}
       >
         <HudHeader />
 
-        <div
-          className="app-hud-bottom pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col gap-4 transition-opacity duration-200 ease-in"
-        >
+        <div className="app-hud-bottom pointer-events-none flex flex-col gap-4">
           <div className="app-pip-row flex items-end justify-between gap-3 px-3 sm:px-4">
             <PipWindow
               className="pointer-events-auto shrink-0"

@@ -69,17 +69,27 @@ select {
   bottom: 0;
 }
 
+.app-ui-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  pointer-events: none;
+}
+
 .app-hud-bottom {
-  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  margin-top: auto;
+  width: 100%;
 }
 
 /* Landscape — portrait layout unchanged; only applies when rotated */
 @media (orientation: landscape) {
-  .app-hud-layer {
-    top: env(safe-area-inset-top, 0px);
-    right: env(safe-area-inset-right, 0px);
-    bottom: env(safe-area-inset-bottom, 0px);
-    left: env(safe-area-inset-left, 0px);
+  .app-ui-overlay {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   .review-overlay {
@@ -94,7 +104,6 @@ select {
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   }
 
   .app-pip-row {
@@ -181,18 +190,34 @@ select {
 }
 
 .camera-background {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 0;
-  width: 100vw;
-  height: 100dvh;
   overflow: hidden;
 }
 
 .camera-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100vw;
   height: 100dvh;
   object-fit: cover;
+  z-index: 0;
+}
+
+.camera-background-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
 }
 
 .app-shell {

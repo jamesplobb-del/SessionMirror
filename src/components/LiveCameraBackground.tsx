@@ -44,7 +44,7 @@ function LiveCameraBackground({
   }, [previewRef, streamRef, recordingMode, streamGeneration])
 
   return (
-    <div className="camera-background">
+    <div className="camera-background" aria-hidden>
       <video
         ref={previewRef}
         autoPlay
@@ -55,19 +55,12 @@ function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        style={{
-          transform: isAudioMode ? undefined : 'scaleX(-1)',
-          width: '100vw',
-          height: '100dvh',
-          objectFit: 'cover',
-        }}
-        className={`camera-preview absolute inset-0 z-0 transition-opacity duration-300 ${
-          isAudioMode ? 'pointer-events-none opacity-0' : 'opacity-100'
-        }`}
+        style={{ transform: isAudioMode ? undefined : 'scaleX(-1)' }}
+        className={`camera-preview ${isAudioMode ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
       />
 
       {isAudioMode && (
-        <div className="absolute inset-0 z-0 flex flex-col items-center justify-center bg-gradient-to-b from-stone-950 via-stone-900 to-black">
+        <div className="camera-background-overlay flex flex-col items-center justify-center bg-gradient-to-b from-stone-950 via-stone-900 to-black">
           <div
             className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/5 ${
               isRecording ? 'shadow-[0_0_24px_rgba(56,189,248,0.35)]' : ''
@@ -98,12 +91,13 @@ function LiveCameraBackground({
       )}
 
       {error && (
-        <div className="absolute inset-0 z-0 flex items-center justify-center bg-stone-900">
+        <div className="camera-background-overlay flex items-center justify-center bg-stone-900">
           <p className="max-w-sm px-6 text-center text-sm text-white/70">{error}</p>
         </div>
       )}
+
       <div
-        className={`pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/25 via-transparent to-black/45 transition-opacity duration-300 ${
+        className={`camera-background-overlay pointer-events-none bg-gradient-to-b from-black/25 via-transparent to-black/45 ${
           isAudioMode ? 'opacity-40' : 'opacity-100'
         }`}
       />
