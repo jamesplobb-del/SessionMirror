@@ -138,6 +138,7 @@ export default function TakeVaultDrawer({
   }, [isOpen])
 
   useEffect(() => {
+    teardownVideosInContainer(drawerRef.current)
     setSelectionMode(false)
     setSelectedIds(new Set())
   }, [activeProject?.id])
@@ -228,6 +229,7 @@ export default function TakeVaultDrawer({
       return
     }
 
+    teardownVideosInContainer(drawerRef.current)
     silenceAllVaultVideos()
     onClearAllTakes()
     exitSelectionMode()

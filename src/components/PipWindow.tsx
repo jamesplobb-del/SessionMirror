@@ -128,7 +128,7 @@ export default function PipWindow({
 
   return (
     <div
-      className={`pip-video-container group relative aspect-video w-[8.25rem] min-h-[4.640625rem] min-w-[8.25rem] sm:w-[9.25rem] sm:min-h-[5.203125rem] sm:min-w-[9.25rem] ${className}`}
+      className={`pip-video-container group relative aspect-video w-[9rem] min-h-[5.0625rem] min-w-[9rem] sm:w-[10rem] sm:min-h-[5.625rem] sm:min-w-[10rem] ${className}`}
     >
       {variant === 'benchmark' && onUpload && (
         <input

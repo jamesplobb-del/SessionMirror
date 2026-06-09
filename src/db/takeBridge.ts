@@ -10,6 +10,10 @@ function defaultTakeName(vaultTake: VaultTake, index: number): string {
 
 export async function loadUiTakesForProject(projectId: string): Promise<Take[]> {
   const rows = await getTakesByProject(projectId)
+  return uiTakesFromVaultRows(rows)
+}
+
+export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
   const chronological = [...rows].reverse()
 
   const takes = await Promise.all(

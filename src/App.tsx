@@ -30,25 +30,26 @@ import {
   findBestTakeId,
   getTakesByProject,
   listProjects,
-  loadUiTakesForProject,
   saveTake,
   setProjectBestTake,
+  uiTakesFromVaultRows,
   updateVaultTake,
   type Project,
 } from './db'
 
-async function hydrateTakeThumbnails(takes: Take[]): Promise<Take[]> {
-  return Promise.all(
-    takes.map(async (take) => {
-      if (take.thumbnailUrl || isAudioTake(take)) return take
-      try {
-        const thumbnailUrl = await generateThumbnailFromUrl(take.videoUrl)
-        return { ...take, thumbnailUrl }
-      } catch {
-        return take
-      }
-    }),
-  )
+async function hydrateTakeThumbnailsInBackground(
+  takes: Take[],
+  applyThumbnail: (takeId: string, thumbnailUrl: string) => void,
+): Promise<void> {
+  for (const take of takes) {
+    if (take.thumbnailUrl || isAudioTake(take)) continue
+    try {
+      const thumbnailUrl = await generateThumbnailFromUrl(take.videoUrl)
+      applyThumbnail(take.id, thumbnailUrl)
+    } catch {
+      /* vault cards show placeholder until thumbnail is ready */
+    }
+  }
 }
 
 export default function App() {
@@ -82,18 +83,30 @@ export default function App() {
     resetVideoPlayback(challengerPipVideoRef.current)
   }, [])
 
-  const reloadProjectTakes = useCallback(async (projectId: string) => {
-    const loaded = await loadUiTakesForProject(projectId)
-    const withThumbs = await hydrateTakeThumbnails(loaded)
-    setTakes(withThumbs)
-
-    const rows = await getTakesByProject(projectId)
-    setBenchmarkId(findBestTakeId(rows))
-    setChallengerId((current) => {
-      if (current && rows.some((row) => row.id === current)) return current
-      return rows.find((row) => !row.isBestTake)?.id ?? null
-    })
+  const applyTakeThumbnail = useCallback((takeId: string, thumbnailUrl: string) => {
+    setTakes((prev) =>
+      prev.map((take) =>
+        take.id === takeId ? { ...take, thumbnailUrl } : take,
+      ),
+    )
   }, [])
+
+  const reloadProjectTakes = useCallback(
+    async (projectId: string) => {
+      const rows = await getTakesByProject(projectId)
+      const loaded = await uiTakesFromVaultRows(rows)
+
+      setTakes(loaded)
+      setBenchmarkId(findBestTakeId(rows))
+      setChallengerId((current) => {
+        if (current && rows.some((row) => row.id === current)) return current
+        return rows.find((row) => !row.isBestTake)?.id ?? null
+      })
+
+      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnail)
+    },
+    [applyTakeThumbnail],
+  )
 
   useEffect(() => {
     void (async () => {
@@ -109,8 +122,13 @@ export default function App() {
 
   const handleSelectProject = useCallback(
     async (projectId: string) => {
+      if (projectId === activeProjectIdRef.current) return
+
       pausePipVideos()
       setActiveProjectId(projectId)
+      setTakes([])
+      setBenchmarkId(null)
+      setChallengerId(null)
       await reloadProjectTakes(projectId)
     },
     [pausePipVideos, reloadProjectTakes],
@@ -398,20 +416,18 @@ export default function App() {
       if (ids.length === 0) return
 
       const idSet = new Set(ids)
-      setTakes((prev) => {
-        for (const take of prev) {
-          if (idSet.has(take.id)) {
-            removeTakeResources(take)
-          }
-        }
-        return prev.filter((take) => !idSet.has(take.id))
-      })
+      const removed = takes.filter((take) => idSet.has(take.id))
 
+      setTakes((prev) => prev.filter((take) => !idSet.has(take.id)))
       void Promise.all(ids.map((id) => deleteVaultTake(id)))
       setBenchmarkId((current) => (current && idSet.has(current) ? null : current))
       setChallengerId((current) => (current && idSet.has(current) ? null : current))
+
+      for (const take of removed) {
+        removeTakeResources(take)
+      }
     },
-    [removeTakeResources],
+    [removeTakeResources, takes],
   )
 
   const handleDeleteTake = useCallback(
@@ -425,14 +441,17 @@ export default function App() {
     const projectId = activeProjectIdRef.current
     if (!projectId || takes.length === 0) return
 
-    for (const take of takes) {
-      removeTakeResources(take)
-    }
-
-    void deleteTakesByProject(projectId)
+    const takesToRemove = takes
     setTakes([])
     setBenchmarkId(null)
     setChallengerId(null)
+
+    void (async () => {
+      await deleteTakesByProject(projectId)
+      for (const take of takesToRemove) {
+        removeTakeResources(take)
+      }
+    })()
   }, [removeTakeResources, takes])
 
   const activeProject = useMemo(
