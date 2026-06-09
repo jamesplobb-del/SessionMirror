@@ -3,17 +3,19 @@ import type { RecordingMode } from '../types'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
 
-const POLL_INTERVAL_MS = 4
+const POLL_INTERVAL_MS = 8
 const MIN_RECORDING_MS = 400
-const COOLDOWN_MS = 350
-const MONITOR_WARMUP_MS = 450
+const COOLDOWN_MS = 300
+const MONITOR_WARMUP_MS = 280
 const START_LATCH_MS = 3000
-const WARM_RETRY_MS = 600
-const QUIET_EMA_ALPHA = 0.04
+const WARM_RETRY_MS = 800
+const QUIET_EMA_ALPHA = 0.03
 
 interface UseAutoSoundRecordingOptions {
   enabled: boolean
   monitoringAllowed: boolean
+  /** Block new auto-starts (e.g. while take is playing back through speakers). */
+  suppressStart: boolean
   recordingMode: RecordingMode
   ready: boolean
   isRecording: boolean
@@ -28,17 +30,28 @@ interface UseAutoSoundRecordingOptions {
   onAutoRecordingFinished: () => void
 }
 
-function computeEffectiveGate(profile: AutoRecordProfile, quietRmsEma: number): number {
-  const ambientGate =
-    quietRmsEma > 0
-      ? quietRmsEma * profile.noiseHeadroom + profile.noiseMargin
-      : profile.gate
-  return Math.max(profile.gate, ambientGate)
+function percentile(sorted: number[], ratio: number): number {
+  if (sorted.length === 0) return 0
+  const index = Math.min(
+    sorted.length - 1,
+    Math.floor(sorted.length * ratio),
+  )
+  return sorted[index] ?? 0
+}
+
+function computeEffectiveGate(profile: AutoRecordProfile, quietRms: number): number {
+  if (quietRms <= 0) return profile.gate
+
+  const ambientGate = quietRms * profile.noiseHeadroom + profile.noiseMargin
+  const merged = Math.max(profile.gate, ambientGate)
+  const cap = profile.gate * profile.gateCapMultiplier
+  return Math.min(merged, cap)
 }
 
 export function useAutoSoundRecording({
   enabled,
   monitoringAllowed,
+  suppressStart,
   recordingMode,
   ready,
   isRecording,
@@ -69,6 +82,7 @@ export function useAutoSoundRecording({
   const cooldownUntilRef = useRef(0)
   const quietRmsEmaRef = useRef(0)
   const effectiveGateRef = useRef(0)
+  const suppressStartRef = useRef(suppressStart)
   const isRecordingRef = useRef(isRecording)
   const startRecordingRef = useRef(startRecording)
   const stopRecordingRef = useRef(stopRecording)
@@ -80,6 +94,7 @@ export function useAutoSoundRecording({
   const wasRecordingRef = useRef(isRecording)
 
   isRecordingRef.current = isRecording
+  suppressStartRef.current = suppressStart
   startRecordingRef.current = startRecording
   stopRecordingRef.current = stopRecording
   warmRecorderRef.current = warmRecorder
@@ -114,7 +129,14 @@ export function useAutoSoundRecording({
   }
 
   const triggerAutoStart = () => {
-    if (startLatchRef.current || isRecordingRef.current) return
+    if (
+      startLatchRef.current ||
+      isRecordingRef.current ||
+      suppressStartRef.current
+    ) {
+      return
+    }
+
     autoTriggeredRef.current = true
     loudSinceRef.current = null
     attackSinceRef.current = null
@@ -173,8 +195,6 @@ export function useAutoSoundRecording({
     }
 
     if (wasRecordingRef.current && shouldMonitor) {
-      autoTriggeredRef.current = false
-      clearStartLatch()
       loudSinceRef.current = null
       attackSinceRef.current = null
       cooldownUntilRef.current = performance.now() + COOLDOWN_MS
@@ -196,6 +216,7 @@ export function useAutoSoundRecording({
 
     let cancelled = false
     const calibrationSamples: number[] = []
+    let calibrated = false
 
     const setup = async () => {
       teardownMonitor()
@@ -217,7 +238,7 @@ export function useAutoSoundRecording({
 
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 128
-      analyser.smoothingTimeConstant = 0
+      analyser.smoothingTimeConstant = 0.08
 
       const source = audioContext.createMediaStreamSource(stream)
       source.connect(analyser)
@@ -228,12 +249,13 @@ export function useAutoSoundRecording({
       sampleBufferRef.current = new Float32Array(analyser.fftSize)
 
       monitorWarmUntilRef.current = performance.now() + MONITOR_WARMUP_MS
+      void warmRecorderRef.current()
 
       const tick = () => {
         if (cancelled || !analyserRef.current || !sampleBufferRef.current) return
 
         const now = performance.now()
-        if (now < cooldownUntilRef.current) return
+        if (now < cooldownUntilRef.current && !isRecordingRef.current) return
 
         const ctx = audioContextRef.current
         if (ctx?.state === 'suspended') {
@@ -245,8 +267,7 @@ export function useAutoSoundRecording({
         const gateLevel = profile.usePeak
           ? combinedGateLevel(metrics)
           : metrics.rms
-        const stopLevel = combinedGateLevel(metrics, 0.35)
-        const effectiveGate = effectiveGateRef.current
+        const stopGate = Math.max(profile.gate * profile.stopGateRatio, effectiveGateRef.current * 0.55)
 
         if (now < monitorWarmUntilRef.current) {
           calibrationSamples.push(metrics.rms)
@@ -255,15 +276,12 @@ export function useAutoSoundRecording({
           return
         }
 
-        if (calibrationSamples.length > 0) {
-          calibrationSamples.sort((a, b) => a - b)
-          const index = Math.min(
-            calibrationSamples.length - 1,
-            Math.floor(calibrationSamples.length * 0.85),
-          )
-          quietRmsEmaRef.current = calibrationSamples[index] ?? metrics.rms
-          calibrationSamples.length = 0
+        if (!calibrated && calibrationSamples.length > 0) {
+          const sorted = [...calibrationSamples].sort((a, b) => a - b)
+          quietRmsEmaRef.current = percentile(sorted, 0.5)
           effectiveGateRef.current = computeEffectiveGate(profile, quietRmsEmaRef.current)
+          calibrationSamples.length = 0
+          calibrated = true
           void warmRecorderRef.current()
         }
 
@@ -271,7 +289,7 @@ export function useAutoSoundRecording({
           silenceSinceRef.current = null
           recordingStartedAtRef.current = null
 
-          if (metrics.rms < effectiveGate * 0.85) {
+          if (!suppressStartRef.current && metrics.rms < effectiveGateRef.current * 0.9) {
             quietRmsEmaRef.current =
               quietRmsEmaRef.current === 0
                 ? metrics.rms
@@ -281,6 +299,12 @@ export function useAutoSoundRecording({
               profile,
               quietRmsEmaRef.current,
             )
+          }
+
+          if (suppressStartRef.current) {
+            loudSinceRef.current = null
+            attackSinceRef.current = null
+            return
           }
 
           const currentGate = effectiveGateRef.current
@@ -299,7 +323,6 @@ export function useAutoSoundRecording({
               !startLatchRef.current
             ) {
               triggerAutoStart()
-              return
             }
             loudSinceRef.current = null
           } else {
@@ -313,7 +336,6 @@ export function useAutoSoundRecording({
                 !startLatchRef.current
               ) {
                 triggerAutoStart()
-                return
               }
             } else {
               loudSinceRef.current = null
@@ -333,8 +355,9 @@ export function useAutoSoundRecording({
         }
 
         const recordingDuration = now - recordingStartedAtRef.current
+        const stillLoud = metrics.rms >= stopGate || gateLevel >= stopGate
 
-        if (stopLevel >= effectiveGateRef.current * 0.72) {
+        if (stillLoud) {
           silenceSinceRef.current = null
         } else if (recordingDuration >= MIN_RECORDING_MS) {
           if (silenceSinceRef.current === null) {

@@ -84,6 +84,10 @@ export interface AutoRecordProfile {
   noiseMargin: number
   /** Peak must exceed effective gate by this factor for attack path. */
   attackPeakRatio: number
+  /** Cap adaptive gate relative to user gate — prevents runaway sensitivity loss. */
+  gateCapMultiplier: number
+  /** Silence stop threshold as fraction of user gate. */
+  stopGateRatio: number
 }
 
 /** Per-slider detection profile — loud mode rejects peak-only spikes; sensitive mode triggers fast. */
@@ -95,11 +99,13 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
     return {
       gate,
       usePeak: false,
-      holdMs: 72,
+      holdMs: 56,
       attackHoldMs: 0,
-      noiseHeadroom: 3.5,
-      noiseMargin: 0.001,
+      noiseHeadroom: 2.2,
+      noiseMargin: 0.0004,
       attackPeakRatio: 0,
+      gateCapMultiplier: 2.5,
+      stopGateRatio: 0.45,
     }
   }
 
@@ -107,21 +113,25 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
     return {
       gate,
       usePeak: true,
-      holdMs: 28,
+      holdMs: 24,
       attackHoldMs: 12,
-      noiseHeadroom: 2.2,
-      noiseMargin: 0.00015,
-      attackPeakRatio: 1.75,
+      noiseHeadroom: 1.8,
+      noiseMargin: 0.0001,
+      attackPeakRatio: 1.6,
+      gateCapMultiplier: 4,
+      stopGateRatio: 0.38,
     }
   }
 
   return {
     gate,
     usePeak: true,
-    holdMs: 44,
-    attackHoldMs: 20,
-    noiseHeadroom: 2.8,
-    noiseMargin: 0.00035,
-    attackPeakRatio: 1.9,
+    holdMs: 36,
+    attackHoldMs: 16,
+    noiseHeadroom: 2,
+    noiseMargin: 0.0002,
+    attackPeakRatio: 1.75,
+    gateCapMultiplier: 3,
+    stopGateRatio: 0.42,
   }
 }
