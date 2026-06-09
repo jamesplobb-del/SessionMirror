@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { RecordingMode } from '../types'
 import { readAnalyserRms } from '../utils/audioLevel'
 import { volumeThresholdToLevel } from '../utils/appSettings'
@@ -59,10 +59,42 @@ export function useAutoSoundRecording({
   gateRef.current = volumeThresholdToLevel(volumeThreshold)
   silenceMsRef.current = silenceMs
 
-  useEffect(() => {
-    if (!enabled || !monitoringAllowed || recordingMode !== 'audio' || !ready) {
-      return
+  const shouldMonitor =
+    enabled && monitoringAllowed && recordingMode === 'audio' && ready
+
+  const teardownMonitor = () => {
+    if (rafRef.current !== null) {
+      window.cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
     }
+
+    try {
+      sourceRef.current?.disconnect()
+    } catch {
+      /* ignore */
+    }
+    sourceRef.current = null
+    analyserRef.current = null
+
+    const ctx = audioContextRef.current
+    audioContextRef.current = null
+    if (ctx && ctx.state !== 'closed') {
+      void ctx.close().catch(() => {})
+    }
+
+    loudSinceRef.current = null
+    silenceSinceRef.current = null
+    recordingStartedAtRef.current = null
+    autoTriggeredRef.current = false
+  }
+
+  useLayoutEffect(() => {
+    if (shouldMonitor) return
+    teardownMonitor()
+  }, [shouldMonitor])
+
+  useEffect(() => {
+    if (!shouldMonitor) return
 
     const stream = streamRef.current
     if (!stream || stream.getAudioTracks().every((track) => track.readyState !== 'live')) {
@@ -72,6 +104,8 @@ export function useAutoSoundRecording({
     let cancelled = false
 
     const setup = async () => {
+      teardownMonitor()
+
       const audioContext = new AudioContext()
       if (cancelled) {
         await audioContext.close().catch(() => {})
@@ -80,6 +114,11 @@ export function useAutoSoundRecording({
 
       if (audioContext.state === 'suspended') {
         await audioContext.resume().catch(() => {})
+      }
+
+      if (cancelled) {
+        await audioContext.close().catch(() => {})
+        return
       }
 
       const analyser = audioContext.createAnalyser()
@@ -167,23 +206,9 @@ export function useAutoSoundRecording({
 
     return () => {
       cancelled = true
-      if (rafRef.current !== null) {
-        window.cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
-      }
-
-      sourceRef.current?.disconnect()
-      sourceRef.current = null
-      analyserRef.current = null
-
-      const ctx = audioContextRef.current
-      audioContextRef.current = null
-      void ctx?.close().catch(() => {})
-
-      loudSinceRef.current = null
-      silenceSinceRef.current = null
-      recordingStartedAtRef.current = null
-      autoTriggeredRef.current = false
+      teardownMonitor()
     }
-  }, [enabled, monitoringAllowed, ready, recordingMode, streamGeneration, streamRef])
+  }, [shouldMonitor, streamGeneration, streamRef])
+
+  return { teardownMonitor }
 }

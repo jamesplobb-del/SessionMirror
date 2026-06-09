@@ -168,13 +168,15 @@ export default function SettingsDrawer({
 
                 <SettingSlider
                   label="Start Loudness"
-                  description="How loud playing must be before recording begins. Lower = more sensitive."
+                  description="Left = picks up quiet playing. Right = only loud playing triggers recording."
                   value={settings.soundVolumeThreshold}
                   min={1}
                   max={100}
                   step={1}
                   unit=""
-                  formatValue={(value) => (value <= 25 ? 'Sensitive' : value >= 75 ? 'Loud only' : 'Balanced')}
+                  formatValue={(value) =>
+                    value <= 30 ? 'Sensitive' : value >= 70 ? 'Loud only' : 'Balanced'
+                  }
                   onChange={(value) => onUpdate({ soundVolumeThreshold: value })}
                 />
               </div>

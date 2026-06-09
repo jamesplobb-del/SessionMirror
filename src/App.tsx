@@ -71,6 +71,7 @@ export default function App() {
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const pendingAutoPlaybackRef = useRef(false)
+  const autoPlaybackTakeIdRef = useRef<string | null>(null)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -186,6 +187,11 @@ export default function App() {
         setChallengerId(next.id)
         return [...prev, next]
       })
+
+      if (mediaType === 'audio' && pendingAutoPlaybackRef.current) {
+        pendingAutoPlaybackRef.current = false
+        autoPlaybackTakeIdRef.current = takeId
+      }
 
       if (mediaType === 'audio') {
         setTakes((current) =>
@@ -323,21 +329,41 @@ export default function App() {
   )
 
   useEffect(() => {
-    if (!pendingAutoPlaybackRef.current || isRecording) return
-    if (!challengerTake || challengerTake.mediaType !== 'audio') return
+    const takeId = autoPlaybackTakeIdRef.current
+    if (!takeId || !challengerTake || challengerTake.id !== takeId) return
 
-    pendingAutoPlaybackRef.current = false
-    const timer = window.setTimeout(() => {
+    autoPlaybackTakeIdRef.current = null
+
+    let attempts = 0
+    let cancelled = false
+
+    const tryPlay = () => {
+      if (cancelled) return
+      attempts += 1
+
       const media = challengerPipVideoRef.current
-      if (!media) return
-      media.muted = false
-      void media.play().catch(() => {})
-    }, 200)
+      if (media) {
+        media.muted = false
+        void media.play().catch(() => {
+          if (attempts < 15) {
+            window.setTimeout(tryPlay, 120)
+          }
+        })
+        return
+      }
+
+      if (attempts < 15) {
+        window.setTimeout(tryPlay, 120)
+      }
+    }
+
+    const timer = window.setTimeout(tryPlay, 150)
 
     return () => {
+      cancelled = true
       window.clearTimeout(timer)
     }
-  }, [challengerTake, isRecording])
+  }, [challengerTake?.id, challengerTake?.videoUrl])
 
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),

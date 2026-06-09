@@ -63,5 +63,5 @@ export function volumeThresholdToLevel(sliderValue: number): number {
   const normalized = clamp(sliderValue, 1, 100) / 100
   const maxLevel = 0.22
   const minLevel = 0.006
-  return maxLevel - normalized * (maxLevel - minLevel)
+  return minLevel + normalized * (maxLevel - minLevel)
 }

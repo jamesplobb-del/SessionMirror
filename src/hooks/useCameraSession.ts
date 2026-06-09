@@ -26,6 +26,7 @@ const CAMERA_INIT_RETRY_MS = 450
 const CAMERA_RELEASE_DELAY_MS = 700
 const FOREGROUND_RESTART_DELAY_MS = 250
 const IOS_CAMERA_RELEASE_DELAY_MS = 250
+const IOS_AUDIO_TO_VIDEO_DELAY_MS = 200
 const BACKGROUND_SUSPEND_DELAY_MS = 500
 
 function detachPreviewStream(video: HTMLVideoElement | null) {
@@ -91,6 +92,7 @@ export function useCameraSession({
   const chunksRef = useRef<BlobPart[]>([])
   const recorderMimeTypeRef = useRef<string>('video/webm')
   const recordingModeRef = useRef<RecordingMode>('video')
+  const previousRecordingModeRef = useRef<RecordingMode>('video')
   const isRecordingRef = useRef(false)
   const readyRef = useRef(false)
   const resumeInFlightRef = useRef(false)
@@ -245,8 +247,21 @@ export function useCameraSession({
         forceClearCameraState()
       }
 
+      const mode = recordingMode
+      const leavingAudioForVideo =
+        previousRecordingModeRef.current === 'audio' && mode === 'video'
+
+      if (leavingAudioForVideo && Capacitor.isNativePlatform()) {
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, IOS_AUDIO_TO_VIDEO_DELAY_MS),
+        )
+        if (cancelled) return
+      }
+
+      previousRecordingModeRef.current = mode
+
       try {
-        const mediaStream = await acquireStream(recordingMode, () => cancelled)
+        const mediaStream = await acquireStream(mode, () => cancelled)
         if (cancelled) {
           if (mediaStream) {
             stopStreamTracks(mediaStream)
@@ -481,10 +496,18 @@ export function useCameraSession({
 
   const changeRecordingMode = useCallback(
     (mode: RecordingMode) => {
-      if (isRecording) return
+      if (isRecording || mode === recordingModeRef.current) return
+
+      cancelScheduledRelease()
+      stopStreamTracks(streamRef.current)
+      streamRef.current = null
+      detachPreviewStream(previewRef.current)
+      setReady(false)
+      setStreamGeneration((generation) => generation + 1)
+      setError(null)
       setRecordingMode(mode)
     },
-    [isRecording],
+    [cancelScheduledRelease, isRecording, stopStreamTracks],
   )
 
   const suspendCameraForBackground = useCallback(() => {

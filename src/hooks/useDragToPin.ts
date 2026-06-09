@@ -6,6 +6,7 @@ import {
   type PointerEvent,
   type RefObject,
 } from 'react'
+import { triggerDragStartHaptic, triggerSelectionHaptic } from '../utils/haptics'
 
 const LONG_PRESS_MS = 280
 const DRAG_THRESHOLD_PX = 8
@@ -88,8 +89,8 @@ export function useDragToPin({
       longPressTimerRef.current = window.setTimeout(() => {
         armedRef.current = true
         setIsArming(true)
-        if (hapticFeedback && navigator.vibrate) {
-          navigator.vibrate(12)
+        if (hapticFeedback) {
+          void triggerSelectionHaptic()
         }
       }, LONG_PRESS_MS)
     },
@@ -117,6 +118,9 @@ export function useDragToPin({
         draggingRef.current = true
         setIsArming(false)
         event.preventDefault()
+        if (hapticFeedback) {
+          void triggerDragStartHaptic()
+        }
       }
 
       if (!draggingRef.current) return
@@ -134,7 +138,7 @@ export function useDragToPin({
         overTarget,
       })
     },
-    [clearLongPressTimer, dropTargetRef],
+    [clearLongPressTimer, dropTargetRef, hapticFeedback],
   )
 
   const handlePointerEnd = useCallback(
