@@ -110,6 +110,7 @@ export function useAutoSoundRecording({
   const profileRef = useRef(getAutoRecordProfile(volumeThreshold))
   const silenceMsRef = useRef(silenceMs)
   const wasRecordingRef = useRef(isRecording)
+  const appliedVolumeThresholdRef = useRef(volumeThreshold)
 
   isRecordingRef.current = isRecording
   suppressStartRef.current = suppressStart
@@ -478,6 +479,28 @@ export function useAutoSoundRecording({
       teardownMonitor()
     }
   }, [shouldMonitor, streamGeneration, streamRef, monitorEpoch])
+
+  useEffect(() => {
+    if (!shouldMonitor) return
+    if (appliedVolumeThresholdRef.current === volumeThreshold) return
+
+    const timer = window.setTimeout(() => {
+      if (appliedVolumeThresholdRef.current === volumeThreshold) return
+
+      appliedVolumeThresholdRef.current = volumeThreshold
+      profileRef.current = getAutoRecordProfile(volumeThreshold)
+      quietRmsEmaRef.current = 0
+      effectiveGateRef.current = profileRef.current.gate
+      loudSinceRef.current = null
+      attackSinceRef.current = null
+      clearStartLatch()
+      bumpMonitorEpoch()
+    }, 300)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [volumeThreshold, shouldMonitor])
 
   useEffect(() => {
     if (!shouldMonitor) return

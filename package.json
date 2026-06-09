@@ -9,6 +9,7 @@
     "build": "npm run copy:sql:wasm && tsc -b && vite build",
     "preview": "vite preview",
     "cap:sync": "npm run build && npx cap sync ios",
+    "cap:icons": "npx @capacitor/assets generate --iconBackgroundColor \"#0c0a09\" --iconBackgroundColorDark \"#0c0a09\" --splashBackgroundColor \"#0c0a09\" --splashBackgroundColorDark \"#0c0a09\"",
     "cap:open": "npx cap open ios"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^7.2.0",
+    "@capacitor/assets": "^3.0.5",
     "@tailwindcss/vite": "^4.1.8",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",

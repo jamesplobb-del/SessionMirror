@@ -77,3 +77,15 @@ npx cap sync ios
 ```
 
 Then rebuild in Xcode.
+
+## 8. App icon
+
+Source icon: `assets/icon.png` (1024×1024). After updating the icon:
+
+```bash
+npm install
+npm run cap:icons
+npm run cap:sync
+```
+
+Then rebuild in Xcode. Web/PWA icons are served from `public/icons/`.
