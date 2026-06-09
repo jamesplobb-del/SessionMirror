@@ -14,7 +14,6 @@ import {
 } from '../utils/takeStorage'
 import {
   applyViewportCssVarsOnResume,
-  rebindCameraPreviewStream,
   refreshCameraPreviewLayout,
 } from '../utils/viewportSync'
 
@@ -25,7 +24,33 @@ interface UseCameraSessionOptions {
 const CAMERA_INIT_MAX_ATTEMPTS = 3
 const CAMERA_INIT_RETRY_MS = 450
 const CAMERA_RELEASE_DELAY_MS = 700
-const CAMERA_RESUME_SYNC_MS = [0, 100, 250, 500]
+const FOREGROUND_RESTART_DELAY_MS = 250
+const IOS_CAMERA_RELEASE_DELAY_MS = 250
+
+function detachPreviewStream(video: HTMLVideoElement | null) {
+  if (!video) return
+  try {
+    video.pause()
+    video.srcObject = null
+  } catch {
+    /* ignore */
+  }
+}
+
+function isStreamRecordable(stream: MediaStream | null, mode: RecordingMode): boolean {
+  if (!stream) return false
+
+  const audioLive = stream
+    .getAudioTracks()
+    .some((track) => track.readyState === 'live' && track.enabled)
+  if (!audioLive) return false
+
+  if (mode === 'audio') return true
+
+  return stream
+    .getVideoTracks()
+    .some((track) => track.readyState === 'live' && track.enabled)
+}
 
 function detachRecorder(recorder: MediaRecorder) {
   recorder.ondataavailable = null
@@ -66,7 +91,10 @@ export function useCameraSession({
   const recorderMimeTypeRef = useRef<string>('video/webm')
   const recordingModeRef = useRef<RecordingMode>('video')
   const isRecordingRef = useRef(false)
+  const readyRef = useRef(false)
   const resumeInFlightRef = useRef(false)
+  const foregroundRestartTokenRef = useRef(0)
+  const foregroundRestartTimerRef = useRef<number | null>(null)
   const releaseTimerRef = useRef<number | null>(null)
   const onCompleteRef = useRef(onRecordingComplete)
   onCompleteRef.current = onRecordingComplete
@@ -80,6 +108,7 @@ export function useCameraSession({
 
   recordingModeRef.current = recordingMode
   isRecordingRef.current = isRecording
+  readyRef.current = ready
 
   const cancelScheduledRelease = useCallback(() => {
     if (releaseTimerRef.current !== null) {
@@ -138,16 +167,16 @@ export function useCameraSession({
     setReady(false)
     setStreamGeneration((generation) => generation + 1)
 
-    const video = previewRef.current
-    if (video) {
-      try {
-        video.pause()
-        video.srcObject = null
-      } catch {
-        /* ignore */
-      }
-    }
+    detachPreviewStream(previewRef.current)
   }, [])
+
+  const releaseLiveStream = useCallback(() => {
+    stopStreamTracks(streamRef.current)
+    streamRef.current = null
+    setReady(false)
+    setStreamGeneration((generation) => generation + 1)
+    detachPreviewStream(previewRef.current)
+  }, [stopStreamTracks])
 
   const scheduleReleaseCameraState = useCallback(() => {
     cancelScheduledRelease()
@@ -160,10 +189,18 @@ export function useCameraSession({
   const acquireStream = useCallback(
     async (mode: RecordingMode, cancelled?: () => boolean) => {
       setError(null)
+
+      stopStreamTracks(streamRef.current)
+      streamRef.current = null
+      detachPreviewStream(previewRef.current)
+
       const constraints: MediaStreamConstraints =
         mode === 'audio'
           ? { audio: true, video: false }
-          : { audio: true, video: true }
+          : {
+              audio: true,
+              video: { facingMode: 'user' },
+            }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
       if (cancelled?.()) {
@@ -176,8 +213,23 @@ export function useCameraSession({
       setReady(true)
       return mediaStream
     },
-    [],
+    [stopStreamTracks],
   )
+
+  const ensureRecordableStream = useCallback(async (): Promise<MediaStream | null> => {
+    const mode = recordingModeRef.current
+    const stream = streamRef.current
+
+    if (readyRef.current && isStreamRecordable(stream, mode)) {
+      return stream
+    }
+
+    try {
+      return await acquireStream(mode)
+    } catch {
+      return null
+    }
+  }, [acquireStream])
 
   useEffect(() => {
     let cancelled = false
@@ -264,10 +316,12 @@ export function useCameraSession({
   }, [isRecording])
 
   const startRecording = useCallback(() => {
-    const currentStream = streamRef.current
-    if (!currentStream || isRecording) return
+    if (isRecording) return
 
     void (async () => {
+      const currentStream = await ensureRecordableStream()
+      if (!currentStream || isRecordingRef.current) return
+
       const takeId = crypto.randomUUID()
       const mode = recordingModeRef.current
       const mimeType = getRecorderMimeTypeForMode(mode)
@@ -384,7 +438,7 @@ export function useCameraSession({
       chunksRef.current = []
       setIsRecording(false)
     })
-  }, [abortActiveWriter, isRecording])
+  }, [abortActiveWriter, ensureRecordableStream, isRecording])
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current
@@ -420,83 +474,98 @@ export function useCameraSession({
     [isRecording],
   )
 
-  const recoverCameraAfterResume = useCallback(async () => {
+  const suspendCameraForBackground = useCallback(() => {
+    if (isRecordingRef.current) return
+    cancelScheduledRelease()
+    releaseLiveStream()
+  }, [cancelScheduledRelease, releaseLiveStream])
+
+  const restartCameraAfterForeground = useCallback(async () => {
     if (isRecordingRef.current || resumeInFlightRef.current) return
 
-    const mode = recordingModeRef.current
-    if (mode === 'audio') return
-
+    const restartToken = ++foregroundRestartTokenRef.current
     resumeInFlightRef.current = true
     cancelScheduledRelease()
 
     try {
       applyViewportCssVarsOnResume()
+      releaseLiveStream()
 
-      const stream = streamRef.current
-      const videoTrack = stream?.getVideoTracks()[0]
-      const video = previewRef.current
-
-      if (!stream || !videoTrack || videoTrack.readyState === 'ended') {
-        stopStreamTracks(streamRef.current)
-        streamRef.current = null
-        if (video) {
-          video.srcObject = null
-        }
-        await acquireStream(mode)
-        return
+      if (Capacitor.isNativePlatform()) {
+        await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
       }
+      if (restartToken !== foregroundRestartTokenRef.current) return
 
-      if (video) {
-        rebindCameraPreviewStream(video)
-        refreshCameraPreviewLayout(video)
-        setStreamGeneration((generation) => generation + 1)
-      } else {
-        attachPreviewStream(previewRef.current, stream, mode)
-        setStreamGeneration((generation) => generation + 1)
-      }
+      await acquireStream(recordingModeRef.current)
+      if (restartToken !== foregroundRestartTokenRef.current) return
+
+      refreshCameraPreviewLayout(previewRef.current)
     } catch {
       setError('Camera interrupted. Close and reopen the app if the preview looks wrong.')
     } finally {
-      resumeInFlightRef.current = false
+      if (restartToken === foregroundRestartTokenRef.current) {
+        resumeInFlightRef.current = false
+      }
     }
-  }, [acquireStream, cancelScheduledRelease, stopStreamTracks])
+  }, [acquireStream, cancelScheduledRelease, releaseLiveStream])
+
+  const scheduleForegroundRecovery = useCallback(() => {
+    if (foregroundRestartTimerRef.current !== null) {
+      window.clearTimeout(foregroundRestartTimerRef.current)
+    }
+
+    foregroundRestartTimerRef.current = window.setTimeout(() => {
+      foregroundRestartTimerRef.current = null
+      void restartCameraAfterForeground()
+    }, FOREGROUND_RESTART_DELAY_MS)
+  }, [restartCameraAfterForeground])
 
   useEffect(() => {
-    const scheduleResumeRecovery = () => {
-      CAMERA_RESUME_SYNC_MS.forEach((delay) => {
-        window.setTimeout(() => {
-          void recoverCameraAfterResume()
-        }, delay)
-      })
-    }
-
-    if (Capacitor.isNativePlatform()) {
-      let removeListener: (() => void) | undefined
-
-      void import('@capacitor/app').then(({ App }) =>
-        App.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) scheduleResumeRecovery()
-        }).then((handle) => {
-          removeListener = () => {
-            void handle.remove()
+    const bindAppLifecycle = async () => {
+      if (Capacitor.isNativePlatform()) {
+        const { App } = await import('@capacitor/app')
+        return App.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) {
+            scheduleForegroundRecovery()
+            return
           }
-        }),
-      )
+          suspendCameraForBackground()
+        })
+      }
 
-      return () => {
-        removeListener?.()
+      const onVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          scheduleForegroundRecovery()
+          return
+        }
+        suspendCameraForBackground()
+      }
+
+      document.addEventListener('visibilitychange', onVisibilityChange)
+      return {
+        remove: async () => {
+          document.removeEventListener('visibilitychange', onVisibilityChange)
+        },
       }
     }
 
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        scheduleResumeRecovery()
-      }
-    }
+    let removeListener: (() => void) | undefined
 
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [recoverCameraAfterResume])
+    void bindAppLifecycle().then((handle) => {
+      removeListener = () => {
+        void handle.remove()
+      }
+    })
+
+    return () => {
+      if (foregroundRestartTimerRef.current !== null) {
+        window.clearTimeout(foregroundRestartTimerRef.current)
+        foregroundRestartTimerRef.current = null
+      }
+      foregroundRestartTokenRef.current += 1
+      removeListener?.()
+    }
+  }, [scheduleForegroundRecovery, suspendCameraForBackground])
 
   return {
     previewRef,

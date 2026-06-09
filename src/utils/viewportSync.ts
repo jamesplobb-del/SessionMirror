@@ -110,19 +110,6 @@ export function refreshCameraPreviewLayout(video: HTMLVideoElement | null): void
   void video.play().catch(() => {})
 }
 
-/** iOS WKWebView keeps a stale video frame after backgrounding — rebind the stream. */
-export function rebindCameraPreviewStream(video: HTMLVideoElement): void {
-  const stream = video.srcObject
-  if (!(stream instanceof MediaStream)) return
-
-  applyViewportCssVarsOnResume()
-  video.srcObject = null
-  void video.offsetHeight
-  video.srcObject = stream
-  video.muted = true
-  void video.play().catch(() => {})
-}
-
 const BOOT_SYNC_DELAYS_MS = [0, 50, 100, 250, 500, 750, 1000, 1500, 2000]
 const RESUME_SYNC_DELAYS_MS = [0, 50, 100, 250, 500, 750]
 
