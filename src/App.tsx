@@ -300,7 +300,7 @@ export default function App() {
               filePath={challengerTake?.filePath}
               mimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
               takeName={challengerTake?.name}
-              label={challengerTake?.name ?? 'Current Take'}
+              label="Current Take"
               variant="challenger"
               emptyMessage="Load a take from the vault."
               mirror={challengerTake?.mirrorPlayback !== false}
