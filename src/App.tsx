@@ -78,7 +78,10 @@ export default function App() {
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const pendingAutoPlaybackRef = useRef(false)
   const autoPlaybackTakeIdRef = useRef<string | null>(null)
+  const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
+  const [autoPlaybackSuppressRecording, setAutoPlaybackSuppressRecording] =
+    useState(false)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -253,7 +256,11 @@ export default function App() {
   })
 
   const autoMonitoringAllowed =
-    !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
+    !isVaultOpen &&
+    !isSettingsOpen &&
+    !isReviewOpen &&
+    ready &&
+    !autoPlaybackSuppressRecording
 
   useAutoSoundRecording({
     enabled: settings.autoSoundRecording,
@@ -275,6 +282,7 @@ export default function App() {
     },
     onAutoRecordingFinished: () => {
       pendingAutoPlaybackRef.current = true
+      setAutoPlaybackSuppressRecording(true)
     },
   })
 
@@ -351,6 +359,44 @@ export default function App() {
 
     let attempts = 0
     let cancelled = false
+    let detachPlaybackGuard: (() => void) | null = null
+
+    const clearReleaseTimer = () => {
+      if (autoPlaybackReleaseTimerRef.current !== null) {
+        window.clearTimeout(autoPlaybackReleaseTimerRef.current)
+        autoPlaybackReleaseTimerRef.current = null
+      }
+    }
+
+    const releaseAutoPlaybackSuppress = () => {
+      clearReleaseTimer()
+      autoPlaybackReleaseTimerRef.current = window.setTimeout(() => {
+        autoPlaybackReleaseTimerRef.current = null
+        setAutoPlaybackSuppressRecording(false)
+      }, 1500)
+    }
+
+    const attachPlaybackGuard = (media: HTMLMediaElement) => {
+      detachPlaybackGuard?.()
+
+      const onEnded = () => {
+        releaseAutoPlaybackSuppress()
+      }
+
+      const onPause = () => {
+        if (media.ended || media.currentTime >= Math.max(media.duration - 0.05, 0)) {
+          releaseAutoPlaybackSuppress()
+        }
+      }
+
+      media.addEventListener('ended', onEnded)
+      media.addEventListener('pause', onPause)
+
+      detachPlaybackGuard = () => {
+        media.removeEventListener('ended', onEnded)
+        media.removeEventListener('pause', onPause)
+      }
+    }
 
     const tryPlay = () => {
       if (cancelled) return
@@ -358,17 +404,26 @@ export default function App() {
 
       const media = challengerPipVideoRef.current
       if (media) {
+        setAutoPlaybackSuppressRecording(true)
+        attachPlaybackGuard(media)
         media.muted = false
         void media.play().catch(() => {
           if (attempts < 15) {
             window.setTimeout(tryPlay, 120)
+            return
           }
+
+          detachPlaybackGuard?.()
+          detachPlaybackGuard = null
+          setAutoPlaybackSuppressRecording(false)
         })
         return
       }
 
       if (attempts < 15) {
         window.setTimeout(tryPlay, 120)
+      } else {
+        setAutoPlaybackSuppressRecording(false)
       }
     }
 
@@ -377,6 +432,8 @@ export default function App() {
     return () => {
       cancelled = true
       window.clearTimeout(timer)
+      detachPlaybackGuard?.()
+      clearReleaseTimer()
     }
   }, [challengerTake?.id, challengerTake?.videoUrl])
 
