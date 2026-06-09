@@ -511,36 +511,36 @@ export default function ReviewModeOverlay({
         className="pointer-events-none absolute inset-x-0 top-0 z-40 bg-gradient-to-b from-black/55 to-transparent px-5 pb-3"
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
-        <div className="relative">
-          <div className="flex items-start gap-2 pr-24">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
-                {activeLabel}
-              </p>
-              {activeName && (
-                <p className="text-sm font-medium text-white">{activeName}</p>
-              )}
-            </div>
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              {activeLabel}
+            </p>
+            {activeName && (
+              <p className="text-sm font-medium text-white">{activeName}</p>
+            )}
+          </div>
+          <div className="pointer-events-auto flex shrink-0 items-center gap-2">
             {onOpenPitchAnalysis && !isVault && (
               <button
                 type="button"
                 onClick={onOpenPitchAnalysis}
-                className="pointer-events-auto flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 text-white backdrop-blur-md transition hover:bg-white/25"
+                className="flex h-11 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 text-white backdrop-blur-md transition hover:bg-white/25"
                 aria-label="Open pitch analysis"
               >
                 <AudioLines className="h-4 w-4" />
-                <span className="text-xs font-medium">Pitch</span>
+                <span className="text-xs font-medium">Pitch Analysis</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleCloseClick}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/25"
+              aria-label="Done"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleCloseClick}
-            className="pointer-events-auto absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/25"
-            aria-label="Done"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
       </div>
 

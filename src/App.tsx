@@ -507,12 +507,25 @@ export default function App() {
     pausePipVideos()
   }, [pausePipVideos])
 
-  const canOpenPitchAnalysis = Boolean(
-    benchmarkTake?.videoUrl &&
-      challengerTake?.videoUrl &&
-      !isAudioTake(benchmarkTake) &&
-      !isAudioTake(challengerTake),
-  )
+  const pitchComparison = useMemo(() => {
+    const current = challengerTake
+    if (!current?.videoUrl || isAudioTake(current)) return null
+
+    let best = benchmarkTake
+    if (!best?.videoUrl || isAudioTake(best) || best.id === current.id) {
+      best =
+        takes.find(
+          (take) =>
+            take.id !== current.id && take.videoUrl && !isAudioTake(take),
+        ) ?? null
+    }
+
+    if (!best?.videoUrl || best.id === current.id) return null
+
+    return { currentTake: current, bestTake: best }
+  }, [benchmarkTake, challengerTake, takes])
+
+  const canOpenPitchAnalysis = pitchComparison != null
 
   useEffect(() => {
     if (isPitchAnalysisOpen && !canOpenPitchAnalysis) {
@@ -713,6 +726,9 @@ export default function App() {
                 ? () => handleOpenCompareReview('challenger')
                 : undefined
             }
+            onOpenPitchAnalysis={
+              canOpenPitchAnalysis ? handleOpenPitchAnalysis : undefined
+            }
             onDragStateChange={setPipDragState}
             hapticFeedback={settings.hapticFeedback}
           />
@@ -760,12 +776,12 @@ export default function App() {
         onOpenPitchAnalysis={canOpenPitchAnalysis ? handleOpenPitchAnalysis : undefined}
       />
 
-      {benchmarkTake && challengerTake && (
+      {pitchComparison && (
         <PitchAnalysis
           isOpen={isPitchAnalysisOpen}
           onClose={handleClosePitchAnalysis}
-          currentTake={challengerTake}
-          bestTake={benchmarkTake}
+          currentTake={pitchComparison.currentTake}
+          bestTake={pitchComparison.bestTake}
         />
       )}
 
