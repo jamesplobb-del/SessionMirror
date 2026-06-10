@@ -5,7 +5,7 @@ import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import Pressable from './ui/Pressable'
-import { iosEaseOut, iosScreenEnter, iosScreenExit } from '../utils/motionPresets'
+import { iosEaseOut, iosScreenEnter, iosScreenExit, motionGpuLayer } from '../utils/motionPresets'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
@@ -704,7 +704,10 @@ export default function ReviewModeOverlay({
       initial="initial"
       animate="animate"
       exit="exit"
-      style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
+      style={{
+        ...motionGpuLayer,
+        pointerEvents: isOpen ? 'auto' : 'none',
+      }}
       aria-hidden={!isOpen}
     >
       <div ref={reviewBoundsRef} className="relative h-full w-full">

@@ -1,4 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  startTransition,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Capacitor } from '@capacitor/core'
 import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
@@ -36,7 +46,7 @@ import { scheduleViewportSync } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
-import { iosHudDim } from './utils/motionPresets'
+import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -623,12 +633,16 @@ export default function App() {
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleCloseVault = useCallback(() => {
-    setIsVaultOpen(false)
+    startTransition(() => {
+      setIsVaultOpen(false)
+    })
   }, [])
 
   const handleOpenVault = useCallback(() => {
-    setIsSettingsOpen(false)
-    setIsVaultOpen(true)
+    startTransition(() => {
+      setIsSettingsOpen(false)
+      setIsVaultOpen(true)
+    })
     deferHudMediaPause()
   }, [deferHudMediaPause])
 
@@ -658,13 +672,23 @@ export default function App() {
   }, [applyTakeThumbnails, isVaultOpen])
 
   const handleOpenSettings = useCallback(() => {
-    setIsVaultOpen(false)
-    setIsSettingsOpen(true)
+    startTransition(() => {
+      setIsVaultOpen(false)
+      setIsSettingsOpen(true)
+    })
     deferHudMediaPause()
   }, [deferHudMediaPause])
 
   const handleCloseSettings = useCallback(() => {
-    setIsSettingsOpen(false)
+    startTransition(() => {
+      setIsSettingsOpen(false)
+    })
+  }, [])
+
+  const handleQuickSettingsOpenChange = useCallback((open: boolean) => {
+    startTransition(() => {
+      setQuickSettingsOpen(open)
+    })
   }, [])
 
   const suspendPipPlayback =
@@ -840,10 +864,12 @@ export default function App() {
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
-      setVaultReviewIndex(index >= 0 ? index : 0)
-      setReviewContext('vault')
-      setReviewSlot('benchmark')
-      setIsVaultOpen(false)
+      startTransition(() => {
+        setVaultReviewIndex(index >= 0 ? index : 0)
+        setReviewContext('vault')
+        setReviewSlot('benchmark')
+        setIsVaultOpen(false)
+      })
       deferHudMediaPause()
     },
     [deferHudMediaPause, sortedTakes],
@@ -859,12 +885,14 @@ export default function App() {
   )
 
   const handleCloseReview = useCallback(() => {
-    setReviewSlot(null)
-    setReviewContext((context) => {
-      if (context === 'vault') {
-        setIsVaultOpen(true)
-      }
-      return 'compare'
+    startTransition(() => {
+      setReviewSlot(null)
+      setReviewContext((context) => {
+        if (context === 'vault') {
+          setIsVaultOpen(true)
+        }
+        return 'compare'
+      })
     })
     pausePipVideos()
     stopAutoPlaybackAudio()
@@ -1140,7 +1168,10 @@ export default function App() {
           scale: hudModalState === 'review' ? 0.94 : hudModalState === 'sheet' ? 0.985 : 1,
         }}
         transition={iosHudDim}
-        style={{ pointerEvents: hudModalState !== 'idle' ? 'none' : undefined }}
+        style={{
+          ...motionGpuLayer,
+          pointerEvents: hudModalState !== 'idle' ? 'none' : undefined,
+        }}
       >
         <HudHeader
           sessionName={activeProject?.name ?? 'BestTake'}
@@ -1158,6 +1189,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
                 transition={iosHudDim}
+                style={motionGpuLayer}
               >
                 <PipCompareRow
                   benchmarkTake={benchmarkTake}
@@ -1203,7 +1235,7 @@ export default function App() {
             }}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
-            onBranchOpenChange={setQuickSettingsOpen}
+            onBranchOpenChange={handleQuickSettingsOpenChange}
           />
         </div>
       </motion.div>

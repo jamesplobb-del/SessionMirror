@@ -6,6 +6,7 @@ import {
   iosSheetBackdrop,
   iosSheetPremium,
   iosSpringSheet,
+  motionGpuLayer,
 } from '../../utils/motionPresets'
 import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
 
@@ -77,6 +78,7 @@ export default function AnimatedBottomSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={backdropTransition}
+            style={motionGpuLayer}
             onClick={onClose}
           />
 
@@ -86,7 +88,7 @@ export default function AnimatedBottomSheet({
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            style={{ ...motionGpuLayer, paddingBottom: 'env(safe-area-inset-bottom)' }}
             initial={useScale ? { y: slideDistance, scale: 0.975 } : { y: slideDistance }}
             animate={useScale ? { y: 0, scale: 1 } : { y: 0 }}
             exit={useScale ? { y: slideDistance, scale: 0.985 } : { y: slideDistance }}

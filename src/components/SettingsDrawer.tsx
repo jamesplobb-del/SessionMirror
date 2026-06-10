@@ -7,7 +7,7 @@ import AnimatedExpand from './ui/AnimatedExpand'
 import IOSSegmentedControl from './ui/IOSSegmentedControl'
 import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
-import { iosSpringSnappy } from '../utils/motionPresets'
+import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -63,11 +63,7 @@ function SettingInstrumentPicker({
   const activeProfile = getTunerProfile(value)
 
   return (
-    <motion.div
-      layout
-      className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
-      transition={iosSpringSnappy}
-    >
+    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
       <p className="text-sm font-semibold text-stone-900">Instrument Profile</p>
       <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
         Tunes pitch detection sensitivity and trace smoothing for your source.
@@ -86,7 +82,7 @@ function SettingInstrumentPicker({
       />
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-stone-400">{activeProfile.description}</p>
-    </motion.div>
+    </div>
   )
 }
 
@@ -114,11 +110,7 @@ function SettingSlider({
   const display = formatValue ? formatValue(value) : `${value}${unit}`
 
   return (
-    <motion.div
-      layout
-      className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
-      transition={iosSpringSnappy}
-    >
+    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-stone-900">{label}</p>
@@ -129,6 +121,7 @@ function SettingSlider({
           initial={{ scale: 0.92, opacity: 0.6 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={iosSpringSnappy}
+          style={motionGpuLayer}
           className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-stone-700"
         >
           {display}
@@ -143,7 +136,7 @@ function SettingSlider({
         onChange={(event) => onChange(Number(event.target.value))}
         className="h-2 w-full cursor-pointer accent-sky-500"
       />
-    </motion.div>
+    </div>
   )
 }
 

@@ -42,8 +42,22 @@ html.platform-ios #root {
   min-height: var(--app-height, -webkit-fill-available);
 }
 
-body {
+/* Native touch — eliminate web-like tap delay, flash, and accidental selection. */
+*,
+*::before,
+*::after {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable='true'] {
+  user-select: auto;
+  -webkit-touch-callout: default;
 }
 
 /* Prevent iOS Safari from auto-zooming focused form fields */

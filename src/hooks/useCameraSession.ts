@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import type { RecordingMode } from '../types'
 import {
@@ -27,6 +27,7 @@ import {
   applyViewportCssVars,
   applyViewportCssVarsOnResume,
 } from '../utils/viewportSync'
+import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
@@ -309,6 +310,11 @@ export function useCameraSession({
         activeStream = streamRef.current
         return
       }
+
+      await new Promise<void>((resolve) => {
+        scheduleAfterPaint(() => resolve())
+      })
+      if (cancelled) return
 
       if (streamRef.current) {
         forceClearCameraState()
@@ -767,14 +773,20 @@ export function useCameraSession({
       if (isRecording || mode === recordingModeRef.current) return
 
       cancelScheduledRelease()
-      stopStreamTracks(streamRef.current)
-      streamRef.current = null
-      detachPreviewStream(previewRef.current)
-      void disarmAutoAudioRecorder()
-      setReady(false)
-      setStreamGeneration((generation) => generation + 1)
       setError(null)
-      setRecordingMode(mode)
+
+      startTransition(() => {
+        setReady(false)
+        setStreamGeneration((generation) => generation + 1)
+        setRecordingMode(mode)
+      })
+
+      scheduleAfterPaint(() => {
+        stopStreamTracks(streamRef.current)
+        streamRef.current = null
+        detachPreviewStream(previewRef.current)
+        void disarmAutoAudioRecorder()
+      })
     },
     [cancelScheduledRelease, disarmAutoAudioRecorder, isRecording, stopStreamTracks],
   )

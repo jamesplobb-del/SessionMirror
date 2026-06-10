@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { type ReactNode } from 'react'
-import { iosEaseOut } from '../../utils/motionPresets'
+import { iosEaseOut, motionGpuLayer } from '../../utils/motionPresets'
 
 interface AnimatedExpandProps {
   open: boolean
@@ -19,6 +19,7 @@ export default function AnimatedExpand({ open, children, className = '' }: Anima
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={iosEaseOut}
+          style={motionGpuLayer}
         >
           {children}
         </motion.div>

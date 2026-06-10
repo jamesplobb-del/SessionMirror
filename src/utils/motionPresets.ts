@@ -1,4 +1,11 @@
+import type { CSSProperties } from 'react'
+
 /** Shared iOS-style motion tokens for framer-motion. */
+
+/** Promote animated surfaces to their own compositor layer (transform/opacity only). */
+export const motionGpuLayer: CSSProperties = {
+  willChange: 'transform, opacity',
+}
 
 export const iosSpring = {
   type: 'spring' as const,

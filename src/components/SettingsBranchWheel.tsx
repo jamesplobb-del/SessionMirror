@@ -3,6 +3,7 @@ import { AudioLines, LayoutGrid } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
+import { motionGpuLayer } from '../utils/motionPresets'
 
 interface SettingsBranchWheelProps {
   open: boolean
@@ -132,6 +133,7 @@ export default function SettingsBranchWheel({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={BRANCH_MOTION}
+            style={motionGpuLayer}
             aria-label="Close quick settings"
             onPointerDown={(event) => event.preventDefault()}
             onClick={onClose}
@@ -153,6 +155,7 @@ export default function SettingsBranchWheel({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={BRANCH_MOTION}
+              style={motionGpuLayer}
             >
             {branchItems.map((item, index) => {
               const Icon = item.icon
@@ -179,6 +182,7 @@ export default function SettingsBranchWheel({
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.85 }}
                     transition={{ ...BRANCH_MOTION, delay: index * 0.04 }}
+                    style={motionGpuLayer}
                     aria-label={item.label}
                     aria-pressed={item.active}
                     onClick={item.onSelect}
