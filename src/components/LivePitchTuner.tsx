@@ -4,6 +4,7 @@ import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
   formatFrequencyHz,
+  formatAccentOrbitArcStyle,
   formatInTuneGlowStyles,
   getIntonationColor,
   getIntonationZone,
@@ -244,7 +245,11 @@ function NoteOrbitReadout({
   const accentGlow = active && !sustainedGlow ? `0 0 20px ${accent}33` : 'none'
   const textShadow = sustainedGlow?.textShadow ?? accentGlow
   const fillRatio = active ? Math.min(1, Math.abs(cents) / 50) : 0
-  const arcSpan = 28 + fillRatio * 52
+  const arcSpan = 34 + fillRatio * 56
+  const accentArc =
+    active && zone && (isSharp || isFlat)
+      ? formatAccentOrbitArcStyle(accent, zone, fillRatio)
+      : null
 
   return (
     <div
@@ -259,6 +264,19 @@ function NoteOrbitReadout({
         <svg className="pitch-note-orbit__svg" viewBox="0 0 200 200" aria-hidden>
           <circle className="pitch-note-orbit__ring-track" cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS} />
 
+          {inTune && sustainedGlow && inTuneGlow > 0.04 && (
+            <circle
+              className="pitch-note-orbit__ring-halo"
+              cx={ORBIT_CENTER}
+              cy={ORBIT_CENTER}
+              r={ORBIT_RADIUS}
+              fill="none"
+              stroke="#22c55e"
+              strokeWidth={sustainedGlow.haloStrokeWidth}
+              strokeOpacity={sustainedGlow.haloOpacity}
+            />
+          )}
+
           {inTune && (
             <circle
               className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--in-tune"
@@ -272,45 +290,53 @@ function NoteOrbitReadout({
             />
           )}
 
-          {isSharp && (
-            <motion.path
-              className="pitch-note-orbit__ring-arc"
-              d={describeOrbitArc(ORBIT_CENTER, ORBIT_CENTER, ORBIT_RADIUS, -arcSpan, arcSpan)}
-              fill="none"
-              stroke={accent}
-              strokeWidth={4}
-              strokeLinecap="round"
-              initial={false}
-              animate={{
-                opacity: [0.72, 1, 0.72],
-                strokeWidth: zone === 'red' ? [3.5, 5, 3.5] : [3.25, 4.25, 3.25],
-              }}
-              transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            {isSharp && accentArc && (
+              <motion.path
+                key="sharp-arc"
+                className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--accent"
+                d={describeOrbitArc(ORBIT_CENTER, ORBIT_CENTER, ORBIT_RADIUS, -arcSpan, arcSpan)}
+                fill="none"
+                stroke={accent}
+                strokeLinecap="round"
+                style={{ filter: accentArc.filter }}
+                initial={{ opacity: 0, pathLength: 0.6 }}
+                animate={{
+                  opacity: [accentArc.minOpacity, 1, accentArc.minOpacity],
+                  pathLength: [0.82, 1, 0.82],
+                  strokeWidth: [accentArc.minStroke, accentArc.maxStroke, accentArc.minStroke],
+                }}
+                exit={{ opacity: 0, transition: { duration: 0.28, ease: 'easeOut' } }}
+                transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            )}
 
-          {isFlat && (
-            <motion.path
-              className="pitch-note-orbit__ring-arc"
-              d={describeOrbitArc(
-                ORBIT_CENTER,
-                ORBIT_CENTER,
-                ORBIT_RADIUS,
-                180 - arcSpan,
-                180 + arcSpan,
-              )}
-              fill="none"
-              stroke={accent}
-              strokeWidth={4}
-              strokeLinecap="round"
-              initial={false}
-              animate={{
-                opacity: [0.72, 1, 0.72],
-                strokeWidth: zone === 'red' ? [3.5, 5, 3.5] : [3.25, 4.25, 3.25],
-              }}
-              transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          )}
+            {isFlat && accentArc && (
+              <motion.path
+                key="flat-arc"
+                className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--accent"
+                d={describeOrbitArc(
+                  ORBIT_CENTER,
+                  ORBIT_CENTER,
+                  ORBIT_RADIUS,
+                  180 - arcSpan,
+                  180 + arcSpan,
+                )}
+                fill="none"
+                stroke={accent}
+                strokeLinecap="round"
+                style={{ filter: accentArc.filter }}
+                initial={{ opacity: 0, pathLength: 0.6 }}
+                animate={{
+                  opacity: [accentArc.minOpacity, 1, accentArc.minOpacity],
+                  pathLength: [0.82, 1, 0.82],
+                  strokeWidth: [accentArc.minStroke, accentArc.maxStroke, accentArc.minStroke],
+                }}
+                exit={{ opacity: 0, transition: { duration: 0.28, ease: 'easeOut' } }}
+                transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            )}
+          </AnimatePresence>
         </svg>
 
         <div className="pitch-note-orbit__core">

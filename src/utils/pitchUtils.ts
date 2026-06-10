@@ -277,17 +277,49 @@ export function formatInTuneGlowStyles(glow: number): {
   filter: string
   ringStrokeWidth: number
   ringOpacity: number
+  haloStrokeWidth: number
+  haloOpacity: number
 } {
   const clamped = Math.max(0, glow)
   const t = Math.min(1, clamped)
-  const spread = 10 + clamped * 38
-  const alpha = 0.28 + t * 0.52
-  const outerAlpha = 0.12 + t * 0.28
+  const spread = 22 + clamped * 62
+  const alpha = 0.42 + t * 0.58
+  const outerAlpha = 0.2 + t * 0.38
+  const farAlpha = 0.08 + t * 0.22
   return {
-    textShadow: `0 0 ${spread}px rgba(34, 197, 94, ${alpha}), 0 0 ${spread * 1.8}px rgba(34, 197, 94, ${outerAlpha})`,
-    filter: `drop-shadow(0 0 ${5 + clamped * 16}px rgba(34, 197, 94, ${0.28 + t * 0.55}))`,
-    ringStrokeWidth: 2.4 + clamped * 2.4,
-    ringOpacity: 0.72 + t * 0.28,
+    textShadow: [
+      `0 0 ${spread}px rgba(34, 197, 94, ${alpha})`,
+      `0 0 ${spread * 1.6}px rgba(34, 197, 94, ${outerAlpha})`,
+      `0 0 ${spread * 2.8}px rgba(34, 197, 94, ${farAlpha})`,
+    ].join(', '),
+    filter: [
+      `drop-shadow(0 0 ${8 + clamped * 22}px rgba(34, 197, 94, ${0.38 + t * 0.55}))`,
+      `drop-shadow(0 0 ${16 + clamped * 36}px rgba(34, 197, 94, ${0.18 + t * 0.35}))`,
+    ].join(' '),
+    ringStrokeWidth: 3 + clamped * 3.2,
+    ringOpacity: 0.78 + t * 0.22,
+    haloStrokeWidth: 10 + clamped * 18,
+    haloOpacity: 0.06 + t * 0.14 + Math.min(0.08, clamped * 0.05),
+  }
+}
+
+/** Sharp/flat ring arc emphasis from zone severity and |cents|. */
+export function formatAccentOrbitArcStyle(
+  accent: string,
+  zone: IntonationZone,
+  fillRatio: number,
+): {
+  minStroke: number
+  maxStroke: number
+  minOpacity: number
+  filter: string
+} {
+  const severity = zone === 'red' ? 1 : zone === 'yellow' ? 0.65 : 0.4
+  return {
+    minStroke: 5 + severity * 1.5 + fillRatio * 1.2,
+    maxStroke: 7.5 + severity * 3.5 + fillRatio * 2.5,
+    minOpacity: 0.58 + severity * 0.08,
+    filter: `drop-shadow(0 0 ${5 + severity * 8}px ${accent}) drop-shadow(0 0 ${10 + severity * 14}px ${accent}88)`,
   }
 }
 
