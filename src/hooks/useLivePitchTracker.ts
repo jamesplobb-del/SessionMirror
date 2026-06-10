@@ -572,16 +572,28 @@ function drawPitchCanvas(
       ctx.stroke()
     }
   } else {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)'
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
     ctx.lineWidth = 1
-    ctx.setLineDash([])
-    for (const cents of [-50, -25, 25, 50]) {
-      const y = centsToY(cents)
+    ctx.setLineDash([3, 3])
+
+    const gridXStep = Math.max(16, Math.floor(width / 14))
+    for (let x = gridXStep; x < width; x += gridXStep) {
       ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(width, y)
+      ctx.moveTo(x + 0.5, pitchTop)
+      ctx.lineTo(x + 0.5, pitchBottom)
       ctx.stroke()
     }
+
+    const gridYStep = pitchHeight / 8
+    for (let i = 1; i < 8; i += 1) {
+      const y = pitchTop + i * gridYStep
+      ctx.beginPath()
+      ctx.moveTo(0, y + 0.5)
+      ctx.lineTo(width, y + 0.5)
+      ctx.stroke()
+    }
+
+    ctx.setLineDash([])
 
     ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
     ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'

@@ -105,7 +105,9 @@ function StatusLabel({
       : 'Paused'
 
   return (
-    <p className={`pitch-status-label ${inTune ? 'pitch-status-label--in-tune' : zone === 'yellow' ? 'pitch-status-label--close' : ''}`}>
+    <p
+      className={`pitch-status-label ${inTune ? 'pitch-status-label--in-tune' : zone === 'yellow' ? 'pitch-status-label--close' : zone === 'red' ? 'pitch-status-label--adjust' : ''}`}
+    >
       {text}
     </p>
   )
@@ -131,17 +133,24 @@ function AudioTunerPane({
   const zone = active ? getIntonationZone(readout.cents) : null
   const modeLabel =
     mode === 'live' ? 'Live Tuner' : mode === 'playback' ? 'Recorded Take' : 'Pitch Analysis'
+  const showAdjustPill = active && zone === 'red'
 
   return (
-    <div className="pitch-audio-pane flex min-h-0 flex-1 flex-col">
+    <div className="pitch-audio-pane flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="pitch-audio-pane__header">
         <div className="min-w-0">
-          <p className="pitch-audio-pane__eyebrow">{modeLabel}</p>
+          <p
+            className={`pitch-audio-pane__eyebrow ${mode === 'live' ? 'pitch-audio-pane__eyebrow--live' : ''}`}
+          >
+            {modeLabel}
+          </p>
           {takeName && mode === 'playback' && (
             <p className="pitch-audio-pane__take-name">{takeName}</p>
           )}
         </div>
-        <div className="pitch-audio-pane__status-pill">
+        <div
+          className={`pitch-audio-pane__status-pill ${showAdjustPill ? 'pitch-audio-pane__status-pill--adjust' : ''}`}
+        >
           <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
         </div>
       </div>
