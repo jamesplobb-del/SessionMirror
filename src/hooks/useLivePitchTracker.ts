@@ -20,6 +20,7 @@ import {
   normalizeInstrumentFrequency,
   quantizeDisplayCents,
   smoothFrequency,
+  TUNING_GREEN_CENTS,
   type PitchReadout,
 } from '../utils/pitchUtils'
 
@@ -517,6 +518,7 @@ function drawPitchCanvas(
   theme: PitchCanvasTheme,
   graphSmoothWindow: number,
   traceEndBlend: number,
+  liveCents = 0,
 ): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -608,6 +610,31 @@ function drawPitchCanvas(
     ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
     ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
     ctx.fillText('Flat', 2, centsToY(-50) + 10)
+  }
+
+  if (isGlass) {
+    const inTuneBand = active && Math.abs(liveCents) <= TUNING_GREEN_CENTS
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 420)
+    const bandAlpha = inTuneBand ? 0.42 + pulse * 0.38 : 0.22
+    ctx.strokeStyle = inTuneBand
+      ? `rgba(34, 197, 94, ${bandAlpha})`
+      : 'rgba(34, 197, 94, 0.22)'
+    ctx.lineWidth = inTuneBand ? 1.25 : 1
+    ctx.setLineDash([])
+    for (const cents of [TUNING_GREEN_CENTS, -TUNING_GREEN_CENTS]) {
+      const y = centsToY(cents)
+      if (inTuneBand) {
+        ctx.shadowColor = 'rgba(34, 197, 94, 0.55)'
+        ctx.shadowBlur = 6 + pulse * 4
+      } else {
+        ctx.shadowBlur = 0
+      }
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(width, y)
+      ctx.stroke()
+    }
+    ctx.shadowBlur = 0
   }
 
   ctx.strokeStyle = isGlass ? 'rgba(255, 255, 255, 0.14)' : 'rgba(52, 211, 153, 0.35)'
@@ -959,6 +986,7 @@ export function useLivePitchTracker(
             canvasTheme,
             activeProfile.graphSmoothWindow,
             activeProfile.traceEndBlend,
+            readoutRef.current.cents,
           )
         }
         tickRef.current = requestAnimationFrame(tick)
@@ -1167,6 +1195,7 @@ export function useLivePitchTracker(
           canvasTheme,
           activeProfile.graphSmoothWindow,
           activeProfile.traceEndBlend,
+          readoutRef.current.cents,
         )
       }
 

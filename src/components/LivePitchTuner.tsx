@@ -28,18 +28,23 @@ interface LivePitchTunerProps {
 function PitchChartCanvas({
   canvasRef,
   glass = false,
+  fill = false,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
   glass?: boolean
+  fill?: boolean
 }) {
   return (
-    <div className="pitch-chart-shell relative w-full flex-1" style={{ minHeight: 140, height: '100%' }}>
+    <div
+      className="pitch-chart-shell relative w-full flex-1"
+      style={fill ? { minHeight: '100%', height: '100%' } : { minHeight: 140, height: '100%' }}
+    >
       <canvas
         ref={canvasRef}
         className={`pitch-spectrogram absolute inset-0 h-full w-full ${
           glass ? 'pitch-spectrogram--glass' : ''
         }`}
-        style={{ minHeight: 140 }}
+        style={fill ? { minHeight: '100%' } : { minHeight: 140 }}
       />
     </div>
   )
@@ -134,12 +139,6 @@ function VerticalPitchMeter({
       aria-hidden={!active}
     >
       <div className="pitch-vertical-meter__track">
-        <div className="pitch-vertical-meter__band" aria-hidden>
-          <span className="pitch-vertical-meter__band-zone" />
-          <span className="pitch-vertical-meter__band-line pitch-vertical-meter__band-line--high" />
-          <span className="pitch-vertical-meter__band-line pitch-vertical-meter__band-line--low" />
-        </div>
-
         <div className="pitch-vertical-meter__zone pitch-vertical-meter__zone--sharp">
           {isSharp && (
             <motion.div
@@ -195,8 +194,30 @@ function VerticalPitchMeter({
   )
 }
 
-const SHARP_ORBIT_ANGLES = [-118, -104, -90, -76, -62]
-const FLAT_ORBIT_ANGLES = [62, 76, 90, 104, 118]
+const ORBIT_RADIUS = 93
+const ORBIT_CENTER = 100
+
+function orbitPoint(cx: number, cy: number, r: number, degreesFromTop: number) {
+  const rad = (degreesFromTop * Math.PI) / 180 - Math.PI / 2
+  return {
+    x: cx + r * Math.cos(rad),
+    y: cy + r * Math.sin(rad),
+  }
+}
+
+function describeOrbitArc(
+  cx: number,
+  cy: number,
+  r: number,
+  startFromTop: number,
+  endFromTop: number,
+) {
+  const start = orbitPoint(cx, cy, r, startFromTop)
+  const end = orbitPoint(cx, cy, r, endFromTop)
+  const span = endFromTop - startFromTop
+  const largeArc = Math.abs(span) > 180 ? 1 : 0
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`
+}
 
 function NoteOrbitReadout({
   noteName,
@@ -216,57 +237,72 @@ function NoteOrbitReadout({
   const isFlat = active && cents < -TUNING_GREEN_CENTS
   const pulseDuration = zone === 'red' ? 0.38 : zone === 'yellow' ? 0.58 : 0.85
   const readoutGlow = active ? `0 0 28px ${accent}44` : 'none'
+  const fillRatio = active ? Math.min(1, Math.abs(cents) / 50) : 0
+  const arcSpan = 28 + fillRatio * 52
 
   return (
     <div
       className={`pitch-note-orbit ${inTune ? 'pitch-note-orbit--in-tune' : ''} ${isSharp ? 'pitch-note-orbit--sharp' : ''} ${isFlat ? 'pitch-note-orbit--flat' : ''}`}
       style={{ ['--orbit-accent' as string]: accent }}
     >
-      <div className="pitch-note-orbit__rays" aria-hidden>
-        {isSharp &&
-          SHARP_ORBIT_ANGLES.map((angle, index) => (
-            <motion.span
-              key={`sharp-${angle}`}
-              className="pitch-note-orbit__ray pitch-note-orbit__ray--sharp"
-              style={{ ['--ray-angle' as string]: `${angle}deg` }}
-              initial={false}
-              animate={{ opacity: [0.35, 1, 0.35], y: [0, -7, 0] }}
-              transition={{
-                duration: pulseDuration,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: index * 0.07,
-              }}
-            />
-          ))}
-        {isFlat &&
-          FLAT_ORBIT_ANGLES.map((angle, index) => (
-            <motion.span
-              key={`flat-${angle}`}
-              className="pitch-note-orbit__ray pitch-note-orbit__ray--flat"
-              style={{ ['--ray-angle' as string]: `${angle}deg` }}
-              initial={false}
-              animate={{ opacity: [0.35, 1, 0.35], y: [0, 7, 0] }}
-              transition={{
-                duration: pulseDuration,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: index * 0.07,
-              }}
-            />
-          ))}
-      </div>
-
       <div className="pitch-note-orbit__ring">
         <svg className="pitch-note-orbit__svg" viewBox="0 0 200 200" aria-hidden>
-          <circle className="pitch-note-orbit__ring-track" cx="100" cy="100" r="93" />
-          <circle
-            className={`pitch-note-orbit__ring-glow ${inTune ? 'pitch-note-orbit__ring-glow--in-tune' : active ? 'pitch-note-orbit__ring-glow--active' : ''}`}
-            cx="100"
-            cy="100"
-            r="93"
-            style={!inTune && active ? { stroke: accent } : undefined}
-          />
+          <circle className="pitch-note-orbit__ring-track" cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS} />
+
+          {inTune && (
+            <motion.circle
+              className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--in-tune"
+              cx={ORBIT_CENTER}
+              cy={ORBIT_CENTER}
+              r={ORBIT_RADIUS}
+              fill="none"
+              stroke="#22c55e"
+              strokeWidth={3}
+              initial={false}
+              animate={{ opacity: [0.78, 1, 0.78] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
+
+          {isSharp && (
+            <motion.path
+              className="pitch-note-orbit__ring-arc"
+              d={describeOrbitArc(ORBIT_CENTER, ORBIT_CENTER, ORBIT_RADIUS, -arcSpan, arcSpan)}
+              fill="none"
+              stroke={accent}
+              strokeWidth={4}
+              strokeLinecap="round"
+              initial={false}
+              animate={{
+                opacity: [0.72, 1, 0.72],
+                strokeWidth: zone === 'red' ? [3.5, 5, 3.5] : [3.25, 4.25, 3.25],
+              }}
+              transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
+
+          {isFlat && (
+            <motion.path
+              className="pitch-note-orbit__ring-arc"
+              d={describeOrbitArc(
+                ORBIT_CENTER,
+                ORBIT_CENTER,
+                ORBIT_RADIUS,
+                180 - arcSpan,
+                180 + arcSpan,
+              )}
+              fill="none"
+              stroke={accent}
+              strokeWidth={4}
+              strokeLinecap="round"
+              initial={false}
+              animate={{
+                opacity: [0.72, 1, 0.72],
+                strokeWidth: zone === 'red' ? [3.5, 5, 3.5] : [3.25, 4.25, 3.25],
+              }}
+              transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
         </svg>
 
         <div className="pitch-note-orbit__core">
@@ -303,7 +339,7 @@ function LiveAudioTunerPane({
 
   return (
     <div className="pitch-audio-stage flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="pitch-audio-stage__hero">
+      <div className="pitch-audio-stage__hero shrink-0">
         <NoteOrbitReadout
           noteName={readout.noteName}
           frequencyHz={readout.frequencyHz}
@@ -312,12 +348,8 @@ function LiveAudioTunerPane({
         />
       </div>
 
-      <div className="pitch-audio-stage__meter">
-        <VerticalPitchMeter cents={displayCents} active={active} />
-      </div>
-
-      <div className="pitch-audio-stage__chart min-h-[120px] flex-1">
-        <PitchChartCanvas canvasRef={canvasRef} glass />
+      <div className="pitch-audio-stage__chart min-h-0 flex-1">
+        <PitchChartCanvas canvasRef={canvasRef} glass fill />
       </div>
     </div>
   )
