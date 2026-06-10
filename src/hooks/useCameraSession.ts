@@ -135,6 +135,8 @@ export function useCameraSession({
     mimeType: string
   } | null>(null)
   const warmAutoAudioInFlightRef = useRef(false)
+  const modeSwitchCleanupTimerRef = useRef<number | null>(null)
+  const autoAudioDisarmInFlightRef = useRef<Promise<void> | null>(null)
   const recordingOrientationRef = useRef<'portrait' | 'landscape'>('portrait')
   const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
   onCompleteRef.current = onRecordingComplete
@@ -544,15 +546,32 @@ export function useCameraSession({
   )
 
   const disarmAutoAudioRecorder = useCallback(async () => {
+    if (autoAudioDisarmInFlightRef.current) {
+      await autoAudioDisarmInFlightRef.current
+      return
+    }
+
     const armed = armedAutoAudioRef.current
     armedAutoAudioRef.current = null
     if (!armed) return
 
     detachRecorder(armed.recorder)
+
+    const disarmTask = (async () => {
+      try {
+        await armed.writer.abort()
+      } catch {
+        /* ignore — abort is best-effort */
+      }
+    })()
+
+    autoAudioDisarmInFlightRef.current = disarmTask
     try {
-      await armed.writer.abort()
-    } catch {
-      /* ignore */
+      await disarmTask
+    } finally {
+      if (autoAudioDisarmInFlightRef.current === disarmTask) {
+        autoAudioDisarmInFlightRef.current = null
+      }
     }
   }, [])
 
@@ -609,6 +628,20 @@ export function useCameraSession({
       void warmAutoAudioRecorder()
     }, 200)
   }
+
+  const scheduleModeSwitchCleanup = useCallback(() => {
+    if (modeSwitchCleanupTimerRef.current !== null) {
+      window.clearTimeout(modeSwitchCleanupTimerRef.current)
+    }
+
+    modeSwitchCleanupTimerRef.current = window.setTimeout(() => {
+      modeSwitchCleanupTimerRef.current = null
+      stopStreamTracks(streamRef.current)
+      streamRef.current = null
+      detachPreviewStream(previewRef.current)
+      void disarmAutoAudioRecorder()
+    }, 48)
+  }, [disarmAutoAudioRecorder, stopStreamTracks])
 
   const startRecording = useCallback(() => {
     if (isRecording) return
@@ -782,13 +815,10 @@ export function useCameraSession({
       })
 
       scheduleAfterPaint(() => {
-        stopStreamTracks(streamRef.current)
-        streamRef.current = null
-        detachPreviewStream(previewRef.current)
-        void disarmAutoAudioRecorder()
+        scheduleModeSwitchCleanup()
       })
     },
-    [cancelScheduledRelease, disarmAutoAudioRecorder, isRecording, stopStreamTracks],
+    [cancelScheduledRelease, isRecording, scheduleModeSwitchCleanup],
   )
 
   const suspendCameraForBackground = useCallback(() => {

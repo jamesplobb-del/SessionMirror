@@ -184,6 +184,8 @@ function isMediaPitchGraph(graph: ActivePitchGraph): graph is PitchGraph {
   return 'media' in graph
 }
 
+const MIC_PITCH_ATTACH_DEFER_MS = 400
+
 export type PitchTrackerSource = 'media' | 'microphone'
 
 export interface PitchTrackerOptions {
@@ -972,6 +974,7 @@ export function useLivePitchTracker(
 
     let cancelled = false
     let retryTimer: number | null = null
+    let initTimer: number | null = null
     let attachAttempt = 0
     const MAX_ATTACH_ATTEMPTS = source === 'microphone' ? 12 : 36
 
@@ -1041,12 +1044,25 @@ export function useLivePitchTracker(
       }
     }
 
-    void tryAttach()
+    const beginAttach = () => {
+      if (cancelled) return
+      void tryAttach()
+    }
+
+    if (source === 'microphone') {
+      initTimer = window.setTimeout(beginAttach, MIC_PITCH_ATTACH_DEFER_MS)
+    } else {
+      beginAttach()
+    }
+
     tryAttachRef.current = tryAttach
 
     return () => {
       cancelled = true
       tryAttachRef.current = null
+      if (initTimer !== null) {
+        window.clearTimeout(initTimer)
+      }
       if (retryTimer !== null) {
         window.clearTimeout(retryTimer)
       }

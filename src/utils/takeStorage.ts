@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { agentDebugLog } from './agentDebugLog'
 import { Directory, Filesystem } from '@capacitor/filesystem'
-import { initAppFilesystem, isFilesystemMissingError, TAKES_DIR } from './filesystemInit'
+import { initAppFilesystem, isFilesystemMissingError, nativeDataFileExists, TAKES_DIR } from './filesystemInit'
 
 export const NATIVE_VIDEO_MIME = 'video/mp4'
 export const NATIVE_AUDIO_MIME = 'audio/mp4'
@@ -248,6 +248,7 @@ export class StreamingTakeWriter {
   private chunkCount = 0
   private closed = false
   private aborted = false
+  private fileMaterialized = false
   private readonly bufferChunks: Blob[] = []
   private readonly useBufferedWrite: boolean
 
@@ -276,7 +277,9 @@ export class StreamingTakeWriter {
     const ext = extensionForMime(mimeType)
     const filePath = `${TAKES_DIR}/${takeId}.${ext}`
 
-    await deleteTakeFile(filePath)
+    if (await nativeDataFileExists(filePath)) {
+      await deleteTakeFile(filePath)
+    }
 
     const useBufferedWrite =
       mimeType.includes('mp4') || Capacitor.getPlatform() === 'ios'
@@ -323,6 +326,7 @@ export class StreamingTakeWriter {
     }
 
     this.chunkCount += 1
+    this.fileMaterialized = true
   }
 
   async finalize(): Promise<PersistedTakeVideo> {
@@ -411,7 +415,10 @@ export class StreamingTakeWriter {
     this.closed = true
     this.bufferChunks.length = 0
     await this.writeChain.catch(() => {})
-    await deleteTakeFile(this.filePath)
+
+    if (this.fileMaterialized || this.chunkCount > 0) {
+      await deleteTakeFile(this.filePath)
+    }
   }
 }
 
@@ -484,18 +491,36 @@ export async function resolveTakePlaybackUrl(
   return (await resolveNativeVideoPlaybackSrc(filePath, fallbackUrl)) ?? fallbackUrl
 }
 
+const deleteTakeFileInFlight = new Map<string, Promise<void>>()
+
 export async function deleteTakeFile(filePath: string): Promise<void> {
   if (!filePath || !Capacitor.isNativePlatform()) return
 
-  try {
-    await Filesystem.deleteFile({
-      path: filePath,
-      directory: Directory.Data,
-    })
-  } catch (err) {
-    if (isFilesystemMissingError(err)) {
-      return
-    }
-    /* file may already be gone or delete is best-effort */
+  const inFlight = deleteTakeFileInFlight.get(filePath)
+  if (inFlight) {
+    await inFlight
+    return
   }
+
+  const task = (async () => {
+    try {
+      const exists = await nativeDataFileExists(filePath)
+      if (!exists) return
+
+      await Filesystem.deleteFile({
+        path: filePath,
+        directory: Directory.Data,
+      })
+    } catch (err) {
+      if (isFilesystemMissingError(err)) {
+        return
+      }
+      /* file may already be gone or delete is best-effort */
+    } finally {
+      deleteTakeFileInFlight.delete(filePath)
+    }
+  })()
+
+  deleteTakeFileInFlight.set(filePath, task)
+  await task
 }
