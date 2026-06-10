@@ -13,7 +13,6 @@ import {
 import {
   frequencyToPitchReadout,
   getIntonationColor,
-  holdPitchNote,
   isFrequencyInInstrumentRange,
   normalizeInstrumentFrequency,
   quantizeDisplayCents,
@@ -260,7 +259,6 @@ export function useLivePitchTracker(
   const mountedRef = useRef(true)
   const smoothedCentsRef = useRef<number | null>(null)
   const lastReadoutEmitRef = useRef(0)
-  const lastNoteChangeRef = useRef(0)
   const lastHistoryPushRef = useRef(0)
 
   useEffect(() => {
@@ -294,7 +292,6 @@ export function useLivePitchTracker(
       historyRef.current = []
       smoothedCentsRef.current = null
       lastReadoutEmitRef.current = 0
-      lastNoteChangeRef.current = 0
       lastHistoryPushRef.current = 0
       if (mountedRef.current) {
         readoutRef.current = emptyReadout
@@ -359,7 +356,6 @@ export function useLivePitchTracker(
         historyRef.current = []
         smoothedCentsRef.current = null
         lastReadoutEmitRef.current = 0
-        lastNoteChangeRef.current = 0
         lastHistoryPushRef.current = 0
         if (mountedRef.current) {
           readoutRef.current = emptyReadout
@@ -401,28 +397,21 @@ export function useLivePitchTracker(
 
       if (clarity >= PITCH_CLARITY_MIN && isFrequencyInInstrumentRange(pitch)) {
         graph.smoothed = smoothFrequency(graph.smoothed, pitch)
-        const rawNext = stabilizePitchReadout(
+        const next = stabilizePitchReadout(
           readoutRef.current.noteName === '—' ? null : readoutRef.current,
           frequencyToPitchReadout(graph.smoothed),
         )
-        const held = holdPitchNote(
-          readoutRef.current.noteName === '—' ? null : readoutRef.current,
-          rawNext,
-          lastNoteChangeRef.current,
-          now,
-        )
-        lastNoteChangeRef.current = held.noteChangedAt
-        const next = held.readout
 
         smoothedCentsRef.current = smoothFrequency(
           smoothedCentsRef.current,
           next.cents,
           PITCH_CENTS_SMOOTH_ALPHA,
         )
-        const displayCents = quantizeDisplayCents(
-          smoothedCentsRef.current ?? next.cents,
-          CENTS_DISPLAY_STEP,
+        const clampedCents = Math.max(
+          -50,
+          Math.min(50, smoothedCentsRef.current ?? next.cents),
         )
+        const displayCents = quantizeDisplayCents(clampedCents, CENTS_DISPLAY_STEP)
         const displayReadout: PitchReadout = { ...next, cents: displayCents }
 
         if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {

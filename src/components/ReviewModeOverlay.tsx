@@ -61,34 +61,36 @@ function ReviewTakeLayer({
   if (videoAnalysis) {
     return (
       <div
-        className="absolute inset-0 flex h-full w-full flex-col bg-stone-950 transition-all duration-200 ease-out"
+        className="absolute inset-0 h-full w-full bg-black transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
-        <div className="relative min-h-0 flex-1">
-          <TakeVideoPlayer
-            key={takeKey}
-            filePath={filePath}
-            videoUrl={videoUrl}
-            mimeType={mimeType}
-            videoRef={videoRef}
-            className="h-full w-full object-contain"
-            mirror={mirror}
-            audible
-            manualPlayOnly
-            eagerLoad
-            preload="auto"
-            style={{
-              WebkitTouchCallout: 'default',
-              userSelect: 'auto',
-            }}
-            controls={false}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerCancel}
-          />
-        </div>
-        <div className="h-[min(24dvh,200px)] shrink-0 border-t border-white/8">
+        <TakeVideoPlayer
+          key={takeKey}
+          filePath={filePath}
+          videoUrl={videoUrl}
+          mimeType={mimeType}
+          videoRef={videoRef}
+          className="absolute inset-0 h-full w-full object-contain"
+          mirror={mirror}
+          audible
+          manualPlayOnly
+          eagerLoad
+          preload="auto"
+          style={{
+            WebkitTouchCallout: 'default',
+            userSelect: 'auto',
+          }}
+          controls={false}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(18dvh,148px)] bg-gradient-to-t from-stone-950/95 via-stone-950/55 to-transparent"
+          aria-hidden
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(14dvh,128px)]">
           <LivePitchTuner
             mediaRef={videoRef}
             enabled={pitchTrackerEnabled && isActive}

@@ -3,7 +3,6 @@ import {
   MAX_INSTRUMENT_HZ,
   MIN_INSTRUMENT_HZ,
   NOTE_HYSTERESIS_CENTS,
-  NOTE_MIN_HOLD_MS,
   PITCH_SMOOTH_ALPHA,
 } from './pitchConfig'
 
@@ -33,8 +32,8 @@ const NOTE_NAMES = [
   'B',
 ] as const
 
-export const TUNING_GREEN_CENTS = 8
-export const TUNING_YELLOW_CENTS = 20
+export const TUNING_GREEN_CENTS = 6
+export const TUNING_YELLOW_CENTS = 16
 
 export function frequencyToMidi(frequencyHz: number): number {
   return 69 + 12 * Math.log2(frequencyHz / A4_HZ)
@@ -106,49 +105,17 @@ export function stabilizePitchReadout(
 
   if (previous.noteName === next.noteName) return next
 
-  if (Math.abs(next.cents) <= NOTE_HYSTERESIS_CENTS) {
+  const centsFromPrevious = centsFromMidi(next.frequencyHz, previous.midi)
+  if (Math.abs(centsFromPrevious) <= NOTE_HYSTERESIS_CENTS) {
     return {
       ...next,
       noteName: previous.noteName,
       midi: previous.midi,
-      cents: centsFromMidi(next.frequencyHz, previous.midi),
+      cents: centsFromPrevious,
     }
   }
 
   return next
-}
-
-/** Keep the note label stable through brief detection wobble. */
-export function holdPitchNote(
-  previous: PitchReadout | null,
-  next: PitchReadout,
-  noteChangedAt: number,
-  now: number,
-): { readout: PitchReadout; noteChangedAt: number } {
-  if (next.noteName === '—' || !previous || previous.noteName === '—') {
-    return {
-      readout: next,
-      noteChangedAt: next.noteName !== '—' ? now : noteChangedAt,
-    }
-  }
-
-  if (next.noteName === previous.noteName) {
-    return { readout: next, noteChangedAt }
-  }
-
-  if (now - noteChangedAt < NOTE_MIN_HOLD_MS) {
-    return {
-      readout: {
-        ...next,
-        noteName: previous.noteName,
-        midi: previous.midi,
-        cents: centsFromMidi(next.frequencyHz, previous.midi),
-      },
-      noteChangedAt,
-    }
-  }
-
-  return { readout: next, noteChangedAt: now }
 }
 
 export function quantizeDisplayCents(cents: number, step: number): number {

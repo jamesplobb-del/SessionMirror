@@ -115,32 +115,27 @@ export default function LivePitchTuner({
 
   if (isPanel) {
     return (
-      <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-stone-950/95">
-        <div className="flex shrink-0 items-center gap-3 px-3 py-2">
-          <div className="min-w-[4.5rem] shrink-0">
+      <div className="pitch-tuner pitch-tuner--panel flex h-full w-full flex-col justify-end overflow-hidden bg-transparent">
+        <div className="flex shrink-0 items-center gap-2.5 px-3 py-1.5">
+          <div className="min-w-[3.25rem] shrink-0">
             <p
-              className="font-mono text-2xl font-bold leading-none tabular-nums"
+              className="font-mono text-xl font-bold leading-none tabular-nums"
               style={{ color: accent }}
             >
               {readout.noteName}
             </p>
-            <p className="mt-0.5 font-mono text-[10px] text-white/30">
+            <p className="mt-0.5 font-mono text-[9px] text-white/35">
               {formatFrequencyHz(readout.frequencyHz)}
             </p>
           </div>
 
           <div className="min-w-0 flex-1">
             <CentsNeedle cents={readout.cents} active={active} compact />
-            <div className="mt-1 flex justify-between font-mono text-[8px] text-white/20">
-              <span>-50</span>
-              <span className="text-emerald-400/50">0</span>
-              <span>+50</span>
-            </div>
           </div>
 
           <div className="shrink-0 text-right">
             <p
-              className="font-mono text-lg font-semibold tabular-nums"
+              className="font-mono text-base font-semibold tabular-nums"
               style={{ color: accent }}
             >
               {active ? (
@@ -156,7 +151,7 @@ export default function LivePitchTuner({
           </div>
         </div>
 
-        <div className={`relative shrink-0 overflow-hidden ${spectrogramHeight}`}>
+        <div className="relative h-[3.25rem] shrink-0 overflow-hidden opacity-90">
           <canvas ref={canvasRef} className="pitch-spectrogram absolute inset-0 h-full w-full" />
         </div>
       </div>
