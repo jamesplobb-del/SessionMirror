@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { Capacitor } from '@capacitor/core'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
@@ -15,6 +14,7 @@ import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from './hooks/us
 import {
   generateThumbnailFromBlob,
   captureAndPersistTakeThumbnail,
+  hydrateTakeThumbnailsInBackground,
 } from './utils/generateThumbnail'
 import { createTake, sortTakes } from './utils/takes'
 import {
@@ -45,30 +45,6 @@ import {
   updateVaultTake,
   type Project,
 } from './db'
-
-async function hydrateTakeThumbnailsInBackground(
-  takes: Take[],
-  applyThumbnails: (updates: Map<string, string>) => void,
-): Promise<void> {
-  const pending = new Map<string, string>()
-
-  for (const take of takes) {
-    if (take.thumbnailUrl || isAudioTake(take)) continue
-
-    const thumbnailUrl = await captureAndPersistTakeThumbnail(take)
-    if (!thumbnailUrl) continue
-
-    pending.set(take.id, thumbnailUrl)
-    if (pending.size >= 4) {
-      applyThumbnails(new Map(pending))
-      pending.clear()
-    }
-  }
-
-  if (pending.size > 0) {
-    applyThumbnails(pending)
-  }
-}
 
 export default function App() {
   const [takes, setTakes] = useState<Take[]>([])
@@ -287,26 +263,32 @@ export default function App() {
         })
       }
 
-      let savedTake: Take | null = null
+      const savedTake: Take = {
+        ...createTake(
+          takeId,
+          takeIndex,
+          safeVideoUrl,
+          filePath,
+          mimeType,
+          mediaType,
+        ),
+        recordingOrientation: recordingOrientation ?? 'portrait',
+      }
 
       setTakes((prev) => {
         const index = projectId ? takeIndex : prev.length + 1
-        savedTake = {
-          ...createTake(
-            takeId,
-            index,
-            safeVideoUrl,
-            filePath,
-            mimeType,
-            mediaType,
-          ),
-          recordingOrientation: recordingOrientation ?? 'portrait',
-        }
-        setChallengerId(savedTake.id)
-        return [...prev, savedTake]
+        const nextTake =
+          index === takeIndex
+            ? savedTake
+            : {
+                ...savedTake,
+                name: mediaType === 'audio' ? `Audio ${index}` : `Take ${index}`,
+              }
+        setChallengerId(nextTake.id)
+        return [...prev, nextTake]
       })
 
-      if (!savedTake) return
+      const thumbnailTake: Take = savedTake
 
       if (
         mediaType === 'audio' &&
@@ -327,15 +309,10 @@ export default function App() {
       }
 
       const thumbnailPromise = blob
-        ? generateThumbnailFromBlob(blob).then((dataUrl) =>
-            persistTakeThumbnail(takeId, dataUrl),
+        ? generateThumbnailFromBlob(blob, thumbnailTake.mirrorPlayback !== false).then(
+            (dataUrl) => persistTakeThumbnail(takeId, dataUrl),
           )
-        : (async () => {
-            if (Capacitor.isNativePlatform()) {
-              await new Promise((resolve) => window.setTimeout(resolve, 800))
-            }
-            return captureAndPersistTakeThumbnail(savedTake)
-          })()
+        : captureAndPersistTakeThumbnail(thumbnailTake)
 
       void thumbnailPromise
         .then((thumbnailUrl) => {
@@ -519,6 +496,7 @@ export default function App() {
     !autoRecordStartSuppressed
 
   const wasVaultOpenRef = useRef(false)
+  const thumbnailHydrateRef = useRef(0)
 
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
@@ -551,7 +529,12 @@ export default function App() {
     )
     if (missingThumbnails.length === 0) return
 
-    void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails)
+    const hydrateToken = ++thumbnailHydrateRef.current
+    void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(
+      () => {
+        if (hydrateToken !== thumbnailHydrateRef.current) return
+      },
+    )
   }, [applyTakeThumbnails, isVaultOpen, takes])
 
   const handleOpenSettings = useCallback(() => {
@@ -1082,6 +1065,10 @@ export default function App() {
           onDeleteTakes={handleDeleteTakes}
           onClearAllTakes={handleClearAllTakes}
           onOpenTake={handleOpenVaultTake}
+          onBeforeExport={() => {
+            stopAutoPlaybackAudio()
+            pausePipVideos()
+          }}
         />
       )}
 

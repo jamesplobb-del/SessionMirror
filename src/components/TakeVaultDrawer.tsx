@@ -1,30 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Capacitor } from '@capacitor/core'
 import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
-import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
+import TakeVideoPlayer from './TakeVideoPlayer'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, isAudioTake } from '../utils/mediaType'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
 import type { Project } from '../db/types'
-
-/** Resolves a on-disk take to a WebView-safe URL via Capacitor.convertFileSrc. */
-export async function resolveVaultVideoSrc(
-  filePath: string,
-  fallbackUrl: string,
-): Promise<string> {
-  if (!Capacitor.isNativePlatform()) {
-    return fallbackUrl
-  }
-  if (filePath) {
-    return toCapacitorPlaybackSrc(filePath)
-  }
-  return toCapacitorPlaybackSrc(fallbackUrl)
-}
 
 interface TakeVaultDrawerProps {
   isOpen: boolean
@@ -47,6 +32,7 @@ interface TakeVaultDrawerProps {
   onDeleteTakes: (ids: string[]) => void
   onClearAllTakes: () => void
   onOpenTake: (take: Take) => void
+  onBeforeExport?: () => void
 }
 
 interface VaultTakeVideoProps {
@@ -75,10 +61,26 @@ export function VaultTakeVideo({
     )
   }
 
+  if (audio) {
+    return (
+      <div
+        className={`${className} animate-pulse bg-stone-200`}
+        aria-hidden
+      />
+    )
+  }
+
   return (
-    <div
-      className={`${className} animate-pulse bg-stone-200`}
-      aria-hidden
+    <TakeVideoPlayer
+      filePath={take.filePath}
+      videoUrl={take.videoUrl}
+      mimeType={take.videoMimeType}
+      className={className}
+      mirror={take.mirrorPlayback !== false}
+      thumbnailPreview
+      preload="metadata"
+      controls={false}
+      manualPlayOnly
     />
   )
 }
@@ -104,12 +106,14 @@ export default function TakeVaultDrawer({
   onDeleteTakes,
   onClearAllTakes,
   onOpenTake,
+  onBeforeExport,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
   const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [exportingTakeId, setExportingTakeId] = useState<string | null>(null)
 
   const videoCount = useMemo(
     () => takes.filter((take) => getTakeMediaType(take) === 'video').length,
@@ -188,6 +192,7 @@ export default function TakeVaultDrawer({
 
     setBulkSaving(true)
     silenceAllVaultVideos()
+    onBeforeExport?.()
     void shareTakeVideos(selectedTakes)
       .then((result) => {
         const message = describeBulkSaveResult(result)
@@ -198,7 +203,7 @@ export default function TakeVaultDrawer({
       .finally(() => {
         setBulkSaving(false)
       })
-  }, [selectedIds, silenceAllVaultVideos, takes])
+  }, [onBeforeExport, selectedIds, silenceAllVaultVideos, takes])
 
   const handleBulkDelete = useCallback(() => {
     const ids = [...selectedIds]
@@ -389,17 +394,27 @@ export default function TakeVaultDrawer({
                             !selectionMode && getTakeMediaType(take) === 'video'
                               ? () => {
                                   silenceAllVaultVideos()
-                                  void shareTakeVideo(take).then((result) => {
-                                    const message = describeSaveTakeResult(result)
-                                    if (message) {
-                                      window.alert(message)
-                                    }
-                                  })
+                                  onBeforeExport?.()
+                                  setExportingTakeId(take.id)
+                                  void shareTakeVideo(take)
+                                    .then((result) => {
+                                      const message = describeSaveTakeResult(result)
+                                      if (message) {
+                                        window.alert(message)
+                                      }
+                                    })
+                                    .finally(() => {
+                                      setExportingTakeId((current) =>
+                                        current === take.id ? null : current,
+                                      )
+                                    })
                                 }
                               : undefined
                           }
                           onUpdate={(updates) => onUpdateTake(take.id, updates)}
                           onDelete={() => onDeleteTake(take.id)}
+                          thumbnailVideo={<VaultTakeVideo take={take} />}
+                          exportBusy={exportingTakeId === take.id}
                         />
                       ))}
                   </div>

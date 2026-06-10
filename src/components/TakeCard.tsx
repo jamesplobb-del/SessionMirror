@@ -18,6 +18,7 @@ interface TakeCardProps {
   selectionMode?: boolean
   selected?: boolean
   onToggleSelect?: () => void
+  exportBusy?: boolean
 }
 
 function TakeCard({
@@ -34,6 +35,7 @@ function TakeCard({
   selectionMode = false,
   selected = false,
   onToggleSelect,
+  exportBusy = false,
 }: TakeCardProps) {
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(take.name)
@@ -330,16 +332,17 @@ function TakeCard({
               {onExport && (
                 <button
                   type="button"
+                  disabled={exportBusy}
                   {...pinButtonBubbleProps()}
                   onClick={(e) => {
                     e.stopPropagation()
                     onExport()
                   }}
-                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100"
+                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
                   aria-label={`Save ${take.name} to Photos`}
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Save Video
+                  {exportBusy ? 'Saving…' : 'Save Video'}
                 </button>
               )}
             </>
@@ -359,5 +362,6 @@ export default memo(TakeCard, (previous, next) =>
   previous.isBenchmark === next.isBenchmark &&
   previous.isChallenger === next.isChallenger &&
   previous.selectionMode === next.selectionMode &&
-  previous.selected === next.selected,
+  previous.selected === next.selected &&
+  previous.exportBusy === next.exportBusy,
 )
