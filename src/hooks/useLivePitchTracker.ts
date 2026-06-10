@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, startTransition, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { PitchDetector } from 'pitchy'
 import {
   PITCH_ATTACK_FRAMES,
   PITCH_CLARITY_MIN,
   PITCH_CLARITY_MIN_MIC,
   PITCH_FRAME_SIZE,
+  PITCH_FRAME_SIZE_MIC,
   PITCH_HOLD_MS,
   PITCH_HOLD_MS_MIC,
   PITCH_MIN_VOLUME_DB,
@@ -20,6 +21,7 @@ import {
 import {
   frequencyToPitchReadout,
   getIntonationColor,
+  getIntonationZone,
   glowColorForCents,
   isFrequencyInInstrumentRange,
   isSignalAboveRmsGate,
@@ -107,12 +109,12 @@ async function createMicPitchGraph(
   await context.resume()
 
   const analyser = context.createAnalyser()
-  analyser.fftSize = PITCH_FRAME_SIZE
+  analyser.fftSize = PITCH_FRAME_SIZE_MIC
 
   const source = context.createMediaStreamSource(stream)
   source.connect(analyser)
 
-  const detector = PitchDetector.forFloat32Array(PITCH_FRAME_SIZE)
+  const detector = PitchDetector.forFloat32Array(PITCH_FRAME_SIZE_MIC)
   detector.clarityThreshold = PITCH_CLARITY_MIN_MIC
   detector.minVolumeDecibels = PITCH_RMS_GATE_DB_MIC
 
@@ -121,7 +123,7 @@ async function createMicPitchGraph(
     source,
     analyser,
     detector,
-    buffer: new Float32Array(PITCH_FRAME_SIZE),
+    buffer: new Float32Array(PITCH_FRAME_SIZE_MIC),
     smoothed: null,
     stream,
     ownsStream,
@@ -303,6 +305,59 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
   notifyPitchGraphReleased(media, mode)
 }
 
+function drawColoredTraceSegments(
+  ctx: CanvasRenderingContext2D,
+  points: Array<{ x: number; y: number; cents: number }>,
+  lineWidth: number,
+  alpha: number,
+  glow = false,
+): void {
+  if (points.length < 2) return
+
+  ctx.lineWidth = lineWidth
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.globalAlpha = alpha
+
+  let runStart = 0
+  for (let index = 1; index < points.length; index += 1) {
+    const zoneChanged =
+      getIntonationZone(points[index].cents) !== getIntonationZone(points[index - 1].cents)
+    const isLast = index === points.length - 1
+
+    if (!zoneChanged && !isLast) continue
+
+    const runEnd = isLast && !zoneChanged ? index : index - 1
+    const strokeColor = getIntonationColor(points[runEnd].cents)
+
+    if (glow) {
+      ctx.save()
+      ctx.shadowColor = glowColorForCents(points[runEnd].cents)
+      ctx.shadowBlur = 8
+      ctx.strokeStyle = strokeColor
+      ctx.beginPath()
+      ctx.moveTo(points[runStart].x, points[runStart].y)
+      for (let step = runStart + 1; step <= runEnd; step += 1) {
+        ctx.lineTo(points[step].x, points[step].y)
+      }
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    ctx.strokeStyle = strokeColor
+    ctx.beginPath()
+    ctx.moveTo(points[runStart].x, points[runStart].y)
+    for (let step = runStart + 1; step <= runEnd; step += 1) {
+      ctx.lineTo(points[step].x, points[step].y)
+    }
+    ctx.stroke()
+
+    runStart = zoneChanged ? index - 1 : index
+  }
+
+  ctx.globalAlpha = 1
+}
+
 function drawSmoothPitchTrace(
   ctx: CanvasRenderingContext2D,
   centsHistory: number[],
@@ -344,37 +399,8 @@ function drawSmoothPitchTrace(
   ctx.lineCap = 'round'
 
   if (theme === 'glass') {
-    const latest = points[points.length - 1]
-    const glow = glowColorForCents(latest.cents)
-
-    ctx.save()
-    ctx.shadowColor = glow
-    ctx.shadowBlur = 10
-    ctx.lineWidth = 4.5
-    ctx.globalAlpha = 0.35
-    for (let index = 1; index < points.length; index += 1) {
-      const previous = points[index - 1]
-      const current = points[index]
-      ctx.strokeStyle = getIntonationColor(current.cents)
-      ctx.beginPath()
-      ctx.moveTo(previous.x, previous.y)
-      ctx.lineTo(current.x, current.y)
-      ctx.stroke()
-    }
-    ctx.restore()
-
-    ctx.lineWidth = 3.25
-    ctx.globalAlpha = 0.96
-    for (let index = 1; index < points.length; index += 1) {
-      const previous = points[index - 1]
-      const current = points[index]
-      ctx.strokeStyle = getIntonationColor(current.cents)
-      ctx.beginPath()
-      ctx.moveTo(previous.x, previous.y)
-      ctx.lineTo(current.x, current.y)
-      ctx.stroke()
-    }
-    ctx.globalAlpha = 1
+    drawColoredTraceSegments(ctx, points, 4.5, 0.34, true)
+    drawColoredTraceSegments(ctx, points, 3.1, 0.96)
     return
   }
 
@@ -562,6 +588,9 @@ export function useLivePitchTracker(
   const lastReadoutEmitRef = useRef(0)
   const goodFrameCountRef = useRef(0)
   const lastStableCentsRef = useRef<number | null>(null)
+  const attachInFlightRef = useRef(false)
+  const framesSinceAttachAttemptRef = useRef(0)
+  const tryAttachRef = useRef<(() => Promise<void>) | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
@@ -569,6 +598,16 @@ export function useLivePitchTracker(
       mountedRef.current = false
     }
   }, [])
+
+  useEffect(() => {
+    historyRef.current = []
+    needleCentsRef.current = null
+    goodFrameCountRef.current = 0
+    lastStableCentsRef.current = null
+    lastNoteRef.current = '—'
+    framesSinceAttachAttemptRef.current = 0
+    lastPitchAtRef.current = 0
+  }, [mediaKey, source])
 
   useEffect(() => {
     readoutRef.current = readout
@@ -620,11 +659,12 @@ export function useLivePitchTracker(
     }
 
     const tryAttach = async () => {
-      if (cancelled) return
+      if (cancelled || attachInFlightRef.current) return
+      attachInFlightRef.current = true
       attachAttempt += 1
 
-      if (source === 'microphone') {
-        try {
+      try {
+        if (source === 'microphone') {
           const graph = await createMicPitchGraph(micStreamRef?.current)
           if (cancelled) {
             safeDisposeMicGraph(graph)
@@ -632,19 +672,15 @@ export function useLivePitchTracker(
           }
           safeDisposeActiveGraph(graphRef.current)
           graphRef.current = graph
-        } catch {
-          scheduleRetry(120)
+          return
         }
-        return
-      }
 
-      const media = mediaRef.current
-      if (!media) {
-        scheduleRetry(50)
-        return
-      }
+        const media = mediaRef.current
+        if (!media) {
+          scheduleRetry(50)
+          return
+        }
 
-      try {
         const graph = await createPitchGraph(media)
         if (cancelled) {
           safeDisposePitchGraph(graph)
@@ -653,14 +689,18 @@ export function useLivePitchTracker(
         safeDisposeActiveGraph(graphRef.current)
         graphRef.current = graph
       } catch {
-        scheduleRetry(100)
+        scheduleRetry(source === 'microphone' ? 120 : 80)
+      } finally {
+        attachInFlightRef.current = false
       }
     }
 
     void tryAttach()
+    tryAttachRef.current = tryAttach
 
     return () => {
       cancelled = true
+      tryAttachRef.current = null
       if (retryTimer !== null) {
         window.clearTimeout(retryTimer)
       }
@@ -699,9 +739,23 @@ export function useLivePitchTracker(
     }
 
     const tick = () => {
-      const graph = graphRef.current
+      framesSinceAttachAttemptRef.current += 1
+      let graph = graphRef.current
+
+      if (graph && isMediaPitchGraph(graph) && elementGraphs.get(graph.media) !== graph) {
+        graphRef.current = null
+        graph = null
+      }
 
       if (!graph) {
+        if (
+          enabled &&
+          isPlaying &&
+          framesSinceAttachAttemptRef.current % 18 === 0
+        ) {
+          void tryAttachRef.current?.()
+        }
+
         const canvas = canvasRef?.current
         if (canvas) {
           drawPitchCanvas(
@@ -717,17 +771,9 @@ export function useLivePitchTracker(
         return
       }
 
-      if (isMediaPitchGraph(graph)) {
-        if (elementGraphs.get(graph.media) !== graph) {
-          graphRef.current = null
-          tickRef.current = null
-          return
-        }
-      }
-
       if (graph.context.state === 'closed') {
         graphRef.current = null
-        tickRef.current = null
+        tickRef.current = requestAnimationFrame(tick)
         return
       }
 
@@ -830,7 +876,7 @@ export function useLivePitchTracker(
                 if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
                   readoutRef.current = displayReadout
                   if (mountedRef.current) {
-                    startTransition(() => setReadout(displayReadout))
+                    setReadout(displayReadout)
                   }
                   lastReadoutEmitRef.current = now
                 }

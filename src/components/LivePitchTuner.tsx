@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useRef, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatFrequencyHz,
@@ -128,33 +128,32 @@ function AudioTunerPane({
   const accent = active ? getIntonationColor(displayCents) : 'rgba(255,255,255,0.55)'
   const inTune = active && isInTune(readout.cents)
   const zone = active ? getIntonationZone(readout.cents) : null
+  const modeLabel =
+    mode === 'live' ? 'Live Tuner' : mode === 'playback' ? 'Recorded Take' : 'Pitch Analysis'
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-4">
-      <div className="flex shrink-0 items-start justify-between gap-4">
+    <div className="pitch-audio-pane flex min-h-0 flex-1 flex-col">
+      <div className="pitch-audio-pane__header">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/40">
-            {mode === 'live' ? 'Live Tuner' : mode === 'playback' ? 'Recorded Analysis' : 'Pitch Analysis'}
-          </p>
+          <p className="pitch-audio-pane__eyebrow">{modeLabel}</p>
           {takeName && mode === 'playback' && (
-            <p className="mt-0.5 truncate text-sm text-white/45">{takeName}</p>
+            <p className="pitch-audio-pane__take-name">{takeName}</p>
           )}
-          <p
-            className="mt-2 font-mono text-5xl font-bold leading-none tabular-nums sm:text-6xl"
-            style={{ color: accent }}
-          >
-            {readout.noteName}
-          </p>
-          <p className="mt-2 font-mono text-sm tabular-nums" style={{ color: accent }}>
+        </div>
+        <div className="pitch-audio-pane__status-pill">
+          <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
+        </div>
+      </div>
+
+      <div className="pitch-audio-pane__readout">
+        <p className="pitch-audio-pane__note font-mono tabular-nums" style={{ color: accent }}>
+          {readout.noteName}
+        </p>
+        <div className="pitch-audio-pane__meta">
+          <p className="font-mono text-sm tabular-nums" style={{ color: accent }}>
             {formatFrequencyHz(readout.frequencyHz)}
           </p>
-        </div>
-
-        <div className="shrink-0 text-right">
-          <p
-            className="font-mono text-3xl font-semibold tabular-nums"
-            style={{ color: accent }}
-          >
+          <p className="pitch-audio-pane__cents font-mono tabular-nums" style={{ color: accent }}>
             {active ? (
               <>
                 {readout.cents >= 0 ? '+' : ''}
@@ -164,34 +163,31 @@ function AudioTunerPane({
               '—'
             )}
           </p>
-          <div className="mt-2">
-            <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
-          </div>
         </div>
       </div>
 
-      <div className="mt-5 shrink-0">
+      <div className="pitch-audio-pane__needle">
         {active ? (
           <CentsNeedle cents={displayCents} active={active} large />
         ) : (
           <CentsNeedle cents={0} active={false} large />
         )}
-        <div className="mt-2 flex justify-between font-mono text-[10px] text-white/25">
-          <span>-50</span>
-          <span className="text-emerald-400/60">0</span>
-          <span>+50</span>
+        <div className="mt-2 flex justify-between font-mono text-[10px] text-white/28">
+          <span>Flat</span>
+          <span className="text-emerald-400/70">In tune</span>
+          <span>Sharp</span>
         </div>
       </div>
 
       {mode === 'idle' ? (
-        <div className="mt-6 flex flex-1 items-center justify-center text-center">
-          <p className="max-w-xs text-sm leading-relaxed text-white/35">
+        <div className="pitch-audio-pane__idle flex flex-1 items-center justify-center text-center">
+          <p className="max-w-xs text-sm leading-relaxed text-white/40">
             Enable Live Mic Tuner in Settings to practice with a live tuner, or press play to analyze
             this take.
           </p>
         </div>
       ) : (
-        <div className="mt-5 min-h-[140px] flex-1">
+        <div className="pitch-audio-pane__chart-well mt-4 min-h-[140px] flex-1">
           <PitchChartCanvas canvasRef={canvasRef} glass />
         </div>
       )}
@@ -219,9 +215,27 @@ function LivePitchTunerAudio({
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
   const idleCanvasRef = useRef<HTMLCanvasElement>(null)
+  const [playbackSession, setPlaybackSession] = useState(0)
 
   const showLive = !isPlaying && liveMicEnabled
   const showPlayback = isPlaying
+
+  useEffect(() => {
+    const media = mediaRef.current
+    if (!media) return
+
+    const onSessionBreak = () => {
+      setPlaybackSession((value) => value + 1)
+    }
+
+    media.addEventListener('seeked', onSessionBreak)
+    media.addEventListener('ended', onSessionBreak)
+
+    return () => {
+      media.removeEventListener('seeked', onSessionBreak)
+      media.removeEventListener('ended', onSessionBreak)
+    }
+  }, [mediaRef, mediaKey, enabled])
 
   const liveReadout = useLivePitchTracker(
     mediaRef,
@@ -237,10 +251,10 @@ function LivePitchTunerAudio({
     mediaRef,
     enabled && showPlayback,
     showPlayback,
-    mediaKey,
+    `${mediaKey}-p${playbackSession}`,
     playbackCanvasRef,
     'glass',
-    { source: 'media' },
+    { source: 'media', persistWhenPaused: true },
   )
 
   const idleReadout = useLivePitchTracker(

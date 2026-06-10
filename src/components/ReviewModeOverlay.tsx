@@ -188,6 +188,7 @@ export default function ReviewModeOverlay({
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [showPitch, setShowPitch] = useState(true)
+  const [pitchSession, setPitchSession] = useState(0)
 
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
@@ -228,6 +229,8 @@ export default function ReviewModeOverlay({
     : activeSlot === 'benchmark'
       ? `benchmark-${benchmarkFilePath}-${benchmarkSrc}`
       : `challenger-${challengerFilePath}-${challengerSrc}`
+
+  const activePitchMediaKeyWithSession = `${activePitchMediaKey}-s${pitchSession}`
 
   const activeIsAudio = isVault
     ? Boolean(
@@ -393,6 +396,10 @@ export default function ReviewModeOverlay({
     }
   }, [getActiveVideo, revealPlayOverlay])
 
+  const bumpPitchSession = useCallback(() => {
+    setPitchSession((value) => value + 1)
+  }, [])
+
   const hasBenchmark = Boolean(benchmarkSrc || benchmarkFilePath)
   const hasChallenger = Boolean(challengerSrc || challengerFilePath)
   const hasMedia = isVault ? vaultTakes.length > 0 : hasBenchmark || hasChallenger
@@ -479,12 +486,17 @@ export default function ReviewModeOverlay({
     const onSeeked = () => {
       if (isScrubbingRef.current) {
         scheduleTimeUpdate(video.currentTime)
+      } else {
+        bumpPitchSession()
       }
     }
     const onPlay = () => {
       setIsPlaying(true)
       revealPlayOverlay(true)
       startProgressLoop()
+    }
+    const onPlaying = () => {
+      setIsPlaying(true)
     }
     const onPause = () => {
       setIsPlaying(false)
@@ -495,12 +507,14 @@ export default function ReviewModeOverlay({
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
+      bumpPitchSession()
     }
 
     video.addEventListener('durationchange', onDurationChange)
     video.addEventListener('loadedmetadata', onLoadedMetadata)
     video.addEventListener('seeked', onSeeked)
     video.addEventListener('play', onPlay)
+    video.addEventListener('playing', onPlaying)
     video.addEventListener('pause', onPause)
     video.addEventListener('ended', onEnded)
 
@@ -511,12 +525,14 @@ export default function ReviewModeOverlay({
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
       video.removeEventListener('seeked', onSeeked)
       video.removeEventListener('play', onPlay)
+      video.removeEventListener('playing', onPlaying)
       video.removeEventListener('pause', onPause)
       video.removeEventListener('ended', onEnded)
       stopProgressLoop()
     }
   }, [
     activeSlot,
+    bumpPitchSession,
     getActiveVideo,
     isVault,
     revealPlayOverlay,
@@ -548,16 +564,20 @@ export default function ReviewModeOverlay({
     if (video) {
       scheduleTimeUpdate(video.currentTime)
       syncDurationFromVideo(video)
+      bumpPitchSession()
 
       if (wasPlayingBeforeScrubRef.current) {
         video.muted = false
-        void video.play().catch(() => revealPlayOverlay(false))
+        void video.play().then(() => {
+          setIsPlaying(true)
+        }).catch(() => revealPlayOverlay(false))
       }
     }
 
     wasPlayingBeforeScrubRef.current = false
     revealPlayOverlay(false)
   }, [
+    bumpPitchSession,
     getActiveVideo,
     revealPlayOverlay,
     scheduleTimeUpdate,
@@ -831,11 +851,11 @@ export default function ReviewModeOverlay({
               <DraggablePitchWidget
                 boundaryRef={reviewBoundsRef}
                 defaultBottomOffset={120}
-                layoutKey={`${isOpen}-${activePitchMediaKey}`}
+                layoutKey={`${isOpen}-${activePitchMediaKeyWithSession}`}
                 mediaRef={activePitchMediaRef}
                 enabled={pitchTrackerEnabled}
                 isPlaying={isPlaying}
-                mediaKey={activePitchMediaKey}
+                mediaKey={activePitchMediaKeyWithSession}
                 takeName={activeName}
                 label="Pitch Analysis"
                 isAudioMode={activeIsAudio}

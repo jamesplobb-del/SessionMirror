@@ -418,19 +418,18 @@ video.camera-preview.camera-preview--hidden {
   left: 0;
   width: 100%;
   z-index: 10;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
   overflow: hidden;
 }
 
 .pitch-glass-panel {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(22, 22, 24, 0.68);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 10px 36px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .pitch-glass-panel--compact {
@@ -439,8 +438,91 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .pitch-glass-panel--audio {
-  border-radius: 20px;
+  border-radius: 24px;
   min-height: 0;
+  background: rgba(18, 18, 20, 0.78);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.pitch-audio-pane {
+  padding: 1.125rem 1.125rem 1rem;
+}
+
+.pitch-audio-pane__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pitch-audio-pane__eyebrow {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.pitch-audio-pane__take-name {
+  margin-top: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.pitch-audio-pane__status-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.25rem 0.625rem;
+}
+
+.pitch-audio-pane__readout {
+  margin-top: 1rem;
+}
+
+.pitch-audio-pane__note {
+  font-size: clamp(2.75rem, 8vw, 3.75rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.pitch-audio-pane__meta {
+  margin-top: 0.625rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pitch-audio-pane__cents {
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.pitch-audio-pane__needle {
+  margin-top: 1.125rem;
+}
+
+.pitch-audio-pane__chart-well {
+  border-radius: 16px;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.26);
+  overflow: hidden;
+  padding: 0.375rem;
+}
+
+.pitch-audio-pane__idle {
+  margin-top: 1rem;
 }
 
 .pitch-chart-shell {

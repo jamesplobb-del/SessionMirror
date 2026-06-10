@@ -12,8 +12,11 @@ export const PITCH_CLARITY_MIN = 0.74
 /** Stricter clarity for live microphone (rejects room noise). */
 export const PITCH_CLARITY_MIN_MIC = 0.86
 
-/** Analysis frame — larger window improves low-note stability. */
-export const PITCH_FRAME_SIZE = 8192
+/** Analysis frame — playback (lower latency). */
+export const PITCH_FRAME_SIZE = 4096
+
+/** Live mic — larger window for stability. */
+export const PITCH_FRAME_SIZE_MIC = 8192
 
 /** Minimum RMS in dB before attempting pitch. */
 export const PITCH_MIN_VOLUME_DB = -58
@@ -25,7 +28,7 @@ export const PITCH_RMS_GATE_DB_MEDIA = -54
 export const PITCH_RMS_GATE_DB_MIC = -46
 
 /** Consecutive good frames required before showing pitch from silence. */
-export const PITCH_ATTACK_FRAMES = 3
+export const PITCH_ATTACK_FRAMES = 2
 
 /** Reject same-note cents jumps larger than this (noise spikes). */
 export const PITCH_OUTLIER_CENTS = 20
@@ -52,7 +55,7 @@ export const PITCH_GRAPH_SMOOTH_WINDOW = 2
 export const CENTS_DISPLAY_STEP = 1
 
 /** UI cents readout refresh interval (ms). */
-export const PITCH_READOUT_INTERVAL_MS = 66
+export const PITCH_READOUT_INTERVAL_MS = 36
 
 /** Note label sticks until cents drift toward the next semitone boundary. */
 export const NOTE_HYSTERESIS_CENTS = 24
