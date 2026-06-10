@@ -220,7 +220,7 @@ export function useCameraSession({
           ? { audio: getAudioCaptureConstraints(), video: false }
           : {
               audio: getAudioCaptureConstraints(),
-              video: getVideoCaptureConstraints(readRecordingOrientation()),
+              video: getVideoCaptureConstraints(),
             }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -229,9 +229,6 @@ export function useCameraSession({
         return null
       }
       await tuneMusicRecordingStream(mediaStream)
-      if (mode === 'video') {
-        await tuneVideoRecordingStream(mediaStream, readRecordingOrientation())
-      }
       streamRef.current = mediaStream
       attachPreviewStream(previewRef.current, mediaStream, mode)
       setStreamGeneration((generation) => generation + 1)
@@ -544,8 +541,8 @@ export function useCameraSession({
       recorderMimeTypeRef.current = mimeType
       chunksRef.current = []
 
-      if (mode === 'video') {
-        await tuneVideoRecordingStream(currentStream, recordingOrientationRef.current)
+      if (mode === 'video' && recordingOrientationRef.current === 'landscape') {
+        await tuneVideoRecordingStream(currentStream, 'landscape')
       }
 
       let writer: StreamingTakeWriter | null = null
