@@ -5,12 +5,17 @@ import {
   PITCH_FRAME_SIZE,
   PITCH_HOLD_MS,
   PITCH_MIN_VOLUME_DB,
+  PITCH_CENTS_SMOOTH_ALPHA,
+  PITCH_HISTORY_INTERVAL_MS,
+  PITCH_READOUT_INTERVAL_MS,
+  CENTS_DISPLAY_STEP,
 } from '../utils/pitchConfig'
 import {
   frequencyToPitchReadout,
   getIntonationColor,
   isFrequencyInInstrumentRange,
   normalizeInstrumentFrequency,
+  quantizeDisplayCents,
   smoothFrequency,
   stabilizePitchReadout,
   type PitchReadout,
@@ -252,6 +257,10 @@ export function useLivePitchTracker(
   const lastPitchAtRef = useRef(0)
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
+  const displayCentsRef = useRef<number | null>(null)
+  const lastNoteRef = useRef('—')
+  const lastReadoutEmitRef = useRef(0)
+  const lastHistoryPushRef = useRef(0)
 
   useEffect(() => {
     mountedRef.current = true
@@ -282,6 +291,10 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
       historyRef.current = []
+      displayCentsRef.current = null
+      lastNoteRef.current = '—'
+      lastReadoutEmitRef.current = 0
+      lastHistoryPushRef.current = 0
       if (mountedRef.current) {
         readoutRef.current = emptyReadout
         setReadout(emptyReadout)
@@ -343,6 +356,10 @@ export function useLivePitchTracker(
       if (!isPlaying) {
         if (graphRef.current) graphRef.current.smoothed = null
         historyRef.current = []
+        displayCentsRef.current = null
+        lastNoteRef.current = '—'
+        lastReadoutEmitRef.current = 0
+        lastHistoryPushRef.current = 0
         if (mountedRef.current) {
           readoutRef.current = emptyReadout
           setReadout(emptyReadout)
@@ -389,12 +406,36 @@ export function useLivePitchTracker(
         )
 
         if (next.noteName !== '—') {
-          readoutRef.current = next
-          if (mountedRef.current) setReadout(next)
+          if (lastNoteRef.current !== next.noteName) {
+            displayCentsRef.current = next.cents
+            lastNoteRef.current = next.noteName
+          }
+
+          displayCentsRef.current = smoothFrequency(
+            displayCentsRef.current,
+            next.cents,
+            PITCH_CENTS_SMOOTH_ALPHA,
+          )
+          const displayCents = quantizeDisplayCents(
+            Math.max(-50, Math.min(50, displayCentsRef.current ?? next.cents)),
+            CENTS_DISPLAY_STEP,
+          )
+          const displayReadout: PitchReadout = { ...next, cents: displayCents }
+
+          if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
+            readoutRef.current = displayReadout
+            if (mountedRef.current) setReadout(displayReadout)
+            lastReadoutEmitRef.current = now
+          }
+
           lastPitchAtRef.current = now
-          currentCents = next.cents
+          currentCents = displayCents
           active = true
-          historyRef.current = [...historyRef.current, next.cents].slice(-HISTORY_LENGTH)
+
+          if (now - lastHistoryPushRef.current >= PITCH_HISTORY_INTERVAL_MS) {
+            historyRef.current = [...historyRef.current, displayCents].slice(-HISTORY_LENGTH)
+            lastHistoryPushRef.current = now
+          }
         }
       } else if (
         lastPitchAtRef.current > 0 &&
@@ -403,9 +444,11 @@ export function useLivePitchTracker(
         readoutRef.current = emptyReadout
         if (mountedRef.current) setReadout(emptyReadout)
         graph.smoothed = null
+        displayCentsRef.current = null
+        lastNoteRef.current = '—'
         active = false
       } else if (readoutRef.current.noteName !== '—') {
-        currentCents = readoutRef.current.cents
+        currentCents = displayCentsRef.current ?? readoutRef.current.cents
         active = true
       }
 

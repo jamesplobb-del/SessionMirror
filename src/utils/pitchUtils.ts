@@ -144,6 +144,11 @@ export function stabilizePitchReadout(
   return next
 }
 
+export function quantizeDisplayCents(cents: number, step: number): number {
+  if (step <= 0) return cents
+  return Math.round(cents / step) * step
+}
+
 export function getIntonationZone(cents: number): IntonationZone {
   const abs = Math.abs(cents)
   if (abs <= TUNING_GREEN_CENTS) return 'green'
