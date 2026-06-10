@@ -28,82 +28,92 @@ export interface PitchTunerProfile {
   noteChangeSmoothAlpha: number
   graphSmoothWindow: number
   noteHysteresisCents: number
-  /** Per-frame cap on trace vertical movement (reduces spikes). */
-  traceStepLimitCents: number
-  /** Exponential smoothing for the scrolling trace line. */
-  traceSmoothAlpha: number
+  /** UI readout refresh interval (ms). Lower = snappier note/cents display. */
+  readoutIntervalMs: number
+  /** Frequency smoothing for note/HZ readout (higher = faster lock). */
+  readoutFreqAlpha: number
+  /** Blend latest sample into rendered trace tip (0–1). Keeps dot on the line. */
+  traceEndBlend: number
+  /** Max same-note cents jump stored per frame (spike filter for the trace). */
+  traceSpikeCapCents: number
 }
 
 const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Voice',
-  description: 'Softer gate and wider range for singing and speech.',
+  description: 'Balanced latency for singing — responsive readout with a smooth scrolling trace.',
   minHz: 65,
   maxHz: 1100,
-  clarityMin: 0.72,
-  clarityMinMic: 0.82,
+  clarityMin: 0.7,
+  clarityMinMic: 0.78,
   frameSize: 4096,
-  frameSizeMic: 8192,
+  frameSizeMic: 4096,
   rmsGateDbMedia: -54,
   rmsGateDbMic: -48,
-  attackFrames: 2,
-  outlierCents: 18,
-  holdMs: 320,
-  holdMsMic: 480,
-  smoothAlpha: 0.26,
-  needleSmoothAlpha: 0.34,
-  noteChangeSmoothAlpha: 0.48,
-  graphSmoothWindow: 5,
-  noteHysteresisCents: 28,
-  traceStepLimitCents: 7,
-  traceSmoothAlpha: 0.2,
+  attackFrames: 1,
+  outlierCents: 20,
+  holdMs: 260,
+  holdMsMic: 300,
+  smoothAlpha: 0.4,
+  needleSmoothAlpha: 0.52,
+  noteChangeSmoothAlpha: 0.66,
+  graphSmoothWindow: 4,
+  noteHysteresisCents: 24,
+  readoutIntervalMs: 16,
+  readoutFreqAlpha: 0.56,
+  traceEndBlend: 0.74,
+  traceSpikeCapCents: 14,
 }
 
 const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Strings',
-  description: 'Stable tracking for violin, viola, cello, and bass — resists harmonic jumps.',
+  description: 'Stable bowed-string tracking — resists harmonics while keeping the trace readable.',
   minHz: 82,
   maxHz: 1400,
-  clarityMin: 0.78,
-  clarityMinMic: 0.88,
+  clarityMin: 0.76,
+  clarityMinMic: 0.84,
   frameSize: 8192,
-  frameSizeMic: 16384,
+  frameSizeMic: 8192,
   rmsGateDbMedia: -52,
   rmsGateDbMic: -44,
-  attackFrames: 3,
-  outlierCents: 14,
-  holdMs: 380,
-  holdMsMic: 520,
-  smoothAlpha: 0.2,
-  needleSmoothAlpha: 0.28,
-  noteChangeSmoothAlpha: 0.38,
-  graphSmoothWindow: 7,
-  noteHysteresisCents: 34,
-  traceStepLimitCents: 5,
-  traceSmoothAlpha: 0.16,
+  attackFrames: 2,
+  outlierCents: 16,
+  holdMs: 340,
+  holdMsMic: 420,
+  smoothAlpha: 0.3,
+  needleSmoothAlpha: 0.42,
+  noteChangeSmoothAlpha: 0.54,
+  graphSmoothWindow: 5,
+  noteHysteresisCents: 30,
+  readoutIntervalMs: 16,
+  readoutFreqAlpha: 0.44,
+  traceEndBlend: 0.68,
+  traceSpikeCapCents: 10,
 }
 
 const BRASS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Brass',
-  description: 'Loud-signal profile for trumpet, trombone, horn, and tuba with vibrato tolerance.',
+  description: 'Low-latency trumpet, trombone, and horn — fast lock with vibrato-friendly trace.',
   minHz: 58,
   maxHz: 988,
-  clarityMin: 0.75,
-  clarityMinMic: 0.8,
+  clarityMin: 0.68,
+  clarityMinMic: 0.7,
   frameSize: 4096,
-  frameSizeMic: 8192,
+  frameSizeMic: 2048,
   rmsGateDbMedia: -50,
-  rmsGateDbMic: -40,
-  attackFrames: 2,
-  outlierCents: 24,
-  holdMs: 340,
-  holdMsMic: 460,
-  smoothAlpha: 0.3,
-  needleSmoothAlpha: 0.4,
-  noteChangeSmoothAlpha: 0.52,
-  graphSmoothWindow: 5,
-  noteHysteresisCents: 22,
-  traceStepLimitCents: 9,
-  traceSmoothAlpha: 0.22,
+  rmsGateDbMic: -42,
+  attackFrames: 1,
+  outlierCents: 32,
+  holdMs: 200,
+  holdMsMic: 130,
+  smoothAlpha: 0.58,
+  needleSmoothAlpha: 0.72,
+  noteChangeSmoothAlpha: 0.84,
+  graphSmoothWindow: 3,
+  noteHysteresisCents: 12,
+  readoutIntervalMs: 16,
+  readoutFreqAlpha: 0.76,
+  traceEndBlend: 0.86,
+  traceSpikeCapCents: 20,
 }
 
 export const TUNER_INSTRUMENTS: TunerInstrument[] = ['voice', 'strings', 'brass']
