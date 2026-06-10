@@ -3,7 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
-  type PointerEvent,
+  type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
 import { triggerDragStartHaptic, triggerSelectionHaptic } from '../utils/haptics'
@@ -107,7 +107,7 @@ export function useDragToPin({
   }, [clearLongPressTimer, emitDragState])
 
   useEffect(() => {
-    const handleGlobalPointerEnd = (event: PointerEvent) => {
+    const handleGlobalPointerEnd = (event: globalThis.PointerEvent) => {
       if (pointerIdRef.current !== null && event.pointerId !== pointerIdRef.current) {
         return
       }
@@ -116,14 +116,20 @@ export function useDragToPin({
       }
     }
 
+    const handleWindowBlur = () => {
+      if (draggingRef.current || armedRef.current) {
+        reset()
+      }
+    }
+
     window.addEventListener('pointerup', handleGlobalPointerEnd)
     window.addEventListener('pointercancel', handleGlobalPointerEnd)
-    window.addEventListener('blur', handleGlobalPointerEnd)
+    window.addEventListener('blur', handleWindowBlur)
 
     return () => {
       window.removeEventListener('pointerup', handleGlobalPointerEnd)
       window.removeEventListener('pointercancel', handleGlobalPointerEnd)
-      window.removeEventListener('blur', handleGlobalPointerEnd)
+      window.removeEventListener('blur', handleWindowBlur)
     }
   }, [reset])
 
@@ -152,7 +158,7 @@ export function useDragToPin({
   )
 
   const handlePointerDown = useCallback(
-    (event: PointerEvent<HTMLElement>) => {
+    (event: ReactPointerEvent<HTMLElement>) => {
       if (!enabled || !sourceTakeId) return
       if ((event.target as HTMLElement).closest('button, label, input')) return
 
@@ -178,7 +184,7 @@ export function useDragToPin({
   )
 
   const handlePointerMove = useCallback(
-    (event: PointerEvent<HTMLElement>) => {
+    (event: ReactPointerEvent<HTMLElement>) => {
       if (pointerIdRef.current !== event.pointerId) return
 
       const deltaX = event.clientX - startRef.current.x
@@ -229,7 +235,7 @@ export function useDragToPin({
   )
 
   const handlePointerEnd = useCallback(
-    (event: PointerEvent<HTMLElement>) => {
+    (event: ReactPointerEvent<HTMLElement>) => {
       if (pointerIdRef.current !== event.pointerId) return
 
       clearLongPressTimer()
