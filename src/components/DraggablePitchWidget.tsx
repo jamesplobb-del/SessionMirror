@@ -32,7 +32,7 @@ function PitchWidgetCloseButton({ onClose }: { onClose: () => void }) {
         onClose()
       }}
       onPointerDown={(event) => event.stopPropagation()}
-      className="pitch-widget-close absolute right-3 top-3 z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full transition hover:bg-white/20 active:scale-95"
+      className="pitch-widget-close absolute right-4 top-2 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/18 active:scale-95"
       aria-label="Hide pitch tuner"
     >
       <svg
@@ -126,14 +126,13 @@ export default function DraggablePitchWidget({
       <motion.div
         key={`audio-${mediaKey}`}
         ref={widgetRef}
-        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} absolute z-20 flex min-h-0 flex-col`}
-        initial={{ opacity: 0, scale: 0.98, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.98, y: 8 }}
+        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} pitch-widget-audio--stage absolute z-20 flex min-h-0 flex-col`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="pitch-stage-ambient pitch-stage-ambient--inset" aria-hidden />
-        <div className="pitch-widget-audio__card relative flex min-h-0 max-h-full flex-col">
+        <div className="pitch-widget-audio__stage relative flex min-h-0 max-h-full w-full flex-col">
           {onClose && <PitchWidgetCloseButton onClose={onClose} />}
           {tuner}
         </div>

@@ -100,7 +100,7 @@ function LiveCameraBackground({
       />
 
       {isAudioMode && pitchStageActive && (
-        <div className="pitch-stage-ambient" aria-hidden />
+        <div className="pitch-stage-ambient pitch-stage-ambient--live-tuner" aria-hidden />
       )}
 
       {showAudioIdle && (

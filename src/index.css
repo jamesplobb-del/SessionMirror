@@ -7,6 +7,7 @@
   --safe-right: env(safe-area-inset-right, 0px);
   --pitch-tuner-edge-gap: 20px;
   --pitch-hud-top-offset: 5rem;
+  --pitch-live-top-offset: 3.5rem;
   --pitch-pip-row-block: calc(9rem * 9 / 16 + 0.375rem);
   --pitch-control-deck-block: calc(56px + 1.25rem);
   --pitch-hud-bottom-gap: 0.625rem;
@@ -498,6 +499,13 @@ video.camera-preview.camera-preview--hidden {
   opacity: 0.92;
 }
 
+.pitch-stage-ambient--live-tuner {
+  background:
+    radial-gradient(ellipse 72% 48% at 50% 24%, rgba(34, 197, 94, 0.07) 0%, transparent 58%),
+    radial-gradient(ellipse 85% 55% at 50% 42%, rgba(255, 255, 255, 0.035) 0%, transparent 62%),
+    #000;
+}
+
 .pitch-audio-idle {
   background:
     radial-gradient(ellipse 80% 50% at 50% 30%, rgba(56, 189, 248, 0.12) 0%, transparent 60%),
@@ -555,6 +563,179 @@ video.camera-preview.camera-preview--hidden {
   font-family: ui-rounded, ui-sans-serif, system-ui, -apple-system, 'SF Pro Display', sans-serif;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
+}
+
+.pitch-vertical-meter {
+  width: 3.25rem;
+  height: 9.75rem;
+  flex-shrink: 0;
+}
+
+.pitch-vertical-meter__track {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 0 24px rgba(0, 0, 0, 0.35),
+    0 0 24px rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.pitch-vertical-meter__zone {
+  flex: 1;
+  position: relative;
+  display: flex;
+  overflow: hidden;
+}
+
+.pitch-vertical-meter__zone--sharp {
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+
+.pitch-vertical-meter__zone--flat {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+.pitch-vertical-meter__fill {
+  width: 100%;
+  min-height: 4px;
+  box-shadow:
+    0 0 16px var(--meter-glow, transparent),
+    0 0 32px color-mix(in srgb, var(--meter-glow, transparent) 40%, transparent);
+}
+
+.pitch-vertical-meter__zone--sharp .pitch-vertical-meter__fill {
+  border-radius: 999px 999px 2px 2px;
+  transform-origin: center bottom;
+}
+
+.pitch-vertical-meter__zone--flat .pitch-vertical-meter__fill {
+  border-radius: 2px 2px 999px 999px;
+  transform-origin: center top;
+}
+
+.pitch-vertical-meter__center {
+  flex-shrink: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.28);
+  z-index: 2;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    height 0.15s ease;
+}
+
+.pitch-vertical-meter__center--in-tune {
+  height: 3px;
+  background: #22c55e;
+  box-shadow:
+    0 0 12px rgba(34, 197, 94, 0.9),
+    0 0 28px rgba(34, 197, 94, 0.5),
+    0 0 48px rgba(34, 197, 94, 0.25);
+}
+
+.pitch-vertical-meter--in-tune .pitch-vertical-meter__track {
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow:
+    inset 0 0 24px rgba(34, 197, 94, 0.08),
+    0 0 28px rgba(34, 197, 94, 0.12);
+}
+
+.pitch-audio-stage {
+  width: 100%;
+  padding: 0.25rem 1.25rem 0.5rem;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', sans-serif;
+}
+
+.pitch-audio-stage__title {
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 0 22px rgba(255, 255, 255, 0.22);
+}
+
+.pitch-audio-stage__readout {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.pitch-audio-stage__note {
+  font-size: clamp(4.25rem, 17vw, 6.75rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+}
+
+.pitch-audio-stage__meta {
+  margin-top: 0.625rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1.75rem;
+}
+
+.pitch-audio-stage__freq {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.pitch-audio-stage__cents {
+  font-size: clamp(1.875rem, 5.5vw, 2.625rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.pitch-audio-stage__meter {
+  display: flex;
+  justify-content: center;
+  margin: 1.125rem 0 0.875rem;
+}
+
+.pitch-audio-stage__chart {
+  width: 100%;
+  min-height: 7.5rem;
+  flex: 1;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 0.625rem;
+}
+
+.pitch-audio-idle-pane {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', sans-serif;
+}
+
+.pitch-audio-idle-pane__title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.pitch-audio-idle-pane__copy {
+  margin-top: 0.875rem;
+  max-width: 18rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.pitch-tuner__live-body {
+  width: 100%;
 }
 
 .pitch-audio-pane {
@@ -674,8 +855,8 @@ video.camera-preview.camera-preview--hidden {
 .pitch-audio-pane__needle {
   margin-top: 1.375rem;
   width: 100%;
-  max-width: 20rem;
-  margin-inline: auto;
+  display: flex;
+  justify-content: center;
 }
 
 .pitch-needle-rail {
@@ -765,10 +946,28 @@ video.camera-preview.camera-preview--hidden {
   width: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-end;
   overflow: hidden;
   pointer-events: none;
+}
+
+.pitch-widget-audio--stage {
+  left: 0;
+  right: 0;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.pitch-widget-audio__stage {
+  pointer-events: auto;
+  width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 0 1 auto;
+  z-index: 1;
 }
 
 .pitch-widget-audio__card {
@@ -787,6 +986,14 @@ video.camera-preview.camera-preview--hidden {
   bottom: calc(var(--safe-bottom) + var(--pitch-main-bottom-reserve));
   max-height: calc(
     100dvh - var(--safe-top) - var(--safe-bottom) - var(--pitch-hud-top-offset) -
+      var(--pitch-main-bottom-reserve)
+  );
+}
+
+.pitch-widget-audio--main.pitch-widget-audio--stage {
+  top: calc(var(--safe-top) + var(--pitch-live-top-offset));
+  max-height: calc(
+    100dvh - var(--safe-top) - var(--safe-bottom) - var(--pitch-live-top-offset) -
       var(--pitch-main-bottom-reserve)
   );
 }
