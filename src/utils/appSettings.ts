@@ -24,7 +24,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   soundSilenceSeconds: 2,
   soundVolumeThreshold: 20,
   hapticFeedback: true,
-  pitchTrackerEnabled: true,
+  pitchTrackerEnabled: false,
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
   showTakeCards: true,

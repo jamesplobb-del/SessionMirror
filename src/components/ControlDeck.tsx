@@ -59,28 +59,40 @@ export default function ControlDeck({
   const showDeleteDrop = dragDeleteActive && !isRecording
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const [branchOpen, setBranchOpen] = useState(false)
+  const [branchActive, setBranchActive] = useState(false)
 
-  const setBranch = (open: boolean) => {
-    setBranchOpen(open)
-    onBranchOpenChange?.(open)
+  const openBranch = () => {
+    setBranchOpen(true)
+    setBranchActive(true)
+    onBranchOpenChange?.(true)
+  }
+
+  const closeBranch = () => {
+    setBranchOpen(false)
+  }
+
+  const handleBranchExitComplete = () => {
+    setBranchActive(false)
+    onBranchOpenChange?.(false)
   }
 
   useEffect(() => {
-    if (settingsBranchDisabled && branchOpen) {
+    if (settingsBranchDisabled && branchActive) {
       setBranchOpen(false)
+      setBranchActive(false)
       onBranchOpenChange?.(false)
     }
-  }, [branchOpen, onBranchOpenChange, settingsBranchDisabled])
+  }, [branchActive, onBranchOpenChange, settingsBranchDisabled])
 
   const settingsPress = useLongPress({
     onClick: () => {
-      if (branchOpen) {
-        setBranch(false)
+      if (branchActive) {
+        closeBranch()
         return
       }
       onOpenSettings()
     },
-    onLongPress: () => setBranch(true),
+    onLongPress: () => openBranch(),
     disabled: settingsBranchDisabled,
     targetRef: settingsButtonRef,
   })
@@ -91,7 +103,8 @@ export default function ControlDeck({
     <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
       <SettingsBranchWheel
         open={branchOpen}
-        onClose={() => setBranch(false)}
+        onClose={closeBranch}
+        onExitComplete={handleBranchExitComplete}
         anchorRef={settingsButtonRef}
         pitchTrackerEnabled={pitchTrackerEnabled}
         showTakeCards={showTakeCards}
@@ -119,21 +132,21 @@ export default function ControlDeck({
           type="button"
           ref={settingsButtonRef}
           className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors ${
-            branchOpen
+            branchActive
               ? 'bg-white/25 text-white ring-1 ring-white/35'
               : 'bg-black/40 text-white/90 hover:bg-black/55'
           }`}
           aria-label={
-            branchOpen ? 'Close quick settings' : 'Open settings. Long press for quick settings.'
+            branchActive ? 'Close quick settings' : 'Open settings. Long press for quick settings.'
           }
-          aria-expanded={branchOpen}
+          aria-expanded={branchActive}
           aria-haspopup="menu"
           onContextMenu={(event) => event.preventDefault()}
           onClickCapture={onClickCapture}
           {...settingsPressHandlers}
         >
           <AnimatePresence mode="wait" initial={false}>
-            {branchOpen ? (
+            {branchActive ? (
               <motion.span
                 key="close"
                 initial={{ opacity: 0, rotate: -45, scale: 0.8 }}

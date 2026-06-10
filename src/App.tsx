@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
@@ -68,7 +68,7 @@ export default function App() {
   const [autoPlaybackPlaying, setAutoPlaybackPlaying] = useState(false)
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
-  const [showPitch, setShowPitch] = useState(true)
+  const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
 
@@ -1029,27 +1029,38 @@ export default function App() {
         />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {settings.showTakeCards && !quickSettingsOpen && (
-            <PipCompareRow
-              benchmarkTake={benchmarkTake}
-              challengerTake={challengerTake}
-              suspendPipPlayback={suspendPipPlayback}
-              benchmarkPipVideoRef={benchmarkPipVideoRef}
-              challengerPipVideoRef={challengerPipVideoRef}
-              deleteDropRef={recordDeleteDropRef}
-              onPinBenchmark={handlePinBenchmark}
-              onDeleteTake={handleDragDeleteTake}
-              onUnpinBenchmark={handleUnpinBenchmark}
-              onUnpinChallenger={handleUnpinChallenger}
-              onUploadBenchmark={handleUploadBenchmark}
-              onExpandBenchmark={handleExpandBenchmark}
-              onExpandChallenger={handleExpandChallenger}
-              onDragStateChange={handlePipDragStateChange}
-              onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
-              onChallengerPlaybackChange={setChallengerPipPlaying}
-              hapticFeedback={settings.hapticFeedback}
-            />
-          )}
+          <AnimatePresence>
+            {settings.showTakeCards && !quickSettingsOpen && (
+              <motion.div
+                key="pip-row"
+                className="app-pip-row-wrap w-full"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+              >
+                <PipCompareRow
+                  benchmarkTake={benchmarkTake}
+                  challengerTake={challengerTake}
+                  suspendPipPlayback={suspendPipPlayback}
+                  benchmarkPipVideoRef={benchmarkPipVideoRef}
+                  challengerPipVideoRef={challengerPipVideoRef}
+                  deleteDropRef={recordDeleteDropRef}
+                  onPinBenchmark={handlePinBenchmark}
+                  onDeleteTake={handleDragDeleteTake}
+                  onUnpinBenchmark={handleUnpinBenchmark}
+                  onUnpinChallenger={handleUnpinChallenger}
+                  onUploadBenchmark={handleUploadBenchmark}
+                  onExpandBenchmark={handleExpandBenchmark}
+                  onExpandChallenger={handleExpandChallenger}
+                  onDragStateChange={handlePipDragStateChange}
+                  onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+                  onChallengerPlaybackChange={setChallengerPipPlaying}
+                  hapticFeedback={settings.hapticFeedback}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <ControlDeck
             isRecording={isRecording}
