@@ -917,6 +917,10 @@ export default function App() {
               mediaKey={mainPitchSource.mediaKey}
               takeName={mainPitchSource.take.name}
               label="Live Pitch"
+              isAudioMode
+              liveMicEnabled={settings.liveMicTunerEnabled}
+              micStreamRef={streamRef}
+              layoutRegion="main"
               onClose={() => setShowPitch(false)}
             />
           )}
@@ -1000,6 +1004,8 @@ export default function App() {
           benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
           challengerMirror={challengerTake?.mirrorPlayback !== false}
           pitchTrackerEnabled={settings.pitchTrackerEnabled}
+          liveMicTunerEnabled={settings.liveMicTunerEnabled}
+          micStreamRef={streamRef}
           isOpen
           onClose={handleCloseReview}
           onSlotChange={handleReviewSlotChange}

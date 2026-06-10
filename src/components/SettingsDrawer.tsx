@@ -187,6 +187,14 @@ export default function SettingsDrawer({
               checked={settings.pitchTrackerEnabled}
               onChange={(checked) => onUpdate({ pitchTrackerEnabled: checked })}
             />
+            {settings.pitchTrackerEnabled && (
+              <SettingToggle
+                label="Live Mic Tuner (Idle)"
+                description="When an audio take is paused, listen through the microphone and show a full-screen live tuner. Turn off to only analyze pitch during playback."
+                checked={settings.liveMicTunerEnabled}
+                onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
+              />
+            )}
           </section>
 
           <section className="space-y-3">

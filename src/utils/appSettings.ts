@@ -9,6 +9,8 @@ export interface AppSettings {
   hapticFeedback: boolean
   /** Audio mode playback: show live A440 pitch tracker instead of a blank screen. */
   pitchTrackerEnabled: boolean
+  /** Audio mode idle: listen to the mic for a live tuner when playback is paused. */
+  liveMicTunerEnabled: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -17,6 +19,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   soundVolumeThreshold: 20,
   hapticFeedback: true,
   pitchTrackerEnabled: true,
+  liveMicTunerEnabled: true,
 }
 
 const STORAGE_KEY = 'sessionmirror:settings'
@@ -51,6 +54,10 @@ export function loadAppSettings(): AppSettings {
         parsed.pitchTrackerEnabled !== undefined
           ? Boolean(parsed.pitchTrackerEnabled)
           : DEFAULT_APP_SETTINGS.pitchTrackerEnabled,
+      liveMicTunerEnabled:
+        parsed.liveMicTunerEnabled !== undefined
+          ? Boolean(parsed.liveMicTunerEnabled)
+          : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

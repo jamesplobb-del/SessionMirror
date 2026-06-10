@@ -135,6 +135,8 @@ interface ReviewModeOverlayProps {
   benchmarkMirror?: boolean
   challengerMirror?: boolean
   pitchTrackerEnabled?: boolean
+  liveMicTunerEnabled?: boolean
+  micStreamRef?: RefObject<MediaStream | null>
   isOpen: boolean
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
@@ -159,6 +161,8 @@ export default function ReviewModeOverlay({
   benchmarkMirror = true,
   challengerMirror = true,
   pitchTrackerEnabled = false,
+  liveMicTunerEnabled = true,
+  micStreamRef,
   isOpen,
   onClose,
   onSlotChange,
@@ -224,6 +228,19 @@ export default function ReviewModeOverlay({
     : activeSlot === 'benchmark'
       ? `benchmark-${benchmarkFilePath}-${benchmarkSrc}`
       : `challenger-${challengerFilePath}-${challengerSrc}`
+
+  const activeIsAudio = isVault
+    ? Boolean(
+        vaultTake &&
+          isAudioMedia(
+            vaultTake.videoMimeType ??
+              (vaultTake.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME),
+            vaultTake.mediaType,
+          ),
+      )
+    : activeSlot === 'benchmark'
+      ? isAudioMedia(benchmarkMimeType, benchmarkMediaType)
+      : isAudioMedia(challengerMimeType, challengerMediaType)
 
   const pauseAllReviewVideos = useCallback(() => {
     resetVideoPlayback(benchmarkVideoRef.current)
@@ -809,7 +826,7 @@ export default function ReviewModeOverlay({
         )}
 
         {showPitchPanel && (
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {showPitch && (
               <DraggablePitchWidget
                 boundaryRef={reviewBoundsRef}
@@ -820,6 +837,10 @@ export default function ReviewModeOverlay({
                 mediaKey={activePitchMediaKey}
                 takeName={activeName}
                 label="Pitch Analysis"
+                isAudioMode={activeIsAudio}
+                liveMicEnabled={liveMicTunerEnabled}
+                micStreamRef={micStreamRef}
+                layoutRegion="review"
                 onClose={() => setShowPitch(false)}
               />
             )}

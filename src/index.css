@@ -437,6 +437,43 @@ video.camera-preview.camera-preview--hidden {
   padding: 0;
 }
 
+.pitch-glass-panel--audio {
+  border-radius: 20px;
+  min-height: 0;
+}
+
+.pitch-chart-shell {
+  width: 100%;
+  min-height: 140px;
+}
+
+.pitch-widget-close {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pitch-widget-audio {
+  left: 1rem;
+  right: 1rem;
+  width: auto;
+}
+
+.pitch-widget-audio--main {
+  top: calc(env(safe-area-inset-top, 0px) + 4.5rem);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 11rem);
+}
+
+.pitch-widget-audio--review {
+  top: calc(env(safe-area-inset-top, 0px) + 4.75rem);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+}
+
+.pitch-tuner--audio {
+  pointer-events: none;
+}
+
 .pitch-widget-draggable {
   cursor: grab;
 }

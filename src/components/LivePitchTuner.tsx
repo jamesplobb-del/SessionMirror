@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion'
 import { useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
@@ -13,18 +14,41 @@ interface LivePitchTunerProps {
   mediaKey: string
   takeName?: string
   label?: string
-  variant?: 'panel' | 'dock' | 'stage' | 'widget'
+  variant?: 'panel' | 'dock' | 'stage' | 'widget' | 'audio'
   enabled?: boolean
+  liveMicEnabled?: boolean
+  micStreamRef?: RefObject<MediaStream | null>
+}
+
+function PitchChartCanvas({
+  canvasRef,
+  glass = false,
+}: {
+  canvasRef: RefObject<HTMLCanvasElement | null>
+  glass?: boolean
+}) {
+  return (
+    <div className="pitch-chart-shell relative min-h-[140px] w-full flex-1">
+      <canvas
+        ref={canvasRef}
+        className={`pitch-spectrogram absolute inset-0 h-full w-full min-h-[140px] ${
+          glass ? 'pitch-spectrogram--glass' : ''
+        }`}
+      />
+    </div>
+  )
 }
 
 function CentsNeedle({
   cents,
   active,
   compact = false,
+  large = false,
 }: {
   cents: number
   active: boolean
   compact?: boolean
+  large?: boolean
 }) {
   const clamped = active ? Math.max(-50, Math.min(50, cents)) : 0
   const position = 50 + clamped
@@ -33,14 +57,14 @@ function CentsNeedle({
   return (
     <div
       className={`relative w-full overflow-hidden rounded-full bg-white/8 ${
-        compact ? 'h-1' : 'h-1.5'
+        large ? 'h-2' : compact ? 'h-1' : 'h-1.5'
       }`}
     >
       <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-emerald-400/20" />
       <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-amber-400/10" />
       <div
         className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] ${
-          compact ? 'h-2.5 w-2.5' : 'h-3 w-3'
+          large ? 'h-4 w-4' : compact ? 'h-2.5 w-2.5' : 'h-3 w-3'
         }`}
         style={{
           left: `${position}%`,
@@ -84,6 +108,188 @@ function StatusLabel({
   )
 }
 
+function AudioTunerPane({
+  readout,
+  canvasRef,
+  mode,
+  takeName,
+  isPlaying,
+}: {
+  readout: ReturnType<typeof useLivePitchTracker>
+  canvasRef: RefObject<HTMLCanvasElement | null>
+  mode: 'live' | 'playback' | 'idle'
+  takeName?: string
+  isPlaying: boolean
+}) {
+  const active = readout.noteName !== '—'
+  const accent = active ? getIntonationColor(readout.cents) : 'rgba(255,255,255,0.55)'
+  const inTune = active && isInTune(readout.cents)
+  const zone = active ? getIntonationZone(readout.cents) : null
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-4">
+      <div className="flex shrink-0 items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/40">
+            {mode === 'live' ? 'Live Tuner' : mode === 'playback' ? 'Recorded Analysis' : 'Pitch Analysis'}
+          </p>
+          {takeName && mode === 'playback' && (
+            <p className="mt-0.5 truncate text-sm text-white/45">{takeName}</p>
+          )}
+          <p
+            className="mt-2 font-mono text-5xl font-bold leading-none tabular-nums sm:text-6xl"
+            style={{ color: accent }}
+          >
+            {readout.noteName}
+          </p>
+          <p className="mt-2 font-mono text-sm text-white/40">
+            {formatFrequencyHz(readout.frequencyHz)}
+          </p>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <p
+            className="font-mono text-3xl font-semibold tabular-nums"
+            style={{ color: accent }}
+          >
+            {active ? (
+              <>
+                {readout.cents >= 0 ? '+' : ''}
+                {Math.round(readout.cents)}¢
+              </>
+            ) : (
+              '—'
+            )}
+          </p>
+          <div className="mt-2">
+            <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 shrink-0">
+        <CentsNeedle cents={readout.cents} active={active} large />
+        <div className="mt-2 flex justify-between font-mono text-[10px] text-white/25">
+          <span>-50</span>
+          <span className="text-emerald-400/60">0</span>
+          <span>+50</span>
+        </div>
+      </div>
+
+      {mode === 'idle' ? (
+        <div className="mt-6 flex flex-1 items-center justify-center text-center">
+          <p className="max-w-xs text-sm leading-relaxed text-white/35">
+            Enable Live Mic Tuner in Settings to practice with a live tuner, or press play to analyze
+            this take.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-5 min-h-[140px] flex-1">
+          <PitchChartCanvas canvasRef={canvasRef} glass />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LivePitchTunerAudio({
+  mediaRef,
+  isPlaying,
+  mediaKey,
+  takeName,
+  enabled,
+  liveMicEnabled,
+  micStreamRef,
+}: {
+  mediaRef: RefObject<HTMLMediaElement | null>
+  isPlaying: boolean
+  mediaKey: string
+  takeName?: string
+  enabled: boolean
+  liveMicEnabled: boolean
+  micStreamRef?: RefObject<MediaStream | null>
+}) {
+  const liveCanvasRef = useRef<HTMLCanvasElement>(null)
+  const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
+  const idleCanvasRef = useRef<HTMLCanvasElement>(null)
+
+  const showLive = !isPlaying && liveMicEnabled
+  const showPlayback = isPlaying
+
+  const liveReadout = useLivePitchTracker(
+    mediaRef,
+    enabled && showLive,
+    showLive,
+    `live-mic-${mediaKey}`,
+    liveCanvasRef,
+    'glass',
+    { source: 'microphone', micStreamRef },
+  )
+
+  const playbackReadout = useLivePitchTracker(
+    mediaRef,
+    enabled && showPlayback,
+    showPlayback,
+    mediaKey,
+    playbackCanvasRef,
+    'glass',
+    { source: 'media' },
+  )
+
+  const idleReadout = useLivePitchTracker(
+    mediaRef,
+    false,
+    false,
+    `idle-${mediaKey}`,
+    idleCanvasRef,
+    'glass',
+    { source: 'media' },
+  )
+
+  const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
+
+  return (
+    <div className="pitch-tuner pitch-tuner--audio flex h-full min-h-0 w-full flex-col">
+      <div className="pitch-glass-panel pitch-glass-panel--audio flex h-full min-h-0 w-full flex-col overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={paneKey}
+            className="flex min-h-0 flex-1 flex-col"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeInOut' }}
+          >
+            {showPlayback ? (
+              <AudioTunerPane
+                readout={playbackReadout}
+                canvasRef={playbackCanvasRef}
+                mode="playback"
+                takeName={takeName}
+                isPlaying={isPlaying}
+              />
+            ) : showLive ? (
+              <AudioTunerPane
+                readout={liveReadout}
+                canvasRef={liveCanvasRef}
+                mode="live"
+                isPlaying={isPlaying}
+              />
+            ) : (
+              <AudioTunerPane
+                readout={idleReadout}
+                canvasRef={idleCanvasRef}
+                mode="idle"
+                isPlaying={isPlaying}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
 export default function LivePitchTuner({
   mediaRef,
   isPlaying,
@@ -92,20 +298,38 @@ export default function LivePitchTuner({
   label = 'Pitch Analysis',
   variant = 'panel',
   enabled = true,
+  liveMicEnabled = true,
+  micStreamRef,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
+  const isAudio = variant === 'audio'
   const isStage = variant === 'stage'
-  const canvasTheme = isPanel || isWidget ? 'glass' : 'solid'
+  const canvasTheme = isPanel || isWidget || isAudio ? 'glass' : 'solid'
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const readout = useLivePitchTracker(
     mediaRef,
-    enabled,
+    enabled && !isAudio,
     isPlaying,
     mediaKey,
     canvasRef,
     canvasTheme,
+    { source: 'media' },
   )
+
+  if (isAudio) {
+    return (
+      <LivePitchTunerAudio
+        mediaRef={mediaRef}
+        isPlaying={isPlaying}
+        mediaKey={mediaKey}
+        takeName={takeName}
+        enabled={enabled}
+        liveMicEnabled={liveMicEnabled}
+        micStreamRef={micStreamRef}
+      />
+    )
+  }
 
   const active = readout.noteName !== '—'
   const accent = active ? getIntonationColor(readout.cents) : 'rgba(255,255,255,0.55)'
@@ -117,8 +341,8 @@ export default function LivePitchTuner({
 
   if (isWidget) {
     return (
-      <div className="pitch-tuner pitch-tuner--widget h-full w-full">
-        <div className="pitch-glass-panel pitch-glass-panel--compact flex h-[7rem] w-full flex-col overflow-hidden">
+      <div className="pitch-tuner pitch-tuner--widget h-full w-full min-h-[180px]">
+        <div className="pitch-glass-panel pitch-glass-panel--compact flex h-full min-h-[180px] w-full flex-col overflow-hidden">
           <div className="flex shrink-0 items-start justify-between gap-3 px-3 pt-2.5 pb-1">
             <p
               className="font-mono text-base font-bold leading-none tabular-nums tracking-tight"
@@ -140,11 +364,8 @@ export default function LivePitchTuner({
             </p>
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-hidden px-3 pb-2.5">
-            <canvas
-              ref={canvasRef}
-              className="pitch-spectrogram pitch-spectrogram--glass absolute inset-0 h-full w-full"
-            />
+          <div className="relative min-h-[140px] flex-1 overflow-hidden px-3 pb-2.5">
+            <PitchChartCanvas canvasRef={canvasRef} glass />
           </div>
         </div>
       </div>
@@ -179,10 +400,7 @@ export default function LivePitchTuner({
           </div>
 
           <div className="relative min-h-[5rem] flex-1 overflow-hidden px-5 pb-5">
-            <canvas
-              ref={canvasRef}
-              className="pitch-spectrogram pitch-spectrogram--glass absolute inset-0 h-full w-full"
-            />
+            <PitchChartCanvas canvasRef={canvasRef} glass />
           </div>
         </div>
       </div>
