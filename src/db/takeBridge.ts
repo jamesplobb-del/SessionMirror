@@ -21,7 +21,10 @@ export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
   const takes = await Promise.all(
     chronological.map(async (row, index) => {
       const videoUrl = await resolveTakePlaybackUrl(row.filePath, '')
-      const cachedThumbnail = await resolveCachedTakeThumbnail(row.id)
+      const cachedThumbnail = await resolveCachedTakeThumbnail(
+        row.id,
+        row.recordingOrientation ?? 'portrait',
+      )
       return vaultTakeToUiTake(row, index + 1, videoUrl, cachedThumbnail ?? '')
     }),
   )

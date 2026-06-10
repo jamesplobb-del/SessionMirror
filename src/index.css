@@ -430,7 +430,7 @@ video.camera-preview.camera-preview--live {
 
 video.camera-preview.camera-preview--mirror {
   transform: scaleX(-1) !important;
-  transform-origin: bottom center !important;
+  transform-origin: center center !important;
 }
 
 video.camera-preview.camera-preview--hidden {

@@ -118,9 +118,6 @@ export function applyViewportCssVars(): number {
   root.style.setProperty('--safe-top-js', `${safe.top}px`)
   root.style.setProperty('--safe-bottom-js', `${safe.bottom}px`)
 
-  document.body.style.width = `${width}px`
-  document.body.style.height = `${height}px`
-
   return height
 }
 
@@ -137,11 +134,8 @@ export function bootstrapViewport(): void {
 
 /** Clear stale inline sizes before measuring — prevents zoom/crop after app resume. */
 export function applyViewportCssVarsOnResume(): number {
-  document.body.style.width = ''
-  document.body.style.height = ''
   lastAppliedWidth = 0
   lastAppliedHeight = 0
-  void document.documentElement.offsetHeight
   return applyViewportCssVars()
 }
 
@@ -304,4 +298,5 @@ function rootCleanup(): void {
   lastAppliedWidth = 0
   lastAppliedHeight = 0
   cachedSafeAreaInsets = null
+  orientationTransitionActive = false
 }

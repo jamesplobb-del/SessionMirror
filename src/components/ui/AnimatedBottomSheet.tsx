@@ -31,6 +31,8 @@ export default function AnimatedBottomSheet({
   const [slideDistance, setSlideDistance] = useState(readSlideDistance)
 
   useLayoutEffect(() => {
+    if (!isOpen) return
+
     const update = () => setSlideDistance(readSlideDistance())
     update()
     window.addEventListener('resize', update)
@@ -39,7 +41,7 @@ export default function AnimatedBottomSheet({
       window.removeEventListener('resize', update)
       window.visualViewport?.removeEventListener('resize', update)
     }
-  }, [])
+  }, [isOpen])
 
   if (typeof document === 'undefined') return null
 

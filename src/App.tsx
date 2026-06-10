@@ -30,7 +30,7 @@ import ReviewModeOverlay from './components/ReviewModeOverlay'
 import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
-import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
+import { applyViewportCssVars, isOrientationTransitionActive, scheduleViewportSync } from './utils/viewportSync'
 import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -99,6 +99,7 @@ export default function App() {
     let lastHeight = window.innerHeight
 
     return scheduleViewportSync((height) => {
+      if (isOrientationTransitionActive()) return
       if (height === lastHeight) return
       lastHeight = height
       if (debounceTimer !== null) {
@@ -194,7 +195,9 @@ export default function App() {
         return rows.find((row) => !row.isBestTake)?.id ?? null
       })
 
-      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
+      window.setTimeout(() => {
+        void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
+      }, 600)
     },
     [applyTakeThumbnails],
   )
@@ -320,7 +323,9 @@ export default function App() {
             blob,
             thumbnailTake.mirrorPlayback !== false,
             thumbnailTake.recordingOrientation,
-          ).then((dataUrl) => persistTakeThumbnail(takeId, dataUrl))
+          ).then((dataUrl) =>
+            persistTakeThumbnail(takeId, dataUrl, thumbnailTake.recordingOrientation ?? 'portrait'),
+          )
         : captureAndPersistTakeThumbnail(thumbnailTake)
 
       void thumbnailPromise

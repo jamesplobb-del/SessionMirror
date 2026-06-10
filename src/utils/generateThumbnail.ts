@@ -165,7 +165,11 @@ export async function captureAndPersistTakeThumbnail(
         mirrorPreview: mirror,
         recordingOrientation: take.recordingOrientation,
       })
-      const persisted = await persistTakeThumbnail(take.id, dataUrl)
+      const persisted = await persistTakeThumbnail(
+        take.id,
+        dataUrl,
+        take.recordingOrientation ?? 'portrait',
+      )
       // #region agent log
       agentDebugLog(
         'generateThumbnail.ts:captureAndPersistTakeThumbnail',
