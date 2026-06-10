@@ -30,7 +30,7 @@ import ReviewModeOverlay from './components/ReviewModeOverlay'
 import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
-import { applyViewportCssVars, isOrientationTransitionActive, scheduleViewportSync } from './utils/viewportSync'
+import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
 import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -99,7 +99,6 @@ export default function App() {
     let lastHeight = window.innerHeight
 
     return scheduleViewportSync((height) => {
-      if (isOrientationTransitionActive()) return
       if (height === lastHeight) return
       lastHeight = height
       if (debounceTimer !== null) {
@@ -195,9 +194,7 @@ export default function App() {
         return rows.find((row) => !row.isBestTake)?.id ?? null
       })
 
-      window.setTimeout(() => {
-        void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
-      }, 600)
+      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
     },
     [applyTakeThumbnails],
   )
@@ -555,19 +552,12 @@ export default function App() {
     // #endregion
 
     const hydrateToken = ++thumbnailHydrateRef.current
-    const timer = window.setTimeout(() => {
-      const stillMissing = takesRef.current.filter(
-        (take) => !take.thumbnailUrl && !isAudioTake(take),
-      )
-      if (stillMissing.length === 0) return
-
-      void hydrateTakeThumbnailsInBackground(stillMissing, applyTakeThumbnails).then(() => {
-        if (hydrateToken !== thumbnailHydrateRef.current) return
-      })
-    }, 480)
+    void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(() => {
+      if (hydrateToken !== thumbnailHydrateRef.current) return
+    })
 
     return () => {
-      window.clearTimeout(timer)
+      thumbnailHydrateRef.current += 1
     }
   }, [applyTakeThumbnails, isVaultOpen])
 

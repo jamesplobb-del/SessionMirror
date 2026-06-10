@@ -2,7 +2,6 @@ import { Capacitor } from '@capacitor/core'
 
 const DEBUG_ENDPOINT = 'http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454'
 const DEBUG_SESSION = 'fba730'
-const DEBUG_LOG_FILE = 'debug-fba730.log'
 
 export function agentDebugLog(
   location: string,
@@ -41,13 +40,7 @@ export function agentDebugLog(
   }).catch(() => {})
 
   if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform?.()) {
-    void import('@capacitor/filesystem').then(({ Directory, Filesystem }) => {
-      void Filesystem.appendFile({
-        path: DEBUG_LOG_FILE,
-        directory: Directory.Cache,
-        data: line,
-      }).catch(() => {})
-    })
+    // Skip hot-path disk I/O — it blocked the main thread on iOS during debug sessions.
   }
   // #endregion
 }

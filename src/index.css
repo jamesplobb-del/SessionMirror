@@ -364,11 +364,6 @@ body.settings-branch-open * {
 
 .record-carousel-slot--recording {
   background: transparent;
-  transition: none;
-}
-
-.record-carousel-slot--center.record-carousel-slot--recording {
-  transition: none;
 }
 
 .record-carousel-slot--active:not(.record-carousel-slot--video-active):not(.record-carousel-slot--recording) {
@@ -411,8 +406,9 @@ body.settings-branch-open * {
 video.camera-preview {
   position: fixed !important;
   inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
   min-width: 0 !important;
   min-height: 0 !important;
   opacity: 0;

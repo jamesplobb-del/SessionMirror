@@ -76,8 +76,8 @@ export async function resolveCachedTakeThumbnail(
   if (recordingOrientation === 'landscape') {
     const landscapeThumb = await readThumbnailUri(thumbnailPath(takeId, 'landscape'))
     if (landscapeThumb) return landscapeThumb
-    // Ignore legacy portrait-path caches for landscape takes — they show wrong crops.
-    return null
+    // Fall back to legacy cache while v2 regenerates.
+    return readThumbnailUri(thumbnailPath(takeId, 'portrait'))
   }
 
   return readThumbnailUri(thumbnailPath(takeId, 'portrait'))

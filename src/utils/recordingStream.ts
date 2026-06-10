@@ -1,26 +1,22 @@
 import type { RecordingMode } from '../types'
 
-/**
- * Dedicated stream for MediaRecorder — cloned tracks so Web Audio (pitch monitor)
- * and the live preview never share an encoder sink with the recorder.
- */
+/** Clone only video — shared mic track keeps iOS MediaRecorder stable. */
 export function buildRecorderStream(
   source: MediaStream,
   mode: RecordingMode,
 ): MediaStream {
-  const recordStream = new MediaStream()
-
-  source.getAudioTracks().forEach((track) => {
-    recordStream.addTrack(track.clone())
-  })
-
-  if (mode === 'video') {
-    const videoTrack = source.getVideoTracks()[0]
-    if (videoTrack) {
-      recordStream.addTrack(videoTrack.clone())
-    }
+  if (mode === 'audio') {
+    return source
   }
 
+  const videoTrack = source.getVideoTracks()[0]
+  if (!videoTrack) {
+    return source
+  }
+
+  const recordStream = new MediaStream()
+  source.getAudioTracks().forEach((track) => recordStream.addTrack(track))
+  recordStream.addTrack(videoTrack.clone())
   return recordStream
 }
 

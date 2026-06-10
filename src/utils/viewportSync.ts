@@ -15,7 +15,6 @@ function markPlatformClass(): void {
 let cachedSafeAreaInsets: { top: number; bottom: number } | null = null
 let lastAppliedWidth = 0
 let lastAppliedHeight = 0
-let orientationTransitionActive = false
 
 function invalidateSafeAreaCache(): void {
   cachedSafeAreaInsets = null
@@ -44,7 +43,6 @@ export function readViewportSize(): { width: number; height: number } {
   const offsetTop = vv?.offsetTop ?? 0
   const offsetLeft = vv?.offsetLeft ?? 0
 
-  // visualViewport.height omits offsetTop on cold boot — add it so bottom-anchored fill reaches the bezel.
   const vvHeight = (vv?.height ?? 0) + offsetTop
   const vvWidth = (vv?.width ?? 0) + offsetLeft
 
@@ -64,7 +62,6 @@ export function readViewportSize(): { width: number; height: number } {
 
   if (isIOSNative()) {
     const inner = window.innerHeight
-    // outerHeight can help cold boot; ignore if it diverges (stale after backgrounding).
     if (window.outerHeight > 0 && Math.abs(window.outerHeight - inner) <= 48) {
       heightCandidates.push(window.outerHeight)
     }
@@ -76,33 +73,15 @@ export function readViewportSize(): { width: number; height: number } {
   }
 }
 
-/** Apply live viewport dimensions — skips DOM writes when size is unchanged. */
+/** Apply HUD viewport vars — camera preview uses fixed inset:0 and ignores these. */
 export function applyViewportCssVars(): number {
   const { width, height } = readViewportSize()
   if (width === lastAppliedWidth && height === lastAppliedHeight) {
     return height
   }
 
-  const prevWidth = lastAppliedWidth
-  const prevHeight = lastAppliedHeight
-
   lastAppliedWidth = width
   lastAppliedHeight = height
-
-  // #region agent log
-  agentDebugLog(
-    'viewportSync.ts:applyViewportCssVars',
-    'viewport dimensions applied',
-    {
-      prevWidth,
-      prevHeight,
-      width,
-      height,
-      orientationTransitionActive,
-    },
-    'H-C1',
-  )
-  // #endregion
 
   const vv = window.visualViewport
   const root = document.documentElement
@@ -121,21 +100,20 @@ export function applyViewportCssVars(): number {
   return height
 }
 
-/** Skip layout writes while the device is mid-rotation — one settled sync follows. */
+/** @deprecated Always false — orientation lock removed (caused stuck layout). */
 export function isOrientationTransitionActive(): boolean {
-  return orientationTransitionActive
+  return false
 }
 
-/** Run before React paint so every iPhone gets correct dimensions on cold launch. */
 export function bootstrapViewport(): void {
   markPlatformClass()
   applyViewportCssVars()
 }
 
-/** Clear stale inline sizes before measuring — prevents zoom/crop after app resume. */
 export function applyViewportCssVarsOnResume(): number {
   lastAppliedWidth = 0
   lastAppliedHeight = 0
+  invalidateSafeAreaCache()
   return applyViewportCssVars()
 }
 
@@ -146,15 +124,8 @@ export function refreshCameraPreviewLayout(video: HTMLVideoElement | null): void
   }
 }
 
-const BOOT_SYNC_DELAYS_MS = [100, 300, 750]
-const RESUME_SYNC_DELAYS_MS = [0, 100, 250, 500]
-
-function syncWithRaf(sync: () => void): void {
-  requestAnimationFrame(() => {
-    sync()
-    requestAnimationFrame(sync)
-  })
-}
+const BOOT_SYNC_DELAYS_MS = [100, 300]
+const RESUME_SYNC_DELAYS_MS = [0, 100, 250]
 
 async function setupCapacitorResumeSync(syncOnResume: () => void): Promise<(() => void) | undefined> {
   if (!Capacitor.isNativePlatform()) return undefined
@@ -164,7 +135,6 @@ async function setupCapacitorResumeSync(syncOnResume: () => void): Promise<(() =
     if (!isActive) return
 
     syncOnResume()
-    syncWithRaf(syncOnResume)
     RESUME_SYNC_DELAYS_MS.forEach((delay) => window.setTimeout(syncOnResume, delay))
   })
 
@@ -177,7 +147,6 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   markPlatformClass()
 
   const sync = () => {
-    if (orientationTransitionActive) return
     onHeightChange(applyViewportCssVars())
   }
   const syncOnResume = () => {
@@ -187,9 +156,7 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   const timers = BOOT_SYNC_DELAYS_MS.map((delay) => window.setTimeout(sync, delay))
 
   let syncDebounceTimer: number | null = null
-
-  const scheduleSync = (delayMs = 48) => {
-    if (orientationTransitionActive) return
+  const scheduleSync = (delayMs = 80) => {
     if (syncDebounceTimer !== null) {
       window.clearTimeout(syncDebounceTimer)
     }
@@ -199,64 +166,35 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
     }, delayMs)
   }
 
+  const onDebouncedLayout = () => scheduleSync(80)
+
   let orientationSyncTimer: number | null = null
-  const scheduleOrientationSync = () => {
-    orientationTransitionActive = true
-    // #region agent log
-    agentDebugLog(
-      'viewportSync.ts:scheduleOrientationSync',
-      'orientation transition locked',
-      { viewport: readViewportSize() },
-      'H-C4',
-    )
-    // #endregion
+  const onOrientationChange = () => {
     invalidateSafeAreaCache()
+    lastAppliedWidth = 0
+    lastAppliedHeight = 0
     if (orientationSyncTimer !== null) {
       window.clearTimeout(orientationSyncTimer)
     }
     orientationSyncTimer = window.setTimeout(() => {
       orientationSyncTimer = null
-      orientationTransitionActive = false
       sync()
       // #region agent log
       agentDebugLog(
         'viewportSync.ts:onOrientationChange',
         'orientation layout sync (settled)',
-        {
-          viewport: readViewportSize(),
-          native: Capacitor.isNativePlatform(),
-        },
-        'H-P',
+        { viewport: readViewportSize(), native: Capacitor.isNativePlatform() },
+        'H-C1',
       )
       // #endregion
-    }, 320)
-  }
-
-  const onOrientationChange = () => {
-    scheduleOrientationSync()
-  }
-
-  const onPageShow = () => {
-    if (orientationTransitionActive) return
-    sync()
-    syncWithRaf(sync)
-  }
-
-  const onDebouncedLayout = () => scheduleSync(48)
-
-  const onFocus = () => {
-    if (orientationTransitionActive) return
-    sync()
+    }, 200)
   }
 
   sync()
   window.addEventListener('resize', onDebouncedLayout)
   window.addEventListener('orientationchange', onOrientationChange)
-  window.addEventListener('pageshow', onPageShow)
-  window.addEventListener('focus', onFocus)
-  window.visualViewport?.addEventListener('resize', onDebouncedLayout)
-  window.visualViewport?.addEventListener('scroll', onDebouncedLayout)
   screen.orientation?.addEventListener('change', onOrientationChange)
+  window.visualViewport?.addEventListener('resize', onDebouncedLayout)
 
   let capCleanup: (() => void) | undefined
   void setupCapacitorResumeSync(syncOnResume).then((cleanup) => {
@@ -273,11 +211,8 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
     }
     window.removeEventListener('resize', onDebouncedLayout)
     window.removeEventListener('orientationchange', onOrientationChange)
-    window.removeEventListener('pageshow', onPageShow)
-    window.removeEventListener('focus', onFocus)
-    window.visualViewport?.removeEventListener('resize', onDebouncedLayout)
-    window.visualViewport?.removeEventListener('scroll', onDebouncedLayout)
     screen.orientation?.removeEventListener('change', onOrientationChange)
+    window.visualViewport?.removeEventListener('resize', onDebouncedLayout)
     capCleanup?.()
     rootCleanup()
   }
@@ -293,10 +228,7 @@ function rootCleanup(): void {
   root.style.removeProperty('--vv-offset-left')
   root.style.removeProperty('--safe-top-js')
   root.style.removeProperty('--safe-bottom-js')
-  document.body.style.width = ''
-  document.body.style.height = ''
   lastAppliedWidth = 0
   lastAppliedHeight = 0
   cachedSafeAreaInsets = null
-  orientationTransitionActive = false
 }

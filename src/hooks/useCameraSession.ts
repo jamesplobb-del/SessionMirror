@@ -640,7 +640,12 @@ export function useCameraSession({
 
       let writer: StreamingTakeWriter | null = null
       try {
-        const writerPromise = StreamingTakeWriter.open(takeId, mimeType)
+        writer = await StreamingTakeWriter.open(takeId, mimeType)
+        if (!writer) {
+          throw new Error('Recording writer unavailable')
+        }
+        writerRef.current = writer
+        activeTakeIdRef.current = takeId
 
         const recordStream = buildRecorderStream(currentStream, mode)
         recordStreamRef.current = recordStream
@@ -650,8 +655,7 @@ export function useCameraSession({
           'useCameraSession.ts:startRecording:recorderStream',
           'recorder stream prepared',
           {
-            clonedAudio: recordStream.getAudioTracks().length > 0,
-            clonedVideo: recordStream.getVideoTracks().length > 0,
+            clonedVideo: recordStream !== currentStream,
             previewAudioTracks: currentStream.getAudioTracks().length,
           },
           'H-S',
@@ -670,16 +674,10 @@ export function useCameraSession({
           recorder.start()
         }
 
+        isRecordingRef.current = true
         setIsRecording(true)
         setElapsed(0)
         elapsedRef.current = 0
-
-        writer = await writerPromise
-        if (!writer || !isRecordingRef.current) {
-          throw new Error('Recording writer unavailable')
-        }
-        writerRef.current = writer
-        activeTakeIdRef.current = takeId
       } catch {
         chunksRef.current = []
         const activeRecorder = recorderRef.current
@@ -696,12 +694,14 @@ export function useCameraSession({
         recorderRef.current = null
         releaseRecorderStream(recordStreamRef.current, streamRef.current)
         recordStreamRef.current = null
+        isRecordingRef.current = false
         setIsRecording(false)
       }
     })().catch(() => {
       chunksRef.current = []
       releaseRecorderStream(recordStreamRef.current, streamRef.current)
       recordStreamRef.current = null
+      isRecordingRef.current = false
       setIsRecording(false)
     })
   }, [bindRecordingHandlers, ensureRecordableStream, isRecording])
