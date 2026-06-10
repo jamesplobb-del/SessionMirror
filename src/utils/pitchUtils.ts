@@ -7,6 +7,7 @@ import {
 } from './pitchConfig'
 
 const A4_HZ = 440
+const MAX_DISPLAY_CENTS = 50
 
 export interface PitchReadout {
   noteName: string
@@ -32,8 +33,8 @@ const NOTE_NAMES = [
   'B',
 ] as const
 
-export const TUNING_GREEN_CENTS = 6
-export const TUNING_YELLOW_CENTS = 16
+export const TUNING_GREEN_CENTS = 5
+export const TUNING_YELLOW_CENTS = 15
 
 export function frequencyToMidi(frequencyHz: number): number {
   return 69 + 12 * Math.log2(frequencyHz / A4_HZ)
@@ -52,7 +53,26 @@ export function midiToNoteName(midi: number): string {
 
 export function centsFromMidi(frequencyHz: number, midi: number): number {
   const perfectHz = A4_HZ * 2 ** ((midi - 69) / 12)
+  if (!Number.isFinite(perfectHz) || perfectHz <= 0 || frequencyHz <= 0) return 0
   return 1200 * Math.log2(frequencyHz / perfectHz)
+}
+
+/** Pick the octave whose cents offset is smallest (fixes harmonic/octave jumps). */
+function bestMidiForFrequency(frequencyHz: number): { midi: number; cents: number } {
+  const baseMidi = frequencyToNearestMidi(frequencyHz)
+  let bestMidi = baseMidi
+  let bestCents = centsFromMidi(frequencyHz, baseMidi)
+
+  for (const shift of [-24, -12, 12, 24]) {
+    const candidate = baseMidi + shift
+    const cents = centsFromMidi(frequencyHz, candidate)
+    if (Math.abs(cents) < Math.abs(bestCents)) {
+      bestCents = cents
+      bestMidi = candidate
+    }
+  }
+
+  return { midi: bestMidi, cents: bestCents }
 }
 
 export function normalizeInstrumentFrequency(frequencyHz: number): number {
@@ -75,7 +95,7 @@ export function normalizeInstrumentFrequency(frequencyHz: number): number {
 
 export function frequencyToCentsOffset(frequencyHz: number): number {
   if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) return 0
-  return centsFromMidi(frequencyHz, frequencyToNearestMidi(frequencyHz))
+  return bestMidiForFrequency(frequencyHz).cents
 }
 
 export function frequencyToPitchReadout(frequencyHz: number): PitchReadout {
@@ -84,8 +104,14 @@ export function frequencyToPitchReadout(frequencyHz: number): PitchReadout {
   }
 
   const normalized = normalizeInstrumentFrequency(frequencyHz)
-  const midi = frequencyToNearestMidi(normalized)
-  const cents = centsFromMidi(normalized, midi)
+  if (!isFrequencyInInstrumentRange(normalized)) {
+    return { noteName: '—', cents: 0, frequencyHz: 0, midi: 0 }
+  }
+
+  const { midi, cents } = bestMidiForFrequency(normalized)
+  if (!Number.isFinite(cents) || Math.abs(cents) > MAX_DISPLAY_CENTS) {
+    return { noteName: '—', cents: 0, frequencyHz: 0, midi: 0 }
+  }
 
   return {
     noteName: midiToNoteName(midi),
@@ -111,16 +137,11 @@ export function stabilizePitchReadout(
       ...next,
       noteName: previous.noteName,
       midi: previous.midi,
-      cents: centsFromPrevious,
+      cents: Math.max(-MAX_DISPLAY_CENTS, Math.min(MAX_DISPLAY_CENTS, centsFromPrevious)),
     }
   }
 
   return next
-}
-
-export function quantizeDisplayCents(cents: number, step: number): number {
-  if (step <= 0) return cents
-  return Math.round(cents / step) * step
 }
 
 export function getIntonationZone(cents: number): IntonationZone {
@@ -151,12 +172,17 @@ export function smoothFrequency(
   next: number,
   alpha = PITCH_SMOOTH_ALPHA,
 ): number {
-  if (previous == null || !Number.isFinite(previous)) return next
+  if (previous == null || !Number.isFinite(previous) || previous <= 0) return next
+  if (!Number.isFinite(next) || next <= 0) return previous
   return previous * (1 - alpha) + next * alpha
 }
 
 export function isFrequencyInInstrumentRange(frequencyHz: number): boolean {
-  return frequencyHz >= MIN_INSTRUMENT_HZ && frequencyHz <= MAX_INSTRUMENT_HZ
+  return (
+    Number.isFinite(frequencyHz) &&
+    frequencyHz >= MIN_INSTRUMENT_HZ &&
+    frequencyHz <= MAX_INSTRUMENT_HZ
+  )
 }
 
 export function interpolateFrequencyAtTime(
