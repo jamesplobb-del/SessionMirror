@@ -1,8 +1,16 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronUp, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Clapperboard, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
 import { pinButtonBubbleProps } from '../utils/eventBubbling'
+
+function TakeCardThumbnailPlaceholder() {
+  return (
+    <div className="vault-thumb-placeholder h-full w-full">
+      <Clapperboard className="h-8 w-8 text-white/30" strokeWidth={1.5} aria-hidden />
+    </div>
+  )
+}
 
 interface TakeCardProps {
   take: Take
@@ -41,6 +49,7 @@ function TakeCard({
   const [nameDraft, setNameDraft] = useState(take.name)
   const [notesExpanded, setNotesExpanded] = useState(false)
   const [notesDraft, setNotesDraft] = useState(take.notes)
+  const [thumbnailBroken, setThumbnailBroken] = useState(false)
   const notesDebounceRef = useRef<number | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const tapStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -62,6 +71,10 @@ function TakeCard({
   useEffect(() => {
     setNameDraft(take.name)
   }, [take.name])
+
+  useEffect(() => {
+    setThumbnailBroken(false)
+  }, [take.id, take.thumbnailUrl])
 
   useEffect(() => {
     if (isEditingName) {
@@ -140,6 +153,8 @@ function TakeCard({
         ? 'border-sky-300 ring-1 ring-sky-200'
         : 'border-stone-200'
 
+  const showThumbnailImage = Boolean(take.thumbnailUrl) && !thumbnailBroken
+
   return (
     <div
       className={`group flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${cardRingClass}`}
@@ -153,7 +168,7 @@ function TakeCard({
           >
             {thumbnailVideo}
           </div>
-        ) : take.thumbnailUrl ? (
+        ) : showThumbnailImage ? (
           <div
             {...thumbActivateProps}
             aria-label={thumbAriaLabel}
@@ -165,14 +180,17 @@ function TakeCard({
               draggable={false}
               loading="lazy"
               decoding="async"
+              onError={() => setThumbnailBroken(true)}
             />
           </div>
         ) : (
           <div
             {...thumbActivateProps}
-            className={`${thumbActivateProps.className} animate-pulse bg-stone-200`}
+            className={`${thumbActivateProps.className} overflow-hidden`}
             aria-label={thumbAriaLabel}
-          />
+          >
+            <TakeCardThumbnailPlaceholder />
+          </div>
         )}
         {selectionMode && (
           <div

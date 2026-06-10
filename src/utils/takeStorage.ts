@@ -1,8 +1,8 @@
 import { Capacitor } from '@capacitor/core'
 import { agentDebugLog } from './agentDebugLog'
 import { Directory, Filesystem } from '@capacitor/filesystem'
+import { initAppFilesystem, isFilesystemMissingError, TAKES_DIR } from './filesystemInit'
 
-const TAKES_DIR = 'takes'
 export const NATIVE_VIDEO_MIME = 'video/mp4'
 export const NATIVE_AUDIO_MIME = 'audio/mp4'
 
@@ -40,95 +40,8 @@ export function normalizeBlobMime(mimeType: string): string {
   return mimeType
 }
 
-function serializeError(err: unknown): string {
-  try {
-    return JSON.stringify(err)
-  } catch {
-    return String(err)
-  }
-}
-
-function isAlreadyExistsError(err: unknown): boolean {
-  if (err == null) return false
-
-  if (serializeError(err).includes('OS-PLUG-FILE-0010')) {
-    return true
-  }
-
-  if (typeof err === 'string') {
-    return err.toLowerCase().includes('already exists')
-  }
-
-  if (typeof err === 'object') {
-    const e = err as {
-      code?: string
-      message?: string
-      errorMessage?: string
-      error?: { code?: string; message?: string }
-    }
-    const code = e.code ?? e.error?.code ?? ''
-    const message = `${e.message ?? ''} ${e.errorMessage ?? ''} ${e.error?.message ?? ''}`.toLowerCase()
-    return code === 'OS-PLUG-FILE-0010' || message.includes('already exists')
-  }
-
-  return false
-}
-
-function isDoesNotExistError(err: unknown): boolean {
-  if (err == null) return false
-
-  const serialized = serializeError(err)
-  if (serialized.includes('OS-PLUG-FILE-0008')) {
-    return true
-  }
-
-  if (typeof err === 'string') {
-    const lower = err.toLowerCase()
-    return lower.includes('does not exist') || lower.includes('not found')
-  }
-
-  if (typeof err === 'object') {
-    const e = err as {
-      code?: string
-      message?: string
-      errorMessage?: string
-      error?: { code?: string; message?: string }
-    }
-    const code = e.code ?? e.error?.code ?? ''
-    const message = `${e.message ?? ''} ${e.errorMessage ?? ''} ${e.error?.message ?? ''}`.toLowerCase()
-    return (
-      code === 'OS-PLUG-FILE-0008' ||
-      message.includes('does not exist') ||
-      message.includes('not found')
-    )
-  }
-
-  return false
-}
-
 async function ensureTakesDirectory(): Promise<void> {
-  try {
-    await Filesystem.stat({
-      path: TAKES_DIR,
-      directory: Directory.Data,
-    })
-    return
-  } catch {
-    /* directory missing — create below */
-  }
-
-  try {
-    await Filesystem.mkdir({
-      path: TAKES_DIR,
-      directory: Directory.Data,
-      recursive: true,
-    })
-  } catch (err) {
-    if (isAlreadyExistsError(err)) {
-      return
-    }
-    /* Non-fatal — proceed even if mkdir fails; writes may still succeed */
-  }
+  await initAppFilesystem()
 }
 
 /** True when the URL is a WebView-safe Capacitor playback URL (never raw file://). */
@@ -282,11 +195,18 @@ export async function toCapacitorPlaybackSrc(
   if (uriOrPath.startsWith('file://')) {
     converted = Capacitor.convertFileSrc(uriOrPath)
   } else {
-    const { uri } = await Filesystem.getUri({
-      path: uriOrPath,
-      directory: Directory.Data,
-    })
-    converted = Capacitor.convertFileSrc(uri)
+    try {
+      const { uri } = await Filesystem.getUri({
+        path: uriOrPath,
+        directory: Directory.Data,
+      })
+      converted = Capacitor.convertFileSrc(uri)
+    } catch (err) {
+      if (isFilesystemMissingError(err)) {
+        return ''
+      }
+      return ''
+    }
   }
 
   if (converted.startsWith('file://')) {
@@ -573,7 +493,7 @@ export async function deleteTakeFile(filePath: string): Promise<void> {
       directory: Directory.Data,
     })
   } catch (err) {
-    if (isDoesNotExistError(err)) {
+    if (isFilesystemMissingError(err)) {
       return
     }
     /* file may already be gone or delete is best-effort */

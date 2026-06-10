@@ -46,6 +46,7 @@ import { scheduleViewportSync } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
+import { initAppFilesystem } from './utils/filesystemInit'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
@@ -246,7 +247,7 @@ export default function App() {
     let cancelled = false
 
     void (async () => {
-      await initVaultDatabase()
+      await Promise.all([initVaultDatabase(), initAppFilesystem()])
       if (cancelled) return
 
       const projectList = await listProjects()
@@ -609,6 +610,33 @@ export default function App() {
     !autoRecordStartSuppressed
 
   const wasVaultOpenRef = useRef(false)
+  const vaultEnterLoadDoneRef = useRef(false)
+  const vaultHydrateInFlightRef = useRef(false)
+
+  useEffect(() => {
+    if (!isVaultOpen) {
+      vaultEnterLoadDoneRef.current = false
+      vaultHydrateInFlightRef.current = false
+    }
+  }, [isVaultOpen])
+
+  const loadVaultTakesFromFilesystem = useCallback(
+    async (projectId: string) => {
+      if (vaultHydrateInFlightRef.current) return
+      vaultHydrateInFlightRef.current = true
+
+      try {
+        const rows = await getTakesByProject(projectId)
+        const loaded = await uiTakesFromVaultRows(rows)
+        setTakes(loaded)
+        setBenchmarkId(findBestTakeId(rows))
+        void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
+      } finally {
+        vaultHydrateInFlightRef.current = false
+      }
+    },
+    [applyTakeThumbnails],
+  )
 
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
@@ -644,17 +672,14 @@ export default function App() {
   }, [deferHudMediaPause])
 
   const handleVaultEnterComplete = useCallback(() => {
+    if (vaultEnterLoadDoneRef.current) return
+    vaultEnterLoadDoneRef.current = true
+
     const projectId = activeProjectIdRef.current
     if (!projectId) return
 
-    void (async () => {
-      const rows = await getTakesByProject(projectId)
-      const loaded = await uiTakesFromVaultRows(rows)
-      setTakes(loaded)
-      setBenchmarkId(findBestTakeId(rows))
-      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
-    })()
-  }, [applyTakeThumbnails])
+    void loadVaultTakesFromFilesystem(projectId)
+  }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
     startTransition(() => {

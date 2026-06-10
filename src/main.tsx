@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { initVaultDatabase } from './db'
+import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { agentDebugLog } from './utils/agentDebugLog'
@@ -38,7 +39,7 @@ function bootstrap() {
   )
   // #endregion
 
-  void initVaultDatabase().then(() => {
+  void Promise.all([initVaultDatabase(), initAppFilesystem()]).then(() => {
     // #region agent log
     agentDebugLog(
       'main.tsx:bootstrap',

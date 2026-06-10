@@ -1,8 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import type { RecordingOrientation } from './takeVideoTransform'
-
-const THUMBNAIL_DIR = 'thumbnails'
+import { THUMBNAIL_DIR, initAppFilesystem, isFilesystemMissingError } from './filesystemInit'
 
 function thumbnailPath(takeId: string, orientation: RecordingOrientation = 'portrait'): string {
   if (orientation === 'landscape') {
@@ -17,26 +16,32 @@ async function readThumbnailUri(path: string): Promise<string | null> {
       path,
       directory: Directory.Data,
     })
-  } catch {
+  } catch (err) {
+    if (isFilesystemMissingError(err)) {
+      return null
+    }
     return null
   }
 
-  const { uri } = await Filesystem.getUri({
-    path,
-    directory: Directory.Data,
-  })
-
-  if (Capacitor.isNativePlatform()) {
-    return Capacitor.convertFileSrc(uri)
-  }
-
   try {
+    const { uri } = await Filesystem.getUri({
+      path,
+      directory: Directory.Data,
+    })
+
+    if (Capacitor.isNativePlatform()) {
+      return Capacitor.convertFileSrc(uri)
+    }
+
     const { data } = await Filesystem.readFile({
       path,
       directory: Directory.Data,
     })
     return `data:image/jpeg;base64,${data}`
-  } catch {
+  } catch (err) {
+    if (isFilesystemMissingError(err)) {
+      return null
+    }
     return null
   }
 }
@@ -46,27 +51,30 @@ export async function persistTakeThumbnail(
   dataUrl: string,
   recordingOrientation: RecordingOrientation = 'portrait',
 ): Promise<string> {
+  await initAppFilesystem()
+
   const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
-
-  await Filesystem.mkdir({
-    path: THUMBNAIL_DIR,
-    directory: Directory.Data,
-    recursive: true,
-  })
-
   const path = thumbnailPath(takeId, recordingOrientation)
-  await Filesystem.writeFile({
-    path,
-    directory: Directory.Data,
-    data: base64,
-  })
 
-  const { uri } = await Filesystem.getUri({
-    path,
-    directory: Directory.Data,
-  })
+  try {
+    await Filesystem.writeFile({
+      path,
+      directory: Directory.Data,
+      data: base64,
+    })
+  } catch {
+    return dataUrl
+  }
 
-  return Capacitor.isNativePlatform() ? Capacitor.convertFileSrc(uri) : dataUrl
+  try {
+    const { uri } = await Filesystem.getUri({
+      path,
+      directory: Directory.Data,
+    })
+    return Capacitor.isNativePlatform() ? Capacitor.convertFileSrc(uri) : dataUrl
+  } catch {
+    return dataUrl
+  }
 }
 
 export async function resolveCachedTakeThumbnail(
@@ -76,7 +84,6 @@ export async function resolveCachedTakeThumbnail(
   if (recordingOrientation === 'landscape') {
     const landscapeThumb = await readThumbnailUri(thumbnailPath(takeId, 'landscape'))
     if (landscapeThumb) return landscapeThumb
-    // Fall back to legacy cache while v2 regenerates.
     return readThumbnailUri(thumbnailPath(takeId, 'portrait'))
   }
 
