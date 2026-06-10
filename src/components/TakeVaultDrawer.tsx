@@ -61,6 +61,7 @@ export default function TakeVaultDrawer({
   onBeforeExport,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
+  const [vaultContentReady, setVaultContentReady] = useState(false)
   const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
@@ -86,6 +87,7 @@ export default function TakeVaultDrawer({
 
   useEffect(() => {
     if (!isOpen) {
+      setVaultContentReady(false)
       teardownVideosInContainer(drawerRef.current)
       setSelectionMode(false)
       setSelectedIds(new Set())
@@ -208,9 +210,10 @@ export default function TakeVaultDrawer({
       isOpen={isOpen}
       onClose={onClose}
       ariaLabel="Take Vault"
-      maxHeightClass="max-h-[min(75vh,100dvh)]"
+      maxHeightClass="h-[min(75vh,100dvh)]"
       sheetRef={drawerRef}
       motionPreset="light"
+      onEnterComplete={() => setVaultContentReady(true)}
     >
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
@@ -267,6 +270,17 @@ export default function TakeVaultDrawer({
         </div>
 
         <div className="vault-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-4">
+          {!vaultContentReady ? (
+            <div className="flex h-full min-h-[12rem] flex-col gap-3" aria-hidden>
+              <div className="h-10 rounded-xl bg-stone-100" />
+              <div className="h-8 w-40 rounded-lg bg-stone-100" />
+              <div className="mt-2 flex gap-4">
+                <div className="h-44 w-36 shrink-0 rounded-2xl bg-stone-100" />
+                <div className="h-44 w-36 shrink-0 rounded-2xl bg-stone-100" />
+              </div>
+            </div>
+          ) : (
+            <>
           <ProjectSessionBar
             projects={projects}
             activeProjectId={activeProject?.id ?? null}
@@ -313,8 +327,7 @@ export default function TakeVaultDrawer({
                     )}
                   </div>
                   <div className="flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
-                    {isOpen &&
-                      filteredTakes.map((take) => (
+                    {filteredTakes.map((take) => (
                         <TakeCard
                           key={take.id}
                           take={take}
@@ -367,6 +380,8 @@ export default function TakeVaultDrawer({
                   </div>
                 </>
               )}
+            </>
+          )}
             </>
           )}
         </div>

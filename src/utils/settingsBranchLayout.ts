@@ -3,10 +3,14 @@ interface ViewportPoint {
   y: number
 }
 
-const ITEM_WIDTH = 88
-const ITEM_HEIGHT = 68
-const ITEM_GAP = 12
-const COG_CLEARANCE = 56
+/** Icon + label stack — keep in sync with SettingsBranchWheel markup. */
+const ITEM_WIDTH = 96
+const ITEM_HEIGHT = 92
+const ITEM_GAP = 10
+/** Space between cog top and nearest branch item. */
+const COG_CLEARANCE = 20
+/** Extra lift so labels clear the record timer / deck text below. */
+const DECK_TEXT_CLEARANCE = 28
 const VIEWPORT_MARGIN = 12
 
 function clampBranchPoint(
@@ -31,22 +35,20 @@ function clampBranchPoint(
   }
 }
 
-/** Lay out branches in a row centered above the settings cog. */
+/** Stack quick-setting branches in a column above the settings cog. */
 export function layoutBranchItems(count: number, anchorRect: DOMRect): ViewportPoint[] {
-  const baseY = -(COG_CLEARANCE + ITEM_HEIGHT / 2)
-
-  if (count <= 1) {
-    return [clampBranchPoint({ x: 0, y: baseY }, anchorRect)]
-  }
-
-  const totalWidth = ITEM_WIDTH * count + ITEM_GAP * (count - 1)
-  const startX = -totalWidth / 2 + ITEM_WIDTH / 2
+  const firstCenterY = -(
+    COG_CLEARANCE +
+    DECK_TEXT_CLEARANCE +
+    ITEM_HEIGHT / 2
+  )
+  const stepY = ITEM_HEIGHT + ITEM_GAP
 
   return Array.from({ length: count }, (_, index) =>
     clampBranchPoint(
       {
-        x: startX + index * (ITEM_WIDTH + ITEM_GAP),
-        y: baseY,
+        x: 0,
+        y: firstCenterY - index * stepY,
       },
       anchorRect,
     ),

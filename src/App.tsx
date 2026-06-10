@@ -536,11 +536,17 @@ export default function App() {
     if (missingThumbnails.length === 0) return
 
     const hydrateToken = ++thumbnailHydrateRef.current
-    void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(
-      () => {
-        if (hydrateToken !== thumbnailHydrateRef.current) return
-      },
-    )
+    const timer = window.setTimeout(() => {
+      void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(
+        () => {
+          if (hydrateToken !== thumbnailHydrateRef.current) return
+        },
+      )
+    }, 320)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
   }, [applyTakeThumbnails, isVaultOpen, takes])
 
   const handleOpenSettings = useCallback(() => {

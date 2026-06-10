@@ -187,7 +187,7 @@ export default function SettingsBranchWheel({
                     <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
                       <Icon className="h-5 w-5" strokeWidth={2.1} />
                     </span>
-                    <span className="settings-branch-wheel__label text-center text-[10px] font-semibold leading-tight tracking-wide">
+                    <span className="settings-branch-wheel__label block max-w-[5.5rem] text-center text-[10px] font-semibold leading-snug tracking-wide">
                       {item.label}
                     </span>
                   </motion.button>
