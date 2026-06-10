@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { AudioLines, LayoutGrid } from 'lucide-react'
-import { useEffect, useMemo, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
 
@@ -24,8 +24,8 @@ interface BranchItem {
 }
 
 const BRANCH_MOTION = {
-  enter: { duration: 0.2, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] },
-  exit: { duration: 0.22, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] },
+  duration: 0.2,
+  ease: [0.32, 0.72, 0, 1] as [number, number, number, number],
 }
 
 export default function SettingsBranchWheel({
@@ -38,6 +38,39 @@ export default function SettingsBranchWheel({
   onPitchTrackerChange,
   onShowTakeCardsChange,
 }: SettingsBranchWheelProps) {
+  const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
+    null,
+  )
+
+  useLayoutEffect(() => {
+    if (!open) return
+
+    const measure = () => {
+      const node = anchorRef.current
+      if (!node) return
+      const rect = node.getBoundingClientRect()
+      setAnchor({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        rect,
+      })
+    }
+
+    measure()
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+    }
+  }, [anchorRef, open])
+
+  const handleExitComplete = () => {
+    setAnchor(null)
+    onExitComplete?.()
+  }
+
   useEffect(() => {
     if (!open) return
 
@@ -84,16 +117,13 @@ export default function SettingsBranchWheel({
     [onPitchTrackerChange, onShowTakeCardsChange, pitchTrackerEnabled, showTakeCards],
   )
 
-  const anchorRect = open ? anchorRef.current?.getBoundingClientRect() : null
-  const anchorX = anchorRect ? anchorRect.left + anchorRect.width / 2 : window.innerWidth - 36
-  const anchorY = anchorRect ? anchorRect.top + anchorRect.height / 2 : window.innerHeight - 48
-  const positions = anchorRect ? layoutBranchItems(branchItems.length, anchorRect) : []
+  const positions = anchor ? layoutBranchItems(branchItems.length, anchor.rect) : []
 
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <AnimatePresence onExitComplete={onExitComplete}>
-      {open && (
+    <AnimatePresence onExitComplete={handleExitComplete}>
+      {open && anchor && (
         <>
           <motion.button
             type="button"
@@ -107,56 +137,65 @@ export default function SettingsBranchWheel({
             onClick={onClose}
           />
 
-          <motion.div
-            className="settings-branch-wheel pointer-events-none fixed z-[201] touch-none"
-            style={{ left: anchorX, top: anchorY }}
-            role="menu"
-            aria-label="Quick settings"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.88 }}
-            transition={BRANCH_MOTION}
+          <div
+            className="pointer-events-none fixed z-[201] touch-none"
+            style={{
+              left: anchor.x,
+              top: anchor.y,
+              transform: 'translate(-50%, -50%)',
+            }}
           >
+            <motion.div
+              className="settings-branch-wheel relative"
+              role="menu"
+              aria-label="Quick settings"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={BRANCH_MOTION}
+            >
             {branchItems.map((item, index) => {
               const Icon = item.icon
-              const { x, y } = positions[index] ?? { x: 0, y: -80 }
+              const { x, y } = positions[index] ?? { x: 0, y: -88 }
 
               return (
-                <motion.button
+                <div
                   key={item.id}
-                  type="button"
-                  role="menuitem"
-                  className={`settings-branch-wheel__item pointer-events-auto absolute flex flex-col items-center gap-1.5 ${
-                    item.active ? 'settings-branch-wheel__item--active' : ''
-                  }`}
+                  className="settings-branch-wheel__slot pointer-events-none absolute"
                   style={{
-                    left: 0,
-                    top: 0,
+                    left: x,
+                    top: y,
                     width: BRANCH_ITEM_WIDTH,
-                    transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                    transform: 'translate(-50%, -50%)',
                   }}
-                  initial={{ opacity: 0, scale: 0.72 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.72 }}
-                  transition={{
-                    ...BRANCH_MOTION,
-                    delay: index * 0.03,
-                  }}
-                  aria-label={item.label}
-                  aria-pressed={item.active}
-                  onClick={item.onSelect}
-                  whileTap={{ scale: 0.94 }}
                 >
-                  <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
-                    <Icon className="h-5 w-5" strokeWidth={2.1} />
-                  </span>
-                  <span className="settings-branch-wheel__label text-center text-[10px] font-semibold leading-tight tracking-wide">
-                    {item.label}
-                  </span>
-                </motion.button>
+                  <motion.button
+                    type="button"
+                    role="menuitem"
+                    className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${
+                      item.active ? 'settings-branch-wheel__item--active' : ''
+                    }`}
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    transition={{ ...BRANCH_MOTION, delay: index * 0.04 }}
+                    aria-label={item.label}
+                    aria-pressed={item.active}
+                    onClick={item.onSelect}
+                    whileTap={{ scale: 0.94 }}
+                  >
+                    <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
+                      <Icon className="h-5 w-5" strokeWidth={2.1} />
+                    </span>
+                    <span className="settings-branch-wheel__label text-center text-[10px] font-semibold leading-tight tracking-wide">
+                      {item.label}
+                    </span>
+                  </motion.button>
+                </div>
               )
             })}
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>,

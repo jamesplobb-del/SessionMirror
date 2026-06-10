@@ -1,7 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { iosFade, iosSpringSheet } from '../../utils/motionPresets'
+
+function readSlideDistance(): number {
+  if (typeof window === 'undefined') return 800
+  return window.visualViewport?.height ?? window.innerHeight
+}
 
 interface AnimatedBottomSheetProps {
   isOpen: boolean
@@ -23,14 +28,27 @@ export default function AnimatedBottomSheet({
   sheetRef,
   motionPreset = 'default',
 }: AnimatedBottomSheetProps) {
+  const [slideDistance, setSlideDistance] = useState(readSlideDistance)
+
+  useLayoutEffect(() => {
+    const update = () => setSlideDistance(readSlideDistance())
+    update()
+    window.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('resize', update)
+    }
+  }, [])
+
   if (typeof document === 'undefined') return null
 
   const sheetTransition =
     motionPreset === 'light'
-      ? { duration: 0.24, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] }
+      ? { duration: 0.28, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] }
       : iosSpringSheet
   const backdropTransition =
-    motionPreset === 'light' ? { duration: 0.18, ease: 'easeOut' as const } : iosFade
+    motionPreset === 'light' ? { duration: 0.2, ease: 'easeOut' as const } : iosFade
 
   return createPortal(
     <AnimatePresence>
@@ -49,14 +67,14 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             ref={sheetRef}
-            className={`fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl`}
+            className={`fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl will-change-transform`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
+            initial={{ y: slideDistance, opacity: motionPreset === 'light' ? 0.98 : 1 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: slideDistance, opacity: motionPreset === 'light' ? 0.98 : 1 }}
             transition={sheetTransition}
           >
             <div

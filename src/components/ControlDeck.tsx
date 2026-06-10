@@ -77,12 +77,10 @@ export default function ControlDeck({
   }
 
   useEffect(() => {
-    if (settingsBranchDisabled && branchActive) {
+    if (settingsBranchDisabled && branchOpen) {
       setBranchOpen(false)
-      setBranchActive(false)
-      onBranchOpenChange?.(false)
     }
-  }, [branchActive, onBranchOpenChange, settingsBranchDisabled])
+  }, [branchOpen, settingsBranchDisabled])
 
   const settingsPress = useLongPress({
     onClick: () => {

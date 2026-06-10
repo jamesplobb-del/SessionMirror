@@ -6,46 +6,47 @@ interface ViewportPoint {
 const ITEM_WIDTH = 88
 const ITEM_HEIGHT = 68
 const ITEM_GAP = 12
-const COG_CLEARANCE = 52
-const VIEWPORT_MARGIN = 10
+const COG_CLEARANCE = 56
+const VIEWPORT_MARGIN = 12
 
 function clampBranchPoint(
   point: ViewportPoint,
   anchorRect: DOMRect,
 ): ViewportPoint {
-  const centerX = anchorRect.left + anchorRect.width / 2 + point.x
-  const centerY = anchorRect.top + anchorRect.height / 2 + point.y
+  const anchorCenterX = anchorRect.left + anchorRect.width / 2
+  const anchorCenterY = anchorRect.top + anchorRect.height / 2
+  const centerX = anchorCenterX + point.x
+  const centerY = anchorCenterY + point.y
 
-  const minCenterX = VIEWPORT_MARGIN + ITEM_WIDTH / 2
-  const maxCenterX = window.innerWidth - VIEWPORT_MARGIN - ITEM_WIDTH / 2
-  const minCenterY = VIEWPORT_MARGIN + ITEM_HEIGHT / 2
-  const maxCenterY = window.innerHeight - VIEWPORT_MARGIN - ITEM_HEIGHT / 2
-
-  const clampedCenterX = Math.min(maxCenterX, Math.max(minCenterX, centerX))
-  const clampedCenterY = Math.min(maxCenterY, Math.max(minCenterY, centerY))
+  const halfW = ITEM_WIDTH / 2
+  const halfH = ITEM_HEIGHT / 2
+  const minCenterX = VIEWPORT_MARGIN + halfW
+  const maxCenterX = window.innerWidth - VIEWPORT_MARGIN - halfW
+  const minCenterY = VIEWPORT_MARGIN + halfH
+  const maxCenterY = window.innerHeight - VIEWPORT_MARGIN - halfH
 
   return {
-    x: clampedCenterX - (anchorRect.left + anchorRect.width / 2),
-    y: clampedCenterY - (anchorRect.top + anchorRect.height / 2),
+    x: Math.min(maxCenterX, Math.max(minCenterX, centerX)) - anchorCenterX,
+    y: Math.min(maxCenterY, Math.max(minCenterY, centerY)) - anchorCenterY,
   }
 }
 
-/** Lay out quick-setting branches above the settings cog, biased left on screen. */
+/** Lay out branches in a row centered above the settings cog. */
 export function layoutBranchItems(count: number, anchorRect: DOMRect): ViewportPoint[] {
-  const liftY = -(COG_CLEARANCE + ITEM_HEIGHT / 2)
+  const baseY = -(COG_CLEARANCE + ITEM_HEIGHT / 2)
 
   if (count <= 1) {
-    return [clampBranchPoint({ x: -ITEM_WIDTH * 0.55, y: liftY }, anchorRect)]
+    return [clampBranchPoint({ x: 0, y: baseY }, anchorRect)]
   }
 
-  const rowWidth = ITEM_WIDTH * count + ITEM_GAP * (count - 1)
-  const startX = -rowWidth + ITEM_WIDTH / 2
+  const totalWidth = ITEM_WIDTH * count + ITEM_GAP * (count - 1)
+  const startX = -totalWidth / 2 + ITEM_WIDTH / 2
 
   return Array.from({ length: count }, (_, index) =>
     clampBranchPoint(
       {
         x: startX + index * (ITEM_WIDTH + ITEM_GAP),
-        y: liftY,
+        y: baseY,
       },
       anchorRect,
     ),
