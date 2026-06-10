@@ -34,13 +34,17 @@ export interface PitchTunerProfile {
   readoutFreqAlpha: number
   /** Blend latest sample into rendered trace tip (0–1). Keeps dot on the line. */
   traceEndBlend: number
-  /** Max same-note cents jump stored per frame (spike filter for the trace). */
+  /** Max cents the trace may move per frame on the same note. */
   traceSpikeCapCents: number
+  /** Max cents the trace may move per frame when the note changes. */
+  traceNoteJumpCapCents: number
+  /** Cents readout quantization step (smaller = finer display). */
+  readoutCentsStep: number
 }
 
 const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Voice',
-  description: 'Balanced latency for singing — responsive readout with a smooth scrolling trace.',
+  description: 'Instant pitch readout with a trace that follows smoothly — no harsh jumps.',
   minHz: 65,
   maxHz: 1100,
   clarityMin: 0.7,
@@ -50,23 +54,25 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   rmsGateDbMedia: -54,
   rmsGateDbMic: -48,
   attackFrames: 1,
-  outlierCents: 20,
+  outlierCents: 22,
   holdMs: 260,
   holdMsMic: 300,
   smoothAlpha: 0.4,
-  needleSmoothAlpha: 0.52,
-  noteChangeSmoothAlpha: 0.66,
+  needleSmoothAlpha: 0.95,
+  noteChangeSmoothAlpha: 0.95,
   graphSmoothWindow: 4,
-  noteHysteresisCents: 24,
-  readoutIntervalMs: 16,
-  readoutFreqAlpha: 0.56,
-  traceEndBlend: 0.74,
-  traceSpikeCapCents: 14,
+  noteHysteresisCents: 20,
+  readoutIntervalMs: 0,
+  readoutFreqAlpha: 0.98,
+  traceEndBlend: 0.78,
+  traceSpikeCapCents: 6,
+  traceNoteJumpCapCents: 12,
+  readoutCentsStep: 0.5,
 }
 
 const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Strings',
-  description: 'Stable bowed-string tracking — resists harmonics while keeping the trace readable.',
+  description: 'Exact intonation readout; trace eases between notes to stay readable.',
   minHz: 82,
   maxHz: 1400,
   clarityMin: 0.76,
@@ -75,24 +81,26 @@ const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   frameSizeMic: 8192,
   rmsGateDbMedia: -52,
   rmsGateDbMic: -44,
-  attackFrames: 2,
-  outlierCents: 16,
+  attackFrames: 1,
+  outlierCents: 18,
   holdMs: 340,
   holdMsMic: 420,
   smoothAlpha: 0.3,
-  needleSmoothAlpha: 0.42,
-  noteChangeSmoothAlpha: 0.54,
+  needleSmoothAlpha: 0.92,
+  noteChangeSmoothAlpha: 0.92,
   graphSmoothWindow: 5,
-  noteHysteresisCents: 30,
-  readoutIntervalMs: 16,
-  readoutFreqAlpha: 0.44,
-  traceEndBlend: 0.68,
-  traceSpikeCapCents: 10,
+  noteHysteresisCents: 26,
+  readoutIntervalMs: 0,
+  readoutFreqAlpha: 0.96,
+  traceEndBlend: 0.72,
+  traceSpikeCapCents: 5,
+  traceNoteJumpCapCents: 10,
+  readoutCentsStep: 0.5,
 }
 
 const BRASS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Brass',
-  description: 'Low-latency trumpet, trombone, and horn — fast lock with vibrato-friendly trace.',
+  description: 'Immediate trumpet/trombone/horn feedback with a controlled scrolling trace.',
   minHz: 58,
   maxHz: 988,
   clarityMin: 0.68,
@@ -102,18 +110,20 @@ const BRASS_TUNER_PROFILE: PitchTunerProfile = {
   rmsGateDbMedia: -50,
   rmsGateDbMic: -42,
   attackFrames: 1,
-  outlierCents: 32,
+  outlierCents: 34,
   holdMs: 200,
   holdMsMic: 130,
   smoothAlpha: 0.58,
-  needleSmoothAlpha: 0.72,
-  noteChangeSmoothAlpha: 0.84,
+  needleSmoothAlpha: 0.98,
+  noteChangeSmoothAlpha: 0.98,
   graphSmoothWindow: 3,
-  noteHysteresisCents: 12,
-  readoutIntervalMs: 16,
-  readoutFreqAlpha: 0.76,
-  traceEndBlend: 0.86,
-  traceSpikeCapCents: 20,
+  noteHysteresisCents: 10,
+  readoutIntervalMs: 0,
+  readoutFreqAlpha: 0.99,
+  traceEndBlend: 0.82,
+  traceSpikeCapCents: 7,
+  traceNoteJumpCapCents: 14,
+  readoutCentsStep: 0.5,
 }
 
 export const TUNER_INSTRUMENTS: TunerInstrument[] = ['voice', 'strings', 'brass']

@@ -3,7 +3,6 @@ import { PitchDetector } from 'pitchy'
 import {
   getTunerProfile,
   PITCH_SILENCE_FLOOR_CENTS,
-  CENTS_DISPLAY_STEP,
   type PitchCanvasTheme,
   type PitchTunerProfile,
   type TunerInstrument,
@@ -21,7 +20,6 @@ import {
   normalizeInstrumentFrequency,
   quantizeDisplayCents,
   smoothFrequency,
-  stabilizePitchReadout,
   type PitchReadout,
 } from '../utils/pitchUtils'
 
@@ -573,9 +571,11 @@ function drawPitchCanvas(
     ctx.fillStyle = 'rgba(255, 255, 255, 0.32)'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
+    ctx.fillText('Sharp', 2, centsToY(50) - 10)
     ctx.fillText('+50', 2, centsToY(50))
     ctx.fillText('0', 2, centsToY(0))
     ctx.fillText('-50', 2, centsToY(-50))
+    ctx.fillText('Flat', 2, centsToY(-50) + 10)
   }
 
   ctx.strokeStyle = isGlass ? 'rgba(255, 255, 255, 0.28)' : 'rgba(52, 211, 153, 0.35)'
@@ -671,7 +671,6 @@ export function useLivePitchTracker(
   const mountedRef = useRef(true)
   const needleCentsRef = useRef<number | null>(null)
   const lastNoteRef = useRef('—')
-  const lastReadoutEmitRef = useRef(0)
   const goodFrameCountRef = useRef(0)
   const lastStableCentsRef = useRef<number | null>(null)
   const attachInFlightRef = useRef(false)
@@ -758,7 +757,6 @@ export function useLivePitchTracker(
       goodFrameCountRef.current = 0
       lastStableCentsRef.current = null
       lastNoteRef.current = '—'
-      lastReadoutEmitRef.current = 0
       const disabledEmpty = frequencyToPitchReadout(
         0,
         profileRef.current.minHz,
@@ -871,7 +869,6 @@ export function useLivePitchTracker(
         goodFrameCountRef.current = 0
         lastStableCentsRef.current = null
         lastNoteRef.current = '—'
-        lastReadoutEmitRef.current = 0
         if (mountedRef.current) {
           readoutRef.current = emptyReadout
           setReadout(emptyReadout)
@@ -954,13 +951,15 @@ export function useLivePitchTracker(
 
         if (
           last != null &&
-          !noteChanged &&
           !isSilenceFloorSample(last) &&
           !isSilenceFloorSample(targetCents)
         ) {
+          const cap = noteChanged
+            ? activeProfile.traceNoteJumpCapCents
+            : activeProfile.traceSpikeCapCents
           const jump = Math.abs(targetCents - last)
-          if (jump > activeProfile.traceSpikeCapCents) {
-            sample = last + Math.sign(targetCents - last) * activeProfile.traceSpikeCapCents
+          if (jump > cap) {
+            sample = last + Math.sign(targetCents - last) * cap
           }
         }
 
@@ -1016,19 +1015,15 @@ export function useLivePitchTracker(
               pitch,
               activeProfile.smoothAlpha,
             )
-            const readoutHz = smoothFrequency(
-              graph.smoothed,
-              pitch,
-              activeProfile.readoutFreqAlpha,
-            )
-            const next = stabilizePitchReadout(
-              readoutRef.current.noteName === '—' ? null : readoutRef.current,
-              frequencyToPitchReadout(
-                readoutHz,
-                activeProfile.minHz,
-                activeProfile.maxHz,
-              ),
-              activeProfile.noteHysteresisCents,
+            const readoutHz =
+              clarity >= clarityMin ? pitch : graph.smoothed ?? pitch
+            const preferMidi =
+              readoutRef.current.noteName !== '—' ? readoutRef.current.midi : null
+            const next = frequencyToPitchReadout(
+              readoutHz,
+              activeProfile.minHz,
+              activeProfile.maxHz,
+              preferMidi,
             )
 
             if (next.noteName !== '—') {
@@ -1042,7 +1037,7 @@ export function useLivePitchTracker(
                 !wasIdle &&
                 lastStableCentsRef.current != null &&
                 Math.abs(next.cents - lastStableCentsRef.current) > activeProfile.outlierCents &&
-                clarity < clarityMin + 0.06
+                clarity < clarityMin + 0.03
               ) {
                 acceptFrame = false
               }
@@ -1059,43 +1054,20 @@ export function useLivePitchTracker(
               if (acceptFrame && attackSatisfied) {
                 lastNoteRef.current = next.noteName
 
-                const highConfidence = clarity >= clarityMin + 0.08
-                const needleAlpha = noteChanged
-                  ? activeProfile.noteChangeSmoothAlpha
-                  : highConfidence
-                    ? Math.min(0.9, activeProfile.needleSmoothAlpha + 0.14)
-                    : activeProfile.needleSmoothAlpha
-
-                if (needleCentsRef.current == null) {
-                  needleCentsRef.current = next.cents
-                } else {
-                  needleCentsRef.current = smoothFrequency(
-                    needleCentsRef.current,
-                    next.cents,
-                    needleAlpha,
-                  )
-                }
-
-                const intonationCents = Math.max(
-                  -50,
-                  Math.min(50, needleCentsRef.current ?? next.cents),
+                const intonationCents = Math.max(-50, Math.min(50, next.cents))
+                needleCentsRef.current = intonationCents
+                const displayCents = quantizeDisplayCents(
+                  intonationCents,
+                  activeProfile.readoutCentsStep,
                 )
-                const displayCents = quantizeDisplayCents(intonationCents, CENTS_DISPLAY_STEP)
                 const displayReadout: PitchReadout = {
                   ...next,
                   cents: displayCents,
                 }
 
-                const shouldEmitReadout =
-                  noteChanged ||
-                  now - lastReadoutEmitRef.current >= activeProfile.readoutIntervalMs
-
                 readoutRef.current = displayReadout
-                if (shouldEmitReadout) {
-                  if (mountedRef.current) {
-                    setReadout(displayReadout)
-                  }
-                  lastReadoutEmitRef.current = now
+                if (mountedRef.current) {
+                  setReadout(displayReadout)
                 }
 
                 lastPitchAtRef.current = now

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
+  formatDisplayCents,
   formatFrequencyHz,
   frequencyToPitchReadout,
   getIntonationColor,
@@ -161,14 +162,7 @@ function AudioTunerPane({
             {formatFrequencyHz(readout.frequencyHz)}
           </p>
           <p className="pitch-audio-pane__cents font-mono tabular-nums" style={{ color: accent }}>
-            {active ? (
-              <>
-                {readout.cents >= 0 ? '+' : ''}
-                {Math.round(readout.cents)}¢
-              </>
-            ) : (
-              '—'
-            )}
+            {active ? formatDisplayCents(readout.cents) : '—'}
           </p>
         </div>
       </div>
@@ -365,8 +359,7 @@ export default function LivePitchTuner({
               {readout.noteName}
               {active && (
                 <span className="ml-1.5 text-sm font-semibold">
-                  {readout.cents >= 0 ? '+' : ''}
-                  {Math.round(readout.cents)}¢
+                  {active ? formatDisplayCents(readout.cents) : '—'}
                 </span>
               )}
             </p>
@@ -407,8 +400,7 @@ export default function LivePitchTuner({
                 {readout.noteName}
                 {active && (
                   <span className="ml-2 text-lg font-semibold">
-                    {readout.cents >= 0 ? '+' : ''}
-                    {Math.round(readout.cents)}¢
+                    {formatDisplayCents(readout.cents)}
                   </span>
                 )}
               </p>
@@ -457,14 +449,7 @@ export default function LivePitchTuner({
                 className="font-mono text-3xl font-semibold tabular-nums"
                 style={{ color: accent }}
               >
-                {active ? (
-                  <>
-                    {readout.cents >= 0 ? '+' : ''}
-                    {Math.round(readout.cents)}¢
-                  </>
-                ) : (
-                  '—'
-                )}
+                {active ? formatDisplayCents(readout.cents) : '—'}
               </p>
               <div className="mt-1.5">
                 <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
@@ -516,14 +501,7 @@ export default function LivePitchTuner({
               className="font-mono text-2xl font-semibold tabular-nums"
               style={{ color: accent }}
             >
-              {active ? (
-                <>
-                  {readout.cents >= 0 ? '+' : ''}
-                  {Math.round(readout.cents)}¢
-                </>
-              ) : (
-                '—'
-              )}
+              {active ? formatDisplayCents(readout.cents) : '—'}
             </p>
             <div className="mt-1">
               <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />

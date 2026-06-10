@@ -58,8 +58,18 @@ export function centsFromMidi(frequencyHz: number, midi: number): number {
   return 1200 * Math.log2(frequencyHz / perfectHz)
 }
 
-/** Pick the octave whose cents offset is smallest (fixes harmonic/octave jumps). */
-function bestMidiForFrequency(frequencyHz: number): { midi: number; cents: number } {
+/** Pick the best MIDI note for a frequency, optionally sticking to the prior note while in range. */
+function bestMidiForFrequency(
+  frequencyHz: number,
+  preferMidi?: number | null,
+): { midi: number; cents: number } {
+  if (preferMidi != null && Number.isFinite(preferMidi)) {
+    const stickyCents = centsFromMidi(frequencyHz, preferMidi)
+    if (Math.abs(stickyCents) <= MAX_DISPLAY_CENTS) {
+      return { midi: preferMidi, cents: stickyCents }
+    }
+  }
+
   const baseMidi = frequencyToNearestMidi(frequencyHz)
   let bestMidi = baseMidi
   let bestCents = centsFromMidi(frequencyHz, baseMidi)
@@ -107,6 +117,7 @@ export function frequencyToPitchReadout(
   frequencyHz: number,
   minHz = MIN_INSTRUMENT_HZ,
   maxHz = MAX_INSTRUMENT_HZ,
+  preferMidi?: number | null,
 ): PitchReadout {
   if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) {
     return { noteName: '—', cents: 0, frequencyHz: 0, midi: 0 }
@@ -117,7 +128,7 @@ export function frequencyToPitchReadout(
     return { noteName: '—', cents: 0, frequencyHz: 0, midi: 0 }
   }
 
-  const { midi, cents } = bestMidiForFrequency(normalized)
+  const { midi, cents } = bestMidiForFrequency(normalized, preferMidi)
   if (!Number.isFinite(cents) || Math.abs(cents) > MAX_DISPLAY_CENTS) {
     return { noteName: '—', cents: 0, frequencyHz: 0, midi: 0 }
   }
@@ -246,6 +257,14 @@ export function glowColorForCents(cents: number): string {
 export function formatFrequencyHz(frequencyHz: number): string {
   if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) return '— Hz'
   return `${frequencyHz.toFixed(1)} Hz`
+}
+
+/** Human-readable cents for tuner readout (e.g. +3.5¢). */
+export function formatDisplayCents(cents: number): string {
+  if (!Number.isFinite(cents)) return '—'
+  const rounded = Math.round(cents * 10) / 10
+  const sign = rounded >= 0 ? '+' : ''
+  return `${sign}${rounded.toFixed(1)}¢`
 }
 
 export function isInTune(cents: number, tolerance = TUNING_GREEN_CENTS): boolean {
