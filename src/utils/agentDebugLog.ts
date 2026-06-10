@@ -31,6 +31,10 @@ export function agentDebugLog(
     },
     body: JSON.stringify(payload),
   }).catch(() => {})
+
+  if (typeof console !== 'undefined' && console.warn) {
+    console.warn('[SM-DEBUG]', location, message, data)
+  }
   // #endregion
 }
 

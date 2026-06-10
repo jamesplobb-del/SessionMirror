@@ -248,12 +248,12 @@ async function createMicPitchGraph(
     // #region agent log
     agentDebugLog(
       'useLivePitchTracker.ts:createMicPitchGraph',
-      'using shared mic stream',
+      'using shared mic stream (skip retune)',
       { trackCount: stream.getAudioTracks().length },
       'H1',
     )
     // #endregion
-    await tuneMusicRecordingStream(stream)
+    /* Shared session mic is already tuned in useCameraSession.acquireStream. */
   }
 
   const context = new AudioContext({ latencyHint: 'playback' })
@@ -1122,6 +1122,7 @@ export function useLivePitchTracker(
     if (!shouldTick) {
       if (tickRef.current !== null) {
         cancelAnimationFrame(tickRef.current)
+        window.clearTimeout(tickRef.current)
         tickRef.current = null
       }
       if (!isPlaying && !persistWhenPaused) {
@@ -1164,6 +1165,19 @@ export function useLivePitchTracker(
       }
 
       if (!graph) {
+        if (source === 'microphone') {
+          if (
+            enabled &&
+            (isPlaying || persistWhenPaused) &&
+            framesSinceAttachAttemptRef.current % 12 === 0
+          ) {
+            void tryAttachRef.current?.()
+          }
+          // Avoid 60fps canvas work while waiting for mic graph attach.
+          tickRef.current = window.setTimeout(tick, 100) as unknown as number
+          return
+        }
+
         if (
           enabled &&
           (isPlaying || persistWhenPaused) &&
@@ -1444,6 +1458,7 @@ export function useLivePitchTracker(
     return () => {
       if (tickRef.current !== null) {
         cancelAnimationFrame(tickRef.current)
+        window.clearTimeout(tickRef.current)
         tickRef.current = null
       }
     }

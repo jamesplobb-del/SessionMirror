@@ -67,6 +67,16 @@ function isStreamRecordable(stream: MediaStream | null, mode: RecordingMode): bo
     .some((track) => track.readyState === 'live' && track.enabled)
 }
 
+/** Audio mode must not reuse a camera stream that still has live video tracks. */
+function isStreamCompatibleForMode(stream: MediaStream | null, mode: RecordingMode): boolean {
+  if (!isStreamRecordable(stream, mode)) return false
+  if (mode !== 'audio') return true
+
+  return !stream!
+    .getVideoTracks()
+    .some((track) => track.readyState === 'live' && track.enabled)
+}
+
 function detachRecorder(recorder: MediaRecorder) {
   recorder.ondataavailable = null
   recorder.onstop = null
@@ -305,12 +315,39 @@ export function useCameraSession({
       cancelScheduledRelease()
 
       const mode = recordingMode
-      if (streamRef.current && isStreamRecordable(streamRef.current, mode)) {
+      if (streamRef.current && isStreamCompatibleForMode(streamRef.current, mode)) {
         previousRecordingModeRef.current = mode
         attachPreviewStream(previewRef.current, streamRef.current, mode)
         setReady(true)
         activeStream = streamRef.current
+        // #region agent log
+        agentDebugLog(
+          'useCameraSession.ts:startWithRecovery',
+          'reused compatible stream',
+          {
+            mode,
+            videoTracks: streamRef.current.getVideoTracks().length,
+            audioTracks: streamRef.current.getAudioTracks().length,
+          },
+          'H6',
+        )
+        // #endregion
         return
+      }
+
+      if (streamRef.current && isStreamRecordable(streamRef.current, mode)) {
+        // #region agent log
+        agentDebugLog(
+          'useCameraSession.ts:startWithRecovery',
+          'stream recordable but incompatible — forcing re-acquire',
+          {
+            mode,
+            videoTracks: streamRef.current.getVideoTracks().length,
+            audioTracks: streamRef.current.getAudioTracks().length,
+          },
+          'H6',
+        )
+        // #endregion
       }
 
       await new Promise<void>((resolve) => {
@@ -636,6 +673,18 @@ export function useCameraSession({
 
     modeSwitchCleanupTimerRef.current = window.setTimeout(() => {
       modeSwitchCleanupTimerRef.current = null
+      // #region agent log
+      agentDebugLog(
+        'useCameraSession.ts:scheduleModeSwitchCleanup',
+        'mode switch cleanup firing',
+        {
+          mode: recordingModeRef.current,
+          hasStream: Boolean(streamRef.current),
+          ready: readyRef.current,
+        },
+        'H6',
+      )
+      // #endregion
       stopStreamTracks(streamRef.current)
       streamRef.current = null
       detachPreviewStream(previewRef.current)
@@ -807,6 +856,15 @@ export function useCameraSession({
 
       cancelScheduledRelease()
       setError(null)
+
+      // #region agent log
+      agentDebugLog(
+        'useCameraSession.ts:changeRecordingMode',
+        'recording mode change requested',
+        { from: recordingModeRef.current, to: mode },
+        'H6',
+      )
+      // #endregion
 
       startTransition(() => {
         setReady(false)
