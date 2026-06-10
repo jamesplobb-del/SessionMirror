@@ -26,6 +26,95 @@ import {
 
 const HISTORY_LENGTH = 140
 
+/** Sustained in-tune time before the chart band begins turning green. */
+const IN_TUNE_BAND_GLOW_HOLD_MS = 520
+/** Fade-in duration once hold is satisfied. */
+const IN_TUNE_BAND_GLOW_RAMP_MS = 900
+
+function lerpValue(a: number, b: number, t: number): number {
+  return a + (b - a) * t
+}
+
+function updateInTuneBandGlow(
+  glow: { current: number },
+  inTuneSince: { current: number },
+  now: number,
+  dtMs: number,
+  inTune: boolean,
+): void {
+  if (inTune) {
+    if (inTuneSince.current === 0) inTuneSince.current = now
+    const held = now - inTuneSince.current
+    let target = 0
+    if (held >= IN_TUNE_BAND_GLOW_HOLD_MS) {
+      target = Math.min(
+        1,
+        (held - IN_TUNE_BAND_GLOW_HOLD_MS) / IN_TUNE_BAND_GLOW_RAMP_MS,
+      )
+    }
+    const ease = Math.min(1, dtMs * 0.0032)
+    glow.current += (target - glow.current) * ease
+  } else {
+    inTuneSince.current = 0
+    const ease = Math.min(1, dtMs * 0.0022)
+    glow.current += (0 - glow.current) * ease
+  }
+}
+
+function sampleInTuneBandGlow(
+  glow: { current: number },
+  inTuneSince: { current: number },
+  lastFrameAt: { current: number },
+  readout: PitchReadout,
+): number {
+  const now = performance.now()
+  const dtMs =
+    lastFrameAt.current > 0 ? Math.min(48, now - lastFrameAt.current) : 16
+  lastFrameAt.current = now
+  const inTune =
+    readout.noteName !== '—' && Math.abs(readout.cents) <= TUNING_GREEN_CENTS
+  updateInTuneBandGlow(glow, inTuneSince, now, dtMs, inTune)
+  return glow.current
+}
+
+function drawInTuneBandRegion(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  centsToY: (cents: number) => number,
+  inTuneHighlight: number,
+): void {
+  const yTop = centsToY(TUNING_GREEN_CENTS)
+  const yBottom = centsToY(-TUNING_GREEN_CENTS)
+  const bandTop = Math.min(yTop, yBottom)
+  const bandHeight = Math.abs(yBottom - yTop)
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.085)'
+  ctx.fillRect(0, bandTop, width, bandHeight)
+
+  if (inTuneHighlight > 0.002) {
+    ctx.fillStyle = `rgba(34, 197, 94, ${0.15 * inTuneHighlight})`
+    ctx.fillRect(0, bandTop, width, bandHeight)
+  }
+
+  const lineAlpha = lerpValue(0.36, 0.64, inTuneHighlight)
+  const red = Math.round(lerpValue(255, 34, inTuneHighlight))
+  const green = Math.round(lerpValue(255, 197, inTuneHighlight))
+  const blue = Math.round(lerpValue(255, 94, inTuneHighlight))
+
+  ctx.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${lineAlpha})`
+  ctx.lineWidth = lerpValue(1.05, 1.4, inTuneHighlight)
+  ctx.setLineDash([])
+  ctx.shadowBlur = 0
+
+  for (const cents of [TUNING_GREEN_CENTS, -TUNING_GREEN_CENTS]) {
+    const y = centsToY(cents)
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(width, y)
+    ctx.stroke()
+  }
+}
+
 /** Dispatched when an element-routed pitch graph is torn down (requires media remount). */
 export const PITCH_GRAPH_RELEASED_EVENT = 'pitchgraph-released'
 
@@ -518,7 +607,7 @@ function drawPitchCanvas(
   theme: PitchCanvasTheme,
   graphSmoothWindow: number,
   traceEndBlend: number,
-  liveCents = 0,
+  inTuneHighlight = 0,
 ): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -613,28 +702,7 @@ function drawPitchCanvas(
   }
 
   if (isGlass) {
-    const inTuneBand = active && Math.abs(liveCents) <= TUNING_GREEN_CENTS
-    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 420)
-    const bandAlpha = inTuneBand ? 0.42 + pulse * 0.38 : 0.22
-    ctx.strokeStyle = inTuneBand
-      ? `rgba(34, 197, 94, ${bandAlpha})`
-      : 'rgba(34, 197, 94, 0.22)'
-    ctx.lineWidth = inTuneBand ? 1.25 : 1
-    ctx.setLineDash([])
-    for (const cents of [TUNING_GREEN_CENTS, -TUNING_GREEN_CENTS]) {
-      const y = centsToY(cents)
-      if (inTuneBand) {
-        ctx.shadowColor = 'rgba(34, 197, 94, 0.55)'
-        ctx.shadowBlur = 6 + pulse * 4
-      } else {
-        ctx.shadowBlur = 0
-      }
-      ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(width, y)
-      ctx.stroke()
-    }
-    ctx.shadowBlur = 0
+    drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight)
   }
 
   ctx.strokeStyle = isGlass ? 'rgba(255, 255, 255, 0.14)' : 'rgba(52, 211, 153, 0.35)'
@@ -735,6 +803,9 @@ export function useLivePitchTracker(
   const attachInFlightRef = useRef(false)
   const framesSinceAttachAttemptRef = useRef(0)
   const tryAttachRef = useRef<(() => Promise<void>) | null>(null)
+  const inTuneGlowRef = useRef(0)
+  const inTuneSinceRef = useRef(0)
+  const inTuneBandFrameRef = useRef(0)
 
   useEffect(() => {
     mountedRef.current = true
@@ -751,6 +822,9 @@ export function useLivePitchTracker(
     lastNoteRef.current = '—'
     framesSinceAttachAttemptRef.current = 0
     lastPitchAtRef.current = 0
+    inTuneGlowRef.current = 0
+    inTuneSinceRef.current = 0
+    inTuneBandFrameRef.current = 0
   }, [mediaKey, source, tunerInstrument])
 
   useEffect(() => {
@@ -945,6 +1019,9 @@ export function useLivePitchTracker(
           setReadout(emptyReadout)
         }
         lastPitchAtRef.current = 0
+        inTuneGlowRef.current = 0
+        inTuneSinceRef.current = 0
+        inTuneBandFrameRef.current = 0
       }
       return
     }
@@ -978,6 +1055,12 @@ export function useLivePitchTracker(
 
         const canvas = canvasRef?.current
         if (canvas) {
+          const bandGlow = sampleInTuneBandGlow(
+            inTuneGlowRef,
+            inTuneSinceRef,
+            inTuneBandFrameRef,
+            readoutRef.current,
+          )
           drawPitchCanvas(
             canvas,
             new Float32Array(activeProfile.frameSize),
@@ -986,7 +1069,7 @@ export function useLivePitchTracker(
             canvasTheme,
             activeProfile.graphSmoothWindow,
             activeProfile.traceEndBlend,
-            readoutRef.current.cents,
+            bandGlow,
           )
         }
         tickRef.current = requestAnimationFrame(tick)
@@ -1187,6 +1270,12 @@ export function useLivePitchTracker(
 
       const canvas = canvasRef?.current
       if (canvas) {
+        const bandGlow = sampleInTuneBandGlow(
+          inTuneGlowRef,
+          inTuneSinceRef,
+          inTuneBandFrameRef,
+          readoutRef.current,
+        )
         drawPitchCanvas(
           canvas,
           graph.buffer,
@@ -1195,7 +1284,7 @@ export function useLivePitchTracker(
           canvasTheme,
           activeProfile.graphSmoothWindow,
           activeProfile.traceEndBlend,
-          readoutRef.current.cents,
+          bandGlow,
         )
       }
 
