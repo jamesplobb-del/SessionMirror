@@ -200,7 +200,7 @@ export default function ReviewModeOverlay({
   const [showPlayOverlay, setShowPlayOverlay] = useState(true)
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
-  const [showPitch, setShowPitch] = useState(true)
+  const [showPitch, setShowPitch] = useState(false)
 
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
@@ -420,10 +420,10 @@ export default function ReviewModeOverlay({
         : hasChallenger)
 
   useEffect(() => {
-    if (isOpen) {
-      setShowPitch(true)
+    if (!isOpen) {
+      setShowPitch(false)
     }
-  }, [activePitchMediaKey, isOpen, pitchTrackerEnabled])
+  }, [isOpen])
 
   useEffect(() => {
     reviewAutoplayEnabledRef.current = isOpen
@@ -444,9 +444,9 @@ export default function ReviewModeOverlay({
 
     if (!isVault) {
       if (activeSlot === 'benchmark') {
-        resetVideoPlayback(challengerVideoRef.current)
+        pauseVideoElement(challengerVideoRef.current)
       } else {
-        resetVideoPlayback(benchmarkVideoRef.current)
+        pauseVideoElement(benchmarkVideoRef.current)
       }
     }
 

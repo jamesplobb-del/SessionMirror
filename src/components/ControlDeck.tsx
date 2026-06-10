@@ -49,7 +49,7 @@ export default function ControlDeck({
   recordDropRef,
   dragDeleteActive = false,
   dragOverDelete = false,
-  pitchTrackerEnabled = true,
+  pitchTrackerEnabled = false,
   showTakeCards = true,
   onPitchTrackerChange,
   onShowTakeCardsChange,

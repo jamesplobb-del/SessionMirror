@@ -7,6 +7,7 @@ import VaultMediaSegment from './VaultMediaSegment'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import Pressable from './ui/Pressable'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
+import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { getTakeMediaType } from '../utils/mediaType'
@@ -85,11 +86,13 @@ export default function TakeVaultDrawer({
   }, [])
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) return
+
+    scheduleAfterPaint(() => {
       teardownVideosInContainer(drawerRef.current)
-      setSelectionMode(false)
-      setSelectedIds(new Set())
-    }
+    })
+    setSelectionMode(false)
+    setSelectedIds(new Set())
   }, [isOpen])
 
   useEffect(() => {
@@ -335,8 +338,10 @@ export default function TakeVaultDrawer({
                         selected={selectedIds.has(take.id)}
                         onToggleSelect={() => toggleTakeSelection(take.id)}
                         onOpenTake={() => {
-                          silenceAllVaultVideos()
                           onOpenTake(take)
+                          scheduleAfterPaint(() => {
+                            silenceAllVaultVideos()
+                          })
                         }}
                         onPinBenchmark={() => {
                           onBeforePin?.()

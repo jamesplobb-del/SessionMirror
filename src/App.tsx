@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
@@ -6,8 +6,6 @@ import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
-import TakeVaultDrawer from './components/TakeVaultDrawer'
-import SettingsDrawer from './components/SettingsDrawer'
 import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
@@ -32,8 +30,6 @@ import {
   type RecordingCompletePayload,
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
-import ReviewModeOverlay from './components/ReviewModeOverlay'
-import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { scheduleViewportSync } from './utils/viewportSync'
@@ -41,6 +37,7 @@ import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { iosHudDim } from './utils/motionPresets'
+import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
   createProject,
@@ -48,13 +45,20 @@ import {
   deleteTakesByProject,
   findBestTakeId,
   getTakesByProject,
+  initVaultDatabase,
   listProjects,
   saveTake,
   setProjectBestTake,
   uiTakesFromVaultRows,
+  uiTakesFromVaultRowsFast,
   updateVaultTake,
   type Project,
 } from './db'
+
+const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
+const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
+const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
+const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 
 export default function App() {
   usePhysicalOrientation()
@@ -208,9 +212,9 @@ export default function App() {
   const reloadProjectTakes = useCallback(
     async (projectId: string) => {
       const rows = await getTakesByProject(projectId)
-      const loaded = await uiTakesFromVaultRows(rows)
+      const loadedFast = uiTakesFromVaultRowsFast(rows)
 
-      setTakes(loaded)
+      setTakes(loadedFast)
       setBenchmarkId(findBestTakeId(rows))
       setChallengerId((current) => {
         if (!showTakeCardsRef.current) return null
@@ -218,21 +222,46 @@ export default function App() {
         return rows.find((row) => !row.isBestTake)?.id ?? null
       })
 
-      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
+      scheduleIdle(() => {
+        void uiTakesFromVaultRows(rows).then((loaded) => {
+          setTakes(loaded)
+          void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
+        })
+      }, 150)
     },
     [applyTakeThumbnails],
   )
 
   useEffect(() => {
+    let cancelled = false
+
     void (async () => {
+      await initVaultDatabase()
+      if (cancelled) return
+
       const projectList = await listProjects()
+      if (cancelled) return
+
       setProjects(projectList)
       const initialId = projectList[0]?.id ?? null
       setActiveProjectId(initialId)
       if (initialId) {
         await reloadProjectTakes(initialId)
       }
+
+      // #region agent log
+      agentDebugLog(
+        'App.tsx:boot',
+        'session data ready',
+        { projectCount: projectList.length, msSinceNav: Math.round(performance.now()) },
+        'H-BOOT',
+      )
+      // #endregion
     })()
+
+    return () => {
+      cancelled = true
+    }
   }, [reloadProjectTakes])
 
   const handleSelectProject = useCallback(
@@ -758,8 +787,10 @@ export default function App() {
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
 
   useEffect(() => {
-    setShowPitch(true)
-  }, [mainAudioPitchSource?.mediaKey, mainVideoPitchSource?.mediaKey, recordingMode])
+    if (!settings.pitchTrackerEnabled) {
+      setShowPitch(false)
+    }
+  }, [settings.pitchTrackerEnabled])
 
   useEffect(() => {
     if (!settings.showTakeCards) {
@@ -1059,6 +1090,7 @@ export default function App() {
 
       <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
       {showMainPitchWidget && (
+        <Suspense fallback={null}>
         <AnimatePresence>
           {showPitch && mainAudioPitchSource && (
             <DraggablePitchWidget
@@ -1097,6 +1129,7 @@ export default function App() {
             />
           )}
         </AnimatePresence>
+        </Suspense>
       )}
 
       <motion.div
@@ -1167,7 +1200,6 @@ export default function App() {
             showTakeCards={settings.showTakeCards}
             onPitchTrackerChange={(enabled) => {
               updateSettings({ pitchTrackerEnabled: enabled })
-              if (enabled) setShowPitch(true)
             }}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
@@ -1176,6 +1208,7 @@ export default function App() {
         </div>
       </motion.div>
 
+      <Suspense fallback={null}>
       <AnimatePresence>
       {isReviewOpen && (
         <ReviewModeOverlay
@@ -1215,7 +1248,9 @@ export default function App() {
         />
       )}
       </AnimatePresence>
+      </Suspense>
 
+      <Suspense fallback={null}>
       <TakeVaultDrawer
         isOpen={isVaultOpen}
         onClose={handleCloseVault}
@@ -1251,6 +1286,7 @@ export default function App() {
         onReset={resetSettings}
         recordingMode={recordingMode}
       />
+      </Suspense>
       </div>
     </div>
   )

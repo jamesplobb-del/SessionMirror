@@ -8,4 +8,19 @@ export default defineConfig({
   server: {
     host: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('framer-motion')) return 'motion'
+          if (id.includes('@capacitor-community/sqlite') || id.includes('jeep-sqlite')) {
+            return 'sqlite'
+          }
+          if (id.includes('@capacitor')) return 'capacitor'
+          return 'vendor'
+        },
+      },
+    },
+  },
 })

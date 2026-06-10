@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEventHandl
 import { Mic } from 'lucide-react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { iosTakeVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
+import { isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
@@ -75,7 +75,27 @@ export default function TakeVideoPlayer({
   }, [mediaSrc, videoSourceKey])
 
   useEffect(() => {
-    if (manualPlayOnly) return
+    if (!audible || !mediaSrc) return
+    const media = mediaRef.current
+    if (!media) return
+
+    const ensureAudible = () => {
+      media.muted = false
+      media.volume = 1
+    }
+
+    ensureAudible()
+    media.addEventListener('play', ensureAudible)
+    media.addEventListener('loadeddata', ensureAudible)
+
+    return () => {
+      media.removeEventListener('play', ensureAudible)
+      media.removeEventListener('loadeddata', ensureAudible)
+    }
+  }, [audible, mediaSrc, mediaRef])
+
+  useEffect(() => {
+    if (manualPlayOnly || audible) return
     const media = mediaRef.current
     if (!media || !mediaSrc) return
     media.pause()
@@ -83,7 +103,7 @@ export default function TakeVideoPlayer({
     if ('muted' in media) {
       media.muted = true
     }
-  }, [mediaSrc, mediaRef, manualPlayOnly])
+  }, [audible, mediaSrc, mediaRef, manualPlayOnly])
 
   useEffect(() => {
     if (manualPlayOnly) return
@@ -172,6 +192,13 @@ export default function TakeVideoPlayer({
 
   const { onLoadedMetadata, ...videoRest } = rest
 
+  const replayElementProps = {
+    playsInline: true,
+    disablePictureInPicture: true,
+    ...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>),
+    ...(audible ? {} : { muted: true as const }),
+  }
+
   const videoElement = (
     <video
       key={videoSourceKey ?? mediaSrc ?? 'empty'}
@@ -188,14 +215,9 @@ export default function TakeVideoPlayer({
         onLoadedMetadata?.(event)
       }}
       {...videoRest}
-      {...iosTakeVideoProps}
-      playsInline
-      {...({
-        'webkit-playsinline': 'true',
-      } as VideoHTMLAttributes<HTMLVideoElement>)}
+      {...replayElementProps}
       muted={!audible}
       autoPlay={false}
-      disablePictureInPicture
       controls={
         thumbnailPreview ? false : mirror && !mirroredControls ? false : controls
       }
