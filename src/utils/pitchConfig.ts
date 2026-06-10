@@ -22,19 +22,25 @@ export const PITCH_HOLD_MS = 280
 export const PITCH_SMOOTH_ALPHA = 0.28
 
 /** Needle / numeric readout smoothing (0–1, higher = snappier). */
-export const PITCH_NEEDLE_SMOOTH_ALPHA = 0.34
+export const PITCH_NEEDLE_SMOOTH_ALPHA = 0.24
 
-/** Pitch trace smoothing for the scrolling graph (0–1, lower = smoother line). */
-export const PITCH_GRAPH_SMOOTH_ALPHA = 0.2
+/** Extra smoothing on note changes so cents do not snap. */
+export const PITCH_NOTE_CHANGE_SMOOTH_ALPHA = 0.1
+
+/** Continuous pitch trace smoothing (fractional MIDI). */
+export const PITCH_TRACE_MIDI_ALPHA = 0.11
+
+/** Slow anchor so the trace scrolls smoothly through large intervals. */
+export const PITCH_ANCHOR_MIDI_ALPHA = 0.035
 
 /** Moving-average radius applied when drawing the trace curve. */
-export const PITCH_GRAPH_SMOOTH_WINDOW = 5
+export const PITCH_GRAPH_SMOOTH_WINDOW = 8
 
 /** Round displayed cents to this step. */
 export const CENTS_DISPLAY_STEP = 1
 
 /** UI cents readout refresh interval (ms). */
-export const PITCH_READOUT_INTERVAL_MS = 100
+export const PITCH_READOUT_INTERVAL_MS = 66
 
 /** Note label sticks until cents drift toward the next semitone boundary. */
 export const NOTE_HYSTERESIS_CENTS = 32

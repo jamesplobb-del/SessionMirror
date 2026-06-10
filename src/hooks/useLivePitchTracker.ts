@@ -6,12 +6,15 @@ import {
   PITCH_HOLD_MS,
   PITCH_MIN_VOLUME_DB,
   PITCH_NEEDLE_SMOOTH_ALPHA,
-  PITCH_GRAPH_SMOOTH_ALPHA,
+  PITCH_NOTE_CHANGE_SMOOTH_ALPHA,
+  PITCH_TRACE_MIDI_ALPHA,
+  PITCH_ANCHOR_MIDI_ALPHA,
   PITCH_GRAPH_SMOOTH_WINDOW,
   PITCH_READOUT_INTERVAL_MS,
   CENTS_DISPLAY_STEP,
 } from '../utils/pitchConfig'
 import {
+  frequencyToMidi,
   frequencyToPitchReadout,
   getIntonationColor,
   isFrequencyInInstrumentRange,
@@ -25,17 +28,74 @@ import {
 
 const HISTORY_LENGTH = 140
 
+/** Dispatched when an element-routed pitch graph is torn down (requires media remount). */
+export const PITCH_GRAPH_RELEASED_EVENT = 'pitchgraph-released'
+
+type PitchGraphMode = 'stream' | 'element'
+
 interface PitchGraph {
   context: AudioContext
-  source: MediaElementAudioSourceNode
+  source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode
   analyser: AnalyserNode
   detector: PitchDetector<Float32Array>
   buffer: Float32Array
   smoothed: number | null
   media: HTMLMediaElement
+  mode: PitchGraphMode
 }
 
 const elementGraphs = new WeakMap<HTMLMediaElement, PitchGraph>()
+
+function getMediaCaptureStream(media: HTMLMediaElement): MediaStream | null {
+  if (typeof media.captureStream === 'function') {
+    try {
+      return media.captureStream()
+    } catch {
+      /* try legacy / fallback below */
+    }
+  }
+
+  const legacyMedia = media as HTMLMediaElement & {
+    mozCaptureStream?: () => MediaStream
+  }
+  if (typeof legacyMedia.mozCaptureStream === 'function') {
+    try {
+      return legacyMedia.mozCaptureStream()
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return null
+}
+
+function streamHasAudio(stream: MediaStream): boolean {
+  return stream.getAudioTracks().some((track) => track.readyState !== 'ended')
+}
+
+async function waitForMediaAudio(media: HTMLMediaElement, timeoutMs = 1500): Promise<void> {
+  if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return
+
+  await new Promise<void>((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      media.removeEventListener('loadeddata', finish)
+      media.removeEventListener('canplay', finish)
+      resolve()
+    }
+
+    media.addEventListener('loadeddata', finish, { once: true })
+    media.addEventListener('canplay', finish, { once: true })
+    window.setTimeout(finish, timeoutMs)
+  })
+}
+
+function notifyPitchGraphReleased(media: HTMLMediaElement, mode: PitchGraphMode): void {
+  if (mode !== 'element') return
+  media.dispatchEvent(new CustomEvent(PITCH_GRAPH_RELEASED_EVENT, { bubbles: true }))
+}
 
 async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
   const existing = elementGraphs.get(media)
@@ -50,19 +110,47 @@ async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
   const context = new AudioContext()
   await context.resume()
 
-  let source: MediaElementAudioSourceNode
-  try {
-    source = context.createMediaElementSource(media)
-  } catch {
-    await context.close()
-    throw new Error('Unable to attach pitch tracker to this playback source')
-  }
-
   const analyser = context.createAnalyser()
   analyser.fftSize = PITCH_FRAME_SIZE
 
-  source.connect(analyser)
-  analyser.connect(context.destination)
+  let source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null
+  let mode: PitchGraphMode = 'stream'
+
+  const attachStreamSource = (): boolean => {
+    const stream = getMediaCaptureStream(media)
+    if (!stream || !streamHasAudio(stream)) return false
+
+    try {
+      const streamSource = context.createMediaStreamSource(stream)
+      streamSource.connect(analyser)
+      source = streamSource
+      mode = 'stream'
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  if (!attachStreamSource()) {
+    await waitForMediaAudio(media)
+    if (!attachStreamSource()) {
+      try {
+        const elementSource = context.createMediaElementSource(media)
+        elementSource.connect(analyser)
+        analyser.connect(context.destination)
+        source = elementSource
+        mode = 'element'
+      } catch {
+        await context.close()
+        throw new Error('Unable to attach pitch tracker to this playback source')
+      }
+    }
+  }
+
+  if (!source) {
+    await context.close()
+    throw new Error('Unable to attach pitch tracker to this playback source')
+  }
 
   const detector = PitchDetector.forFloat32Array(PITCH_FRAME_SIZE)
   detector.clarityThreshold = PITCH_CLARITY_MIN
@@ -76,6 +164,7 @@ async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
     buffer: new Float32Array(PITCH_FRAME_SIZE),
     smoothed: null,
     media,
+    mode,
   }
 
   elementGraphs.set(media, graph)
@@ -85,7 +174,8 @@ async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
 function safeDisposePitchGraph(graph: PitchGraph | null): void {
   if (!graph) return
 
-  elementGraphs.delete(graph.media)
+  const { media, mode } = graph
+  elementGraphs.delete(media)
 
   try {
     graph.source.disconnect()
@@ -96,6 +186,7 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
 
   const { context } = graph
   void context.close().catch(() => {})
+  notifyPitchGraphReleased(media, mode)
 }
 
 function drawSmoothPitchTrace(
@@ -126,25 +217,31 @@ function drawSmoothPitchTrace(
     const next = points[index + 1]
     const following = points[Math.min(points.length - 1, index + 2)]
 
-    const cp1x = current.x + (next.x - previous.x) / 6
-    const cp1y = current.y + (next.y - previous.y) / 6
-    const cp2x = next.x - (following.x - current.x) / 6
-    const cp2y = next.y - (following.y - current.y) / 6
+    const cp1x = current.x + (next.x - previous.x) / 4
+    const cp1y = current.y + (next.y - previous.y) / 4
+    const cp2x = next.x - (following.x - current.x) / 4
+    const cp2y = next.y - (following.y - current.y) / 4
 
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, next.x, next.y)
   }
 
   const latest = points[points.length - 1]
   const gradient = ctx.createLinearGradient(points[0].x, 0, latest.x, 0)
-  gradient.addColorStop(0, 'rgba(148, 163, 184, 0.18)')
-  gradient.addColorStop(0.55, 'rgba(34, 197, 94, 0.42)')
+  gradient.addColorStop(0, 'rgba(148, 163, 184, 0.12)')
+  gradient.addColorStop(0.5, 'rgba(34, 197, 94, 0.38)')
   gradient.addColorStop(1, getIntonationColor(latest.cents))
 
-  ctx.strokeStyle = gradient
-  ctx.lineWidth = 2.5
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  ctx.globalAlpha = 0.92
+
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.22)'
+  ctx.lineWidth = 8
+  ctx.globalAlpha = 0.85
+  ctx.stroke()
+
+  ctx.strokeStyle = gradient
+  ctx.lineWidth = 4.25
+  ctx.globalAlpha = 0.96
   ctx.stroke()
   ctx.globalAlpha = 1
 }
@@ -170,11 +267,11 @@ function drawPitchCanvas(
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
-  const pitchTop = height * 0.08
-  const pitchBottom = height * 0.72
+  const pitchTop = height * 0.04
+  const pitchBottom = height * 0.86
   const pitchHeight = pitchBottom - pitchTop
-  const waveTop = height * 0.76
-  const waveHeight = height * 0.2
+  const waveTop = height * 0.88
+  const waveHeight = height * 0.1
   const midPitchY = pitchTop + pitchHeight * 0.5
 
   ctx.clearRect(0, 0, width, height)
@@ -219,23 +316,19 @@ function drawPitchCanvas(
   }
 
   if (currentCents != null && active) {
-    const dotX = width - 14
+    const dotX = width - 16
     const dotY = centsToY(currentCents)
+    ctx.beginPath()
+    ctx.arc(dotX, dotY, 6, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.25)'
+    ctx.fill()
     ctx.beginPath()
     ctx.arc(dotX, dotY, 4.5, 0, Math.PI * 2)
     ctx.fillStyle = getIntonationColor(currentCents)
     ctx.fill()
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'
-    ctx.lineWidth = 1.5
+    ctx.lineWidth = 1.75
     ctx.stroke()
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)'
-    ctx.setLineDash([2, 4])
-    ctx.beginPath()
-    ctx.moveTo(dotX, dotY)
-    ctx.lineTo(width, dotY)
-    ctx.stroke()
-    ctx.setLineDash([])
   }
 
   const waveMidY = waveTop + waveHeight * 0.5
@@ -290,7 +383,8 @@ export function useLivePitchTracker(
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
   const needleCentsRef = useRef<number | null>(null)
-  const graphCentsRef = useRef<number | null>(null)
+  const traceMidiRef = useRef<number | null>(null)
+  const anchorMidiRef = useRef<number | null>(null)
   const lastNoteRef = useRef('—')
   const lastReadoutEmitRef = useRef(0)
 
@@ -324,7 +418,8 @@ export function useLivePitchTracker(
       }
       historyRef.current = []
       needleCentsRef.current = null
-      graphCentsRef.current = null
+      traceMidiRef.current = null
+      anchorMidiRef.current = null
       lastNoteRef.current = '—'
       lastReadoutEmitRef.current = 0
       if (mountedRef.current) {
@@ -389,7 +484,8 @@ export function useLivePitchTracker(
         if (graphRef.current) graphRef.current.smoothed = null
         historyRef.current = []
         needleCentsRef.current = null
-        graphCentsRef.current = null
+        traceMidiRef.current = null
+        anchorMidiRef.current = null
         lastNoteRef.current = '—'
         lastReadoutEmitRef.current = 0
         if (mountedRef.current) {
@@ -438,31 +534,38 @@ export function useLivePitchTracker(
         )
 
         if (next.noteName !== '—') {
-          if (lastNoteRef.current !== next.noteName) {
-            needleCentsRef.current = next.cents
-            graphCentsRef.current = next.cents
-            lastNoteRef.current = next.noteName
-          }
+          const noteChanged = lastNoteRef.current !== next.noteName
+          lastNoteRef.current = next.noteName
+
+          const midiFloat = frequencyToMidi(next.frequencyHz)
+          traceMidiRef.current = smoothFrequency(
+            traceMidiRef.current,
+            midiFloat,
+            PITCH_TRACE_MIDI_ALPHA,
+          )
+          anchorMidiRef.current = smoothFrequency(
+            anchorMidiRef.current,
+            midiFloat,
+            PITCH_ANCHOR_MIDI_ALPHA,
+          )
 
           needleCentsRef.current = smoothFrequency(
             needleCentsRef.current,
             next.cents,
-            PITCH_NEEDLE_SMOOTH_ALPHA,
-          )
-          graphCentsRef.current = smoothFrequency(
-            graphCentsRef.current,
-            next.cents,
-            PITCH_GRAPH_SMOOTH_ALPHA,
+            noteChanged ? PITCH_NOTE_CHANGE_SMOOTH_ALPHA : PITCH_NEEDLE_SMOOTH_ALPHA,
           )
 
           const needleCents = Math.max(
             -50,
             Math.min(50, needleCentsRef.current ?? next.cents),
           )
-          const traceCents = Math.max(
-            -50,
-            Math.min(50, graphCentsRef.current ?? next.cents),
-          )
+          const tracePlot =
+            traceMidiRef.current != null && anchorMidiRef.current != null
+              ? Math.max(
+                  -50,
+                  Math.min(50, (traceMidiRef.current - anchorMidiRef.current) * 100),
+                )
+              : needleCents
           const displayCents = quantizeDisplayCents(needleCents, CENTS_DISPLAY_STEP)
           const displayReadout: PitchReadout = { ...next, cents: displayCents }
 
@@ -475,10 +578,10 @@ export function useLivePitchTracker(
           }
 
           lastPitchAtRef.current = now
-          currentCents = needleCents
+          currentCents = tracePlot
           active = true
           const history = historyRef.current
-          history.push(traceCents)
+          history.push(tracePlot)
           if (history.length > HISTORY_LENGTH) {
             history.splice(0, history.length - HISTORY_LENGTH)
           }
@@ -491,7 +594,8 @@ export function useLivePitchTracker(
         if (mountedRef.current) setReadout(emptyReadout)
         graph.smoothed = null
         needleCentsRef.current = null
-        graphCentsRef.current = null
+        traceMidiRef.current = null
+        anchorMidiRef.current = null
         lastNoteRef.current = '—'
         active = false
       } else if (readoutRef.current.noteName !== '—') {

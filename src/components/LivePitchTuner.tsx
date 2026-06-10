@@ -38,7 +38,7 @@ function CentsNeedle({
       <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-emerald-400/25" />
       <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-amber-400/10" />
       <div
-        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] transition-[left] duration-300 ease-out ${
+        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] ${
           compact ? 'h-2.5 w-2.5' : 'h-3 w-3'
         }`}
         style={{
@@ -115,8 +115,12 @@ export default function LivePitchTuner({
 
   if (isPanel) {
     return (
-      <div className="pitch-tuner pitch-tuner--panel flex h-full w-full flex-col justify-end overflow-hidden bg-transparent">
-        <div className="flex shrink-0 items-center gap-2.5 px-3 py-1.5">
+      <div className="pitch-tuner pitch-tuner--panel flex h-full w-full flex-col overflow-hidden bg-transparent">
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <canvas ref={canvasRef} className="pitch-spectrogram absolute inset-0 h-full w-full" />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2.5 border-t border-white/10 bg-stone-950/40 px-3 py-1.5 backdrop-blur-[2px]">
           <div className="min-w-[3.25rem] shrink-0">
             <p
               className="font-mono text-xl font-bold leading-none tabular-nums"
@@ -149,10 +153,6 @@ export default function LivePitchTuner({
             </p>
             <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
           </div>
-        </div>
-
-        <div className="relative h-[3.25rem] shrink-0 overflow-hidden opacity-90">
-          <canvas ref={canvasRef} className="pitch-spectrogram absolute inset-0 h-full w-full" />
         </div>
       </div>
     )

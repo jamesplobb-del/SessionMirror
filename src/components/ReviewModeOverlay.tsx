@@ -7,7 +7,7 @@ import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
-import { pausePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
+import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
@@ -52,11 +52,27 @@ function ReviewTakeLayer({
   onPointerUp,
   onPointerCancel,
 }: ReviewTakeLayerProps) {
+  const [mediaRepairKey, setMediaRepairKey] = useState(0)
+  const playerKey = `${takeKey}-r${mediaRepairKey}`
   const isAudio = isAudioMedia(mimeType, mediaType)
   const showTuner = pitchTrackerEnabled
   const audioAnalysis = showTuner && isAudio
   const videoAnalysis = showTuner && !isAudio
   const trackerPlaying = isPlaying && isActive
+
+  useEffect(() => {
+    const media = videoRef.current
+    if (!media) return
+
+    const onReleased = () => {
+      setMediaRepairKey((key) => key + 1)
+    }
+
+    media.addEventListener(PITCH_GRAPH_RELEASED_EVENT, onReleased)
+    return () => {
+      media.removeEventListener(PITCH_GRAPH_RELEASED_EVENT, onReleased)
+    }
+  }, [playerKey, videoRef])
 
   if (videoAnalysis) {
     return (
@@ -65,7 +81,7 @@ function ReviewTakeLayer({
         style={swipeLayerStyle}
       >
         <TakeVideoPlayer
-          key={takeKey}
+          key={playerKey}
           filePath={filePath}
           videoUrl={videoUrl}
           mimeType={mimeType}
@@ -87,15 +103,15 @@ function ReviewTakeLayer({
           onPointerCancel={onPointerCancel}
         />
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(18dvh,148px)] bg-gradient-to-t from-stone-950/95 via-stone-950/55 to-transparent"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(20dvh,156px)] bg-gradient-to-t from-stone-950/95 via-stone-950/45 to-transparent"
           aria-hidden
         />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(14dvh,128px)]">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(16dvh,132px)]">
           <LivePitchTuner
             mediaRef={videoRef}
             enabled={pitchTrackerEnabled && isActive}
             isPlaying={trackerPlaying}
-            mediaKey={takeKey}
+            mediaKey={playerKey}
             takeName={takeName}
             label={tunerLabel ?? 'Pitch Analysis'}
             variant="panel"
@@ -112,7 +128,7 @@ function ReviewTakeLayer({
         style={swipeLayerStyle}
       >
         <TakeVideoPlayer
-          key={takeKey}
+          key={playerKey}
           filePath={filePath}
           videoUrl={videoUrl}
           mimeType={mimeType}
@@ -131,7 +147,7 @@ function ReviewTakeLayer({
             mediaRef={videoRef}
             enabled={pitchTrackerEnabled && isActive}
             isPlaying={trackerPlaying}
-            mediaKey={takeKey}
+            mediaKey={playerKey}
             takeName={takeName}
             label={tunerLabel ?? 'Pitch Analysis'}
             variant="dock"
@@ -147,7 +163,7 @@ function ReviewTakeLayer({
       style={swipeLayerStyle}
     >
       <TakeVideoPlayer
-        key={takeKey}
+        key={playerKey}
         filePath={filePath}
         videoUrl={videoUrl}
         mimeType={mimeType}
@@ -379,6 +395,7 @@ export default function ReviewModeOverlay({
     const video = getActiveVideo()
     if (!video) return
     video.muted = false
+    video.volume = 1
     void video.play().catch(() => {
       revealPlayOverlay(false)
     })
@@ -407,6 +424,7 @@ export default function ReviewModeOverlay({
     if (!video) return
 
     video.muted = false
+    video.volume = 1
 
     if (video.paused) {
       void video.play().catch(() => revealPlayOverlay(false))

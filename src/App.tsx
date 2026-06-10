@@ -10,7 +10,7 @@ import SettingsDrawer from './components/SettingsDrawer'
 import { useCameraSession } from './hooks/useCameraSession'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
-import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
+import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from './hooks/useLivePitchTracker'
 import {
   generateThumbnailFromBlob,
   generateThumbnailFromUrl,
@@ -415,10 +415,16 @@ export default function App() {
     audio.addEventListener('pause', syncPlaying)
     audio.addEventListener('ended', syncPlaying)
 
+    const onPitchReleased = () => {
+      setAutoPlaybackAudioKey((key) => key + 1)
+    }
+    audio.addEventListener(PITCH_GRAPH_RELEASED_EVENT, onPitchReleased)
+
     return () => {
       audio.removeEventListener('play', syncPlaying)
       audio.removeEventListener('pause', syncPlaying)
       audio.removeEventListener('ended', syncPlaying)
+      audio.removeEventListener(PITCH_GRAPH_RELEASED_EVENT, onPitchReleased)
     }
   }, [autoPlaybackAudioKey])
 
