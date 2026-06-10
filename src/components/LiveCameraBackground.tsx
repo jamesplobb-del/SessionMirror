@@ -90,7 +90,7 @@ function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        className={`camera-preview ${
+        className={`camera-preview media-display-enhance ${
           isAudioMode
             ? 'camera-preview--hidden'
             : previewVisible
@@ -139,7 +139,7 @@ function LiveCameraBackground({
       )}
 
       <div
-        className={`camera-background-overlay pointer-events-none bg-gradient-to-b from-black/25 via-transparent to-black/45 ${
+        className={`camera-background-overlay pointer-events-none bg-gradient-to-b from-black/10 via-transparent to-black/25 ${
           showAudioIdle ? 'opacity-40' : isAudioMode ? 'opacity-0' : 'opacity-100'
         }`}
       />

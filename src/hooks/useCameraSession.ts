@@ -16,6 +16,8 @@ import {
   StreamingTakeWriter,
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
+import { tuneMusicRecordingStream } from '../utils/audioCapture'
+import { tuneVideoRecordingStream } from '../utils/videoCapture'
 import {
   applyViewportCssVarsOnResume,
   refreshCameraPreviewLayout,
@@ -218,13 +220,17 @@ export function useCameraSession({
           ? { audio: getAudioCaptureConstraints(), video: false }
           : {
               audio: getAudioCaptureConstraints(),
-              video: getVideoCaptureConstraints(),
+              video: getVideoCaptureConstraints(readRecordingOrientation()),
             }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
       if (cancelled?.()) {
         mediaStream.getTracks().forEach((track) => track.stop())
         return null
+      }
+      await tuneMusicRecordingStream(mediaStream)
+      if (mode === 'video') {
+        await tuneVideoRecordingStream(mediaStream, readRecordingOrientation())
       }
       streamRef.current = mediaStream
       attachPreviewStream(previewRef.current, mediaStream, mode)
@@ -529,6 +535,8 @@ export function useCameraSession({
       const currentStream = await ensureRecordableStream()
       if (!currentStream || isRecordingRef.current) return
 
+      await tuneMusicRecordingStream(currentStream)
+
       const takeId = crypto.randomUUID()
       const mode = recordingModeRef.current
       recordingOrientationRef.current = readRecordingOrientation()
@@ -536,17 +544,8 @@ export function useCameraSession({
       recorderMimeTypeRef.current = mimeType
       chunksRef.current = []
 
-      if (mode === 'video' && recordingOrientationRef.current === 'landscape') {
-        const track = currentStream.getVideoTracks()[0]
-        if (track) {
-          try {
-            await track.applyConstraints(
-              getVideoCaptureConstraints(recordingOrientationRef.current),
-            )
-          } catch {
-            /* keep the live stream if landscape constraints fail */
-          }
-        }
+      if (mode === 'video') {
+        await tuneVideoRecordingStream(currentStream, recordingOrientationRef.current)
       }
 
       let writer: StreamingTakeWriter | null = null

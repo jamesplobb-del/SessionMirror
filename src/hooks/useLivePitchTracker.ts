@@ -23,6 +23,10 @@ import {
   TUNING_GREEN_CENTS,
   type PitchReadout,
 } from '../utils/pitchUtils'
+import {
+  getMusicRecordingAudioConstraints,
+  tuneMusicRecordingStream,
+} from '../utils/audioCapture'
 
 const HISTORY_LENGTH = 140
 
@@ -215,17 +219,16 @@ async function createMicPitchGraph(
     }
 
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: false,
-      },
+      audio: getMusicRecordingAudioConstraints(),
       video: false,
     })
+    await tuneMusicRecordingStream(stream)
     ownsStream = true
+  } else {
+    await tuneMusicRecordingStream(stream)
   }
 
-  const context = new AudioContext()
+  const context = new AudioContext({ latencyHint: 'playback' })
   await context.resume()
 
   const analyser = context.createAnalyser()
@@ -400,7 +403,7 @@ async function createPitchGraph(
     elementGraphs.delete(media)
   }
 
-  const context = new AudioContext()
+  const context = new AudioContext({ latencyHint: 'playback' })
   await context.resume()
 
   const analyser = context.createAnalyser()
@@ -422,8 +425,11 @@ async function createPitchGraph(
     } else {
       try {
         const elementSource = context.createMediaElementSource(media)
+        const passthrough = context.createGain()
+        passthrough.gain.value = 1
         elementSource.connect(analyser)
-        analyser.connect(context.destination)
+        elementSource.connect(passthrough)
+        passthrough.connect(context.destination)
         source = elementSource
         mode = 'element'
       } catch {

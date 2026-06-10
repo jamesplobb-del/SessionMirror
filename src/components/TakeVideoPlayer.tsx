@@ -144,7 +144,7 @@ export default function TakeVideoPlayer({
     <video
       key={videoSourceKey ?? mediaSrc ?? 'empty'}
       ref={mediaRef as RefObject<HTMLVideoElement>}
-      className={`${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
+      className={`media-display-enhance ${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
       src={mediaSrc}
       style={videoStyle}
       {...rest}

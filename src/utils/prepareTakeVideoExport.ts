@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
+import { RECORDING_AUDIO_BITS_PER_SECOND } from './audioCapture'
 import {
   buildTakeVideoExportTransform,
   drawTakeVideoFrame,
@@ -172,7 +173,7 @@ async function transcodeTakeVideoForExport(
     const recorder = new MediaRecorder(canvasStream, {
       mimeType: recorderMime,
       videoBitsPerSecond: estimateVideoBitrate(width, height),
-      audioBitsPerSecond: 192_000,
+      audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
     })
 
     recorder.ondataavailable = (event) => {

@@ -68,6 +68,11 @@ select {
   -webkit-touch-callout: default;
 }
 
+/* Brighter, clearer preview & playback (display-only — not baked into files). */
+video.media-display-enhance {
+  filter: brightness(1.05) contrast(1.07) saturate(1.12);
+}
+
 .app-pip-row {
   display: flex;
   align-items: flex-end;

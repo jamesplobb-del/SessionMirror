@@ -110,6 +110,7 @@ function PipWindow({
 
       if (video.paused) {
         video.muted = false
+        video.volume = 1
         void video.play()
         setIsPlaying(true)
       } else {

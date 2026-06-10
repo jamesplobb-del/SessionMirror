@@ -1,6 +1,11 @@
 import { Capacitor } from '@capacitor/core'
 import type { VideoHTMLAttributes } from 'react'
 import type { RecordingOrientation } from './takeVideoTransform'
+import {
+  getMusicRecordingAudioConstraints,
+  RECORDING_AUDIO_BITS_PER_SECOND,
+} from './audioCapture'
+import { getVideoCaptureConstraintsForOrientation } from './videoCapture'
 
 /** Shared inline-playback attributes for iOS / mobile Safari (live camera). */
 export const mobileVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
@@ -49,40 +54,23 @@ export function getRecorderMimeTypeForMode(mode: 'video' | 'audio'): string {
   return mode === 'audio' ? getAudioRecorderMimeType() : getRecorderMimeType()
 }
 
-/** Full field-of-view front camera — portrait uses native defaults; landscape requests 16:9. */
+/** Video capture tuned per orientation — soft ideals to avoid iOS crop. */
 export function getVideoCaptureConstraints(
   orientation: RecordingOrientation = 'portrait',
 ): MediaTrackConstraints {
-  if (orientation === 'landscape') {
-    return {
-      facingMode: 'user',
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      aspectRatio: { ideal: 16 / 9 },
-    }
-  }
-
-  return {
-    facingMode: 'user',
-  }
+  return getVideoCaptureConstraintsForOrientation(orientation)
 }
 
 export function getAudioCaptureConstraints(): MediaTrackConstraints {
-  return {
-    channelCount: { ideal: 1 },
-    sampleRate: { ideal: 48000 },
-    echoCancellation: { ideal: true },
-    noiseSuppression: { ideal: false },
-    autoGainControl: { ideal: false },
-  }
+  return getMusicRecordingAudioConstraints()
 }
 
 export function estimateVideoBitrate(width: number, height: number): number {
   const pixels = width * height
-  if (pixels >= 1920 * 1080) return 10_000_000
-  if (pixels >= 1280 * 720) return 8_000_000
-  if (pixels >= 960 * 540) return 5_500_000
-  return 3_500_000
+  if (pixels >= 1920 * 1080) return 14_000_000
+  if (pixels >= 1280 * 720) return 10_000_000
+  if (pixels >= 960 * 540) return 7_000_000
+  return 4_500_000
 }
 
 export function createMediaRecorder(
@@ -94,7 +82,7 @@ export function createMediaRecorder(
   if (!isVideo) {
     const audioOptions: MediaRecorderOptions = {
       mimeType,
-      audioBitsPerSecond: 192_000,
+      audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
     }
     try {
       return new MediaRecorder(stream, audioOptions)
@@ -111,14 +99,14 @@ export function createMediaRecorder(
   const qualityOptions: MediaRecorderOptions = {
     mimeType,
     videoBitsPerSecond: estimateVideoBitrate(width, height),
-    audioBitsPerSecond: 192_000,
+    audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
   }
 
   try {
     return new MediaRecorder(stream, qualityOptions)
   } catch {
     try {
-      return new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 192_000 })
+      return new MediaRecorder(stream, { mimeType, audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND })
     } catch {
       return new MediaRecorder(stream, { mimeType })
     }
