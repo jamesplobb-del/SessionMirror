@@ -394,6 +394,32 @@ video.camera-preview.camera-preview--hidden {
   background: #0c0a09;
 }
 
+.pitch-analysis-float {
+  bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  max-height: min(24dvh, 188px);
+}
+
+.pitch-glass-panel {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.pitch-spectrogram--glass {
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.45));
+}
+
+.pitch-tuner--panel {
+  pointer-events: none;
+}
+
 @media (orientation: landscape) {
   .audio-main-pitch-stage {
     padding-left: max(0.75rem, env(safe-area-inset-left, 0px));

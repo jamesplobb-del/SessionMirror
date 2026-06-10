@@ -102,11 +102,7 @@ function ReviewTakeLayer({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
         />
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(20dvh,156px)] bg-gradient-to-t from-stone-950/95 via-stone-950/45 to-transparent"
-          aria-hidden
-        />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[min(16dvh,132px)]">
+        <div className="pitch-analysis-float pointer-events-none absolute inset-x-0 z-20">
           <LivePitchTuner
             mediaRef={videoRef}
             enabled={pitchTrackerEnabled && isActive}

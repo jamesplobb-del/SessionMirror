@@ -11,7 +11,10 @@ import {
   PITCH_ANCHOR_MIDI_ALPHA,
   PITCH_GRAPH_SMOOTH_WINDOW,
   PITCH_READOUT_INTERVAL_MS,
+  PITCH_TRACE_COLOR,
+  PITCH_TRACE_GLOW,
   CENTS_DISPLAY_STEP,
+  type PitchCanvasTheme,
 } from '../utils/pitchConfig'
 import {
   frequencyToMidi,
@@ -199,6 +202,7 @@ function drawSmoothPitchTrace(
   historyLength: number,
   width: number,
   centsToY: (cents: number) => number,
+  theme: PitchCanvasTheme,
 ): void {
   const smoothed = movingAverage(centsHistory, PITCH_GRAPH_SMOOTH_WINDOW)
   if (smoothed.length < 2) return
@@ -229,14 +233,32 @@ function drawSmoothPitchTrace(
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, next.x, next.y)
   }
 
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+
+  if (theme === 'glass') {
+    ctx.save()
+    ctx.shadowColor = PITCH_TRACE_GLOW
+    ctx.shadowBlur = 12
+    ctx.strokeStyle = PITCH_TRACE_COLOR
+    ctx.lineWidth = 4.5
+    ctx.globalAlpha = 0.35
+    ctx.stroke()
+    ctx.restore()
+
+    ctx.strokeStyle = PITCH_TRACE_COLOR
+    ctx.lineWidth = 3.25
+    ctx.globalAlpha = 0.95
+    ctx.stroke()
+    ctx.globalAlpha = 1
+    return
+  }
+
   const latest = points[points.length - 1]
   const gradient = ctx.createLinearGradient(points[0].x, 0, latest.x, 0)
   gradient.addColorStop(0, 'rgba(148, 163, 184, 0.12)')
   gradient.addColorStop(0.5, 'rgba(34, 197, 94, 0.38)')
   gradient.addColorStop(1, getIntonationColor(latest.cents))
-
-  ctx.lineJoin = 'round'
-  ctx.lineCap = 'round'
 
   ctx.strokeStyle = 'rgba(34, 197, 94, 0.22)'
   ctx.lineWidth = 8
@@ -256,6 +278,7 @@ function drawPitchCanvas(
   centsHistory: number[],
   currentCents: number | null,
   active: boolean,
+  theme: PitchCanvasTheme,
 ): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -271,8 +294,9 @@ function drawPitchCanvas(
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
-  const pitchTop = height * 0.04
-  const pitchBottom = height * 0.86
+  const isGlass = theme === 'glass'
+  const pitchTop = isGlass ? height * 0.12 : height * 0.04
+  const pitchBottom = isGlass ? height * 0.92 : height * 0.86
   const pitchHeight = pitchBottom - pitchTop
   const waveTop = height * 0.88
   const waveHeight = height * 0.1
@@ -280,35 +304,48 @@ function drawPitchCanvas(
 
   ctx.clearRect(0, 0, width, height)
 
-  const bg = ctx.createLinearGradient(0, 0, 0, height)
-  bg.addColorStop(0, '#0c1018')
-  bg.addColorStop(0.55, '#080b12')
-  bg.addColorStop(1, '#050608')
-  ctx.fillStyle = bg
-  ctx.fillRect(0, 0, width, height)
+  if (!isGlass) {
+    const bg = ctx.createLinearGradient(0, 0, 0, height)
+    bg.addColorStop(0, '#0c1018')
+    bg.addColorStop(0.55, '#080b12')
+    bg.addColorStop(1, '#050608')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, width, height)
+  }
 
   const centsToY = (cents: number) =>
     midPitchY - (Math.max(-50, Math.min(50, cents)) / 50) * (pitchHeight * 0.46)
 
-  ctx.fillStyle = 'rgba(16, 185, 129, 0.08)'
-  ctx.fillRect(0, centsToY(10), width, centsToY(-10) - centsToY(10))
+  if (!isGlass) {
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.08)'
+    ctx.fillRect(0, centsToY(10), width, centsToY(-10) - centsToY(10))
 
-  ctx.fillStyle = 'rgba(245, 158, 11, 0.05)'
-  ctx.fillRect(0, centsToY(25), width, centsToY(10) - centsToY(25))
-  ctx.fillRect(0, centsToY(-10), width, centsToY(-25) - centsToY(-10))
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.05)'
+    ctx.fillRect(0, centsToY(25), width, centsToY(10) - centsToY(25))
+    ctx.fillRect(0, centsToY(-10), width, centsToY(-25) - centsToY(-10))
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)'
-  ctx.lineWidth = 1
-  for (const cents of [-50, -25, -10, 0, 10, 25, 50]) {
-    const y = centsToY(cents)
-    ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(width, y)
-    ctx.stroke()
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+    ctx.lineWidth = 1
+    for (const cents of [-50, -25, -10, 0, 10, 25, 50]) {
+      const y = centsToY(cents)
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(width, y)
+      ctx.stroke()
+    }
+  } else {
+    ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.32)'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('+50', 2, centsToY(50))
+    ctx.fillText('0', 2, centsToY(0))
+    ctx.fillText('-50', 2, centsToY(-50))
   }
 
-  ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)'
-  ctx.setLineDash([4, 6])
+  ctx.strokeStyle = isGlass ? 'rgba(255, 255, 255, 0.28)' : 'rgba(52, 211, 153, 0.35)'
+  ctx.setLineDash(isGlass ? [5, 5] : [4, 6])
+  ctx.lineWidth = isGlass ? 1 : 1
   ctx.beginPath()
   ctx.moveTo(0, centsToY(0))
   ctx.lineTo(width, centsToY(0))
@@ -316,24 +353,28 @@ function drawPitchCanvas(
   ctx.setLineDash([])
 
   if (centsHistory.length > 1) {
-    drawSmoothPitchTrace(ctx, centsHistory, HISTORY_LENGTH, width, centsToY)
+    drawSmoothPitchTrace(ctx, centsHistory, HISTORY_LENGTH, width, centsToY, theme)
   }
 
   if (currentCents != null && active) {
-    const dotX = width - 16
+    const dotX = width - (isGlass ? 18 : 16)
     const dotY = centsToY(currentCents)
+    const dotColor = isGlass ? PITCH_TRACE_COLOR : getIntonationColor(currentCents)
+
     ctx.beginPath()
-    ctx.arc(dotX, dotY, 6, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.25)'
+    ctx.arc(dotX, dotY, isGlass ? 7 : 6, 0, Math.PI * 2)
+    ctx.fillStyle = isGlass ? 'rgba(56, 189, 248, 0.28)' : 'rgba(34, 197, 94, 0.25)'
     ctx.fill()
     ctx.beginPath()
-    ctx.arc(dotX, dotY, 4.5, 0, Math.PI * 2)
-    ctx.fillStyle = getIntonationColor(currentCents)
+    ctx.arc(dotX, dotY, isGlass ? 5 : 4.5, 0, Math.PI * 2)
+    ctx.fillStyle = dotColor
     ctx.fill()
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'
     ctx.lineWidth = 1.75
     ctx.stroke()
   }
+
+  if (isGlass) return
 
   const waveMidY = waveTop + waveHeight * 0.5
   const step = width / Math.max(timeDomain.length - 1, 1)
@@ -377,6 +418,7 @@ export function useLivePitchTracker(
   isPlaying: boolean,
   mediaKey: string,
   canvasRef?: RefObject<HTMLCanvasElement | null>,
+  canvasTheme: PitchCanvasTheme = 'solid',
 ): PitchReadout {
   const emptyReadout = frequencyToPitchReadout(0)
   const [readout, setReadout] = useState<PitchReadout>(emptyReadout)
@@ -615,6 +657,7 @@ export function useLivePitchTracker(
           historyRef.current,
           currentCents,
           active,
+          canvasTheme,
         )
       }
 
@@ -629,7 +672,7 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
     }
-  }, [canvasRef, enabled, isPlaying, mediaKey])
+  }, [canvasRef, canvasTheme, enabled, isPlaying, mediaKey])
 
   return readout
 }
