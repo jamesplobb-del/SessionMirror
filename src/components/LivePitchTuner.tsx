@@ -63,12 +63,12 @@ function CentsNeedle({
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-full bg-white/8 ${
-        large ? 'h-2' : compact ? 'h-1' : 'h-1.5'
+      className={`pitch-needle-rail relative w-full overflow-hidden ${
+        large ? 'pitch-needle-rail--large' : compact ? 'pitch-needle-rail--compact' : ''
       }`}
     >
-      <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-emerald-400/20" />
-      <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-amber-400/10" />
+      <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-emerald-400/14" />
+      <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-amber-400/8" />
       <div
         className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] ${
           large ? 'h-4 w-4' : compact ? 'h-2.5 w-2.5' : 'h-3 w-3'
@@ -105,11 +105,7 @@ function StatusLabel({
       : 'Paused'
 
   return (
-    <p
-      className={`text-[9px] font-medium uppercase tracking-wider ${
-        inTune ? 'text-emerald-400/90' : zone === 'yellow' ? 'text-amber-300/80' : 'text-white/30'
-      }`}
-    >
+    <p className={`pitch-status-label ${inTune ? 'pitch-status-label--in-tune' : zone === 'yellow' ? 'pitch-status-label--close' : ''}`}>
       {text}
     </p>
   )
@@ -151,17 +147,14 @@ function AudioTunerPane({
       </div>
 
       <div className="pitch-audio-pane__readout">
-        <p className="pitch-audio-pane__note font-mono tabular-nums" style={{ color: accent }}>
+        <p className="pitch-audio-pane__note pitch-readout-display" style={{ color: accent }}>
           {readout.noteName}
         </p>
         <div className="pitch-audio-pane__meta">
-          <p
-            className="pitch-audio-pane__meta-freq font-mono tabular-nums"
-            style={{ color: accent }}
-          >
+          <p className="pitch-audio-pane__meta-freq pitch-readout-display" style={{ color: accent }}>
             {formatFrequencyHz(readout.frequencyHz)}
           </p>
-          <p className="pitch-audio-pane__cents font-mono tabular-nums" style={{ color: accent }}>
+          <p className="pitch-audio-pane__cents pitch-readout-display" style={{ color: accent }}>
             {active ? formatDisplayCents(readout.cents) : '—'}
           </p>
         </div>
@@ -173,16 +166,16 @@ function AudioTunerPane({
         ) : (
           <CentsNeedle cents={0} active={false} large />
         )}
-        <div className="mt-2 flex justify-between font-mono text-[10px] text-white/28">
+        <div className="mt-2 flex justify-between pitch-axis-label">
           <span>Flat</span>
-          <span className="text-emerald-400/70">In tune</span>
+          <span className="pitch-axis-label__center">In tune</span>
           <span>Sharp</span>
         </div>
       </div>
 
       {mode === 'idle' ? (
         <div className="pitch-audio-pane__idle flex flex-1 items-center justify-center text-center">
-          <p className="max-w-xs text-sm leading-relaxed text-white/40">
+          <p className="max-w-xs">
             Enable Live Mic Tuner in Settings to practice with a live tuner, or press play to analyze
             this take.
           </p>
@@ -307,6 +300,7 @@ export default function LivePitchTuner({
   const isStage = variant === 'stage'
   const canvasTheme = isPanel || isWidget || isAudio ? 'glass' : 'solid'
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const widgetContinuousScroll = isWidget && persistWhenPaused
   const readout = useLivePitchTracker(
     mediaRef,
     enabled && !isAudio,
@@ -314,7 +308,12 @@ export default function LivePitchTuner({
     mediaKey,
     canvasRef,
     canvasTheme,
-    { source: 'media', persistWhenPaused: isWidget && persistWhenPaused, tunerInstrument },
+    {
+      source: 'media',
+      persistWhenPaused: widgetContinuousScroll,
+      continuousScroll: widgetContinuousScroll,
+      tunerInstrument,
+    },
   )
 
   if (isAudio) {
@@ -348,12 +347,12 @@ export default function LivePitchTuner({
         style={{ height: 188, minHeight: 188 }}
       >
         <div
-          className="pitch-glass-panel pitch-glass-panel--compact flex w-full flex-col overflow-hidden"
+          className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget flex w-full flex-col overflow-hidden"
           style={{ height: 188, minHeight: 188 }}
         >
-          <div className="flex shrink-0 items-start justify-between gap-3 px-3 pt-2.5 pb-1 pr-10">
+          <div className="pitch-widget-chrome flex shrink-0 items-start justify-between gap-3 px-3.5 pt-3 pb-1 pr-10">
             <p
-              className="font-mono text-base font-bold leading-none tabular-nums tracking-tight"
+              className="pitch-readout-display text-base font-bold leading-none tracking-tight"
               style={{ color: accent }}
             >
               {readout.noteName}
@@ -364,20 +363,17 @@ export default function LivePitchTuner({
               )}
             </p>
             <p
-              className="shrink-0 font-mono text-xs font-semibold tabular-nums"
+              className="pitch-readout-display shrink-0 text-xs font-semibold"
               style={{ color: accent }}
             >
               {formatFrequencyHz(readout.frequencyHz)}
             </p>
           </div>
 
-          <div
-            className="relative shrink-0 overflow-hidden px-3 pb-2.5"
-            style={{ height: 140, minHeight: 140 }}
-          >
+          <div className="pitch-widget-chart relative shrink-0 overflow-hidden px-3.5 pb-3">
             <PitchChartCanvas canvasRef={canvasRef} glass />
-            {!active && !isPlaying && (
-              <p className="pointer-events-none absolute inset-x-3 bottom-2 text-center text-[10px] text-white/35">
+            {!widgetContinuousScroll && !isPlaying && (
+              <p className="pitch-widget-hint pointer-events-none absolute inset-x-3 bottom-2 text-center">
                 Pitch trace during playback
               </p>
             )}
@@ -391,10 +387,10 @@ export default function LivePitchTuner({
     return (
       <div className="pitch-tuner pitch-tuner--panel h-full w-full">
         <div className="pitch-glass-panel flex h-full min-h-[9.5rem] w-full flex-col overflow-hidden">
-          <div className="flex shrink-0 items-start justify-between gap-4 px-5 pt-5 pb-2">
+          <div className="pitch-widget-chrome flex shrink-0 items-start justify-between gap-4 px-5 pt-5 pb-2">
             <div className="min-w-0">
               <p
-                className="font-mono text-2xl font-bold leading-none tabular-nums tracking-tight"
+                className="pitch-readout-display text-2xl font-bold leading-none tracking-tight"
                 style={{ color: accent }}
               >
                 {readout.noteName}
@@ -406,7 +402,7 @@ export default function LivePitchTuner({
               </p>
             </div>
             <p
-              className="shrink-0 font-mono text-sm font-bold tabular-nums"
+              className="pitch-readout-display shrink-0 text-sm font-bold"
               style={{ color: accent }}
             >
               {formatFrequencyHz(readout.frequencyHz)}

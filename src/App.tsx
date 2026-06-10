@@ -622,7 +622,7 @@ export default function App() {
       }
     }
 
-    if (settings.liveMicTunerEnabled) {
+    if (settings.liveMicTunerEnabled && ready) {
       return {
         mediaRef: liveMicPlaceholderRef,
         take: null,
@@ -649,6 +649,7 @@ export default function App() {
     benchmarkTake,
     benchmarkPipPlaying,
     streamGeneration,
+    ready,
   ])
 
   const showMainPitchWidget = mainPitchSource !== null

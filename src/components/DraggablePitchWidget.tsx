@@ -132,6 +132,7 @@ export default function DraggablePitchWidget({
         exit={{ opacity: 0, scale: 0.98, y: 8 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
+        <div className="pitch-stage-ambient pitch-stage-ambient--inset" aria-hidden />
         <div className="pitch-widget-audio__card relative flex min-h-0 flex-1 flex-col">
           {onClose && <PitchWidgetCloseButton onClose={onClose} />}
           {tuner}

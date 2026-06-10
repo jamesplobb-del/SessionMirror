@@ -31,6 +31,7 @@ const CAMERA_RELEASE_DELAY_MS = 700
 const FOREGROUND_RESTART_DELAY_MS = 250
 const IOS_CAMERA_RELEASE_DELAY_MS = 250
 const IOS_AUDIO_TO_VIDEO_DELAY_MS = 200
+const IOS_VIDEO_TO_AUDIO_DELAY_MS = 280
 const BACKGROUND_SUSPEND_DELAY_MS = 500
 
 function detachPreviewStream(video: HTMLVideoElement | null) {
@@ -263,10 +264,19 @@ export function useCameraSession({
       const mode = recordingMode
       const leavingAudioForVideo =
         previousRecordingModeRef.current === 'audio' && mode === 'video'
+      const enteringAudioFromVideo =
+        previousRecordingModeRef.current === 'video' && mode === 'audio'
 
       if (leavingAudioForVideo && Capacitor.isNativePlatform()) {
         await new Promise((resolve) =>
           window.setTimeout(resolve, IOS_AUDIO_TO_VIDEO_DELAY_MS),
+        )
+        if (cancelled) return
+      }
+
+      if (enteringAudioFromVideo && Capacitor.isNativePlatform()) {
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, IOS_VIDEO_TO_AUDIO_DELAY_MS),
         )
         if (cancelled) return
       }

@@ -99,32 +99,34 @@ function LiveCameraBackground({
         }`}
       />
 
+      {isAudioMode && pitchStageActive && (
+        <div className="pitch-stage-ambient" aria-hidden />
+      )}
+
       {showAudioIdle && (
-        <div className="camera-background-overlay flex flex-col items-center justify-center bg-gradient-to-b from-stone-950 via-stone-900 to-black">
+        <div className="camera-background-overlay pitch-audio-idle flex flex-col items-center justify-center">
           <div
-            className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/5 ${
-              isRecording ? 'shadow-[0_0_24px_rgba(56,189,248,0.35)]' : ''
+            className={`pitch-audio-idle__orb mb-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full ${
+              isRecording ? 'pitch-audio-idle__orb--recording' : ''
             }`}
           >
-            <Mic
-              className={`h-7 w-7 text-sky-300 ${isRecording ? 'animate-pulse' : 'opacity-80'}`}
-            />
+            <Mic className={`h-7 w-7 ${isRecording ? 'text-sky-200' : 'text-sky-300/90'}`} />
           </div>
-          <div className="flex h-8 items-end justify-center gap-1">
+          <div className="flex h-9 items-end justify-center gap-1.5">
             {[0, 1, 2, 3, 4].map((bar) => (
               <div
                 key={bar}
-                className={`w-1 rounded-full bg-sky-400/70 ${
-                  isRecording ? 'animate-pulse' : 'opacity-30'
+                className={`pitch-audio-idle__bar w-[3px] rounded-full ${
+                  isRecording ? 'pitch-audio-idle__bar--live' : ''
                 }`}
                 style={{
-                  height: `${12 + bar * 4}px`,
+                  height: `${14 + bar * 5}px`,
                   animationDelay: `${bar * 90}ms`,
                 }}
               />
             ))}
           </div>
-          <p className="mt-4 text-xs font-medium tracking-wide text-white/45 uppercase">
+          <p className="pitch-audio-idle__label mt-5 text-sm font-medium">
             Audio Mode
           </p>
         </div>

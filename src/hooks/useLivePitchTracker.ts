@@ -84,11 +84,16 @@ function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
 async function createMicPitchGraph(
   profile: PitchTunerProfile,
   existingStream?: MediaStream | null,
+  requireExistingStream = false,
 ): Promise<MicPitchGraph> {
   let stream = micStreamIsLive(existingStream) ? existingStream! : null
   let ownsStream = false
 
   if (!stream) {
+    if (requireExistingStream) {
+      throw new Error('Shared mic stream not ready')
+    }
+
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -567,19 +572,34 @@ function drawPitchCanvas(
       ctx.stroke()
     }
   } else {
-    ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.32)'
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([])
+    for (const cents of [-50, -25, 25, 50]) {
+      const y = centsToY(cents)
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(width, y)
+      ctx.stroke()
+    }
+
+    ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     ctx.fillText('Sharp', 2, centsToY(50) - 10)
+    ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
     ctx.fillText('+50', 2, centsToY(50))
     ctx.fillText('0', 2, centsToY(0))
     ctx.fillText('-50', 2, centsToY(-50))
+    ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
     ctx.fillText('Flat', 2, centsToY(-50) + 10)
   }
 
-  ctx.strokeStyle = isGlass ? 'rgba(255, 255, 255, 0.28)' : 'rgba(52, 211, 153, 0.35)'
-  ctx.setLineDash(isGlass ? [5, 5] : [4, 6])
+  ctx.strokeStyle = isGlass ? 'rgba(255, 255, 255, 0.14)' : 'rgba(52, 211, 153, 0.35)'
+  ctx.setLineDash(isGlass ? [4, 7] : [4, 6])
   ctx.lineWidth = isGlass ? 1 : 1
   ctx.beginPath()
   ctx.moveTo(0, centsToY(0))
@@ -794,7 +814,19 @@ export function useLivePitchTracker(
 
       try {
         if (source === 'microphone') {
-          const graph = await createMicPitchGraph(profileRef.current, micStreamRef?.current)
+          const requireSharedMic = Boolean(micStreamRef)
+          const sharedStream = micStreamRef?.current
+
+          if (requireSharedMic && !micStreamIsLive(sharedStream)) {
+            scheduleRetry(100)
+            return
+          }
+
+          const graph = await createMicPitchGraph(
+            profileRef.current,
+            sharedStream,
+            requireSharedMic,
+          )
           if (cancelled) {
             safeDisposeMicGraph(graph)
             return
@@ -895,6 +927,14 @@ export function useLivePitchTracker(
           framesSinceAttachAttemptRef.current % 12 === 0
         ) {
           void tryAttachRef.current?.()
+        }
+
+        if (continuousScroll && persistWhenPaused && enabled) {
+          const history = historyRef.current
+          history.push(PITCH_SILENCE_FLOOR_CENTS)
+          if (history.length > HISTORY_LENGTH) {
+            history.splice(0, history.length - HISTORY_LENGTH)
+          }
         }
 
         const canvas = canvasRef?.current
@@ -1093,6 +1133,13 @@ export function useLivePitchTracker(
 
         if (continuousScroll && !pushedHistoryThisFrame) {
           pushHistorySample(PITCH_SILENCE_FLOOR_CENTS)
+        }
+      } else if (continuousScroll && persistWhenPaused) {
+        if (!pushedHistoryThisFrame) {
+          pushHistorySample(PITCH_SILENCE_FLOOR_CENTS)
+        }
+        if (readoutRef.current.noteName !== '—') {
+          active = true
         }
       } else if (readoutRef.current.noteName !== '—') {
         active = true
