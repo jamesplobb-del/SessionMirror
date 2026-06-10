@@ -78,16 +78,29 @@ export function createMediaRecorder(
   mimeType: string,
 ): MediaRecorder {
   const isVideo = !isAudioMimeType(mimeType)
+  const isIOSNative =
+    Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
 
   if (!isVideo) {
-    const audioOptions: MediaRecorderOptions = {
-      mimeType,
-      audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
-    }
+    const audioOptions: MediaRecorderOptions = isIOSNative
+      ? { mimeType }
+      : {
+          mimeType,
+          audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
+        }
     try {
       return new MediaRecorder(stream, audioOptions)
     } catch {
       return new MediaRecorder(stream, { mimeType })
+    }
+  }
+
+  // Let iOS pick encoder bitrates — custom targets can stall preview and drift A/V.
+  if (isIOSNative) {
+    try {
+      return new MediaRecorder(stream, { mimeType })
+    } catch {
+      return new MediaRecorder(stream)
     }
   }
 

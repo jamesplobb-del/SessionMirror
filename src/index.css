@@ -68,8 +68,8 @@ select {
   -webkit-touch-callout: default;
 }
 
-/* Brighter, clearer preview & playback (display-only — not baked into files). */
-video.media-display-enhance {
+/* Brighter, clearer saved-take playback (display-only — not baked into files). */
+video.media-display-enhance:not(.camera-preview) {
   filter: brightness(1.05) contrast(1.07) saturate(1.12);
 }
 
@@ -364,6 +364,11 @@ body.settings-branch-open * {
 
 .record-carousel-slot--recording {
   background: transparent;
+  transition: none;
+}
+
+.record-carousel-slot--center.record-carousel-slot--recording {
+  transition: none;
 }
 
 .record-carousel-slot--active:not(.record-carousel-slot--video-active):not(.record-carousel-slot--recording) {
@@ -405,27 +410,16 @@ body.settings-branch-open * {
 
 video.camera-preview {
   position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  top: auto !important;
-  width: var(--viewport-width, 100vw) !important;
-  /* Progressive fallbacks: legacy WebKit → dvh → synced JS height */
-  height: var(--camera-fill-height, 100vh) !important;
-  height: var(
-    --camera-fill-height,
-    calc(100dvh + env(safe-area-inset-bottom, 0px))
-  ) !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
   min-width: 0 !important;
-  min-height: var(--camera-fill-height, 100vh) !important;
-  min-height: var(
-    --camera-fill-height,
-    calc(100dvh + env(safe-area-inset-bottom, 0px))
-  ) !important;
+  min-height: 0 !important;
   opacity: 0;
   transition: opacity 280ms ease;
   transform: none !important;
   object-fit: cover !important;
-  object-position: bottom center !important;
+  object-position: center center !important;
   z-index: 0 !important;
   pointer-events: none !important;
 }

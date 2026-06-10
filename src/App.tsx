@@ -604,7 +604,7 @@ export default function App() {
 
   const mainAudioPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'audio') return null
-    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
+    if (isReviewOpen || isVaultOpen || isSettingsOpen || isRecording) return null
 
     if (autoPlaybackTakeId && autoPlaybackTake) {
       return {
@@ -664,11 +664,12 @@ export default function App() {
     benchmarkPipPlaying,
     streamGeneration,
     ready,
+    isRecording,
   ])
 
   const mainVideoPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'video') return null
-    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
+    if (isReviewOpen || isVaultOpen || isSettingsOpen || isRecording) return null
     if (!ready) return null
 
     return {
@@ -684,6 +685,7 @@ export default function App() {
     isSettingsOpen,
     streamGeneration,
     ready,
+    isRecording,
   ])
 
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null

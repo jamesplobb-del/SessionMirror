@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { agentDebugLog } from './agentDebugLog'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 
 const TAKES_DIR = 'takes'
@@ -386,7 +387,30 @@ export class StreamingTakeWriter {
 
     if (this.useBufferedWrite) {
       const writeMime = normalizeBlobMime(this.mimeType)
-      const blob = new Blob(this.bufferChunks, { type: writeMime })
+      let blob: Blob
+      let usedLastChunk = false
+      if (this.bufferChunks.length <= 1) {
+        blob = new Blob(this.bufferChunks, { type: writeMime })
+      } else {
+        const primary = this.bufferChunks[this.bufferChunks.length - 1]!
+        blob = new Blob([primary], { type: writeMime })
+        usedLastChunk = true
+      }
+      // #region agent log
+      agentDebugLog(
+        'takeStorage.ts:finalize',
+        'buffered mp4 finalize',
+        {
+          takeId: this.takeId,
+          chunkCount: this.chunkCount,
+          bufferChunks: this.bufferChunks.length,
+          usedLastChunk,
+          chunkSizes: this.bufferChunks.map((chunk) => chunk.size),
+          totalBytes: blob.size,
+        },
+        'H-E',
+      )
+      // #endregion
       this.bufferChunks.length = 0
 
       if (blob.size === 0) {

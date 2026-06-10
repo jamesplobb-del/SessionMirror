@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { agentDebugLog } from './agentDebugLog'
 
 export function isIOSNative(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
@@ -101,9 +102,6 @@ export function applyViewportCssVars(): number {
   document.body.style.width = `${width}px`
   document.body.style.height = `${height}px`
 
-  // Nudge WebKit layout after dimension changes.
-  void document.body.offsetHeight
-
   return height
 }
 
@@ -124,9 +122,10 @@ export function applyViewportCssVarsOnResume(): number {
 }
 
 export function refreshCameraPreviewLayout(video: HTMLVideoElement | null): void {
-  applyViewportCssVars()
   if (!video || !video.srcObject) return
-  void video.play().catch(() => {})
+  if (video.paused) {
+    void video.play().catch(() => {})
+  }
 }
 
 const BOOT_SYNC_DELAYS_MS = [100, 300, 750]
@@ -168,14 +167,47 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
 
   const timers = BOOT_SYNC_DELAYS_MS.map((delay) => window.setTimeout(sync, delay))
 
-  const onOrientationChange = () => {
+  let syncDebounceTimer: number | null = null
+  let orientationLocked = false
+
+  const scheduleSync = (delayMs = 48) => {
+    if (orientationLocked) return
+    if (syncDebounceTimer !== null) {
+      window.clearTimeout(syncDebounceTimer)
+    }
+    syncDebounceTimer = window.setTimeout(() => {
+      syncDebounceTimer = null
+      sync()
+    }, delayMs)
+  }
+
+  let orientationSyncTimer: number | null = null
+  const scheduleOrientationSync = () => {
+    orientationLocked = true
     invalidateSafeAreaCache()
-    lastAppliedWidth = 0
-    lastAppliedHeight = 0
-    sync()
-    syncWithRaf(sync)
-    window.setTimeout(sync, 100)
-    window.setTimeout(sync, 300)
+    if (orientationSyncTimer !== null) {
+      window.clearTimeout(orientationSyncTimer)
+    }
+    orientationSyncTimer = window.setTimeout(() => {
+      orientationSyncTimer = null
+      orientationLocked = false
+      sync()
+      // #region agent log
+      agentDebugLog(
+        'viewportSync.ts:onOrientationChange',
+        'orientation layout sync (settled)',
+        {
+          viewport: readViewportSize(),
+          native: Capacitor.isNativePlatform(),
+        },
+        'H-P',
+      )
+      // #endregion
+    }, 320)
+  }
+
+  const onOrientationChange = () => {
+    scheduleOrientationSync()
   }
 
   const onPageShow = () => {
@@ -183,13 +215,15 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
     syncWithRaf(sync)
   }
 
+  const onDebouncedLayout = () => scheduleSync(48)
+
   sync()
-  window.addEventListener('resize', sync)
+  window.addEventListener('resize', onDebouncedLayout)
   window.addEventListener('orientationchange', onOrientationChange)
   window.addEventListener('pageshow', onPageShow)
   window.addEventListener('focus', sync)
-  window.visualViewport?.addEventListener('resize', sync)
-  window.visualViewport?.addEventListener('scroll', sync)
+  window.visualViewport?.addEventListener('resize', onDebouncedLayout)
+  window.visualViewport?.addEventListener('scroll', onDebouncedLayout)
   screen.orientation?.addEventListener('change', onOrientationChange)
 
   let capCleanup: (() => void) | undefined
@@ -199,12 +233,18 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
 
   return () => {
     timers.forEach((timer) => window.clearTimeout(timer))
-    window.removeEventListener('resize', sync)
+    if (orientationSyncTimer !== null) {
+      window.clearTimeout(orientationSyncTimer)
+    }
+    if (syncDebounceTimer !== null) {
+      window.clearTimeout(syncDebounceTimer)
+    }
+    window.removeEventListener('resize', onDebouncedLayout)
     window.removeEventListener('orientationchange', onOrientationChange)
     window.removeEventListener('pageshow', onPageShow)
     window.removeEventListener('focus', sync)
-    window.visualViewport?.removeEventListener('resize', sync)
-    window.visualViewport?.removeEventListener('scroll', sync)
+    window.visualViewport?.removeEventListener('resize', onDebouncedLayout)
+    window.visualViewport?.removeEventListener('scroll', onDebouncedLayout)
     screen.orientation?.removeEventListener('change', onOrientationChange)
     capCleanup?.()
     rootCleanup()

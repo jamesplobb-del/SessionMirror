@@ -17,9 +17,17 @@ import {
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream } from '../utils/audioCapture'
-import { tuneVideoRecordingStream } from '../utils/videoCapture'
 import {
-  applyViewportCssVarsOnResume,
+  agentDebugLog,
+  readAudioTrackSettings,
+  readVideoTrackSettings,
+} from '../utils/agentDebugLog'
+import {
+  buildRecorderStream,
+  releaseRecorderStream,
+} from '../utils/recordingStream'
+import {
+  applyViewportCssVars,
   refreshCameraPreviewLayout,
 } from '../utils/viewportSync'
 
@@ -88,12 +96,33 @@ function attachPreviewStream(
   void video.play().catch(() => {})
 }
 
+function waitForPreviewFrame(video: HTMLVideoElement | null): Promise<void> {
+  return new Promise((resolve) => {
+    if (!video || video.readyState < 2) {
+      requestAnimationFrame(() => resolve())
+      return
+    }
+
+    const withFrameCallback = video as HTMLVideoElement & {
+      requestVideoFrameCallback?: (callback: () => void) => number
+    }
+
+    if (typeof withFrameCallback.requestVideoFrameCallback === 'function') {
+      withFrameCallback.requestVideoFrameCallback(() => resolve())
+      return
+    }
+
+    requestAnimationFrame(() => resolve())
+  })
+}
+
 export function useCameraSession({
   onRecordingComplete,
 }: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
+  const recordStreamRef = useRef<MediaStream | null>(null)
   const writerRef = useRef<StreamingTakeWriter | null>(null)
   const activeTakeIdRef = useRef<string | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
@@ -230,6 +259,18 @@ export function useCameraSession({
       }
       await tuneMusicRecordingStream(mediaStream)
       streamRef.current = mediaStream
+      // #region agent log
+      agentDebugLog(
+        'useCameraSession.ts:acquireStream',
+        'stream acquired',
+        {
+          mode,
+          video: readVideoTrackSettings(mediaStream),
+          audio: readAudioTrackSettings(mediaStream),
+        },
+        'H-C',
+      )
+      // #endregion
       attachPreviewStream(previewRef.current, mediaStream, mode)
       setStreamGeneration((generation) => generation + 1)
       setReady(true)
@@ -369,6 +410,19 @@ export function useCameraSession({
     (recorder: MediaRecorder, takeId: string) => {
       recorder.ondataavailable = (event) => {
         if (event.data.size === 0) return
+        // #region agent log
+        agentDebugLog(
+          'useCameraSession.ts:ondataavailable',
+          'recorder chunk',
+          {
+            takeId,
+            chunkBytes: event.data.size,
+            chunkType: event.data.type,
+            bufferedChunks: writerRef.current ? 'writer' : chunksRef.current.length + 1,
+          },
+          'H-E',
+        )
+        // #endregion
 
         if (writerRef.current) {
           void writerRef.current.enqueue(event.data).catch(async () => {
@@ -401,6 +455,25 @@ export function useCameraSession({
           const completedMode = recordingModeRef.current
           const durationSeconds = elapsedRef.current
 
+          // #region agent log
+          agentDebugLog(
+            'useCameraSession.ts:onstop',
+            'recording finalized',
+            {
+              takeId: stoppedTakeId,
+              durationSeconds,
+              capturedChunks: capturedChunks.length,
+              capturedBytes: capturedChunks.reduce(
+                (sum, chunk) => sum + (chunk instanceof Blob ? chunk.size : 0),
+                0,
+              ),
+              usedWriter: Boolean(activeWriter),
+              mimeType: recorderMimeTypeRef.current,
+            },
+            'H-E',
+          )
+          // #endregion
+
           try {
             if (activeWriter) {
               const persisted = await activeWriter.finalize()
@@ -415,7 +488,13 @@ export function useCameraSession({
               })
             } else {
               const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
-              const blob = new Blob(capturedChunks, { type: writeMime })
+              let blob: Blob
+              if (capturedChunks.length <= 1) {
+                blob = new Blob(capturedChunks, { type: writeMime })
+              } else {
+                const primary = capturedChunks[capturedChunks.length - 1]!
+                blob = new Blob([primary], { type: writeMime })
+              }
               const persisted = await persistRecordingBlob(
                 blob,
                 stoppedTakeId,
@@ -437,10 +516,14 @@ export function useCameraSession({
               await activeWriter.abort().catch(() => {})
             }
           } finally {
+            releaseRecorderStream(recordStreamRef.current, streamRef.current)
+            recordStreamRef.current = null
             setIsRecording(false)
             scheduleWarmAutoAudioRef.current()
           }
         })().catch(() => {
+          releaseRecorderStream(recordStreamRef.current, streamRef.current)
+          recordStreamRef.current = null
           setIsRecording(false)
         })
       }
@@ -448,6 +531,8 @@ export function useCameraSession({
       recorder.onerror = () => {
         chunksRef.current = []
         void abortActiveWriter().catch(() => {})
+        releaseRecorderStream(recordStreamRef.current, streamRef.current)
+        recordStreamRef.current = null
         if (recorderRef.current) {
           detachRecorder(recorderRef.current)
         }
@@ -532,7 +617,18 @@ export function useCameraSession({
       const currentStream = await ensureRecordableStream()
       if (!currentStream || isRecordingRef.current) return
 
-      await tuneMusicRecordingStream(currentStream)
+      // #region agent log
+      agentDebugLog(
+        'useCameraSession.ts:startRecording:beforeTune',
+        'record start (no mid-stream retune)',
+        {
+          video: readVideoTrackSettings(currentStream),
+          audio: readAudioTrackSettings(currentStream),
+          orientation: readRecordingOrientation(),
+        },
+        'H-A',
+      )
+      // #endregion
 
       const takeId = crypto.randomUUID()
       const mode = recordingModeRef.current
@@ -541,38 +637,70 @@ export function useCameraSession({
       recorderMimeTypeRef.current = mimeType
       chunksRef.current = []
 
-      if (mode === 'video' && recordingOrientationRef.current === 'landscape') {
-        await tuneVideoRecordingStream(currentStream, 'landscape')
-      }
-
       let writer: StreamingTakeWriter | null = null
       try {
-        writer = await StreamingTakeWriter.open(takeId, mimeType)
-        writerRef.current = writer
-        activeTakeIdRef.current = takeId
+        const writerPromise = StreamingTakeWriter.open(takeId, mimeType)
 
-        const recorder = createMediaRecorder(currentStream, mimeType)
+        const recordStream = buildRecorderStream(currentStream, mode)
+        recordStreamRef.current = recordStream
+
+        // #region agent log
+        agentDebugLog(
+          'useCameraSession.ts:startRecording:recorderStream',
+          'recorder stream prepared',
+          {
+            clonedAudio: recordStream.getAudioTracks().length > 0,
+            clonedVideo: recordStream.getVideoTracks().length > 0,
+            previewAudioTracks: currentStream.getAudioTracks().length,
+          },
+          'H-S',
+        )
+        // #endregion
+
+        const recorder = createMediaRecorder(recordStream, mimeType)
         recorderRef.current = recorder
         bindRecordingHandlers(recorder, takeId)
+
+        await waitForPreviewFrame(previewRef.current)
 
         if (shouldUseRecordingTimeslice(mimeType)) {
           recorder.start(RECORDING_TIMESLICE_MS)
         } else {
           recorder.start()
         }
+
         setIsRecording(true)
         setElapsed(0)
         elapsedRef.current = 0
+
+        writer = await writerPromise
+        if (!writer || !isRecordingRef.current) {
+          throw new Error('Recording writer unavailable')
+        }
+        writerRef.current = writer
+        activeTakeIdRef.current = takeId
       } catch {
         chunksRef.current = []
+        const activeRecorder = recorderRef.current
+        if (activeRecorder && activeRecorder.state === 'recording') {
+          try {
+            activeRecorder.stop()
+          } catch {
+            /* already stopping */
+          }
+        }
         await writer?.abort().catch(() => {})
         writerRef.current = null
         activeTakeIdRef.current = null
         recorderRef.current = null
+        releaseRecorderStream(recordStreamRef.current, streamRef.current)
+        recordStreamRef.current = null
         setIsRecording(false)
       }
     })().catch(() => {
       chunksRef.current = []
+      releaseRecorderStream(recordStreamRef.current, streamRef.current)
+      recordStreamRef.current = null
       setIsRecording(false)
     })
   }, [bindRecordingHandlers, ensureRecordableStream, isRecording])
@@ -615,12 +743,34 @@ export function useCameraSession({
       return
     }
 
-    try {
-      if (recorder.state === 'recording') {
-        recorder.requestData()
+    const mimeType = recorderMimeTypeRef.current
+    // iOS/mp4 records as a single blob — requestData() emits an extra fMP4 fragment
+    // that breaks mux timing when concatenated (A/V drift on longer takes).
+    if (shouldUseRecordingTimeslice(mimeType)) {
+      try {
+        if (recorder.state === 'recording') {
+          // #region agent log
+          agentDebugLog(
+            'useCameraSession.ts:stopRecording',
+            'requestData before stop (timesliced)',
+            { state: recorder.state, mimeType },
+            'H-E',
+          )
+          // #endregion
+          recorder.requestData()
+        }
+      } catch {
+        /* requestData may throw if already stopping */
       }
-    } catch {
-      /* requestData may throw if already stopping */
+    } else {
+      // #region agent log
+      agentDebugLog(
+        'useCameraSession.ts:stopRecording',
+        'stop without requestData (single-blob mp4)',
+        { state: recorder.state, mimeType },
+        'H-E',
+      )
+      // #endregion
     }
 
     recorder.stop()
@@ -717,7 +867,7 @@ export function useCameraSession({
     if (isRecordingRef.current || resumeInFlightRef.current) return
 
     cancelScheduledRelease()
-    applyViewportCssVarsOnResume()
+    applyViewportCssVars()
 
     const mode = recordingModeRef.current
     const stream = streamRef.current
@@ -729,7 +879,17 @@ export function useCameraSession({
 
     attachPreviewStream(previewRef.current, stream, mode)
     refreshCameraPreviewLayout(previewRef.current)
-    setStreamGeneration((generation) => generation + 1)
+    // #region agent log
+    agentDebugLog(
+      'useCameraSession.ts:refreshCameraSession',
+      'preview refreshed without streamGeneration bump',
+      {
+        mode,
+        streamLive: isStreamRecordable(stream, mode),
+      },
+      'H-C',
+    )
+    // #endregion
   }, [cancelScheduledRelease, restartCameraAfterForeground])
 
   useEffect(() => {

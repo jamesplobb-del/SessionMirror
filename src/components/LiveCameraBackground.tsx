@@ -1,7 +1,6 @@
-import { memo, useEffect, useState, type RefObject, type VideoHTMLAttributes } from 'react'
+import { memo, useEffect, type RefObject, type VideoHTMLAttributes } from 'react'
 import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
-import { refreshCameraPreviewLayout } from '../utils/viewportSync'
 import { mobileVideoProps } from '../utils/mobileVideo'
 
 interface LiveCameraBackgroundProps {
@@ -30,28 +29,6 @@ function LiveCameraBackground({
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
   const showAudioIdle = isAudioMode && !pitchStageActive
-  const [previewVisible, setPreviewVisible] = useState(false)
-
-  useEffect(() => {
-    if (!previewLive || isAudioMode) {
-      setPreviewVisible(false)
-      return
-    }
-
-    const video = previewRef.current
-    if (!video) return
-
-    const reveal = () => setPreviewVisible(true)
-    if (video.readyState >= 2) {
-      reveal()
-      return
-    }
-
-    video.addEventListener('loadeddata', reveal, { once: true })
-    return () => {
-      video.removeEventListener('loadeddata', reveal)
-    }
-  }, [previewLive, isAudioMode, previewRef, streamGeneration])
 
   useEffect(() => {
     const video = previewRef.current
@@ -72,12 +49,6 @@ function LiveCameraBackground({
     void video.play().catch(() => {})
   }, [previewRef, streamRef, recordingMode, streamGeneration, isAudioMode])
 
-  useEffect(() => {
-    const video = previewRef.current
-    if (!video || isAudioMode) return
-    refreshCameraPreviewLayout(video)
-  }, [previewRef, viewportKey, isAudioMode])
-
   return (
     <div className="camera-background" aria-hidden>
       <video
@@ -90,10 +61,10 @@ function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        className={`camera-preview media-display-enhance ${
+        className={`camera-preview ${
           isAudioMode
             ? 'camera-preview--hidden'
-            : previewVisible
+            : previewLive
               ? 'camera-preview--mirror camera-preview--live'
               : 'camera-preview--mirror camera-preview--booting'
         }`}
