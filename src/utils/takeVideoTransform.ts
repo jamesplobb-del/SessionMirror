@@ -30,6 +30,35 @@ export function outputDimensionsForTransform(
   return { width: videoWidth, height: videoHeight }
 }
 
+/** True when the encoded buffer needs rotation for landscape playback/export. */
+export function needsOrientationCorrection(
+  videoWidth: number,
+  videoHeight: number,
+  recordingOrientation?: RecordingOrientation,
+): boolean {
+  return recordingOrientation === 'landscape' && videoHeight >= videoWidth
+}
+
+export function buildTakeVideoTransform(
+  recordingOrientation: RecordingOrientation | undefined,
+  mirrorPreview: boolean,
+): TakeVideoTransform {
+  return {
+    recordingOrientation: recordingOrientation ?? 'portrait',
+    /** Match legacy thumbnail mirror + true-perspective Photos export when flipped. */
+    unmirror: mirrorPreview,
+  }
+}
+
+export function buildTakeVideoExportTransform(
+  recordingOrientation: RecordingOrientation | undefined,
+): TakeVideoTransform {
+  return {
+    recordingOrientation: recordingOrientation ?? 'portrait',
+    unmirror: true,
+  }
+}
+
 /** Draw one decoded frame into the export/thumbnail canvas. */
 export function drawTakeVideoFrame(
   ctx: CanvasRenderingContext2D,

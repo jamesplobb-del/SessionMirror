@@ -315,9 +315,11 @@ export default function App() {
       }
 
       const thumbnailPromise = blob
-        ? generateThumbnailFromBlob(blob, thumbnailTake.mirrorPlayback !== false).then(
-            (dataUrl) => persistTakeThumbnail(takeId, dataUrl),
-          )
+        ? generateThumbnailFromBlob(
+            blob,
+            thumbnailTake.mirrorPlayback !== false,
+            thumbnailTake.recordingOrientation,
+          ).then((dataUrl) => persistTakeThumbnail(takeId, dataUrl))
         : captureAndPersistTakeThumbnail(thumbnailTake)
 
       void thumbnailPromise

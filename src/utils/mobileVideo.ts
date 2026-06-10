@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import type { VideoHTMLAttributes } from 'react'
+import type { RecordingOrientation } from './takeVideoTransform'
 
 /** Shared inline-playback attributes for iOS / mobile Safari (live camera). */
 export const mobileVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
@@ -48,8 +49,19 @@ export function getRecorderMimeTypeForMode(mode: 'video' | 'audio'): string {
   return mode === 'audio' ? getAudioRecorderMimeType() : getRecorderMimeType()
 }
 
-/** Full field-of-view front camera — no width/height locks (those crop/zoom on iOS). */
-export function getVideoCaptureConstraints(): MediaTrackConstraints {
+/** Full field-of-view front camera — portrait uses native defaults; landscape requests 16:9. */
+export function getVideoCaptureConstraints(
+  orientation: RecordingOrientation = 'portrait',
+): MediaTrackConstraints {
+  if (orientation === 'landscape') {
+    return {
+      facingMode: 'user',
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      aspectRatio: { ideal: 16 / 9 },
+    }
+  }
+
   return {
     facingMode: 'user',
   }
@@ -65,7 +77,7 @@ export function getAudioCaptureConstraints(): MediaTrackConstraints {
   }
 }
 
-function estimateVideoBitrate(width: number, height: number): number {
+export function estimateVideoBitrate(width: number, height: number): number {
   const pixels = width * height
   if (pixels >= 1920 * 1080) return 10_000_000
   if (pixels >= 1280 * 720) return 8_000_000

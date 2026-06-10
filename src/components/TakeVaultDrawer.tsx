@@ -3,7 +3,6 @@ import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
-import VaultTakeThumbnail from './VaultTakeThumbnail'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import Pressable from './ui/Pressable'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
@@ -359,7 +358,6 @@ export default function TakeVaultDrawer({
                         }
                         onUpdate={(updates) => onUpdateTake(take.id, updates)}
                         onDelete={() => onDeleteTake(take.id)}
-                        thumbnailVideo={<VaultTakeThumbnail take={take} />}
                         exportBusy={exportingTakeId === take.id}
                       />
                     ))}

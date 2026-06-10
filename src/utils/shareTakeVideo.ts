@@ -2,6 +2,7 @@ import { Media } from '@capacitor-community/media'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { getTakeMediaType } from './mediaType'
+import { prepareTakeVideoExportUri, prepareTakeVideoExportUrl } from './prepareTakeVideoExport'
 import type { Take } from '../types'
 
 const EXPORT_CACHE_DIR = 'export-cache'
@@ -172,14 +173,27 @@ export async function shareTakeVideo(take: Take): Promise<SaveTakeResult> {
   }
 
   if (!Capacitor.isNativePlatform()) {
-    const url = take.videoUrl || null
-    if (!url) return { ok: false, reason: 'missing_file' }
-    return downloadTakeOnWeb(take, url)
+    const exportUrl = await prepareTakeVideoExportUrl(take)
+    if (!exportUrl) return { ok: false, reason: 'missing_file' }
+    const result = downloadTakeOnWeb(take, exportUrl)
+    if (exportUrl.startsWith('blob:')) {
+      window.setTimeout(() => URL.revokeObjectURL(exportUrl), 60_000)
+    }
+    return result
   }
 
-  const path = await resolveNativeFileUri(take)
+  let path = await resolveNativeFileUri(take)
   if (!path) {
     return { ok: false, reason: 'missing_file' }
+  }
+
+  try {
+    const orientedPath = await prepareTakeVideoExportUri(take)
+    if (orientedPath) {
+      path = orientedPath
+    }
+  } catch {
+    /* fall back to the raw take file */
   }
 
   try {

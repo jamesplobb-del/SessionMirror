@@ -2,6 +2,11 @@ import { Capacitor } from '@capacitor/core'
 import { resolveNativeVideoPlaybackSrc } from './takeStorage'
 import { persistTakeThumbnail } from './takeThumbnailCache'
 import { isAudioTake } from './mediaType'
+import {
+  buildTakeVideoTransform,
+  drawTakeVideoFrame,
+  type RecordingOrientation,
+} from './takeVideoTransform'
 import type { Take } from '../types'
 
 const THUMBNAIL_SEEK_SECONDS = 0.1
@@ -10,13 +15,21 @@ const THUMBNAIL_CONCURRENCY = 4
 
 export interface ThumbnailCaptureOptions {
   filePath?: string
-  /** Match in-app mirrored playback in vault cards. */
+  /** Match in-app mirrored playback in take cards. */
   mirrorPreview?: boolean
+  recordingOrientation?: RecordingOrientation
 }
 
-export function generateThumbnailFromBlob(blob: Blob, mirrorPreview = false): Promise<string> {
+export function generateThumbnailFromBlob(
+  blob: Blob,
+  mirrorPreview = false,
+  recordingOrientation?: RecordingOrientation,
+): Promise<string> {
   const url = URL.createObjectURL(blob)
-  return captureThumbnailFromVideoUrl(url, mirrorPreview).finally(() => {
+  return captureThumbnailFromVideoUrl(url, {
+    mirrorPreview,
+    recordingOrientation,
+  }).finally(() => {
     URL.revokeObjectURL(url)
   })
 }
@@ -38,13 +51,16 @@ export async function generateThumbnailFromUrl(
     throw new Error('Refusing raw file:// URL for thumbnail capture')
   }
 
-  return captureThumbnailFromVideoUrl(resolvedUrl, options.mirrorPreview === true)
+  return captureThumbnailFromVideoUrl(resolvedUrl, options)
 }
 
 function captureThumbnailFromVideoUrl(
   url: string,
-  mirrorPreview = false,
+  options: ThumbnailCaptureOptions = {},
 ): Promise<string> {
+  const mirrorPreview = options.mirrorPreview === true
+  const transform = buildTakeVideoTransform(options.recordingOrientation, mirrorPreview)
+
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
     video.muted = true
@@ -85,23 +101,14 @@ function captureThumbnailFromVideoUrl(
 
     const captureFrame = () => {
       try {
-        const width = Math.max(video.videoWidth || 320, 1)
-        const height = Math.max(video.videoHeight || 180, 1)
         const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
         const ctx = canvas.getContext('2d')
         if (!ctx) {
           fail(new Error('Canvas context unavailable'))
           return
         }
 
-        if (mirrorPreview) {
-          ctx.translate(width, 0)
-          ctx.scale(-1, 1)
-        }
-
-        ctx.drawImage(video, 0, 0, width, height)
+        drawTakeVideoFrame(ctx, video, transform)
         finish(canvas.toDataURL('image/jpeg', 0.82))
       } catch (err) {
         fail(err instanceof Error ? err : new Error('Thumbnail capture failed'))
@@ -143,7 +150,7 @@ function captureThumbnailFromVideoUrl(
 export async function captureAndPersistTakeThumbnail(
   take: Pick<
     Take,
-    'id' | 'videoUrl' | 'filePath' | 'mirrorPlayback' | 'mediaType'
+    'id' | 'videoUrl' | 'filePath' | 'mirrorPlayback' | 'mediaType' | 'recordingOrientation'
   >,
 ): Promise<string | null> {
   if (take.mediaType === 'audio') return null
@@ -155,6 +162,7 @@ export async function captureAndPersistTakeThumbnail(
       const dataUrl = await generateThumbnailFromUrl(take.videoUrl, {
         filePath: take.filePath,
         mirrorPreview: mirror,
+        recordingOrientation: take.recordingOrientation,
       })
       return persistTakeThumbnail(take.id, dataUrl)
     } catch {
@@ -169,7 +177,11 @@ export async function hydrateTakeThumbnailsInBackground(
   takes: Take[],
   applyThumbnails: (updates: Map<string, string>) => void,
 ): Promise<void> {
-  const targets = takes.filter((take) => !take.thumbnailUrl && !isAudioTake(take))
+  const targets = takes.filter(
+    (take) =>
+      !isAudioTake(take) &&
+      (!take.thumbnailUrl || take.recordingOrientation === 'landscape'),
+  )
   if (targets.length === 0) return
 
   let cursor = 0

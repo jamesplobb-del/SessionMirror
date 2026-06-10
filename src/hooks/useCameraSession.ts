@@ -536,6 +536,19 @@ export function useCameraSession({
       recorderMimeTypeRef.current = mimeType
       chunksRef.current = []
 
+      if (mode === 'video' && recordingOrientationRef.current === 'landscape') {
+        const track = currentStream.getVideoTracks()[0]
+        if (track) {
+          try {
+            await track.applyConstraints(
+              getVideoCaptureConstraints(recordingOrientationRef.current),
+            )
+          } catch {
+            /* keep the live stream if landscape constraints fail */
+          }
+        }
+      }
+
       let writer: StreamingTakeWriter | null = null
       try {
         writer = await StreamingTakeWriter.open(takeId, mimeType)
