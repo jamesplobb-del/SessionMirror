@@ -9,7 +9,7 @@ import {
   type PhysicalOrientation,
 } from '../utils/physicalOrientation'
 
-const STABLE_MS = 120
+const STABLE_MS = 300
 
 function resolvePhysicalTilt(
   gamma: number | null,
@@ -22,7 +22,7 @@ function resolvePhysicalTilt(
     return fromAngles
   }
 
-  if (gamma == null || beta == null || Math.abs(gamma) < 15) {
+  if (gamma == null && beta == null) {
     return classifyDeviceTiltFromAcceleration(accelX, accelY)
   }
 
@@ -51,6 +51,20 @@ export function usePhysicalOrientation(): PhysicalOrientation {
       stableOrientation = next
       syncPhysicalOrientationClass(next)
       setOrientation(next)
+      // #region agent log
+      agentDebugLog(
+        'usePhysicalOrientation.ts:commit',
+        'orientation committed',
+        {
+          orientation: next,
+          gamma: lastGamma,
+          beta: lastBeta,
+          accelX: lastAccelX,
+          accelY: lastAccelY,
+        },
+        'H-O7',
+      )
+      // #endregion
     }
 
     const handleSample = (next: PhysicalOrientation) => {

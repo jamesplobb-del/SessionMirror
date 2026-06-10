@@ -182,6 +182,7 @@ function PipWindow({
         />
       )}
 
+      <div className="ui-orient-spin relative h-full w-full">
       <div
         className={`relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
           src ? 'opacity-100' : 'opacity-90'
@@ -317,6 +318,7 @@ function PipWindow({
           <X className="h-3 w-3" />
         </button>
       )}
+      </div>
     </div>
   )
 }

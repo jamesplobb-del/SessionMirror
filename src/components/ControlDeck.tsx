@@ -118,12 +118,14 @@ export default function ControlDeck({
           className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
-          <FolderOpen className="h-5 w-5" />
-          {takeCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[9px] font-semibold text-stone-900">
-              {takeCount > 99 ? '99+' : takeCount}
-            </span>
-          )}
+          <span className="ui-orient-spin relative flex h-full w-full items-center justify-center">
+            <FolderOpen className="h-5 w-5" />
+            {takeCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[9px] font-semibold text-stone-900">
+                {takeCount > 99 ? '99+' : takeCount}
+              </span>
+            )}
+          </span>
         </Pressable>
 
         <button
@@ -143,34 +145,36 @@ export default function ControlDeck({
           onClickCapture={onClickCapture}
           {...settingsPressHandlers}
         >
-          <AnimatePresence mode="wait" initial={false}>
-            {branchActive ? (
-              <motion.span
-                key="close"
-                initial={{ opacity: 0, rotate: -45, scale: 0.8 }}
-                animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                exit={{ opacity: 0, rotate: 45, scale: 0.8 }}
-                transition={{ duration: 0.16, ease: 'easeOut' }}
-                className="flex items-center justify-center"
-              >
-                <X className="h-5 w-5" />
-              </motion.span>
-            ) : (
-              <motion.span
-                key="settings"
-                initial={{ opacity: 0, rotate: 45, scale: 0.8 }}
-                animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                exit={{ opacity: 0, rotate: -45, scale: 0.8 }}
-                transition={{ duration: 0.16, ease: 'easeOut' }}
-                className="flex items-center justify-center"
-              >
-                <Settings className="h-5 w-5" />
-              </motion.span>
-            )}
-          </AnimatePresence>
+          <span className="ui-orient-spin flex items-center justify-center">
+            <AnimatePresence mode="wait" initial={false}>
+              {branchActive ? (
+                <motion.span
+                  key="close"
+                  initial={{ opacity: 0, rotate: -45, scale: 0.8 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: 45, scale: 0.8 }}
+                  transition={{ duration: 0.16, ease: 'easeOut' }}
+                  className="flex items-center justify-center"
+                >
+                  <X className="h-5 w-5" />
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="settings"
+                  initial={{ opacity: 0, rotate: 45, scale: 0.8 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: -45, scale: 0.8 }}
+                  transition={{ duration: 0.16, ease: 'easeOut' }}
+                  className="flex items-center justify-center"
+                >
+                  <Settings className="h-5 w-5" />
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </span>
         </button>
 
-        <div className="flex flex-col items-center gap-1">
+        <div className="ui-orient-spin flex flex-col items-center gap-1">
           <div
             ref={recordDropRef}
             className={`record-delete-drop ${showDeleteDrop ? 'record-delete-drop--active' : ''} ${

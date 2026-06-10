@@ -697,7 +697,7 @@ export default function ReviewModeOverlay({
     >
       <div ref={reviewBoundsRef} className="relative h-full w-full">
       <div className="review-overlay-header pointer-events-none absolute inset-x-0 top-0 z-10 px-5 pb-3">
-        <div className="relative flex items-start justify-between gap-3 bg-gradient-to-b from-black/50 to-transparent pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="ui-orient-spin relative flex items-start justify-between gap-3 bg-gradient-to-b from-black/50 to-transparent pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
               {activeLabel}
@@ -883,6 +883,7 @@ export default function ReviewModeOverlay({
 
         {isOpen && (
           <div className="review-bottom-ui pointer-events-none absolute inset-x-0 bottom-0 z-10">
+            <div className="ui-orient-spin pointer-events-auto">
             <ReviewTimeline
               trackRef={timelineTrackRef}
               currentTime={currentTime}
@@ -895,6 +896,7 @@ export default function ReviewModeOverlay({
               pitchToggleActive={showPitch}
               onPitchToggle={() => setShowPitch((prev) => !prev)}
             />
+            </div>
           </div>
         )}
       </div>

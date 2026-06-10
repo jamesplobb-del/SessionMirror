@@ -184,11 +184,13 @@ export default function SettingsBranchWheel({
                     onClick={item.onSelect}
                     whileTap={{ scale: 0.94 }}
                   >
+                    <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
                     <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
                       <Icon className="h-5 w-5" strokeWidth={2.1} />
                     </span>
                     <span className="settings-branch-wheel__label block max-w-[5.5rem] text-center text-[10px] font-semibold leading-snug tracking-wide">
                       {item.label}
+                    </span>
                     </span>
                   </motion.button>
                 </div>

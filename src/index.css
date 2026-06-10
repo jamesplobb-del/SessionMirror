@@ -266,7 +266,7 @@ body.settings-branch-open * {
   }
 }
 
-/* Portrait-locked shell — controls stay put; icons spin like native Camera/Dolby. */
+/* Portrait-locked shell — controls stay put; inner .ui-orient-spin rotates in place. */
 :root {
   --ui-orient-rotate: 0deg;
 }
@@ -280,28 +280,16 @@ html.physical-landscape-right {
 }
 
 .ui-orient-spin {
-  transform: rotate(var(--ui-orient-rotate));
   transform-origin: center center;
   transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-html.physical-landscape-left .app-ui-overlay > header,
-html.physical-landscape-right .app-ui-overlay > header,
-html.physical-landscape-left .app-pip-row-wrap,
-html.physical-landscape-right .app-pip-row-wrap,
-html.physical-landscape-left .control-deck,
-html.physical-landscape-right .control-deck,
-html.physical-landscape-left .ui-orient-spin,
-html.physical-landscape-right .ui-orient-spin,
-html.physical-landscape-left .settings-branch-wheel,
-html.physical-landscape-right .settings-branch-wheel,
-html.physical-landscape-left .review-overlay-header,
-html.physical-landscape-right .review-overlay-header,
-html.physical-landscape-left .review-bottom-ui,
-html.physical-landscape-right .review-bottom-ui {
-  transform: rotate(var(--ui-orient-rotate));
-  transform-origin: center center;
-  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+html.physical-landscape-left .ui-orient-spin {
+  transform: rotate(90deg);
+}
+
+html.physical-landscape-right .ui-orient-spin {
+  transform: rotate(-90deg);
 }
 
 .app-ui-rotator {

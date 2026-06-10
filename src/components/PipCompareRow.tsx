@@ -51,7 +51,7 @@ function PipDragGhost({
       aria-hidden
     >
       <div
-        className={`pip-drag-ghost-inner overflow-hidden rounded-xl border bg-stone-900 shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
+        className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-xl border bg-stone-900 shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
           overDelete
             ? 'border-red-400/70 ring-red-400/50'
             : 'border-sky-400/60 ring-sky-400/40'

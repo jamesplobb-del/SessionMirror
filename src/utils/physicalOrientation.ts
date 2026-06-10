@@ -11,8 +11,10 @@ const HTML_CLASS = {
   'landscape-right': 'physical-landscape-right',
 } as const
 
-const LANDSCAPE_GAMMA_THRESHOLD = 42
-const LANDSCAPE_ACCEL_THRESHOLD = 5.5
+const LANDSCAPE_GAMMA_THRESHOLD = 62
+const LANDSCAPE_BETA_MAX = 38
+const LANDSCAPE_ACCEL_THRESHOLD = 7.2
+const LANDSCAPE_ACCEL_PORTRAIT_MAX = 3.8
 
 export function readPhysicalOrientation(): PhysicalOrientation {
   return currentPhysicalOrientation
@@ -56,7 +58,7 @@ export function classifyDeviceTilt(
     return 'portrait'
   }
 
-  if (Math.abs(gamma) >= LANDSCAPE_GAMMA_THRESHOLD) {
+  if (Math.abs(gamma) >= LANDSCAPE_GAMMA_THRESHOLD && Math.abs(beta) <= LANDSCAPE_BETA_MAX) {
     return gamma > 0 ? 'landscape-right' : 'landscape-left'
   }
 
@@ -75,7 +77,11 @@ export function classifyDeviceTiltFromAcceleration(
   const absX = Math.abs(x)
   const absY = Math.abs(y)
 
-  if (absX > LANDSCAPE_ACCEL_THRESHOLD && absX > absY * 1.15) {
+  if (
+    absX > LANDSCAPE_ACCEL_THRESHOLD &&
+    absY <= LANDSCAPE_ACCEL_PORTRAIT_MAX &&
+    absX > absY * 1.85
+  ) {
     return x > 0 ? 'landscape-right' : 'landscape-left'
   }
 
