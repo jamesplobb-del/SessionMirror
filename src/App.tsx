@@ -71,6 +71,9 @@ const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidge
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 
+/** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
+const PITCH_ENGINE_COMMIT_DELAY_MS = 300
+
 export default function App() {
   usePhysicalOrientation()
   const [takes, setTakes] = useState<Take[]>([])
@@ -96,6 +99,9 @@ export default function App() {
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
+  const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(
+    null,
+  )
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
@@ -105,6 +111,7 @@ export default function App() {
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
   const queuedAutoPlayRef = useRef<{ url: string; takeId: string } | null>(null)
   const recordingModeRef = useRef<RecordingMode>('video')
+  const pitchCommitTimerRef = useRef<number | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
   const playAutoTakeAudioRef = useRef<(playbackUrl: string, takeId: string) => void>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
@@ -697,6 +704,44 @@ export default function App() {
     })
   }, [])
 
+  const schedulePitchTrackerCommit = useCallback(
+    (enabled: boolean) => {
+      if (pitchCommitTimerRef.current !== null) {
+        window.clearTimeout(pitchCommitTimerRef.current)
+      }
+
+      setPendingPitchTrackerEnabled(enabled)
+
+      pitchCommitTimerRef.current = window.setTimeout(() => {
+        pitchCommitTimerRef.current = null
+        setPendingPitchTrackerEnabled(null)
+        startTransition(() => {
+          updateSettings({ pitchTrackerEnabled: enabled })
+        })
+      }, PITCH_ENGINE_COMMIT_DELAY_MS)
+    },
+    [updateSettings],
+  )
+
+  const handlePitchTrackerChange = useCallback(
+    (enabled: boolean) => {
+      if (recordingModeRef.current === 'audio') {
+        schedulePitchTrackerCommit(enabled)
+        return
+      }
+      updateSettings({ pitchTrackerEnabled: enabled })
+    },
+    [schedulePitchTrackerCommit, updateSettings],
+  )
+
+  useEffect(() => {
+    return () => {
+      if (pitchCommitTimerRef.current !== null) {
+        window.clearTimeout(pitchCommitTimerRef.current)
+      }
+    }
+  }, [])
+
   const handleQuickSettingsOpenChange = useCallback((open: boolean) => {
     startTransition(() => {
       setQuickSettingsOpen(open)
@@ -1286,9 +1331,7 @@ export default function App() {
             dragOverDelete={pipDragState.overDelete}
             pitchTrackerEnabled={settings.pitchTrackerEnabled}
             showTakeCards={settings.showTakeCards}
-            onPitchTrackerChange={(enabled) => {
-              updateSettings({ pitchTrackerEnabled: enabled })
-            }}
+            onPitchTrackerChange={handlePitchTrackerChange}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
             onBranchOpenChange={handleQuickSettingsOpenChange}
@@ -1371,7 +1414,9 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={handleCloseSettings}
         settings={settings}
+        pitchDisplayEnabled={pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled}
         onUpdate={updateSettings}
+        onPitchTrackerChange={handlePitchTrackerChange}
         onReset={resetSettings}
         recordingMode={recordingMode}
       />

@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -16,7 +16,11 @@ interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
   settings: AppSettings
+  /** Reflects pending pitch commits while the drawer is closed in Audio mode. */
+  pitchDisplayEnabled: boolean
   onUpdate: (patch: Partial<AppSettings>) => void
+  /** Commits pitch engine after drawer close in Audio mode. */
+  onPitchTrackerChange: (enabled: boolean) => void
   onReset: () => void
   recordingMode: 'video' | 'audio'
 }
@@ -147,15 +151,40 @@ export default function SettingsDrawer({
   isOpen,
   onClose,
   settings,
+  pitchDisplayEnabled,
   onUpdate,
+  onPitchTrackerChange,
   onReset,
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
+  const [localPitchEnabled, setLocalPitchEnabled] = useState(pitchDisplayEnabled)
+  const pitchUiEnabled =
+    recordingMode === 'audio' && isOpen ? localPitchEnabled : pitchDisplayEnabled
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocalPitchEnabled(pitchDisplayEnabled)
+    }
+  }, [isOpen, pitchDisplayEnabled])
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
   }, [markContentReady])
+
+  const handlePitchTrackerToggle = useCallback(
+    (checked: boolean) => {
+      if (recordingMode === 'audio') {
+        setLocalPitchEnabled(checked)
+        onClose()
+        onPitchTrackerChange(checked)
+        return
+      }
+
+      onUpdate({ pitchTrackerEnabled: checked })
+    },
+    [onClose, onPitchTrackerChange, onUpdate, recordingMode],
+  )
 
   return (
     <AnimatedBottomSheet
@@ -247,11 +276,11 @@ export default function SettingsDrawer({
             <SettingToggle
               label="Live Pitch Tracker"
               description="During playback, show a live A440 tuner. With auto recording in Audio mode, pitch analysis fills the main screen right after each take while it plays once."
-              checked={settings.pitchTrackerEnabled}
-              onChange={(checked) => onUpdate({ pitchTrackerEnabled: checked })}
+              checked={pitchUiEnabled}
+              onChange={handlePitchTrackerToggle}
             />
 
-            <AnimatedExpand open={settings.pitchTrackerEnabled}>
+            <AnimatedExpand open={pitchUiEnabled}>
               <div className="space-y-3 pt-3">
                 <SettingToggle
                   label="Live Mic Tuner (Idle)"
