@@ -123,13 +123,13 @@ export default function DraggablePitchWidget({
       <motion.div
         key={`audio-${mediaKey}`}
         ref={widgetRef}
-        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} pointer-events-auto absolute z-20 flex min-h-0 flex-col`}
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        transition={{ duration: 0.22, ease: 'easeInOut' }}
+        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} absolute z-20 flex min-h-0 flex-col`}
+        initial={{ opacity: 0, scale: 0.98, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: 8 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="relative flex h-full min-h-0 w-full flex-1 flex-col">
+        <div className="pitch-widget-audio__card relative flex min-h-0 flex-1 flex-col">
           {onClose && <PitchWidgetCloseButton onClose={onClose} />}
           {tuner}
         </div>

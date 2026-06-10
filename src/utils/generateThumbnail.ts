@@ -109,6 +109,8 @@ function captureThumbnailFromVideoUrl(
     }
 
     const seekAndCapture = () => {
+      if (settled) return
+
       const seekTarget = Math.min(
         THUMBNAIL_SEEK_SECONDS,
         Math.max(0, (video.duration || THUMBNAIL_SEEK_SECONDS) - 0.01),
@@ -132,6 +134,7 @@ function captureThumbnailFromVideoUrl(
       fail(new Error('Thumbnail video failed to load'))
     })
 
+    video.addEventListener('loadedmetadata', seekAndCapture, { once: true })
     video.addEventListener('loadeddata', seekAndCapture, { once: true })
     video.load()
   })
@@ -145,15 +148,21 @@ export async function captureAndPersistTakeThumbnail(
 ): Promise<string | null> {
   if (take.mediaType === 'audio') return null
 
-  try {
-    const dataUrl = await generateThumbnailFromUrl(take.videoUrl, {
-      filePath: take.filePath,
-      mirrorPreview: take.mirrorPlayback !== false,
-    })
-    return persistTakeThumbnail(take.id, dataUrl)
-  } catch {
-    return null
+  const mirrorPreview = take.mirrorPlayback !== false
+
+  for (const mirror of mirrorPreview ? [true, false] : [false]) {
+    try {
+      const dataUrl = await generateThumbnailFromUrl(take.videoUrl, {
+        filePath: take.filePath,
+        mirrorPreview: mirror,
+      })
+      return persistTakeThumbnail(take.id, dataUrl)
+    } catch {
+      /* try without mirror or next take */
+    }
   }
+
+  return null
 }
 
 export async function hydrateTakeThumbnailsInBackground(

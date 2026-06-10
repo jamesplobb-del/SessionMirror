@@ -421,6 +421,10 @@ video.camera-preview.camera-preview--hidden {
   overflow: hidden;
 }
 
+.settings-drawer-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
 .pitch-glass-panel {
   background: rgba(22, 22, 24, 0.68);
   backdrop-filter: blur(20px) saturate(165%);
@@ -440,89 +444,108 @@ video.camera-preview.camera-preview--hidden {
 .pitch-glass-panel--audio {
   border-radius: 24px;
   min-height: 0;
-  background: rgba(18, 18, 20, 0.78);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(20, 20, 20, 0.65);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    0 20px 50px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .pitch-audio-pane {
-  padding: 1.125rem 1.125rem 1rem;
+  padding: 1.375rem 1.5rem 1.25rem;
 }
 
 .pitch-audio-pane__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.625rem;
 }
 
 .pitch-audio-pane__eyebrow {
   font-size: 0.625rem;
   font-weight: 600;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .pitch-audio-pane__take-name {
-  margin-top: 0.25rem;
+  margin-top: 0.125rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
   font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.48);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .pitch-audio-pane__status-pill {
   flex-shrink: 0;
   border-radius: 999px;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.06);
-  padding: 0.25rem 0.625rem;
+  padding: 0.3125rem 0.75rem;
 }
 
 .pitch-audio-pane__readout {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .pitch-audio-pane__note {
-  font-size: clamp(2.75rem, 8vw, 3.75rem);
-  font-weight: 700;
+  font-size: clamp(3rem, 10vw, 4.25rem);
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.06em;
 }
 
 .pitch-audio-pane__meta {
-  margin-top: 0.625rem;
+  margin-top: 0.75rem;
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.pitch-audio-pane__meta-freq {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
 }
 
 .pitch-audio-pane__cents {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: clamp(1.5rem, 4.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .pitch-audio-pane__needle {
-  margin-top: 1.125rem;
+  margin-top: 1.375rem;
+  width: 100%;
+  max-width: 20rem;
+  margin-inline: auto;
 }
 
 .pitch-audio-pane__chart-well {
-  border-radius: 16px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.26);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.22);
   overflow: hidden;
   padding: 0.375rem;
 }
 
 .pitch-audio-pane__idle {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
+  padding-inline: 0.5rem;
 }
 
 .pitch-chart-shell {
@@ -538,19 +561,32 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .pitch-widget-audio {
-  left: 1rem;
-  right: 1rem;
+  left: 1.25rem;
+  right: 1.25rem;
   width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.pitch-widget-audio__card {
+  pointer-events: auto;
+  width: min(100%, 26rem);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .pitch-widget-audio--main {
-  top: calc(env(safe-area-inset-top, 0px) + 4.5rem);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 11rem);
+  top: calc(env(safe-area-inset-top, 0px) + 5rem);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 11.5rem);
 }
 
 .pitch-widget-audio--review {
-  top: calc(env(safe-area-inset-top, 0px) + 4.75rem);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+  top: calc(env(safe-area-inset-top, 0px) + 5rem);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 7.5rem);
 }
 
 .pitch-tuner--audio {

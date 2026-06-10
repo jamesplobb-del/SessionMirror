@@ -3,11 +3,11 @@ import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
-import TakeVideoPlayer from './TakeVideoPlayer'
+import VaultTakeThumbnail from './VaultTakeThumbnail'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
-import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, isAudioTake } from '../utils/mediaType'
+import { getTakeMediaType } from '../utils/mediaType'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
 import type { Project } from '../db/types'
 
@@ -33,56 +33,6 @@ interface TakeVaultDrawerProps {
   onClearAllTakes: () => void
   onOpenTake: (take: Take) => void
   onBeforeExport?: () => void
-}
-
-interface VaultTakeVideoProps {
-  take: Take
-  className?: string
-}
-
-export function VaultTakeVideo({
-  take,
-  className = 'h-full w-full object-cover pointer-events-none',
-}: VaultTakeVideoProps) {
-  const audio = isAudioTake(take)
-  const poster =
-    take.thumbnailUrl ||
-    (audio ? AUDIO_TAKE_THUMBNAIL : undefined)
-
-  if (poster) {
-    return (
-      <img
-        src={poster}
-        alt=""
-        className={className}
-        draggable={false}
-        loading="lazy"
-      />
-    )
-  }
-
-  if (audio) {
-    return (
-      <div
-        className={`${className} animate-pulse bg-stone-200`}
-        aria-hidden
-      />
-    )
-  }
-
-  return (
-    <TakeVideoPlayer
-      filePath={take.filePath}
-      videoUrl={take.videoUrl}
-      mimeType={take.videoMimeType}
-      className={className}
-      mirror={take.mirrorPlayback !== false}
-      thumbnailPreview
-      preload="metadata"
-      controls={false}
-      manualPlayOnly
-    />
-  )
 }
 
 export default function TakeVaultDrawer({
@@ -413,7 +363,7 @@ export default function TakeVaultDrawer({
                           }
                           onUpdate={(updates) => onUpdateTake(take.id, updates)}
                           onDelete={() => onDeleteTake(take.id)}
-                          thumbnailVideo={<VaultTakeVideo take={take} />}
+                          thumbnailVideo={<VaultTakeThumbnail take={take} />}
                           exportBusy={exportingTakeId === take.id}
                         />
                       ))}

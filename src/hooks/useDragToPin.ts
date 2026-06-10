@@ -103,13 +103,29 @@ export function useDragToPin({
     pointerIdRef.current = null
     setIsArming(false)
     setGhost(null)
-    lastEmittedRef.current = {
-      isDragging: false,
-      isArming: false,
-      overDelete: false,
-    }
     emitDragState(false, false, false)
   }, [clearLongPressTimer, emitDragState])
+
+  useEffect(() => {
+    const handleGlobalPointerEnd = (event: PointerEvent) => {
+      if (pointerIdRef.current !== null && event.pointerId !== pointerIdRef.current) {
+        return
+      }
+      if (draggingRef.current || armedRef.current) {
+        reset()
+      }
+    }
+
+    window.addEventListener('pointerup', handleGlobalPointerEnd)
+    window.addEventListener('pointercancel', handleGlobalPointerEnd)
+    window.addEventListener('blur', handleGlobalPointerEnd)
+
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerEnd)
+      window.removeEventListener('pointercancel', handleGlobalPointerEnd)
+      window.removeEventListener('blur', handleGlobalPointerEnd)
+    }
+  }, [reset])
 
   useEffect(() => {
     if (!isArming && !ghost) return

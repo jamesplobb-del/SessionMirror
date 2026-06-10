@@ -110,7 +110,7 @@ export default function SettingsDrawer({
       />
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 max-h-[82vh] rounded-t-3xl border border-stone-200 bg-white shadow-2xl transition-[transform,opacity] duration-200 ease-in ${
+        className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[min(88vh,100dvh)] flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transition-[transform,opacity] duration-200 ease-in ${
           isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
         }`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -118,7 +118,7 @@ export default function SettingsDrawer({
         aria-modal="true"
         aria-label="Settings"
       >
-        <div className="flex items-center justify-between border-b border-stone-200/80 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-stone-900">Settings</h2>
             <p className="text-xs text-stone-500">Toggle features and adjust recording behavior</p>
@@ -133,7 +133,8 @@ export default function SettingsDrawer({
           </button>
         </div>
 
-        <div className="space-y-6 overflow-y-auto px-6 py-5">
+        <div className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+          <div className="space-y-6 pb-2">
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Audio Mode
@@ -218,6 +219,7 @@ export default function SettingsDrawer({
             <RotateCcw className="h-3.5 w-3.5" />
             Reset to Defaults
           </button>
+          </div>
         </div>
       </div>
     </>

@@ -152,7 +152,10 @@ function AudioTunerPane({
           {readout.noteName}
         </p>
         <div className="pitch-audio-pane__meta">
-          <p className="font-mono text-sm tabular-nums" style={{ color: accent }}>
+          <p
+            className="pitch-audio-pane__meta-freq font-mono tabular-nums"
+            style={{ color: accent }}
+          >
             {formatFrequencyHz(readout.frequencyHz)}
           </p>
           <p className="pitch-audio-pane__cents font-mono tabular-nums" style={{ color: accent }}>
@@ -246,8 +249,8 @@ function LivePitchTunerAudio({
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
 
   return (
-    <div className="pitch-tuner pitch-tuner--audio flex h-full min-h-0 w-full flex-col">
-      <div className="pitch-glass-panel pitch-glass-panel--audio flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div className="pitch-tuner pitch-tuner--audio flex h-full min-h-0 w-full flex-col items-center justify-center">
+      <div className="pitch-glass-panel pitch-glass-panel--audio flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={paneKey}
