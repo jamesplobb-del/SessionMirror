@@ -1,26 +1,28 @@
 import { useEffect, useRef, useState, startTransition, type RefObject } from 'react'
 import { PitchDetector } from 'pitchy'
 import {
+  PITCH_ATTACK_FRAMES,
   PITCH_CLARITY_MIN,
+  PITCH_CLARITY_MIN_MIC,
   PITCH_FRAME_SIZE,
   PITCH_HOLD_MS,
+  PITCH_HOLD_MS_MIC,
   PITCH_MIN_VOLUME_DB,
   PITCH_NEEDLE_SMOOTH_ALPHA,
-  PITCH_NOTE_CHANGE_SMOOTH_ALPHA,
-  PITCH_TRACE_MIDI_ALPHA,
-  PITCH_ANCHOR_MIDI_ALPHA,
   PITCH_GRAPH_SMOOTH_WINDOW,
+  PITCH_OUTLIER_CENTS,
   PITCH_READOUT_INTERVAL_MS,
+  PITCH_RMS_GATE_DB_MEDIA,
+  PITCH_RMS_GATE_DB_MIC,
   CENTS_DISPLAY_STEP,
   type PitchCanvasTheme,
 } from '../utils/pitchConfig'
 import {
-  frequencyToMidi,
   frequencyToPitchReadout,
-  createPitchVerticalGradient,
   getIntonationColor,
   glowColorForCents,
   isFrequencyInInstrumentRange,
+  isSignalAboveRmsGate,
   movingAverage,
   normalizeInstrumentFrequency,
   quantizeDisplayCents,
@@ -111,8 +113,8 @@ async function createMicPitchGraph(
   source.connect(analyser)
 
   const detector = PitchDetector.forFloat32Array(PITCH_FRAME_SIZE)
-  detector.clarityThreshold = PITCH_CLARITY_MIN
-  detector.minVolumeDecibels = PITCH_MIN_VOLUME_DB
+  detector.clarityThreshold = PITCH_CLARITY_MIN_MIC
+  detector.minVolumeDecibels = PITCH_RMS_GATE_DB_MIC
 
   return {
     context,
@@ -342,23 +344,36 @@ function drawSmoothPitchTrace(
   ctx.lineCap = 'round'
 
   if (theme === 'glass') {
-    const pitchGradient = createPitchVerticalGradient(ctx, centsToY)
     const latest = points[points.length - 1]
     const glow = glowColorForCents(latest.cents)
 
     ctx.save()
     ctx.shadowColor = glow
-    ctx.shadowBlur = 12
-    ctx.strokeStyle = pitchGradient
+    ctx.shadowBlur = 10
     ctx.lineWidth = 4.5
-    ctx.globalAlpha = 0.4
-    ctx.stroke()
+    ctx.globalAlpha = 0.35
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1]
+      const current = points[index]
+      ctx.strokeStyle = getIntonationColor(current.cents)
+      ctx.beginPath()
+      ctx.moveTo(previous.x, previous.y)
+      ctx.lineTo(current.x, current.y)
+      ctx.stroke()
+    }
     ctx.restore()
 
-    ctx.strokeStyle = pitchGradient
     ctx.lineWidth = 3.25
     ctx.globalAlpha = 0.96
-    ctx.stroke()
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1]
+      const current = points[index]
+      ctx.strokeStyle = getIntonationColor(current.cents)
+      ctx.beginPath()
+      ctx.moveTo(previous.x, previous.y)
+      ctx.lineTo(current.x, current.y)
+      ctx.stroke()
+    }
     ctx.globalAlpha = 1
     return
   }
@@ -543,10 +558,10 @@ export function useLivePitchTracker(
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
   const needleCentsRef = useRef<number | null>(null)
-  const traceMidiRef = useRef<number | null>(null)
-  const anchorMidiRef = useRef<number | null>(null)
   const lastNoteRef = useRef('—')
   const lastReadoutEmitRef = useRef(0)
+  const goodFrameCountRef = useRef(0)
+  const lastStableCentsRef = useRef<number | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
@@ -578,8 +593,8 @@ export function useLivePitchTracker(
       }
       historyRef.current = []
       needleCentsRef.current = null
-      traceMidiRef.current = null
-      anchorMidiRef.current = null
+      goodFrameCountRef.current = 0
+      lastStableCentsRef.current = null
       lastNoteRef.current = '—'
       lastReadoutEmitRef.current = 0
       safeDisposeActiveGraph(graphRef.current)
@@ -670,8 +685,8 @@ export function useLivePitchTracker(
         }
         historyRef.current = []
         needleCentsRef.current = null
-        traceMidiRef.current = null
-        anchorMidiRef.current = null
+        goodFrameCountRef.current = 0
+        lastStableCentsRef.current = null
         lastNoteRef.current = '—'
         lastReadoutEmitRef.current = 0
         if (mountedRef.current) {
@@ -727,88 +742,131 @@ export function useLivePitchTracker(
       let active = false
 
       if (isPlaying) {
-        const [rawPitch, clarity] = graph.detector.findPitch(
-          graph.buffer,
-          graph.context.sampleRate,
-        )
+        const clarityMin = source === 'microphone' ? PITCH_CLARITY_MIN_MIC : PITCH_CLARITY_MIN
+        const rmsGate = source === 'microphone' ? PITCH_RMS_GATE_DB_MIC : PITCH_RMS_GATE_DB_MEDIA
+        const holdMs = source === 'microphone' ? PITCH_HOLD_MS_MIC : PITCH_HOLD_MS
+        const signalStrong = isSignalAboveRmsGate(graph.buffer, rmsGate)
 
-        const pitch = normalizeInstrumentFrequency(rawPitch)
-
-        if (clarity >= PITCH_CLARITY_MIN && isFrequencyInInstrumentRange(pitch)) {
-          graph.smoothed = smoothFrequency(graph.smoothed, pitch)
-          const next = stabilizePitchReadout(
-            readoutRef.current.noteName === '—' ? null : readoutRef.current,
-            frequencyToPitchReadout(graph.smoothed),
+        if (!signalStrong) {
+          goodFrameCountRef.current = 0
+          if (
+            lastPitchAtRef.current > 0 &&
+            now - lastPitchAtRef.current > holdMs
+          ) {
+            readoutRef.current = emptyReadout
+            if (mountedRef.current) setReadout(emptyReadout)
+            graph.smoothed = null
+            needleCentsRef.current = null
+            lastStableCentsRef.current = null
+            lastNoteRef.current = '—'
+            active = false
+          } else if (readoutRef.current.noteName !== '—') {
+            currentCents = needleCentsRef.current ?? readoutRef.current.cents
+            active = true
+          }
+        } else {
+          const [rawPitch, clarity] = graph.detector.findPitch(
+            graph.buffer,
+            graph.context.sampleRate,
           )
 
-          if (next.noteName !== '—') {
-            const noteChanged = lastNoteRef.current !== next.noteName
-            lastNoteRef.current = next.noteName
+          const pitch = normalizeInstrumentFrequency(rawPitch)
 
-            const midiFloat = frequencyToMidi(next.frequencyHz)
-            traceMidiRef.current = smoothFrequency(
-              traceMidiRef.current,
-              midiFloat,
-              PITCH_TRACE_MIDI_ALPHA,
-            )
-            anchorMidiRef.current = smoothFrequency(
-              anchorMidiRef.current,
-              midiFloat,
-              PITCH_ANCHOR_MIDI_ALPHA,
+          if (clarity >= clarityMin && isFrequencyInInstrumentRange(pitch)) {
+            graph.smoothed = smoothFrequency(graph.smoothed, pitch)
+            const next = stabilizePitchReadout(
+              readoutRef.current.noteName === '—' ? null : readoutRef.current,
+              frequencyToPitchReadout(graph.smoothed),
             )
 
-            needleCentsRef.current = smoothFrequency(
-              needleCentsRef.current,
-              next.cents,
-              noteChanged ? PITCH_NOTE_CHANGE_SMOOTH_ALPHA : PITCH_NEEDLE_SMOOTH_ALPHA,
-            )
+            if (next.noteName !== '—') {
+              const noteChanged =
+                lastNoteRef.current !== '—' && lastNoteRef.current !== next.noteName
+              const wasIdle = readoutRef.current.noteName === '—'
 
-            const needleCents = Math.max(
-              -50,
-              Math.min(50, needleCentsRef.current ?? next.cents),
-            )
-            const tracePlot =
-              traceMidiRef.current != null && anchorMidiRef.current != null
-                ? Math.max(
-                    -50,
-                    Math.min(50, (traceMidiRef.current - anchorMidiRef.current) * 100),
-                  )
-                : needleCents
-            const displayCents = quantizeDisplayCents(needleCents, CENTS_DISPLAY_STEP)
-            const displayReadout: PitchReadout = { ...next, cents: displayCents }
-
-            if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
-              readoutRef.current = displayReadout
-              if (mountedRef.current) {
-                startTransition(() => setReadout(displayReadout))
+              let acceptFrame = true
+              if (
+                !noteChanged &&
+                !wasIdle &&
+                lastStableCentsRef.current != null &&
+                Math.abs(next.cents - lastStableCentsRef.current) > PITCH_OUTLIER_CENTS &&
+                clarity < clarityMin + 0.06
+              ) {
+                acceptFrame = false
               }
-              lastReadoutEmitRef.current = now
-            }
 
-            lastPitchAtRef.current = now
-            currentCents = tracePlot
-            active = true
-            const history = historyRef.current
-            history.push(tracePlot)
-            if (history.length > HISTORY_LENGTH) {
-              history.splice(0, history.length - HISTORY_LENGTH)
+              if (acceptFrame) {
+                goodFrameCountRef.current += 1
+              } else {
+                goodFrameCountRef.current = Math.max(0, goodFrameCountRef.current - 1)
+              }
+
+              const attackSatisfied =
+                noteChanged || goodFrameCountRef.current >= PITCH_ATTACK_FRAMES
+
+              if (acceptFrame && attackSatisfied) {
+                lastNoteRef.current = next.noteName
+
+                if (noteChanged || needleCentsRef.current == null) {
+                  needleCentsRef.current = next.cents
+                } else {
+                  needleCentsRef.current = smoothFrequency(
+                    needleCentsRef.current,
+                    next.cents,
+                    PITCH_NEEDLE_SMOOTH_ALPHA,
+                  )
+                }
+
+                const intonationCents = Math.max(
+                  -50,
+                  Math.min(50, needleCentsRef.current ?? next.cents),
+                )
+                const displayCents = quantizeDisplayCents(intonationCents, CENTS_DISPLAY_STEP)
+                const displayReadout: PitchReadout = {
+                  ...next,
+                  cents: displayCents,
+                }
+
+                if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
+                  readoutRef.current = displayReadout
+                  if (mountedRef.current) {
+                    startTransition(() => setReadout(displayReadout))
+                  }
+                  lastReadoutEmitRef.current = now
+                }
+
+                lastPitchAtRef.current = now
+                lastStableCentsRef.current = intonationCents
+                currentCents = intonationCents
+                active = true
+
+                const history = historyRef.current
+                history.push(intonationCents)
+                if (history.length > HISTORY_LENGTH) {
+                  history.splice(0, history.length - HISTORY_LENGTH)
+                }
+              }
+            } else {
+              goodFrameCountRef.current = 0
+            }
+          } else {
+            goodFrameCountRef.current = Math.max(0, goodFrameCountRef.current - 1)
+            if (
+              lastPitchAtRef.current > 0 &&
+              now - lastPitchAtRef.current > holdMs
+            ) {
+              readoutRef.current = emptyReadout
+              if (mountedRef.current) setReadout(emptyReadout)
+              graph.smoothed = null
+              needleCentsRef.current = null
+              lastStableCentsRef.current = null
+              lastNoteRef.current = '—'
+              active = false
+            } else if (readoutRef.current.noteName !== '—') {
+              currentCents = needleCentsRef.current ?? readoutRef.current.cents
+              active = true
             }
           }
-        } else if (
-          lastPitchAtRef.current > 0 &&
-          now - lastPitchAtRef.current > PITCH_HOLD_MS
-        ) {
-          readoutRef.current = emptyReadout
-          if (mountedRef.current) setReadout(emptyReadout)
-          graph.smoothed = null
-          needleCentsRef.current = null
-          traceMidiRef.current = null
-          anchorMidiRef.current = null
-          lastNoteRef.current = '—'
-          active = false
-        } else if (readoutRef.current.noteName !== '—') {
-          currentCents = needleCentsRef.current ?? readoutRef.current.cents
-          active = true
         }
       } else if (readoutRef.current.noteName !== '—') {
         currentCents = needleCentsRef.current ?? readoutRef.current.cents

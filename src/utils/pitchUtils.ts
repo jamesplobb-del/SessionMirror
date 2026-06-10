@@ -149,6 +149,22 @@ export function quantizeDisplayCents(cents: number, step: number): number {
   return Math.round(cents / step) * step
 }
 
+/** RMS level of a time-domain audio buffer in decibels. */
+export function bufferRmsDb(timeDomain: Float32Array): number {
+  if (timeDomain.length === 0) return -100
+  let sum = 0
+  for (let index = 0; index < timeDomain.length; index += 1) {
+    const sample = timeDomain[index]
+    sum += sample * sample
+  }
+  const rms = Math.sqrt(sum / timeDomain.length)
+  return 20 * Math.log10(Math.max(rms, 1e-8))
+}
+
+export function isSignalAboveRmsGate(timeDomain: Float32Array, gateDb: number): boolean {
+  return bufferRmsDb(timeDomain) >= gateDb
+}
+
 /** Symmetric moving average — used for drawing smooth pitch curves. */
 export function movingAverage(values: number[], radius: number): number[] {
   if (values.length === 0 || radius <= 0) return values

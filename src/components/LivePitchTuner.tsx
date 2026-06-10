@@ -124,7 +124,8 @@ function AudioTunerPane({
   isPlaying: boolean
 }) {
   const active = readout.noteName !== '—'
-  const accent = active ? getIntonationColor(readout.cents) : 'rgba(255,255,255,0.55)'
+  const displayCents = active ? readout.cents : 0
+  const accent = active ? getIntonationColor(displayCents) : 'rgba(255,255,255,0.55)'
   const inTune = active && isInTune(readout.cents)
   const zone = active ? getIntonationZone(readout.cents) : null
 
@@ -144,7 +145,7 @@ function AudioTunerPane({
           >
             {readout.noteName}
           </p>
-          <p className="mt-2 font-mono text-sm text-white/40">
+          <p className="mt-2 font-mono text-sm tabular-nums" style={{ color: accent }}>
             {formatFrequencyHz(readout.frequencyHz)}
           </p>
         </div>
@@ -170,7 +171,11 @@ function AudioTunerPane({
       </div>
 
       <div className="mt-5 shrink-0">
-        <CentsNeedle cents={readout.cents} active={active} large />
+        {active ? (
+          <CentsNeedle cents={displayCents} active={active} large />
+        ) : (
+          <CentsNeedle cents={0} active={false} large />
+        )}
         <div className="mt-2 flex justify-between font-mono text-[10px] text-white/25">
           <span>-50</span>
           <span className="text-emerald-400/60">0</span>
@@ -335,7 +340,8 @@ export default function LivePitchTuner({
   }
 
   const active = readout.noteName !== '—'
-  const accent = active ? getIntonationColor(readout.cents) : 'rgba(255,255,255,0.55)'
+  const displayCents = active ? readout.cents : 0
+  const accent = active ? getIntonationColor(displayCents) : 'rgba(255,255,255,0.55)'
   const inTune = active && isInTune(readout.cents)
   const zone = active ? getIntonationZone(readout.cents) : null
   const spectrogramHeight = isStage
