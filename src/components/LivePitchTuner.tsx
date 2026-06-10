@@ -134,6 +134,12 @@ function VerticalPitchMeter({
       aria-hidden={!active}
     >
       <div className="pitch-vertical-meter__track">
+        <div className="pitch-vertical-meter__band" aria-hidden>
+          <span className="pitch-vertical-meter__band-zone" />
+          <span className="pitch-vertical-meter__band-line pitch-vertical-meter__band-line--high" />
+          <span className="pitch-vertical-meter__band-line pitch-vertical-meter__band-line--low" />
+        </div>
+
         <div className="pitch-vertical-meter__zone pitch-vertical-meter__zone--sharp">
           {isSharp && (
             <motion.div
@@ -189,6 +195,102 @@ function VerticalPitchMeter({
   )
 }
 
+const SHARP_ORBIT_ANGLES = [-118, -104, -90, -76, -62]
+const FLAT_ORBIT_ANGLES = [62, 76, 90, 104, 118]
+
+function NoteOrbitReadout({
+  noteName,
+  frequencyHz,
+  cents,
+  active,
+}: {
+  noteName: string
+  frequencyHz: number
+  cents: number
+  active: boolean
+}) {
+  const inTune = active && isInTune(cents, TUNING_GREEN_CENTS)
+  const zone = active ? getIntonationZone(cents) : null
+  const accent = active ? getIntonationColor(cents) : 'rgba(255,255,255,0.55)'
+  const isSharp = active && cents > TUNING_GREEN_CENTS
+  const isFlat = active && cents < -TUNING_GREEN_CENTS
+  const pulseDuration = zone === 'red' ? 0.38 : zone === 'yellow' ? 0.58 : 0.85
+  const readoutGlow = active ? `0 0 28px ${accent}44` : 'none'
+
+  return (
+    <div
+      className={`pitch-note-orbit ${inTune ? 'pitch-note-orbit--in-tune' : ''} ${isSharp ? 'pitch-note-orbit--sharp' : ''} ${isFlat ? 'pitch-note-orbit--flat' : ''}`}
+      style={{ ['--orbit-accent' as string]: accent }}
+    >
+      <div className="pitch-note-orbit__rays" aria-hidden>
+        {isSharp &&
+          SHARP_ORBIT_ANGLES.map((angle, index) => (
+            <motion.span
+              key={`sharp-${angle}`}
+              className="pitch-note-orbit__ray pitch-note-orbit__ray--sharp"
+              style={{ ['--ray-angle' as string]: `${angle}deg` }}
+              initial={false}
+              animate={{ opacity: [0.35, 1, 0.35], y: [0, -7, 0] }}
+              transition={{
+                duration: pulseDuration,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: index * 0.07,
+              }}
+            />
+          ))}
+        {isFlat &&
+          FLAT_ORBIT_ANGLES.map((angle, index) => (
+            <motion.span
+              key={`flat-${angle}`}
+              className="pitch-note-orbit__ray pitch-note-orbit__ray--flat"
+              style={{ ['--ray-angle' as string]: `${angle}deg` }}
+              initial={false}
+              animate={{ opacity: [0.35, 1, 0.35], y: [0, 7, 0] }}
+              transition={{
+                duration: pulseDuration,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: index * 0.07,
+              }}
+            />
+          ))}
+      </div>
+
+      <div className="pitch-note-orbit__ring">
+        <svg className="pitch-note-orbit__svg" viewBox="0 0 200 200" aria-hidden>
+          <circle className="pitch-note-orbit__ring-track" cx="100" cy="100" r="93" />
+          <circle
+            className={`pitch-note-orbit__ring-glow ${inTune ? 'pitch-note-orbit__ring-glow--in-tune' : active ? 'pitch-note-orbit__ring-glow--active' : ''}`}
+            cx="100"
+            cy="100"
+            r="93"
+            style={!inTune && active ? { stroke: accent } : undefined}
+          />
+        </svg>
+
+        <div className="pitch-note-orbit__core">
+          <p
+            className="pitch-note-orbit__note pitch-readout-display"
+            style={{ color: accent, textShadow: readoutGlow }}
+          >
+            {noteName}
+          </p>
+          <div className="pitch-note-orbit__meta pitch-readout-display">
+            <span style={{ color: accent }}>{formatFrequencyHz(frequencyHz)}</span>
+            <span className="pitch-note-orbit__sep" aria-hidden>
+              ·
+            </span>
+            <span style={{ color: accent }}>
+              {active ? formatDisplayCents(cents) : '—'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LiveAudioTunerPane({
   readout,
   canvasRef,
@@ -198,34 +300,16 @@ function LiveAudioTunerPane({
 }) {
   const active = readout.noteName !== '—'
   const displayCents = active ? readout.cents : 0
-  const accent = active ? getIntonationColor(displayCents) : 'rgba(255,255,255,0.72)'
-  const readoutGlow = active ? `0 0 36px ${accent}55, 0 0 72px ${accent}22` : 'none'
 
   return (
     <div className="pitch-audio-stage flex min-h-0 flex-1 flex-col overflow-hidden">
-      <p className="pitch-audio-stage__title">Live Tuner</p>
-
-      <div className="pitch-audio-stage__readout">
-        <p
-          className="pitch-audio-stage__note pitch-readout-display"
-          style={{ color: accent, textShadow: readoutGlow }}
-        >
-          {readout.noteName}
-        </p>
-        <div className="pitch-audio-stage__meta">
-          <p
-            className="pitch-audio-stage__freq pitch-readout-display"
-            style={{ color: accent, textShadow: readoutGlow }}
-          >
-            {formatFrequencyHz(readout.frequencyHz)}
-          </p>
-          <p
-            className="pitch-audio-stage__cents pitch-readout-display"
-            style={{ color: accent, textShadow: readoutGlow }}
-          >
-            {active ? formatDisplayCents(readout.cents) : '—'}
-          </p>
-        </div>
+      <div className="pitch-audio-stage__hero">
+        <NoteOrbitReadout
+          noteName={readout.noteName}
+          frequencyHz={readout.frequencyHz}
+          cents={displayCents}
+          active={active}
+        />
       </div>
 
       <div className="pitch-audio-stage__meter">

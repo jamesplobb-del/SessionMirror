@@ -32,7 +32,7 @@ function PitchWidgetCloseButton({ onClose }: { onClose: () => void }) {
         onClose()
       }}
       onPointerDown={(event) => event.stopPropagation()}
-      className="pitch-widget-close absolute right-4 top-2 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/18 active:scale-95"
+      className="pitch-widget-close absolute right-4 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/18 active:scale-95"
       aria-label="Hide pitch tuner"
     >
       <svg
