@@ -9,6 +9,7 @@ import {
   RECORDING_TIMESLICE_MS,
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
+import { readRecordingOrientation } from '../utils/takeVideoTransform'
 import {
   normalizeBlobMime,
   persistRecordingBlob,
@@ -112,6 +113,7 @@ export function useCameraSession({
     mimeType: string
   } | null>(null)
   const warmAutoAudioInFlightRef = useRef(false)
+  const recordingOrientationRef = useRef<'portrait' | 'landscape'>('portrait')
   const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
   onCompleteRef.current = onRecordingComplete
 
@@ -396,6 +398,7 @@ export function useCameraSession({
                 filePath: persisted.filePath,
                 videoUrl: persisted.videoUrl,
                 durationSeconds,
+                recordingOrientation: recordingOrientationRef.current,
               })
             } else {
               const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
@@ -412,6 +415,7 @@ export function useCameraSession({
                 filePath: persisted.filePath,
                 videoUrl: persisted.videoUrl,
                 durationSeconds,
+                recordingOrientation: recordingOrientationRef.current,
                 blob,
               })
             }
@@ -517,6 +521,7 @@ export function useCameraSession({
 
       const takeId = crypto.randomUUID()
       const mode = recordingModeRef.current
+      recordingOrientationRef.current = readRecordingOrientation()
       const mimeType = getRecorderMimeTypeForMode(mode)
       recorderMimeTypeRef.current = mimeType
       chunksRef.current = []

@@ -18,6 +18,8 @@ export interface RecordingCompletePayload {
   videoUrl: string
   /** Recording length in whole seconds */
   durationSeconds: number
+  /** Device orientation when recording started */
+  recordingOrientation?: 'portrait' | 'landscape'
   /** Only set on web dev fallback — native recordings are already on disk */
   blob?: Blob
 }

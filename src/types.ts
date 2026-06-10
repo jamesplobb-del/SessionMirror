@@ -25,6 +25,8 @@ export interface Take {
   mediaType?: MediaType
   /** Recorded takes mirror on playback; uploads show true perspective. */
   mirrorPlayback?: boolean
+  /** Device orientation when the take was recorded. */
+  recordingOrientation?: 'portrait' | 'landscape'
   /** Optional pitch contour from offline or live analysis */
   pitchSeries?: PitchSample[]
 }

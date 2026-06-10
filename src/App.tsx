@@ -14,7 +14,7 @@ import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from './hooks/useLivePitchTracker'
 import {
   generateThumbnailFromBlob,
-  generateThumbnailFromUrl,
+  captureAndPersistTakeThumbnail,
 } from './utils/generateThumbnail'
 import { createTake, sortTakes } from './utils/takes'
 import {
@@ -31,6 +31,7 @@ import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
+import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
   createProject,
   deleteVaultTake,
@@ -53,15 +54,14 @@ async function hydrateTakeThumbnailsInBackground(
 
   for (const take of takes) {
     if (take.thumbnailUrl || isAudioTake(take)) continue
-    try {
-      const thumbnailUrl = await generateThumbnailFromUrl(take.videoUrl)
-      pending.set(take.id, thumbnailUrl)
-      if (pending.size >= 4) {
-        applyThumbnails(new Map(pending))
-        pending.clear()
-      }
-    } catch {
-      /* vault cards show placeholder until thumbnail is ready */
+
+    const thumbnailUrl = await captureAndPersistTakeThumbnail(take)
+    if (!thumbnailUrl) continue
+
+    pending.set(take.id, thumbnailUrl)
+    if (pending.size >= 4) {
+      applyThumbnails(new Map(pending))
+      pending.clear()
     }
   }
 
@@ -256,8 +256,16 @@ export default function App() {
   }, [])
 
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
-    const { takeId, mimeType, filePath, videoUrl, blob, mediaType, durationSeconds } =
-      payload
+    const {
+      takeId,
+      mimeType,
+      filePath,
+      videoUrl,
+      blob,
+      mediaType,
+      durationSeconds,
+      recordingOrientation,
+    } = payload
 
     void (async () => {
       const safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
@@ -274,23 +282,31 @@ export default function App() {
           takeId,
           mimeType,
           mediaType,
+          recordingOrientation,
           name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
         })
       }
 
+      let savedTake: Take | null = null
+
       setTakes((prev) => {
         const index = projectId ? takeIndex : prev.length + 1
-        const next = createTake(
-          takeId,
-          index,
-          safeVideoUrl,
-          filePath,
-          mimeType,
-          mediaType,
-        )
-        setChallengerId(next.id)
-        return [...prev, next]
+        savedTake = {
+          ...createTake(
+            takeId,
+            index,
+            safeVideoUrl,
+            filePath,
+            mimeType,
+            mediaType,
+          ),
+          recordingOrientation: recordingOrientation ?? 'portrait',
+        }
+        setChallengerId(savedTake.id)
+        return [...prev, savedTake]
       })
+
+      if (!savedTake) return
 
       if (
         mediaType === 'audio' &&
@@ -311,16 +327,19 @@ export default function App() {
       }
 
       const thumbnailPromise = blob
-        ? generateThumbnailFromBlob(blob)
+        ? generateThumbnailFromBlob(blob).then((dataUrl) =>
+            persistTakeThumbnail(takeId, dataUrl),
+          )
         : (async () => {
             if (Capacitor.isNativePlatform()) {
-              await new Promise((resolve) => window.setTimeout(resolve, 1200))
+              await new Promise((resolve) => window.setTimeout(resolve, 800))
             }
-            return generateThumbnailFromUrl(safeVideoUrl)
+            return captureAndPersistTakeThumbnail(savedTake)
           })()
 
       void thumbnailPromise
         .then((thumbnailUrl) => {
+          if (!thumbnailUrl) return
           setTakes((current) =>
             current.map((take) =>
               take.id === takeId ? { ...take, thumbnailUrl } : take,
@@ -523,6 +542,17 @@ export default function App() {
     setIsSettingsOpen(false)
     setIsVaultOpen(true)
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+
+  useEffect(() => {
+    if (!isVaultOpen) return
+
+    const missingThumbnails = takes.filter(
+      (take) => !take.thumbnailUrl && !isAudioTake(take),
+    )
+    if (missingThumbnails.length === 0) return
+
+    void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails)
+  }, [applyTakeThumbnails, isVaultOpen, takes])
 
   const handleOpenSettings = useCallback(() => {
     stopAutoPlaybackAudio()
@@ -761,8 +791,9 @@ export default function App() {
 
         if (mediaType === 'audio') return
 
-        void generateThumbnailFromUrl(safeVideoUrl)
+        void captureAndPersistTakeThumbnail(uploadedTake)
           .then((thumbnailUrl) => {
+            if (!thumbnailUrl) return
             setTakes((current) =>
               current.map((take) =>
                 take.id === takeId ? { ...take, thumbnailUrl } : take,
@@ -785,6 +816,7 @@ export default function App() {
   }, [])
 
   const removeTakeResources = useCallback((take: Take) => {
+    void deleteCachedTakeThumbnail(take.id)
     if (take.filePath) {
       void deleteTakeFile(take.filePath)
     } else if (take.videoUrl.startsWith('blob:')) {

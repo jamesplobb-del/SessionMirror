@@ -400,7 +400,6 @@ export default function TakeVaultDrawer({
                           }
                           onUpdate={(updates) => onUpdateTake(take.id, updates)}
                           onDelete={() => onDeleteTake(take.id)}
-                          thumbnailVideo={<VaultTakeVideo take={take} />}
                         />
                       ))}
                   </div>

@@ -1,6 +1,11 @@
 import { Media } from '@capacitor-community/media'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
+import {
+  downloadTransformedTakeOnWeb,
+  prepareTakeVideoForPhotosExport,
+  takeNeedsPhotosExportTransform,
+} from './exportTakeVideo'
 import { getTakeMediaType } from './mediaType'
 import type { Take } from '../types'
 
@@ -91,6 +96,19 @@ async function resolveNativeFileUri(take: Take): Promise<string | null> {
 }
 
 function downloadTakeOnWeb(take: Take, url: string): SaveTakeResult {
+  const transform = takeNeedsPhotosExportTransform(take)
+  if (transform) {
+    void downloadTransformedTakeOnWeb(take.name, take.filePath, take.videoUrl, transform).catch(
+      () => {
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `${take.name.replace(/[^\w.-]+/g, '_') || 'take'}.mp4`
+        anchor.click()
+      },
+    )
+    return { ok: true }
+  }
+
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = `${take.name.replace(/[^\w.-]+/g, '_') || 'take'}.mp4`
@@ -182,7 +200,22 @@ export async function shareTakeVideo(take: Take): Promise<SaveTakeResult> {
     return { ok: false, reason: 'missing_file' }
   }
 
+  const transform = takeNeedsPhotosExportTransform(take)
+
   try {
+    if (transform) {
+      const preparedPath = await prepareTakeVideoForPhotosExport(
+        take.id,
+        take.filePath,
+        take.videoUrl,
+        transform,
+      )
+      if (preparedPath) {
+        await Media.saveVideo({ path: preparedPath })
+        return { ok: true }
+      }
+    }
+
     await Media.saveVideo({ path })
     return { ok: true }
   } catch (firstError) {

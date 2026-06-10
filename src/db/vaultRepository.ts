@@ -24,6 +24,10 @@ function mapTakeRow(row: SqlRow): VaultTake {
     mediaType: String(row.media_type ?? 'video') === 'audio' ? 'audio' : 'video',
     rating: Number(row.rating ?? 0),
     notes: String(row.notes ?? ''),
+    recordingOrientation:
+      String(row.recording_orientation ?? 'portrait') === 'landscape'
+        ? 'landscape'
+        : 'portrait',
   }
 }
 
@@ -86,13 +90,14 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
     mediaType: input.mediaType ?? 'video',
     rating: 0,
     notes: '',
+    recordingOrientation: input.recordingOrientation ?? 'portrait',
   }
 
   await db.run(
     `INSERT INTO takes (
       id, project_id, file_path, duration, is_best_take, created_at,
-      name, mime_type, media_type, rating, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      name, mime_type, media_type, rating, notes, recording_orientation
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       take.id,
       take.projectId,
@@ -105,6 +110,7 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
       take.mediaType,
       take.rating,
       take.notes,
+      take.recordingOrientation ?? 'portrait',
     ],
   )
 

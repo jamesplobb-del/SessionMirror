@@ -1,5 +1,6 @@
 import type { Take } from '../types'
 import { resolveTakePlaybackUrl } from '../utils/takeStorage'
+import { resolveCachedTakeThumbnail } from '../utils/takeThumbnailCache'
 import { getTakesByProject } from './vaultRepository'
 import type { VaultTake } from './types'
 
@@ -19,7 +20,8 @@ export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
   const takes = await Promise.all(
     chronological.map(async (row, index) => {
       const videoUrl = await resolveTakePlaybackUrl(row.filePath, '')
-      return vaultTakeToUiTake(row, index + 1, videoUrl)
+      const cachedThumbnail = await resolveCachedTakeThumbnail(row.id)
+      return vaultTakeToUiTake(row, index + 1, videoUrl, cachedThumbnail ?? '')
     }),
   )
 
@@ -30,6 +32,7 @@ export function vaultTakeToUiTake(
   vaultTake: VaultTake,
   index: number,
   videoUrl: string,
+  thumbnailUrl = '',
 ): Take {
   return {
     id: vaultTake.id,
@@ -37,12 +40,13 @@ export function vaultTakeToUiTake(
     videoUrl,
     filePath: vaultTake.filePath,
     videoMimeType: vaultTake.mimeType,
-    thumbnailUrl: '',
+    thumbnailUrl,
     timestamp: vaultTake.createdAt,
     rating: vaultTake.rating,
     notes: vaultTake.notes,
     mediaType: vaultTake.mediaType,
     mirrorPlayback: vaultTake.mediaType === 'video',
+    recordingOrientation: vaultTake.recordingOrientation ?? 'portrait',
   }
 }
 

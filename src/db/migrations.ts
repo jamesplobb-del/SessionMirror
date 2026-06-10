@@ -6,6 +6,7 @@ const TAKE_COLUMN_MIGRATIONS = [
   "ALTER TABLE takes ADD COLUMN media_type TEXT NOT NULL DEFAULT 'video'",
   'ALTER TABLE takes ADD COLUMN rating INTEGER NOT NULL DEFAULT 0',
   "ALTER TABLE takes ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE takes ADD COLUMN recording_orientation TEXT NOT NULL DEFAULT 'portrait'",
 ] as const
 
 /** Idempotent column adds for existing installs. */
