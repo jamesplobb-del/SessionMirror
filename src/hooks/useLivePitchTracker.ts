@@ -46,21 +46,25 @@ interface PitchGraph {
 
 const elementGraphs = new WeakMap<HTMLMediaElement, PitchGraph>()
 
+type MediaWithCaptureStream = HTMLMediaElement & {
+  captureStream?: () => MediaStream
+  mozCaptureStream?: () => MediaStream
+}
+
 function getMediaCaptureStream(media: HTMLMediaElement): MediaStream | null {
-  if (typeof media.captureStream === 'function') {
+  const captureMedia = media as MediaWithCaptureStream
+
+  if (typeof captureMedia.captureStream === 'function') {
     try {
-      return media.captureStream()
+      return captureMedia.captureStream()
     } catch {
       /* try legacy / fallback below */
     }
   }
 
-  const legacyMedia = media as HTMLMediaElement & {
-    mozCaptureStream?: () => MediaStream
-  }
-  if (typeof legacyMedia.mozCaptureStream === 'function') {
+  if (typeof captureMedia.mozCaptureStream === 'function') {
     try {
-      return legacyMedia.mozCaptureStream()
+      return captureMedia.mozCaptureStream()
     } catch {
       /* fall through */
     }
