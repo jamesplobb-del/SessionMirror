@@ -266,6 +266,78 @@ body.settings-branch-open * {
   }
 }
 
+/* Physical tilt — UI rotates inside portrait-locked WebView (native camera app pattern). */
+.app-ui-rotator {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.app-ui-rotator .review-overlay,
+.app-ui-rotator .pitch-widget-draggable,
+.app-ui-rotator [role='dialog'] {
+  pointer-events: auto;
+}
+
+.app-ui-rotator--landscape-left,
+.app-ui-rotator--landscape-right {
+  top: 50%;
+  left: 50%;
+  width: 100vh;
+  height: 100vw;
+  max-width: none;
+  max-height: none;
+  inset: auto;
+  transform-origin: center center;
+}
+
+.app-ui-rotator--landscape-left {
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+.app-ui-rotator--landscape-right {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.app-ui-rotator--landscape-left .app-hud-bottom,
+.app-ui-rotator--landscape-right .app-hud-bottom {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.app-ui-rotator--landscape-left .app-pip-row,
+.app-ui-rotator--landscape-right .app-pip-row {
+  flex: 0 1 auto;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: 1.5rem;
+  overflow: visible;
+}
+
+.app-ui-rotator--landscape-left .app-pip-row > *,
+.app-ui-rotator--landscape-right .app-pip-row > * {
+  min-width: 9rem;
+  max-width: 30vw;
+  overflow: visible;
+}
+
+.app-ui-rotator--landscape-left .app-ui-overlay,
+.app-ui-rotator--landscape-right .app-ui-overlay {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.app-ui-rotator--landscape-left .review-overlay,
+.app-ui-rotator--landscape-right .review-overlay {
+  top: env(safe-area-inset-top, 0px) !important;
+  right: env(safe-area-inset-right, 0px) !important;
+  bottom: env(safe-area-inset-bottom, 0px) !important;
+  left: env(safe-area-inset-left, 0px) !important;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -403,22 +475,18 @@ body.settings-branch-open * {
   padding: 0;
 }
 
-/* Lock preview to the long screen edge so rotation does not resize/re-crop the stream. */
+/* Portrait-locked app — camera fills the fixed portrait viewport. */
 video.camera-preview {
   position: fixed !important;
-  left: 50% !important;
-  top: 50% !important;
-  right: auto !important;
-  bottom: auto !important;
-  width: max(100vw, 100dvh) !important;
-  height: max(100vw, 100dvh) !important;
-  min-width: max(100vw, 100dvh) !important;
-  min-height: max(100vw, 100dvh) !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
   opacity: 1;
-  transform: translate(-50%, -50%) !important;
-  transform-origin: center center !important;
+  transform: none !important;
   object-fit: cover !important;
   object-position: center center !important;
   z-index: 0 !important;
@@ -430,7 +498,7 @@ video.camera-preview.camera-preview--live {
 }
 
 video.camera-preview.camera-preview--mirror {
-  transform: translate(-50%, -50%) scaleX(-1) !important;
+  transform: scaleX(-1) !important;
   transform-origin: center center !important;
 }
 
@@ -1218,6 +1286,11 @@ video.camera-preview.camera-preview--hidden {
   .pitch-widget-draggable {
     max-width: min(18rem, calc(100% - 1.5rem));
   }
+}
+
+.app-ui-rotator--landscape-left .pitch-widget-draggable,
+.app-ui-rotator--landscape-right .pitch-widget-draggable {
+  max-width: min(18rem, calc(100% - 1.5rem));
 }
 
 .app-shell {

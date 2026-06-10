@@ -1,14 +1,13 @@
-export type RecordingOrientation = 'portrait' | 'landscape'
+export type { RecordingOrientation } from './physicalOrientation'
+export { readRecordingOrientation } from './physicalOrientation'
+
+import type { RecordingOrientation } from './physicalOrientation'
 
 export interface TakeVideoTransform {
   /** Horizontal flip so Photos matches true (non-selfie) perspective. */
   unmirror?: boolean
   /** Device orientation while the take was recorded. */
   recordingOrientation?: RecordingOrientation
-}
-
-export function readRecordingOrientation(): RecordingOrientation {
-  return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
 }
 
 export function outputDimensionsForTransform(

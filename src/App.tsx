@@ -8,6 +8,7 @@ import ControlDeck from './components/ControlDeck'
 import TakeVaultDrawer from './components/TakeVaultDrawer'
 import SettingsDrawer from './components/SettingsDrawer'
 import { useCameraSession } from './hooks/useCameraSession'
+import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from './hooks/useLivePitchTracker'
@@ -31,6 +32,7 @@ import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { scheduleViewportSync } from './utils/viewportSync'
+import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -48,6 +50,7 @@ import {
 } from './db'
 
 export default function App() {
+  const physicalOrientation = usePhysicalOrientation()
   const [takes, setTakes] = useState<Take[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
@@ -963,6 +966,10 @@ export default function App() {
         pitchStageActive={mainAudioPitchSource !== null && showPitch}
       />
 
+      <div
+        id={PHYSICAL_UI_ROOT_ID}
+        className={`app-ui-rotator app-ui-rotator--${physicalOrientation}`}
+      >
       {showMainPitchWidget && (
         <AnimatePresence>
           {showPitch && mainAudioPitchSource && (
@@ -1145,6 +1152,7 @@ export default function App() {
         onReset={resetSettings}
         recordingMode={recordingMode}
       />
+      </div>
     </div>
   )
 }

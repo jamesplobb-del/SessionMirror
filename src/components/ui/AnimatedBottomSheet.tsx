@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { iosFade, iosSpringSheet } from '../../utils/motionPresets'
+import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
 
 function readSlideDistance(): number {
   if (typeof window === 'undefined') return 800
@@ -88,6 +89,6 @@ export default function AnimatedBottomSheet({
         </>
       )}
     </AnimatePresence>,
-    document.body,
+    document.getElementById(PHYSICAL_UI_ROOT_ID) ?? document.body,
   )
 }

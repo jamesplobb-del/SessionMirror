@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core'
-import { agentDebugLog } from './agentDebugLog'
 
 export function isIOSNative(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
@@ -90,23 +89,6 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
 
   sync()
 
-  const onOrientationChange = () => {
-    // #region agent log
-    agentDebugLog(
-      'viewportSync.ts:orientationchange',
-      'device rotated (no camera layout sync)',
-      {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        orientation: window.screen?.orientation?.type ?? 'unknown',
-      },
-      'H-O1',
-    )
-    // #endregion
-  }
-
-  window.addEventListener('orientationchange', onOrientationChange)
-
   let capCleanup: (() => void) | undefined
   if (Capacitor.isNativePlatform()) {
     void import('@capacitor/app').then(({ App }) => {
@@ -123,7 +105,6 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   }
 
   return () => {
-    window.removeEventListener('orientationchange', onOrientationChange)
     capCleanup?.()
     lastAppliedWidth = 0
     lastAppliedHeight = 0
