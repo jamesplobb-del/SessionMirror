@@ -15,6 +15,7 @@ function markPlatformClass(): void {
 let cachedSafeAreaInsets: { top: number; bottom: number } | null = null
 let lastAppliedWidth = 0
 let lastAppliedHeight = 0
+let orientationTransitionActive = false
 
 function invalidateSafeAreaCache(): void {
   cachedSafeAreaInsets = null
@@ -82,8 +83,26 @@ export function applyViewportCssVars(): number {
     return height
   }
 
+  const prevWidth = lastAppliedWidth
+  const prevHeight = lastAppliedHeight
+
   lastAppliedWidth = width
   lastAppliedHeight = height
+
+  // #region agent log
+  agentDebugLog(
+    'viewportSync.ts:applyViewportCssVars',
+    'viewport dimensions applied',
+    {
+      prevWidth,
+      prevHeight,
+      width,
+      height,
+      orientationTransitionActive,
+    },
+    'H-C1',
+  )
+  // #endregion
 
   const vv = window.visualViewport
   const root = document.documentElement
@@ -103,6 +122,11 @@ export function applyViewportCssVars(): number {
   document.body.style.height = `${height}px`
 
   return height
+}
+
+/** Skip layout writes while the device is mid-rotation — one settled sync follows. */
+export function isOrientationTransitionActive(): boolean {
+  return orientationTransitionActive
 }
 
 /** Run before React paint so every iPhone gets correct dimensions on cold launch. */
@@ -159,6 +183,7 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   markPlatformClass()
 
   const sync = () => {
+    if (orientationTransitionActive) return
     onHeightChange(applyViewportCssVars())
   }
   const syncOnResume = () => {
@@ -168,10 +193,9 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   const timers = BOOT_SYNC_DELAYS_MS.map((delay) => window.setTimeout(sync, delay))
 
   let syncDebounceTimer: number | null = null
-  let orientationLocked = false
 
   const scheduleSync = (delayMs = 48) => {
-    if (orientationLocked) return
+    if (orientationTransitionActive) return
     if (syncDebounceTimer !== null) {
       window.clearTimeout(syncDebounceTimer)
     }
@@ -183,14 +207,22 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
 
   let orientationSyncTimer: number | null = null
   const scheduleOrientationSync = () => {
-    orientationLocked = true
+    orientationTransitionActive = true
+    // #region agent log
+    agentDebugLog(
+      'viewportSync.ts:scheduleOrientationSync',
+      'orientation transition locked',
+      { viewport: readViewportSize() },
+      'H-C4',
+    )
+    // #endregion
     invalidateSafeAreaCache()
     if (orientationSyncTimer !== null) {
       window.clearTimeout(orientationSyncTimer)
     }
     orientationSyncTimer = window.setTimeout(() => {
       orientationSyncTimer = null
-      orientationLocked = false
+      orientationTransitionActive = false
       sync()
       // #region agent log
       agentDebugLog(
@@ -211,17 +243,23 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   }
 
   const onPageShow = () => {
+    if (orientationTransitionActive) return
     sync()
     syncWithRaf(sync)
   }
 
   const onDebouncedLayout = () => scheduleSync(48)
 
+  const onFocus = () => {
+    if (orientationTransitionActive) return
+    sync()
+  }
+
   sync()
   window.addEventListener('resize', onDebouncedLayout)
   window.addEventListener('orientationchange', onOrientationChange)
   window.addEventListener('pageshow', onPageShow)
-  window.addEventListener('focus', sync)
+  window.addEventListener('focus', onFocus)
   window.visualViewport?.addEventListener('resize', onDebouncedLayout)
   window.visualViewport?.addEventListener('scroll', onDebouncedLayout)
   screen.orientation?.addEventListener('change', onOrientationChange)
@@ -242,7 +280,7 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
     window.removeEventListener('resize', onDebouncedLayout)
     window.removeEventListener('orientationchange', onOrientationChange)
     window.removeEventListener('pageshow', onPageShow)
-    window.removeEventListener('focus', sync)
+    window.removeEventListener('focus', onFocus)
     window.visualViewport?.removeEventListener('resize', onDebouncedLayout)
     window.visualViewport?.removeEventListener('scroll', onDebouncedLayout)
     screen.orientation?.removeEventListener('change', onOrientationChange)

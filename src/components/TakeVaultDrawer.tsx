@@ -9,6 +9,7 @@ import { resetVideosInContainer, teardownVideosInContainer } from '../utils/vide
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { getTakeMediaType } from '../utils/mediaType'
+import { agentDebugLog } from '../utils/agentDebugLog'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
 import type { Project } from '../db/types'
 
@@ -88,8 +89,24 @@ export default function TakeVaultDrawer({
       teardownVideosInContainer(drawerRef.current)
       setSelectionMode(false)
       setSelectedIds(new Set())
+      return
     }
-  }, [isOpen])
+
+    // #region agent log
+    agentDebugLog(
+      'TakeVaultDrawer.tsx:open',
+      'vault opened',
+      {
+        takeCount: takes.length,
+        videoCount,
+        audioCount,
+        filteredCount: filteredTakes.length,
+        vaultMediaTab,
+      },
+      'H-V5',
+    )
+    // #endregion
+  }, [isOpen, takes.length, videoCount, audioCount, filteredTakes.length, vaultMediaTab])
 
   useEffect(() => {
     teardownVideosInContainer(drawerRef.current)

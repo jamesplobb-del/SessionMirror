@@ -1,6 +1,7 @@
 import type { Take } from '../types'
 import { resolveTakePlaybackUrl } from '../utils/takeStorage'
 import { resolveCachedTakeThumbnail } from '../utils/takeThumbnailCache'
+import { agentDebugLog } from '../utils/agentDebugLog'
 import { getTakesByProject } from './vaultRepository'
 import type { VaultTake } from './types'
 
@@ -24,6 +25,21 @@ export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
       return vaultTakeToUiTake(row, index + 1, videoUrl, cachedThumbnail ?? '')
     }),
   )
+
+  // #region agent log
+  agentDebugLog(
+    'takeBridge.ts:uiTakesFromVaultRows',
+    'takes loaded from vault',
+    {
+      rowCount: rows.length,
+      cacheHits: takes.filter((t) => t.thumbnailUrl.length > 0).length,
+      cacheMisses: takes.filter((t) => t.thumbnailUrl.length === 0 && t.mediaType === 'video')
+        .length,
+      landscapeCount: takes.filter((t) => t.recordingOrientation === 'landscape').length,
+    },
+    'H-V3',
+  )
+  // #endregion
 
   return takes.reverse()
 }

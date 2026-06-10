@@ -31,6 +31,7 @@ import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
+import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
   createProject,
@@ -505,6 +506,8 @@ export default function App() {
 
   const wasVaultOpenRef = useRef(false)
   const thumbnailHydrateRef = useRef(0)
+  const takesRef = useRef(takes)
+  takesRef.current = takes
 
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
@@ -532,24 +535,36 @@ export default function App() {
   useEffect(() => {
     if (!isVaultOpen) return
 
-    const missingThumbnails = takes.filter(
+    const missingThumbnails = takesRef.current.filter(
       (take) => !take.thumbnailUrl && !isAudioTake(take),
     )
     if (missingThumbnails.length === 0) return
 
+    // #region agent log
+    agentDebugLog(
+      'App.tsx:vaultHydrateEffect',
+      'vault thumbnail hydrate scheduled',
+      { missingCount: missingThumbnails.length, takeCount: takesRef.current.length },
+      'H-V8',
+    )
+    // #endregion
+
     const hydrateToken = ++thumbnailHydrateRef.current
     const timer = window.setTimeout(() => {
-      void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(
-        () => {
-          if (hydrateToken !== thumbnailHydrateRef.current) return
-        },
+      const stillMissing = takesRef.current.filter(
+        (take) => !take.thumbnailUrl && !isAudioTake(take),
       )
-    }, 320)
+      if (stillMissing.length === 0) return
+
+      void hydrateTakeThumbnailsInBackground(stillMissing, applyTakeThumbnails).then(() => {
+        if (hydrateToken !== thumbnailHydrateRef.current) return
+      })
+    }, 480)
 
     return () => {
       window.clearTimeout(timer)
     }
-  }, [applyTakeThumbnails, isVaultOpen, takes])
+  }, [applyTakeThumbnails, isVaultOpen])
 
   const handleOpenSettings = useCallback(() => {
     stopAutoPlaybackAudio()

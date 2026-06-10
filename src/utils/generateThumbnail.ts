@@ -7,11 +7,12 @@ import {
   drawTakeVideoFrame,
   type RecordingOrientation,
 } from './takeVideoTransform'
+import { agentDebugLog } from './agentDebugLog'
 import type { Take } from '../types'
 
 const THUMBNAIL_SEEK_SECONDS = 0.1
 const THUMBNAIL_LOAD_TIMEOUT_MS = 5_000
-const THUMBNAIL_CONCURRENCY = 4
+const THUMBNAIL_CONCURRENCY = 2
 
 export interface ThumbnailCaptureOptions {
   filePath?: string
@@ -164,9 +165,35 @@ export async function captureAndPersistTakeThumbnail(
         mirrorPreview: mirror,
         recordingOrientation: take.recordingOrientation,
       })
-      return persistTakeThumbnail(take.id, dataUrl)
-    } catch {
-      /* try without mirror or next take */
+      const persisted = await persistTakeThumbnail(take.id, dataUrl)
+      // #region agent log
+      agentDebugLog(
+        'generateThumbnail.ts:captureAndPersistTakeThumbnail',
+        'thumbnail captured',
+        {
+          takeId: take.id,
+          mirror,
+          orientation: take.recordingOrientation ?? 'portrait',
+          ok: true,
+        },
+        'H-V2',
+      )
+      // #endregion
+      return persisted
+    } catch (err) {
+      // #region agent log
+      agentDebugLog(
+        'generateThumbnail.ts:captureAndPersistTakeThumbnail',
+        'thumbnail capture failed',
+        {
+          takeId: take.id,
+          mirror,
+          orientation: take.recordingOrientation ?? 'portrait',
+          error: err instanceof Error ? err.message : String(err),
+        },
+        'H-V2',
+      )
+      // #endregion
     }
   }
 
@@ -177,12 +204,25 @@ export async function hydrateTakeThumbnailsInBackground(
   takes: Take[],
   applyThumbnails: (updates: Map<string, string>) => void,
 ): Promise<void> {
-  const targets = takes.filter(
-    (take) =>
-      !isAudioTake(take) &&
-      (!take.thumbnailUrl || take.recordingOrientation === 'landscape'),
-  )
+  const targets = takes.filter((take) => !isAudioTake(take) && !take.thumbnailUrl)
   if (targets.length === 0) return
+
+  const hydrateStarted = Date.now()
+  // #region agent log
+  agentDebugLog(
+    'generateThumbnail.ts:hydrateTakeThumbnailsInBackground',
+    'hydrate started',
+    {
+      targetCount: targets.length,
+      missingUrl: targets.filter((t) => !t.thumbnailUrl).length,
+      landscapeRecapture: targets.filter(
+        (t) => t.thumbnailUrl && t.recordingOrientation === 'landscape',
+      ).length,
+      concurrency: Math.min(THUMBNAIL_CONCURRENCY, targets.length),
+    },
+    'H-V1',
+  )
+  // #endregion
 
   let cursor = 0
   const pending = new Map<string, string>()
@@ -202,13 +242,21 @@ export async function hydrateTakeThumbnailsInBackground(
       if (!thumbnailUrl) continue
 
       pending.set(take.id, thumbnailUrl)
-      if (pending.size >= 2) {
-        flushPending()
-      }
     }
   }
 
   const workerCount = Math.min(THUMBNAIL_CONCURRENCY, targets.length)
   await Promise.all(Array.from({ length: workerCount }, () => worker()))
   flushPending()
+  // #region agent log
+  agentDebugLog(
+    'generateThumbnail.ts:hydrateTakeThumbnailsInBackground',
+    'hydrate finished',
+    {
+      targetCount: targets.length,
+      elapsedMs: Date.now() - hydrateStarted,
+    },
+    'H-V6',
+  )
+  // #endregion
 }
