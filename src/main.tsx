@@ -4,9 +4,11 @@ import './index.css'
 import App from './App.tsx'
 import { initVaultDatabase } from './db'
 import { bootstrapViewport } from './utils/viewportSync'
+import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 
 async function bootstrap() {
   bootstrapViewport()
+  await lockPortraitOrientation()
 
   try {
     await initVaultDatabase()

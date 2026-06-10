@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
@@ -32,6 +33,7 @@ import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { scheduleViewportSync } from './utils/viewportSync'
+import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
@@ -98,6 +100,29 @@ export default function App() {
 
   useLayoutEffect(() => {
     return scheduleViewportSync(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    void lockPortraitOrientation()
+
+    let removeListener: (() => void) | undefined
+    void import('@capacitor/app').then(({ App }) => {
+      void App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          void lockPortraitOrientation()
+        }
+      }).then((sub) => {
+        removeListener = () => {
+          void sub.remove()
+        }
+      })
+    })
+
+    return () => {
+      removeListener?.()
+    }
   }, [])
 
   const pausePipVideos = useCallback(() => {

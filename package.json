@@ -21,6 +21,7 @@
     "@capacitor/filesystem": "^7.1.1",
     "@capacitor/haptics": "^7.0.5",
     "@capacitor/ios": "^7.2.0",
+    "@capacitor/screen-orientation": "^7.0.4",
     "@capacitor/share": "^7.0.4",
     "framer-motion": "^12.40.0",
     "jeep-sqlite": "^2.8.0",
