@@ -10,6 +10,8 @@ interface AnimatedBottomSheetProps {
   children: ReactNode
   maxHeightClass?: string
   sheetRef?: RefObject<HTMLDivElement | null>
+  /** Lighter sheet motion for performance-sensitive surfaces like the vault. */
+  motionPreset?: 'default' | 'light'
 }
 
 export default function AnimatedBottomSheet({
@@ -19,8 +21,16 @@ export default function AnimatedBottomSheet({
   children,
   maxHeightClass = 'max-h-[min(88vh,100dvh)]',
   sheetRef,
+  motionPreset = 'default',
 }: AnimatedBottomSheetProps) {
   if (typeof document === 'undefined') return null
+
+  const sheetTransition =
+    motionPreset === 'light'
+      ? { duration: 0.24, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] }
+      : iosSpringSheet
+  const backdropTransition =
+    motionPreset === 'light' ? { duration: 0.18, ease: 'easeOut' as const } : iosFade
 
   return createPortal(
     <AnimatePresence>
@@ -33,7 +43,7 @@ export default function AnimatedBottomSheet({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={iosFade}
+            transition={backdropTransition}
             onClick={onClose}
           />
 
@@ -47,7 +57,7 @@ export default function AnimatedBottomSheet({
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={iosSpringSheet}
+            transition={sheetTransition}
           >
             <div
               className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-stone-300/90"

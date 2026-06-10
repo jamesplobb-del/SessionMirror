@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
@@ -7,7 +6,6 @@ import VaultMediaSegment from './VaultMediaSegment'
 import VaultTakeThumbnail from './VaultTakeThumbnail'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import Pressable from './ui/Pressable'
-import { iosSpringSheet } from '../utils/motionPresets'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
@@ -212,6 +210,7 @@ export default function TakeVaultDrawer({
       ariaLabel="Take Vault"
       maxHeightClass="max-h-[min(75vh,100dvh)]"
       sheetRef={drawerRef}
+      motionPreset="light"
     >
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
@@ -372,54 +371,42 @@ export default function TakeVaultDrawer({
           )}
         </div>
 
-        <AnimatePresence>
-          {selectionMode && selectedCount > 0 && (
-            <motion.div
-              key="bulk-actions"
-              className="flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
-              style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={iosSpringSheet}
+        {selectionMode && selectedCount > 0 && (
+          <div
+            className="vault-bulk-bar flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <Pressable
+              type="button"
+              intensity="soft"
+              disabled={bulkSaving}
+              onClick={handleBulkSave}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-800 hover:bg-stone-100 disabled:opacity-50"
             >
-              <Pressable
-                type="button"
-                intensity="soft"
-                disabled={bulkSaving}
-                onClick={handleBulkSave}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-800 hover:bg-stone-100 disabled:opacity-50"
-              >
-                <Download className="h-3.5 w-3.5" />
-                {bulkSaving ? 'Saving…' : `Save (${selectedCount})`}
-              </Pressable>
-              <Pressable
-                type="button"
-                intensity="soft"
-                onClick={handleBulkDelete}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete ({selectedCount})
-              </Pressable>
-            </motion.div>
-          )}
+              <Download className="h-3.5 w-3.5" />
+              {bulkSaving ? 'Saving…' : `Save (${selectedCount})`}
+            </Pressable>
+            <Pressable
+              type="button"
+              intensity="soft"
+              onClick={handleBulkDelete}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete ({selectedCount})
+            </Pressable>
+          </div>
+        )}
 
-          {selectionMode && selectedCount === 0 && (
-            <motion.div
-              key="bulk-hint"
-              className="flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
-              style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={iosSpringSheet}
-            >
-              <CheckSquare className="h-3.5 w-3.5" />
-              Tap takes to select, then save or delete
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {selectionMode && selectedCount === 0 && (
+          <div
+            className="vault-bulk-bar flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <CheckSquare className="h-3.5 w-3.5" />
+            Tap takes to select, then save or delete
+          </div>
+        )}
     </AnimatedBottomSheet>
   )
 }

@@ -1,4 +1,4 @@
-import IOSSegmentedControl from './ui/IOSSegmentedControl'
+import SimpleSegmentedControl from './ui/SimpleSegmentedControl'
 import type { SortMode } from '../types'
 
 interface GallerySortStripProps {
@@ -15,8 +15,7 @@ export default function GallerySortStrip({
   return (
     <div className="mb-4 flex items-center justify-between">
       <p className="text-xs text-stone-500">{takeCount} take{takeCount === 1 ? '' : 's'}</p>
-      <IOSSegmentedControl
-        layoutId="vault-sort-segment"
+      <SimpleSegmentedControl
         size="sm"
         ariaLabel="Sort takes"
         value={sortMode}

@@ -1,4 +1,4 @@
-import IOSSegmentedControl from './ui/IOSSegmentedControl'
+import SimpleSegmentedControl from './ui/SimpleSegmentedControl'
 import type { MediaType } from '../types'
 
 interface VaultMediaSegmentProps {
@@ -15,9 +15,8 @@ export default function VaultMediaSegment({
   audioCount,
 }: VaultMediaSegmentProps) {
   return (
-    <IOSSegmentedControl
+    <SimpleSegmentedControl
       className="mb-4 bg-stone-200/80"
-      layoutId="vault-media-segment"
       ariaLabel="Filter takes by media type"
       value={value}
       onChange={onChange}

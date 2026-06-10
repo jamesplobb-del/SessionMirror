@@ -1,4 +1,5 @@
-import { FolderOpen, Settings, Trash2 } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { FolderOpen, Settings, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
@@ -20,12 +21,12 @@ interface ControlDeckProps {
   recordDropRef?: RefObject<HTMLDivElement | null>
   dragDeleteActive?: boolean
   dragOverDelete?: boolean
-  pitchToggleVisible?: boolean
-  pitchToggleActive?: boolean
-  onPitchToggle?: () => void
+  pitchTrackerEnabled?: boolean
   showTakeCards?: boolean
+  onPitchTrackerChange?: (enabled: boolean) => void
   onShowTakeCardsChange?: (show: boolean) => void
   settingsBranchDisabled?: boolean
+  onBranchOpenChange?: (open: boolean) => void
 }
 
 function formatElapsed(seconds: number): string {
@@ -48,35 +49,39 @@ export default function ControlDeck({
   recordDropRef,
   dragDeleteActive = false,
   dragOverDelete = false,
-  pitchToggleVisible = false,
-  pitchToggleActive = false,
-  onPitchToggle,
+  pitchTrackerEnabled = true,
   showTakeCards = true,
+  onPitchTrackerChange,
   onShowTakeCardsChange,
   settingsBranchDisabled = false,
+  onBranchOpenChange,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const [branchOpen, setBranchOpen] = useState(false)
-  const pitchVisibleRef = useRef(pitchToggleVisible)
 
-  useEffect(() => {
-    if (branchOpen && pitchVisibleRef.current !== pitchToggleVisible) {
-      setBranchOpen(false)
-    }
-    pitchVisibleRef.current = pitchToggleVisible
-  }, [branchOpen, pitchToggleVisible])
+  const setBranch = (open: boolean) => {
+    setBranchOpen(open)
+    onBranchOpenChange?.(open)
+  }
 
   useEffect(() => {
     if (settingsBranchDisabled && branchOpen) {
       setBranchOpen(false)
+      onBranchOpenChange?.(false)
     }
-  }, [branchOpen, settingsBranchDisabled])
+  }, [branchOpen, onBranchOpenChange, settingsBranchDisabled])
 
   const settingsPress = useLongPress({
-    onClick: onOpenSettings,
-    onLongPress: () => setBranchOpen(true),
-    disabled: branchOpen || settingsBranchDisabled,
+    onClick: () => {
+      if (branchOpen) {
+        setBranch(false)
+        return
+      }
+      onOpenSettings()
+    },
+    onLongPress: () => setBranch(true),
+    disabled: settingsBranchDisabled,
     targetRef: settingsButtonRef,
   })
 
@@ -86,12 +91,11 @@ export default function ControlDeck({
     <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
       <SettingsBranchWheel
         open={branchOpen}
-        onClose={() => setBranchOpen(false)}
+        onClose={() => setBranch(false)}
         anchorRef={settingsButtonRef}
-        pitchToggleVisible={pitchToggleVisible}
-        pitchToggleActive={pitchToggleActive}
-        onPitchToggle={() => onPitchToggle?.()}
+        pitchTrackerEnabled={pitchTrackerEnabled}
         showTakeCards={showTakeCards}
+        onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
       />
 
@@ -116,17 +120,43 @@ export default function ControlDeck({
           ref={settingsButtonRef}
           className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors ${
             branchOpen
-              ? 'bg-white/20 text-white ring-1 ring-white/30'
+              ? 'bg-white/25 text-white ring-1 ring-white/35'
               : 'bg-black/40 text-white/90 hover:bg-black/55'
           }`}
-          aria-label="Open settings. Long press for quick settings."
+          aria-label={
+            branchOpen ? 'Close quick settings' : 'Open settings. Long press for quick settings.'
+          }
           aria-expanded={branchOpen}
           aria-haspopup="menu"
           onContextMenu={(event) => event.preventDefault()}
           onClickCapture={onClickCapture}
           {...settingsPressHandlers}
         >
-          <Settings className="h-5 w-5" />
+          <AnimatePresence mode="wait" initial={false}>
+            {branchOpen ? (
+              <motion.span
+                key="close"
+                initial={{ opacity: 0, rotate: -45, scale: 0.8 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={{ opacity: 0, rotate: 45, scale: 0.8 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+                className="flex items-center justify-center"
+              >
+                <X className="h-5 w-5" />
+              </motion.span>
+            ) : (
+              <motion.span
+                key="settings"
+                initial={{ opacity: 0, rotate: 45, scale: 0.8 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={{ opacity: 0, rotate: -45, scale: 0.8 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+                className="flex items-center justify-center"
+              >
+                <Settings className="h-5 w-5" />
+              </motion.span>
+            )}
+          </AnimatePresence>
         </button>
 
         <div className="flex flex-col items-center gap-1">

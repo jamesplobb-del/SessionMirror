@@ -69,6 +69,7 @@ export default function App() {
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [showPitch, setShowPitch] = useState(true)
+  const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
@@ -1018,16 +1019,17 @@ export default function App() {
       )}
 
       <div
-        className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}
+        className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
         aria-hidden={isReviewOpen}
       >
         <HudHeader
           sessionName={activeProject?.name ?? 'BestTake'}
           onOpenVault={handleOpenVault}
+          className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
         />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {settings.showTakeCards && (
+          {settings.showTakeCards && !quickSettingsOpen && (
             <PipCompareRow
               benchmarkTake={benchmarkTake}
               challengerTake={challengerTake}
@@ -1063,12 +1065,15 @@ export default function App() {
             recordDropRef={recordDeleteDropRef}
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
-            pitchToggleVisible={settings.pitchTrackerEnabled}
-            pitchToggleActive={showPitch}
-            onPitchToggle={() => setShowPitch((prev) => !prev)}
+            pitchTrackerEnabled={settings.pitchTrackerEnabled}
             showTakeCards={settings.showTakeCards}
+            onPitchTrackerChange={(enabled) => {
+              updateSettings({ pitchTrackerEnabled: enabled })
+              if (enabled) setShowPitch(true)
+            }}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
+            onBranchOpenChange={setQuickSettingsOpen}
           />
         </div>
       </div>

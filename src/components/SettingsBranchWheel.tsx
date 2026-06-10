@@ -1,17 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { AudioLines, LayoutGrid, X } from 'lucide-react'
+import { AudioLines, LayoutGrid } from 'lucide-react'
 import { useEffect, useMemo, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { iosFade, iosSpringSnappy, motionTap, motionTapSoft } from '../utils/motionPresets'
+import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
 
 interface SettingsBranchWheelProps {
   open: boolean
   onClose: () => void
   anchorRef: RefObject<HTMLElement | null>
-  pitchToggleVisible: boolean
-  pitchToggleActive: boolean
-  onPitchToggle: () => void
+  pitchTrackerEnabled: boolean
   showTakeCards: boolean
+  onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
 }
 
@@ -23,35 +22,13 @@ interface BranchItem {
   onSelect: () => void
 }
 
-const BRANCH_RADIUS = 92
-
-function branchPosition(index: number, count: number): { x: number; y: number } {
-  if (count <= 1) {
-    return { x: 0, y: -BRANCH_RADIUS }
-  }
-
-  if (count === 2) {
-    return index === 0 ? { x: -62, y: -BRANCH_RADIUS } : { x: 62, y: -BRANCH_RADIUS }
-  }
-
-  const startAngle = -150
-  const endAngle = -30
-  const angle = startAngle + ((endAngle - startAngle) * index) / Math.max(1, count - 1)
-  const rad = (angle * Math.PI) / 180
-  return {
-    x: Math.cos(rad) * BRANCH_RADIUS,
-    y: Math.sin(rad) * BRANCH_RADIUS,
-  }
-}
-
 export default function SettingsBranchWheel({
   open,
   onClose,
   anchorRef,
-  pitchToggleVisible,
-  pitchToggleActive,
-  onPitchToggle,
+  pitchTrackerEnabled,
   showTakeCards,
+  onPitchTrackerChange,
   onShowTakeCardsChange,
 }: SettingsBranchWheelProps) {
   useEffect(() => {
@@ -80,46 +57,42 @@ export default function SettingsBranchWheel({
     }
   }, [onClose, open])
 
-  const visibleItems = useMemo<BranchItem[]>(() => {
-    const items: BranchItem[] = []
-
-    if (pitchToggleVisible) {
-      items.push({
+  const branchItems = useMemo<BranchItem[]>(
+    () => [
+      {
         id: 'pitch',
-        label: pitchToggleActive ? 'Hide Pitch' : 'Pitch Analysis',
+        label: 'Pitch Analysis',
         icon: AudioLines,
-        active: pitchToggleActive,
+        active: pitchTrackerEnabled,
         onSelect: () => {
-          onPitchToggle()
+          onPitchTrackerChange(!pitchTrackerEnabled)
           onClose()
         },
-      })
-    }
-
-    items.push({
-      id: 'take-cards',
-      label: showTakeCards ? 'Hide Take Cards' : 'Show Take Cards',
-      icon: LayoutGrid,
-      active: showTakeCards,
-      onSelect: () => {
-        onShowTakeCardsChange(!showTakeCards)
-        onClose()
       },
-    })
-
-    return items
-  }, [
-    onClose,
-    onPitchToggle,
-    onShowTakeCardsChange,
-    pitchToggleActive,
-    pitchToggleVisible,
-    showTakeCards,
-  ])
+      {
+        id: 'take-cards',
+        label: 'Take Cards',
+        icon: LayoutGrid,
+        active: showTakeCards,
+        onSelect: () => {
+          onShowTakeCardsChange(!showTakeCards)
+          onClose()
+        },
+      },
+    ],
+    [
+      onClose,
+      onPitchTrackerChange,
+      onShowTakeCardsChange,
+      pitchTrackerEnabled,
+      showTakeCards,
+    ],
+  )
 
   const anchorRect = open ? anchorRef.current?.getBoundingClientRect() : null
   const anchorX = anchorRect ? anchorRect.left + anchorRect.width / 2 : window.innerWidth - 36
   const anchorY = anchorRect ? anchorRect.top + anchorRect.height / 2 : window.innerHeight - 48
+  const positions = anchorRect ? layoutBranchItems(branchItems.length, anchorRect) : []
 
   if (typeof document === 'undefined') return null
 
@@ -129,82 +102,53 @@ export default function SettingsBranchWheel({
         <>
           <motion.button
             type="button"
-            className="settings-branch-backdrop fixed inset-0 z-[200] cursor-default touch-none bg-black/25"
+            className="settings-branch-backdrop fixed inset-0 z-[200] cursor-default touch-none bg-black/45"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={iosFade}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             aria-label="Close quick settings"
             onPointerDown={(event) => event.preventDefault()}
             onClick={onClose}
-            whileTap={motionTapSoft}
           />
 
           <div
             className="settings-branch-wheel pointer-events-none fixed z-[201] touch-none"
-            style={{
-              left: anchorX,
-              top: anchorY,
-            }}
+            style={{ left: anchorX, top: anchorY }}
             role="menu"
             aria-label="Quick settings"
           >
-            <motion.button
-              type="button"
-              className="settings-branch-wheel__close pointer-events-auto absolute flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-black/50 text-white/80 backdrop-blur-md"
-              style={{ left: 0, top: visibleItems.length === 1 ? -148 : -132 }}
-              initial={{ opacity: 0, scale: 0.8, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 8 }}
-              transition={iosSpringSnappy}
-              aria-label="Close quick settings"
-              onClick={onClose}
-              whileTap={motionTapSoft}
-            >
-              <X className="h-4 w-4" />
-            </motion.button>
+            {branchItems.map((item, index) => {
+              const Icon = item.icon
+              const { x, y } = positions[index] ?? { x: 0, y: -80 }
 
-            <AnimatePresence mode="popLayout" initial={false}>
-              {visibleItems.map((item, index) => {
-                const Icon = item.icon
-                const { x, y } = branchPosition(index, visibleItems.length)
-
-                return (
-                  <motion.button
-                    key={item.id}
-                    type="button"
-                    role="menuitem"
-                    layout="position"
-                    className={`settings-branch-wheel__item pointer-events-auto absolute flex w-[5.5rem] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5 ${
-                      item.active ? 'settings-branch-wheel__item--active' : ''
-                    }`}
-                    initial={{ opacity: 0, scale: 0.72, x: x * 0.15, y: y * 0.15 }}
-                    animate={{ opacity: 1, scale: 1, x, y }}
-                    exit={{ opacity: 0, scale: 0.72 }}
-                    transition={iosSpringSnappy}
-                    aria-label={item.label}
-                    aria-pressed={item.active}
-                    onClick={item.onSelect}
-                    whileTap={motionTap}
-                  >
-                    <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
-                      <Icon className="h-5 w-5" strokeWidth={2.1} />
-                    </span>
-                    <span className="settings-branch-wheel__label text-center text-[10px] font-semibold leading-tight tracking-wide">
-                      {item.label}
-                    </span>
-                  </motion.button>
-                )
-              })}
-            </AnimatePresence>
-
-            <motion.span
-              className="settings-branch-wheel__stem absolute left-0 top-0 h-10 w-px -translate-x-1/2 -translate-y-full bg-white/20"
-              initial={{ scaleY: 0, opacity: 0 }}
-              animate={{ scaleY: 1, opacity: 1 }}
-              exit={{ scaleY: 0, opacity: 0 }}
-              aria-hidden
-            />
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="menuitem"
+                  className={`settings-branch-wheel__item pointer-events-auto absolute flex flex-col items-center gap-1.5 transition-transform duration-150 active:scale-95 ${
+                    item.active ? 'settings-branch-wheel__item--active' : ''
+                  }`}
+                  style={{
+                    left: 0,
+                    top: 0,
+                    width: BRANCH_ITEM_WIDTH,
+                    transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                  }}
+                  aria-label={item.label}
+                  aria-pressed={item.active}
+                  onClick={item.onSelect}
+                >
+                  <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
+                    <Icon className="h-5 w-5" strokeWidth={2.1} />
+                  </span>
+                  <span className="settings-branch-wheel__label text-center text-[10px] font-semibold leading-tight tracking-wide">
+                    {item.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </>
       )}

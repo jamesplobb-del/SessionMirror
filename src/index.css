@@ -177,6 +177,42 @@ body.settings-branch-open * {
   padding-bottom: 0;
 }
 
+.app-ui-overlay--quick-settings .hud-header-hidden {
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 0.18s ease-out;
+}
+
+.vault-bulk-bar {
+  animation: vault-bulk-in 0.18s ease-out;
+}
+
+@keyframes vault-bulk-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vault-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #292524 0%, #1c1917 100%);
+}
+
+.vault-thumb-placeholder__label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+}
+
 .control-deck__settings-btn {
   -webkit-user-select: none;
   user-select: none;

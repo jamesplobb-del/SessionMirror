@@ -4,11 +4,14 @@ import Pressable from './ui/Pressable'
 interface HudHeaderProps {
   sessionName: string
   onOpenVault: () => void
+  className?: string
 }
 
-export default function HudHeader({ sessionName, onOpenVault }: HudHeaderProps) {
+export default function HudHeader({ sessionName, onOpenVault, className = '' }: HudHeaderProps) {
   return (
-    <header className="pointer-events-none flex shrink-0 justify-center px-4 pt-2">
+    <header
+      className={`pointer-events-none flex shrink-0 justify-center px-4 pt-2 transition-opacity duration-200 ${className}`}
+    >
       <Pressable
         type="button"
         intensity="soft"
