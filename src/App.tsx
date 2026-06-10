@@ -41,7 +41,7 @@ import {
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
-import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
+import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
 import { scheduleViewportSync } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
@@ -609,9 +609,6 @@ export default function App() {
     !autoRecordStartSuppressed
 
   const wasVaultOpenRef = useRef(false)
-  const thumbnailHydrateRef = useRef(0)
-  const takesRef = useRef(takes)
-  takesRef.current = takes
 
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
@@ -646,30 +643,18 @@ export default function App() {
     deferHudMediaPause()
   }, [deferHudMediaPause])
 
-  useEffect(() => {
-    if (!isVaultOpen) return
+  const handleVaultEnterComplete = useCallback(() => {
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
 
-    let cancelled = false
-    const cancelSchedule = scheduleIdle(() => {
-      if (cancelled) return
-
-      const missingThumbnails = takesRef.current.filter(
-        (take) => !take.thumbnailUrl && !isAudioTake(take),
-      )
-      if (missingThumbnails.length === 0) return
-
-      const hydrateToken = ++thumbnailHydrateRef.current
-      void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(() => {
-        if (hydrateToken !== thumbnailHydrateRef.current) return
-      })
-    }, 140)
-
-    return () => {
-      cancelled = true
-      cancelSchedule()
-      thumbnailHydrateRef.current += 1
-    }
-  }, [applyTakeThumbnails, isVaultOpen])
+    void (async () => {
+      const rows = await getTakesByProject(projectId)
+      const loaded = await uiTakesFromVaultRows(rows)
+      setTakes(loaded)
+      setBenchmarkId(findBestTakeId(rows))
+      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
+    })()
+  }, [applyTakeThumbnails])
 
   const handleOpenSettings = useCallback(() => {
     startTransition(() => {
@@ -1308,6 +1293,7 @@ export default function App() {
           stopAutoPlaybackAudio()
           pausePipVideos()
         }}
+        onEnterComplete={handleVaultEnterComplete}
       />
 
       <SettingsDrawer

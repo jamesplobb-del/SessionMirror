@@ -68,6 +68,9 @@ export const iosSheetPremium = {
   ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
 }
 
+/** Milliseconds — matches iosSheetPremium duration for deferred drawer content. */
+export const iosSheetPremiumDurationMs = Math.round(iosSheetPremium.duration * 1000)
+
 export const iosSheetBackdrop = {
   duration: 0.28,
   ease: [0.32, 0.72, 0, 1] as [number, number, number, number],

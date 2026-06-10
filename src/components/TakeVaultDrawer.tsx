@@ -5,9 +5,11 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
+import { VaultDrawerSkeleton } from './ui/DrawerSkeletons'
 import Pressable from './ui/Pressable'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
+import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { getTakeMediaType } from '../utils/mediaType'
@@ -36,6 +38,8 @@ interface TakeVaultDrawerProps {
   onClearAllTakes: () => void
   onOpenTake: (take: Take) => void
   onBeforeExport?: () => void
+  /** Fires after the sheet slide completes — use for deferred DB hydration. */
+  onEnterComplete?: () => void
 }
 
 export default function TakeVaultDrawer({
@@ -60,25 +64,37 @@ export default function TakeVaultDrawer({
   onClearAllTakes,
   onOpenTake,
   onBeforeExport,
+  onEnterComplete,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
+  const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
   const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
   const [exportingTakeId, setExportingTakeId] = useState<string | null>(null)
 
+  const handleSheetEnterComplete = useCallback(() => {
+    markContentReady()
+    onEnterComplete?.()
+  }, [markContentReady, onEnterComplete])
+
   const videoCount = useMemo(
-    () => takes.filter((take) => getTakeMediaType(take) === 'video').length,
-    [takes],
+    () =>
+      contentReady ? takes.filter((take) => getTakeMediaType(take) === 'video').length : 0,
+    [contentReady, takes],
   )
   const audioCount = useMemo(
-    () => takes.filter((take) => getTakeMediaType(take) === 'audio').length,
-    [takes],
+    () =>
+      contentReady ? takes.filter((take) => getTakeMediaType(take) === 'audio').length : 0,
+    [contentReady, takes],
   )
   const filteredTakes = useMemo(
-    () => sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab),
-    [sortedTakes, vaultMediaTab],
+    () =>
+      contentReady
+        ? sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab)
+        : [],
+    [contentReady, sortedTakes, vaultMediaTab],
   )
 
   const silenceAllVaultVideos = useCallback(() => {
@@ -210,6 +226,7 @@ export default function TakeVaultDrawer({
       maxHeightClass="h-[min(75vh,100dvh)]"
       sheetRef={drawerRef}
       motionPreset="premium"
+      onEnterComplete={handleSheetEnterComplete}
     >
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
@@ -223,7 +240,7 @@ export default function TakeVaultDrawer({
             </p>
           </div>
           <div className="flex items-center gap-1">
-            {takes.length > 0 && !selectionMode && (
+            {contentReady && takes.length > 0 && !selectionMode && (
               <>
                 <Pressable
                   type="button"
@@ -266,6 +283,10 @@ export default function TakeVaultDrawer({
         </div>
 
         <div className="vault-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-4">
+          {!contentReady ? (
+            <VaultDrawerSkeleton />
+          ) : (
+            <>
           <ProjectSessionBar
             projects={projects}
             activeProjectId={activeProject?.id ?? null}
@@ -384,9 +405,11 @@ export default function TakeVaultDrawer({
               )}
             </>
           )}
+            </>
+          )}
         </div>
 
-        {selectionMode && selectedCount > 0 && (
+        {contentReady && selectionMode && selectedCount > 0 && (
           <div
             className="vault-bulk-bar flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
@@ -413,7 +436,7 @@ export default function TakeVaultDrawer({
           </div>
         )}
 
-        {selectionMode && selectedCount === 0 && (
+        {contentReady && selectionMode && selectedCount === 0 && (
           <div
             className="vault-bulk-bar flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}

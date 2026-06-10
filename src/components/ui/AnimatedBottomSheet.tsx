@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import {
   iosFade,
@@ -24,6 +24,8 @@ interface AnimatedBottomSheetProps {
   sheetRef?: RefObject<HTMLDivElement | null>
   /** Sheet motion profile — premium uses eased slide + subtle scale. */
   motionPreset?: 'default' | 'light' | 'premium'
+  /** Fires once when the enter slide animation finishes (not on exit). */
+  onEnterComplete?: () => void
 }
 
 export default function AnimatedBottomSheet({
@@ -34,8 +36,16 @@ export default function AnimatedBottomSheet({
   maxHeightClass = 'max-h-[min(88vh,100dvh)]',
   sheetRef,
   motionPreset = 'premium',
+  onEnterComplete,
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSlideDistance)
+  const enterNotifiedRef = useRef(false)
+
+  useLayoutEffect(() => {
+    if (isOpen) {
+      enterNotifiedRef.current = false
+    }
+  }, [isOpen])
 
   useLayoutEffect(() => {
     if (!isOpen) return
@@ -66,6 +76,12 @@ export default function AnimatedBottomSheet({
         : iosSheetBackdrop
   const useScale = motionPreset !== 'light'
 
+  const handleSheetAnimationComplete = () => {
+    if (!isOpen || enterNotifiedRef.current) return
+    enterNotifiedRef.current = true
+    onEnterComplete?.()
+  }
+
   return createPortal(
     <AnimatePresence>
       {isOpen && (
@@ -93,6 +109,7 @@ export default function AnimatedBottomSheet({
             animate={useScale ? { y: 0, scale: 1 } : { y: 0 }}
             exit={useScale ? { y: slideDistance, scale: 0.985 } : { y: slideDistance }}
             transition={sheetTransition}
+            onAnimationComplete={handleSheetAnimationComplete}
           >
             <div className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden">
               <div

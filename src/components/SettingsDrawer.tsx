@@ -1,13 +1,16 @@
+import { useCallback } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import AnimatedExpand from './ui/AnimatedExpand'
+import { SettingsDrawerSkeleton } from './ui/DrawerSkeletons'
 import IOSSegmentedControl from './ui/IOSSegmentedControl'
 import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
+import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -148,8 +151,20 @@ export default function SettingsDrawer({
   onReset,
   recordingMode,
 }: SettingsDrawerProps) {
+  const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
+
+  const handleSheetEnterComplete = useCallback(() => {
+    markContentReady()
+  }, [markContentReady])
+
   return (
-    <AnimatedBottomSheet isOpen={isOpen} onClose={onClose} ariaLabel="Settings" motionPreset="premium">
+    <AnimatedBottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Settings"
+      motionPreset="premium"
+      onEnterComplete={handleSheetEnterComplete}
+    >
       <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
         <div>
           <h2 className="text-base font-semibold text-stone-900">Settings</h2>
@@ -167,6 +182,9 @@ export default function SettingsDrawer({
       </div>
 
       <div className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+        {!contentReady ? (
+          <SettingsDrawerSkeleton />
+        ) : (
         <div className="space-y-6 pb-2">
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
@@ -279,6 +297,7 @@ export default function SettingsDrawer({
             Reset to Defaults
           </Pressable>
         </div>
+        )}
       </div>
     </AnimatedBottomSheet>
   )
