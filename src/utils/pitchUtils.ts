@@ -182,6 +182,27 @@ export function getIntonationColor(cents: number): string {
   return '#ef4444'
 }
 
+/** Vertical cents gradient for pitch trace (sharp top → in-tune center → flat bottom). */
+export function createPitchVerticalGradient(
+  ctx: CanvasRenderingContext2D,
+  centsToY: (cents: number) => number,
+): CanvasGradient {
+  const gradient = ctx.createLinearGradient(0, centsToY(50), 0, centsToY(-50))
+  gradient.addColorStop(0, '#ef4444')
+  gradient.addColorStop(0.32, '#f59e0b')
+  gradient.addColorStop(0.5, '#22c55e')
+  gradient.addColorStop(0.68, '#f59e0b')
+  gradient.addColorStop(1, '#ef4444')
+  return gradient
+}
+
+export function glowColorForCents(cents: number): string {
+  const zone = getIntonationZone(cents)
+  if (zone === 'green') return 'rgba(34, 197, 94, 0.55)'
+  if (zone === 'yellow') return 'rgba(245, 158, 11, 0.55)'
+  return 'rgba(239, 68, 68, 0.55)'
+}
+
 export function formatFrequencyHz(frequencyHz: number): string {
   if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) return '— Hz'
   return `${frequencyHz.toFixed(1)} Hz`

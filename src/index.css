@@ -394,11 +394,43 @@ video.camera-preview.camera-preview--hidden {
   background: #0c0a09;
 }
 
-.pitch-analysis-float {
-  bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
-  padding-left: max(1rem, env(safe-area-inset-left, 0px));
-  padding-right: max(1rem, env(safe-area-inset-right, 0px));
-  max-height: min(24dvh, 188px);
+.review-overlay--immersive {
+  background: transparent !important;
+}
+
+.review-video-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.review-video-bleed,
+.review-video-bleed__player,
+.review-video-bleed video {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  object-fit: cover !important;
+  z-index: 0;
+}
+
+.review-overlay-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+}
+
+.review-bottom-ui {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .pitch-glass-panel {
@@ -413,7 +445,7 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .pitch-spectrogram--glass {
-  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.45));
+  filter: none;
 }
 
 .pitch-tuner--panel {

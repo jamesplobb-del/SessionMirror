@@ -77,7 +77,7 @@ function ReviewTakeLayer({
   if (videoAnalysis) {
     return (
       <div
-        className="absolute inset-0 h-full w-full bg-black transition-all duration-200 ease-out"
+        className="review-video-bleed absolute inset-0 h-full w-full transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
         <TakeVideoPlayer
@@ -86,7 +86,7 @@ function ReviewTakeLayer({
           videoUrl={videoUrl}
           mimeType={mimeType}
           videoRef={videoRef}
-          className="absolute inset-0 h-full w-full object-contain"
+          className="review-video-bleed__player"
           mirror={mirror}
           audible
           manualPlayOnly
@@ -102,17 +102,6 @@ function ReviewTakeLayer({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
         />
-        <div className="pitch-analysis-float pointer-events-none absolute inset-x-0 z-20">
-          <LivePitchTuner
-            mediaRef={videoRef}
-            enabled={pitchTrackerEnabled && isActive}
-            isPlaying={trackerPlaying}
-            mediaKey={playerKey}
-            takeName={takeName}
-            label={tunerLabel ?? 'Pitch Analysis'}
-            variant="panel"
-          />
-        </div>
       </div>
     )
   }
@@ -155,7 +144,7 @@ function ReviewTakeLayer({
 
   return (
     <div
-      className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
+      className="review-video-bleed absolute inset-0 h-full w-full transition-all duration-200 ease-out"
       style={swipeLayerStyle}
     >
       <TakeVideoPlayer
@@ -164,7 +153,7 @@ function ReviewTakeLayer({
         videoUrl={videoUrl}
         mimeType={mimeType}
         videoRef={videoRef}
-        className="custom-video-player h-full w-full object-cover"
+        className="review-video-bleed__player custom-video-player"
         mirror={mirror}
         audible
         manualPlayOnly
@@ -278,6 +267,18 @@ export default function ReviewModeOverlay({
   const canSwipeRight = isVault
     ? vaultIndex > 0
     : activeSlot === 'challenger' && benchmarkSrc !== null
+
+  const activePitchMediaRef = isVault
+    ? vaultVideoRef
+    : activeSlot === 'benchmark'
+      ? benchmarkVideoRef
+      : challengerVideoRef
+
+  const activePitchMediaKey = isVault
+    ? `vault-${vaultTake?.id ?? vaultIndex}`
+    : activeSlot === 'benchmark'
+      ? `benchmark-${benchmarkFilePath}-${benchmarkSrc}`
+      : `challenger-${challengerFilePath}-${challengerSrc}`
 
   const pauseAllReviewVideos = useCallback(() => {
     resetVideoPlayback(benchmarkVideoRef.current)
@@ -433,6 +434,24 @@ export default function ReviewModeOverlay({
   const hasBenchmark = Boolean(benchmarkSrc || benchmarkFilePath)
   const hasChallenger = Boolean(challengerSrc || challengerFilePath)
   const hasMedia = isVault ? vaultTakes.length > 0 : hasBenchmark || hasChallenger
+
+  const showVideoPitchPanel =
+    pitchTrackerEnabled &&
+    isOpen &&
+    (isVault
+      ? Boolean(
+          vaultTake &&
+            !isAudioMedia(
+              vaultTake.videoMimeType ??
+                (vaultTake.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME),
+              vaultTake.mediaType,
+            ),
+        )
+      : activeSlot === 'benchmark'
+        ? hasBenchmark &&
+          !isAudioMedia(benchmarkMimeType, benchmarkMediaType)
+        : hasChallenger &&
+          !isAudioMedia(challengerMimeType, challengerMediaType))
 
   useEffect(() => {
     reviewAutoplayEnabledRef.current = isOpen
@@ -687,18 +706,15 @@ export default function ReviewModeOverlay({
 
   return (
     <div
-      className={`review-overlay fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-black transition-opacity duration-200 ease-in ${
+      className={`review-overlay review-overlay--immersive fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden transition-opacity duration-200 ease-in ${
         isOpen
           ? 'pointer-events-auto opacity-100'
           : 'pointer-events-none invisible opacity-0'
       }`}
       aria-hidden={!isOpen}
     >
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-40 bg-gradient-to-b from-black/55 to-transparent px-5 pb-3"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-      >
-        <div className="relative flex items-start justify-between gap-3">
+      <div className="review-overlay-header pointer-events-none absolute inset-x-0 top-0 z-10 px-5 pb-3">
+        <div className="relative flex items-start justify-between gap-3 bg-gradient-to-b from-black/50 to-transparent pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
               {activeLabel}
@@ -720,7 +736,7 @@ export default function ReviewModeOverlay({
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="review-video-stage relative min-h-0 flex-1 overflow-hidden">
         {isOpen && !isVault && (canSwipeLeft || canSwipeRight) && (
           <div className="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center">
             <p className="rounded-full bg-black/40 px-3 py-1 text-[10px] text-white/50 backdrop-blur-sm">
@@ -864,7 +880,20 @@ export default function ReviewModeOverlay({
         )}
 
         {isOpen && (
-          <div className="review-timeline-overlay pointer-events-none absolute inset-x-0 bottom-0 z-30">
+          <div className="review-bottom-ui pointer-events-none absolute inset-x-0 bottom-0 z-10">
+            {showVideoPitchPanel && (
+              <div className="px-4 pb-3">
+                <LivePitchTuner
+                  mediaRef={activePitchMediaRef}
+                  enabled={pitchTrackerEnabled}
+                  isPlaying={isPlaying}
+                  mediaKey={activePitchMediaKey}
+                  takeName={activeName}
+                  label="Pitch Analysis"
+                  variant="panel"
+                />
+              </div>
+            )}
             <ReviewTimeline
               trackRef={timelineTrackRef}
               currentTime={currentTime}

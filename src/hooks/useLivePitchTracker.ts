@@ -11,15 +11,15 @@ import {
   PITCH_ANCHOR_MIDI_ALPHA,
   PITCH_GRAPH_SMOOTH_WINDOW,
   PITCH_READOUT_INTERVAL_MS,
-  PITCH_TRACE_COLOR,
-  PITCH_TRACE_GLOW,
   CENTS_DISPLAY_STEP,
   type PitchCanvasTheme,
 } from '../utils/pitchConfig'
 import {
   frequencyToMidi,
   frequencyToPitchReadout,
+  createPitchVerticalGradient,
   getIntonationColor,
+  glowColorForCents,
   isFrequencyInInstrumentRange,
   movingAverage,
   normalizeInstrumentFrequency,
@@ -237,18 +237,22 @@ function drawSmoothPitchTrace(
   ctx.lineCap = 'round'
 
   if (theme === 'glass') {
+    const pitchGradient = createPitchVerticalGradient(ctx, centsToY)
+    const latest = points[points.length - 1]
+    const glow = glowColorForCents(latest.cents)
+
     ctx.save()
-    ctx.shadowColor = PITCH_TRACE_GLOW
+    ctx.shadowColor = glow
     ctx.shadowBlur = 12
-    ctx.strokeStyle = PITCH_TRACE_COLOR
+    ctx.strokeStyle = pitchGradient
     ctx.lineWidth = 4.5
-    ctx.globalAlpha = 0.35
+    ctx.globalAlpha = 0.4
     ctx.stroke()
     ctx.restore()
 
-    ctx.strokeStyle = PITCH_TRACE_COLOR
+    ctx.strokeStyle = pitchGradient
     ctx.lineWidth = 3.25
-    ctx.globalAlpha = 0.95
+    ctx.globalAlpha = 0.96
     ctx.stroke()
     ctx.globalAlpha = 1
     return
@@ -359,11 +363,12 @@ function drawPitchCanvas(
   if (currentCents != null && active) {
     const dotX = width - (isGlass ? 18 : 16)
     const dotY = centsToY(currentCents)
-    const dotColor = isGlass ? PITCH_TRACE_COLOR : getIntonationColor(currentCents)
+    const dotColor = getIntonationColor(currentCents)
+    const dotGlow = glowColorForCents(currentCents)
 
     ctx.beginPath()
     ctx.arc(dotX, dotY, isGlass ? 7 : 6, 0, Math.PI * 2)
-    ctx.fillStyle = isGlass ? 'rgba(56, 189, 248, 0.28)' : 'rgba(34, 197, 94, 0.25)'
+    ctx.fillStyle = dotGlow.replace('0.55', '0.3')
     ctx.fill()
     ctx.beginPath()
     ctx.arc(dotX, dotY, isGlass ? 5 : 4.5, 0, Math.PI * 2)

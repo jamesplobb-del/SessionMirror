@@ -47,10 +47,4 @@ export const NOTE_HYSTERESIS_CENTS = 32
 
 export const INSTRUMENT_RANGE_LABEL = 'Voice · winds · strings'
 
-/** Brand trace color for pitch graph (sky-400). */
-export const PITCH_TRACE_COLOR = '#38bdf8'
-
-/** Glow for pitch trace line. */
-export const PITCH_TRACE_GLOW = 'rgba(56, 189, 248, 0.55)'
-
 export type PitchCanvasTheme = 'glass' | 'solid'

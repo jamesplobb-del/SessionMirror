@@ -1,6 +1,5 @@
 import { useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
-import { PITCH_TRACE_COLOR } from '../utils/pitchConfig'
 import {
   formatFrequencyHz,
   getIntonationColor,
@@ -22,18 +21,14 @@ function CentsNeedle({
   cents,
   active,
   compact = false,
-  accentColor,
 }: {
   cents: number
   active: boolean
   compact?: boolean
-  accentColor?: string
 }) {
   const clamped = active ? Math.max(-50, Math.min(50, cents)) : 0
   const position = 50 + clamped
-  const dotColor = active
-    ? (accentColor ?? getIntonationColor(cents))
-    : 'rgba(255,255,255,0.35)'
+  const dotColor = active ? getIntonationColor(cents) : 'rgba(255,255,255,0.35)'
 
   return (
     <div
@@ -41,10 +36,10 @@ function CentsNeedle({
         compact ? 'h-1' : 'h-1.5'
       }`}
     >
-      <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-sky-400/20" />
-      <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-white/5" />
+      <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-emerald-400/20" />
+      <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-amber-400/10" />
       <div
-        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(56,189,248,0.35)] ${
+        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] ${
           compact ? 'h-2.5 w-2.5' : 'h-3 w-3'
         }`}
         style={{
@@ -81,7 +76,7 @@ function StatusLabel({
   return (
     <p
       className={`text-[9px] font-medium uppercase tracking-wider ${
-        inTune ? 'text-sky-300/90' : zone === 'yellow' ? 'text-amber-300/80' : 'text-white/35'
+        inTune ? 'text-emerald-400/90' : zone === 'yellow' ? 'text-amber-300/80' : 'text-white/30'
       }`}
     >
       {text}
@@ -112,68 +107,45 @@ export default function LivePitchTuner({
   )
 
   const active = readout.noteName !== '—'
-  const accent = active
-    ? isPanel
-      ? PITCH_TRACE_COLOR
-      : getIntonationColor(readout.cents)
-    : 'rgba(255,255,255,0.55)'
+  const accent = active ? getIntonationColor(readout.cents) : 'rgba(255,255,255,0.55)'
   const inTune = active && isInTune(readout.cents)
   const zone = active ? getIntonationZone(readout.cents) : null
-  const spectrogramHeight = isPanel
-    ? 'min-h-[5.5rem]'
-    : isStage
-      ? 'min-h-0 flex-1'
-      : 'h-[6.5rem]'
+  const spectrogramHeight = isStage
+    ? 'min-h-0 flex-1'
+    : 'h-[6.5rem]'
 
   if (isPanel) {
     return (
       <div className="pitch-tuner pitch-tuner--panel h-full w-full">
-        <div className="pitch-glass-panel flex h-full w-full flex-col overflow-hidden">
-          <div className={`relative flex-1 overflow-hidden p-5 ${spectrogramHeight}`}>
+        <div className="pitch-glass-panel flex h-full min-h-[9.5rem] w-full flex-col overflow-hidden">
+          <div className="flex shrink-0 items-start justify-between gap-4 px-5 pt-5 pb-2">
+            <div className="min-w-0">
+              <p
+                className="font-mono text-2xl font-bold leading-none tabular-nums tracking-tight"
+                style={{ color: accent }}
+              >
+                {readout.noteName}
+                {active && (
+                  <span className="ml-2 text-lg font-semibold">
+                    {readout.cents >= 0 ? '+' : ''}
+                    {Math.round(readout.cents)}¢
+                  </span>
+                )}
+              </p>
+            </div>
+            <p
+              className="shrink-0 font-mono text-sm font-bold tabular-nums"
+              style={{ color: accent }}
+            >
+              {formatFrequencyHz(readout.frequencyHz)}
+            </p>
+          </div>
+
+          <div className="relative min-h-[5rem] flex-1 overflow-hidden px-5 pb-5">
             <canvas
               ref={canvasRef}
               className="pitch-spectrogram pitch-spectrogram--glass absolute inset-0 h-full w-full"
             />
-          </div>
-
-          <div className="flex shrink-0 items-center gap-3 border-t border-white/10 px-5 pb-5 pt-3">
-            <div className="min-w-[3.25rem] shrink-0">
-              <p
-                className="font-mono text-xl font-bold leading-none tabular-nums"
-                style={{ color: accent }}
-              >
-                {readout.noteName}
-              </p>
-              <p className="mt-0.5 font-mono text-[9px] text-white/40">
-                {formatFrequencyHz(readout.frequencyHz)}
-              </p>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <CentsNeedle
-                cents={readout.cents}
-                active={active}
-                compact
-                accentColor={PITCH_TRACE_COLOR}
-              />
-            </div>
-
-            <div className="shrink-0 text-right">
-              <p
-                className="font-mono text-base font-semibold tabular-nums"
-                style={{ color: accent }}
-              >
-                {active ? (
-                  <>
-                    {readout.cents >= 0 ? '+' : ''}
-                    {Math.round(readout.cents)}¢
-                  </>
-                ) : (
-                  '—'
-                )}
-              </p>
-              <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
-            </div>
           </div>
         </div>
       </div>
