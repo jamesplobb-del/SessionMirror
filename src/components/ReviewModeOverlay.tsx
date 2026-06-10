@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
-import LivePitchTuner from './LivePitchTuner'
+import DraggablePitchWidget from './DraggablePitchWidget'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
@@ -20,12 +20,7 @@ interface ReviewTakeLayerProps {
   mimeType: string
   mediaType?: MediaType
   mirror: boolean
-  takeName?: string
-  tunerLabel?: string
   videoRef: RefObject<HTMLMediaElement | null>
-  pitchTrackerEnabled: boolean
-  isPlaying: boolean
-  isActive: boolean
   swipeLayerStyle?: React.CSSProperties
   onPointerDown?: React.PointerEventHandler<HTMLVideoElement>
   onPointerMove?: React.PointerEventHandler<HTMLVideoElement>
@@ -40,12 +35,7 @@ function ReviewTakeLayer({
   mimeType,
   mediaType,
   mirror,
-  takeName,
-  tunerLabel,
   videoRef,
-  pitchTrackerEnabled,
-  isPlaying,
-  isActive,
   swipeLayerStyle,
   onPointerDown,
   onPointerMove,
@@ -55,10 +45,6 @@ function ReviewTakeLayer({
   const [mediaRepairKey, setMediaRepairKey] = useState(0)
   const playerKey = `${takeKey}-r${mediaRepairKey}`
   const isAudio = isAudioMedia(mimeType, mediaType)
-  const showTuner = pitchTrackerEnabled
-  const audioAnalysis = showTuner && isAudio
-  const videoAnalysis = showTuner && !isAudio
-  const trackerPlaying = isPlaying && isActive
 
   useEffect(() => {
     const media = videoRef.current
@@ -74,42 +60,10 @@ function ReviewTakeLayer({
     }
   }, [playerKey, videoRef])
 
-  if (videoAnalysis) {
+  if (isAudio) {
     return (
       <div
-        className="review-video-bleed absolute inset-0 h-full w-full transition-all duration-200 ease-out"
-        style={swipeLayerStyle}
-      >
-        <TakeVideoPlayer
-          key={playerKey}
-          filePath={filePath}
-          videoUrl={videoUrl}
-          mimeType={mimeType}
-          videoRef={videoRef}
-          className="review-video-bleed__player"
-          mirror={mirror}
-          audible
-          manualPlayOnly
-          eagerLoad
-          preload="auto"
-          style={{
-            WebkitTouchCallout: 'default',
-            userSelect: 'auto',
-          }}
-          controls={false}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
-        />
-      </div>
-    )
-  }
-
-  if (audioAnalysis) {
-    return (
-      <div
-        className="absolute inset-0 flex h-full w-full flex-col bg-stone-950 transition-all duration-200 ease-out"
+        className="absolute inset-0 bg-stone-950 transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
         <TakeVideoPlayer
@@ -126,18 +80,6 @@ function ReviewTakeLayer({
           preload="auto"
           controls={false}
         />
-        <div className="flex-1" />
-        <div className="h-[min(34dvh,280px)] shrink-0 border-t border-white/8">
-          <LivePitchTuner
-            mediaRef={videoRef}
-            enabled={pitchTrackerEnabled && isActive}
-            isPlaying={trackerPlaying}
-            mediaKey={playerKey}
-            takeName={takeName}
-            label={tunerLabel ?? 'Pitch Analysis'}
-            variant="dock"
-          />
-        </div>
       </div>
     )
   }
@@ -153,7 +95,7 @@ function ReviewTakeLayer({
         videoUrl={videoUrl}
         mimeType={mimeType}
         videoRef={videoRef}
-        className="review-video-bleed__player custom-video-player"
+        className="review-video-bleed__player"
         mirror={mirror}
         audible
         manualPlayOnly
@@ -223,6 +165,7 @@ export default function ReviewModeOverlay({
   const benchmarkVideoRef = useRef<HTMLMediaElement>(null)
   const challengerVideoRef = useRef<HTMLMediaElement>(null)
   const vaultVideoRef = useRef<HTMLMediaElement>(null)
+  const reviewBoundsRef = useRef<HTMLDivElement>(null)
   const timelineTrackRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
   const progressLoopRef = useRef<number | null>(null)
@@ -435,23 +378,14 @@ export default function ReviewModeOverlay({
   const hasChallenger = Boolean(challengerSrc || challengerFilePath)
   const hasMedia = isVault ? vaultTakes.length > 0 : hasBenchmark || hasChallenger
 
-  const showVideoPitchPanel =
+  const showPitchPanel =
     pitchTrackerEnabled &&
     isOpen &&
     (isVault
-      ? Boolean(
-          vaultTake &&
-            !isAudioMedia(
-              vaultTake.videoMimeType ??
-                (vaultTake.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME),
-              vaultTake.mediaType,
-            ),
-        )
+      ? Boolean(vaultTake)
       : activeSlot === 'benchmark'
-        ? hasBenchmark &&
-          !isAudioMedia(benchmarkMimeType, benchmarkMediaType)
-        : hasChallenger &&
-          !isAudioMedia(challengerMimeType, challengerMediaType))
+        ? hasBenchmark
+        : hasChallenger)
 
   useEffect(() => {
     reviewAutoplayEnabledRef.current = isOpen
@@ -713,6 +647,7 @@ export default function ReviewModeOverlay({
       }`}
       aria-hidden={!isOpen}
     >
+      <div ref={reviewBoundsRef} className="relative h-full w-full">
       <div className="review-overlay-header pointer-events-none absolute inset-x-0 top-0 z-10 px-5 pb-3">
         <div className="relative flex items-start justify-between gap-3 bg-gradient-to-b from-black/50 to-transparent pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0 flex-1">
@@ -760,12 +695,7 @@ export default function ReviewModeOverlay({
             }
             mediaType={vaultTake.mediaType}
             mirror={vaultTake.mirrorPlayback !== false}
-            takeName={vaultTake.name}
-            tunerLabel="Pitch Analysis"
             videoRef={vaultVideoRef}
-            pitchTrackerEnabled={pitchTrackerEnabled}
-            isPlaying={isPlaying}
-            isActive
             swipeLayerStyle={swipeLayerStyle}
             onPointerDown={handleVideoPointerDown}
             onPointerMove={handleVideoPointerMove}
@@ -789,12 +719,7 @@ export default function ReviewModeOverlay({
                   mimeType={benchmarkMimeType}
                   mediaType={benchmarkMediaType}
                   mirror={benchmarkMirror}
-                  takeName={benchmarkName}
-                  tunerLabel="Pitch Analysis"
                   videoRef={benchmarkVideoRef}
-                  pitchTrackerEnabled={pitchTrackerEnabled}
-                  isPlaying={isPlaying}
-                  isActive={activeSlot === 'benchmark'}
                   swipeLayerStyle={
                     activeSlot === 'benchmark' ? swipeLayerStyle : undefined
                   }
@@ -829,12 +754,7 @@ export default function ReviewModeOverlay({
                   mimeType={challengerMimeType}
                   mediaType={challengerMediaType}
                   mirror={challengerMirror}
-                  takeName={challengerName}
-                  tunerLabel="Pitch Analysis"
                   videoRef={challengerVideoRef}
-                  pitchTrackerEnabled={pitchTrackerEnabled}
-                  isPlaying={isPlaying}
-                  isActive={activeSlot === 'challenger'}
                   swipeLayerStyle={
                     activeSlot === 'challenger' ? swipeLayerStyle : undefined
                   }
@@ -855,6 +775,7 @@ export default function ReviewModeOverlay({
             )}
           </>
         ) : null}
+      </div>
 
         {isOpen && (
         <button
@@ -879,21 +800,21 @@ export default function ReviewModeOverlay({
         </button>
         )}
 
+        {showPitchPanel && (
+          <DraggablePitchWidget
+            boundaryRef={reviewBoundsRef}
+            defaultBottomOffset={120}
+            mediaRef={activePitchMediaRef}
+            enabled={pitchTrackerEnabled}
+            isPlaying={isPlaying}
+            mediaKey={activePitchMediaKey}
+            takeName={activeName}
+            label="Pitch Analysis"
+          />
+        )}
+
         {isOpen && (
           <div className="review-bottom-ui pointer-events-none absolute inset-x-0 bottom-0 z-10">
-            {showVideoPitchPanel && (
-              <div className="px-4 pb-3">
-                <LivePitchTuner
-                  mediaRef={activePitchMediaRef}
-                  enabled={pitchTrackerEnabled}
-                  isPlaying={isPlaying}
-                  mediaKey={activePitchMediaKey}
-                  takeName={activeName}
-                  label="Pitch Analysis"
-                  variant="panel"
-                />
-              </div>
-            )}
             <ReviewTimeline
               trackRef={timelineTrackRef}
               currentTime={currentTime}

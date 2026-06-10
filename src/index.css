@@ -382,18 +382,6 @@ video.camera-preview.camera-preview--hidden {
   z-index: 1;
 }
 
-.audio-main-pitch-stage {
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  padding-top: max(calc(env(safe-area-inset-top, 0px) + 3rem), 3.5rem);
-  padding-bottom: calc(11.5rem + env(safe-area-inset-bottom, 0px));
-  pointer-events: none;
-  background: #0c0a09;
-}
-
 .review-overlay--immersive {
   background: transparent !important;
 }
@@ -444,6 +432,23 @@ video.camera-preview.camera-preview--hidden {
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.pitch-glass-panel--compact {
+  border-radius: 14px;
+  padding: 0;
+}
+
+.pitch-widget-draggable {
+  cursor: grab;
+}
+
+.pitch-widget-draggable:active {
+  cursor: grabbing;
+}
+
+.pitch-tuner--widget {
+  pointer-events: none;
+}
+
 .pitch-spectrogram--glass {
   filter: none;
 }
@@ -453,10 +458,8 @@ video.camera-preview.camera-preview--hidden {
 }
 
 @media (orientation: landscape) {
-  .audio-main-pitch-stage {
-    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  .pitch-widget-draggable {
+    max-width: min(18rem, calc(100% - 1.5rem));
   }
 }
 

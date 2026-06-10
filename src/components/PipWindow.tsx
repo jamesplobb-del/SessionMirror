@@ -28,6 +28,7 @@ interface PipWindowProps {
     onPointerUp: (event: PointerEvent<HTMLElement>) => void
     onPointerCancel: (event: PointerEvent<HTMLElement>) => void
   }
+  onPlaybackChange?: (playing: boolean) => void
 }
 
 const FLOAT_BADGE =
@@ -52,6 +53,7 @@ function PipWindow({
   dragSourceActive = false,
   dragSourceArming = false,
   dragSourceProps,
+  onPlaybackChange,
 }: PipWindowProps) {
   const videoSourceKey = src || filePath || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
@@ -84,6 +86,10 @@ function PipWindow({
       media.removeEventListener('ended', syncPlaying)
     }
   }, [videoRef, videoSourceKey])
+
+  useEffect(() => {
+    onPlaybackChange?.(isPlaying)
+  }, [isPlaying, onPlaybackChange])
 
   useEffect(() => {
     if (!suspendPlayback) return

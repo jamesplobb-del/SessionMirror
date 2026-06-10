@@ -26,7 +26,7 @@ import {
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
-import AudioMainPitchStage from './components/AudioMainPitchStage'
+import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
@@ -89,6 +89,8 @@ export default function App() {
   })
   const [autoPlaybackTakeId, setAutoPlaybackTakeId] = useState<string | null>(null)
   const [autoPlaybackPlaying, setAutoPlaybackPlaying] = useState(false)
+  const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
+  const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
@@ -103,6 +105,7 @@ export default function App() {
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
+  const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
 
@@ -551,15 +554,6 @@ export default function App() {
   const suspendPipPlayback =
     isVaultOpen || isReviewOpen || isSettingsOpen || autoRecordStartSuppressed
 
-  const showAudioMainPitch =
-    settings.pitchTrackerEnabled &&
-    settings.autoSoundRecording &&
-    recordingMode === 'audio' &&
-    autoPlaybackTakeId !== null &&
-    !isReviewOpen &&
-    !isVaultOpen &&
-    !isSettingsOpen
-
   const autoPlaybackTake = useMemo(
     () =>
       autoPlaybackTakeId
@@ -577,6 +571,56 @@ export default function App() {
     () => takes.find((t) => t.id === challengerId) ?? null,
     [takes, challengerId],
   )
+
+  const mainPitchSource = useMemo(() => {
+    if (!settings.pitchTrackerEnabled || recordingMode !== 'audio') return null
+    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
+
+    if (autoPlaybackTakeId && autoPlaybackTake) {
+      return {
+        mediaRef: autoPlaybackAudioRef,
+        take: autoPlaybackTake,
+        isPlaying: autoPlaybackPlaying,
+        mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackAudioKey}`,
+      }
+    }
+
+    if (challengerTake?.mediaType === 'audio' && challengerTake.videoUrl) {
+      return {
+        mediaRef: challengerPipVideoRef,
+        take: challengerTake,
+        isPlaying: challengerPipPlaying,
+        mediaKey: `main-pip-ch-${challengerTake.id}-${challengerTake.filePath}`,
+      }
+    }
+
+    if (benchmarkTake?.mediaType === 'audio' && benchmarkTake.videoUrl) {
+      return {
+        mediaRef: benchmarkPipVideoRef,
+        take: benchmarkTake,
+        isPlaying: benchmarkPipPlaying,
+        mediaKey: `main-pip-bm-${benchmarkTake.id}-${benchmarkTake.filePath}`,
+      }
+    }
+
+    return null
+  }, [
+    settings.pitchTrackerEnabled,
+    recordingMode,
+    isReviewOpen,
+    isVaultOpen,
+    isSettingsOpen,
+    autoPlaybackTakeId,
+    autoPlaybackTake,
+    autoPlaybackPlaying,
+    autoPlaybackAudioKey,
+    challengerTake,
+    challengerPipPlaying,
+    benchmarkTake,
+    benchmarkPipPlaying,
+  ])
+
+  const showMainPitchWidget = mainPitchSource !== null
 
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),
@@ -834,7 +878,7 @@ export default function App() {
   ])
 
   return (
-    <div className="app-shell">
+    <div ref={appShellRef} className="app-shell">
       <audio
         key={autoPlaybackAudioKey}
         ref={autoPlaybackAudioRef}
@@ -852,15 +896,19 @@ export default function App() {
         isRecording={isRecording}
         previewLive={ready}
         viewportKey={windowHeight}
-        pitchStageActive={showAudioMainPitch}
+        pitchStageActive={showMainPitchWidget}
       />
 
-      {showAudioMainPitch && autoPlaybackTake && (
-        <AudioMainPitchStage
-          mediaRef={autoPlaybackAudioRef}
-          take={autoPlaybackTake}
-          isPlaying={autoPlaybackPlaying}
-          audioSessionKey={autoPlaybackAudioKey}
+      {showMainPitchWidget && mainPitchSource && (
+        <DraggablePitchWidget
+          boundaryRef={appShellRef}
+          defaultBottomOffset={200}
+          mediaRef={mainPitchSource.mediaRef}
+          enabled={settings.pitchTrackerEnabled}
+          isPlaying={mainPitchSource.isPlaying}
+          mediaKey={mainPitchSource.mediaKey}
+          takeName={mainPitchSource.take.name}
+          label="Live Pitch"
         />
       )}
 
@@ -889,6 +937,8 @@ export default function App() {
             onExpandBenchmark={handleExpandBenchmark}
             onExpandChallenger={handleExpandChallenger}
             onDragStateChange={handlePipDragStateChange}
+            onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+            onChallengerPlaybackChange={setChallengerPipPlaying}
             hapticFeedback={settings.hapticFeedback}
           />
 

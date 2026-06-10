@@ -13,7 +13,7 @@ interface LivePitchTunerProps {
   mediaKey: string
   takeName?: string
   label?: string
-  variant?: 'panel' | 'dock' | 'stage'
+  variant?: 'panel' | 'dock' | 'stage' | 'widget'
   enabled?: boolean
 }
 
@@ -94,8 +94,9 @@ export default function LivePitchTuner({
   enabled = true,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
+  const isWidget = variant === 'widget'
   const isStage = variant === 'stage'
-  const canvasTheme = isPanel ? 'glass' : 'solid'
+  const canvasTheme = isPanel || isWidget ? 'glass' : 'solid'
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const readout = useLivePitchTracker(
     mediaRef,
@@ -113,6 +114,42 @@ export default function LivePitchTuner({
   const spectrogramHeight = isStage
     ? 'min-h-0 flex-1'
     : 'h-[6.5rem]'
+
+  if (isWidget) {
+    return (
+      <div className="pitch-tuner pitch-tuner--widget h-full w-full">
+        <div className="pitch-glass-panel pitch-glass-panel--compact flex h-[7rem] w-full flex-col overflow-hidden">
+          <div className="flex shrink-0 items-start justify-between gap-3 px-3 pt-2.5 pb-1">
+            <p
+              className="font-mono text-base font-bold leading-none tabular-nums tracking-tight"
+              style={{ color: accent }}
+            >
+              {readout.noteName}
+              {active && (
+                <span className="ml-1.5 text-sm font-semibold">
+                  {readout.cents >= 0 ? '+' : ''}
+                  {Math.round(readout.cents)}¢
+                </span>
+              )}
+            </p>
+            <p
+              className="shrink-0 font-mono text-xs font-semibold tabular-nums"
+              style={{ color: accent }}
+            >
+              {formatFrequencyHz(readout.frequencyHz)}
+            </p>
+          </div>
+
+          <div className="relative min-h-0 flex-1 overflow-hidden px-3 pb-2.5">
+            <canvas
+              ref={canvasRef}
+              className="pitch-spectrogram pitch-spectrogram--glass absolute inset-0 h-full w-full"
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (isPanel) {
     return (
