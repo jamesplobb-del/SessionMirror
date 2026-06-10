@@ -183,7 +183,7 @@ export default function SettingsDrawer({
             )}
             <SettingToggle
               label="Live Pitch Tracker"
-              description="During playback, show a live A440 tuner for winds, brass, and strings. Audio takes show full-screen; video takes show a tuner below the video."
+              description="During playback, show a live A440 tuner for winds, brass, and strings. With auto recording in Audio mode, pitch analysis fills the main screen right after each take while it plays once."
               checked={settings.pitchTrackerEnabled}
               onChange={(checked) => onUpdate({ pitchTrackerEnabled: checked })}
             />

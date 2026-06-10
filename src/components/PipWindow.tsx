@@ -42,7 +42,7 @@ export default function PipWindow({
   variant,
   emptyMessage,
   mirror = true,
-  suspendPlayback: _suspendPlayback = false,
+  suspendPlayback = false,
   videoRef: externalVideoRef,
   onUnpin,
   onExpand,
@@ -64,12 +64,41 @@ export default function PipWindow({
 
   useEffect(() => {
     setIsPlaying(false)
-  }, [videoSourceKey])
+  }, [videoSourceKey, suspendPlayback])
+
+  useEffect(() => {
+    const media = videoRef.current
+    if (!media) return
+
+    const syncPlaying = () => {
+      setIsPlaying(!media.paused && !media.ended)
+    }
+
+    media.addEventListener('play', syncPlaying)
+    media.addEventListener('pause', syncPlaying)
+    media.addEventListener('ended', syncPlaying)
+
+    return () => {
+      media.removeEventListener('play', syncPlaying)
+      media.removeEventListener('pause', syncPlaying)
+      media.removeEventListener('ended', syncPlaying)
+    }
+  }, [videoRef, videoSourceKey])
+
+  useEffect(() => {
+    if (!suspendPlayback) return
+    const media = videoRef.current
+    if (!media) return
+    media.pause()
+    if ('muted' in media) media.muted = true
+    setIsPlaying(false)
+  }, [suspendPlayback, videoRef, videoSourceKey])
 
   const handlePlayPauseClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       stopEventBubble(event)
+      if (suspendPlayback) return
       const video = videoRef.current
       if (!video) return
 
@@ -83,7 +112,7 @@ export default function PipWindow({
         setIsPlaying(false)
       }
     },
-    [videoRef],
+    [suspendPlayback, videoRef],
   )
 
   const handleVolume = useCallback(
@@ -191,6 +220,7 @@ export default function PipWindow({
             )}
 
             <div className="absolute inset-0 z-[5] pointer-events-none">
+              {!suspendPlayback && (
               <button
                 type="button"
                 onPointerDown={stopEventBubble}
@@ -208,8 +238,10 @@ export default function PipWindow({
                   )}
                 </span>
               </button>
+              )}
             </div>
 
+            {!suspendPlayback && (
             <div
               className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
               onClick={(e) => e.stopPropagation()}
@@ -222,6 +254,7 @@ export default function PipWindow({
                 onVolumeChange={handleVolume}
               />
             </div>
+            )}
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col bg-stone-800/90 px-2 pb-2 pt-6">

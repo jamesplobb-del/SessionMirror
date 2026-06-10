@@ -13,19 +13,34 @@ interface LivePitchTunerProps {
   mediaKey: string
   takeName?: string
   label?: string
-  variant?: 'full' | 'panel'
+  variant?: 'panel' | 'dock' | 'stage'
+  enabled?: boolean
 }
 
-function CentsNeedle({ cents, active }: { cents: number; active: boolean }) {
+function CentsNeedle({
+  cents,
+  active,
+  compact = false,
+}: {
+  cents: number
+  active: boolean
+  compact?: boolean
+}) {
   const clamped = active ? Math.max(-50, Math.min(50, cents)) : 0
   const position = 50 + clamped
 
   return (
-    <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/8">
+    <div
+      className={`relative w-full overflow-hidden rounded-full bg-white/8 ${
+        compact ? 'h-1' : 'h-1.5'
+      }`}
+    >
       <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-emerald-400/25" />
       <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-amber-400/10" />
       <div
-        className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_10px_rgba(255,255,255,0.35)] transition-[left] duration-75 ease-out"
+        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] transition-[left] duration-200 ease-out ${
+          compact ? 'h-2.5 w-2.5' : 'h-3 w-3'
+        }`}
         style={{
           left: `${position}%`,
           backgroundColor: active ? getIntonationColor(cents) : 'rgba(255,255,255,0.35)',
@@ -36,18 +51,51 @@ function CentsNeedle({ cents, active }: { cents: number; active: boolean }) {
   )
 }
 
+function StatusLabel({
+  active,
+  inTune,
+  zone,
+  isPlaying,
+}: {
+  active: boolean
+  inTune: boolean
+  zone: ReturnType<typeof getIntonationZone> | null
+  isPlaying: boolean
+}) {
+  const text = active
+    ? zone === 'green'
+      ? 'In tune'
+      : zone === 'yellow'
+        ? 'Close'
+        : 'Adjust'
+    : isPlaying
+      ? 'Listening'
+      : 'Paused'
+
+  return (
+    <p
+      className={`text-[9px] font-medium uppercase tracking-wider ${
+        inTune ? 'text-emerald-400/90' : zone === 'yellow' ? 'text-amber-300/80' : 'text-white/30'
+      }`}
+    >
+      {text}
+    </p>
+  )
+}
+
 export default function LivePitchTuner({
   mediaRef,
   isPlaying,
   mediaKey,
   takeName,
   label = 'Pitch Analysis',
-  variant = 'full',
+  variant = 'panel',
+  enabled = true,
 }: LivePitchTunerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const readout = useLivePitchTracker(
     mediaRef,
-    true,
+    enabled,
     isPlaying,
     mediaKey,
     canvasRef,
@@ -56,50 +104,43 @@ export default function LivePitchTuner({
   const active = readout.noteName !== '—'
   const accent = active ? getIntonationColor(readout.cents) : 'rgba(255,255,255,0.55)'
   const inTune = active && isInTune(readout.cents)
-  const isPanel = variant === 'panel'
   const zone = active ? getIntonationZone(readout.cents) : null
+  const isPanel = variant === 'panel'
+  const isStage = variant === 'stage'
+  const spectrogramHeight = isPanel
+    ? 'h-[4.5rem]'
+    : isStage
+      ? 'min-h-0 flex-1'
+      : 'h-[6.5rem]'
 
-  return (
-    <div
-      className={`pitch-tuner flex h-full w-full flex-col overflow-hidden ${
-        isPanel ? 'bg-stone-950/90' : 'bg-stone-950'
-      }`}
-    >
-      <div
-        className={`relative shrink-0 ${
-          isPanel
-            ? 'border-b border-white/8 px-4 py-2.5'
-            : 'border-b border-white/8 px-5 pb-3 pt-[max(3.75rem,calc(env(safe-area-inset-top)+2.75rem))]'
-        }`}
-      >
-        <div className="flex items-end justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            {!isPanel && (
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35">
-                {label}
-              </p>
-            )}
-            {takeName && !isPanel && (
-              <p className="mt-0.5 truncate text-xs text-white/50">{takeName}</p>
-            )}
+  if (isPanel) {
+    return (
+      <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-stone-950/95">
+        <div className="flex shrink-0 items-center gap-3 px-3 py-2">
+          <div className="min-w-[4.5rem] shrink-0">
             <p
-              className={`font-mono font-bold leading-none tracking-tight tabular-nums ${
-                isPanel ? 'text-4xl' : 'text-6xl sm:text-7xl'
-              } ${isPanel ? '' : 'mt-1'}`}
+              className="font-mono text-2xl font-bold leading-none tabular-nums"
               style={{ color: accent }}
             >
               {readout.noteName}
             </p>
-            <p className="mt-1 font-mono text-[11px] text-white/35">
+            <p className="mt-0.5 font-mono text-[10px] text-white/30">
               {formatFrequencyHz(readout.frequencyHz)}
             </p>
           </div>
 
+          <div className="min-w-0 flex-1">
+            <CentsNeedle cents={readout.cents} active={active} compact />
+            <div className="mt-1 flex justify-between font-mono text-[8px] text-white/20">
+              <span>-50</span>
+              <span className="text-emerald-400/50">0</span>
+              <span>+50</span>
+            </div>
+          </div>
+
           <div className="shrink-0 text-right">
             <p
-              className={`font-mono font-semibold tabular-nums ${
-                isPanel ? 'text-2xl' : 'text-3xl'
-              }`}
+              className="font-mono text-lg font-semibold tabular-nums"
               style={{ color: accent }}
             >
               {active ? (
@@ -111,25 +152,120 @@ export default function LivePitchTuner({
                 '—'
               )}
             </p>
-            <p
-              className={`mt-1 text-[10px] font-medium uppercase tracking-wider ${
-                inTune ? 'text-emerald-400/90' : zone === 'yellow' ? 'text-amber-300/80' : 'text-white/30'
-              }`}
-            >
-              {active
-                ? zone === 'green'
-                  ? 'In tune'
-                  : zone === 'yellow'
-                    ? 'Close'
-                    : 'Adjust'
-                : isPlaying
-                  ? 'Listening'
-                  : 'Paused'}
-            </p>
+            <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
           </div>
         </div>
 
-        <div className={`${isPanel ? 'mt-2.5' : 'mt-4'}`}>
+        <div className={`relative shrink-0 overflow-hidden ${spectrogramHeight}`}>
+          <canvas ref={canvasRef} className="pitch-spectrogram absolute inset-0 h-full w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  if (isStage) {
+    return (
+      <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-stone-950">
+        <div className="shrink-0 border-b border-white/8 px-5 py-4">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35">
+                {label}
+              </p>
+              {takeName && (
+                <p className="mt-0.5 truncate text-sm text-white/50">{takeName}</p>
+              )}
+              <p
+                className="mt-2 font-mono text-6xl font-bold leading-none tabular-nums sm:text-7xl"
+                style={{ color: accent }}
+              >
+                {readout.noteName}
+              </p>
+              <p className="mt-1.5 font-mono text-xs text-white/35">
+                {formatFrequencyHz(readout.frequencyHz)}
+              </p>
+            </div>
+
+            <div className="shrink-0 text-right">
+              <p
+                className="font-mono text-3xl font-semibold tabular-nums"
+                style={{ color: accent }}
+              >
+                {active ? (
+                  <>
+                    {readout.cents >= 0 ? '+' : ''}
+                    {Math.round(readout.cents)}¢
+                  </>
+                ) : (
+                  '—'
+                )}
+              </p>
+              <div className="mt-1.5">
+                <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <CentsNeedle cents={readout.cents} active={active} />
+            <div className="mt-1.5 flex justify-between font-mono text-[10px] text-white/25">
+              <span>-50</span>
+              <span className="text-emerald-400/60">0</span>
+              <span>+50</span>
+            </div>
+          </div>
+        </div>
+
+        <div className={`relative overflow-hidden ${spectrogramHeight}`}>
+          <canvas ref={canvasRef} className="pitch-spectrogram absolute inset-0 h-full w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-stone-950/95">
+      <div className="shrink-0 border-b border-white/8 px-4 py-3">
+        <div className="flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">
+              {label}
+            </p>
+            {takeName && (
+              <p className="mt-0.5 truncate text-xs text-white/45">{takeName}</p>
+            )}
+            <p
+              className="mt-1 font-mono text-5xl font-bold leading-none tabular-nums"
+              style={{ color: accent }}
+            >
+              {readout.noteName}
+            </p>
+            <p className="mt-1 font-mono text-[11px] text-white/35">
+              {formatFrequencyHz(readout.frequencyHz)}
+            </p>
+          </div>
+
+          <div className="shrink-0 text-right">
+            <p
+              className="font-mono text-2xl font-semibold tabular-nums"
+              style={{ color: accent }}
+            >
+              {active ? (
+                <>
+                  {readout.cents >= 0 ? '+' : ''}
+                  {Math.round(readout.cents)}¢
+                </>
+              ) : (
+                '—'
+              )}
+            </p>
+            <div className="mt-1">
+              <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3">
           <CentsNeedle cents={readout.cents} active={active} />
           <div className="mt-1 flex justify-between font-mono text-[9px] text-white/25">
             <span>-50</span>
@@ -139,17 +275,12 @@ export default function LivePitchTuner({
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className={`relative shrink-0 overflow-hidden ${spectrogramHeight}`}>
         <canvas ref={canvasRef} className="pitch-spectrogram absolute inset-0 h-full w-full" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-stone-950/80 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between px-3 pb-2 pt-6 text-[9px] font-medium uppercase tracking-[0.18em] text-white/25">
-          <span>Pitch trace</span>
-          <span className="text-sky-400/50">A440</span>
-        </div>
       </div>
 
       {!active && !isPlaying && (
-        <p className="shrink-0 border-t border-white/6 py-2.5 text-center text-[11px] text-white/30">
+        <p className="shrink-0 py-2 text-center text-[11px] text-white/30">
           Tap play to analyze pitch
         </p>
       )}

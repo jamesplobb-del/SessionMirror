@@ -64,7 +64,7 @@ function ReviewTakeLayer({
         className="absolute inset-0 flex h-full w-full flex-col bg-stone-950 transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
-        <div className="relative min-h-0 flex-[5]">
+        <div className="relative min-h-0 flex-1">
           <TakeVideoPlayer
             key={takeKey}
             filePath={filePath}
@@ -75,6 +75,8 @@ function ReviewTakeLayer({
             mirror={mirror}
             audible
             manualPlayOnly
+            eagerLoad
+            preload="auto"
             style={{
               WebkitTouchCallout: 'default',
               userSelect: 'auto',
@@ -86,9 +88,10 @@ function ReviewTakeLayer({
             onPointerCancel={onPointerCancel}
           />
         </div>
-        <div className="min-h-0 flex-[4] border-t border-white/8">
+        <div className="h-[min(24dvh,200px)] shrink-0 border-t border-white/8">
           <LivePitchTuner
             mediaRef={videoRef}
+            enabled={pitchTrackerEnabled && isActive}
             isPlaying={trackerPlaying}
             mediaKey={takeKey}
             takeName={takeName}
@@ -103,7 +106,7 @@ function ReviewTakeLayer({
   if (audioAnalysis) {
     return (
       <div
-        className="absolute inset-0 flex h-full w-full flex-col transition-all duration-200 ease-out"
+        className="absolute inset-0 flex h-full w-full flex-col bg-stone-950 transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
         <TakeVideoPlayer
@@ -116,16 +119,20 @@ function ReviewTakeLayer({
           mirror={false}
           audible
           manualPlayOnly
+          eagerLoad
+          preload="auto"
           controls={false}
         />
-        <div className="absolute inset-0 z-10">
+        <div className="flex-1" />
+        <div className="h-[min(34dvh,280px)] shrink-0 border-t border-white/8">
           <LivePitchTuner
             mediaRef={videoRef}
+            enabled={pitchTrackerEnabled && isActive}
             isPlaying={trackerPlaying}
             mediaKey={takeKey}
             takeName={takeName}
             label={tunerLabel ?? 'Pitch Analysis'}
-            variant="full"
+            variant="dock"
           />
         </div>
       </div>
@@ -147,6 +154,8 @@ function ReviewTakeLayer({
         mirror={mirror}
         audible
         manualPlayOnly
+        eagerLoad
+        preload="auto"
         style={{
           WebkitTouchCallout: 'default',
           userSelect: 'auto',

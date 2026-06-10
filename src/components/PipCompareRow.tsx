@@ -3,6 +3,7 @@ import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
+import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 interface PipCompareRowProps {
   benchmarkTake: Take | null
@@ -114,7 +115,10 @@ export default function PipCompareRow({
           <PipWindow
             src={benchmarkTake?.videoUrl ?? null}
             filePath={benchmarkTake?.filePath}
-            mimeType={benchmarkTake?.videoMimeType ?? 'video/mp4'}
+            mimeType={
+              benchmarkTake?.videoMimeType ??
+              (benchmarkTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+            }
             takeName={benchmarkTake?.name}
             label="Best Take"
             variant="benchmark"
@@ -133,7 +137,10 @@ export default function PipCompareRow({
           className="pointer-events-auto shrink-0"
           src={challengerTake?.videoUrl ?? null}
           filePath={challengerTake?.filePath}
-          mimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
+          mimeType={
+            challengerTake?.videoMimeType ??
+            (challengerTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+          }
           takeName={challengerTake?.name}
           label="Current Take"
           variant="challenger"

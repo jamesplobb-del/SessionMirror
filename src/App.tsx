@@ -10,6 +10,7 @@ import SettingsDrawer from './components/SettingsDrawer'
 import { useCameraSession } from './hooks/useCameraSession'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
+import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
   generateThumbnailFromBlob,
   generateThumbnailFromUrl,
@@ -25,7 +26,8 @@ import {
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import ReviewModeOverlay from './components/ReviewModeOverlay'
-import type { ReviewContext, ReviewSlot, SortMode, Take, TakeUpdate } from './types'
+import AudioMainPitchStage from './components/AudioMainPitchStage'
+import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
 import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
 import {
@@ -75,12 +77,17 @@ export default function App() {
     isArming: false,
     overDelete: false,
   })
+  const [autoPlaybackTakeId, setAutoPlaybackTakeId] = useState<string | null>(null)
+  const [autoPlaybackPlaying, setAutoPlaybackPlaying] = useState(false)
+  const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const pendingAutoPlaybackRef = useRef(false)
   const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
+  const queuedAutoPlayRef = useRef<{ url: string; takeId: string } | null>(null)
+  const recordingModeRef = useRef<RecordingMode>('video')
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
-  const playAutoTakeAudioRef = useRef<(playbackUrl: string) => void>(() => {})
+  const playAutoTakeAudioRef = useRef<(playbackUrl: string, takeId: string) => void>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
 
@@ -119,43 +126,41 @@ export default function App() {
     }, delayMs)
   }, [])
 
-  const stopAutoPlaybackAudio = useCallback(() => {
+  const teardownAutoPlaybackMedia = useCallback(() => {
     const audio = autoPlaybackAudioRef.current
-    if (!audio) return
-
-    audio.onended = null
-    audio.onerror = null
-    audio.pause()
-    audio.removeAttribute('src')
-    audio.load()
-    autoPlaybackAudioRef.current = null
+    if (audio) {
+      pausePitchGraphsForMedia(audio)
+      audio.onended = null
+      audio.onerror = null
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+    }
+    setAutoPlaybackPlaying(false)
   }, [])
 
+  const stopAutoPlaybackAudio = useCallback(() => {
+    queuedAutoPlayRef.current = null
+    pendingAutoPlaybackRef.current = false
+    teardownAutoPlaybackMedia()
+    setAutoPlaybackTakeId(null)
+    setAutoPlaybackAudioKey((key) => key + 1)
+  }, [teardownAutoPlaybackMedia])
+
   const playAutoTakeAudio = useCallback(
-    (playbackUrl: string) => {
-      stopAutoPlaybackAudio()
-
-      const audio = new Audio()
-      autoPlaybackAudioRef.current = audio
-      audio.preload = 'auto'
-      audio.src = playbackUrl
-
-      const finish = () => {
-        stopAutoPlaybackAudio()
-        releaseAutoRecordSuppress(350)
+    (playbackUrl: string, takeId: string) => {
+      if (recordingModeRef.current !== 'audio') {
+        pendingAutoPlaybackRef.current = false
+        return
       }
 
+      teardownAutoPlaybackMedia()
+      queuedAutoPlayRef.current = { url: playbackUrl, takeId }
+      setAutoPlaybackTakeId(takeId)
       setAutoRecordStartSuppressed(true)
-      audio.muted = false
-      audio.onended = finish
-      audio.onerror = finish
-
-      void audio.play().catch(() => {
-        stopAutoPlaybackAudio()
-        releaseAutoRecordSuppress(0)
-      })
+      setAutoPlaybackAudioKey((key) => key + 1)
     },
-    [releaseAutoRecordSuppress, stopAutoPlaybackAudio],
+    [teardownAutoPlaybackMedia],
   )
 
   playAutoTakeAudioRef.current = playAutoTakeAudio
@@ -201,6 +206,8 @@ export default function App() {
     async (projectId: string) => {
       if (projectId === activeProjectIdRef.current) return
 
+      stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
       pausePipVideos()
       setActiveProjectId(projectId)
       setTakes([])
@@ -208,7 +215,7 @@ export default function App() {
       setChallengerId(null)
       await reloadProjectTakes(projectId)
     },
-    [pausePipVideos, reloadProjectTakes],
+    [pausePipVideos, releaseAutoRecordSuppress, reloadProjectTakes, stopAutoPlaybackAudio],
   )
 
   const handleCreateProject = useCallback(async (name: string) => {
@@ -257,9 +264,13 @@ export default function App() {
         return [...prev, next]
       })
 
-      if (mediaType === 'audio' && pendingAutoPlaybackRef.current) {
+      if (
+        mediaType === 'audio' &&
+        pendingAutoPlaybackRef.current &&
+        recordingModeRef.current === 'audio'
+      ) {
         pendingAutoPlaybackRef.current = false
-        playAutoTakeAudioRef.current(safeVideoUrl)
+        playAutoTakeAudioRef.current(safeVideoUrl, takeId)
       }
 
       if (mediaType === 'audio') {
@@ -313,6 +324,81 @@ export default function App() {
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
   })
+
+  recordingModeRef.current = recordingMode
+
+  useEffect(() => {
+    if (recordingMode === 'audio') return
+
+    pendingAutoPlaybackRef.current = false
+    stopAutoPlaybackAudio()
+    releaseAutoRecordSuppress(0)
+  }, [recordingMode, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+
+  useEffect(() => {
+    const queued = queuedAutoPlayRef.current
+    if (!queued) return
+
+    let cancelled = false
+
+    const startPlayback = () => {
+      if (cancelled) return
+
+      const audio = autoPlaybackAudioRef.current
+      if (!audio) {
+        window.requestAnimationFrame(startPlayback)
+        return
+      }
+
+      const { url } = queued
+      queuedAutoPlayRef.current = null
+
+      const finish = () => {
+        stopAutoPlaybackAudio()
+        releaseAutoRecordSuppress(500)
+      }
+
+      audio.preload = 'auto'
+      audio.src = url
+      audio.muted = false
+      audio.onended = finish
+      audio.onerror = finish
+
+      void audio.play().catch(() => {
+        finish()
+        releaseAutoRecordSuppress(0)
+      })
+    }
+
+    startPlayback()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    autoPlaybackAudioKey,
+    releaseAutoRecordSuppress,
+    stopAutoPlaybackAudio,
+  ])
+
+  useEffect(() => {
+    const audio = autoPlaybackAudioRef.current
+    if (!audio) return
+
+    const syncPlaying = () => {
+      setAutoPlaybackPlaying(!audio.paused && !audio.ended)
+    }
+
+    audio.addEventListener('play', syncPlaying)
+    audio.addEventListener('pause', syncPlaying)
+    audio.addEventListener('ended', syncPlaying)
+
+    return () => {
+      audio.removeEventListener('play', syncPlaying)
+      audio.removeEventListener('pause', syncPlaying)
+      audio.removeEventListener('ended', syncPlaying)
+    }
+  }, [autoPlaybackAudioKey])
 
   const autoMonitoringAllowed =
     !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
@@ -393,16 +479,20 @@ export default function App() {
   }, [])
 
   const handleOpenVault = useCallback(() => {
+    stopAutoPlaybackAudio()
+    releaseAutoRecordSuppress(0)
     pausePipVideos()
     setIsSettingsOpen(false)
     setIsVaultOpen(true)
-  }, [pausePipVideos])
+  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleOpenSettings = useCallback(() => {
+    stopAutoPlaybackAudio()
+    releaseAutoRecordSuppress(0)
     pausePipVideos()
     setIsVaultOpen(false)
     setIsSettingsOpen(true)
-  }, [pausePipVideos])
+  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleCloseSettings = useCallback(() => {
     setIsSettingsOpen(false)
@@ -426,7 +516,25 @@ export default function App() {
     }
   }, [ready])
 
-  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
+  const suspendPipPlayback =
+    isVaultOpen || isReviewOpen || isSettingsOpen || autoRecordStartSuppressed
+
+  const showAudioMainPitch =
+    settings.pitchTrackerEnabled &&
+    settings.autoSoundRecording &&
+    recordingMode === 'audio' &&
+    autoPlaybackTakeId !== null &&
+    !isReviewOpen &&
+    !isVaultOpen &&
+    !isSettingsOpen
+
+  const autoPlaybackTake = useMemo(
+    () =>
+      autoPlaybackTakeId
+        ? takes.find((take) => take.id === autoPlaybackTakeId) ?? null
+        : null,
+    [autoPlaybackTakeId, takes],
+  )
 
   const benchmarkTake = useMemo(
     () => takes.find((t) => t.id === benchmarkId) ?? null,
@@ -445,6 +553,8 @@ export default function App() {
 
   const handlePinBenchmark = useCallback(
     (id: string) => {
+      stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
       pausePipVideos()
       setBenchmarkId(id)
       if (activeProjectIdRef.current) {
@@ -456,7 +566,7 @@ export default function App() {
         return other?.id ?? null
       })
     },
-    [pausePipVideos, takes],
+    [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio, takes],
   )
 
   const handlePinChallenger = useCallback(
@@ -470,6 +580,7 @@ export default function App() {
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
       stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
       pausePipVideos()
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
       setVaultReviewIndex(index >= 0 ? index : 0)
@@ -477,17 +588,18 @@ export default function App() {
       setReviewSlot('benchmark')
       setIsVaultOpen(false)
     },
-    [pausePipVideos, sortedTakes, stopAutoPlaybackAudio],
+    [pausePipVideos, releaseAutoRecordSuppress, sortedTakes, stopAutoPlaybackAudio],
   )
 
   const handleOpenCompareReview = useCallback(
     (slot: ReviewSlot) => {
       stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
       pausePipVideos()
       setReviewContext('compare')
       setReviewSlot(slot)
     },
-    [pausePipVideos, stopAutoPlaybackAudio],
+    [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio],
   )
 
   const handleCloseReview = useCallback(() => {
@@ -500,7 +612,8 @@ export default function App() {
     })
     pausePipVideos()
     stopAutoPlaybackAudio()
-  }, [pausePipVideos, stopAutoPlaybackAudio])
+    releaseAutoRecordSuppress(0)
+  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleUploadBenchmark = useCallback(
     (file: File) => {
@@ -586,6 +699,11 @@ export default function App() {
       if (ids.length === 0) return
 
       const idSet = new Set(ids)
+      if (autoPlaybackTakeId && idSet.has(autoPlaybackTakeId)) {
+        stopAutoPlaybackAudio()
+        releaseAutoRecordSuppress(0)
+      }
+
       const removed = takes.filter((take) => idSet.has(take.id))
 
       setTakes((prev) => prev.filter((take) => !idSet.has(take.id)))
@@ -597,7 +715,7 @@ export default function App() {
         removeTakeResources(take)
       }
     },
-    [removeTakeResources, takes],
+    [autoPlaybackTakeId, releaseAutoRecordSuppress, removeTakeResources, stopAutoPlaybackAudio, takes],
   )
 
   const handleDragDeleteTake = useCallback(
@@ -619,6 +737,9 @@ export default function App() {
     const projectId = activeProjectIdRef.current
     if (!projectId || takes.length === 0) return
 
+    stopAutoPlaybackAudio()
+    releaseAutoRecordSuppress(0)
+
     const takesToRemove = takes
     setTakes([])
     setBenchmarkId(null)
@@ -630,7 +751,7 @@ export default function App() {
         removeTakeResources(take)
       }
     })()
-  }, [removeTakeResources, takes])
+  }, [releaseAutoRecordSuppress, removeTakeResources, stopAutoPlaybackAudio, takes])
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
@@ -652,6 +773,14 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <audio
+        key={autoPlaybackAudioKey}
+        ref={autoPlaybackAudioRef}
+        className="sr-only"
+        preload="auto"
+        playsInline
+      />
+
       <LiveCameraBackground
         previewRef={previewRef}
         streamRef={streamRef}
@@ -661,7 +790,17 @@ export default function App() {
         isRecording={isRecording}
         previewLive={ready}
         viewportKey={windowHeight}
+        pitchStageActive={showAudioMainPitch}
       />
+
+      {showAudioMainPitch && autoPlaybackTake && (
+        <AudioMainPitchStage
+          mediaRef={autoPlaybackAudioRef}
+          take={autoPlaybackTake}
+          isPlaying={autoPlaybackPlaying}
+          audioSessionKey={autoPlaybackAudioKey}
+        />
+      )}
 
       <div
         className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''}`}

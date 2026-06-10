@@ -249,9 +249,14 @@ export function useAutoSoundRecording({
       loudSinceRef.current = null
       attackSinceRef.current = null
       cooldownUntilRef.current = performance.now() + COOLDOWN_MS
-      window.setTimeout(() => {
+      const warmTimer = window.setTimeout(() => {
         void warmRecorderRef.current()
       }, 200)
+
+      wasRecordingRef.current = isRecording
+      return () => {
+        window.clearTimeout(warmTimer)
+      }
     }
 
     wasRecordingRef.current = isRecording

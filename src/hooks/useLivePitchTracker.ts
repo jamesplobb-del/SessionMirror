@@ -5,12 +5,18 @@ import {
   PITCH_FRAME_SIZE,
   PITCH_HOLD_MS,
   PITCH_MIN_VOLUME_DB,
+  PITCH_CENTS_SMOOTH_ALPHA,
+  PITCH_HISTORY_INTERVAL_MS,
+  PITCH_READOUT_INTERVAL_MS,
+  CENTS_DISPLAY_STEP,
 } from '../utils/pitchConfig'
 import {
   frequencyToPitchReadout,
   getIntonationColor,
+  holdPitchNote,
   isFrequencyInInstrumentRange,
   normalizeInstrumentFrequency,
+  quantizeDisplayCents,
   smoothFrequency,
   stabilizePitchReadout,
   type PitchReadout,
@@ -81,12 +87,6 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
   elementGraphs.delete(graph.media)
 
   try {
-    graph.media.pause()
-  } catch {
-    /* already torn down */
-  }
-
-  try {
     graph.source.disconnect()
     graph.analyser.disconnect()
   } catch {
@@ -94,9 +94,7 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
   }
 
   const { context } = graph
-  window.setTimeout(() => {
-    void context.close().catch(() => {})
-  }, 0)
+  void context.close().catch(() => {})
 }
 
 function drawPitchCanvas(
@@ -260,6 +258,10 @@ export function useLivePitchTracker(
   const lastPitchAtRef = useRef(0)
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
+  const smoothedCentsRef = useRef<number | null>(null)
+  const lastReadoutEmitRef = useRef(0)
+  const lastNoteChangeRef = useRef(0)
+  const lastHistoryPushRef = useRef(0)
 
   useEffect(() => {
     mountedRef.current = true
@@ -273,14 +275,27 @@ export function useLivePitchTracker(
   }, [readout])
 
   useEffect(() => {
-    if (!enabled) {
+    return () => {
       if (tickRef.current !== null) {
         cancelAnimationFrame(tickRef.current)
         tickRef.current = null
       }
       safeDisposePitchGraph(graphRef.current)
       graphRef.current = null
+    }
+  }, [mediaKey])
+
+  useEffect(() => {
+    if (!enabled) {
+      if (tickRef.current !== null) {
+        cancelAnimationFrame(tickRef.current)
+        tickRef.current = null
+      }
       historyRef.current = []
+      smoothedCentsRef.current = null
+      lastReadoutEmitRef.current = 0
+      lastNoteChangeRef.current = 0
+      lastHistoryPushRef.current = 0
       if (mountedRef.current) {
         readoutRef.current = emptyReadout
         setReadout(emptyReadout)
@@ -289,32 +304,47 @@ export function useLivePitchTracker(
     }
 
     let cancelled = false
-    const media = mediaRef.current
-    if (!media) return
+    let retryTimer: number | null = null
+    let attachAttempt = 0
+    const MAX_ATTACH_ATTEMPTS = 80
 
-    void createPitchGraph(media)
-      .then((graph) => {
+    const scheduleRetry = (delayMs: number) => {
+      if (cancelled || attachAttempt >= MAX_ATTACH_ATTEMPTS) return
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null
+        void tryAttach()
+      }, delayMs)
+    }
+
+    const tryAttach = async () => {
+      if (cancelled) return
+      attachAttempt += 1
+
+      const media = mediaRef.current
+      if (!media) {
+        scheduleRetry(50)
+        return
+      }
+
+      try {
+        const graph = await createPitchGraph(media)
         if (cancelled) {
           safeDisposePitchGraph(graph)
           return
         }
         graphRef.current = graph
-      })
-      .catch(() => {
-        if (!cancelled && mountedRef.current) {
-          readoutRef.current = emptyReadout
-          setReadout(emptyReadout)
-        }
-      })
+      } catch {
+        scheduleRetry(100)
+      }
+    }
+
+    void tryAttach()
 
     return () => {
       cancelled = true
-      if (tickRef.current !== null) {
-        cancelAnimationFrame(tickRef.current)
-        tickRef.current = null
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
       }
-      safeDisposePitchGraph(graphRef.current)
-      graphRef.current = null
     }
   }, [enabled, mediaKey, mediaRef])
 
@@ -327,6 +357,10 @@ export function useLivePitchTracker(
       if (!isPlaying) {
         if (graphRef.current) graphRef.current.smoothed = null
         historyRef.current = []
+        smoothedCentsRef.current = null
+        lastReadoutEmitRef.current = 0
+        lastNoteChangeRef.current = 0
+        lastHistoryPushRef.current = 0
         if (mountedRef.current) {
           readoutRef.current = emptyReadout
           setReadout(emptyReadout)
@@ -367,17 +401,44 @@ export function useLivePitchTracker(
 
       if (clarity >= PITCH_CLARITY_MIN && isFrequencyInInstrumentRange(pitch)) {
         graph.smoothed = smoothFrequency(graph.smoothed, pitch)
-        const next = stabilizePitchReadout(
+        const rawNext = stabilizePitchReadout(
           readoutRef.current.noteName === '—' ? null : readoutRef.current,
           frequencyToPitchReadout(graph.smoothed),
         )
-        readoutRef.current = next
-        if (mountedRef.current) setReadout(next)
+        const held = holdPitchNote(
+          readoutRef.current.noteName === '—' ? null : readoutRef.current,
+          rawNext,
+          lastNoteChangeRef.current,
+          now,
+        )
+        lastNoteChangeRef.current = held.noteChangedAt
+        const next = held.readout
+
+        smoothedCentsRef.current = smoothFrequency(
+          smoothedCentsRef.current,
+          next.cents,
+          PITCH_CENTS_SMOOTH_ALPHA,
+        )
+        const displayCents = quantizeDisplayCents(
+          smoothedCentsRef.current ?? next.cents,
+          CENTS_DISPLAY_STEP,
+        )
+        const displayReadout: PitchReadout = { ...next, cents: displayCents }
+
+        if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
+          readoutRef.current = displayReadout
+          if (mountedRef.current) setReadout(displayReadout)
+          lastReadoutEmitRef.current = now
+        }
+
         lastPitchAtRef.current = now
-        currentCents = next.cents
+        currentCents = displayCents
         active = true
 
-        historyRef.current = [...historyRef.current, next.cents].slice(-HISTORY_LENGTH)
+        if (now - lastHistoryPushRef.current >= PITCH_HISTORY_INTERVAL_MS) {
+          historyRef.current = [...historyRef.current, displayCents].slice(-HISTORY_LENGTH)
+          lastHistoryPushRef.current = now
+        }
       } else if (
         lastPitchAtRef.current > 0 &&
         now - lastPitchAtRef.current > PITCH_HOLD_MS
@@ -385,6 +446,7 @@ export function useLivePitchTracker(
         readoutRef.current = emptyReadout
         if (mountedRef.current) setReadout(emptyReadout)
         graph.smoothed = null
+        smoothedCentsRef.current = null
         active = false
       } else if (readoutRef.current.noteName !== '—') {
         currentCents = readoutRef.current.cents

@@ -13,6 +13,8 @@ interface LiveCameraBackgroundProps {
   isRecording: boolean
   previewLive?: boolean
   viewportKey?: number
+  /** Hide the idle audio-mode mic UI while main-screen pitch analysis is showing. */
+  pitchStageActive?: boolean
 }
 
 function LiveCameraBackground({
@@ -24,8 +26,10 @@ function LiveCameraBackground({
   isRecording,
   previewLive = false,
   viewportKey,
+  pitchStageActive = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
+  const showAudioIdle = isAudioMode && !pitchStageActive
   const [previewVisible, setPreviewVisible] = useState(false)
 
   useEffect(() => {
@@ -95,7 +99,7 @@ function LiveCameraBackground({
         }`}
       />
 
-      {isAudioMode && (
+      {showAudioIdle && (
         <div className="camera-background-overlay flex flex-col items-center justify-center bg-gradient-to-b from-stone-950 via-stone-900 to-black">
           <div
             className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/5 ${
@@ -134,7 +138,7 @@ function LiveCameraBackground({
 
       <div
         className={`camera-background-overlay pointer-events-none bg-gradient-to-b from-black/25 via-transparent to-black/45 ${
-          isAudioMode ? 'opacity-40' : 'opacity-100'
+          showAudioIdle ? 'opacity-40' : isAudioMode ? 'opacity-0' : 'opacity-100'
         }`}
       />
     </div>
@@ -151,5 +155,6 @@ export default memo(
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
     prev.previewLive === next.previewLive &&
-    prev.viewportKey === next.viewportKey,
+    prev.viewportKey === next.viewportKey &&
+    prev.pitchStageActive === next.pitchStageActive,
 )
