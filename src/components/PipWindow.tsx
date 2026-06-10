@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
 import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
@@ -33,7 +33,7 @@ interface PipWindowProps {
 const FLOAT_BADGE =
   'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
 
-export default function PipWindow({
+function PipWindow({
   src,
   filePath = '',
   mimeType = 'video/mp4',
@@ -172,7 +172,7 @@ export default function PipWindow({
       )}
 
       <div
-        className={`relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900 shadow-lg shadow-black/50 ring-1 backdrop-blur-md transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
+        className={`relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
           src ? 'opacity-100' : 'opacity-90'
         } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
           dragSourceActive ? 'pip-drag-source--active' : ''
@@ -308,3 +308,5 @@ export default function PipWindow({
     </div>
   )
 }
+
+export default memo(PipWindow)

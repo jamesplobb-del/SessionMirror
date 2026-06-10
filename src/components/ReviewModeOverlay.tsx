@@ -225,6 +225,8 @@ export default function ReviewModeOverlay({
   const timelineTrackRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
   const progressLoopRef = useRef<number | null>(null)
+  const pendingTimeRef = useRef(0)
+  const lastTimeEmitRef = useRef(0)
   const hideOverlayTimerRef = useRef<number | null>(null)
   const isScrubbingRef = useRef(false)
   const wasPlayingBeforeScrubRef = useRef(false)
@@ -308,12 +310,15 @@ export default function ReviewModeOverlay({
   )
 
   const scheduleTimeUpdate = useCallback((time: number) => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-    }
+    pendingTimeRef.current = time
+    if (rafRef.current !== null) return
+
     rafRef.current = requestAnimationFrame(() => {
-      setCurrentTime(time)
       rafRef.current = null
+      const now = performance.now()
+      if (now - lastTimeEmitRef.current < 80) return
+      lastTimeEmitRef.current = now
+      setCurrentTime(pendingTimeRef.current)
     })
   }, [])
 
@@ -477,11 +482,6 @@ export default function ReviewModeOverlay({
     const video = getActiveVideo()
     if (!video) return
 
-    const onTimeUpdate = () => {
-      if (!isScrubbingRef.current) {
-        scheduleTimeUpdate(video.currentTime)
-      }
-    }
     const onDurationChange = () => syncDurationFromVideo(video)
     const onLoadedMetadata = () => syncDurationFromVideo(video)
     const onSeeked = () => {
@@ -505,7 +505,6 @@ export default function ReviewModeOverlay({
       stopProgressLoop()
     }
 
-    video.addEventListener('timeupdate', onTimeUpdate)
     video.addEventListener('durationchange', onDurationChange)
     video.addEventListener('loadedmetadata', onLoadedMetadata)
     video.addEventListener('seeked', onSeeked)
@@ -516,7 +515,6 @@ export default function ReviewModeOverlay({
     syncDurationFromVideo(video)
 
     return () => {
-      video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('durationchange', onDurationChange)
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
       video.removeEventListener('seeked', onSeeked)

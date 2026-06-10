@@ -3,7 +3,7 @@ import type { RecordingMode } from '../types'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
 
-const POLL_INTERVAL_MS = 8
+const POLL_INTERVAL_MS = 32
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 180
 const MONITOR_WARMUP_MS = 280

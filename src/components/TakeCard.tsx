@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
 import { Check, ChevronDown, ChevronUp, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
@@ -20,7 +20,7 @@ interface TakeCardProps {
   onToggleSelect?: () => void
 }
 
-export default function TakeCard({
+function TakeCard({
   take,
   isBenchmark,
   isChallenger,
@@ -38,7 +38,21 @@ export default function TakeCard({
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(take.name)
   const [notesExpanded, setNotesExpanded] = useState(false)
+  const [notesDraft, setNotesDraft] = useState(take.notes)
+  const notesDebounceRef = useRef<number | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setNotesDraft(take.notes)
+  }, [take.notes])
+
+  useEffect(() => {
+    return () => {
+      if (notesDebounceRef.current !== null) {
+        window.clearTimeout(notesDebounceRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     setNameDraft(take.name)
@@ -255,8 +269,18 @@ export default function TakeCard({
           </button>
           {notesExpanded && (
             <textarea
-              value={take.notes}
-              onChange={(e) => onUpdate({ notes: e.target.value })}
+              value={notesDraft}
+              onChange={(e) => {
+                const value = e.target.value
+                setNotesDraft(value)
+                if (notesDebounceRef.current !== null) {
+                  window.clearTimeout(notesDebounceRef.current)
+                }
+                notesDebounceRef.current = window.setTimeout(() => {
+                  notesDebounceRef.current = null
+                  onUpdate({ notes: value })
+                }, 400)
+              }}
               placeholder="Equipment, register feel, adjustments..."
               rows={3}
               className="mt-2 w-full resize-none rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-700 outline-none ring-sky-400 placeholder:text-stone-400 focus:ring-2"
@@ -325,3 +349,15 @@ export default function TakeCard({
     </div>
   )
 }
+
+export default memo(TakeCard, (previous, next) =>
+  previous.take.id === next.take.id &&
+  previous.take.thumbnailUrl === next.take.thumbnailUrl &&
+  previous.take.name === next.take.name &&
+  previous.take.notes === next.take.notes &&
+  previous.take.rating === next.take.rating &&
+  previous.isBenchmark === next.isBenchmark &&
+  previous.isChallenger === next.isChallenger &&
+  previous.selectionMode === next.selectionMode &&
+  previous.selected === next.selected,
+)

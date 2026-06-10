@@ -3,7 +3,6 @@ import { Capacitor } from '@capacitor/core'
 import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
-import TakeVideoPlayer from './TakeVideoPlayer'
 import VaultMediaSegment from './VaultMediaSegment'
 import { toCapacitorPlaybackSrc } from '../utils/takeStorage'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
@@ -53,33 +52,33 @@ interface TakeVaultDrawerProps {
 interface VaultTakeVideoProps {
   take: Take
   className?: string
-  /** List tile — eager WebKit thumbnail fetch, no controls. */
-  thumbnail?: boolean
 }
 
 export function VaultTakeVideo({
   take,
   className = 'h-full w-full object-cover pointer-events-none',
-  thumbnail = false,
 }: VaultTakeVideoProps) {
   const audio = isAudioTake(take)
+  const poster =
+    take.thumbnailUrl ||
+    (audio ? AUDIO_TAKE_THUMBNAIL : undefined)
+
+  if (poster) {
+    return (
+      <img
+        src={poster}
+        alt=""
+        className={className}
+        draggable={false}
+        loading="lazy"
+      />
+    )
+  }
+
   return (
-    <TakeVideoPlayer
-      filePath={take.filePath}
-      videoUrl={take.videoUrl}
-      mimeType={take.videoMimeType || (audio ? 'audio/mp4' : 'video/mp4')}
-      className={className}
-      poster={
-        take.thumbnailUrl ||
-        (audio ? AUDIO_TAKE_THUMBNAIL : undefined) ||
-        undefined
-      }
-      loadingClassName="h-full w-full animate-pulse bg-stone-200"
-      controls={false}
-      mirror={!audio}
-      thumbnailPreview={thumbnail}
-      eagerLoad={thumbnail && !audio}
-      preload="metadata"
+    <div
+      className={`${className} animate-pulse bg-stone-200`}
+      aria-hidden
     />
   )
 }
@@ -250,7 +249,7 @@ export default function TakeVaultDrawer({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 ease-in ${
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 ease-in ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
@@ -259,7 +258,7 @@ export default function TakeVaultDrawer({
 
       <div
         ref={drawerRef}
-        className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[min(75vh,100dvh)] flex-col overflow-hidden rounded-t-3xl border border-white/20 bg-white/90 shadow-2xl backdrop-blur-xl transition-[transform,opacity] duration-200 ease-in ${
+        className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[min(75vh,100dvh)] flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transition-[transform,opacity] duration-200 ease-in ${
           isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
         }`}
         role="dialog"
@@ -401,7 +400,7 @@ export default function TakeVaultDrawer({
                           }
                           onUpdate={(updates) => onUpdateTake(take.id, updates)}
                           onDelete={() => onDeleteTake(take.id)}
-                          thumbnailVideo={<VaultTakeVideo take={take} thumbnail />}
+                          thumbnailVideo={<VaultTakeVideo take={take} />}
                         />
                       ))}
                   </div>

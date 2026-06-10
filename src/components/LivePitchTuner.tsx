@@ -38,7 +38,7 @@ function CentsNeedle({
       <div className="absolute inset-y-0 left-[35%] w-[30%] rounded-full bg-emerald-400/25" />
       <div className="absolute inset-y-0 left-[22%] w-[56%] rounded-full bg-amber-400/10" />
       <div
-        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] transition-[left] duration-200 ease-out ${
+        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 shadow-[0_0_8px_rgba(255,255,255,0.25)] transition-[left] duration-300 ease-out ${
           compact ? 'h-2.5 w-2.5' : 'h-3 w-3'
         }`}
         style={{

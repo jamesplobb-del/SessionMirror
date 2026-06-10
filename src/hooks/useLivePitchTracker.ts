@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, startTransition, type RefObject } from 'react'
 import { PitchDetector } from 'pitchy'
 import {
   PITCH_CLARITY_MIN,
   PITCH_FRAME_SIZE,
   PITCH_HOLD_MS,
   PITCH_MIN_VOLUME_DB,
-  PITCH_CENTS_SMOOTH_ALPHA,
-  PITCH_HISTORY_INTERVAL_MS,
+  PITCH_NEEDLE_SMOOTH_ALPHA,
+  PITCH_GRAPH_SMOOTH_ALPHA,
+  PITCH_GRAPH_SMOOTH_WINDOW,
   PITCH_READOUT_INTERVAL_MS,
   CENTS_DISPLAY_STEP,
 } from '../utils/pitchConfig'
@@ -14,6 +15,7 @@ import {
   frequencyToPitchReadout,
   getIntonationColor,
   isFrequencyInInstrumentRange,
+  movingAverage,
   normalizeInstrumentFrequency,
   quantizeDisplayCents,
   smoothFrequency,
@@ -96,6 +98,57 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
   void context.close().catch(() => {})
 }
 
+function drawSmoothPitchTrace(
+  ctx: CanvasRenderingContext2D,
+  centsHistory: number[],
+  historyLength: number,
+  width: number,
+  centsToY: (cents: number) => number,
+): void {
+  const smoothed = movingAverage(centsHistory, PITCH_GRAPH_SMOOTH_WINDOW)
+  if (smoothed.length < 2) return
+
+  const historyStep = width / Math.max(historyLength - 1, 1)
+  const start = historyLength - smoothed.length
+
+  const points = smoothed.map((cents, index) => ({
+    x: (start + index) * historyStep,
+    y: centsToY(cents),
+    cents,
+  }))
+
+  ctx.beginPath()
+  ctx.moveTo(points[0].x, points[0].y)
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[Math.max(0, index - 1)]
+    const current = points[index]
+    const next = points[index + 1]
+    const following = points[Math.min(points.length - 1, index + 2)]
+
+    const cp1x = current.x + (next.x - previous.x) / 6
+    const cp1y = current.y + (next.y - previous.y) / 6
+    const cp2x = next.x - (following.x - current.x) / 6
+    const cp2y = next.y - (following.y - current.y) / 6
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, next.x, next.y)
+  }
+
+  const latest = points[points.length - 1]
+  const gradient = ctx.createLinearGradient(points[0].x, 0, latest.x, 0)
+  gradient.addColorStop(0, 'rgba(148, 163, 184, 0.18)')
+  gradient.addColorStop(0.55, 'rgba(34, 197, 94, 0.42)')
+  gradient.addColorStop(1, getIntonationColor(latest.cents))
+
+  ctx.strokeStyle = gradient
+  ctx.lineWidth = 2.5
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.globalAlpha = 0.92
+  ctx.stroke()
+  ctx.globalAlpha = 1
+}
+
 function drawPitchCanvas(
   canvas: HTMLCanvasElement,
   timeDomain: Float32Array,
@@ -162,28 +215,7 @@ function drawPitchCanvas(
   ctx.setLineDash([])
 
   if (centsHistory.length > 1) {
-    const historyStep = width / Math.max(HISTORY_LENGTH - 1, 1)
-    const start = HISTORY_LENGTH - centsHistory.length
-
-    for (let index = 1; index < centsHistory.length; index += 1) {
-      const prevCents = centsHistory[index - 1]
-      const cents = centsHistory[index]
-      const x0 = (start + index - 1) * historyStep
-      const x1 = (start + index) * historyStep
-      const y0 = centsToY(prevCents)
-      const y1 = centsToY(cents)
-
-      ctx.beginPath()
-      ctx.moveTo(x0, y0)
-      ctx.lineTo(x1, y1)
-      ctx.strokeStyle = getIntonationColor(cents)
-      ctx.globalAlpha = 0.55 + (index / centsHistory.length) * 0.4
-      ctx.lineWidth = 2
-      ctx.lineJoin = 'round'
-      ctx.lineCap = 'round'
-      ctx.stroke()
-    }
-    ctx.globalAlpha = 1
+    drawSmoothPitchTrace(ctx, centsHistory, HISTORY_LENGTH, width, centsToY)
   }
 
   if (currentCents != null && active) {
@@ -257,10 +289,10 @@ export function useLivePitchTracker(
   const lastPitchAtRef = useRef(0)
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
-  const displayCentsRef = useRef<number | null>(null)
+  const needleCentsRef = useRef<number | null>(null)
+  const graphCentsRef = useRef<number | null>(null)
   const lastNoteRef = useRef('—')
   const lastReadoutEmitRef = useRef(0)
-  const lastHistoryPushRef = useRef(0)
 
   useEffect(() => {
     mountedRef.current = true
@@ -291,10 +323,10 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
       historyRef.current = []
-      displayCentsRef.current = null
+      needleCentsRef.current = null
+      graphCentsRef.current = null
       lastNoteRef.current = '—'
       lastReadoutEmitRef.current = 0
-      lastHistoryPushRef.current = 0
       if (mountedRef.current) {
         readoutRef.current = emptyReadout
         setReadout(emptyReadout)
@@ -356,10 +388,10 @@ export function useLivePitchTracker(
       if (!isPlaying) {
         if (graphRef.current) graphRef.current.smoothed = null
         historyRef.current = []
-        displayCentsRef.current = null
+        needleCentsRef.current = null
+        graphCentsRef.current = null
         lastNoteRef.current = '—'
         lastReadoutEmitRef.current = 0
-        lastHistoryPushRef.current = 0
         if (mountedRef.current) {
           readoutRef.current = emptyReadout
           setReadout(emptyReadout)
@@ -407,34 +439,48 @@ export function useLivePitchTracker(
 
         if (next.noteName !== '—') {
           if (lastNoteRef.current !== next.noteName) {
-            displayCentsRef.current = next.cents
+            needleCentsRef.current = next.cents
+            graphCentsRef.current = next.cents
             lastNoteRef.current = next.noteName
           }
 
-          displayCentsRef.current = smoothFrequency(
-            displayCentsRef.current,
+          needleCentsRef.current = smoothFrequency(
+            needleCentsRef.current,
             next.cents,
-            PITCH_CENTS_SMOOTH_ALPHA,
+            PITCH_NEEDLE_SMOOTH_ALPHA,
           )
-          const displayCents = quantizeDisplayCents(
-            Math.max(-50, Math.min(50, displayCentsRef.current ?? next.cents)),
-            CENTS_DISPLAY_STEP,
+          graphCentsRef.current = smoothFrequency(
+            graphCentsRef.current,
+            next.cents,
+            PITCH_GRAPH_SMOOTH_ALPHA,
           )
+
+          const needleCents = Math.max(
+            -50,
+            Math.min(50, needleCentsRef.current ?? next.cents),
+          )
+          const traceCents = Math.max(
+            -50,
+            Math.min(50, graphCentsRef.current ?? next.cents),
+          )
+          const displayCents = quantizeDisplayCents(needleCents, CENTS_DISPLAY_STEP)
           const displayReadout: PitchReadout = { ...next, cents: displayCents }
 
           if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
             readoutRef.current = displayReadout
-            if (mountedRef.current) setReadout(displayReadout)
+            if (mountedRef.current) {
+              startTransition(() => setReadout(displayReadout))
+            }
             lastReadoutEmitRef.current = now
           }
 
           lastPitchAtRef.current = now
-          currentCents = displayCents
+          currentCents = needleCents
           active = true
-
-          if (now - lastHistoryPushRef.current >= PITCH_HISTORY_INTERVAL_MS) {
-            historyRef.current = [...historyRef.current, displayCents].slice(-HISTORY_LENGTH)
-            lastHistoryPushRef.current = now
+          const history = historyRef.current
+          history.push(traceCents)
+          if (history.length > HISTORY_LENGTH) {
+            history.splice(0, history.length - HISTORY_LENGTH)
           }
         }
       } else if (
@@ -444,11 +490,12 @@ export function useLivePitchTracker(
         readoutRef.current = emptyReadout
         if (mountedRef.current) setReadout(emptyReadout)
         graph.smoothed = null
-        displayCentsRef.current = null
+        needleCentsRef.current = null
+        graphCentsRef.current = null
         lastNoteRef.current = '—'
         active = false
       } else if (readoutRef.current.noteName !== '—') {
-        currentCents = displayCentsRef.current ?? readoutRef.current.cents
+        currentCents = needleCentsRef.current ?? readoutRef.current.cents
         active = true
       }
 

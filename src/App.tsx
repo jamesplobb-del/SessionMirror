@@ -46,16 +46,26 @@ import {
 
 async function hydrateTakeThumbnailsInBackground(
   takes: Take[],
-  applyThumbnail: (takeId: string, thumbnailUrl: string) => void,
+  applyThumbnails: (updates: Map<string, string>) => void,
 ): Promise<void> {
+  const pending = new Map<string, string>()
+
   for (const take of takes) {
     if (take.thumbnailUrl || isAudioTake(take)) continue
     try {
       const thumbnailUrl = await generateThumbnailFromUrl(take.videoUrl)
-      applyThumbnail(take.id, thumbnailUrl)
+      pending.set(take.id, thumbnailUrl)
+      if (pending.size >= 4) {
+        applyThumbnails(new Map(pending))
+        pending.clear()
+      }
     } catch {
       /* vault cards show placeholder until thumbnail is ready */
     }
+  }
+
+  if (pending.size > 0) {
+    applyThumbnails(pending)
   }
 }
 
@@ -99,8 +109,19 @@ export default function App() {
   const isReviewOpen = reviewSlot !== null
 
   useLayoutEffect(() => {
+    let debounceTimer: number | null = null
+    let lastHeight = window.innerHeight
+
     return scheduleViewportSync((height) => {
-      setWindowHeight((prev) => (prev === height ? prev : height))
+      if (height === lastHeight) return
+      lastHeight = height
+      if (debounceTimer !== null) {
+        window.clearTimeout(debounceTimer)
+      }
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null
+        setWindowHeight(height)
+      }, 120)
     })
   }, [])
 
@@ -165,11 +186,12 @@ export default function App() {
 
   playAutoTakeAudioRef.current = playAutoTakeAudio
 
-  const applyTakeThumbnail = useCallback((takeId: string, thumbnailUrl: string) => {
+  const applyTakeThumbnails = useCallback((updates: Map<string, string>) => {
     setTakes((prev) =>
-      prev.map((take) =>
-        take.id === takeId ? { ...take, thumbnailUrl } : take,
-      ),
+      prev.map((take) => {
+        const thumbnailUrl = updates.get(take.id)
+        return thumbnailUrl ? { ...take, thumbnailUrl } : take
+      }),
     )
   }, [])
 
@@ -185,9 +207,9 @@ export default function App() {
         return rows.find((row) => !row.isBestTake)?.id ?? null
       })
 
-      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnail)
+      void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
     },
-    [applyTakeThumbnail],
+    [applyTakeThumbnails],
   )
 
   useEffect(() => {
@@ -469,7 +491,11 @@ export default function App() {
 
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
-      void refreshCameraSession()
+      const timer = window.setTimeout(() => {
+        void refreshCameraSession()
+      }, 350)
+      wasVaultOpenRef.current = isVaultOpen
+      return () => window.clearTimeout(timer)
     }
     wasVaultOpenRef.current = isVaultOpen
   }, [isVaultOpen, refreshCameraSession])
@@ -758,6 +784,36 @@ export default function App() {
     [projects, activeProjectId],
   )
 
+  const handleUnpinBenchmark = useCallback(() => setBenchmarkId(null), [])
+  const handleUnpinChallenger = useCallback(() => setChallengerId(null), [])
+  const handleReviewSlotChange = useCallback((slot: ReviewSlot) => {
+    setReviewContext('compare')
+    setReviewSlot(slot)
+  }, [])
+
+  const handlePipDragStateChange = useCallback((state: PipDragUiState) => {
+    setPipDragState((prev) => {
+      if (
+        prev.isDragging === state.isDragging &&
+        prev.isArming === state.isArming &&
+        prev.overDelete === state.overDelete
+      ) {
+        return prev
+      }
+      return state
+    })
+  }, [])
+
+  const handleExpandBenchmark = useMemo(
+    () => (benchmarkTake?.videoUrl ? () => handleOpenCompareReview('benchmark') : undefined),
+    [benchmarkTake?.videoUrl, handleOpenCompareReview],
+  )
+
+  const handleExpandChallenger = useMemo(
+    () => (challengerTake?.videoUrl ? () => handleOpenCompareReview('challenger') : undefined),
+    [challengerTake?.videoUrl, handleOpenCompareReview],
+  )
+
   useLayoutEffect(() => {
     for (const ref of [benchmarkPipVideoRef, challengerPipVideoRef]) {
       resetVideoPlayback(ref.current)
@@ -821,20 +877,12 @@ export default function App() {
             deleteDropRef={recordDeleteDropRef}
             onPinBenchmark={handlePinBenchmark}
             onDeleteTake={handleDragDeleteTake}
-            onUnpinBenchmark={() => setBenchmarkId(null)}
-            onUnpinChallenger={() => setChallengerId(null)}
+            onUnpinBenchmark={handleUnpinBenchmark}
+            onUnpinChallenger={handleUnpinChallenger}
             onUploadBenchmark={handleUploadBenchmark}
-            onExpandBenchmark={
-              benchmarkTake?.videoUrl
-                ? () => handleOpenCompareReview('benchmark')
-                : undefined
-            }
-            onExpandChallenger={
-              challengerTake?.videoUrl
-                ? () => handleOpenCompareReview('challenger')
-                : undefined
-            }
-            onDragStateChange={setPipDragState}
+            onExpandBenchmark={handleExpandBenchmark}
+            onExpandChallenger={handleExpandChallenger}
+            onDragStateChange={handlePipDragStateChange}
             hapticFeedback={settings.hapticFeedback}
           />
 
@@ -856,70 +904,73 @@ export default function App() {
         </div>
       </div>
 
-      <ReviewModeOverlay
-        context={reviewContext}
-        activeSlot={reviewSlot ?? 'benchmark'}
-        vaultTakes={sortedTakes}
-        vaultIndex={vaultReviewIndex}
-        onVaultIndexChange={setVaultReviewIndex}
-        benchmarkSrc={benchmarkTake?.videoUrl ?? null}
-        challengerSrc={challengerTake?.videoUrl ?? null}
-        benchmarkFilePath={benchmarkTake?.filePath}
-        challengerFilePath={challengerTake?.filePath}
-        benchmarkName={benchmarkTake?.name}
-        challengerName={challengerTake?.name}
-        benchmarkMimeType={
-          benchmarkTake?.videoMimeType ??
-          (benchmarkTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-        }
-        challengerMimeType={
-          challengerTake?.videoMimeType ??
-          (challengerTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-        }
-        benchmarkMediaType={benchmarkTake?.mediaType}
-        challengerMediaType={challengerTake?.mediaType}
-        benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
-        challengerMirror={challengerTake?.mirrorPlayback !== false}
-        pitchTrackerEnabled={settings.pitchTrackerEnabled}
-        isOpen={isReviewOpen}
-        onClose={handleCloseReview}
-        onSlotChange={(slot) => {
-          setReviewContext('compare')
-          setReviewSlot(slot)
-        }}
-      />
+      {isReviewOpen && (
+        <ReviewModeOverlay
+          context={reviewContext}
+          activeSlot={reviewSlot ?? 'benchmark'}
+          vaultTakes={sortedTakes}
+          vaultIndex={vaultReviewIndex}
+          onVaultIndexChange={setVaultReviewIndex}
+          benchmarkSrc={benchmarkTake?.videoUrl ?? null}
+          challengerSrc={challengerTake?.videoUrl ?? null}
+          benchmarkFilePath={benchmarkTake?.filePath}
+          challengerFilePath={challengerTake?.filePath}
+          benchmarkName={benchmarkTake?.name}
+          challengerName={challengerTake?.name}
+          benchmarkMimeType={
+            benchmarkTake?.videoMimeType ??
+            (benchmarkTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+          }
+          challengerMimeType={
+            challengerTake?.videoMimeType ??
+            (challengerTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+          }
+          benchmarkMediaType={benchmarkTake?.mediaType}
+          challengerMediaType={challengerTake?.mediaType}
+          benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
+          challengerMirror={challengerTake?.mirrorPlayback !== false}
+          pitchTrackerEnabled={settings.pitchTrackerEnabled}
+          isOpen
+          onClose={handleCloseReview}
+          onSlotChange={handleReviewSlotChange}
+        />
+      )}
 
-      <TakeVaultDrawer
-        isOpen={isVaultOpen}
-        onClose={handleCloseVault}
-        projects={projects}
-        activeProject={activeProject}
-        onSelectProject={handleSelectProject}
-        onCreateProject={handleCreateProject}
-        takes={takes}
-        sortedTakes={sortedTakes}
-        sortMode={sortMode}
-        onSortChange={setSortMode}
-        benchmarkId={benchmarkId}
-        challengerId={challengerId}
-        onPinBenchmark={handlePinBenchmark}
-        onPinChallenger={handlePinChallenger}
-        onBeforePin={pausePipVideos}
-        onUpdateTake={handleUpdateTake}
-        onDeleteTake={handleDeleteTake}
-        onDeleteTakes={handleDeleteTakes}
-        onClearAllTakes={handleClearAllTakes}
-        onOpenTake={handleOpenVaultTake}
-      />
+      {isVaultOpen && (
+        <TakeVaultDrawer
+          isOpen
+          onClose={handleCloseVault}
+          projects={projects}
+          activeProject={activeProject}
+          onSelectProject={handleSelectProject}
+          onCreateProject={handleCreateProject}
+          takes={takes}
+          sortedTakes={sortedTakes}
+          sortMode={sortMode}
+          onSortChange={setSortMode}
+          benchmarkId={benchmarkId}
+          challengerId={challengerId}
+          onPinBenchmark={handlePinBenchmark}
+          onPinChallenger={handlePinChallenger}
+          onBeforePin={pausePipVideos}
+          onUpdateTake={handleUpdateTake}
+          onDeleteTake={handleDeleteTake}
+          onDeleteTakes={handleDeleteTakes}
+          onClearAllTakes={handleClearAllTakes}
+          onOpenTake={handleOpenVaultTake}
+        />
+      )}
 
-      <SettingsDrawer
-        isOpen={isSettingsOpen}
-        onClose={handleCloseSettings}
-        settings={settings}
-        onUpdate={updateSettings}
-        onReset={resetSettings}
-        recordingMode={recordingMode}
-      />
+      {isSettingsOpen && (
+        <SettingsDrawer
+          isOpen
+          onClose={handleCloseSettings}
+          settings={settings}
+          onUpdate={updateSettings}
+          onReset={resetSettings}
+          recordingMode={recordingMode}
+        />
+      )}
     </div>
   )
 }

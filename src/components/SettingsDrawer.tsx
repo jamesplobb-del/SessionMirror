@@ -102,7 +102,7 @@ export default function SettingsDrawer({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 ease-in ${
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 ease-in ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
@@ -110,7 +110,7 @@ export default function SettingsDrawer({
       />
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 max-h-[82vh] rounded-t-3xl border border-white/20 bg-white/95 shadow-2xl backdrop-blur-xl transition-[transform,opacity] duration-200 ease-in ${
+        className={`fixed inset-x-0 bottom-0 z-50 max-h-[82vh] rounded-t-3xl border border-stone-200 bg-white shadow-2xl transition-[transform,opacity] duration-200 ease-in ${
           isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
         }`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}

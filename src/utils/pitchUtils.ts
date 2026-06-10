@@ -149,6 +149,25 @@ export function quantizeDisplayCents(cents: number, step: number): number {
   return Math.round(cents / step) * step
 }
 
+/** Symmetric moving average — used for drawing smooth pitch curves. */
+export function movingAverage(values: number[], radius: number): number[] {
+  if (values.length === 0 || radius <= 0) return values
+
+  return values.map((_, index) => {
+    let sum = 0
+    let count = 0
+    for (
+      let offset = Math.max(0, index - radius);
+      offset <= Math.min(values.length - 1, index + radius);
+      offset += 1
+    ) {
+      sum += values[offset]
+      count += 1
+    }
+    return sum / count
+  })
+}
+
 export function getIntonationZone(cents: number): IntonationZone {
   const abs = Math.abs(cents)
   if (abs <= TUNING_GREEN_CENTS) return 'green'

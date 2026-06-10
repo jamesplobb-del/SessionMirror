@@ -62,13 +62,29 @@ export function useDragToPin({
   const onDragStateChangeRef = useRef(onDragStateChange)
   onDragStateChangeRef.current = onDragStateChange
 
+  const lastEmittedRef = useRef<PipDragUiState>({
+    isDragging: false,
+    isArming: false,
+    overDelete: false,
+  })
+
   const emitDragState = useCallback(
     (isDragging: boolean, isArmingState: boolean, overDelete: boolean) => {
-      onDragStateChangeRef.current?.({
+      const next = {
         isDragging,
         isArming: isArmingState,
         overDelete,
-      })
+      }
+      const prev = lastEmittedRef.current
+      if (
+        prev.isDragging === next.isDragging &&
+        prev.isArming === next.isArming &&
+        prev.overDelete === next.overDelete
+      ) {
+        return
+      }
+      lastEmittedRef.current = next
+      onDragStateChangeRef.current?.(next)
     },
     [],
   )
@@ -87,6 +103,11 @@ export function useDragToPin({
     pointerIdRef.current = null
     setIsArming(false)
     setGhost(null)
+    lastEmittedRef.current = {
+      isDragging: false,
+      isArming: false,
+      overDelete: false,
+    }
     emitDragState(false, false, false)
   }, [clearLongPressTimer, emitDragState])
 
