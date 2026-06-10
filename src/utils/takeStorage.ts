@@ -183,6 +183,37 @@ export function convertFileSrcIfNeeded(uri: string): string {
 /** In-memory cache so PiP / vault players don't hammer Filesystem.getUri. */
 const playbackSrcCache = new Map<string, string>()
 
+/** Sync read when a take was just saved — avoids a black frame while getUri resolves. */
+export function readCachedPlaybackSrc(
+  filePath: string,
+  fallbackUrl: string,
+): string | null {
+  if (!Capacitor.isNativePlatform()) {
+    return fallbackUrl || null
+  }
+
+  const fromFallback = sanitizeNativeVideoSrc(fallbackUrl)
+  if (fromFallback) return fromFallback
+
+  for (const key of [filePath, fallbackUrl]) {
+    if (!key) continue
+    const cached = playbackSrcCache.get(key)
+    if (cached) {
+      const safe = sanitizeNativeVideoSrc(cached)
+      if (safe) return safe
+    }
+  }
+
+  return null
+}
+
+function rememberPlaybackSrc(filePath: string, videoUrl: string): string {
+  const safe = sanitizeNativeVideoSrc(videoUrl) ?? applyStrictPlaybackSrc(videoUrl)
+  if (filePath && safe) playbackSrcCache.set(filePath, safe)
+  if (videoUrl && safe) playbackSrcCache.set(videoUrl, safe)
+  return safe
+}
+
 /**
  * Resolve playback URL for native takes — cached, prefers already-converted videoUrl.
  */
@@ -195,7 +226,9 @@ export async function resolveNativeVideoPlaybackSrc(
   }
 
   if (isConvertedPlaybackUrl(fallbackUrl)) {
-    return sanitizeNativeVideoSrc(fallbackUrl)
+    const safe = sanitizeNativeVideoSrc(fallbackUrl)
+    if (safe && filePath) rememberPlaybackSrc(filePath, safe)
+    return safe
   }
 
   const cacheKey = filePath || fallbackUrl
@@ -432,7 +465,10 @@ export class StreamingTakeWriter {
 
       return {
         filePath: this.filePath,
-        videoUrl: Capacitor.convertFileSrc(uri),
+        videoUrl: rememberPlaybackSrc(
+          this.filePath,
+          Capacitor.convertFileSrc(uri),
+        ),
       }
     }
 
@@ -443,7 +479,7 @@ export class StreamingTakeWriter {
 
     return {
       filePath: this.filePath,
-      videoUrl: Capacitor.convertFileSrc(uri),
+      videoUrl: rememberPlaybackSrc(this.filePath, Capacitor.convertFileSrc(uri)),
     }
   }
 

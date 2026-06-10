@@ -211,6 +211,8 @@ function PipWindow({
               recordingOrientation={recordingOrientation}
               controls={false}
               manualPlayOnly
+              eagerLoad
+              preload="auto"
             />
 
             {onExpand && (
@@ -312,7 +314,7 @@ function PipWindow({
             onUnpin()
           }}
           className={FLOAT_BADGE}
-          style={{ top: -12, right: -12 }}
+          style={{ bottom: -12, left: -12 }}
           aria-label={`Unload ${label}`}
         >
           <X className="h-3 w-3" />

@@ -1,10 +1,4 @@
-import { Capacitor } from '@capacitor/core'
-import { Directory, Filesystem } from '@capacitor/filesystem'
-
-const DEBUG_ENDPOINT = 'http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454'
-const DEBUG_SESSION = 'fba730'
-const NATIVE_DEBUG_LOG = 'debug-fba730.log'
-
+/** In-memory debug ring only — no network or filesystem I/O (keeps the UI responsive on device). */
 export function agentDebugLog(
   location: string,
   message: string,
@@ -12,8 +6,10 @@ export function agentDebugLog(
   hypothesisId: string,
   runId = 'pre-fix',
 ): void {
+  if (typeof window === 'undefined') return
+
   const payload = {
-    sessionId: DEBUG_SESSION,
+    sessionId: 'fba730',
     runId,
     hypothesisId,
     location,
@@ -22,32 +18,10 @@ export function agentDebugLog(
     timestamp: Date.now(),
   }
 
-  const line = `${JSON.stringify(payload)}\n`
-
   // #region agent log
-  if (typeof window !== 'undefined') {
-    const ring = ((window as unknown as { __SM_DEBUG_LOGS?: string[] }).__SM_DEBUG_LOGS ??=
-      [])
-    ring.push(line.trim())
-    if (ring.length > 200) ring.shift()
-  }
-
-  fetch(DEBUG_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': DEBUG_SESSION,
-    },
-    body: JSON.stringify(payload),
-  }).catch(() => {})
-
-  if (Capacitor.isNativePlatform?.()) {
-    void Filesystem.appendFile({
-      path: NATIVE_DEBUG_LOG,
-      directory: Directory.Data,
-      data: line,
-    }).catch(() => {})
-  }
+  const ring = ((window as unknown as { __SM_DEBUG_LOGS?: string[] }).__SM_DEBUG_LOGS ??= [])
+  ring.push(JSON.stringify(payload))
+  if (ring.length > 80) ring.shift()
   // #endregion
 }
 

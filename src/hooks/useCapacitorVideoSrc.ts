@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import {
-  isConvertedPlaybackUrl,
+  readCachedPlaybackSrc,
   resolveNativeVideoPlaybackSrc,
-  sanitizeNativeVideoSrc,
 } from '../utils/takeStorage'
 
 /**
@@ -15,15 +14,9 @@ export function useCapacitorVideoSrc(
   filePath: string,
   fallbackUrl: string,
 ): string | null {
-  const [src, setSrc] = useState<string | null>(() => {
-    if (!Capacitor.isNativePlatform()) {
-      return fallbackUrl || null
-    }
-    if (isConvertedPlaybackUrl(fallbackUrl)) {
-      return sanitizeNativeVideoSrc(fallbackUrl)
-    }
-    return null
-  })
+  const [src, setSrc] = useState<string | null>(() =>
+    readCachedPlaybackSrc(filePath, fallbackUrl),
+  )
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {

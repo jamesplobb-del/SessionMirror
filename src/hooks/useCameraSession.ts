@@ -417,19 +417,6 @@ export function useCameraSession({
     (recorder: MediaRecorder, takeId: string) => {
       recorder.ondataavailable = (event) => {
         if (event.data.size === 0) return
-        // #region agent log
-        agentDebugLog(
-          'useCameraSession.ts:ondataavailable',
-          'recorder chunk',
-          {
-            takeId,
-            chunkBytes: event.data.size,
-            chunkType: event.data.type,
-            bufferedChunks: writerRef.current ? 'writer' : chunksRef.current.length + 1,
-          },
-          'H-E',
-        )
-        // #endregion
 
         if (writerRef.current) {
           void writerRef.current.enqueue(event.data).catch(async () => {

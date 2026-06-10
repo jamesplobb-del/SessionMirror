@@ -267,86 +267,20 @@ export default function App() {
     } = payload
 
     void (async () => {
-      let safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
-      let resolvedFilePath = filePath
-      let normalizedBlob = blob
+      const safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
       const projectId = activeProjectIdRef.current
-      let takeIndex = 1
-
-      if (mediaType === 'video' && recordingOrientation === 'landscape') {
-        if (blob) {
-          normalizedBlob = await normalizeLandscapeRecordingBlob(
-            blob,
-            mimeType,
-            recordingOrientation,
-          )
-          if (normalizedBlob !== blob) {
-            if (safeVideoUrl.startsWith('blob:')) {
-              URL.revokeObjectURL(safeVideoUrl)
-            }
-            safeVideoUrl = URL.createObjectURL(normalizedBlob)
-          }
-        } else if (filePath) {
-          const normalized = await normalizeLandscapeTakeInPlace({
-            id: takeId,
-            filePath,
-            videoUrl: safeVideoUrl,
-            videoMimeType: mimeType,
-            recordingOrientation,
-          })
-          if (normalized) {
-            resolvedFilePath = normalized.filePath
-            safeVideoUrl = await resolveTakePlaybackUrl(
-              normalized.filePath,
-              normalized.videoUrl,
-            )
-          }
-        }
-      }
-
-      if (projectId && resolvedFilePath) {
-        const existing = await getTakesByProject(projectId)
-        takeIndex = existing.length + 1
-        await saveTake({
-          projectId,
-          filePath: resolvedFilePath,
-          duration: durationSeconds,
-          takeId,
-          mimeType,
-          mediaType,
-          recordingOrientation,
-          name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
-        })
-      }
-
-      const savedTake: Take = {
-        ...createTake(
-          takeId,
-          takeIndex,
-          safeVideoUrl,
-          resolvedFilePath,
-          mimeType,
-          mediaType,
-        ),
-        recordingOrientation: recordingOrientation ?? 'portrait',
-      }
 
       setTakes((prev) => {
-        const index = projectId ? takeIndex : prev.length + 1
-        const nextTake =
-          index === takeIndex
-            ? savedTake
-            : {
-                ...savedTake,
-                name: mediaType === 'audio' ? `Audio ${index}` : `Take ${index}`,
-              }
-        if (showTakeCardsRef.current) {
-          setChallengerId(nextTake.id)
+        const index = prev.length + 1
+        const savedTake: Take = {
+          ...createTake(takeId, index, safeVideoUrl, filePath, mimeType, mediaType),
+          recordingOrientation: recordingOrientation ?? 'portrait',
         }
-        return [...prev, nextTake]
+        if (showTakeCardsRef.current) {
+          setChallengerId(takeId)
+        }
+        return [...prev, savedTake]
       })
-
-      const thumbnailTake: Take = savedTake
 
       if (
         mediaType === 'audio' &&
@@ -363,31 +297,103 @@ export default function App() {
             take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take,
           ),
         )
-        return
       }
 
-      const thumbnailPromise = normalizedBlob
-        ? generateThumbnailFromBlob(
-            normalizedBlob,
-            thumbnailTake.mirrorPlayback !== false,
-            thumbnailTake.recordingOrientation,
-          ).then((dataUrl) =>
-            persistTakeThumbnail(takeId, dataUrl, thumbnailTake.recordingOrientation ?? 'portrait'),
-          )
-        : captureAndPersistTakeThumbnail(thumbnailTake)
+      void (async () => {
+        let resolvedFilePath = filePath
+        let playbackUrl = safeVideoUrl
+        let normalizedBlob = blob
 
-      void thumbnailPromise
-        .then((thumbnailUrl) => {
-          if (!thumbnailUrl) return
-          setTakes((current) =>
-            current.map((take) =>
-              take.id === takeId ? { ...take, thumbnailUrl } : take,
-            ),
-          )
-        })
-        .catch(() => {
-          /* vault falls back to placeholder until thumbnail is ready */
-        })
+        if (mediaType === 'video' && recordingOrientation === 'landscape') {
+          if (blob) {
+            normalizedBlob = await normalizeLandscapeRecordingBlob(
+              blob,
+              mimeType,
+              recordingOrientation,
+            )
+            if (normalizedBlob !== blob) {
+              if (playbackUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(playbackUrl)
+              }
+              playbackUrl = URL.createObjectURL(normalizedBlob)
+            }
+          } else if (filePath) {
+            const normalized = await normalizeLandscapeTakeInPlace({
+              id: takeId,
+              filePath,
+              videoUrl: playbackUrl,
+              videoMimeType: mimeType,
+              recordingOrientation,
+            })
+            if (normalized) {
+              resolvedFilePath = normalized.filePath
+              playbackUrl = await resolveTakePlaybackUrl(
+                normalized.filePath,
+                normalized.videoUrl,
+              )
+            }
+          }
+
+          if (playbackUrl !== safeVideoUrl || resolvedFilePath !== filePath) {
+            setTakes((current) =>
+              current.map((take) =>
+                take.id === takeId
+                  ? { ...take, videoUrl: playbackUrl, filePath: resolvedFilePath }
+                  : take,
+              ),
+            )
+          }
+        }
+
+        if (projectId && resolvedFilePath) {
+          const existing = await getTakesByProject(projectId)
+          const takeIndex = existing.length + 1
+          await saveTake({
+            projectId,
+            filePath: resolvedFilePath,
+            duration: durationSeconds,
+            takeId,
+            mimeType,
+            mediaType,
+            recordingOrientation,
+            name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
+          })
+        }
+
+        if (mediaType !== 'video') return
+
+        const thumbnailTake: Take = {
+          ...createTake(takeId, 1, playbackUrl, resolvedFilePath, mimeType, mediaType),
+          recordingOrientation: recordingOrientation ?? 'portrait',
+        }
+
+        const thumbnailPromise = normalizedBlob
+          ? generateThumbnailFromBlob(
+              normalizedBlob,
+              thumbnailTake.mirrorPlayback !== false,
+              thumbnailTake.recordingOrientation,
+            ).then((dataUrl) =>
+              persistTakeThumbnail(
+                takeId,
+                dataUrl,
+                thumbnailTake.recordingOrientation ?? 'portrait',
+              ),
+            )
+          : captureAndPersistTakeThumbnail(thumbnailTake)
+
+        void thumbnailPromise
+          .then((thumbnailUrl) => {
+            if (!thumbnailUrl) return
+            setTakes((current) =>
+              current.map((take) =>
+                take.id === takeId ? { ...take, thumbnailUrl } : take,
+              ),
+            )
+          })
+          .catch(() => {
+            /* vault falls back to placeholder until thumbnail is ready */
+          })
+      })()
     })()
   }, [])
 
@@ -647,7 +653,17 @@ export default function App() {
 
   const mainAudioPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'audio') return null
-    if (isReviewOpen || isVaultOpen || isSettingsOpen || isRecording) return null
+    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
+
+    if (isRecording && ready) {
+      return {
+        mediaRef: liveMicPlaceholderRef,
+        take: null,
+        isPlaying: true,
+        mediaKey: `main-recording-audio-${streamGeneration}`,
+        liveMicOnly: true,
+      }
+    }
 
     if (autoPlaybackTakeId && autoPlaybackTake) {
       return {
@@ -712,8 +728,8 @@ export default function App() {
 
   const mainVideoPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'video') return null
-    if (isReviewOpen || isVaultOpen || isSettingsOpen || isRecording) return null
-    if (!ready) return null
+    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
+    if (!ready && !isRecording) return null
 
     return {
       mediaRef: liveMicPlaceholderRef,
@@ -1025,7 +1041,9 @@ export default function App() {
         error={cameraError}
         recordingMode={recordingMode}
         isRecording={isRecording}
-        pitchStageActive={mainAudioPitchSource !== null && showPitch}
+        pitchStageActive={
+          showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
+        }
       />
 
       <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
