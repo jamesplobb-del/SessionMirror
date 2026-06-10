@@ -342,6 +342,7 @@ export default function TakeVaultDrawer({
                               filePath={take.filePath}
                               videoUrl={take.videoUrl}
                               mimeType={take.videoMimeType}
+                              recordingOrientation={take.recordingOrientation}
                               thumbnailPreview
                               manualPlayOnly
                               controls={false}

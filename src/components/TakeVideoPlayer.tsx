@@ -1,9 +1,15 @@
-import { useEffect, useRef, type CSSProperties, type PointerEventHandler, type RefObject, type VideoHTMLAttributes } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEventHandler, type RefObject, type VideoHTMLAttributes } from 'react'
 import { Mic } from 'lucide-react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosTakeVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
+import type { RecordingOrientation } from '../utils/physicalOrientation'
+import {
+  buildPlaybackShellStyle,
+  shouldCorrectPlaybackOrientation,
+  takeVideoShellClassName,
+} from '../utils/takeVideoPlayback'
 
 export interface TakeVideoPlayerProps
   extends Omit<VideoHTMLAttributes<HTMLVideoElement>, 'src'> {
@@ -13,6 +19,8 @@ export interface TakeVideoPlayerProps
   videoRef?: RefObject<HTMLMediaElement | null>
   loadingClassName?: string
   mirror?: boolean
+  recordingOrientation?: RecordingOrientation
+  fit?: 'cover' | 'contain'
   eagerLoad?: boolean
   thumbnailPreview?: boolean
   manualPlayOnly?: boolean
@@ -33,6 +41,8 @@ export default function TakeVideoPlayer({
   loadingClassName = 'h-full w-full animate-pulse bg-stone-900',
   controls = true,
   mirror = false,
+  recordingOrientation,
+  fit = 'cover',
   eagerLoad = false,
   thumbnailPreview = false,
   manualPlayOnly = false,
@@ -47,6 +57,7 @@ export default function TakeVideoPlayer({
   const mediaRef = externalVideoRef ?? internalRef
   const playbackSrc = useCapacitorVideoSrc(filePath, videoUrl)
   const isAudio = isAudioMimeType(mimeTypeProp)
+  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 })
 
   const mediaSrc = playbackSrc
     ? isAudio
@@ -58,6 +69,10 @@ export default function TakeVideoPlayer({
     if (!eagerLoad || !mediaSrc) return
     mediaRef.current?.load()
   }, [eagerLoad, mediaSrc, mediaRef])
+
+  useEffect(() => {
+    setVideoDimensions({ width: 0, height: 0 })
+  }, [mediaSrc, videoSourceKey])
 
   useEffect(() => {
     if (manualPlayOnly) return
@@ -124,9 +139,7 @@ export default function TakeVideoPlayer({
           autoPlay={false}
         />
         <div
-          className={`pointer-events-none absolute inset-0 flex items-center justify-center ${
-            thumbnailPreview ? '' : ''
-          }`}
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
           aria-hidden
         >
           <Mic className="h-8 w-8 text-stone-500/80" />
@@ -135,19 +148,46 @@ export default function TakeVideoPlayer({
     )
   }
 
+  const needsLandscapeFix = shouldCorrectPlaybackOrientation(
+    recordingOrientation,
+    videoDimensions.width,
+    videoDimensions.height,
+  )
+
+  const shellClassName = takeVideoShellClassName({
+    needsLandscapeFix,
+    mirror,
+    fit,
+    thumbnailPreview,
+  })
+
+  const shellStyle = needsLandscapeFix
+    ? buildPlaybackShellStyle(videoDimensions.width, videoDimensions.height)
+    : undefined
+
   const videoStyle: CSSProperties = {
     pointerEvents: thumbnailPreview ? 'none' : undefined,
-    ...(mirror ? { transform: 'scaleX(-1)' } : style),
+    ...(needsLandscapeFix || mirror ? {} : style),
   }
+
+  const { onLoadedMetadata, ...videoRest } = rest
 
   const videoElement = (
     <video
       key={videoSourceKey ?? mediaSrc ?? 'empty'}
       ref={mediaRef as RefObject<HTMLVideoElement>}
-      className={`media-display-enhance ${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
+      className={`take-video-shell__media media-display-enhance ${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
       src={mediaSrc}
       style={videoStyle}
-      {...rest}
+      onLoadedMetadata={(event) => {
+        const media = event.currentTarget
+        setVideoDimensions({
+          width: media.videoWidth,
+          height: media.videoHeight,
+        })
+        onLoadedMetadata?.(event)
+      }}
+      {...videoRest}
       {...iosTakeVideoProps}
       playsInline
       {...({
@@ -163,9 +203,12 @@ export default function TakeVideoPlayer({
     />
   )
 
-  if (mirror && style) {
+  if (needsLandscapeFix || mirror) {
     return (
-      <div className="h-full w-full" style={style}>
+      <div
+        className={shellClassName}
+        style={{ ...shellStyle, ...(style ?? undefined) }}
+      >
         {videoElement}
       </div>
     )

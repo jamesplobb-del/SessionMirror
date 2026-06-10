@@ -9,7 +9,7 @@ import {
   type RecordingOrientation,
 } from './takeVideoTransform'
 import { estimateVideoBitrate, getRecorderMimeType } from './mobileVideo'
-import { resolveNativeVideoPlaybackSrc } from './takeStorage'
+import { persistUploadedVideo, resolveNativeVideoPlaybackSrc, type PersistedTakeVideo } from './takeStorage'
 import type { Take } from '../types'
 
 const EXPORT_CACHE_DIR = 'export-cache'
@@ -169,10 +169,15 @@ async function transcodeTakeVideoForExport(
         ? 'video/mp4'
         : getRecorderMimeType()
 
+    const exportBitrate = Math.min(
+      Math.round(estimateVideoBitrate(width, height) * 1.35),
+      18_000_000,
+    )
+
     const chunks: BlobPart[] = []
     const recorder = new MediaRecorder(canvasStream, {
       mimeType: recorderMime,
-      videoBitsPerSecond: estimateVideoBitrate(width, height),
+      videoBitsPerSecond: exportBitrate,
       audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
     })
 
@@ -302,4 +307,66 @@ export async function prepareTakeVideoExportUrl(take: Take): Promise<string | nu
   )
 
   return URL.createObjectURL(blob)
+}
+
+/** Re-encode a landscape take stored in a portrait buffer and overwrite the take file. */
+export async function normalizeLandscapeTakeInPlace(
+  take: Pick<Take, 'id' | 'filePath' | 'videoUrl' | 'videoMimeType' | 'recordingOrientation'>,
+): Promise<PersistedTakeVideo | null> {
+  if (!take.filePath || take.recordingOrientation !== 'landscape') {
+    return null
+  }
+
+  const playbackUrl = await resolveNativeVideoPlaybackSrc(take.filePath, take.videoUrl)
+  if (!playbackUrl) return null
+
+  const { width, height, video } = await loadVideoMetadata(playbackUrl)
+  video.pause()
+  video.removeAttribute('src')
+  video.load()
+  video.remove()
+
+  if (!needsOrientationCorrection(width, height, take.recordingOrientation)) {
+    return null
+  }
+
+  const blob = await transcodeTakeVideoForExport(
+    playbackUrl,
+    take.recordingOrientation,
+    take.videoMimeType || 'video/mp4',
+  )
+
+  return persistUploadedVideo(blob, take.id, take.videoMimeType || 'video/mp4')
+}
+
+/** Web / blob recordings — returns a corrected blob when needed. */
+export async function normalizeLandscapeRecordingBlob(
+  blob: Blob,
+  mimeType: string,
+  recordingOrientation: RecordingOrientation | undefined,
+): Promise<Blob> {
+  if (recordingOrientation !== 'landscape') {
+    return blob
+  }
+
+  const playbackUrl = URL.createObjectURL(blob)
+  try {
+    const { width, height, video } = await loadVideoMetadata(playbackUrl)
+    video.pause()
+    video.removeAttribute('src')
+    video.load()
+    video.remove()
+
+    if (!needsOrientationCorrection(width, height, recordingOrientation)) {
+      return blob
+    }
+
+    return transcodeTakeVideoForExport(
+      playbackUrl,
+      recordingOrientation,
+      mimeType,
+    )
+  } finally {
+    URL.revokeObjectURL(playbackUrl)
+  }
 }

@@ -4,6 +4,8 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 
+import type { Take } from '../types'
+
 interface PipWindowProps {
   src: string | null
   filePath?: string
@@ -13,6 +15,7 @@ interface PipWindowProps {
   variant: 'benchmark' | 'challenger'
   emptyMessage: string
   mirror?: boolean
+  recordingOrientation?: Take['recordingOrientation']
   suspendPlayback?: boolean
   videoRef?: React.RefObject<HTMLMediaElement | null>
   onUnpin: () => void
@@ -43,6 +46,7 @@ function PipWindow({
   variant,
   emptyMessage,
   mirror = true,
+  recordingOrientation,
   suspendPlayback = false,
   videoRef: externalVideoRef,
   onUnpin,
@@ -203,6 +207,7 @@ function PipWindow({
               className="absolute inset-0 h-full w-full object-cover pointer-events-none"
               loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
               mirror={mirror}
+              recordingOrientation={recordingOrientation}
               controls={false}
               manualPlayOnly
             />

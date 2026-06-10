@@ -276,7 +276,12 @@ body.settings-branch-open * {
 
 .app-ui-rotator .review-overlay,
 .app-ui-rotator .pitch-widget-draggable,
-.app-ui-rotator [role='dialog'] {
+.app-ui-rotator [role='dialog'],
+.app-ui-rotator button,
+.app-ui-rotator a,
+.app-ui-rotator input,
+.app-ui-rotator textarea,
+.app-ui-rotator select {
   pointer-events: auto;
 }
 
@@ -517,24 +522,38 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .review-overlay--immersive {
-  background: transparent !important;
+  background: #0c0a09 !important;
 }
 
 .review-video-stage {
   position: absolute;
   inset: 0;
   z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0c0a09;
 }
 
-.review-video-bleed,
+.review-video-bleed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #0c0a09;
+}
+
 .review-video-bleed__player,
-.review-video-bleed video {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  object-fit: cover !important;
+.review-video-bleed .take-video-shell {
+  width: 100%;
+  height: 100%;
+}
+
+.review-video-bleed video,
+.review-video-bleed .take-video-shell__media {
   z-index: 0;
 }
 
@@ -553,6 +572,72 @@ video.camera-preview.camera-preview--hidden {
   width: 100%;
   z-index: 10;
   overflow: hidden;
+  background: linear-gradient(
+    to top,
+    rgba(12, 10, 9, 0.96) 0%,
+    rgba(12, 10, 9, 0.72) 42%,
+    rgba(12, 10, 9, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.review-bottom-ui .review-timeline {
+  pointer-events: auto;
+}
+
+.take-video-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0c0a09;
+}
+
+.take-video-shell__media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.take-video-shell--contain .take-video-shell__media {
+  object-fit: contain;
+}
+
+.take-video-shell--mirror .take-video-shell__media {
+  transform: scaleX(-1);
+  transform-origin: center center;
+}
+
+.take-video-shell--landscape-fix .take-video-shell__media {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(100% * var(--take-video-h, 16) / var(--take-video-w, 9));
+  height: 100%;
+  min-width: calc(100% * var(--take-video-h, 16) / var(--take-video-w, 9));
+  max-width: none;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+  object-fit: cover;
+}
+
+.take-video-shell--landscape-fix.take-video-shell--contain .take-video-shell__media {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.take-video-shell--landscape-fix.take-video-shell--mirror .take-video-shell__media {
+  transform: translate(-50%, -50%) rotate(90deg) scaleX(-1);
+}
+
+.take-video-shell--thumbnail.take-video-shell--landscape-fix .take-video-shell__media {
+  object-fit: cover;
 }
 
 .settings-drawer-scroll {

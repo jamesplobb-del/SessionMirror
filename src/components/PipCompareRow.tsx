@@ -128,6 +128,7 @@ export default function PipCompareRow({
             variant="benchmark"
             emptyMessage="Drag Current Take here or upload."
             mirror={benchmarkTake?.mirrorPlayback !== false}
+            recordingOrientation={benchmarkTake?.recordingOrientation}
             suspendPlayback={suspendPipPlayback}
             videoRef={benchmarkPipVideoRef}
             onUnpin={onUnpinBenchmark}
@@ -151,6 +152,7 @@ export default function PipCompareRow({
           variant="challenger"
           emptyMessage="Load a take from the vault."
           mirror={challengerTake?.mirrorPlayback !== false}
+          recordingOrientation={challengerTake?.recordingOrientation}
           suspendPlayback={suspendPipPlayback}
           videoRef={challengerPipVideoRef}
           onUnpin={onUnpinChallenger}

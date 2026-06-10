@@ -18,6 +18,10 @@ import {
   captureAndPersistTakeThumbnail,
   hydrateTakeThumbnailsInBackground,
 } from './utils/generateThumbnail'
+import {
+  normalizeLandscapeRecordingBlob,
+  normalizeLandscapeTakeInPlace,
+} from './utils/prepareTakeVideoExport'
 import { createTake, sortTakes } from './utils/takes'
 import {
   deleteTakeFile,
@@ -263,16 +267,49 @@ export default function App() {
     } = payload
 
     void (async () => {
-      const safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
+      let safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
+      let resolvedFilePath = filePath
+      let normalizedBlob = blob
       const projectId = activeProjectIdRef.current
       let takeIndex = 1
 
-      if (projectId && filePath) {
+      if (mediaType === 'video' && recordingOrientation === 'landscape') {
+        if (blob) {
+          normalizedBlob = await normalizeLandscapeRecordingBlob(
+            blob,
+            mimeType,
+            recordingOrientation,
+          )
+          if (normalizedBlob !== blob) {
+            if (safeVideoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(safeVideoUrl)
+            }
+            safeVideoUrl = URL.createObjectURL(normalizedBlob)
+          }
+        } else if (filePath) {
+          const normalized = await normalizeLandscapeTakeInPlace({
+            id: takeId,
+            filePath,
+            videoUrl: safeVideoUrl,
+            videoMimeType: mimeType,
+            recordingOrientation,
+          })
+          if (normalized) {
+            resolvedFilePath = normalized.filePath
+            safeVideoUrl = await resolveTakePlaybackUrl(
+              normalized.filePath,
+              normalized.videoUrl,
+            )
+          }
+        }
+      }
+
+      if (projectId && resolvedFilePath) {
         const existing = await getTakesByProject(projectId)
         takeIndex = existing.length + 1
         await saveTake({
           projectId,
-          filePath,
+          filePath: resolvedFilePath,
           duration: durationSeconds,
           takeId,
           mimeType,
@@ -287,7 +324,7 @@ export default function App() {
           takeId,
           takeIndex,
           safeVideoUrl,
-          filePath,
+          resolvedFilePath,
           mimeType,
           mediaType,
         ),
@@ -329,9 +366,9 @@ export default function App() {
         return
       }
 
-      const thumbnailPromise = blob
+      const thumbnailPromise = normalizedBlob
         ? generateThumbnailFromBlob(
-            blob,
+            normalizedBlob,
             thumbnailTake.mirrorPlayback !== false,
             thumbnailTake.recordingOrientation,
           ).then((dataUrl) =>
@@ -1132,6 +1169,8 @@ export default function App() {
           challengerMediaType={challengerTake?.mediaType}
           benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
           challengerMirror={challengerTake?.mirrorPlayback !== false}
+          benchmarkRecordingOrientation={benchmarkTake?.recordingOrientation}
+          challengerRecordingOrientation={challengerTake?.recordingOrientation}
           pitchTrackerEnabled={settings.pitchTrackerEnabled}
           liveMicTunerEnabled={settings.liveMicTunerEnabled}
           tunerInstrument={settings.tunerInstrument}

@@ -11,6 +11,9 @@ const HTML_CLASS = {
   'landscape-right': 'physical-landscape-right',
 } as const
 
+const LANDSCAPE_GAMMA_THRESHOLD = 42
+const LANDSCAPE_ACCEL_THRESHOLD = 5.5
+
 export function readPhysicalOrientation(): PhysicalOrientation {
   return currentPhysicalOrientation
 }
@@ -53,32 +56,97 @@ export function classifyDeviceTilt(
     return 'portrait'
   }
 
-  if (Math.abs(gamma) >= 55) {
+  if (Math.abs(gamma) >= LANDSCAPE_GAMMA_THRESHOLD) {
     return gamma > 0 ? 'landscape-right' : 'landscape-left'
   }
 
   return 'portrait'
 }
 
-export async function requestDeviceOrientationAccess(): Promise<boolean> {
-  if (typeof window === 'undefined' || typeof DeviceOrientationEvent === 'undefined') {
-    return false
+/** Fallback when DeviceOrientation angles are unavailable (common on iOS WKWebView). */
+export function classifyDeviceTiltFromAcceleration(
+  x: number | null,
+  y: number | null,
+): PhysicalOrientation {
+  if (x == null || y == null || Number.isNaN(x) || Number.isNaN(y)) {
+    return 'portrait'
   }
 
-  const requestPermission = (
+  const absX = Math.abs(x)
+  const absY = Math.abs(y)
+
+  if (absX > LANDSCAPE_ACCEL_THRESHOLD && absX > absY * 1.15) {
+    return x > 0 ? 'landscape-right' : 'landscape-left'
+  }
+
+  return 'portrait'
+}
+
+type MotionPermissionState = 'granted' | 'denied' | 'default' | 'unsupported'
+
+function readMotionPermissionRequesters(): Array<
+  () => Promise<MotionPermissionState>
+> {
+  if (typeof window === 'undefined') return []
+
+  const requesters: Array<() => Promise<MotionPermissionState>> = []
+
+  const orientationRequest = (
     DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<'granted' | 'denied' | 'default'>
+      requestPermission?: () => Promise<MotionPermissionState>
     }
   ).requestPermission
-
-  if (typeof requestPermission !== 'function') {
-    return true
+  if (typeof orientationRequest === 'function') {
+    requesters.push(() => orientationRequest())
   }
 
-  try {
-    const result = await requestPermission()
-    return result === 'granted'
-  } catch {
-    return false
+  const motionRequest = (
+    DeviceMotionEvent as unknown as {
+      requestPermission?: () => Promise<MotionPermissionState>
+    }
+  ).requestPermission
+  if (typeof motionRequest === 'function') {
+    requesters.push(() => motionRequest())
   }
+
+  return requesters
+}
+
+/** Must be invoked synchronously from a user-gesture handler on iOS. */
+export function requestMotionSensorAccessFromGesture(): Promise<boolean> {
+  const requesters = readMotionPermissionRequesters()
+  if (requesters.length === 0) {
+    return Promise.resolve(
+      typeof DeviceOrientationEvent !== 'undefined' ||
+        typeof DeviceMotionEvent !== 'undefined',
+    )
+  }
+
+  const tryNext = async (index: number): Promise<boolean> => {
+    if (index >= requesters.length) return false
+    try {
+      const state = await requesters[index]!()
+      const granted = state === 'granted'
+      if (granted) {
+        // #region agent log
+        agentDebugLog(
+          'physicalOrientation.ts:requestMotionSensorAccessFromGesture',
+          'motion permission granted',
+          { index, state },
+          'H-O6',
+        )
+        // #endregion
+        return true
+      }
+    } catch {
+      /* try next sensor permission API */
+    }
+    return tryNext(index + 1)
+  }
+
+  return tryNext(0)
+}
+
+export function motionSensorsNeedGesture(): boolean {
+  return readMotionPermissionRequesters().length > 0
 }

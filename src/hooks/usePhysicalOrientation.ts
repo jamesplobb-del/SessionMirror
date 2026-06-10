@@ -1,13 +1,33 @@
 import { useEffect, useState } from 'react'
+import { agentDebugLog } from '../utils/agentDebugLog'
 import {
   classifyDeviceTilt,
+  classifyDeviceTiltFromAcceleration,
   readPhysicalOrientation,
-  requestDeviceOrientationAccess,
+  requestMotionSensorAccessFromGesture,
   syncPhysicalOrientationClass,
   type PhysicalOrientation,
 } from '../utils/physicalOrientation'
 
-const STABLE_MS = 180
+const STABLE_MS = 120
+
+function resolvePhysicalTilt(
+  gamma: number | null,
+  beta: number | null,
+  accelX: number | null,
+  accelY: number | null,
+): PhysicalOrientation {
+  const fromAngles = classifyDeviceTilt(gamma, beta)
+  if (fromAngles !== 'portrait') {
+    return fromAngles
+  }
+
+  if (gamma == null || beta == null || Math.abs(gamma) < 15) {
+    return classifyDeviceTiltFromAcceleration(accelX, accelY)
+  }
+
+  return 'portrait'
+}
 
 export function usePhysicalOrientation(): PhysicalOrientation {
   const [orientation, setOrientation] = useState<PhysicalOrientation>(() =>
@@ -20,6 +40,11 @@ export function usePhysicalOrientation(): PhysicalOrientation {
     let pendingOrientation: PhysicalOrientation = 'portrait'
     let stableSince = Date.now()
     let cancelled = false
+    let lastGamma: number | null = null
+    let lastBeta: number | null = null
+    let lastAccelX: number | null = null
+    let lastAccelY: number | null = null
+    let loggedFirstSample = false
 
     const commitOrientation = (next: PhysicalOrientation) => {
       if (next === stableOrientation) return
@@ -28,8 +53,7 @@ export function usePhysicalOrientation(): PhysicalOrientation {
       setOrientation(next)
     }
 
-    const handleSample = (gamma: number | null, beta: number | null) => {
-      const next = classifyDeviceTilt(gamma, beta)
+    const handleSample = (next: PhysicalOrientation) => {
       const now = Date.now()
 
       if (next === stableOrientation) {
@@ -48,40 +72,82 @@ export function usePhysicalOrientation(): PhysicalOrientation {
       }
     }
 
+    const publishSample = () => {
+      const next = resolvePhysicalTilt(lastGamma, lastBeta, lastAccelX, lastAccelY)
+      if (!loggedFirstSample) {
+        loggedFirstSample = true
+        // #region agent log
+        agentDebugLog(
+          'usePhysicalOrientation.ts:sample',
+          'first motion sample',
+          {
+            gamma: lastGamma,
+            beta: lastBeta,
+            accelX: lastAccelX,
+            accelY: lastAccelY,
+            resolved: next,
+          },
+          'H-O6',
+        )
+        // #endregion
+      }
+      handleSample(next)
+    }
+
     const onDeviceOrientation = (event: DeviceOrientationEvent) => {
       if (!permissionGranted) return
-      handleSample(event.gamma, event.beta)
+      lastGamma = event.gamma
+      lastBeta = event.beta
+      publishSample()
+    }
+
+    const onDeviceMotion = (event: DeviceMotionEvent) => {
+      if (!permissionGranted) return
+      const sample = event.accelerationIncludingGravity ?? event.acceleration
+      if (!sample) return
+      lastAccelX = sample.x
+      lastAccelY = sample.y
+      publishSample()
     }
 
     const startListening = () => {
       window.addEventListener('deviceorientation', onDeviceOrientation, true)
+      window.addEventListener('devicemotion', onDeviceMotion, true)
     }
 
     const stopListening = () => {
       window.removeEventListener('deviceorientation', onDeviceOrientation, true)
+      window.removeEventListener('devicemotion', onDeviceMotion, true)
     }
 
-    const enable = async () => {
-      permissionGranted = await requestDeviceOrientationAccess()
-      if (cancelled) return
-      if (permissionGranted) {
+    const onUserGesture = () => {
+      if (permissionGranted || cancelled) return
+
+      void requestMotionSensorAccessFromGesture().then((granted) => {
+        if (cancelled || !granted) return
+        permissionGranted = true
         startListening()
-      }
+        document.removeEventListener('pointerdown', onUserGesture, true)
+        document.removeEventListener('touchend', onUserGesture, true)
+        // #region agent log
+        agentDebugLog(
+          'usePhysicalOrientation.ts:onUserGesture',
+          'motion sensors enabled',
+          {},
+          'H-O6',
+        )
+        // #endregion
+      })
     }
 
-    void enable()
-
-    const onFirstGesture = () => {
-      if (permissionGranted) return
-      void enable()
-    }
-
-    window.addEventListener('pointerdown', onFirstGesture, { once: true, passive: true })
+    document.addEventListener('pointerdown', onUserGesture, true)
+    document.addEventListener('touchend', onUserGesture, true)
 
     return () => {
       cancelled = true
       stopListening()
-      window.removeEventListener('pointerdown', onFirstGesture)
+      document.removeEventListener('pointerdown', onUserGesture, true)
+      document.removeEventListener('touchend', onUserGesture, true)
     }
   }, [])
 

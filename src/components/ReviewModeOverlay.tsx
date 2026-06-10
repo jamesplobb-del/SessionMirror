@@ -24,6 +24,7 @@ interface ReviewTakeLayerProps {
   mimeType: string
   mediaType?: MediaType
   mirror: boolean
+  recordingOrientation?: Take['recordingOrientation']
   videoRef: RefObject<HTMLMediaElement | null>
   swipeLayerStyle?: React.CSSProperties
   onPointerDown?: React.PointerEventHandler<HTMLVideoElement>
@@ -39,6 +40,7 @@ function ReviewTakeLayer({
   mimeType,
   mediaType,
   mirror,
+  recordingOrientation,
   videoRef,
   swipeLayerStyle,
   onPointerDown,
@@ -101,6 +103,8 @@ function ReviewTakeLayer({
         videoRef={videoRef}
         className="review-video-bleed__player"
         mirror={mirror}
+        recordingOrientation={recordingOrientation}
+        fit="contain"
         audible
         manualPlayOnly
         eagerLoad
@@ -137,6 +141,8 @@ interface ReviewModeOverlayProps {
   challengerMediaType?: MediaType
   benchmarkMirror?: boolean
   challengerMirror?: boolean
+  benchmarkRecordingOrientation?: Take['recordingOrientation']
+  challengerRecordingOrientation?: Take['recordingOrientation']
   pitchTrackerEnabled?: boolean
   liveMicTunerEnabled?: boolean
   tunerInstrument?: TunerInstrument
@@ -164,6 +170,8 @@ export default function ReviewModeOverlay({
   challengerMediaType,
   benchmarkMirror = true,
   challengerMirror = true,
+  benchmarkRecordingOrientation,
+  challengerRecordingOrientation,
   pitchTrackerEnabled = false,
   liveMicTunerEnabled = true,
   tunerInstrument = 'voice',
@@ -677,7 +685,7 @@ export default function ReviewModeOverlay({
 
   return (
     <motion.div
-      className="review-overlay review-overlay--immersive fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden"
+      className="review-overlay review-overlay--immersive fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden"
       initial={false}
       animate={{
         opacity: isOpen ? 1 : 0,
@@ -736,6 +744,7 @@ export default function ReviewModeOverlay({
             }
             mediaType={vaultTake.mediaType}
             mirror={vaultTake.mirrorPlayback !== false}
+            recordingOrientation={vaultTake.recordingOrientation}
             videoRef={vaultVideoRef}
             swipeLayerStyle={swipeLayerStyle}
             onPointerDown={handleVideoPointerDown}
@@ -760,6 +769,7 @@ export default function ReviewModeOverlay({
                   mimeType={benchmarkMimeType}
                   mediaType={benchmarkMediaType}
                   mirror={benchmarkMirror}
+                  recordingOrientation={benchmarkRecordingOrientation}
                   videoRef={benchmarkVideoRef}
                   swipeLayerStyle={
                     activeSlot === 'benchmark' ? swipeLayerStyle : undefined
@@ -795,6 +805,7 @@ export default function ReviewModeOverlay({
                   mimeType={challengerMimeType}
                   mediaType={challengerMediaType}
                   mirror={challengerMirror}
+                  recordingOrientation={challengerRecordingOrientation}
                   videoRef={challengerVideoRef}
                   swipeLayerStyle={
                     activeSlot === 'challenger' ? swipeLayerStyle : undefined
