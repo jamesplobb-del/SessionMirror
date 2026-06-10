@@ -8,6 +8,10 @@ export function isAudioTake(take: Take): boolean {
   return getTakeMediaType(take) === 'audio'
 }
 
+export function isAudioMedia(mimeType: string, mediaType?: MediaType): boolean {
+  return mediaType === 'audio' || mimeType.startsWith('audio/')
+}
+
 export function inferMediaTypeFromMime(mimeType: string): MediaType {
   return mimeType.startsWith('audio/') ? 'audio' : 'video'
 }

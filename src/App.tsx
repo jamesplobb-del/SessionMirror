@@ -17,6 +17,7 @@ import {
 import { createTake, sortTakes } from './utils/takes'
 import {
   deleteTakeFile,
+  NATIVE_AUDIO_MIME,
   NATIVE_VIDEO_MIME,
   persistUploadedVideo,
   resolveTakePlaybackUrl,
@@ -728,8 +729,16 @@ export default function App() {
         challengerFilePath={challengerTake?.filePath}
         benchmarkName={benchmarkTake?.name}
         challengerName={challengerTake?.name}
-        benchmarkMimeType={benchmarkTake?.videoMimeType ?? 'video/mp4'}
-        challengerMimeType={challengerTake?.videoMimeType ?? 'video/mp4'}
+        benchmarkMimeType={
+          benchmarkTake?.videoMimeType ??
+          (benchmarkTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+        }
+        challengerMimeType={
+          challengerTake?.videoMimeType ??
+          (challengerTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+        }
+        benchmarkMediaType={benchmarkTake?.mediaType}
+        challengerMediaType={challengerTake?.mediaType}
         benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
         challengerMirror={challengerTake?.mirrorPlayback !== false}
         pitchTrackerEnabled={settings.pitchTrackerEnabled}

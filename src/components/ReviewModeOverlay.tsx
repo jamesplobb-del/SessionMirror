@@ -5,8 +5,10 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import LivePitchTuner from './LivePitchTuner'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
-import { isAudioMimeType } from '../utils/mobileVideo'
-import type { ReviewContext, ReviewSlot, Take } from '../types'
+import { isAudioMedia } from '../utils/mediaType'
+import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
+import { pausePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
+import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 1000
@@ -16,6 +18,7 @@ interface ReviewTakeLayerProps {
   filePath: string
   videoUrl: string
   mimeType: string
+  mediaType?: MediaType
   mirror: boolean
   takeName?: string
   tunerLabel?: string
@@ -35,6 +38,7 @@ function ReviewTakeLayer({
   filePath,
   videoUrl,
   mimeType,
+  mediaType,
   mirror,
   takeName,
   tunerLabel,
@@ -48,60 +52,80 @@ function ReviewTakeLayer({
   onPointerUp,
   onPointerCancel,
 }: ReviewTakeLayerProps) {
-  const isAudio = isAudioMimeType(mimeType)
+  const isAudio = isAudioMedia(mimeType, mediaType)
   const showTuner = pitchTrackerEnabled
-  const fullScreenTuner = showTuner && isAudio
-  const splitVideoTuner = showTuner && !isAudio
+  const audioAnalysis = showTuner && isAudio
+  const videoAnalysis = showTuner && !isAudio
   const trackerPlaying = isPlaying && isActive
 
-  const mediaPlayer = (
-    <TakeVideoPlayer
-      key={takeKey}
-      filePath={filePath}
-      videoUrl={videoUrl}
-      mimeType={mimeType}
-      videoRef={videoRef}
-      className={
-        fullScreenTuner
-          ? 'sr-only'
-          : splitVideoTuner
-            ? 'h-full w-full object-contain'
-            : 'custom-video-player h-full w-full object-cover'
-      }
-      mirror={fullScreenTuner ? false : mirror}
-      audible
-      manualPlayOnly
-      style={
-        fullScreenTuner
-          ? undefined
-          : {
-              WebkitTouchCallout: 'default',
-              userSelect: 'auto',
-            }
-      }
-      controls={false}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-    />
-  )
-
-  if (splitVideoTuner) {
+  if (videoAnalysis) {
     return (
       <div
-        className="absolute inset-0 flex h-full w-full flex-col bg-black transition-all duration-200 ease-out"
+        className="absolute inset-0 flex h-full w-full flex-col bg-stone-950 transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
-        <div className="relative min-h-0 flex-[3]">{mediaPlayer}</div>
-        <div className="min-h-0 flex-[2] border-t border-white/10">
+        <div className="relative min-h-0 flex-[5]">
+          <TakeVideoPlayer
+            key={takeKey}
+            filePath={filePath}
+            videoUrl={videoUrl}
+            mimeType={mimeType}
+            videoRef={videoRef}
+            className="h-full w-full object-contain"
+            mirror={mirror}
+            audible
+            manualPlayOnly
+            style={{
+              WebkitTouchCallout: 'default',
+              userSelect: 'auto',
+            }}
+            controls={false}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
+          />
+        </div>
+        <div className="min-h-0 flex-[4] border-t border-white/8">
           <LivePitchTuner
             mediaRef={videoRef}
             isPlaying={trackerPlaying}
             mediaKey={takeKey}
             takeName={takeName}
-            label={tunerLabel}
-            compact
+            label={tunerLabel ?? 'Pitch Analysis'}
+            variant="panel"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (audioAnalysis) {
+    return (
+      <div
+        className="absolute inset-0 flex h-full w-full flex-col transition-all duration-200 ease-out"
+        style={swipeLayerStyle}
+      >
+        <TakeVideoPlayer
+          key={takeKey}
+          filePath={filePath}
+          videoUrl={videoUrl}
+          mimeType={mimeType}
+          videoRef={videoRef}
+          className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
+          mirror={false}
+          audible
+          manualPlayOnly
+          controls={false}
+        />
+        <div className="absolute inset-0 z-10">
+          <LivePitchTuner
+            mediaRef={videoRef}
+            isPlaying={trackerPlaying}
+            mediaKey={takeKey}
+            takeName={takeName}
+            label={tunerLabel ?? 'Pitch Analysis'}
+            variant="full"
           />
         </div>
       </div>
@@ -113,16 +137,26 @@ function ReviewTakeLayer({
       className="absolute inset-0 h-full w-full transition-all duration-200 ease-out"
       style={swipeLayerStyle}
     >
-      {mediaPlayer}
-      {fullScreenTuner && (
-        <LivePitchTuner
-          mediaRef={videoRef}
-          isPlaying={trackerPlaying}
-          mediaKey={takeKey}
-          takeName={takeName}
-          label={tunerLabel}
-        />
-      )}
+      <TakeVideoPlayer
+        key={takeKey}
+        filePath={filePath}
+        videoUrl={videoUrl}
+        mimeType={mimeType}
+        videoRef={videoRef}
+        className="custom-video-player h-full w-full object-cover"
+        mirror={mirror}
+        audible
+        manualPlayOnly
+        style={{
+          WebkitTouchCallout: 'default',
+          userSelect: 'auto',
+        }}
+        controls={false}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+      />
     </div>
   )
 }
@@ -141,6 +175,8 @@ interface ReviewModeOverlayProps {
   challengerName?: string
   benchmarkMimeType?: string
   challengerMimeType?: string
+  benchmarkMediaType?: MediaType
+  challengerMediaType?: MediaType
   benchmarkMirror?: boolean
   challengerMirror?: boolean
   pitchTrackerEnabled?: boolean
@@ -163,6 +199,8 @@ export default function ReviewModeOverlay({
   challengerName,
   benchmarkMimeType = 'video/mp4',
   challengerMimeType = 'video/mp4',
+  benchmarkMediaType,
+  challengerMediaType,
   benchmarkMirror = true,
   challengerMirror = true,
   pitchTrackerEnabled = false,
@@ -334,10 +372,18 @@ export default function ReviewModeOverlay({
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       reviewAutoplayEnabledRef.current = false
-      pauseAllReviewVideos()
-      onClose()
+      stopProgressLoop()
+      pausePitchGraphsForMedia(
+        benchmarkVideoRef.current,
+        challengerVideoRef.current,
+        vaultVideoRef.current,
+      )
+      pauseAllReviewVideosSafe()
+      window.requestAnimationFrame(() => {
+        onClose()
+      })
     },
-    [onClose, pauseAllReviewVideos],
+    [onClose, pauseAllReviewVideosSafe, stopProgressLoop],
   )
 
   const togglePlayPause = useCallback(() => {
@@ -669,10 +715,14 @@ export default function ReviewModeOverlay({
             takeKey={`vault-${vaultTake.id}`}
             filePath={vaultTake.filePath}
             videoUrl={vaultTake.videoUrl}
-            mimeType={vaultTake.videoMimeType || 'video/mp4'}
+            mimeType={
+              vaultTake.videoMimeType ??
+              (vaultTake.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+            }
+            mediaType={vaultTake.mediaType}
             mirror={vaultTake.mirrorPlayback !== false}
             takeName={vaultTake.name}
-            tunerLabel="Take Vault · Live Pitch"
+            tunerLabel="Pitch Analysis"
             videoRef={vaultVideoRef}
             pitchTrackerEnabled={pitchTrackerEnabled}
             isPlaying={isPlaying}
@@ -698,9 +748,10 @@ export default function ReviewModeOverlay({
                   filePath={benchmarkFilePath}
                   videoUrl={benchmarkSrc ?? ''}
                   mimeType={benchmarkMimeType}
+                  mediaType={benchmarkMediaType}
                   mirror={benchmarkMirror}
                   takeName={benchmarkName}
-                  tunerLabel="Best Take · Live Pitch"
+                  tunerLabel="Pitch Analysis"
                   videoRef={benchmarkVideoRef}
                   pitchTrackerEnabled={pitchTrackerEnabled}
                   isPlaying={isPlaying}
@@ -737,9 +788,10 @@ export default function ReviewModeOverlay({
                   filePath={challengerFilePath}
                   videoUrl={challengerSrc ?? ''}
                   mimeType={challengerMimeType}
+                  mediaType={challengerMediaType}
                   mirror={challengerMirror}
                   takeName={challengerName}
-                  tunerLabel="Current Take · Live Pitch"
+                  tunerLabel="Pitch Analysis"
                   videoRef={challengerVideoRef}
                   pitchTrackerEnabled={pitchTrackerEnabled}
                   isPlaying={isPlaying}
