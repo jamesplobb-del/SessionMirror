@@ -271,6 +271,13 @@ export default function SettingsDrawer({
               checked={settings.hapticFeedback}
               onChange={(checked) => onUpdate({ hapticFeedback: checked })}
             />
+
+            <SettingToggle
+              label="Show Take Cards"
+              description="Show Best Take and Current Take on the main screen. Turn off to keep new recordings in the vault only."
+              checked={settings.showTakeCards}
+              onChange={(checked) => onUpdate({ showTakeCards: checked })}
+            />
           </section>
 
           <button

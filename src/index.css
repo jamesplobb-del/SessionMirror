@@ -1121,8 +1121,34 @@ video.camera-preview.camera-preview--hidden {
   cursor: grabbing;
 }
 
-.pitch-widget-draggable:active {
+.pitch-widget-draggable:active:not(.pitch-widget-draggable--pinching) {
   cursor: grabbing;
+}
+
+.settings-branch-wheel__item {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.settings-branch-wheel__icon {
+  background: rgba(0, 0, 0, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.settings-branch-wheel__item--active .settings-branch-wheel__icon {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(125, 211, 252, 0.42);
+  color: rgb(224, 242, 254);
+}
+
+.settings-branch-wheel__item:active .settings-branch-wheel__icon {
+  transform: scale(0.94);
+}
+
+.settings-branch-wheel__label {
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
 }
 
 .pitch-tuner--widget {

@@ -15,6 +15,8 @@ export interface AppSettings {
   liveMicTunerEnabled: boolean
   /** Pitch detection profile — voice, strings, or brass. */
   tunerInstrument: TunerInstrument
+  /** Show Best Take and Current Take cards on the main HUD. */
+  showTakeCards: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -25,6 +27,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   pitchTrackerEnabled: true,
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
+  showTakeCards: true,
 }
 
 function parseTunerInstrument(value: unknown): TunerInstrument {
@@ -71,6 +74,10 @@ export function loadAppSettings(): AppSettings {
           ? Boolean(parsed.liveMicTunerEnabled)
           : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
       tunerInstrument: parseTunerInstrument(parsed.tunerInstrument),
+      showTakeCards:
+        parsed.showTakeCards !== undefined
+          ? Boolean(parsed.showTakeCards)
+          : DEFAULT_APP_SETTINGS.showTakeCards,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

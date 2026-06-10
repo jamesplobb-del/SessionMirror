@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useMotionValue } from 'framer-motion'
 import { useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
@@ -70,13 +70,12 @@ export default function DraggablePitchWidget({
   ...tunerProps
 }: DraggablePitchWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
+  const dragX = useMotionValue(12)
+  const dragY = useMotionValue(0)
   const [maxSize, setMaxSize] = useState(() => ({
     width: Math.min(360, window.innerWidth - 24),
     height: Math.min(280, Math.floor(window.innerHeight * 0.38)),
   }))
-  const [positionY, setPositionY] = useState(() =>
-    Math.max(12, 640 - defaultBottomOffset - DEFAULT_WIDGET_SIZE.height),
-  )
 
   const pinchLimits = useMemo(
     () => ({
@@ -112,42 +111,30 @@ export default function DraggablePitchWidget({
   useLayoutEffect(() => {
     if (isAudioMode) return
 
-    const measurePosition = () => {
+    const measureInitialPosition = () => {
       const bounds = boundaryRef.current
       if (!bounds) return false
 
       const boundsHeight = bounds.clientHeight
-      const widgetHeight = widgetRef.current?.offsetHeight || widgetSize.height
-      setPositionY(Math.max(12, boundsHeight - defaultBottomOffset - widgetHeight))
+      const widgetHeight = DEFAULT_WIDGET_SIZE.height
+      dragX.set(12)
+      dragY.set(Math.max(12, boundsHeight - defaultBottomOffset - widgetHeight))
       return true
     }
 
-    if (!measurePosition()) {
-      setPositionY(Math.max(12, 320 - defaultBottomOffset - widgetSize.height))
+    if (!measureInitialPosition()) {
+      dragX.set(12)
+      dragY.set(Math.max(12, 320 - defaultBottomOffset - DEFAULT_WIDGET_SIZE.height))
     }
 
     const retryFrame = window.requestAnimationFrame(() => {
-      measurePosition()
+      measureInitialPosition()
     })
-
-    const observer =
-      typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(() => {
-            measurePosition()
-          })
-        : null
-
-    if (boundaryRef.current) {
-      observer?.observe(boundaryRef.current)
-    }
-    window.addEventListener('resize', measurePosition)
 
     return () => {
       window.cancelAnimationFrame(retryFrame)
-      observer?.disconnect()
-      window.removeEventListener('resize', measurePosition)
     }
-  }, [boundaryRef, defaultBottomOffset, isAudioMode, layoutKey, mediaKey, widgetSize.height])
+  }, [boundaryRef, defaultBottomOffset, dragX, dragY, isAudioMode, layoutKey, mediaKey])
 
   const tuner = (
     <LivePitchTuner
@@ -194,11 +181,13 @@ export default function DraggablePitchWidget({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       className={`pitch-widget-draggable pointer-events-auto absolute left-0 top-0 z-20 touch-none ${pinching ? 'pitch-widget-draggable--pinching' : ''}`}
-      initial={{ opacity: 0, scale: 0.94, x: 12, y: positionY }}
-      animate={{ opacity: 1, scale: 1, x: 12, y: positionY }}
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
       style={{
+        x: dragX,
+        y: dragY,
         touchAction: 'none',
         width: widgetSize.width,
         height: widgetSize.height,

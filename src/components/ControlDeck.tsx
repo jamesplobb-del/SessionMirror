@@ -1,7 +1,9 @@
-import { AudioLines, FolderOpen, Settings, Trash2 } from 'lucide-react'
-import type { RefObject } from 'react'
-import type { RecordingMode } from '../types'
+import { FolderOpen, Settings, Trash2 } from 'lucide-react'
+import { useRef, useState, type RefObject } from 'react'
+import { useLongPress } from '../hooks/useLongPress'
+import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel from './RecordingModeCarousel'
+import type { RecordingMode } from '../types'
 
 interface ControlDeckProps {
   isRecording: boolean
@@ -20,6 +22,8 @@ interface ControlDeckProps {
   pitchToggleVisible?: boolean
   pitchToggleActive?: boolean
   onPitchToggle?: () => void
+  showTakeCards?: boolean
+  onShowTakeCardsChange?: (show: boolean) => void
 }
 
 function formatElapsed(seconds: number): string {
@@ -45,11 +49,32 @@ export default function ControlDeck({
   pitchToggleVisible = false,
   pitchToggleActive = false,
   onPitchToggle,
+  showTakeCards = true,
+  onShowTakeCardsChange,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
+  const settingsButtonRef = useRef<HTMLButtonElement>(null)
+  const [branchOpen, setBranchOpen] = useState(false)
+
+  const settingsPress = useLongPress({
+    onClick: onOpenSettings,
+    onLongPress: () => setBranchOpen(true),
+    disabled: branchOpen,
+  })
 
   return (
     <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
+      <SettingsBranchWheel
+        open={branchOpen}
+        onClose={() => setBranchOpen(false)}
+        anchorRef={settingsButtonRef}
+        pitchToggleVisible={pitchToggleVisible}
+        pitchToggleActive={pitchToggleActive}
+        onPitchToggle={() => onPitchToggle?.()}
+        showTakeCards={showTakeCards}
+        onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
+      />
+
       <div className="relative flex w-full max-w-xs items-center justify-center">
         <button
           type="button"
@@ -65,27 +90,19 @@ export default function ControlDeck({
           )}
         </button>
 
-        {pitchToggleVisible && onPitchToggle && (
-          <button
-            type="button"
-            onClick={onPitchToggle}
-            className={`absolute right-12 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition ${
-              pitchToggleActive
-                ? 'bg-sky-500/30 text-sky-100 ring-1 ring-sky-400/35'
-                : 'bg-black/40 text-white/90 hover:bg-black/55'
-            }`}
-            aria-label={pitchToggleActive ? 'Hide pitch tuner' : 'Show pitch tuner'}
-            aria-pressed={pitchToggleActive}
-          >
-            <AudioLines className="h-5 w-5" strokeWidth={2.25} />
-          </button>
-        )}
-
         <button
           type="button"
-          onClick={onOpenSettings}
-          className="absolute right-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md transition hover:bg-black/55"
-          aria-label="Open settings"
+          ref={settingsButtonRef}
+          className={`absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition ${
+            branchOpen
+              ? 'bg-white/20 text-white ring-1 ring-white/30'
+              : 'bg-black/40 text-white/90 hover:bg-black/55'
+          }`}
+          aria-label="Open settings. Long press for quick settings."
+          aria-expanded={branchOpen}
+          aria-haspopup="menu"
+          onContextMenu={(event) => event.preventDefault()}
+          {...settingsPress}
         >
           <Settings className="h-5 w-5" />
         </button>

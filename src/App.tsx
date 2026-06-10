@@ -72,6 +72,8 @@ export default function App() {
   const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
+  const showTakeCardsRef = useRef(settings.showTakeCards)
+  showTakeCardsRef.current = settings.showTakeCards
   const pendingAutoPlaybackRef = useRef(false)
   const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
@@ -185,6 +187,7 @@ export default function App() {
       setTakes(loaded)
       setBenchmarkId(findBestTakeId(rows))
       setChallengerId((current) => {
+        if (!showTakeCardsRef.current) return null
         if (current && rows.some((row) => row.id === current)) return current
         return rows.find((row) => !row.isBestTake)?.id ?? null
       })
@@ -284,7 +287,9 @@ export default function App() {
                 ...savedTake,
                 name: mediaType === 'audio' ? `Audio ${index}` : `Take ${index}`,
               }
-        setChallengerId(nextTake.id)
+        if (showTakeCardsRef.current) {
+          setChallengerId(nextTake.id)
+        }
         return [...prev, nextTake]
       })
 
@@ -678,6 +683,20 @@ export default function App() {
     setShowPitch(true)
   }, [mainAudioPitchSource?.mediaKey, mainVideoPitchSource?.mediaKey, recordingMode])
 
+  useEffect(() => {
+    if (!settings.showTakeCards) {
+      setChallengerId(null)
+      return
+    }
+
+    setChallengerId((current) => {
+      if (current && takes.some((take) => take.id === current)) return current
+      const bestId = benchmarkId
+      const candidate = takes.find((take) => take.id !== bestId)
+      return candidate?.id ?? null
+    })
+  }, [settings.showTakeCards, takes, benchmarkId])
+
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),
     [takes, sortMode],
@@ -1008,25 +1027,27 @@ export default function App() {
         />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          <PipCompareRow
-            benchmarkTake={benchmarkTake}
-            challengerTake={challengerTake}
-            suspendPipPlayback={suspendPipPlayback}
-            benchmarkPipVideoRef={benchmarkPipVideoRef}
-            challengerPipVideoRef={challengerPipVideoRef}
-            deleteDropRef={recordDeleteDropRef}
-            onPinBenchmark={handlePinBenchmark}
-            onDeleteTake={handleDragDeleteTake}
-            onUnpinBenchmark={handleUnpinBenchmark}
-            onUnpinChallenger={handleUnpinChallenger}
-            onUploadBenchmark={handleUploadBenchmark}
-            onExpandBenchmark={handleExpandBenchmark}
-            onExpandChallenger={handleExpandChallenger}
-            onDragStateChange={handlePipDragStateChange}
-            onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
-            onChallengerPlaybackChange={setChallengerPipPlaying}
-            hapticFeedback={settings.hapticFeedback}
-          />
+          {settings.showTakeCards && (
+            <PipCompareRow
+              benchmarkTake={benchmarkTake}
+              challengerTake={challengerTake}
+              suspendPipPlayback={suspendPipPlayback}
+              benchmarkPipVideoRef={benchmarkPipVideoRef}
+              challengerPipVideoRef={challengerPipVideoRef}
+              deleteDropRef={recordDeleteDropRef}
+              onPinBenchmark={handlePinBenchmark}
+              onDeleteTake={handleDragDeleteTake}
+              onUnpinBenchmark={handleUnpinBenchmark}
+              onUnpinChallenger={handleUnpinChallenger}
+              onUploadBenchmark={handleUploadBenchmark}
+              onExpandBenchmark={handleExpandBenchmark}
+              onExpandChallenger={handleExpandChallenger}
+              onDragStateChange={handlePipDragStateChange}
+              onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+              onChallengerPlaybackChange={setChallengerPipPlaying}
+              hapticFeedback={settings.hapticFeedback}
+            />
+          )}
 
           <ControlDeck
             isRecording={isRecording}
@@ -1045,6 +1066,8 @@ export default function App() {
             pitchToggleVisible={showMainPitchWidget}
             pitchToggleActive={showPitch}
             onPitchToggle={() => setShowPitch((prev) => !prev)}
+            showTakeCards={settings.showTakeCards}
+            onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
           />
         </div>
       </div>
