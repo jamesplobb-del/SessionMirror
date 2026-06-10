@@ -10,8 +10,6 @@ interface LiveCameraBackgroundProps {
   error: string | null
   recordingMode: RecordingMode
   isRecording: boolean
-  previewLive?: boolean
-  viewportKey?: number
   /** Hide the idle audio-mode mic UI while main-screen pitch analysis is showing. */
   pitchStageActive?: boolean
 }
@@ -23,7 +21,6 @@ function LiveCameraBackground({
   error,
   recordingMode,
   isRecording,
-  previewLive = false,
   pitchStageActive = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
@@ -43,10 +40,11 @@ function LiveCameraBackground({
 
     if (video.srcObject !== stream) {
       video.srcObject = stream
+      void video.play().catch(() => {})
+    } else if (video.paused) {
+      void video.play().catch(() => {})
     }
-    video.muted = true
-    void video.play().catch(() => {})
-  }, [previewRef, streamRef, recordingMode, streamGeneration, isAudioMode])
+  }, [previewRef, streamRef, recordingMode, isAudioMode])
 
   return (
     <div className="camera-background" aria-hidden>
@@ -60,12 +58,8 @@ function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        className={`camera-preview ${
-          isAudioMode
-            ? 'camera-preview--hidden'
-            : previewLive
-              ? 'camera-preview--mirror camera-preview--live'
-              : 'camera-preview--mirror camera-preview--booting'
+        className={`camera-preview camera-preview--mirror camera-preview--live ${
+          isAudioMode ? 'camera-preview--hidden' : ''
         }`}
       />
 
@@ -126,7 +120,5 @@ export default memo(
     prev.error === next.error &&
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
-    prev.previewLive === next.previewLive &&
-    prev.viewportKey === next.viewportKey &&
     prev.pitchStageActive === next.pitchStageActive,
 )

@@ -246,6 +246,7 @@ export async function hydrateTakeThumbnailsInBackground(
       if (!thumbnailUrl) continue
 
       pending.set(take.id, thumbnailUrl)
+      flushPending()
     }
   }
 

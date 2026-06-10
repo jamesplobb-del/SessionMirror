@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
+import TakeVideoPlayer from './TakeVideoPlayer'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
@@ -335,6 +336,21 @@ export default function TakeVaultDrawer({
                         take={take}
                         isBenchmark={take.id === benchmarkId}
                         isChallenger={take.id === challengerId}
+                        thumbnailVideo={
+                          getTakeMediaType(take) === 'video' && !take.thumbnailUrl ? (
+                            <TakeVideoPlayer
+                              filePath={take.filePath}
+                              videoUrl={take.videoUrl}
+                              mimeType={take.videoMimeType}
+                              thumbnailPreview
+                              manualPlayOnly
+                              controls={false}
+                              mirror={take.mirrorPlayback !== false}
+                              className="h-full w-full object-cover"
+                              preload="metadata"
+                            />
+                          ) : undefined
+                        }
                         selectionMode={selectionMode}
                         selected={selectedIds.has(take.id)}
                         onToggleSelect={() => toggleTakeSelection(take.id)}

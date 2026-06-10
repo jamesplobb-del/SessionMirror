@@ -411,8 +411,7 @@ video.camera-preview {
   height: 100dvh !important;
   min-width: 0 !important;
   min-height: 0 !important;
-  opacity: 0;
-  transition: opacity 280ms ease;
+  opacity: 1;
   transform: none !important;
   object-fit: cover !important;
   object-position: center center !important;

@@ -22,10 +22,7 @@ import {
   readAudioTrackSettings,
   readVideoTrackSettings,
 } from '../utils/agentDebugLog'
-import {
-  buildRecorderStream,
-  releaseRecorderStream,
-} from '../utils/recordingStream'
+import { releaseRecorderStream } from '../utils/recordingStream'
 import {
   applyViewportCssVars,
   applyViewportCssVarsOnResume,
@@ -95,26 +92,6 @@ function attachPreviewStream(
   }
   video.muted = true
   void video.play().catch(() => {})
-}
-
-function waitForPreviewFrame(video: HTMLVideoElement | null): Promise<void> {
-  return new Promise((resolve) => {
-    if (!video || video.readyState < 2) {
-      requestAnimationFrame(() => resolve())
-      return
-    }
-
-    const withFrameCallback = video as HTMLVideoElement & {
-      requestVideoFrameCallback?: (callback: () => void) => number
-    }
-
-    if (typeof withFrameCallback.requestVideoFrameCallback === 'function') {
-      withFrameCallback.requestVideoFrameCallback(() => resolve())
-      return
-    }
-
-    requestAnimationFrame(() => resolve())
-  })
 }
 
 export function useCameraSession({
@@ -241,6 +218,13 @@ export function useCameraSession({
     async (mode: RecordingMode, cancelled?: () => boolean) => {
       setError(null)
 
+      const existing = streamRef.current
+      if (existing && isStreamRecordable(existing, mode)) {
+        attachPreviewStream(previewRef.current, existing, mode)
+        setReady(true)
+        return existing
+      }
+
       stopStreamTracks(streamRef.current)
       streamRef.current = null
       detachPreviewStream(previewRef.current)
@@ -284,7 +268,10 @@ export function useCameraSession({
     const mode = recordingModeRef.current
     const stream = streamRef.current
 
-    if (readyRef.current && isStreamRecordable(stream, mode)) {
+    if (isStreamRecordable(stream, mode)) {
+      if (!readyRef.current) {
+        setReady(true)
+      }
       return stream
     }
 
@@ -302,11 +289,19 @@ export function useCameraSession({
 
     const startWithRecovery = async (attempt = 0) => {
       cancelScheduledRelease()
+
+      const mode = recordingMode
+      if (streamRef.current && isStreamRecordable(streamRef.current, mode)) {
+        previousRecordingModeRef.current = mode
+        attachPreviewStream(previewRef.current, streamRef.current, mode)
+        setReady(true)
+        activeStream = streamRef.current
+        return
+      }
+
       if (streamRef.current) {
         forceClearCameraState()
       }
-
-      const mode = recordingMode
       const leavingAudioForVideo =
         previousRecordingModeRef.current === 'audio' && mode === 'video'
       const enteringAudioFromVideo =
@@ -647,26 +642,10 @@ export function useCameraSession({
         writerRef.current = writer
         activeTakeIdRef.current = takeId
 
-        const recordStream = buildRecorderStream(currentStream, mode)
-        recordStreamRef.current = recordStream
-
-        // #region agent log
-        agentDebugLog(
-          'useCameraSession.ts:startRecording:recorderStream',
-          'recorder stream prepared',
-          {
-            clonedVideo: recordStream !== currentStream,
-            previewAudioTracks: currentStream.getAudioTracks().length,
-          },
-          'H-S',
-        )
-        // #endregion
-
-        const recorder = createMediaRecorder(recordStream, mimeType)
+        const recorder = createMediaRecorder(currentStream, mimeType)
         recorderRef.current = recorder
         bindRecordingHandlers(recorder, takeId)
-
-        await waitForPreviewFrame(previewRef.current)
+        recordStreamRef.current = currentStream
 
         if (shouldUseRecordingTimeslice(mimeType)) {
           recorder.start(RECORDING_TIMESLICE_MS)
@@ -817,6 +796,24 @@ export function useCameraSession({
 
     try {
       applyViewportCssVarsOnResume()
+
+      const mode = recordingModeRef.current
+      const stream = streamRef.current
+      if (isStreamRecordable(stream, mode)) {
+        attachPreviewStream(previewRef.current, stream, mode)
+        refreshCameraPreviewLayout(previewRef.current)
+        setReady(true)
+        // #region agent log
+        agentDebugLog(
+          'useCameraSession.ts:restartCameraAfterForeground',
+          'reused live stream on foreground',
+          { mode },
+          'H-C',
+        )
+        // #endregion
+        return
+      }
+
       releaseLiveStream()
 
       if (Capacitor.isNativePlatform()) {

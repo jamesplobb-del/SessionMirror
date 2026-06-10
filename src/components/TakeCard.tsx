@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react'
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronUp, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
 import type { Take, TakeUpdate } from '../types'
@@ -43,6 +43,9 @@ function TakeCard({
   const [notesDraft, setNotesDraft] = useState(take.notes)
   const notesDebounceRef = useRef<number | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const tapStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  const TAP_SLOP_PX = 14
 
   useEffect(() => {
     setNotesDraft(take.notes)
@@ -77,10 +80,21 @@ function TakeCard({
     setIsEditingName(false)
   }
 
-  const handleOpenTakeInteraction = (
-    event: MouseEvent<HTMLElement> | TouchEvent<HTMLElement>,
-  ) => {
+  const handleThumbPointerDown = (event: React.PointerEvent<HTMLElement>) => {
     if ((event.target as HTMLElement).closest('button')) return
+    tapStartRef.current = { x: event.clientX, y: event.clientY }
+  }
+
+  const handleThumbPointerUp = (event: React.PointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return
+    const start = tapStartRef.current
+    tapStartRef.current = null
+    if (!start) return
+
+    const dx = Math.abs(event.clientX - start.x)
+    const dy = Math.abs(event.clientY - start.y)
+    if (dx > TAP_SLOP_PX || dy > TAP_SLOP_PX) return
+
     event.stopPropagation()
     if (selectionMode) {
       onToggleSelect?.()
@@ -102,6 +116,20 @@ function TakeCard({
     }
   }
 
+  const thumbActivateProps = {
+    role: 'button' as const,
+    tabIndex: 0,
+    onPointerDown: handleThumbPointerDown,
+    onPointerUp: handleThumbPointerUp,
+    onKeyDown: handleKeyActivate,
+    className: 'block h-full w-full cursor-pointer select-none touch-pan-x',
+  }
+
+  const thumbAriaLabel =
+    selectionMode
+      ? `${selected ? 'Deselect' : 'Select'} ${take.name}`
+      : `Open ${take.name} in full screen`
+
   const cardRingClass = selectionMode
     ? selected
       ? 'border-sky-500 ring-2 ring-sky-400'
@@ -119,38 +147,21 @@ function TakeCard({
       <div className="relative aspect-video bg-stone-900">
         {thumbnailVideo ? (
           <div
-            role="button"
-            tabIndex={0}
-            onClick={handleOpenTakeInteraction}
-            onTouchEnd={handleOpenTakeInteraction}
-            onKeyDown={handleKeyActivate}
-            className="block h-full w-full cursor-pointer overflow-hidden select-none"
-            aria-label={
-              selectionMode
-                ? `${selected ? 'Deselect' : 'Select'} ${take.name}`
-                : `Open ${take.name} in full screen`
-            }
+            {...thumbActivateProps}
+            className={`${thumbActivateProps.className} overflow-hidden`}
+            aria-label={thumbAriaLabel}
           >
             {thumbnailVideo}
           </div>
         ) : take.thumbnailUrl ? (
           <div
-            role="button"
-            tabIndex={0}
-            onClick={handleOpenTakeInteraction}
-            onTouchEnd={handleOpenTakeInteraction}
-            onKeyDown={handleKeyActivate}
-            className="block h-full w-full cursor-pointer select-none"
-            aria-label={
-              selectionMode
-                ? `${selected ? 'Deselect' : 'Select'} ${take.name}`
-                : `Open ${take.name} in full screen`
-            }
+            {...thumbActivateProps}
+            aria-label={thumbAriaLabel}
           >
             <img
               src={take.thumbnailUrl}
               alt={take.name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover pointer-events-none"
               draggable={false}
               loading="lazy"
               decoding="async"
@@ -158,17 +169,9 @@ function TakeCard({
           </div>
         ) : (
           <div
-            role="button"
-            tabIndex={0}
-            onClick={handleOpenTakeInteraction}
-            onTouchEnd={handleOpenTakeInteraction}
-            onKeyDown={handleKeyActivate}
-            className="block h-full w-full cursor-pointer animate-pulse bg-stone-200 select-none"
-            aria-label={
-              selectionMode
-                ? `${selected ? 'Deselect' : 'Select'} ${take.name}`
-                : `Open ${take.name} in full screen`
-            }
+            {...thumbActivateProps}
+            className={`${thumbActivateProps.className} animate-pulse bg-stone-200`}
+            aria-label={thumbAriaLabel}
           />
         )}
         {selectionMode && (

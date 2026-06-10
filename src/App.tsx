@@ -30,7 +30,7 @@ import ReviewModeOverlay from './components/ReviewModeOverlay'
 import DraggablePitchWidget from './components/DraggablePitchWidget'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './utils/mediaType'
-import { applyViewportCssVars, scheduleViewportSync } from './utils/viewportSync'
+import { scheduleViewportSync } from './utils/viewportSync'
 import { agentDebugLog } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -58,7 +58,6 @@ export default function App() {
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
-  const [windowHeight, setWindowHeight] = useState(() => window.innerHeight)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
     isDragging: false,
@@ -95,20 +94,7 @@ export default function App() {
   const isReviewOpen = reviewSlot !== null
 
   useLayoutEffect(() => {
-    let debounceTimer: number | null = null
-    let lastHeight = window.innerHeight
-
-    return scheduleViewportSync((height) => {
-      if (height === lastHeight) return
-      lastHeight = height
-      if (debounceTimer !== null) {
-        window.clearTimeout(debounceTimer)
-      }
-      debounceTimer = window.setTimeout(() => {
-        debounceTimer = null
-        setWindowHeight(height)
-      }, 120)
-    })
+    return scheduleViewportSync(() => {})
   }, [])
 
   const pausePipVideos = useCallback(() => {
@@ -573,24 +559,6 @@ export default function App() {
     setIsSettingsOpen(false)
   }, [])
 
-  useEffect(() => {
-    if (!ready) return
-
-    const syncWhenCameraReady = () => {
-      setWindowHeight((prev) => {
-        const next = applyViewportCssVars()
-        return prev === next ? prev : next
-      })
-    }
-
-    syncWhenCameraReady()
-    const timer = window.setTimeout(syncWhenCameraReady, 150)
-
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [ready])
-
   const suspendPipPlayback =
     isVaultOpen || isReviewOpen || isSettingsOpen || autoRecordStartSuppressed
 
@@ -992,8 +960,6 @@ export default function App() {
         error={cameraError}
         recordingMode={recordingMode}
         isRecording={isRecording}
-        previewLive={ready}
-        viewportKey={windowHeight}
         pitchStageActive={mainAudioPitchSource !== null && showPitch}
       />
 
