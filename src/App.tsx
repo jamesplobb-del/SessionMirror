@@ -1063,11 +1063,12 @@ export default function App() {
             recordDropRef={recordDeleteDropRef}
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
-            pitchToggleVisible={showMainPitchWidget}
+            pitchToggleVisible={settings.pitchTrackerEnabled}
             pitchToggleActive={showPitch}
             onPitchToggle={() => setShowPitch((prev) => !prev)}
             showTakeCards={settings.showTakeCards}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
+            settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
           />
         </div>
       </div>
@@ -1107,45 +1108,41 @@ export default function App() {
         />
       )}
 
-      {isVaultOpen && (
-        <TakeVaultDrawer
-          isOpen
-          onClose={handleCloseVault}
-          projects={projects}
-          activeProject={activeProject}
-          onSelectProject={handleSelectProject}
-          onCreateProject={handleCreateProject}
-          takes={takes}
-          sortedTakes={sortedTakes}
-          sortMode={sortMode}
-          onSortChange={setSortMode}
-          benchmarkId={benchmarkId}
-          challengerId={challengerId}
-          onPinBenchmark={handlePinBenchmark}
-          onPinChallenger={handlePinChallenger}
-          onBeforePin={pausePipVideos}
-          onUpdateTake={handleUpdateTake}
-          onDeleteTake={handleDeleteTake}
-          onDeleteTakes={handleDeleteTakes}
-          onClearAllTakes={handleClearAllTakes}
-          onOpenTake={handleOpenVaultTake}
-          onBeforeExport={() => {
-            stopAutoPlaybackAudio()
-            pausePipVideos()
-          }}
-        />
-      )}
+      <TakeVaultDrawer
+        isOpen={isVaultOpen}
+        onClose={handleCloseVault}
+        projects={projects}
+        activeProject={activeProject}
+        onSelectProject={handleSelectProject}
+        onCreateProject={handleCreateProject}
+        takes={takes}
+        sortedTakes={sortedTakes}
+        sortMode={sortMode}
+        onSortChange={setSortMode}
+        benchmarkId={benchmarkId}
+        challengerId={challengerId}
+        onPinBenchmark={handlePinBenchmark}
+        onPinChallenger={handlePinChallenger}
+        onBeforePin={pausePipVideos}
+        onUpdateTake={handleUpdateTake}
+        onDeleteTake={handleDeleteTake}
+        onDeleteTakes={handleDeleteTakes}
+        onClearAllTakes={handleClearAllTakes}
+        onOpenTake={handleOpenVaultTake}
+        onBeforeExport={() => {
+          stopAutoPlaybackAudio()
+          pausePipVideos()
+        }}
+      />
 
-      {isSettingsOpen && (
-        <SettingsDrawer
-          isOpen
-          onClose={handleCloseSettings}
-          settings={settings}
-          onUpdate={updateSettings}
-          onReset={resetSettings}
-          recordingMode={recordingMode}
-        />
-      )}
+      <SettingsDrawer
+        isOpen={isSettingsOpen}
+        onClose={handleCloseSettings}
+        settings={settings}
+        onUpdate={updateSettings}
+        onReset={resetSettings}
+        recordingMode={recordingMode}
+      />
     </div>
   )
 }

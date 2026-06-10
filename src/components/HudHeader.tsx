@@ -1,4 +1,5 @@
 import { ChevronDown, FolderOpen } from 'lucide-react'
+import Pressable from './ui/Pressable'
 
 interface HudHeaderProps {
   sessionName: string
@@ -8,10 +9,11 @@ interface HudHeaderProps {
 export default function HudHeader({ sessionName, onOpenVault }: HudHeaderProps) {
   return (
     <header className="pointer-events-none flex shrink-0 justify-center px-4 pt-2">
-      <button
+      <Pressable
         type="button"
+        intensity="soft"
         onClick={onOpenVault}
-        className="pointer-events-auto flex max-w-[min(100%,16rem)] items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 shadow-lg backdrop-blur-md transition hover:border-white/25 hover:bg-black/55 active:scale-[0.98]"
+        className="pointer-events-auto flex max-w-[min(100%,16rem)] items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 shadow-lg backdrop-blur-md hover:border-white/25 hover:bg-black/55"
         aria-label={`Open vault — current session: ${sessionName}`}
       >
         <FolderOpen className="h-3.5 w-3.5 shrink-0 text-sky-300" />
@@ -22,7 +24,7 @@ export default function HudHeader({ sessionName, onOpenVault }: HudHeaderProps) 
           {sessionName}
         </span>
         <ChevronDown className="h-3 w-3 shrink-0 text-white/55" aria-hidden />
-      </button>
+      </Pressable>
     </header>
   )
 }

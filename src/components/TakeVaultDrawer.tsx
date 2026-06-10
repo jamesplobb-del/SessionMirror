@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
 import VaultTakeThumbnail from './VaultTakeThumbnail'
+import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
+import Pressable from './ui/Pressable'
+import { iosSpringSheet } from '../utils/motionPresets'
 import { resetVideosInContainer, teardownVideosInContainer } from '../utils/videoPlayback'
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
@@ -202,24 +206,13 @@ export default function TakeVaultDrawer({
   }, [])
 
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 ease-in ${
-          isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={onClose}
-        aria-hidden={!isOpen}
-      />
-
-      <div
-        ref={drawerRef}
-        className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[min(75vh,100dvh)] flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transition-[transform,opacity] duration-200 ease-in ${
-          isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
-        }`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Take Vault"
-      >
+    <AnimatedBottomSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Take Vault"
+      maxHeightClass="max-h-[min(75vh,100dvh)]"
+      sheetRef={drawerRef}
+    >
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
@@ -234,39 +227,43 @@ export default function TakeVaultDrawer({
           <div className="flex items-center gap-1">
             {takes.length > 0 && !selectionMode && (
               <>
-                <button
+                <Pressable
                   type="button"
+                  intensity="soft"
                   onClick={() => setSelectionMode(true)}
-                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
                 >
                   Select
-                </button>
-                <button
+                </Pressable>
+                <Pressable
                   type="button"
+                  intensity="soft"
                   onClick={handleClearAll}
-                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
                   Clear All
-                </button>
+                </Pressable>
               </>
             )}
             {selectionMode && (
-              <button
+              <Pressable
                 type="button"
+                intensity="soft"
                 onClick={exitSelectionMode}
-                className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-100"
+                className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100"
               >
                 Cancel
-              </button>
+              </Pressable>
             )}
-            <button
+            <Pressable
               type="button"
+              intensity="icon"
               onClick={onClose}
-              className="rounded-full p-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"
+              className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
               aria-label="Close vault"
             >
               <X className="h-5 w-5" />
-            </button>
+            </Pressable>
           </div>
         </div>
 
@@ -306,13 +303,14 @@ export default function TakeVaultDrawer({
                       takeCount={filteredTakes.length}
                     />
                     {selectionMode && (
-                      <button
+                      <Pressable
                         type="button"
+                        intensity="soft"
                         onClick={toggleSelectAllFiltered}
-                        className="shrink-0 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
+                        className="shrink-0 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
                       >
                         {allFilteredSelected ? 'Deselect All' : 'Select All'}
-                      </button>
+                      </Pressable>
                     )}
                   </div>
                   <div className="flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
@@ -374,42 +372,55 @@ export default function TakeVaultDrawer({
           )}
         </div>
 
-        {selectionMode && selectedCount > 0 && (
-          <div
-            className="flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
-            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-          >
-            <button
-              type="button"
-              disabled={bulkSaving}
-              onClick={handleBulkSave}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-800 transition hover:bg-stone-100 disabled:opacity-50"
+        <AnimatePresence>
+          {selectionMode && selectedCount > 0 && (
+            <motion.div
+              key="bulk-actions"
+              className="flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
+              style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={iosSpringSheet}
             >
-              <Download className="h-3.5 w-3.5" />
-              {bulkSaving ? 'Saving…' : `Save (${selectedCount})`}
-            </button>
-            <button
-              type="button"
-              onClick={handleBulkDelete}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete ({selectedCount})
-            </button>
-          </div>
-        )}
+              <Pressable
+                type="button"
+                intensity="soft"
+                disabled={bulkSaving}
+                onClick={handleBulkSave}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-800 hover:bg-stone-100 disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {bulkSaving ? 'Saving…' : `Save (${selectedCount})`}
+              </Pressable>
+              <Pressable
+                type="button"
+                intensity="soft"
+                onClick={handleBulkDelete}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete ({selectedCount})
+              </Pressable>
+            </motion.div>
+          )}
 
-        {selectionMode && selectedCount === 0 && (
-          <div
-            className="flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
-            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-          >
-            <CheckSquare className="h-3.5 w-3.5" />
-            Tap takes to select, then save or delete
-          </div>
-        )}
-      </div>
-    </>
+          {selectionMode && selectedCount === 0 && (
+            <motion.div
+              key="bulk-hint"
+              className="flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
+              style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={iosSpringSheet}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              Tap takes to select, then save or delete
+            </motion.div>
+          )}
+        </AnimatePresence>
+    </AnimatedBottomSheet>
   )
 }
 

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
+import Pressable from './ui/Pressable'
+import { iosEaseOut } from '../utils/motionPresets'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
@@ -674,12 +676,15 @@ export default function ReviewModeOverlay({
   }
 
   return (
-    <div
-      className={`review-overlay review-overlay--immersive fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden transition-opacity duration-200 ease-in ${
-        isOpen
-          ? 'pointer-events-auto opacity-100'
-          : 'pointer-events-none invisible opacity-0'
-      }`}
+    <motion.div
+      className="review-overlay review-overlay--immersive fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden"
+      initial={false}
+      animate={{
+        opacity: isOpen ? 1 : 0,
+        scale: isOpen ? 1 : 0.985,
+      }}
+      transition={iosEaseOut}
+      style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
       aria-hidden={!isOpen}
     >
       <div ref={reviewBoundsRef} className="relative h-full w-full">
@@ -694,14 +699,15 @@ export default function ReviewModeOverlay({
             )}
           </div>
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
-            <button
+            <Pressable
               type="button"
+              intensity="icon"
               onClick={handleCloseClick}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/25"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/25"
               aria-label="Done"
             >
               <X className="h-5 w-5" />
-            </button>
+            </Pressable>
           </div>
         </div>
       </div>
@@ -813,26 +819,31 @@ export default function ReviewModeOverlay({
       </div>
 
         {isOpen && (
-        <button
-          type="button"
-          data-play-overlay
-          onClick={(e) => {
-            e.stopPropagation()
-            togglePlayPause()
-          }}
-          className={`pointer-events-auto absolute left-1/2 top-1/2 z-20 flex h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300 active:scale-95 ${
-            showPlayOverlay
-              ? 'scale-100 opacity-100'
-              : 'pointer-events-none scale-90 opacity-0'
-          }`}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-        >
-          {isPlaying ? (
-            <Pause className="h-8 w-8 fill-white text-white" />
-          ) : (
-            <Play className="h-8 w-8 fill-white text-white" />
-          )}
-        </button>
+          <AnimatePresence>
+            {showPlayOverlay && (
+              <Pressable
+                type="button"
+                intensity="icon"
+                data-play-overlay
+                onClick={(e) => {
+                  e.stopPropagation()
+                  togglePlayPause()
+                }}
+                className="pointer-events-auto absolute left-1/2 top-1/2 z-20 flex h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+                initial={{ opacity: 0, scale: 0.88 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.88 }}
+                transition={iosEaseOut}
+              >
+                {isPlaying ? (
+                  <Pause className="h-8 w-8 fill-white text-white" />
+                ) : (
+                  <Play className="h-8 w-8 fill-white text-white" />
+                )}
+              </Pressable>
+            )}
+          </AnimatePresence>
         )}
 
         {showPitchPanel && (
@@ -876,6 +887,6 @@ export default function ReviewModeOverlay({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }

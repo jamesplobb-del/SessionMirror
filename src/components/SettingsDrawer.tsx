@@ -1,6 +1,13 @@
 import { RotateCcw, X } from 'lucide-react'
+import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
+import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
+import AnimatedExpand from './ui/AnimatedExpand'
+import IOSSegmentedControl from './ui/IOSSegmentedControl'
+import IOSSwitch from './ui/IOSSwitch'
+import Pressable from './ui/Pressable'
+import { iosSpringSnappy } from '../utils/motionPresets'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -25,23 +32,24 @@ function SettingToggle({
   disabled?: boolean
 }) {
   return (
-    <label
+    <motion.label
+      layout
       className={`flex items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-3.5 ${
         disabled ? 'opacity-50' : 'cursor-pointer'
       }`}
+      transition={iosSpringSnappy}
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-stone-900">{label}</p>
         <p className="mt-0.5 text-xs leading-relaxed text-stone-500">{description}</p>
       </div>
-      <input
-        type="checkbox"
-        className="mt-1 h-5 w-5 shrink-0 accent-sky-500"
+      <IOSSwitch
         checked={checked}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
+        onChange={onChange}
+        ariaLabel={label}
       />
-    </label>
+    </motion.label>
   )
 }
 
@@ -55,41 +63,30 @@ function SettingInstrumentPicker({
   const activeProfile = getTunerProfile(value)
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
+    <motion.div
+      layout
+      className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
+      transition={iosSpringSnappy}
+    >
       <p className="text-sm font-semibold text-stone-900">Instrument Profile</p>
       <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
         Tunes pitch detection sensitivity and trace smoothing for your source.
       </p>
 
-      <div
-        className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-stone-100 p-1"
-        role="radiogroup"
-        aria-label="Tuner instrument profile"
-      >
-        {TUNER_INSTRUMENTS.map((instrument) => {
-          const profile = getTunerProfile(instrument)
-          const selected = value === instrument
-          return (
-            <button
-              key={instrument}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => onChange(instrument)}
-              className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
-                selected
-                  ? 'bg-white text-stone-900 shadow-sm ring-1 ring-stone-200'
-                  : 'text-stone-500 hover:text-stone-700'
-              }`}
-            >
-              {profile.label}
-            </button>
-          )
-        })}
-      </div>
+      <IOSSegmentedControl
+        className="mt-3"
+        layoutId="settings-instrument-segment"
+        ariaLabel="Tuner instrument profile"
+        value={value}
+        onChange={onChange}
+        segments={TUNER_INSTRUMENTS.map((instrument) => ({
+          id: instrument,
+          label: getTunerProfile(instrument).label,
+        }))}
+      />
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-stone-400">{activeProfile.description}</p>
-    </div>
+    </motion.div>
   )
 }
 
@@ -117,15 +114,25 @@ function SettingSlider({
   const display = formatValue ? formatValue(value) : `${value}${unit}`
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
+    <motion.div
+      layout
+      className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
+      transition={iosSpringSnappy}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-stone-900">{label}</p>
           <p className="mt-0.5 text-xs text-stone-500">{description}</p>
         </div>
-        <span className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-stone-700">
+        <motion.span
+          key={display}
+          initial={{ scale: 0.92, opacity: 0.6 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={iosSpringSnappy}
+          className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-stone-700"
+        >
           {display}
-        </span>
+        </motion.span>
       </div>
       <input
         type="range"
@@ -136,7 +143,7 @@ function SettingSlider({
         onChange={(event) => onChange(Number(event.target.value))}
         className="h-2 w-full cursor-pointer accent-sky-500"
       />
-    </div>
+    </motion.div>
   )
 }
 
@@ -149,41 +156,25 @@ export default function SettingsDrawer({
   recordingMode,
 }: SettingsDrawerProps) {
   return (
-    <>
-      <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 ease-in ${
-          isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={onClose}
-        aria-hidden={!isOpen}
-      />
-
-      <div
-        className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[min(88vh,100dvh)] flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transition-[transform,opacity] duration-200 ease-in ${
-          isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
-        }`}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-      >
-        <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-stone-900">Settings</h2>
-            <p className="text-xs text-stone-500">Toggle features and adjust recording behavior</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"
-            aria-label="Close settings"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <AnimatedBottomSheet isOpen={isOpen} onClose={onClose} ariaLabel="Settings">
+      <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
+        <div>
+          <h2 className="text-base font-semibold text-stone-900">Settings</h2>
+          <p className="text-xs text-stone-500">Toggle features and adjust recording behavior</p>
         </div>
+        <Pressable
+          type="button"
+          intensity="icon"
+          onClick={onClose}
+          className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+          aria-label="Close settings"
+        >
+          <X className="h-5 w-5" />
+        </Pressable>
+      </div>
 
-        <div className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
-          <div className="space-y-6 pb-2">
+      <div className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+        <div className="space-y-6 pb-2">
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Audio Mode
@@ -196,12 +187,16 @@ export default function SettingsDrawer({
               onChange={(checked) => onUpdate({ autoSoundRecording: checked })}
             />
 
-            {settings.autoSoundRecording && (
-              <div className="space-y-3 pl-1">
+            <AnimatedExpand open={settings.autoSoundRecording}>
+              <div className="space-y-3 pl-1 pt-3">
                 {recordingMode !== 'audio' && (
-                  <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                  >
                     Switch to Audio mode on the record carousel for auto recording to run.
-                  </p>
+                  </motion.p>
                 )}
 
                 <SettingSlider
@@ -230,7 +225,7 @@ export default function SettingsDrawer({
                   onChange={(value) => onUpdate({ soundVolumeThreshold: value })}
                 />
               </div>
-            )}
+            </AnimatedExpand>
           </section>
 
           <section className="space-y-3">
@@ -244,8 +239,9 @@ export default function SettingsDrawer({
               checked={settings.pitchTrackerEnabled}
               onChange={(checked) => onUpdate({ pitchTrackerEnabled: checked })}
             />
-            {settings.pitchTrackerEnabled && (
-              <>
+
+            <AnimatedExpand open={settings.pitchTrackerEnabled}>
+              <div className="space-y-3 pt-3">
                 <SettingToggle
                   label="Live Mic Tuner (Idle)"
                   description="When an audio take is paused, listen through the microphone and show a full-screen live tuner. Turn off to only analyze pitch during playback."
@@ -256,8 +252,8 @@ export default function SettingsDrawer({
                   value={settings.tunerInstrument}
                   onChange={(tunerInstrument) => onUpdate({ tunerInstrument })}
                 />
-              </>
-            )}
+              </div>
+            </AnimatedExpand>
           </section>
 
           <section className="space-y-3">
@@ -280,17 +276,17 @@ export default function SettingsDrawer({
             />
           </section>
 
-          <button
+          <Pressable
             type="button"
+            intensity="soft"
             onClick={onReset}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-600 transition hover:bg-stone-100"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-600 hover:bg-stone-100"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset to Defaults
-          </button>
-          </div>
+          </Pressable>
         </div>
       </div>
-    </>
+    </AnimatedBottomSheet>
   )
 }

@@ -1,4 +1,5 @@
 import { Star } from 'lucide-react'
+import Pressable from './ui/Pressable'
 
 interface StarRatingProps {
   rating: number
@@ -18,11 +19,12 @@ export default function StarRating({
       {[1, 2, 3, 4, 5].map((value) => {
         const filled = value <= rating
         return (
-          <button
+          <Pressable
             key={value}
             type="button"
+            intensity="icon"
             onClick={() => onChange(value === rating ? 0 : value)}
-            className="rounded p-0.5 text-amber-400 transition hover:scale-110 hover:text-amber-500"
+            className="rounded p-0.5 text-amber-400 hover:text-amber-500"
             aria-label={`${value} star${value === 1 ? '' : 's'}`}
             aria-pressed={filled}
           >
@@ -30,7 +32,7 @@ export default function StarRating({
               className={`${iconClass} ${filled ? 'fill-amber-400' : 'fill-transparent'}`}
               strokeWidth={filled ? 0 : 1.5}
             />
-          </button>
+          </Pressable>
         )
       })}
     </div>

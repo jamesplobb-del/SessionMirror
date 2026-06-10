@@ -1,6 +1,7 @@
 import { AudioLines } from 'lucide-react'
 import type { RefObject } from 'react'
 import { formatTime } from '../hooks/useVideoPlayback'
+import Pressable from './ui/Pressable'
 
 interface ReviewTimelineProps {
   trackRef: RefObject<HTMLDivElement | null>
@@ -95,13 +96,14 @@ export default function ReviewTimeline({
         </span>
 
         {pitchToggleVisible && onPitchToggle && (
-          <button
+          <Pressable
             type="button"
+            intensity="soft"
             onClick={(event) => {
               event.stopPropagation()
               onPitchToggle()
             }}
-            className={`flex h-7 items-center gap-1 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+            className={`flex h-7 items-center gap-1 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wide ${
               pitchToggleActive
                 ? 'border-sky-400/40 bg-sky-500/25 text-sky-100'
                 : 'border-white/15 bg-white/10 text-white/65 hover:bg-white/15 hover:text-white/85'
@@ -111,7 +113,7 @@ export default function ReviewTimeline({
           >
             <AudioLines className="h-3.5 w-3.5" strokeWidth={2.25} />
             Pitch
-          </button>
+          </Pressable>
         )}
 
         <span className="text-[11px] font-medium tracking-tight text-white/45">

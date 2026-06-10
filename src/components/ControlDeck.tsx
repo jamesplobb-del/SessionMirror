@@ -1,8 +1,9 @@
 import { FolderOpen, Settings, Trash2 } from 'lucide-react'
-import { useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel from './RecordingModeCarousel'
+import Pressable from './ui/Pressable'
 import type { RecordingMode } from '../types'
 
 interface ControlDeckProps {
@@ -24,6 +25,7 @@ interface ControlDeckProps {
   onPitchToggle?: () => void
   showTakeCards?: boolean
   onShowTakeCardsChange?: (show: boolean) => void
+  settingsBranchDisabled?: boolean
 }
 
 function formatElapsed(seconds: number): string {
@@ -51,16 +53,34 @@ export default function ControlDeck({
   onPitchToggle,
   showTakeCards = true,
   onShowTakeCardsChange,
+  settingsBranchDisabled = false,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const [branchOpen, setBranchOpen] = useState(false)
+  const pitchVisibleRef = useRef(pitchToggleVisible)
+
+  useEffect(() => {
+    if (branchOpen && pitchVisibleRef.current !== pitchToggleVisible) {
+      setBranchOpen(false)
+    }
+    pitchVisibleRef.current = pitchToggleVisible
+  }, [branchOpen, pitchToggleVisible])
+
+  useEffect(() => {
+    if (settingsBranchDisabled && branchOpen) {
+      setBranchOpen(false)
+    }
+  }, [branchOpen, settingsBranchDisabled])
 
   const settingsPress = useLongPress({
     onClick: onOpenSettings,
     onLongPress: () => setBranchOpen(true),
-    disabled: branchOpen,
+    disabled: branchOpen || settingsBranchDisabled,
+    targetRef: settingsButtonRef,
   })
+
+  const { onClickCapture, ...settingsPressHandlers } = settingsPress
 
   return (
     <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
@@ -76,10 +96,11 @@ export default function ControlDeck({
       />
 
       <div className="relative flex w-full max-w-xs items-center justify-center">
-        <button
+        <Pressable
           type="button"
+          intensity="icon"
           onClick={onOpenVault}
-          className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md transition hover:bg-black/55"
+          className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
           <FolderOpen className="h-5 w-5" />
@@ -88,12 +109,12 @@ export default function ControlDeck({
               {takeCount > 99 ? '99+' : takeCount}
             </span>
           )}
-        </button>
+        </Pressable>
 
         <button
           type="button"
           ref={settingsButtonRef}
-          className={`absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition ${
+          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors ${
             branchOpen
               ? 'bg-white/20 text-white ring-1 ring-white/30'
               : 'bg-black/40 text-white/90 hover:bg-black/55'
@@ -102,7 +123,8 @@ export default function ControlDeck({
           aria-expanded={branchOpen}
           aria-haspopup="menu"
           onContextMenu={(event) => event.preventDefault()}
-          {...settingsPress}
+          onClickCapture={onClickCapture}
+          {...settingsPressHandlers}
         >
           <Settings className="h-5 w-5" />
         </button>

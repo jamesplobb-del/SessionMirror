@@ -114,6 +114,13 @@ body.pip-drag-active * {
   -webkit-touch-callout: none !important;
 }
 
+body.settings-branch-open,
+body.settings-branch-open * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
 .pip-drop-target--active {
   transform: scale(1.04);
   box-shadow:
@@ -168,6 +175,13 @@ body.pip-drag-active * {
 
 .control-deck {
   padding-bottom: 0;
+}
+
+.control-deck__settings-btn {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
 
 /* Landscape — portrait layout unchanged; only applies when rotated */
@@ -1127,6 +1141,8 @@ video.camera-preview.camera-preview--hidden {
 
 .settings-branch-wheel__item {
   color: rgba(255, 255, 255, 0.88);
+  left: 0;
+  top: 0;
 }
 
 .settings-branch-wheel__icon {

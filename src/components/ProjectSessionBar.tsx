@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { FolderPlus } from 'lucide-react'
 import type { Project } from '../db/types'
+import AnimatedExpand from './ui/AnimatedExpand'
+import Pressable from './ui/Pressable'
 
 interface ProjectSessionBarProps {
   projects: Project[]
@@ -45,17 +47,18 @@ export default function ProjectSessionBar({
     <div className="mb-4 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sessions</p>
-        <button
+        <Pressable
           type="button"
+          intensity="soft"
           onClick={openNamingForm}
-          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-50"
+          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:border-stone-300 hover:bg-stone-50"
         >
           <FolderPlus className="h-3.5 w-3.5" />
           New Session
-        </button>
+        </Pressable>
       </div>
 
-      {isNamingSession && (
+      <AnimatedExpand open={isNamingSession}>
         <form
           className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3"
           onSubmit={(event) => {
@@ -76,39 +79,42 @@ export default function ProjectSessionBar({
             maxLength={48}
           />
           <div className="flex justify-end gap-2">
-            <button
+            <Pressable
               type="button"
+              intensity="soft"
               onClick={cancelNaming}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-100"
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100"
             >
               Cancel
-            </button>
-            <button
+            </Pressable>
+            <Pressable
               type="submit"
-              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-700"
+              intensity="soft"
+              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
             >
               Create
-            </button>
+            </Pressable>
           </div>
         </form>
-      )}
+      </AnimatedExpand>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {projects.map((project) => {
           const active = project.id === activeProjectId
           return (
-            <button
+            <Pressable
               key={project.id}
               type="button"
+              intensity="soft"
               onClick={() => onSelectProject(project.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${
                 active
                   ? 'border-sky-300 bg-sky-50 text-sky-800'
                   : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-stone-100'
               }`}
             >
               {project.name}
-            </button>
+            </Pressable>
           )
         })}
       </div>
