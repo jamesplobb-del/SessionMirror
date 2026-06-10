@@ -952,6 +952,7 @@ export default function App() {
               liveMicEnabled={settings.liveMicTunerEnabled}
               micStreamRef={streamRef}
               layoutRegion="main"
+              tunerInstrument={settings.tunerInstrument}
               onClose={() => setShowPitch(false)}
             />
           )}
@@ -1036,6 +1037,7 @@ export default function App() {
           challengerMirror={challengerTake?.mirrorPlayback !== false}
           pitchTrackerEnabled={settings.pitchTrackerEnabled}
           liveMicTunerEnabled={settings.liveMicTunerEnabled}
+          tunerInstrument={settings.tunerInstrument}
           micStreamRef={streamRef}
           isOpen
           onClose={handleCloseReview}

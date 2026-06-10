@@ -76,17 +76,21 @@ function bestMidiForFrequency(frequencyHz: number): { midi: number; cents: numbe
   return { midi: bestMidi, cents: bestCents }
 }
 
-export function normalizeInstrumentFrequency(frequencyHz: number): number {
+export function normalizeInstrumentFrequency(
+  frequencyHz: number,
+  minHz = MIN_INSTRUMENT_HZ,
+  maxHz = MAX_INSTRUMENT_HZ,
+): number {
   if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) return 0
 
   let normalized = frequencyHz
   let guard = 0
-  while (normalized < MIN_INSTRUMENT_HZ && guard < 4) {
+  while (normalized < minHz && guard < 4) {
     normalized *= 2
     guard += 1
   }
   guard = 0
-  while (normalized > MAX_INSTRUMENT_HZ && guard < 4) {
+  while (normalized > maxHz && guard < 4) {
     normalized /= 2
     guard += 1
   }
@@ -99,13 +103,17 @@ export function frequencyToCentsOffset(frequencyHz: number): number {
   return bestMidiForFrequency(frequencyHz).cents
 }
 
-export function frequencyToPitchReadout(frequencyHz: number): PitchReadout {
+export function frequencyToPitchReadout(
+  frequencyHz: number,
+  minHz = MIN_INSTRUMENT_HZ,
+  maxHz = MAX_INSTRUMENT_HZ,
+): PitchReadout {
   if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) {
     return { noteName: '—', cents: 0, frequencyHz: 0, midi: 0 }
   }
 
-  const normalized = normalizeInstrumentFrequency(frequencyHz)
-  if (!isFrequencyInInstrumentRange(normalized)) {
+  const normalized = normalizeInstrumentFrequency(frequencyHz, minHz, maxHz)
+  if (!isFrequencyInInstrumentRange(normalized, minHz, maxHz)) {
     return { noteName: '—', cents: 0, frequencyHz: 0, midi: 0 }
   }
 
@@ -125,6 +133,7 @@ export function frequencyToPitchReadout(frequencyHz: number): PitchReadout {
 export function stabilizePitchReadout(
   previous: PitchReadout | null,
   next: PitchReadout,
+  noteHysteresisCents = NOTE_HYSTERESIS_CENTS,
 ): PitchReadout {
   if (next.noteName === '—' || !previous || previous.noteName === '—') {
     return next
@@ -133,7 +142,7 @@ export function stabilizePitchReadout(
   if (previous.noteName === next.noteName) return next
 
   const centsFromPrevious = centsFromMidi(next.frequencyHz, previous.midi)
-  if (Math.abs(centsFromPrevious) <= NOTE_HYSTERESIS_CENTS) {
+  if (Math.abs(centsFromPrevious) <= noteHysteresisCents) {
     return {
       ...next,
       noteName: previous.noteName,
@@ -253,11 +262,15 @@ export function smoothFrequency(
   return previous * (1 - alpha) + next * alpha
 }
 
-export function isFrequencyInInstrumentRange(frequencyHz: number): boolean {
+export function isFrequencyInInstrumentRange(
+  frequencyHz: number,
+  minHz = MIN_INSTRUMENT_HZ,
+  maxHz = MAX_INSTRUMENT_HZ,
+): boolean {
   return (
     Number.isFinite(frequencyHz) &&
-    frequencyHz >= MIN_INSTRUMENT_HZ &&
-    frequencyHz <= MAX_INSTRUMENT_HZ
+    frequencyHz >= minHz &&
+    frequencyHz <= maxHz
   )
 }
 

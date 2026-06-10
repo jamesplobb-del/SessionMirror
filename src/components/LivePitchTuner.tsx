@@ -9,6 +9,7 @@ import {
   isInTune,
   type PitchReadout,
 } from '../utils/pitchUtils'
+import type { TunerInstrument } from '../utils/pitchConfig'
 
 interface LivePitchTunerProps {
   mediaRef: RefObject<HTMLMediaElement | null>
@@ -21,6 +22,7 @@ interface LivePitchTunerProps {
   liveMicEnabled?: boolean
   micStreamRef?: RefObject<MediaStream | null>
   persistWhenPaused?: boolean
+  tunerInstrument?: TunerInstrument
 }
 
 function PitchChartCanvas({
@@ -210,6 +212,7 @@ function LivePitchTunerAudio({
   enabled,
   liveMicEnabled,
   micStreamRef,
+  tunerInstrument = 'voice',
 }: {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -218,6 +221,7 @@ function LivePitchTunerAudio({
   enabled: boolean
   liveMicEnabled: boolean
   micStreamRef?: RefObject<MediaStream | null>
+  tunerInstrument?: TunerInstrument
 }) {
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -233,7 +237,7 @@ function LivePitchTunerAudio({
     `live-mic-${mediaKey}`,
     liveCanvasRef,
     'glass',
-    { source: 'microphone', micStreamRef, continuousScroll: true },
+    { source: 'microphone', micStreamRef, continuousScroll: true, tunerInstrument },
   )
 
   const playbackReadout = useLivePitchTracker(
@@ -243,7 +247,7 @@ function LivePitchTunerAudio({
     `${mediaKey}-playback`,
     playbackCanvasRef,
     'glass',
-    { source: 'media', persistWhenPaused: true },
+    { source: 'media', persistWhenPaused: true, tunerInstrument },
   )
 
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
@@ -301,6 +305,7 @@ export default function LivePitchTuner({
   liveMicEnabled = true,
   micStreamRef,
   persistWhenPaused = false,
+  tunerInstrument = 'voice',
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -315,7 +320,7 @@ export default function LivePitchTuner({
     mediaKey,
     canvasRef,
     canvasTheme,
-    { source: 'media', persistWhenPaused: isWidget && persistWhenPaused },
+    { source: 'media', persistWhenPaused: isWidget && persistWhenPaused, tunerInstrument },
   )
 
   if (isAudio) {
@@ -328,6 +333,7 @@ export default function LivePitchTuner({
         enabled={enabled}
         liveMicEnabled={liveMicEnabled}
         micStreamRef={micStreamRef}
+        tunerInstrument={tunerInstrument}
       />
     )
   }

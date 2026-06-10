@@ -8,6 +8,7 @@ import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
+import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
@@ -136,6 +137,7 @@ interface ReviewModeOverlayProps {
   challengerMirror?: boolean
   pitchTrackerEnabled?: boolean
   liveMicTunerEnabled?: boolean
+  tunerInstrument?: TunerInstrument
   micStreamRef?: RefObject<MediaStream | null>
   isOpen: boolean
   onClose: () => void
@@ -162,6 +164,7 @@ export default function ReviewModeOverlay({
   challengerMirror = true,
   pitchTrackerEnabled = false,
   liveMicTunerEnabled = true,
+  tunerInstrument = 'voice',
   micStreamRef,
   isOpen,
   onClose,
@@ -848,6 +851,7 @@ export default function ReviewModeOverlay({
                 isAudioMode={activeIsAudio}
                 liveMicEnabled={liveMicTunerEnabled}
                 micStreamRef={micStreamRef}
+                tunerInstrument={tunerInstrument}
                 layoutRegion="review"
                 onClose={() => setShowPitch(false)}
               />

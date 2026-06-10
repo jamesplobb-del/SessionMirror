@@ -1,5 +1,6 @@
 import { RotateCcw, X } from 'lucide-react'
 import type { AppSettings } from '../utils/appSettings'
+import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -41,6 +42,54 @@ function SettingToggle({
         onChange={(event) => onChange(event.target.checked)}
       />
     </label>
+  )
+}
+
+function SettingInstrumentPicker({
+  value,
+  onChange,
+}: {
+  value: TunerInstrument
+  onChange: (value: TunerInstrument) => void
+}) {
+  const activeProfile = getTunerProfile(value)
+
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
+      <p className="text-sm font-semibold text-stone-900">Instrument Profile</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+        Tunes pitch detection sensitivity and trace smoothing for your source.
+      </p>
+
+      <div
+        className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-stone-100 p-1"
+        role="radiogroup"
+        aria-label="Tuner instrument profile"
+      >
+        {TUNER_INSTRUMENTS.map((instrument) => {
+          const profile = getTunerProfile(instrument)
+          const selected = value === instrument
+          return (
+            <button
+              key={instrument}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(instrument)}
+              className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
+                selected
+                  ? 'bg-white text-stone-900 shadow-sm ring-1 ring-stone-200'
+                  : 'text-stone-500 hover:text-stone-700'
+              }`}
+            >
+              {profile.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <p className="mt-2.5 text-[11px] leading-relaxed text-stone-400">{activeProfile.description}</p>
+    </div>
   )
 }
 
@@ -182,19 +231,32 @@ export default function SettingsDrawer({
                 />
               </div>
             )}
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Tuner
+            </h3>
+
             <SettingToggle
               label="Live Pitch Tracker"
-              description="During playback, show a live A440 tuner for voice, winds, brass, and strings. With auto recording in Audio mode, pitch analysis fills the main screen right after each take while it plays once."
+              description="During playback, show a live A440 tuner. With auto recording in Audio mode, pitch analysis fills the main screen right after each take while it plays once."
               checked={settings.pitchTrackerEnabled}
               onChange={(checked) => onUpdate({ pitchTrackerEnabled: checked })}
             />
             {settings.pitchTrackerEnabled && (
-              <SettingToggle
-                label="Live Mic Tuner (Idle)"
-                description="When an audio take is paused, listen through the microphone and show a full-screen live tuner. Turn off to only analyze pitch during playback."
-                checked={settings.liveMicTunerEnabled}
-                onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
-              />
+              <>
+                <SettingToggle
+                  label="Live Mic Tuner (Idle)"
+                  description="When an audio take is paused, listen through the microphone and show a full-screen live tuner. Turn off to only analyze pitch during playback."
+                  checked={settings.liveMicTunerEnabled}
+                  onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
+                />
+                <SettingInstrumentPicker
+                  value={settings.tunerInstrument}
+                  onChange={(tunerInstrument) => onUpdate({ tunerInstrument })}
+                />
+              </>
             )}
           </section>
 

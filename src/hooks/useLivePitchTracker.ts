@@ -1,23 +1,13 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { PitchDetector } from 'pitchy'
 import {
-  PITCH_ATTACK_FRAMES,
-  PITCH_CLARITY_MIN,
-  PITCH_CLARITY_MIN_MIC,
-  PITCH_FRAME_SIZE,
-  PITCH_FRAME_SIZE_MIC,
-  PITCH_HOLD_MS,
-  PITCH_HOLD_MS_MIC,
-  PITCH_MIN_VOLUME_DB,
-  PITCH_NEEDLE_SMOOTH_ALPHA,
-  PITCH_GRAPH_SMOOTH_WINDOW,
-  PITCH_OUTLIER_CENTS,
+  getTunerProfile,
   PITCH_READOUT_INTERVAL_MS,
-  PITCH_RMS_GATE_DB_MEDIA,
-  PITCH_RMS_GATE_DB_MIC,
   PITCH_SILENCE_FLOOR_CENTS,
   CENTS_DISPLAY_STEP,
   type PitchCanvasTheme,
+  type PitchTunerProfile,
+  type TunerInstrument,
 } from '../utils/pitchConfig'
 import {
   frequencyToPitchReadout,
@@ -82,6 +72,8 @@ export interface PitchTrackerOptions {
   persistWhenPaused?: boolean
   /** Live mic: keep trace scrolling on the chart floor during silence. */
   continuousScroll?: boolean
+  /** Voice, strings, or brass detection profile. */
+  tunerInstrument?: TunerInstrument
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
@@ -93,6 +85,7 @@ function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
 }
 
 async function createMicPitchGraph(
+  profile: PitchTunerProfile,
   existingStream?: MediaStream | null,
 ): Promise<MicPitchGraph> {
   let stream = micStreamIsLive(existingStream) ? existingStream! : null
@@ -114,21 +107,21 @@ async function createMicPitchGraph(
   await context.resume()
 
   const analyser = context.createAnalyser()
-  analyser.fftSize = PITCH_FRAME_SIZE_MIC
+  analyser.fftSize = profile.frameSizeMic
 
   const source = context.createMediaStreamSource(stream)
   source.connect(analyser)
 
-  const detector = PitchDetector.forFloat32Array(PITCH_FRAME_SIZE_MIC)
-  detector.clarityThreshold = PITCH_CLARITY_MIN_MIC
-  detector.minVolumeDecibels = PITCH_RMS_GATE_DB_MIC
+  const detector = PitchDetector.forFloat32Array(profile.frameSizeMic)
+  detector.clarityThreshold = profile.clarityMinMic
+  detector.minVolumeDecibels = profile.rmsGateDbMic
 
   return {
     context,
     source,
     analyser,
     detector,
-    buffer: new Float32Array(PITCH_FRAME_SIZE_MIC),
+    buffer: new Float32Array(profile.frameSizeMic),
     smoothed: null,
     stream,
     ownsStream,
@@ -267,10 +260,18 @@ function notifyPitchGraphReleased(media: HTMLMediaElement, mode: PitchGraphMode)
   media.dispatchEvent(new CustomEvent(PITCH_GRAPH_RELEASED_EVENT, { bubbles: true }))
 }
 
-async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
+async function createPitchGraph(
+  media: HTMLMediaElement,
+  profile: PitchTunerProfile,
+): Promise<PitchGraph> {
   const existing = elementGraphs.get(media)
   if (existing && existing.context.state !== 'closed') {
-    return existing
+    if (existing.analyser.fftSize === profile.frameSize) {
+      existing.detector.clarityThreshold = profile.clarityMin
+      existing.detector.minVolumeDecibels = profile.rmsGateDbMedia
+      return existing
+    }
+    safeDisposePitchGraph(existing)
   }
 
   if (existing) {
@@ -281,7 +282,7 @@ async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
   await context.resume()
 
   const analyser = context.createAnalyser()
-  analyser.fftSize = PITCH_FRAME_SIZE
+  analyser.fftSize = profile.frameSize
 
   let source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null
   let mode: PitchGraphMode = 'stream'
@@ -310,16 +311,16 @@ async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
     }
   }
 
-  const detector = PitchDetector.forFloat32Array(PITCH_FRAME_SIZE)
-  detector.clarityThreshold = PITCH_CLARITY_MIN
-  detector.minVolumeDecibels = PITCH_MIN_VOLUME_DB
+  const detector = PitchDetector.forFloat32Array(profile.frameSize)
+  detector.clarityThreshold = profile.clarityMin
+  detector.minVolumeDecibels = profile.rmsGateDbMedia
 
   const graph: PitchGraph = {
     context,
     source,
     analyser,
     detector,
-    buffer: new Float32Array(PITCH_FRAME_SIZE),
+    buffer: new Float32Array(profile.frameSize),
     smoothed: null,
     media,
     mode,
@@ -407,8 +408,13 @@ function drawSmoothPitchTrace(
   width: number,
   centsToY: (cents: number) => number,
   theme: PitchCanvasTheme,
+  graphSmoothWindow: number,
 ): void {
-  const smoothed = movingAverage(centsHistory, PITCH_GRAPH_SMOOTH_WINDOW)
+  const pass1 = movingAverage(centsHistory, graphSmoothWindow)
+  const smoothed =
+    graphSmoothWindow >= 4
+      ? movingAverage(pass1, Math.max(2, Math.floor(graphSmoothWindow / 2)))
+      : pass1
   if (smoothed.length < 2) return
 
   const historyStep = width / Math.max(historyLength - 1, 1)
@@ -471,6 +477,7 @@ function drawPitchCanvas(
   currentCents: number | null,
   active: boolean,
   theme: PitchCanvasTheme,
+  graphSmoothWindow: number,
 ): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -545,7 +552,7 @@ function drawPitchCanvas(
   ctx.setLineDash([])
 
   if (centsHistory.length > 1) {
-    drawSmoothPitchTrace(ctx, centsHistory, HISTORY_LENGTH, width, centsToY, theme)
+    drawSmoothPitchTrace(ctx, centsHistory, HISTORY_LENGTH, width, centsToY, theme, graphSmoothWindow)
   }
 
   if (currentCents != null && active) {
@@ -619,7 +626,12 @@ export function useLivePitchTracker(
   const persistWhenPaused = options.persistWhenPaused ?? false
   const continuousScroll =
     options.continuousScroll ?? source === 'microphone'
-  const emptyReadout = frequencyToPitchReadout(0)
+  const tunerInstrument = options.tunerInstrument ?? 'voice'
+  const profile = getTunerProfile(tunerInstrument)
+  const profileRef = useRef(profile)
+  profileRef.current = profile
+
+  const emptyReadout = frequencyToPitchReadout(0, profile.minHz, profile.maxHz)
   const [readout, setReadout] = useState<PitchReadout>(emptyReadout)
   const graphRef = useRef<ActivePitchGraph | null>(null)
   const tickRef = useRef<number | null>(null)
@@ -628,6 +640,7 @@ export function useLivePitchTracker(
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
   const needleCentsRef = useRef<number | null>(null)
+  const traceCentsRef = useRef<number | null>(null)
   const lastNoteRef = useRef('—')
   const lastReadoutEmitRef = useRef(0)
   const goodFrameCountRef = useRef(0)
@@ -646,12 +659,13 @@ export function useLivePitchTracker(
   useEffect(() => {
     historyRef.current = []
     needleCentsRef.current = null
+    traceCentsRef.current = null
     goodFrameCountRef.current = 0
     lastStableCentsRef.current = null
     lastNoteRef.current = '—'
     framesSinceAttachAttemptRef.current = 0
     lastPitchAtRef.current = 0
-  }, [mediaKey, source])
+  }, [mediaKey, source, tunerInstrument])
 
   useEffect(() => {
     readoutRef.current = readout
@@ -669,7 +683,7 @@ export function useLivePitchTracker(
       }
       graphRef.current = null
     }
-  }, [mediaKey, source])
+  }, [mediaKey, source, tunerInstrument])
 
   useEffect(() => {
     if (source !== 'media' || !enabled) return
@@ -680,12 +694,14 @@ export function useLivePitchTracker(
     const onSeeked = () => {
       historyRef.current = []
       needleCentsRef.current = null
+      traceCentsRef.current = null
       goodFrameCountRef.current = 0
       lastStableCentsRef.current = null
       lastNoteRef.current = '—'
       lastPitchAtRef.current = 0
-      readoutRef.current = emptyReadout
-      if (mountedRef.current) setReadout(emptyReadout)
+      const seekEmpty = frequencyToPitchReadout(0, profileRef.current.minHz, profileRef.current.maxHz)
+      readoutRef.current = seekEmpty
+      if (mountedRef.current) setReadout(seekEmpty)
 
       const graph = graphRef.current
       if (graph && isMediaPitchGraph(graph)) {
@@ -712,18 +728,24 @@ export function useLivePitchTracker(
       }
       historyRef.current = []
       needleCentsRef.current = null
+      traceCentsRef.current = null
       goodFrameCountRef.current = 0
       lastStableCentsRef.current = null
       lastNoteRef.current = '—'
       lastReadoutEmitRef.current = 0
+      const disabledEmpty = frequencyToPitchReadout(
+        0,
+        profileRef.current.minHz,
+        profileRef.current.maxHz,
+      )
       const graph = graphRef.current
       if (graph && !isMediaPitchGraph(graph)) {
         safeDisposeMicGraph(graph)
       }
       graphRef.current = null
       if (mountedRef.current) {
-        readoutRef.current = emptyReadout
-        setReadout(emptyReadout)
+        readoutRef.current = disabledEmpty
+        setReadout(disabledEmpty)
       }
       return
     }
@@ -748,7 +770,7 @@ export function useLivePitchTracker(
 
       try {
         if (source === 'microphone') {
-          const graph = await createMicPitchGraph(micStreamRef?.current)
+          const graph = await createMicPitchGraph(profileRef.current, micStreamRef?.current)
           if (cancelled) {
             safeDisposeMicGraph(graph)
             return
@@ -774,7 +796,7 @@ export function useLivePitchTracker(
           return
         }
 
-        const graph = await createPitchGraph(media)
+        const graph = await createPitchGraph(media, profileRef.current)
         if (cancelled) {
           return
         }
@@ -802,7 +824,7 @@ export function useLivePitchTracker(
       }
       graphRef.current = null
     }
-  }, [enabled, mediaKey, mediaRef, micStreamRef, source])
+  }, [enabled, mediaKey, mediaRef, micStreamRef, source, tunerInstrument])
 
   useEffect(() => {
     const shouldTick = enabled && (isPlaying || persistWhenPaused)
@@ -820,6 +842,7 @@ export function useLivePitchTracker(
         }
         historyRef.current = []
         needleCentsRef.current = null
+        traceCentsRef.current = null
         goodFrameCountRef.current = 0
         lastStableCentsRef.current = null
         lastNoteRef.current = '—'
@@ -834,6 +857,7 @@ export function useLivePitchTracker(
     }
 
     const tick = () => {
+      const activeProfile = profileRef.current
       framesSinceAttachAttemptRef.current += 1
       let graph = graphRef.current
 
@@ -855,11 +879,12 @@ export function useLivePitchTracker(
         if (canvas) {
           drawPitchCanvas(
             canvas,
-            new Float32Array(PITCH_FRAME_SIZE),
+            new Float32Array(activeProfile.frameSize),
             historyRef.current,
-            needleCentsRef.current ?? readoutRef.current.cents,
+            traceCentsRef.current ?? needleCentsRef.current ?? readoutRef.current.cents,
             readoutRef.current.noteName !== '—',
             canvasTheme,
+            activeProfile.graphSmoothWindow,
           )
         }
         tickRef.current = requestAnimationFrame(tick)
@@ -898,20 +923,38 @@ export function useLivePitchTracker(
         pushedHistoryThisFrame = true
       }
 
+      const pushTraceSample = (targetCents: number) => {
+        let traceCents = traceCentsRef.current ?? targetCents
+        const alpha = activeProfile.traceSmoothAlpha
+        traceCents = smoothFrequency(traceCents, targetCents, alpha)
+
+        const delta = targetCents - traceCents
+        const maxStep = activeProfile.traceStepLimitCents
+        if (Math.abs(delta) > maxStep) {
+          traceCents += Math.sign(delta) * maxStep
+        }
+
+        traceCentsRef.current = traceCents
+        pushHistorySample(traceCents)
+      }
+
       const clearReadoutAfterSilence = () => {
         readoutRef.current = emptyReadout
         if (mountedRef.current) setReadout(emptyReadout)
         graph.smoothed = null
         needleCentsRef.current = null
+        traceCentsRef.current = null
         lastStableCentsRef.current = null
         lastNoteRef.current = '—'
         active = false
       }
 
       if (isPlaying) {
-        const clarityMin = source === 'microphone' ? PITCH_CLARITY_MIN_MIC : PITCH_CLARITY_MIN
-        const rmsGate = source === 'microphone' ? PITCH_RMS_GATE_DB_MIC : PITCH_RMS_GATE_DB_MEDIA
-        const holdMs = source === 'microphone' ? PITCH_HOLD_MS_MIC : PITCH_HOLD_MS
+        const clarityMin =
+          source === 'microphone' ? activeProfile.clarityMinMic : activeProfile.clarityMin
+        const rmsGate =
+          source === 'microphone' ? activeProfile.rmsGateDbMic : activeProfile.rmsGateDbMedia
+        const holdMs = source === 'microphone' ? activeProfile.holdMsMic : activeProfile.holdMs
         const signalStrong = isSignalAboveRmsGate(graph.buffer, rmsGate)
 
         if (!signalStrong) {
@@ -922,7 +965,7 @@ export function useLivePitchTracker(
           ) {
             clearReadoutAfterSilence()
           } else if (readoutRef.current.noteName !== '—') {
-            currentCents = needleCentsRef.current ?? readoutRef.current.cents
+            currentCents = traceCentsRef.current ?? needleCentsRef.current ?? readoutRef.current.cents
             active = true
           }
         } else {
@@ -931,13 +974,29 @@ export function useLivePitchTracker(
             graph.context.sampleRate,
           )
 
-          const pitch = normalizeInstrumentFrequency(rawPitch)
+          const pitch = normalizeInstrumentFrequency(
+            rawPitch,
+            activeProfile.minHz,
+            activeProfile.maxHz,
+          )
 
-          if (clarity >= clarityMin && isFrequencyInInstrumentRange(pitch)) {
-            graph.smoothed = smoothFrequency(graph.smoothed, pitch)
+          if (
+            clarity >= clarityMin &&
+            isFrequencyInInstrumentRange(pitch, activeProfile.minHz, activeProfile.maxHz)
+          ) {
+            graph.smoothed = smoothFrequency(
+              graph.smoothed,
+              pitch,
+              activeProfile.smoothAlpha,
+            )
             const next = stabilizePitchReadout(
               readoutRef.current.noteName === '—' ? null : readoutRef.current,
-              frequencyToPitchReadout(graph.smoothed),
+              frequencyToPitchReadout(
+                graph.smoothed,
+                activeProfile.minHz,
+                activeProfile.maxHz,
+              ),
+              activeProfile.noteHysteresisCents,
             )
 
             if (next.noteName !== '—') {
@@ -950,7 +1009,7 @@ export function useLivePitchTracker(
                 !noteChanged &&
                 !wasIdle &&
                 lastStableCentsRef.current != null &&
-                Math.abs(next.cents - lastStableCentsRef.current) > PITCH_OUTLIER_CENTS &&
+                Math.abs(next.cents - lastStableCentsRef.current) > activeProfile.outlierCents &&
                 clarity < clarityMin + 0.06
               ) {
                 acceptFrame = false
@@ -963,18 +1022,24 @@ export function useLivePitchTracker(
               }
 
               const attackSatisfied =
-                noteChanged || goodFrameCountRef.current >= PITCH_ATTACK_FRAMES
+                noteChanged || goodFrameCountRef.current >= activeProfile.attackFrames
 
               if (acceptFrame && attackSatisfied) {
                 lastNoteRef.current = next.noteName
 
-                if (noteChanged || needleCentsRef.current == null) {
+                if (needleCentsRef.current == null) {
                   needleCentsRef.current = next.cents
+                } else if (noteChanged) {
+                  needleCentsRef.current = smoothFrequency(
+                    needleCentsRef.current,
+                    next.cents,
+                    activeProfile.noteChangeSmoothAlpha,
+                  )
                 } else {
                   needleCentsRef.current = smoothFrequency(
                     needleCentsRef.current,
                     next.cents,
-                    PITCH_NEEDLE_SMOOTH_ALPHA,
+                    activeProfile.needleSmoothAlpha,
                   )
                 }
 
@@ -1000,7 +1065,7 @@ export function useLivePitchTracker(
                 lastStableCentsRef.current = intonationCents
                 currentCents = intonationCents
                 active = true
-                pushHistorySample(intonationCents)
+                pushTraceSample(intonationCents)
               }
             } else {
               goodFrameCountRef.current = 0
@@ -1013,7 +1078,7 @@ export function useLivePitchTracker(
             ) {
               clearReadoutAfterSilence()
             } else if (readoutRef.current.noteName !== '—') {
-              currentCents = needleCentsRef.current ?? readoutRef.current.cents
+              currentCents = traceCentsRef.current ?? needleCentsRef.current ?? readoutRef.current.cents
               active = true
             }
           }
@@ -1021,9 +1086,10 @@ export function useLivePitchTracker(
 
         if (continuousScroll && !pushedHistoryThisFrame) {
           pushHistorySample(PITCH_SILENCE_FLOOR_CENTS)
+          traceCentsRef.current = null
         }
       } else if (readoutRef.current.noteName !== '—') {
-        currentCents = needleCentsRef.current ?? readoutRef.current.cents
+        currentCents = traceCentsRef.current ?? needleCentsRef.current ?? readoutRef.current.cents
         active = true
       }
 
@@ -1036,6 +1102,7 @@ export function useLivePitchTracker(
           currentCents,
           active,
           canvasTheme,
+          activeProfile.graphSmoothWindow,
         )
       }
 
@@ -1050,7 +1117,18 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
     }
-  }, [canvasRef, canvasTheme, continuousScroll, enabled, isPlaying, mediaKey, persistWhenPaused, source])
+  }, [
+    canvasRef,
+    canvasTheme,
+    continuousScroll,
+    emptyReadout,
+    enabled,
+    isPlaying,
+    mediaKey,
+    persistWhenPaused,
+    source,
+    tunerInstrument,
+  ])
 
   return readout
 }

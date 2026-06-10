@@ -6,6 +6,119 @@ export const MIN_INSTRUMENT_HZ = 65
 /** Upper singing voice / violin upper range. */
 export const MAX_INSTRUMENT_HZ = 1100
 
+export type TunerInstrument = 'voice' | 'strings' | 'brass'
+
+export interface PitchTunerProfile {
+  label: string
+  description: string
+  minHz: number
+  maxHz: number
+  clarityMin: number
+  clarityMinMic: number
+  frameSize: number
+  frameSizeMic: number
+  rmsGateDbMedia: number
+  rmsGateDbMic: number
+  attackFrames: number
+  outlierCents: number
+  holdMs: number
+  holdMsMic: number
+  smoothAlpha: number
+  needleSmoothAlpha: number
+  noteChangeSmoothAlpha: number
+  graphSmoothWindow: number
+  noteHysteresisCents: number
+  /** Per-frame cap on trace vertical movement (reduces spikes). */
+  traceStepLimitCents: number
+  /** Exponential smoothing for the scrolling trace line. */
+  traceSmoothAlpha: number
+}
+
+const VOICE_TUNER_PROFILE: PitchTunerProfile = {
+  label: 'Voice',
+  description: 'Softer gate and wider range for singing and speech.',
+  minHz: 65,
+  maxHz: 1100,
+  clarityMin: 0.72,
+  clarityMinMic: 0.82,
+  frameSize: 4096,
+  frameSizeMic: 8192,
+  rmsGateDbMedia: -54,
+  rmsGateDbMic: -48,
+  attackFrames: 2,
+  outlierCents: 18,
+  holdMs: 320,
+  holdMsMic: 480,
+  smoothAlpha: 0.26,
+  needleSmoothAlpha: 0.34,
+  noteChangeSmoothAlpha: 0.48,
+  graphSmoothWindow: 5,
+  noteHysteresisCents: 28,
+  traceStepLimitCents: 7,
+  traceSmoothAlpha: 0.2,
+}
+
+const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
+  label: 'Strings',
+  description: 'Stable tracking for violin, viola, cello, and bass — resists harmonic jumps.',
+  minHz: 82,
+  maxHz: 1400,
+  clarityMin: 0.78,
+  clarityMinMic: 0.88,
+  frameSize: 8192,
+  frameSizeMic: 16384,
+  rmsGateDbMedia: -52,
+  rmsGateDbMic: -44,
+  attackFrames: 3,
+  outlierCents: 14,
+  holdMs: 380,
+  holdMsMic: 520,
+  smoothAlpha: 0.2,
+  needleSmoothAlpha: 0.28,
+  noteChangeSmoothAlpha: 0.38,
+  graphSmoothWindow: 7,
+  noteHysteresisCents: 34,
+  traceStepLimitCents: 5,
+  traceSmoothAlpha: 0.16,
+}
+
+const BRASS_TUNER_PROFILE: PitchTunerProfile = {
+  label: 'Brass',
+  description: 'Loud-signal profile for trumpet, trombone, horn, and tuba with vibrato tolerance.',
+  minHz: 58,
+  maxHz: 988,
+  clarityMin: 0.75,
+  clarityMinMic: 0.8,
+  frameSize: 4096,
+  frameSizeMic: 8192,
+  rmsGateDbMedia: -50,
+  rmsGateDbMic: -40,
+  attackFrames: 2,
+  outlierCents: 24,
+  holdMs: 340,
+  holdMsMic: 460,
+  smoothAlpha: 0.3,
+  needleSmoothAlpha: 0.4,
+  noteChangeSmoothAlpha: 0.52,
+  graphSmoothWindow: 5,
+  noteHysteresisCents: 22,
+  traceStepLimitCents: 9,
+  traceSmoothAlpha: 0.22,
+}
+
+export const TUNER_INSTRUMENTS: TunerInstrument[] = ['voice', 'strings', 'brass']
+
+export function getTunerProfile(instrument: TunerInstrument): PitchTunerProfile {
+  switch (instrument) {
+    case 'strings':
+      return STRINGS_TUNER_PROFILE
+    case 'brass':
+      return BRASS_TUNER_PROFILE
+    default:
+      return VOICE_TUNER_PROFILE
+  }
+}
+
 /** McLeod pitch method clarity gate (0–1). */
 export const PITCH_CLARITY_MIN = 0.74
 

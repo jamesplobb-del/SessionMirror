@@ -1,3 +1,5 @@
+import type { TunerInstrument } from './pitchConfig'
+
 export interface AppSettings {
   /** Audio mode: auto-start/stop recording from mic levels. */
   autoSoundRecording: boolean
@@ -11,6 +13,8 @@ export interface AppSettings {
   pitchTrackerEnabled: boolean
   /** Audio mode idle: listen to the mic for a live tuner when playback is paused. */
   liveMicTunerEnabled: boolean
+  /** Pitch detection profile — voice, strings, or brass. */
+  tunerInstrument: TunerInstrument
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -20,6 +24,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   hapticFeedback: true,
   pitchTrackerEnabled: true,
   liveMicTunerEnabled: true,
+  tunerInstrument: 'voice',
+}
+
+function parseTunerInstrument(value: unknown): TunerInstrument {
+  if (value === 'strings' || value === 'brass' || value === 'voice') {
+    return value
+  }
+  return DEFAULT_APP_SETTINGS.tunerInstrument
 }
 
 const STORAGE_KEY = 'sessionmirror:settings'
@@ -58,6 +70,7 @@ export function loadAppSettings(): AppSettings {
         parsed.liveMicTunerEnabled !== undefined
           ? Boolean(parsed.liveMicTunerEnabled)
           : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
+      tunerInstrument: parseTunerInstrument(parsed.tunerInstrument),
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

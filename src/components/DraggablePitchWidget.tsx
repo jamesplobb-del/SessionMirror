@@ -17,6 +17,7 @@ interface DraggablePitchWidgetProps extends TunerProps {
   layoutRegion?: 'main' | 'review'
   /** Forces layout remeasure when the host surface opens or media changes. */
   layoutKey?: string
+  tunerInstrument?: TunerProps['tunerInstrument']
 }
 
 const VIDEO_WIDGET_WIDTH = 'min(calc(100vw - 1.5rem), 18rem)'
@@ -62,6 +63,7 @@ export default function DraggablePitchWidget({
   micStreamRef,
   layoutRegion = 'main',
   layoutKey = '',
+  tunerInstrument = 'voice',
   ...tunerProps
 }: DraggablePitchWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -113,6 +115,7 @@ export default function DraggablePitchWidget({
       mediaKey={mediaKey}
       liveMicEnabled={liveMicEnabled}
       micStreamRef={micStreamRef}
+      tunerInstrument={tunerInstrument}
       persistWhenPaused={!isAudioMode}
       {...tunerProps}
     />
