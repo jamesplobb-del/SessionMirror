@@ -41,6 +41,8 @@ function releaseHealSlot(): void {
 
 export interface ThumbnailCaptureOptions {
   filePath?: string
+  /** Pre-resolved playback URL — skips an extra Filesystem.getUri round-trip when known. */
+  videoUrl?: string
   /** Match in-app mirrored playback in take cards. */
   mirrorPreview?: boolean
   recordingOrientation?: RecordingOrientation
