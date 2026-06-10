@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { type ReactNode } from 'react'
-import { iosSpring } from '../../utils/motionPresets'
+import { iosEaseOut } from '../../utils/motionPresets'
 
 interface AnimatedExpandProps {
   open: boolean
@@ -8,17 +8,17 @@ interface AnimatedExpandProps {
   className?: string
 }
 
-/** iOS-style height expand/collapse for nested settings sections. */
+/** Lightweight expand — opacity + slide only (no height layout thrash). */
 export default function AnimatedExpand({ open, children, className = '' }: AnimatedExpandProps) {
   return (
     <AnimatePresence initial={false}>
       {open && (
         <motion.div
-          className={`overflow-hidden ${className}`}
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={iosSpring}
+          className={className}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={iosEaseOut}
         >
           {children}
         </motion.div>

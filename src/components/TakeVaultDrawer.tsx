@@ -10,7 +10,6 @@ import { resetVideosInContainer, teardownVideosInContainer } from '../utils/vide
 import ProjectSessionBar from './ProjectSessionBar'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { getTakeMediaType } from '../utils/mediaType'
-import { agentDebugLog } from '../utils/agentDebugLog'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
 import type { Project } from '../db/types'
 
@@ -90,24 +89,8 @@ export default function TakeVaultDrawer({
       teardownVideosInContainer(drawerRef.current)
       setSelectionMode(false)
       setSelectedIds(new Set())
-      return
     }
-
-    // #region agent log
-    agentDebugLog(
-      'TakeVaultDrawer.tsx:open',
-      'vault opened',
-      {
-        takeCount: takes.length,
-        videoCount,
-        audioCount,
-        filteredCount: filteredTakes.length,
-        vaultMediaTab,
-      },
-      'H-V5',
-    )
-    // #endregion
-  }, [isOpen, takes.length, videoCount, audioCount, filteredTakes.length, vaultMediaTab])
+  }, [isOpen])
 
   useEffect(() => {
     teardownVideosInContainer(drawerRef.current)
@@ -202,17 +185,13 @@ export default function TakeVaultDrawer({
       return
     }
 
-    teardownVideosInContainer(drawerRef.current)
-    silenceAllVaultVideos()
     onClearAllTakes()
     exitSelectionMode()
-  }, [
-    activeProject?.name,
-    exitSelectionMode,
-    onClearAllTakes,
-    silenceAllVaultVideos,
-    takes.length,
-  ])
+
+    window.requestAnimationFrame(() => {
+      teardownVideosInContainer(drawerRef.current)
+    })
+  }, [activeProject?.name, exitSelectionMode, onClearAllTakes, takes.length])
 
   useEffect(() => {
     return () => {
@@ -227,7 +206,7 @@ export default function TakeVaultDrawer({
       ariaLabel="Take Vault"
       maxHeightClass="h-[min(75vh,100dvh)]"
       sheetRef={drawerRef}
-      motionPreset="light"
+      motionPreset="premium"
     >
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
@@ -329,7 +308,7 @@ export default function TakeVaultDrawer({
                       </Pressable>
                     )}
                   </div>
-                  <div className="flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
+                  <div className="vault-card-strip flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
                     {filteredTakes.map((take) => (
                       <TakeCard
                         key={take.id}

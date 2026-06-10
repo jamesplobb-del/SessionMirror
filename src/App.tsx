@@ -39,7 +39,8 @@ import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime, isAudioTake } from './uti
 import { scheduleViewportSync } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
-import { agentDebugLog } from './utils/agentDebugLog'
+import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
+import { iosHudDim } from './utils/motionPresets'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
   createProject,
@@ -101,6 +102,11 @@ export default function App() {
   activeProjectIdRef.current = activeProjectId
 
   const isReviewOpen = reviewSlot !== null
+  const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
+    ? 'review'
+    : isVaultOpen || isSettingsOpen
+      ? 'sheet'
+      : 'idle'
 
   useLayoutEffect(() => {
     return scheduleViewportSync(() => {})
@@ -579,52 +585,54 @@ export default function App() {
     wasVaultOpenRef.current = isVaultOpen
   }, [isVaultOpen, refreshCameraSession])
 
+  const deferHudMediaPause = useCallback(() => {
+    scheduleAfterPaint(() => {
+      stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
+      pausePipVideos()
+    })
+  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+
   const handleCloseVault = useCallback(() => {
     setIsVaultOpen(false)
   }, [])
 
   const handleOpenVault = useCallback(() => {
-    stopAutoPlaybackAudio()
-    releaseAutoRecordSuppress(0)
-    pausePipVideos()
     setIsSettingsOpen(false)
     setIsVaultOpen(true)
-  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+    deferHudMediaPause()
+  }, [deferHudMediaPause])
 
   useEffect(() => {
     if (!isVaultOpen) return
 
-    const missingThumbnails = takesRef.current.filter(
-      (take) => !take.thumbnailUrl && !isAudioTake(take),
-    )
-    if (missingThumbnails.length === 0) return
+    let cancelled = false
+    const cancelSchedule = scheduleIdle(() => {
+      if (cancelled) return
 
-    // #region agent log
-    agentDebugLog(
-      'App.tsx:vaultHydrateEffect',
-      'vault thumbnail hydrate scheduled',
-      { missingCount: missingThumbnails.length, takeCount: takesRef.current.length },
-      'H-V8',
-    )
-    // #endregion
+      const missingThumbnails = takesRef.current.filter(
+        (take) => !take.thumbnailUrl && !isAudioTake(take),
+      )
+      if (missingThumbnails.length === 0) return
 
-    const hydrateToken = ++thumbnailHydrateRef.current
-    void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(() => {
-      if (hydrateToken !== thumbnailHydrateRef.current) return
-    })
+      const hydrateToken = ++thumbnailHydrateRef.current
+      void hydrateTakeThumbnailsInBackground(missingThumbnails, applyTakeThumbnails).then(() => {
+        if (hydrateToken !== thumbnailHydrateRef.current) return
+      })
+    }, 140)
 
     return () => {
+      cancelled = true
+      cancelSchedule()
       thumbnailHydrateRef.current += 1
     }
   }, [applyTakeThumbnails, isVaultOpen])
 
   const handleOpenSettings = useCallback(() => {
-    stopAutoPlaybackAudio()
-    releaseAutoRecordSuppress(0)
-    pausePipVideos()
     setIsVaultOpen(false)
     setIsSettingsOpen(true)
-  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+    deferHudMediaPause()
+  }, [deferHudMediaPause])
 
   const handleCloseSettings = useCallback(() => {
     setIsSettingsOpen(false)
@@ -800,27 +808,23 @@ export default function App() {
 
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
-      stopAutoPlaybackAudio()
-      releaseAutoRecordSuppress(0)
-      pausePipVideos()
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
       setVaultReviewIndex(index >= 0 ? index : 0)
       setReviewContext('vault')
       setReviewSlot('benchmark')
       setIsVaultOpen(false)
+      deferHudMediaPause()
     },
-    [pausePipVideos, releaseAutoRecordSuppress, sortedTakes, stopAutoPlaybackAudio],
+    [deferHudMediaPause, sortedTakes],
   )
 
   const handleOpenCompareReview = useCallback(
     (slot: ReviewSlot) => {
-      stopAutoPlaybackAudio()
-      releaseAutoRecordSuppress(0)
-      pausePipVideos()
       setReviewContext('compare')
       setReviewSlot(slot)
+      deferHudMediaPause()
     },
-    [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio],
+    [deferHudMediaPause],
   )
 
   const handleCloseReview = useCallback(() => {
@@ -969,12 +973,19 @@ export default function App() {
     setChallengerId(null)
 
     void (async () => {
-      await deleteTakesByProject(projectId)
-      for (const take of takesToRemove) {
-        removeTakeResources(take)
-      }
+      await Promise.all([
+        deleteTakesByProject(projectId),
+        ...takesToRemove.map(async (take) => {
+          await deleteCachedTakeThumbnail(take.id)
+          if (take.filePath) {
+            await deleteTakeFile(take.filePath)
+          } else if (take.videoUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(take.videoUrl)
+          }
+        }),
+      ])
     })()
-  }, [releaseAutoRecordSuppress, removeTakeResources, stopAutoPlaybackAudio, takes])
+  }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio, takes])
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
@@ -1088,9 +1099,15 @@ export default function App() {
         </AnimatePresence>
       )}
 
-      <div
-        className={`app-ui-overlay ${isReviewOpen ? 'pointer-events-none invisible' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
-        aria-hidden={isReviewOpen}
+      <motion.div
+        className={`app-ui-overlay ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
+        aria-hidden={hudModalState === 'review'}
+        animate={{
+          opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
+          scale: hudModalState === 'review' ? 0.94 : hudModalState === 'sheet' ? 0.985 : 1,
+        }}
+        transition={iosHudDim}
+        style={{ pointerEvents: hudModalState !== 'idle' ? 'none' : undefined }}
       >
         <HudHeader
           sessionName={activeProject?.name ?? 'BestTake'}
@@ -1107,7 +1124,7 @@ export default function App() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
-                transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+                transition={iosHudDim}
               >
                 <PipCompareRow
                   benchmarkTake={benchmarkTake}
@@ -1157,10 +1174,12 @@ export default function App() {
             onBranchOpenChange={setQuickSettingsOpen}
           />
         </div>
-      </div>
+      </motion.div>
 
+      <AnimatePresence>
       {isReviewOpen && (
         <ReviewModeOverlay
+          key="review-mode"
           context={reviewContext}
           activeSlot={reviewSlot ?? 'benchmark'}
           vaultTakes={sortedTakes}
@@ -1195,6 +1214,7 @@ export default function App() {
           onSlotChange={handleReviewSlotChange}
         />
       )}
+      </AnimatePresence>
 
       <TakeVaultDrawer
         isOpen={isVaultOpen}

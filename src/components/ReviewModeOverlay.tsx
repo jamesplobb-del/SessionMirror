@@ -5,7 +5,7 @@ import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import Pressable from './ui/Pressable'
-import { iosEaseOut } from '../utils/motionPresets'
+import { iosEaseOut, iosScreenEnter, iosScreenExit } from '../utils/motionPresets'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
@@ -685,13 +685,25 @@ export default function ReviewModeOverlay({
 
   return (
     <motion.div
-      className="review-overlay review-overlay--immersive fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden"
-      initial={false}
-      animate={{
-        opacity: isOpen ? 1 : 0,
-        scale: isOpen ? 1 : 0.985,
+      className="review-overlay review-overlay--immersive fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden transform-gpu"
+      variants={{
+        initial: { opacity: 0, scale: 0.96, y: 10 },
+        animate: {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          transition: iosScreenEnter,
+        },
+        exit: {
+          opacity: 0,
+          scale: 0.98,
+          y: 6,
+          transition: iosScreenExit,
+        },
       }}
-      transition={iosEaseOut}
+      initial="initial"
+      animate="animate"
+      exit="exit"
       style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
       aria-hidden={!isOpen}
     >

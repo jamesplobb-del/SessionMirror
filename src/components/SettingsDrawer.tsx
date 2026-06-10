@@ -33,10 +33,10 @@ function SettingToggle({
 }) {
   return (
     <motion.label
-      layout
       className={`flex items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-3.5 ${
         disabled ? 'opacity-50' : 'cursor-pointer'
       }`}
+      whileTap={disabled ? undefined : { scale: 0.995 }}
       transition={iosSpringSnappy}
     >
       <div className="min-w-0 flex-1">
@@ -156,7 +156,7 @@ export default function SettingsDrawer({
   recordingMode,
 }: SettingsDrawerProps) {
   return (
-    <AnimatedBottomSheet isOpen={isOpen} onClose={onClose} ariaLabel="Settings">
+    <AnimatedBottomSheet isOpen={isOpen} onClose={onClose} ariaLabel="Settings" motionPreset="premium">
       <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
         <div>
           <h2 className="text-base font-semibold text-stone-900">Settings</h2>

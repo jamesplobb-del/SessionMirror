@@ -314,7 +314,7 @@ function PipWindow({
             onUnpin()
           }}
           className={FLOAT_BADGE}
-          style={{ bottom: -12, left: -12 }}
+          style={{ top: -12, right: -12 }}
           aria-label={`Unload ${label}`}
         >
           <X className="h-3 w-3" />

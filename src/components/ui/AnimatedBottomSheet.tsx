@@ -1,7 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { iosFade, iosSpringSheet } from '../../utils/motionPresets'
+import {
+  iosFade,
+  iosSheetBackdrop,
+  iosSheetPremium,
+  iosSpringSheet,
+} from '../../utils/motionPresets'
 import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
 
 function readSlideDistance(): number {
@@ -16,8 +21,8 @@ interface AnimatedBottomSheetProps {
   children: ReactNode
   maxHeightClass?: string
   sheetRef?: RefObject<HTMLDivElement | null>
-  /** Lighter sheet motion for performance-sensitive surfaces like the vault. */
-  motionPreset?: 'default' | 'light'
+  /** Sheet motion profile — premium uses eased slide + subtle scale. */
+  motionPreset?: 'default' | 'light' | 'premium'
 }
 
 export default function AnimatedBottomSheet({
@@ -27,7 +32,7 @@ export default function AnimatedBottomSheet({
   children,
   maxHeightClass = 'max-h-[min(88vh,100dvh)]',
   sheetRef,
-  motionPreset = 'default',
+  motionPreset = 'premium',
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSlideDistance)
 
@@ -47,11 +52,18 @@ export default function AnimatedBottomSheet({
   if (typeof document === 'undefined') return null
 
   const sheetTransition =
-    motionPreset === 'light'
-      ? { duration: 0.28, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] }
-      : iosSpringSheet
+    motionPreset === 'default'
+      ? iosSpringSheet
+      : motionPreset === 'light'
+        ? { duration: 0.28, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] }
+        : iosSheetPremium
   const backdropTransition =
-    motionPreset === 'light' ? { duration: 0.2, ease: 'easeOut' as const } : iosFade
+    motionPreset === 'default'
+      ? iosFade
+      : motionPreset === 'light'
+        ? { duration: 0.2, ease: 'easeOut' as const }
+        : iosSheetBackdrop
+  const useScale = motionPreset !== 'light'
 
   return createPortal(
     <AnimatePresence>
@@ -59,7 +71,7 @@ export default function AnimatedBottomSheet({
         <>
           <motion.button
             type="button"
-            className="fixed inset-0 z-40 cursor-default bg-black/50 touch-none"
+            className="fixed inset-0 z-40 cursor-default touch-none bg-black/55"
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -70,14 +82,14 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             ref={sheetRef}
-            className={`fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl will-change-transform`}
+            className={`fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transform-gpu`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-            initial={{ y: slideDistance }}
-            animate={{ y: 0 }}
-            exit={{ y: slideDistance }}
+            initial={useScale ? { y: slideDistance, scale: 0.975 } : { y: slideDistance }}
+            animate={useScale ? { y: 0, scale: 1 } : { y: 0 }}
+            exit={useScale ? { y: slideDistance, scale: 0.985 } : { y: slideDistance }}
             transition={sheetTransition}
           >
             <div className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden">

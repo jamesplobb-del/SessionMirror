@@ -124,7 +124,7 @@ export default function RecordingModeCarousel({
 
   return (
     <div
-      className={`record-carousel-viewport ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+      className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
       role="group"
       aria-label="Recording mode"
       onTouchStart={handleTouchStart}
