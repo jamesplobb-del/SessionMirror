@@ -24,7 +24,6 @@ function LiveCameraBackground({
   recordingMode,
   isRecording,
   previewLive = false,
-  viewportKey,
   pitchStageActive = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'

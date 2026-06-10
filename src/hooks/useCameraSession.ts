@@ -28,6 +28,7 @@ import {
 } from '../utils/recordingStream'
 import {
   applyViewportCssVars,
+  applyViewportCssVarsOnResume,
   refreshCameraPreviewLayout,
 } from '../utils/viewportSync'
 
