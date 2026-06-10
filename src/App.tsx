@@ -588,7 +588,7 @@ export default function App() {
     [takes, challengerId],
   )
 
-  const mainPitchSource = useMemo(() => {
+  const mainAudioPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'audio') return null
     if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
 
@@ -652,11 +652,31 @@ export default function App() {
     ready,
   ])
 
-  const showMainPitchWidget = mainPitchSource !== null
+  const mainVideoPitchSource = useMemo(() => {
+    if (!settings.pitchTrackerEnabled || recordingMode !== 'video') return null
+    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
+    if (!ready) return null
+
+    return {
+      mediaRef: liveMicPlaceholderRef,
+      isPlaying: true,
+      mediaKey: `main-video-live-${streamGeneration}`,
+    }
+  }, [
+    settings.pitchTrackerEnabled,
+    recordingMode,
+    isReviewOpen,
+    isVaultOpen,
+    isSettingsOpen,
+    streamGeneration,
+    ready,
+  ])
+
+  const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
 
   useEffect(() => {
     setShowPitch(true)
-  }, [mainPitchSource?.mediaKey, recordingMode])
+  }, [mainAudioPitchSource?.mediaKey, mainVideoPitchSource?.mediaKey, recordingMode])
 
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),
@@ -934,25 +954,43 @@ export default function App() {
         isRecording={isRecording}
         previewLive={ready}
         viewportKey={windowHeight}
-        pitchStageActive={showMainPitchWidget}
+        pitchStageActive={mainAudioPitchSource !== null && showPitch}
       />
 
-      {showMainPitchWidget && mainPitchSource && (
+      {showMainPitchWidget && (
         <AnimatePresence>
-          {showPitch && (
+          {showPitch && mainAudioPitchSource && (
             <DraggablePitchWidget
               boundaryRef={appShellRef}
               defaultBottomOffset={200}
-              mediaRef={mainPitchSource.mediaRef}
+              mediaRef={mainAudioPitchSource.mediaRef}
               enabled={settings.pitchTrackerEnabled}
-              isPlaying={mainPitchSource.isPlaying}
-              mediaKey={mainPitchSource.mediaKey}
-              takeName={mainPitchSource.take?.name}
-              label={mainPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
+              isPlaying={mainAudioPitchSource.isPlaying}
+              mediaKey={mainAudioPitchSource.mediaKey}
+              takeName={mainAudioPitchSource.take?.name}
+              label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
               isAudioMode
               liveMicEnabled={settings.liveMicTunerEnabled}
               micStreamRef={streamRef}
               layoutRegion="main"
+              layoutKey={`audio-${recordingMode}-${streamGeneration}`}
+              tunerInstrument={settings.tunerInstrument}
+              onClose={() => setShowPitch(false)}
+            />
+          )}
+          {showPitch && mainVideoPitchSource && (
+            <DraggablePitchWidget
+              boundaryRef={appShellRef}
+              defaultBottomOffset={200}
+              mediaRef={mainVideoPitchSource.mediaRef}
+              enabled={settings.pitchTrackerEnabled}
+              isPlaying={mainVideoPitchSource.isPlaying}
+              mediaKey={mainVideoPitchSource.mediaKey}
+              label="Live Pitch"
+              pitchSource="microphone"
+              micStreamRef={streamRef}
+              layoutRegion="main"
+              layoutKey={`video-${recordingMode}-${streamGeneration}`}
               tunerInstrument={settings.tunerInstrument}
               onClose={() => setShowPitch(false)}
             />

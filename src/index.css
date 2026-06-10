@@ -1014,8 +1014,7 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .pitch-widget-chart {
-  height: 140px;
-  min-height: 140px;
+  min-height: 3.5rem;
 }
 
 .pitch-widget-hint {
@@ -1113,8 +1112,13 @@ video.camera-preview.camera-preview--hidden {
 
 .pitch-widget-draggable {
   cursor: grab;
-  max-width: min(calc(100vw - 1.5rem), 18rem);
+  max-width: min(calc(100vw - 1.5rem), 22.5rem);
+  container-type: size;
   filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.24));
+}
+
+.pitch-widget-draggable--pinching {
+  cursor: grabbing;
 }
 
 .pitch-widget-draggable:active {

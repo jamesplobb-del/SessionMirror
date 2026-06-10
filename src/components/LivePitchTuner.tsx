@@ -26,6 +26,8 @@ interface LivePitchTunerProps {
   micStreamRef?: RefObject<MediaStream | null>
   persistWhenPaused?: boolean
   tunerInstrument?: TunerInstrument
+  /** Widget-only: analyze live mic instead of media element. */
+  pitchSource?: 'media' | 'microphone'
 }
 
 function PitchChartCanvas({
@@ -545,6 +547,7 @@ export default function LivePitchTuner({
   micStreamRef,
   persistWhenPaused = false,
   tunerInstrument = 'voice',
+  pitchSource = 'media',
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -553,17 +556,21 @@ export default function LivePitchTuner({
   const canvasTheme = isPanel || isWidget || isAudio ? 'glass' : 'solid'
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const widgetContinuousScroll = isWidget && persistWhenPaused
+  const liveMicWidget = isWidget && pitchSource === 'microphone'
+  const trackerActive = enabled && !isAudio
+  const trackerPlaying = liveMicWidget ? trackerActive : isPlaying
   const { readout, inTuneGlow: _inTuneGlow } = useLivePitchTracker(
     mediaRef,
-    enabled && !isAudio,
-    isPlaying,
+    trackerActive,
+    trackerPlaying,
     mediaKey,
     canvasRef,
     canvasTheme,
     {
-      source: 'media',
+      source: liveMicWidget ? 'microphone' : 'media',
+      micStreamRef: liveMicWidget ? micStreamRef : undefined,
       persistWhenPaused: widgetContinuousScroll,
-      continuousScroll: widgetContinuousScroll,
+      continuousScroll: liveMicWidget || widgetContinuousScroll,
       tunerInstrument,
     },
   )
@@ -595,37 +602,31 @@ export default function LivePitchTuner({
 
   if (isWidget) {
     return (
-      <div
-        className="pitch-tuner pitch-tuner--widget h-full w-full"
-        style={{ height: 188, minHeight: 188 }}
-      >
-        <div
-          className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget flex w-full flex-col overflow-hidden"
-          style={{ height: 188, minHeight: 188 }}
-        >
+      <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col">
+        <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget flex h-full min-h-0 w-full flex-col overflow-hidden">
           <div className="pitch-widget-chrome flex shrink-0 items-start justify-between gap-3 px-3.5 pt-3 pb-1 pr-10">
             <p
-              className="pitch-readout-display text-base font-bold leading-none tracking-tight"
+              className="pitch-readout-display text-[clamp(0.875rem,4.5cqw,1rem)] font-bold leading-none tracking-tight"
               style={{ color: accent }}
             >
               {readout.noteName}
               {active && (
-                <span className="ml-1.5 text-sm font-semibold">
+                <span className="ml-1.5 text-[clamp(0.75rem,3.8cqw,0.875rem)] font-semibold">
                   {active ? formatDisplayCents(readout.cents) : '—'}
                 </span>
               )}
             </p>
             <p
-              className="pitch-readout-display shrink-0 text-xs font-semibold"
+              className="pitch-readout-display shrink-0 text-[clamp(0.6875rem,3.2cqw,0.75rem)] font-semibold"
               style={{ color: accent }}
             >
               {formatFrequencyHz(readout.frequencyHz)}
             </p>
           </div>
 
-          <div className="pitch-widget-chart relative shrink-0 overflow-hidden px-3.5 pb-3">
-            <PitchChartCanvas canvasRef={canvasRef} glass />
-            {!widgetContinuousScroll && !isPlaying && (
+          <div className="pitch-widget-chart relative min-h-0 flex-1 overflow-hidden px-3.5 pb-3">
+            <PitchChartCanvas canvasRef={canvasRef} glass fill />
+            {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
               <p className="pitch-widget-hint pointer-events-none absolute inset-x-3 bottom-2 text-center">
                 Pitch trace during playback
               </p>
