@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { Pause, Play, X } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
@@ -182,6 +183,7 @@ export default function ReviewModeOverlay({
   const [showPlayOverlay, setShowPlayOverlay] = useState(true)
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
+  const [showPitch, setShowPitch] = useState(true)
 
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
@@ -386,6 +388,12 @@ export default function ReviewModeOverlay({
       : activeSlot === 'benchmark'
         ? hasBenchmark
         : hasChallenger)
+
+  useEffect(() => {
+    if (isOpen) {
+      setShowPitch(true)
+    }
+  }, [activePitchMediaKey, isOpen])
 
   useEffect(() => {
     reviewAutoplayEnabledRef.current = isOpen
@@ -801,16 +809,21 @@ export default function ReviewModeOverlay({
         )}
 
         {showPitchPanel && (
-          <DraggablePitchWidget
-            boundaryRef={reviewBoundsRef}
-            defaultBottomOffset={120}
-            mediaRef={activePitchMediaRef}
-            enabled={pitchTrackerEnabled}
-            isPlaying={isPlaying}
-            mediaKey={activePitchMediaKey}
-            takeName={activeName}
-            label="Pitch Analysis"
-          />
+          <AnimatePresence>
+            {showPitch && (
+              <DraggablePitchWidget
+                boundaryRef={reviewBoundsRef}
+                defaultBottomOffset={120}
+                mediaRef={activePitchMediaRef}
+                enabled={pitchTrackerEnabled}
+                isPlaying={isPlaying}
+                mediaKey={activePitchMediaKey}
+                takeName={activeName}
+                label="Pitch Analysis"
+                onClose={() => setShowPitch(false)}
+              />
+            )}
+          </AnimatePresence>
         )}
 
         {isOpen && (
@@ -823,6 +836,9 @@ export default function ReviewModeOverlay({
               onScrubStart={handleScrubStart}
               onScrub={scrubToClientX}
               onScrubEnd={handleScrubEnd}
+              pitchToggleVisible={showPitchPanel}
+              pitchToggleActive={showPitch}
+              onPitchToggle={() => setShowPitch((prev) => !prev)}
             />
           </div>
         )}

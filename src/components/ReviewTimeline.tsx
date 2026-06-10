@@ -1,3 +1,4 @@
+import { AudioLines } from 'lucide-react'
 import type { RefObject } from 'react'
 import { formatTime } from '../hooks/useVideoPlayback'
 
@@ -9,6 +10,9 @@ interface ReviewTimelineProps {
   onScrubStart: () => void
   onScrub: (clientX: number) => void
   onScrubEnd: () => void
+  pitchToggleVisible?: boolean
+  pitchToggleActive?: boolean
+  onPitchToggle?: () => void
 }
 
 export default function ReviewTimeline({
@@ -19,6 +23,9 @@ export default function ReviewTimeline({
   onScrubStart,
   onScrub,
   onScrubEnd,
+  pitchToggleVisible = false,
+  pitchToggleActive = false,
+  onPitchToggle,
 }: ReviewTimelineProps) {
   const percent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0
 
@@ -86,6 +93,27 @@ export default function ReviewTimeline({
         <span className="text-[11px] font-medium tracking-tight text-white/70">
           {formatTime(currentTime)}
         </span>
+
+        {pitchToggleVisible && onPitchToggle && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onPitchToggle()
+            }}
+            className={`flex h-7 items-center gap-1 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+              pitchToggleActive
+                ? 'border-sky-400/40 bg-sky-500/25 text-sky-100'
+                : 'border-white/15 bg-white/10 text-white/65 hover:bg-white/15 hover:text-white/85'
+            }`}
+            aria-label={pitchToggleActive ? 'Hide pitch tuner' : 'Show pitch tuner'}
+            aria-pressed={pitchToggleActive}
+          >
+            <AudioLines className="h-3.5 w-3.5" strokeWidth={2.25} />
+            Pitch
+          </button>
+        )}
+
         <span className="text-[11px] font-medium tracking-tight text-white/45">
           {formatTime(duration)}
         </span>

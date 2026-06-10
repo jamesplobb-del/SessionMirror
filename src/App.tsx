@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { Capacitor } from '@capacitor/core'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
@@ -91,6 +92,7 @@ export default function App() {
   const [autoPlaybackPlaying, setAutoPlaybackPlaying] = useState(false)
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
+  const [showPitch, setShowPitch] = useState(true)
   const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
@@ -622,6 +624,10 @@ export default function App() {
 
   const showMainPitchWidget = mainPitchSource !== null
 
+  useEffect(() => {
+    setShowPitch(true)
+  }, [mainPitchSource?.mediaKey])
+
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),
     [takes, sortMode],
@@ -900,16 +906,21 @@ export default function App() {
       />
 
       {showMainPitchWidget && mainPitchSource && (
-        <DraggablePitchWidget
-          boundaryRef={appShellRef}
-          defaultBottomOffset={200}
-          mediaRef={mainPitchSource.mediaRef}
-          enabled={settings.pitchTrackerEnabled}
-          isPlaying={mainPitchSource.isPlaying}
-          mediaKey={mainPitchSource.mediaKey}
-          takeName={mainPitchSource.take.name}
-          label="Live Pitch"
-        />
+        <AnimatePresence>
+          {showPitch && (
+            <DraggablePitchWidget
+              boundaryRef={appShellRef}
+              defaultBottomOffset={200}
+              mediaRef={mainPitchSource.mediaRef}
+              enabled={settings.pitchTrackerEnabled}
+              isPlaying={mainPitchSource.isPlaying}
+              mediaKey={mainPitchSource.mediaKey}
+              takeName={mainPitchSource.take.name}
+              label="Live Pitch"
+              onClose={() => setShowPitch(false)}
+            />
+          )}
+        </AnimatePresence>
       )}
 
       <div
@@ -956,6 +967,9 @@ export default function App() {
             recordDropRef={recordDeleteDropRef}
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
+            pitchToggleVisible={showMainPitchWidget}
+            pitchToggleActive={showPitch}
+            onPitchToggle={() => setShowPitch((prev) => !prev)}
           />
         </div>
       </div>

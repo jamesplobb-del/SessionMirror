@@ -1,4 +1,4 @@
-import { FolderOpen, Settings, Trash2 } from 'lucide-react'
+import { AudioLines, FolderOpen, Settings, Trash2 } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { RecordingMode } from '../types'
 import RecordingModeCarousel from './RecordingModeCarousel'
@@ -17,6 +17,9 @@ interface ControlDeckProps {
   recordDropRef?: RefObject<HTMLDivElement | null>
   dragDeleteActive?: boolean
   dragOverDelete?: boolean
+  pitchToggleVisible?: boolean
+  pitchToggleActive?: boolean
+  onPitchToggle?: () => void
 }
 
 function formatElapsed(seconds: number): string {
@@ -39,6 +42,9 @@ export default function ControlDeck({
   recordDropRef,
   dragDeleteActive = false,
   dragOverDelete = false,
+  pitchToggleVisible = false,
+  pitchToggleActive = false,
+  onPitchToggle,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
 
@@ -58,6 +64,22 @@ export default function ControlDeck({
             </span>
           )}
         </button>
+
+        {pitchToggleVisible && onPitchToggle && (
+          <button
+            type="button"
+            onClick={onPitchToggle}
+            className={`absolute right-12 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition ${
+              pitchToggleActive
+                ? 'bg-sky-500/30 text-sky-100 ring-1 ring-sky-400/35'
+                : 'bg-black/40 text-white/90 hover:bg-black/55'
+            }`}
+            aria-label={pitchToggleActive ? 'Hide pitch tuner' : 'Show pitch tuner'}
+            aria-pressed={pitchToggleActive}
+          >
+            <AudioLines className="h-5 w-5" strokeWidth={2.25} />
+          </button>
+        )}
 
         <button
           type="button"
