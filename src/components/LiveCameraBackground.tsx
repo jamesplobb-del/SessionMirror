@@ -44,7 +44,7 @@ function LiveCameraBackground({
     } else if (video.paused) {
       void video.play().catch(() => {})
     }
-  }, [previewRef, streamRef, recordingMode, isAudioMode])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode])
 
   return (
     <div className="camera-background" aria-hidden>
