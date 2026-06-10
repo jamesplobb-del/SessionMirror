@@ -266,7 +266,44 @@ body.settings-branch-open * {
   }
 }
 
-/* Physical tilt — UI rotates inside portrait-locked WebView (native camera app pattern). */
+/* Portrait-locked shell — controls stay put; icons spin like native Camera/Dolby. */
+:root {
+  --ui-orient-rotate: 0deg;
+}
+
+html.physical-landscape-left {
+  --ui-orient-rotate: 90deg;
+}
+
+html.physical-landscape-right {
+  --ui-orient-rotate: -90deg;
+}
+
+.ui-orient-spin {
+  transform: rotate(var(--ui-orient-rotate));
+  transform-origin: center center;
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+html.physical-landscape-left .app-ui-overlay > header,
+html.physical-landscape-right .app-ui-overlay > header,
+html.physical-landscape-left .app-pip-row-wrap,
+html.physical-landscape-right .app-pip-row-wrap,
+html.physical-landscape-left .control-deck,
+html.physical-landscape-right .control-deck,
+html.physical-landscape-left .ui-orient-spin,
+html.physical-landscape-right .ui-orient-spin,
+html.physical-landscape-left .settings-branch-wheel,
+html.physical-landscape-right .settings-branch-wheel,
+html.physical-landscape-left .review-overlay-header,
+html.physical-landscape-right .review-overlay-header,
+html.physical-landscape-left .review-bottom-ui,
+html.physical-landscape-right .review-bottom-ui {
+  transform: rotate(var(--ui-orient-rotate));
+  transform-origin: center center;
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 .app-ui-rotator {
   position: fixed;
   inset: 0;
@@ -283,64 +320,6 @@ body.settings-branch-open * {
 .app-ui-rotator textarea,
 .app-ui-rotator select {
   pointer-events: auto;
-}
-
-.app-ui-rotator--landscape-left,
-.app-ui-rotator--landscape-right {
-  top: 50%;
-  left: 50%;
-  width: 100vh;
-  height: 100vw;
-  max-width: none;
-  max-height: none;
-  inset: auto;
-  transform-origin: center center;
-}
-
-.app-ui-rotator--landscape-left {
-  transform: translate(-50%, -50%) rotate(-90deg);
-}
-
-.app-ui-rotator--landscape-right {
-  transform: translate(-50%, -50%) rotate(90deg);
-}
-
-.app-ui-rotator--landscape-left .app-hud-bottom,
-.app-ui-rotator--landscape-right .app-hud-bottom {
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-}
-
-.app-ui-rotator--landscape-left .app-pip-row,
-.app-ui-rotator--landscape-right .app-pip-row {
-  flex: 0 1 auto;
-  justify-content: space-between;
-  padding: 0 16px;
-  gap: 1.5rem;
-  overflow: visible;
-}
-
-.app-ui-rotator--landscape-left .app-pip-row > *,
-.app-ui-rotator--landscape-right .app-pip-row > * {
-  min-width: 9rem;
-  max-width: 30vw;
-  overflow: visible;
-}
-
-.app-ui-rotator--landscape-left .app-ui-overlay,
-.app-ui-rotator--landscape-right .app-ui-overlay {
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
-}
-
-.app-ui-rotator--landscape-left .review-overlay,
-.app-ui-rotator--landscape-right .review-overlay {
-  top: env(safe-area-inset-top, 0px) !important;
-  right: env(safe-area-inset-right, 0px) !important;
-  bottom: env(safe-area-inset-bottom, 0px) !important;
-  left: env(safe-area-inset-left, 0px) !important;
 }
 
 .no-scrollbar {
@@ -1373,10 +1352,6 @@ video.camera-preview.camera-preview--hidden {
   }
 }
 
-.app-ui-rotator--landscape-left .pitch-widget-draggable,
-.app-ui-rotator--landscape-right .pitch-widget-draggable {
-  max-width: min(18rem, calc(100% - 1.5rem));
-}
 
 .app-shell {
   position: relative;

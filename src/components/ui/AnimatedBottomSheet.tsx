@@ -80,11 +80,13 @@ export default function AnimatedBottomSheet({
             exit={{ y: slideDistance }}
             transition={sheetTransition}
           >
-            <div
-              className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-stone-300/90"
-              aria-hidden
-            />
-            {children}
+            <div className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div
+                className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-stone-300/90"
+                aria-hidden
+              />
+              {children}
+            </div>
           </motion.div>
         </>
       )}

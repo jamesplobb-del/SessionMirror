@@ -56,7 +56,7 @@ import {
 } from './db'
 
 export default function App() {
-  const physicalOrientation = usePhysicalOrientation()
+  usePhysicalOrientation()
   const [takes, setTakes] = useState<Take[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
@@ -1028,10 +1028,7 @@ export default function App() {
         pitchStageActive={mainAudioPitchSource !== null && showPitch}
       />
 
-      <div
-        id={PHYSICAL_UI_ROOT_ID}
-        className={`app-ui-rotator app-ui-rotator--${physicalOrientation}`}
-      >
+      <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
       {showMainPitchWidget && (
         <AnimatePresence>
           {showPitch && mainAudioPitchSource && (
