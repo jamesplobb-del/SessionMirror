@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useRef, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
@@ -13,6 +13,7 @@ import {
   type PitchReadout,
 } from '../utils/pitchUtils'
 import type { TunerInstrument } from '../utils/pitchConfig'
+import { agentDebugLog } from '../utils/agentDebugLog'
 
 interface LivePitchTunerProps {
   mediaRef: RefObject<HTMLMediaElement | null>
@@ -475,6 +476,25 @@ function LivePitchTunerAudio({
 
   const showPlayback = isPlaying && !liveMicOnly
   const showLive = liveMicOnly && (isPlaying || liveMicEnabled)
+
+  useEffect(() => {
+    // #region agent log
+    agentDebugLog(
+      'LivePitchTuner.tsx:LivePitchTunerAudio',
+      'audio pitch pane state',
+      {
+        mediaKey,
+        showLive,
+        showPlayback,
+        liveMicOnly,
+        isPlaying,
+        liveMicEnabled,
+        enabled,
+      },
+      'H2',
+    )
+    // #endregion
+  }, [enabled, isPlaying, liveMicEnabled, liveMicOnly, mediaKey, showLive, showPlayback])
 
   const liveTracker = useLivePitchTracker(
     mediaRef,

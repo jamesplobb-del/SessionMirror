@@ -1,4 +1,4 @@
-/** In-memory debug ring only — no network or filesystem I/O (keeps the UI responsive on device). */
+/** Debug ring + ingest POST for session fba730 (ingest fails silently on device). */
 export function agentDebugLog(
   location: string,
   message: string,
@@ -22,6 +22,15 @@ export function agentDebugLog(
   const ring = ((window as unknown as { __SM_DEBUG_LOGS?: string[] }).__SM_DEBUG_LOGS ??= [])
   ring.push(JSON.stringify(payload))
   if (ring.length > 80) ring.shift()
+
+  fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'fba730',
+    },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
   // #endregion
 }
 

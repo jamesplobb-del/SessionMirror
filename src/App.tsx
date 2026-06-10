@@ -799,6 +799,26 @@ export default function App() {
     isRecording,
   ])
 
+  useEffect(() => {
+    // #region agent log
+    agentDebugLog(
+      'App.tsx:mainAudioPitchSource',
+      'audio pitch source changed',
+      {
+        hasSource: mainAudioPitchSource !== null,
+        mediaKey: mainAudioPitchSource?.mediaKey ?? null,
+        liveMicOnly: mainAudioPitchSource?.liveMicOnly ?? null,
+        isPlaying: mainAudioPitchSource?.isPlaying ?? null,
+        ready,
+        isRecording,
+        pitchEnabled: settings.pitchTrackerEnabled,
+        showPitch,
+      },
+      'H4',
+    )
+    // #endregion
+  }, [mainAudioPitchSource, ready, isRecording, settings.pitchTrackerEnabled, showPitch])
+
   const mainVideoPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'video') return null
     if (isReviewOpen || isVaultOpen || isSettingsOpen) return null

@@ -27,6 +27,7 @@ import {
   getMusicRecordingAudioConstraints,
   tuneMusicRecordingStream,
 } from '../utils/audioCapture'
+import { agentDebugLog } from '../utils/agentDebugLog'
 
 const HISTORY_LENGTH = 140
 
@@ -217,8 +218,25 @@ async function createMicPitchGraph(
 
   if (!stream) {
     if (requireExistingStream) {
+      // #region agent log
+      agentDebugLog(
+        'useLivePitchTracker.ts:createMicPitchGraph',
+        'shared mic not ready',
+        { requireExistingStream, hasRef: Boolean(existingStream), active: existingStream?.active ?? false },
+        'H3',
+      )
+      // #endregion
       throw new Error('Shared mic stream not ready')
     }
+
+    // #region agent log
+    agentDebugLog(
+      'useLivePitchTracker.ts:createMicPitchGraph',
+      'calling getUserMedia for pitch',
+      { requireExistingStream },
+      'H1',
+    )
+    // #endregion
 
     stream = await navigator.mediaDevices.getUserMedia({
       audio: getMusicRecordingAudioConstraints(),
@@ -227,6 +245,14 @@ async function createMicPitchGraph(
     await tuneMusicRecordingStream(stream)
     ownsStream = true
   } else {
+    // #region agent log
+    agentDebugLog(
+      'useLivePitchTracker.ts:createMicPitchGraph',
+      'using shared mic stream',
+      { trackCount: stream.getAudioTracks().length },
+      'H1',
+    )
+    // #endregion
     await tuneMusicRecordingStream(stream)
   }
 
@@ -997,6 +1023,14 @@ export function useLivePitchTracker(
           const sharedStream = micStreamRef?.current
 
           if (requireSharedMic && !micStreamIsLive(sharedStream)) {
+            // #region agent log
+            agentDebugLog(
+              'useLivePitchTracker.ts:tryAttach',
+              'mic attach retry — shared stream not live',
+              { attachAttempt, mediaKey, sharedActive: sharedStream?.active ?? false },
+              'H3',
+            )
+            // #endregion
             scheduleRetry(100)
             return
           }
@@ -1016,6 +1050,14 @@ export function useLivePitchTracker(
               : null,
           )
           graphRef.current = graph
+          // #region agent log
+          agentDebugLog(
+            'useLivePitchTracker.ts:tryAttach',
+            'mic pitch graph attached',
+            { attachAttempt, mediaKey },
+            'H4',
+          )
+          // #endregion
           return
         }
 
@@ -1108,9 +1150,12 @@ export function useLivePitchTracker(
       return
     }
 
+    const tickStats = { frames: 0 }
+
     const tick = () => {
       const activeProfile = profileRef.current
       framesSinceAttachAttemptRef.current += 1
+      tickStats.frames += 1
       let graph = graphRef.current
 
       if (graph && isMediaPitchGraph(graph) && elementGraphs.get(graph.media) !== graph) {
@@ -1124,6 +1169,23 @@ export function useLivePitchTracker(
           (isPlaying || persistWhenPaused) &&
           framesSinceAttachAttemptRef.current % 12 === 0
         ) {
+          // #region agent log
+          if (tickStats.frames % 120 === 0) {
+            agentDebugLog(
+              'useLivePitchTracker.ts:tick',
+              'tick calling tryAttach without graph',
+              {
+                mediaKey,
+                source,
+                enabled,
+                isPlaying,
+                frames: tickStats.frames,
+                attachAttempts: framesSinceAttachAttemptRef.current,
+              },
+              'H5',
+            )
+          }
+          // #endregion
           void tryAttachRef.current?.()
         }
 
