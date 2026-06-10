@@ -2,6 +2,7 @@ import { memo, useEffect, type RefObject, type VideoHTMLAttributes } from 'react
 import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
 import { mobileVideoProps } from '../utils/mobileVideo'
+import { agentDebugLog } from '../utils/agentDebugLog'
 
 interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
@@ -45,6 +46,30 @@ function LiveCameraBackground({
       void video.play().catch(() => {})
     }
   }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode])
+
+  useEffect(() => {
+    const onOrientationChange = () => {
+      const video = previewRef.current
+      // #region agent log
+      agentDebugLog(
+        'LiveCameraBackground.tsx:orientationchange',
+        'preview state on rotate',
+        {
+          hasStream: Boolean(streamRef.current),
+          hasSrcObject: Boolean(video?.srcObject),
+          videoWidth: video?.videoWidth ?? 0,
+          videoHeight: video?.videoHeight ?? 0,
+          layoutWidth: window.innerWidth,
+          layoutHeight: window.innerHeight,
+        },
+        'H-O3',
+      )
+      // #endregion
+    }
+
+    window.addEventListener('orientationchange', onOrientationChange)
+    return () => window.removeEventListener('orientationchange', onOrientationChange)
+  }, [previewRef, streamRef])
 
   return (
     <div className="camera-background" aria-hidden>

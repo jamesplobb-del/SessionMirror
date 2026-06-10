@@ -26,7 +26,6 @@ import { releaseRecorderStream } from '../utils/recordingStream'
 import {
   applyViewportCssVars,
   applyViewportCssVarsOnResume,
-  refreshCameraPreviewLayout,
 } from '../utils/viewportSync'
 
 interface UseCameraSessionOptions {
@@ -89,6 +88,18 @@ function attachPreviewStream(
 
   if (video.srcObject !== stream) {
     video.srcObject = stream
+    // #region agent log
+    agentDebugLog(
+      'useCameraSession.ts:attachPreviewStream',
+      'preview stream attached',
+      {
+        mode,
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      'H-O2',
+    )
+    // #endregion
   }
   video.muted = true
   void video.play().catch(() => {})
@@ -801,7 +812,6 @@ export function useCameraSession({
       const stream = streamRef.current
       if (isStreamRecordable(stream, mode)) {
         attachPreviewStream(previewRef.current, stream, mode)
-        refreshCameraPreviewLayout(previewRef.current)
         setReady(true)
         // #region agent log
         agentDebugLog(
@@ -823,8 +833,6 @@ export function useCameraSession({
 
       await acquireStream(recordingModeRef.current)
       if (restartToken !== foregroundRestartTokenRef.current) return
-
-      refreshCameraPreviewLayout(previewRef.current)
     } catch {
       setError('Camera interrupted. Close and reopen the app if the preview looks wrong.')
     } finally {
@@ -876,7 +884,6 @@ export function useCameraSession({
     }
 
     attachPreviewStream(previewRef.current, stream, mode)
-    refreshCameraPreviewLayout(previewRef.current)
     // #region agent log
     agentDebugLog(
       'useCameraSession.ts:refreshCameraSession',

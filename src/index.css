@@ -403,16 +403,22 @@ body.settings-branch-open * {
   padding: 0;
 }
 
+/* Lock preview to the long screen edge so rotation does not resize/re-crop the stream. */
 video.camera-preview {
   position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  height: 100dvh !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
+  left: 50% !important;
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: max(100vw, 100dvh) !important;
+  height: max(100vw, 100dvh) !important;
+  min-width: max(100vw, 100dvh) !important;
+  min-height: max(100vw, 100dvh) !important;
+  margin: 0 !important;
+  padding: 0 !important;
   opacity: 1;
-  transform: none !important;
+  transform: translate(-50%, -50%) !important;
+  transform-origin: center center !important;
   object-fit: cover !important;
   object-position: center center !important;
   z-index: 0 !important;
@@ -424,7 +430,7 @@ video.camera-preview.camera-preview--live {
 }
 
 video.camera-preview.camera-preview--mirror {
-  transform: scaleX(-1) !important;
+  transform: translate(-50%, -50%) scaleX(-1) !important;
   transform-origin: center center !important;
 }
 

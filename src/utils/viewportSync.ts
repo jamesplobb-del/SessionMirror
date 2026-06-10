@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { agentDebugLog } from './agentDebugLog'
 
 export function isIOSNative(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
@@ -38,7 +39,7 @@ export function readViewportSize(): { width: number; height: number } {
   }
 }
 
-/** HUD layout vars only — live camera uses fixed 100dvh and ignores these. */
+/** HUD layout vars only — live camera uses orientation-stable CSS, not these. */
 export function applyViewportCssVars(): number {
   const { width, height } = readViewportSize()
   if (width === lastAppliedWidth && height === lastAppliedHeight) {
@@ -51,7 +52,6 @@ export function applyViewportCssVars(): number {
   const root = document.documentElement
   root.style.setProperty('--viewport-width', `${width}px`)
   root.style.setProperty('--viewport-height', `${height}px`)
-  root.style.setProperty('--camera-fill-height', `${height}px`)
   root.style.setProperty('--app-height', `${height}px`)
 
   const safe = readSafeAreaInsets()
@@ -77,11 +77,8 @@ export function applyViewportCssVarsOnResume(): number {
   return applyViewportCssVars()
 }
 
-export function refreshCameraPreviewLayout(video: HTMLVideoElement | null): void {
-  if (!video || !video.srcObject) return
-  if (video.paused) {
-    void video.play().catch(() => {})
-  }
+export function refreshCameraPreviewLayout(_video: HTMLVideoElement | null): void {
+  /* Preview layout is CSS-only — never touch srcObject or play() on orientation. */
 }
 
 export function scheduleViewportSync(onHeightChange: (height: number) => void): () => void {
@@ -93,16 +90,19 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
 
   sync()
 
-  let orientationTimer: number | null = null
   const onOrientationChange = () => {
-    if (orientationTimer !== null) {
-      window.clearTimeout(orientationTimer)
-    }
-    orientationTimer = window.setTimeout(() => {
-      orientationTimer = null
-      cachedSafeAreaInsets = null
-      sync()
-    }, 400)
+    // #region agent log
+    agentDebugLog(
+      'viewportSync.ts:orientationchange',
+      'device rotated (no camera layout sync)',
+      {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        orientation: window.screen?.orientation?.type ?? 'unknown',
+      },
+      'H-O1',
+    )
+    // #endregion
   }
 
   window.addEventListener('orientationchange', onOrientationChange)
@@ -123,9 +123,6 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   }
 
   return () => {
-    if (orientationTimer !== null) {
-      window.clearTimeout(orientationTimer)
-    }
     window.removeEventListener('orientationchange', onOrientationChange)
     capCleanup?.()
     lastAppliedWidth = 0
