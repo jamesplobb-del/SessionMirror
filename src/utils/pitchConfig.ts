@@ -57,6 +57,9 @@ export const CENTS_DISPLAY_STEP = 1
 /** UI cents readout refresh interval (ms). */
 export const PITCH_READOUT_INTERVAL_MS = 36
 
+/** Trace sample pushed each frame while live mic hears no pitch (chart floor). */
+export const PITCH_SILENCE_FLOOR_CENTS = -50
+
 /** Note label sticks until cents drift toward the next semitone boundary. */
 export const NOTE_HYSTERESIS_CENTS = 24
 

@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatFrequencyHz,
+  frequencyToPitchReadout,
   getIntonationColor,
   getIntonationZone,
   isInTune,
+  type PitchReadout,
 } from '../utils/pitchUtils'
 
 interface LivePitchTunerProps {
@@ -195,6 +197,8 @@ function AudioTunerPane({
   )
 }
 
+const IDLE_PITCH_READOUT: PitchReadout = frequencyToPitchReadout(0)
+
 function LivePitchTunerAudio({
   mediaRef,
   isPlaying,
@@ -215,27 +219,9 @@ function LivePitchTunerAudio({
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
   const idleCanvasRef = useRef<HTMLCanvasElement>(null)
-  const [playbackSession, setPlaybackSession] = useState(0)
 
   const showLive = !isPlaying && liveMicEnabled
   const showPlayback = isPlaying
-
-  useEffect(() => {
-    const media = mediaRef.current
-    if (!media) return
-
-    const onSessionBreak = () => {
-      setPlaybackSession((value) => value + 1)
-    }
-
-    media.addEventListener('seeked', onSessionBreak)
-    media.addEventListener('ended', onSessionBreak)
-
-    return () => {
-      media.removeEventListener('seeked', onSessionBreak)
-      media.removeEventListener('ended', onSessionBreak)
-    }
-  }, [mediaRef, mediaKey, enabled])
 
   const liveReadout = useLivePitchTracker(
     mediaRef,
@@ -244,27 +230,17 @@ function LivePitchTunerAudio({
     `live-mic-${mediaKey}`,
     liveCanvasRef,
     'glass',
-    { source: 'microphone', micStreamRef },
+    { source: 'microphone', micStreamRef, continuousScroll: true },
   )
 
   const playbackReadout = useLivePitchTracker(
     mediaRef,
     enabled && showPlayback,
     showPlayback,
-    `${mediaKey}-p${playbackSession}`,
+    `${mediaKey}-playback`,
     playbackCanvasRef,
     'glass',
     { source: 'media', persistWhenPaused: true },
-  )
-
-  const idleReadout = useLivePitchTracker(
-    mediaRef,
-    false,
-    false,
-    `idle-${mediaKey}`,
-    idleCanvasRef,
-    'glass',
-    { source: 'media' },
   )
 
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
@@ -298,7 +274,7 @@ function LivePitchTunerAudio({
               />
             ) : (
               <AudioTunerPane
-                readout={idleReadout}
+                readout={IDLE_PITCH_READOUT}
                 canvasRef={idleCanvasRef}
                 mode="idle"
                 isPlaying={isPlaying}

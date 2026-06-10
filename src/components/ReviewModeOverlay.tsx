@@ -188,7 +188,6 @@ export default function ReviewModeOverlay({
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [showPitch, setShowPitch] = useState(true)
-  const [pitchSession, setPitchSession] = useState(0)
 
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
@@ -229,8 +228,6 @@ export default function ReviewModeOverlay({
     : activeSlot === 'benchmark'
       ? `benchmark-${benchmarkFilePath}-${benchmarkSrc}`
       : `challenger-${challengerFilePath}-${challengerSrc}`
-
-  const activePitchMediaKeyWithSession = `${activePitchMediaKey}-s${pitchSession}`
 
   const activeIsAudio = isVault
     ? Boolean(
@@ -396,10 +393,6 @@ export default function ReviewModeOverlay({
     }
   }, [getActiveVideo, revealPlayOverlay])
 
-  const bumpPitchSession = useCallback(() => {
-    setPitchSession((value) => value + 1)
-  }, [])
-
   const hasBenchmark = Boolean(benchmarkSrc || benchmarkFilePath)
   const hasChallenger = Boolean(challengerSrc || challengerFilePath)
   const hasMedia = isVault ? vaultTakes.length > 0 : hasBenchmark || hasChallenger
@@ -486,8 +479,6 @@ export default function ReviewModeOverlay({
     const onSeeked = () => {
       if (isScrubbingRef.current) {
         scheduleTimeUpdate(video.currentTime)
-      } else {
-        bumpPitchSession()
       }
     }
     const onPlay = () => {
@@ -507,7 +498,6 @@ export default function ReviewModeOverlay({
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
-      bumpPitchSession()
     }
 
     video.addEventListener('durationchange', onDurationChange)
@@ -532,7 +522,6 @@ export default function ReviewModeOverlay({
     }
   }, [
     activeSlot,
-    bumpPitchSession,
     getActiveVideo,
     isVault,
     revealPlayOverlay,
@@ -564,7 +553,6 @@ export default function ReviewModeOverlay({
     if (video) {
       scheduleTimeUpdate(video.currentTime)
       syncDurationFromVideo(video)
-      bumpPitchSession()
 
       if (wasPlayingBeforeScrubRef.current) {
         video.muted = false
@@ -577,7 +565,6 @@ export default function ReviewModeOverlay({
     wasPlayingBeforeScrubRef.current = false
     revealPlayOverlay(false)
   }, [
-    bumpPitchSession,
     getActiveVideo,
     revealPlayOverlay,
     scheduleTimeUpdate,
@@ -851,11 +838,11 @@ export default function ReviewModeOverlay({
               <DraggablePitchWidget
                 boundaryRef={reviewBoundsRef}
                 defaultBottomOffset={120}
-                layoutKey={`${isOpen}-${activePitchMediaKeyWithSession}`}
+                layoutKey={`${isOpen}-${activePitchMediaKey}`}
                 mediaRef={activePitchMediaRef}
                 enabled={pitchTrackerEnabled}
                 isPlaying={isPlaying}
-                mediaKey={activePitchMediaKeyWithSession}
+                mediaKey={activePitchMediaKey}
                 takeName={activeName}
                 label="Pitch Analysis"
                 isAudioMode={activeIsAudio}

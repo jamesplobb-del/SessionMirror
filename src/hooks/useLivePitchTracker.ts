@@ -15,14 +15,17 @@ import {
   PITCH_READOUT_INTERVAL_MS,
   PITCH_RMS_GATE_DB_MEDIA,
   PITCH_RMS_GATE_DB_MIC,
+  PITCH_SILENCE_FLOOR_CENTS,
   CENTS_DISPLAY_STEP,
   type PitchCanvasTheme,
 } from '../utils/pitchConfig'
 import {
   frequencyToPitchReadout,
   getIntonationColor,
-  getIntonationZone,
+  getTraceColor,
+  getTraceZone,
   glowColorForCents,
+  isSilenceFloorSample,
   isFrequencyInInstrumentRange,
   isSignalAboveRmsGate,
   movingAverage,
@@ -77,6 +80,8 @@ export interface PitchTrackerOptions {
   micStreamRef?: RefObject<MediaStream | null>
   /** Keep readout/history and redraw the canvas while paused (video widget). */
   persistWhenPaused?: boolean
+  /** Live mic: keep trace scrolling on the chart floor during silence. */
+  continuousScroll?: boolean
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
@@ -189,6 +194,55 @@ function streamHasAudio(stream: MediaStream): boolean {
   return stream.getAudioTracks().some((track) => track.readyState !== 'ended')
 }
 
+function attachStreamSourceToGraph(
+  graph: PitchGraph,
+  context: AudioContext,
+  analyser: AnalyserNode,
+  media: HTMLMediaElement,
+): boolean {
+  const stream = getMediaCaptureStream(media)
+  if (!stream || !streamHasAudio(stream)) return false
+
+  try {
+    const streamSource = context.createMediaStreamSource(stream)
+    streamSource.connect(analyser)
+    graph.source = streamSource
+    graph.mode = 'stream'
+    return true
+  } catch {
+    return false
+  }
+}
+
+function tryAttachStreamSource(
+  context: AudioContext,
+  analyser: AnalyserNode,
+  media: HTMLMediaElement,
+): MediaStreamAudioSourceNode | null {
+  const stream = getMediaCaptureStream(media)
+  if (!stream || !streamHasAudio(stream)) return null
+
+  try {
+    const streamSource = context.createMediaStreamSource(stream)
+    streamSource.connect(analyser)
+    return streamSource
+  } catch {
+    return null
+  }
+}
+
+function refreshMediaPitchStreamSource(graph: PitchGraph): boolean {
+  if (graph.context.state === 'closed') return false
+
+  try {
+    graph.source.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+
+  return attachStreamSourceToGraph(graph, graph.context, graph.analyser, graph.media)
+}
+
 async function waitForMediaAudio(media: HTMLMediaElement, timeoutMs = 1500): Promise<void> {
   if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return
 
@@ -232,24 +286,17 @@ async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
   let source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null
   let mode: PitchGraphMode = 'stream'
 
-  const attachStreamSource = (): boolean => {
-    const stream = getMediaCaptureStream(media)
-    if (!stream || !streamHasAudio(stream)) return false
-
-    try {
-      const streamSource = context.createMediaStreamSource(stream)
-      streamSource.connect(analyser)
-      source = streamSource
-      mode = 'stream'
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  if (!attachStreamSource()) {
+  const streamSource = tryAttachStreamSource(context, analyser, media)
+  if (streamSource) {
+    source = streamSource
+    mode = 'stream'
+  } else {
     await waitForMediaAudio(media)
-    if (!attachStreamSource()) {
+    const retryStreamSource = tryAttachStreamSource(context, analyser, media)
+    if (retryStreamSource) {
+      source = retryStreamSource
+      mode = 'stream'
+    } else {
       try {
         const elementSource = context.createMediaElementSource(media)
         elementSource.connect(analyser)
@@ -261,11 +308,6 @@ async function createPitchGraph(media: HTMLMediaElement): Promise<PitchGraph> {
         throw new Error('Unable to attach pitch tracker to this playback source')
       }
     }
-  }
-
-  if (!source) {
-    await context.close()
-    throw new Error('Unable to attach pitch tracker to this playback source')
   }
 
   const detector = PitchDetector.forFloat32Array(PITCH_FRAME_SIZE)
@@ -322,15 +364,15 @@ function drawColoredTraceSegments(
   let runStart = 0
   for (let index = 1; index < points.length; index += 1) {
     const zoneChanged =
-      getIntonationZone(points[index].cents) !== getIntonationZone(points[index - 1].cents)
+      getTraceZone(points[index].cents) !== getTraceZone(points[index - 1].cents)
     const isLast = index === points.length - 1
 
     if (!zoneChanged && !isLast) continue
 
     const runEnd = isLast && !zoneChanged ? index : index - 1
-    const strokeColor = getIntonationColor(points[runEnd].cents)
+    const strokeColor = getTraceColor(points[runEnd].cents)
 
-    if (glow) {
+    if (glow && !isSilenceFloorSample(points[runEnd].cents)) {
       ctx.save()
       ctx.shadowColor = glowColorForCents(points[runEnd].cents)
       ctx.shadowBlur = 8
@@ -575,6 +617,8 @@ export function useLivePitchTracker(
   const source = options.source ?? 'media'
   const micStreamRef = options.micStreamRef
   const persistWhenPaused = options.persistWhenPaused ?? false
+  const continuousScroll =
+    options.continuousScroll ?? source === 'microphone'
   const emptyReadout = frequencyToPitchReadout(0)
   const [readout, setReadout] = useState<PitchReadout>(emptyReadout)
   const graphRef = useRef<ActivePitchGraph | null>(null)
@@ -619,10 +663,46 @@ export function useLivePitchTracker(
         cancelAnimationFrame(tickRef.current)
         tickRef.current = null
       }
-      safeDisposeActiveGraph(graphRef.current)
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph)) {
+        safeDisposeMicGraph(graph)
+      }
       graphRef.current = null
     }
   }, [mediaKey, source])
+
+  useEffect(() => {
+    if (source !== 'media' || !enabled) return
+
+    const media = mediaRef.current
+    if (!media) return
+
+    const onSeeked = () => {
+      historyRef.current = []
+      needleCentsRef.current = null
+      goodFrameCountRef.current = 0
+      lastStableCentsRef.current = null
+      lastNoteRef.current = '—'
+      lastPitchAtRef.current = 0
+      readoutRef.current = emptyReadout
+      if (mountedRef.current) setReadout(emptyReadout)
+
+      const graph = graphRef.current
+      if (graph && isMediaPitchGraph(graph)) {
+        graph.smoothed = null
+        if (graph.mode === 'stream' && !refreshMediaPitchStreamSource(graph)) {
+          elementGraphs.delete(graph.media)
+          graphRef.current = null
+          void tryAttachRef.current?.()
+        }
+      }
+    }
+
+    media.addEventListener('seeked', onSeeked)
+    return () => {
+      media.removeEventListener('seeked', onSeeked)
+    }
+  }, [enabled, mediaKey, mediaRef, source])
 
   useEffect(() => {
     if (!enabled) {
@@ -636,7 +716,10 @@ export function useLivePitchTracker(
       lastStableCentsRef.current = null
       lastNoteRef.current = '—'
       lastReadoutEmitRef.current = 0
-      safeDisposeActiveGraph(graphRef.current)
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph)) {
+        safeDisposeMicGraph(graph)
+      }
       graphRef.current = null
       if (mountedRef.current) {
         readoutRef.current = emptyReadout
@@ -648,7 +731,7 @@ export function useLivePitchTracker(
     let cancelled = false
     let retryTimer: number | null = null
     let attachAttempt = 0
-    const MAX_ATTACH_ATTEMPTS = source === 'microphone' ? 12 : 80
+    const MAX_ATTACH_ATTEMPTS = source === 'microphone' ? 12 : 36
 
     const scheduleRetry = (delayMs: number) => {
       if (cancelled || attachAttempt >= MAX_ATTACH_ATTEMPTS) return
@@ -670,7 +753,11 @@ export function useLivePitchTracker(
             safeDisposeMicGraph(graph)
             return
           }
-          safeDisposeActiveGraph(graphRef.current)
+          safeDisposeActiveGraph(
+            graphRef.current && !isMediaPitchGraph(graphRef.current)
+              ? graphRef.current
+              : null,
+          )
           graphRef.current = graph
           return
         }
@@ -681,12 +768,17 @@ export function useLivePitchTracker(
           return
         }
 
-        const graph = await createPitchGraph(media)
-        if (cancelled) {
-          safeDisposePitchGraph(graph)
+        const existing = elementGraphs.get(media)
+        if (existing && existing.context.state !== 'closed') {
+          graphRef.current = existing
           return
         }
-        safeDisposeActiveGraph(graphRef.current)
+
+        const graph = await createPitchGraph(media)
+        if (cancelled) {
+          return
+        }
+        safeDisposeActiveGraph(graphRef.current && !isMediaPitchGraph(graphRef.current) ? graphRef.current : null)
         graphRef.current = graph
       } catch {
         scheduleRetry(source === 'microphone' ? 120 : 80)
@@ -704,7 +796,10 @@ export function useLivePitchTracker(
       if (retryTimer !== null) {
         window.clearTimeout(retryTimer)
       }
-      safeDisposeActiveGraph(graphRef.current)
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph)) {
+        safeDisposeMicGraph(graph)
+      }
       graphRef.current = null
     }
   }, [enabled, mediaKey, mediaRef, micStreamRef, source])
@@ -750,8 +845,8 @@ export function useLivePitchTracker(
       if (!graph) {
         if (
           enabled &&
-          isPlaying &&
-          framesSinceAttachAttemptRef.current % 18 === 0
+          (isPlaying || persistWhenPaused) &&
+          framesSinceAttachAttemptRef.current % 12 === 0
         ) {
           void tryAttachRef.current?.()
         }
@@ -772,7 +867,13 @@ export function useLivePitchTracker(
       }
 
       if (graph.context.state === 'closed') {
+        if (isMediaPitchGraph(graph)) {
+          elementGraphs.delete(graph.media)
+        }
         graphRef.current = null
+        if (framesSinceAttachAttemptRef.current % 12 === 0) {
+          void tryAttachRef.current?.()
+        }
         tickRef.current = requestAnimationFrame(tick)
         return
       }
@@ -786,6 +887,26 @@ export function useLivePitchTracker(
       const now = performance.now()
       let currentCents: number | null = null
       let active = false
+      let pushedHistoryThisFrame = false
+
+      const pushHistorySample = (cents: number) => {
+        const history = historyRef.current
+        history.push(cents)
+        if (history.length > HISTORY_LENGTH) {
+          history.splice(0, history.length - HISTORY_LENGTH)
+        }
+        pushedHistoryThisFrame = true
+      }
+
+      const clearReadoutAfterSilence = () => {
+        readoutRef.current = emptyReadout
+        if (mountedRef.current) setReadout(emptyReadout)
+        graph.smoothed = null
+        needleCentsRef.current = null
+        lastStableCentsRef.current = null
+        lastNoteRef.current = '—'
+        active = false
+      }
 
       if (isPlaying) {
         const clarityMin = source === 'microphone' ? PITCH_CLARITY_MIN_MIC : PITCH_CLARITY_MIN
@@ -799,13 +920,7 @@ export function useLivePitchTracker(
             lastPitchAtRef.current > 0 &&
             now - lastPitchAtRef.current > holdMs
           ) {
-            readoutRef.current = emptyReadout
-            if (mountedRef.current) setReadout(emptyReadout)
-            graph.smoothed = null
-            needleCentsRef.current = null
-            lastStableCentsRef.current = null
-            lastNoteRef.current = '—'
-            active = false
+            clearReadoutAfterSilence()
           } else if (readoutRef.current.noteName !== '—') {
             currentCents = needleCentsRef.current ?? readoutRef.current.cents
             active = true
@@ -885,12 +1000,7 @@ export function useLivePitchTracker(
                 lastStableCentsRef.current = intonationCents
                 currentCents = intonationCents
                 active = true
-
-                const history = historyRef.current
-                history.push(intonationCents)
-                if (history.length > HISTORY_LENGTH) {
-                  history.splice(0, history.length - HISTORY_LENGTH)
-                }
+                pushHistorySample(intonationCents)
               }
             } else {
               goodFrameCountRef.current = 0
@@ -901,18 +1011,16 @@ export function useLivePitchTracker(
               lastPitchAtRef.current > 0 &&
               now - lastPitchAtRef.current > holdMs
             ) {
-              readoutRef.current = emptyReadout
-              if (mountedRef.current) setReadout(emptyReadout)
-              graph.smoothed = null
-              needleCentsRef.current = null
-              lastStableCentsRef.current = null
-              lastNoteRef.current = '—'
-              active = false
+              clearReadoutAfterSilence()
             } else if (readoutRef.current.noteName !== '—') {
               currentCents = needleCentsRef.current ?? readoutRef.current.cents
               active = true
             }
           }
+        }
+
+        if (continuousScroll && !pushedHistoryThisFrame) {
+          pushHistorySample(PITCH_SILENCE_FLOOR_CENTS)
         }
       } else if (readoutRef.current.noteName !== '—') {
         currentCents = needleCentsRef.current ?? readoutRef.current.cents
@@ -942,7 +1050,7 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
     }
-  }, [canvasRef, canvasTheme, enabled, isPlaying, mediaKey, persistWhenPaused, source])
+  }, [canvasRef, canvasTheme, continuousScroll, enabled, isPlaying, mediaKey, persistWhenPaused, source])
 
   return readout
 }

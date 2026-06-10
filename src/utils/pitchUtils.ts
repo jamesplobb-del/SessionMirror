@@ -3,6 +3,7 @@ import {
   MAX_INSTRUMENT_HZ,
   MIN_INSTRUMENT_HZ,
   NOTE_HYSTERESIS_CENTS,
+  PITCH_SILENCE_FLOOR_CENTS,
   PITCH_SMOOTH_ALPHA,
 } from './pitchConfig'
 
@@ -196,6 +197,20 @@ export function getIntonationColor(cents: number): string {
   if (zone === 'green') return '#22c55e'
   if (zone === 'yellow') return '#f59e0b'
   return '#ef4444'
+}
+
+export function isSilenceFloorSample(cents: number): boolean {
+  return cents <= PITCH_SILENCE_FLOOR_CENTS + 0.5
+}
+
+export function getTraceColor(cents: number): string {
+  if (isSilenceFloorSample(cents)) return 'rgba(255, 255, 255, 0.16)'
+  return getIntonationColor(cents)
+}
+
+export function getTraceZone(cents: number): IntonationZone | 'silence' {
+  if (isSilenceFloorSample(cents)) return 'silence'
+  return getIntonationZone(cents)
 }
 
 /** Vertical cents gradient for pitch trace (sharp top → in-tune center → flat bottom). */
