@@ -150,6 +150,16 @@ export async function regenerateTakeThumbnailFromVideo(
   }
 }
 
+function configureThumbnailVideoElement(video: HTMLVideoElement): void {
+  video.muted = true
+  video.playsInline = true
+  video.setAttribute('playsinline', 'true')
+  video.setAttribute('webkit-playsinline', 'true')
+  video.disablePictureInPicture = true
+  video.preload = 'metadata'
+  video.crossOrigin = 'anonymous'
+}
+
 function captureThumbnailFromVideoUrl(
   url: string,
   options: ThumbnailCaptureOptions = {},
@@ -159,14 +169,10 @@ function captureThumbnailFromVideoUrl(
 
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
-    video.muted = true
-    video.playsInline = true
-    video.setAttribute('webkit-playsinline', 'true')
-    video.disablePictureInPicture = true
-    video.preload = 'auto'
-    video.src = url.includes('#t=') ? url : `${url}#t=0.1`
+    configureThumbnailVideoElement(video)
 
     let settled = false
+    let seekPending = false
 
     const cleanup = () => {
       video.pause()
@@ -196,6 +202,12 @@ function captureThumbnailFromVideoUrl(
     }, THUMBNAIL_LOAD_TIMEOUT_MS)
 
     const captureFrame = () => {
+      if (settled) return
+
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth <= 0) {
+        return
+      }
+
       try {
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
@@ -211,16 +223,26 @@ function captureThumbnailFromVideoUrl(
       }
     }
 
-    const seekAndCapture = () => {
-      if (settled) return
-
-      const seekTarget = Math.min(
+    const seekTargetForVideo = (): number =>
+      Math.min(
         THUMBNAIL_SEEK_SECONDS,
         Math.max(0, (video.duration || THUMBNAIL_SEEK_SECONDS) - 0.01),
       )
 
+    const requestSeekAndCapture = () => {
+      if (settled || seekPending) return
+
+      const seekTarget = seekTargetForVideo()
+
+      if (Math.abs(video.currentTime - seekTarget) < 0.02) {
+        captureFrame()
+        return
+      }
+
+      seekPending = true
+
       const onSeeked = () => {
-        video.removeEventListener('seeked', onSeeked)
+        seekPending = false
         captureFrame()
       }
 
@@ -229,7 +251,7 @@ function captureThumbnailFromVideoUrl(
       try {
         video.currentTime = seekTarget
       } catch {
-        captureFrame()
+        seekPending = false
       }
     }
 
@@ -237,8 +259,25 @@ function captureThumbnailFromVideoUrl(
       fail(new Error('Thumbnail video failed to load'))
     })
 
-    video.addEventListener('loadedmetadata', seekAndCapture, { once: true })
-    video.addEventListener('loadeddata', seekAndCapture, { once: true })
+    video.addEventListener(
+      'loadeddata',
+      () => {
+        if (settled) return
+
+        if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
+
+        const seekTarget = seekTargetForVideo()
+        if (Math.abs(video.currentTime - seekTarget) < 0.02) {
+          captureFrame()
+          return
+        }
+
+        requestSeekAndCapture()
+      },
+      { once: true },
+    )
+
+    video.src = url
     video.load()
   })
 }
