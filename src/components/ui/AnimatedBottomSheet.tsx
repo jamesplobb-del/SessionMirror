@@ -17,7 +17,6 @@ interface AnimatedBottomSheetProps {
   sheetRef?: RefObject<HTMLDivElement | null>
   /** Lighter sheet motion for performance-sensitive surfaces like the vault. */
   motionPreset?: 'default' | 'light'
-  onEnterComplete?: () => void
 }
 
 export default function AnimatedBottomSheet({
@@ -28,7 +27,6 @@ export default function AnimatedBottomSheet({
   maxHeightClass = 'max-h-[min(88vh,100dvh)]',
   sheetRef,
   motionPreset = 'default',
-  onEnterComplete,
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSlideDistance)
 
@@ -78,9 +76,6 @@ export default function AnimatedBottomSheet({
             animate={{ y: 0 }}
             exit={{ y: slideDistance }}
             transition={sheetTransition}
-            onAnimationComplete={(definition) => {
-              if (definition === 'animate') onEnterComplete?.()
-            }}
           >
             <div
               className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-stone-300/90"
