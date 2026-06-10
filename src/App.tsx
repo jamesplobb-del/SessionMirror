@@ -98,6 +98,7 @@ export default function App() {
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const pendingAutoPlaybackRef = useRef(false)
   const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
+  const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
   const queuedAutoPlayRef = useRef<{ url: string; takeId: string } | null>(null)
   const recordingModeRef = useRef<RecordingMode>('video')
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
@@ -584,6 +585,7 @@ export default function App() {
         take: autoPlaybackTake,
         isPlaying: autoPlaybackPlaying,
         mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackAudioKey}`,
+        liveMicOnly: false,
       }
     }
 
@@ -593,6 +595,7 @@ export default function App() {
         take: challengerTake,
         isPlaying: challengerPipPlaying,
         mediaKey: `main-pip-ch-${challengerTake.id}-${challengerTake.filePath}`,
+        liveMicOnly: false,
       }
     }
 
@@ -602,12 +605,24 @@ export default function App() {
         take: benchmarkTake,
         isPlaying: benchmarkPipPlaying,
         mediaKey: `main-pip-bm-${benchmarkTake.id}-${benchmarkTake.filePath}`,
+        liveMicOnly: false,
+      }
+    }
+
+    if (settings.liveMicTunerEnabled) {
+      return {
+        mediaRef: liveMicPlaceholderRef,
+        take: null,
+        isPlaying: false,
+        mediaKey: `main-live-mic-${streamGeneration}`,
+        liveMicOnly: true,
       }
     }
 
     return null
   }, [
     settings.pitchTrackerEnabled,
+    settings.liveMicTunerEnabled,
     recordingMode,
     isReviewOpen,
     isVaultOpen,
@@ -620,13 +635,14 @@ export default function App() {
     challengerPipPlaying,
     benchmarkTake,
     benchmarkPipPlaying,
+    streamGeneration,
   ])
 
   const showMainPitchWidget = mainPitchSource !== null
 
   useEffect(() => {
     setShowPitch(true)
-  }, [mainPitchSource?.mediaKey])
+  }, [mainPitchSource?.mediaKey, recordingMode])
 
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),
@@ -915,8 +931,8 @@ export default function App() {
               enabled={settings.pitchTrackerEnabled}
               isPlaying={mainPitchSource.isPlaying}
               mediaKey={mainPitchSource.mediaKey}
-              takeName={mainPitchSource.take.name}
-              label="Live Pitch"
+              takeName={mainPitchSource.take?.name}
+              label={mainPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
               isAudioMode
               liveMicEnabled={settings.liveMicTunerEnabled}
               micStreamRef={streamRef}

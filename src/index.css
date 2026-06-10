@@ -419,6 +419,7 @@ video.camera-preview.camera-preview--hidden {
   width: 100%;
   z-index: 10;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
 }
 
 .pitch-glass-panel {
@@ -476,6 +477,7 @@ video.camera-preview.camera-preview--hidden {
 
 .pitch-widget-draggable {
   cursor: grab;
+  max-width: min(calc(100vw - 1.5rem), 18rem);
 }
 
 .pitch-widget-draggable:active {

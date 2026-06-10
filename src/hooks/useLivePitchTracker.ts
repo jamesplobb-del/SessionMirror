@@ -71,6 +71,8 @@ export type PitchTrackerSource = 'media' | 'microphone'
 export interface PitchTrackerOptions {
   source?: PitchTrackerSource
   micStreamRef?: RefObject<MediaStream | null>
+  /** Keep readout/history and redraw the canvas while paused (video widget). */
+  persistWhenPaused?: boolean
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
@@ -531,6 +533,7 @@ export function useLivePitchTracker(
 ): PitchReadout {
   const source = options.source ?? 'media'
   const micStreamRef = options.micStreamRef
+  const persistWhenPaused = options.persistWhenPaused ?? false
   const emptyReadout = frequencyToPitchReadout(0)
   const [readout, setReadout] = useState<PitchReadout>(emptyReadout)
   const graphRef = useRef<ActivePitchGraph | null>(null)
@@ -652,12 +655,14 @@ export function useLivePitchTracker(
   }, [enabled, mediaKey, mediaRef, micStreamRef, source])
 
   useEffect(() => {
-    if (!enabled || !isPlaying) {
+    const shouldTick = enabled && (isPlaying || persistWhenPaused)
+
+    if (!shouldTick) {
       if (tickRef.current !== null) {
         cancelAnimationFrame(tickRef.current)
         tickRef.current = null
       }
-      if (!isPlaying) {
+      if (!isPlaying && !persistWhenPaused) {
         if (graphRef.current && isMediaPitchGraph(graphRef.current)) {
           graphRef.current.smoothed = null
         } else if (graphRef.current && !isMediaPitchGraph(graphRef.current)) {
@@ -680,7 +685,19 @@ export function useLivePitchTracker(
 
     const tick = () => {
       const graph = graphRef.current
+
       if (!graph) {
+        const canvas = canvasRef?.current
+        if (canvas) {
+          drawPitchCanvas(
+            canvas,
+            new Float32Array(PITCH_FRAME_SIZE),
+            historyRef.current,
+            needleCentsRef.current ?? readoutRef.current.cents,
+            readoutRef.current.noteName !== '—',
+            canvasTheme,
+          )
+        }
         tickRef.current = requestAnimationFrame(tick)
         return
       }
@@ -704,88 +721,95 @@ export function useLivePitchTracker(
       }
 
       graph.analyser.getFloatTimeDomainData(graph.buffer)
-      const [rawPitch, clarity] = graph.detector.findPitch(
-        graph.buffer,
-        graph.context.sampleRate,
-      )
 
-      const pitch = normalizeInstrumentFrequency(rawPitch)
       const now = performance.now()
       let currentCents: number | null = null
       let active = false
 
-      if (clarity >= PITCH_CLARITY_MIN && isFrequencyInInstrumentRange(pitch)) {
-        graph.smoothed = smoothFrequency(graph.smoothed, pitch)
-        const next = stabilizePitchReadout(
-          readoutRef.current.noteName === '—' ? null : readoutRef.current,
-          frequencyToPitchReadout(graph.smoothed),
+      if (isPlaying) {
+        const [rawPitch, clarity] = graph.detector.findPitch(
+          graph.buffer,
+          graph.context.sampleRate,
         )
 
-        if (next.noteName !== '—') {
-          const noteChanged = lastNoteRef.current !== next.noteName
-          lastNoteRef.current = next.noteName
+        const pitch = normalizeInstrumentFrequency(rawPitch)
 
-          const midiFloat = frequencyToMidi(next.frequencyHz)
-          traceMidiRef.current = smoothFrequency(
-            traceMidiRef.current,
-            midiFloat,
-            PITCH_TRACE_MIDI_ALPHA,
-          )
-          anchorMidiRef.current = smoothFrequency(
-            anchorMidiRef.current,
-            midiFloat,
-            PITCH_ANCHOR_MIDI_ALPHA,
+        if (clarity >= PITCH_CLARITY_MIN && isFrequencyInInstrumentRange(pitch)) {
+          graph.smoothed = smoothFrequency(graph.smoothed, pitch)
+          const next = stabilizePitchReadout(
+            readoutRef.current.noteName === '—' ? null : readoutRef.current,
+            frequencyToPitchReadout(graph.smoothed),
           )
 
-          needleCentsRef.current = smoothFrequency(
-            needleCentsRef.current,
-            next.cents,
-            noteChanged ? PITCH_NOTE_CHANGE_SMOOTH_ALPHA : PITCH_NEEDLE_SMOOTH_ALPHA,
-          )
+          if (next.noteName !== '—') {
+            const noteChanged = lastNoteRef.current !== next.noteName
+            lastNoteRef.current = next.noteName
 
-          const needleCents = Math.max(
-            -50,
-            Math.min(50, needleCentsRef.current ?? next.cents),
-          )
-          const tracePlot =
-            traceMidiRef.current != null && anchorMidiRef.current != null
-              ? Math.max(
-                  -50,
-                  Math.min(50, (traceMidiRef.current - anchorMidiRef.current) * 100),
-                )
-              : needleCents
-          const displayCents = quantizeDisplayCents(needleCents, CENTS_DISPLAY_STEP)
-          const displayReadout: PitchReadout = { ...next, cents: displayCents }
+            const midiFloat = frequencyToMidi(next.frequencyHz)
+            traceMidiRef.current = smoothFrequency(
+              traceMidiRef.current,
+              midiFloat,
+              PITCH_TRACE_MIDI_ALPHA,
+            )
+            anchorMidiRef.current = smoothFrequency(
+              anchorMidiRef.current,
+              midiFloat,
+              PITCH_ANCHOR_MIDI_ALPHA,
+            )
 
-          if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
-            readoutRef.current = displayReadout
-            if (mountedRef.current) {
-              startTransition(() => setReadout(displayReadout))
+            needleCentsRef.current = smoothFrequency(
+              needleCentsRef.current,
+              next.cents,
+              noteChanged ? PITCH_NOTE_CHANGE_SMOOTH_ALPHA : PITCH_NEEDLE_SMOOTH_ALPHA,
+            )
+
+            const needleCents = Math.max(
+              -50,
+              Math.min(50, needleCentsRef.current ?? next.cents),
+            )
+            const tracePlot =
+              traceMidiRef.current != null && anchorMidiRef.current != null
+                ? Math.max(
+                    -50,
+                    Math.min(50, (traceMidiRef.current - anchorMidiRef.current) * 100),
+                  )
+                : needleCents
+            const displayCents = quantizeDisplayCents(needleCents, CENTS_DISPLAY_STEP)
+            const displayReadout: PitchReadout = { ...next, cents: displayCents }
+
+            if (now - lastReadoutEmitRef.current >= PITCH_READOUT_INTERVAL_MS) {
+              readoutRef.current = displayReadout
+              if (mountedRef.current) {
+                startTransition(() => setReadout(displayReadout))
+              }
+              lastReadoutEmitRef.current = now
             }
-            lastReadoutEmitRef.current = now
-          }
 
-          lastPitchAtRef.current = now
-          currentCents = tracePlot
-          active = true
-          const history = historyRef.current
-          history.push(tracePlot)
-          if (history.length > HISTORY_LENGTH) {
-            history.splice(0, history.length - HISTORY_LENGTH)
+            lastPitchAtRef.current = now
+            currentCents = tracePlot
+            active = true
+            const history = historyRef.current
+            history.push(tracePlot)
+            if (history.length > HISTORY_LENGTH) {
+              history.splice(0, history.length - HISTORY_LENGTH)
+            }
           }
+        } else if (
+          lastPitchAtRef.current > 0 &&
+          now - lastPitchAtRef.current > PITCH_HOLD_MS
+        ) {
+          readoutRef.current = emptyReadout
+          if (mountedRef.current) setReadout(emptyReadout)
+          graph.smoothed = null
+          needleCentsRef.current = null
+          traceMidiRef.current = null
+          anchorMidiRef.current = null
+          lastNoteRef.current = '—'
+          active = false
+        } else if (readoutRef.current.noteName !== '—') {
+          currentCents = needleCentsRef.current ?? readoutRef.current.cents
+          active = true
         }
-      } else if (
-        lastPitchAtRef.current > 0 &&
-        now - lastPitchAtRef.current > PITCH_HOLD_MS
-      ) {
-        readoutRef.current = emptyReadout
-        if (mountedRef.current) setReadout(emptyReadout)
-        graph.smoothed = null
-        needleCentsRef.current = null
-        traceMidiRef.current = null
-        anchorMidiRef.current = null
-        lastNoteRef.current = '—'
-        active = false
       } else if (readoutRef.current.noteName !== '—') {
         currentCents = needleCentsRef.current ?? readoutRef.current.cents
         active = true
@@ -814,7 +838,7 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
     }
-  }, [canvasRef, canvasTheme, enabled, isPlaying, mediaKey, source])
+  }, [canvasRef, canvasTheme, enabled, isPlaying, mediaKey, persistWhenPaused, source])
 
   return readout
 }

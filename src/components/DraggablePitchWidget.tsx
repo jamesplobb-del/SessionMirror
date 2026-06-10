@@ -15,7 +15,12 @@ interface DraggablePitchWidgetProps extends TunerProps {
   liveMicEnabled?: boolean
   micStreamRef?: RefObject<MediaStream | null>
   layoutRegion?: 'main' | 'review'
+  /** Forces layout remeasure when the host surface opens or media changes. */
+  layoutKey?: string
 }
+
+const VIDEO_WIDGET_WIDTH = 'min(calc(100vw - 1.5rem), 18rem)'
+const VIDEO_WIDGET_HEIGHT = 188
 
 function PitchWidgetCloseButton({ onClose }: { onClose: () => void }) {
   return (
@@ -56,42 +61,51 @@ export default function DraggablePitchWidget({
   liveMicEnabled = true,
   micStreamRef,
   layoutRegion = 'main',
+  layoutKey = '',
   ...tunerProps
 }: DraggablePitchWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
-  const [initialY, setInitialY] = useState<number | null>(null)
+  const [positionY, setPositionY] = useState(() => Math.max(12, 640 - defaultBottomOffset - VIDEO_WIDGET_HEIGHT))
 
   useLayoutEffect(() => {
     if (isAudioMode) return
 
-    const updatePosition = () => {
+    const measurePosition = () => {
       const bounds = boundaryRef.current
-      const widget = widgetRef.current
-      if (!bounds) return
+      if (!bounds) return false
 
       const boundsHeight = bounds.clientHeight
-      const widgetHeight = widget?.offsetHeight || 180
-
-      setInitialY(Math.max(12, boundsHeight - defaultBottomOffset - widgetHeight))
+      const widgetHeight = widgetRef.current?.offsetHeight || VIDEO_WIDGET_HEIGHT
+      setPositionY(Math.max(12, boundsHeight - defaultBottomOffset - widgetHeight))
+      return true
     }
 
-    updatePosition()
+    if (!measurePosition()) {
+      setPositionY(Math.max(12, 320 - defaultBottomOffset - VIDEO_WIDGET_HEIGHT))
+    }
+
+    const retryFrame = window.requestAnimationFrame(() => {
+      measurePosition()
+    })
 
     const observer =
       typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(updatePosition)
+        ? new ResizeObserver(() => {
+            measurePosition()
+          })
         : null
 
     if (boundaryRef.current) {
       observer?.observe(boundaryRef.current)
     }
-    window.addEventListener('resize', updatePosition)
+    window.addEventListener('resize', measurePosition)
 
     return () => {
+      window.cancelAnimationFrame(retryFrame)
       observer?.disconnect()
-      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('resize', measurePosition)
     }
-  }, [boundaryRef, defaultBottomOffset, isAudioMode, mediaKey])
+  }, [boundaryRef, defaultBottomOffset, isAudioMode, layoutKey, mediaKey])
 
   const tuner = (
     <LivePitchTuner
@@ -99,6 +113,7 @@ export default function DraggablePitchWidget({
       mediaKey={mediaKey}
       liveMicEnabled={liveMicEnabled}
       micStreamRef={micStreamRef}
+      persistWhenPaused={!isAudioMode}
       {...tunerProps}
     />
   )
@@ -108,31 +123,17 @@ export default function DraggablePitchWidget({
       <motion.div
         key={`audio-${mediaKey}`}
         ref={widgetRef}
-        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} pointer-events-auto absolute z-20 flex min-h-0 w-auto flex-col`}
+        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} pointer-events-auto absolute z-20 flex min-h-0 flex-col`}
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.22, ease: 'easeInOut' }}
-        style={{ width: '100%' }}
       >
         <div className="relative flex h-full min-h-0 w-full flex-1 flex-col">
           {onClose && <PitchWidgetCloseButton onClose={onClose} />}
           {tuner}
         </div>
       </motion.div>
-    )
-  }
-
-  if (initialY === null) {
-    return (
-      <div
-        ref={widgetRef}
-        className="pitch-widget-draggable pointer-events-none absolute left-3 top-0 z-20 w-[min(calc(100%-1.5rem),18rem)] min-h-[180px] opacity-0"
-        style={{ width: '100%', maxWidth: 'min(calc(100% - 1.5rem), 18rem)' }}
-        aria-hidden
-      >
-        {tuner}
-      </div>
     )
   }
 
@@ -144,14 +145,22 @@ export default function DraggablePitchWidget({
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
-      className="pitch-widget-draggable pointer-events-auto absolute left-0 top-0 z-20 w-[min(calc(100%-1.5rem),18rem)] min-h-[180px] touch-none"
-      initial={{ opacity: 0, scale: 0.94, x: 12, y: initialY }}
-      animate={{ opacity: 1, scale: 1, x: 12, y: initialY }}
+      className="pitch-widget-draggable pointer-events-auto absolute left-0 top-0 z-20 touch-none"
+      initial={{ opacity: 0, scale: 0.94, x: 12, y: positionY }}
+      animate={{ opacity: 1, scale: 1, x: 12, y: positionY }}
       exit={{ opacity: 0, scale: 0.94 }}
       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-      style={{ touchAction: 'none', width: '100%', maxWidth: 'min(calc(100% - 1.5rem), 18rem)' }}
+      style={{
+        touchAction: 'none',
+        width: VIDEO_WIDGET_WIDTH,
+        height: VIDEO_WIDGET_HEIGHT,
+        minHeight: VIDEO_WIDGET_HEIGHT,
+      }}
     >
-      <div className="relative h-full min-h-[180px] w-full">
+      <div
+        className="relative h-full w-full overflow-hidden"
+        style={{ height: VIDEO_WIDGET_HEIGHT, minHeight: VIDEO_WIDGET_HEIGHT }}
+      >
         {onClose && <PitchWidgetCloseButton onClose={onClose} />}
         {tuner}
       </div>

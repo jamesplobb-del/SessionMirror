@@ -18,6 +18,7 @@ interface LivePitchTunerProps {
   enabled?: boolean
   liveMicEnabled?: boolean
   micStreamRef?: RefObject<MediaStream | null>
+  persistWhenPaused?: boolean
 }
 
 function PitchChartCanvas({
@@ -28,12 +29,13 @@ function PitchChartCanvas({
   glass?: boolean
 }) {
   return (
-    <div className="pitch-chart-shell relative min-h-[140px] w-full flex-1">
+    <div className="pitch-chart-shell relative w-full flex-1" style={{ minHeight: 140, height: '100%' }}>
       <canvas
         ref={canvasRef}
-        className={`pitch-spectrogram absolute inset-0 h-full w-full min-h-[140px] ${
+        className={`pitch-spectrogram absolute inset-0 h-full w-full ${
           glass ? 'pitch-spectrogram--glass' : ''
         }`}
+        style={{ minHeight: 140 }}
       />
     </div>
   )
@@ -300,6 +302,7 @@ export default function LivePitchTuner({
   enabled = true,
   liveMicEnabled = true,
   micStreamRef,
+  persistWhenPaused = false,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -314,7 +317,7 @@ export default function LivePitchTuner({
     mediaKey,
     canvasRef,
     canvasTheme,
-    { source: 'media' },
+    { source: 'media', persistWhenPaused: isWidget && persistWhenPaused },
   )
 
   if (isAudio) {
@@ -341,9 +344,15 @@ export default function LivePitchTuner({
 
   if (isWidget) {
     return (
-      <div className="pitch-tuner pitch-tuner--widget h-full w-full min-h-[180px]">
-        <div className="pitch-glass-panel pitch-glass-panel--compact flex h-full min-h-[180px] w-full flex-col overflow-hidden">
-          <div className="flex shrink-0 items-start justify-between gap-3 px-3 pt-2.5 pb-1">
+      <div
+        className="pitch-tuner pitch-tuner--widget h-full w-full"
+        style={{ height: 188, minHeight: 188 }}
+      >
+        <div
+          className="pitch-glass-panel pitch-glass-panel--compact flex w-full flex-col overflow-hidden"
+          style={{ height: 188, minHeight: 188 }}
+        >
+          <div className="flex shrink-0 items-start justify-between gap-3 px-3 pt-2.5 pb-1 pr-10">
             <p
               className="font-mono text-base font-bold leading-none tabular-nums tracking-tight"
               style={{ color: accent }}
@@ -364,8 +373,16 @@ export default function LivePitchTuner({
             </p>
           </div>
 
-          <div className="relative min-h-[140px] flex-1 overflow-hidden px-3 pb-2.5">
+          <div
+            className="relative shrink-0 overflow-hidden px-3 pb-2.5"
+            style={{ height: 140, minHeight: 140 }}
+          >
             <PitchChartCanvas canvasRef={canvasRef} glass />
+            {!active && !isPlaying && (
+              <p className="pointer-events-none absolute inset-x-3 bottom-2 text-center text-[10px] text-white/35">
+                Pitch trace during playback
+              </p>
+            )}
           </div>
         </div>
       </div>

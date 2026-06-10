@@ -76,7 +76,7 @@ export default function ReviewTimeline({
       >
         <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/30" />
         <div
-          className={`absolute inset-y-0 left-0 top-1/2 h-px -translate-y-1/2 bg-white/85 ${
+          className={`absolute left-0 top-1/2 h-px -translate-y-1/2 bg-white/85 ${
             isScrubbing ? '' : 'transition-[width] duration-100 ease-linear'
           }`}
           style={{ width: `${percent}%` }}

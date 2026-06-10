@@ -410,7 +410,7 @@ export default function ReviewModeOverlay({
     if (isOpen) {
       setShowPitch(true)
     }
-  }, [activePitchMediaKey, isOpen])
+  }, [activePitchMediaKey, isOpen, pitchTrackerEnabled])
 
   useEffect(() => {
     reviewAutoplayEnabledRef.current = isOpen
@@ -831,6 +831,7 @@ export default function ReviewModeOverlay({
               <DraggablePitchWidget
                 boundaryRef={reviewBoundsRef}
                 defaultBottomOffset={120}
+                layoutKey={`${isOpen}-${activePitchMediaKey}`}
                 mediaRef={activePitchMediaRef}
                 enabled={pitchTrackerEnabled}
                 isPlaying={isPlaying}
