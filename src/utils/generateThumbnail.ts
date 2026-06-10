@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { resolveNativeVideoPlaybackSrc } from './takeStorage'
 import { persistTakeThumbnail } from './takeThumbnailCache'
+import { nativeDataFileExists } from './filesystemInit'
 import { isAudioTake } from './mediaType'
 import {
   buildTakeVideoTransform,
@@ -13,6 +14,30 @@ import type { Take } from '../types'
 const THUMBNAIL_SEEK_SECONDS = 0.1
 const THUMBNAIL_LOAD_TIMEOUT_MS = 5_000
 const THUMBNAIL_CONCURRENCY = 2
+const HEAL_CONCURRENCY = 2
+
+let activeHealJobs = 0
+const healSlotWaiters: Array<() => void> = []
+
+async function acquireHealSlot(): Promise<void> {
+  if (activeHealJobs < HEAL_CONCURRENCY) {
+    activeHealJobs += 1
+    return
+  }
+
+  await new Promise<void>((resolve) => {
+    healSlotWaiters.push(() => {
+      activeHealJobs += 1
+      resolve()
+    })
+  })
+}
+
+function releaseHealSlot(): void {
+  activeHealJobs = Math.max(0, activeHealJobs - 1)
+  const next = healSlotWaiters.shift()
+  if (next) next()
+}
 
 export interface ThumbnailCaptureOptions {
   filePath?: string
@@ -53,6 +78,74 @@ export async function generateThumbnailFromUrl(
   }
 
   return captureThumbnailFromVideoUrl(resolvedUrl, options)
+}
+
+/**
+ * Self-heal a missing on-disk thumbnail by extracting a frame from the take video,
+ * persisting it under thumbnails/, and returning a WebView-safe playback URL.
+ */
+export async function regenerateTakeThumbnailFromVideo(
+  takeId: string,
+  filePath: string,
+  options: ThumbnailCaptureOptions & { recordingOrientation?: RecordingOrientation } = {},
+): Promise<string | null> {
+  if (!takeId || !filePath) return null
+
+  if (Capacitor.isNativePlatform()) {
+    const videoExists = await nativeDataFileExists(filePath)
+    if (!videoExists) return null
+  }
+
+  await acquireHealSlot()
+
+  try {
+    const recordingOrientation = options.recordingOrientation ?? 'portrait'
+    const mirrorPreview = options.mirrorPreview !== false
+    const resolvedVideoUrl =
+      options.videoUrl ||
+      (await resolveNativeVideoPlaybackSrc(filePath, options.videoUrl ?? '')) ||
+      ''
+
+    if (!resolvedVideoUrl) return null
+
+    for (const mirror of mirrorPreview ? [true, false] : [false]) {
+      try {
+        const dataUrl = await generateThumbnailFromUrl(resolvedVideoUrl, {
+          filePath,
+          mirrorPreview: mirror,
+          recordingOrientation,
+        })
+        const persisted = await persistTakeThumbnail(takeId, dataUrl, recordingOrientation)
+        // #region agent log
+        agentDebugLog(
+          'generateThumbnail.ts:regenerateTakeThumbnailFromVideo',
+          'thumbnail self-healed',
+          { takeId, mirror, orientation: recordingOrientation, ok: true },
+          'H-V2',
+        )
+        // #endregion
+        return persisted
+      } catch (err) {
+        // #region agent log
+        agentDebugLog(
+          'generateThumbnail.ts:regenerateTakeThumbnailFromVideo',
+          'thumbnail heal failed',
+          {
+            takeId,
+            mirror,
+            orientation: recordingOrientation,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          'H-V2',
+        )
+        // #endregion
+      }
+    }
+
+    return null
+  } finally {
+    releaseHealSlot()
+  }
 }
 
 function captureThumbnailFromVideoUrl(
@@ -156,52 +249,11 @@ export async function captureAndPersistTakeThumbnail(
 ): Promise<string | null> {
   if (take.mediaType === 'audio') return null
 
-  const mirrorPreview = take.mirrorPlayback !== false
-
-  for (const mirror of mirrorPreview ? [true, false] : [false]) {
-    try {
-      const dataUrl = await generateThumbnailFromUrl(take.videoUrl, {
-        filePath: take.filePath,
-        mirrorPreview: mirror,
-        recordingOrientation: take.recordingOrientation,
-      })
-      const persisted = await persistTakeThumbnail(
-        take.id,
-        dataUrl,
-        take.recordingOrientation ?? 'portrait',
-      )
-      // #region agent log
-      agentDebugLog(
-        'generateThumbnail.ts:captureAndPersistTakeThumbnail',
-        'thumbnail captured',
-        {
-          takeId: take.id,
-          mirror,
-          orientation: take.recordingOrientation ?? 'portrait',
-          ok: true,
-        },
-        'H-V2',
-      )
-      // #endregion
-      return persisted
-    } catch (err) {
-      // #region agent log
-      agentDebugLog(
-        'generateThumbnail.ts:captureAndPersistTakeThumbnail',
-        'thumbnail capture failed',
-        {
-          takeId: take.id,
-          mirror,
-          orientation: take.recordingOrientation ?? 'portrait',
-          error: err instanceof Error ? err.message : String(err),
-        },
-        'H-V2',
-      )
-      // #endregion
-    }
-  }
-
-  return null
+  return regenerateTakeThumbnailFromVideo(take.id, take.filePath, {
+    videoUrl: take.videoUrl,
+    mirrorPreview: take.mirrorPlayback !== false,
+    recordingOrientation: take.recordingOrientation ?? 'portrait',
+  })
 }
 
 export async function hydrateTakeThumbnailsInBackground(

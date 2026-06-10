@@ -28,6 +28,8 @@ interface LivePitchTunerProps {
   tunerInstrument?: TunerInstrument
   /** Widget-only: analyze live mic instead of media element. */
   pitchSource?: 'media' | 'microphone'
+  /** Audio mode: analyze live mic stream (recording or idle tuner). */
+  liveMicOnly?: boolean
 }
 
 function PitchChartCanvas({
@@ -456,6 +458,7 @@ function LivePitchTunerAudio({
   liveMicEnabled,
   micStreamRef,
   tunerInstrument = 'voice',
+  liveMicOnly = false,
 }: {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -465,12 +468,13 @@ function LivePitchTunerAudio({
   liveMicEnabled: boolean
   micStreamRef?: RefObject<MediaStream | null>
   tunerInstrument?: TunerInstrument
+  liveMicOnly?: boolean
 }) {
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
 
-  const showLive = !isPlaying && liveMicEnabled
-  const showPlayback = isPlaying
+  const showPlayback = isPlaying && !liveMicOnly
+  const showLive = liveMicOnly && (isPlaying || liveMicEnabled)
 
   const liveTracker = useLivePitchTracker(
     mediaRef,
@@ -548,6 +552,7 @@ export default function LivePitchTuner({
   persistWhenPaused = false,
   tunerInstrument = 'voice',
   pitchSource = 'media',
+  liveMicOnly = false,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -587,6 +592,7 @@ export default function LivePitchTuner({
         liveMicEnabled={liveMicEnabled}
         micStreamRef={micStreamRef}
         tunerInstrument={tunerInstrument}
+        liveMicOnly={liveMicOnly}
       />
     )
   }

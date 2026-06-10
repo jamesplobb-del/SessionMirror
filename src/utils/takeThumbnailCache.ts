@@ -1,7 +1,15 @@
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
+import type { MediaType } from '../types'
 import type { RecordingOrientation } from './takeVideoTransform'
 import { THUMBNAIL_DIR, initAppFilesystem, isFilesystemMissingError } from './filesystemInit'
+
+export interface ThumbnailHealSource {
+  filePath: string
+  videoUrl?: string
+  mediaType?: MediaType
+  mirrorPreview?: boolean
+}
 
 function thumbnailPath(takeId: string, orientation: RecordingOrientation = 'portrait'): string {
   if (orientation === 'landscape') {
@@ -10,7 +18,7 @@ function thumbnailPath(takeId: string, orientation: RecordingOrientation = 'port
   return `${THUMBNAIL_DIR}/${takeId}.jpg`
 }
 
-async function readThumbnailUri(path: string): Promise<string | null> {
+async function readCachedThumbnailUri(path: string): Promise<string | null> {
   try {
     await Filesystem.stat({
       path,
@@ -44,6 +52,24 @@ async function readThumbnailUri(path: string): Promise<string | null> {
     }
     return null
   }
+}
+
+async function healMissingThumbnail(
+  takeId: string,
+  recordingOrientation: RecordingOrientation,
+  healSource?: ThumbnailHealSource,
+): Promise<string | null> {
+  if (!healSource?.filePath || healSource.mediaType === 'audio') {
+    return null
+  }
+
+  const { regenerateTakeThumbnailFromVideo } = await import('./generateThumbnail')
+
+  return regenerateTakeThumbnailFromVideo(takeId, healSource.filePath, {
+    videoUrl: healSource.videoUrl,
+    mirrorPreview: healSource.mirrorPreview,
+    recordingOrientation,
+  })
 }
 
 export async function persistTakeThumbnail(
@@ -80,14 +106,22 @@ export async function persistTakeThumbnail(
 export async function resolveCachedTakeThumbnail(
   takeId: string,
   recordingOrientation: RecordingOrientation = 'portrait',
+  healSource?: ThumbnailHealSource,
 ): Promise<string | null> {
   if (recordingOrientation === 'landscape') {
-    const landscapeThumb = await readThumbnailUri(thumbnailPath(takeId, 'landscape'))
+    const landscapeThumb = await readCachedThumbnailUri(thumbnailPath(takeId, 'landscape'))
     if (landscapeThumb) return landscapeThumb
-    return readThumbnailUri(thumbnailPath(takeId, 'portrait'))
+
+    const portraitThumb = await readCachedThumbnailUri(thumbnailPath(takeId, 'portrait'))
+    if (portraitThumb) return portraitThumb
+
+    return healMissingThumbnail(takeId, 'landscape', healSource)
   }
 
-  return readThumbnailUri(thumbnailPath(takeId, 'portrait'))
+  const portraitThumb = await readCachedThumbnailUri(thumbnailPath(takeId, 'portrait'))
+  if (portraitThumb) return portraitThumb
+
+  return healMissingThumbnail(takeId, 'portrait', healSource)
 }
 
 export async function deleteCachedTakeThumbnail(takeId: string): Promise<void> {

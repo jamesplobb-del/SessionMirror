@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 
 export const TAKES_DIR = 'takes'
@@ -116,4 +117,20 @@ export async function initAppFilesystem(): Promise<void> {
 
 export function isAppFilesystemInitialized(): boolean {
   return initialized
+}
+
+/** True when a file exists under Capacitor Directory.Data. */
+export async function nativeDataFileExists(relativePath: string): Promise<boolean> {
+  if (!relativePath) return false
+  if (!Capacitor.isNativePlatform()) return true
+
+  try {
+    await Filesystem.stat({
+      path: relativePath,
+      directory: Directory.Data,
+    })
+    return true
+  } catch {
+    return false
+  }
 }

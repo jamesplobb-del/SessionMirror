@@ -63,6 +63,14 @@ export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
         cachedThumbnail = await resolveCachedTakeThumbnail(
           row.id,
           row.recordingOrientation ?? 'portrait',
+          row.mediaType === 'video'
+            ? {
+                filePath: row.filePath,
+                videoUrl,
+                mediaType: row.mediaType,
+                mirrorPreview: true,
+              }
+            : undefined,
         )
       } catch {
         cachedThumbnail = null

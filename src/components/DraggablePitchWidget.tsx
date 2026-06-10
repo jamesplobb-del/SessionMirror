@@ -20,6 +20,7 @@ interface DraggablePitchWidgetProps extends TunerProps {
   layoutKey?: string
   tunerInstrument?: TunerProps['tunerInstrument']
   pitchSource?: 'media' | 'microphone'
+  liveMicOnly?: boolean
 }
 
 const DEFAULT_WIDGET_SIZE = { width: 288, height: 188 }
@@ -67,6 +68,7 @@ export default function DraggablePitchWidget({
   layoutKey = '',
   tunerInstrument = 'voice',
   pitchSource = 'media',
+  liveMicOnly = false,
   ...tunerProps
 }: DraggablePitchWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -145,6 +147,7 @@ export default function DraggablePitchWidget({
       tunerInstrument={tunerInstrument}
       persistWhenPaused={!isAudioMode}
       pitchSource={isAudioMode ? 'media' : pitchSource}
+      liveMicOnly={liveMicOnly}
       {...tunerProps}
     />
   )

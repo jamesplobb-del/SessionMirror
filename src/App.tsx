@@ -116,6 +116,8 @@ export default function App() {
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
 
+  const pitchUserDismissedRef = useRef(false)
+
   const isReviewOpen = reviewSlot !== null
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
     ? 'review'
@@ -820,11 +822,34 @@ export default function App() {
 
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
 
+  const pitchContextKey =
+    mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
+
+  useEffect(() => {
+    pitchUserDismissedRef.current = false
+  }, [pitchContextKey, recordingMode])
+
   useEffect(() => {
     if (!settings.pitchTrackerEnabled) {
       setShowPitch(false)
+      pitchUserDismissedRef.current = false
+      return
     }
-  }, [settings.pitchTrackerEnabled])
+
+    if (!showMainPitchWidget) {
+      setShowPitch(false)
+      return
+    }
+
+    if (!pitchUserDismissedRef.current) {
+      setShowPitch(true)
+    }
+  }, [settings.pitchTrackerEnabled, showMainPitchWidget])
+
+  const handleClosePitch = useCallback(() => {
+    pitchUserDismissedRef.current = true
+    setShowPitch(false)
+  }, [])
 
   useEffect(() => {
     if (!settings.showTakeCards) {
@@ -1145,8 +1170,9 @@ export default function App() {
               micStreamRef={streamRef}
               layoutRegion="main"
               layoutKey={`audio-${recordingMode}-${streamGeneration}`}
+              liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
               tunerInstrument={settings.tunerInstrument}
-              onClose={() => setShowPitch(false)}
+              onClose={handleClosePitch}
             />
           )}
           {showPitch && mainVideoPitchSource && (
@@ -1163,7 +1189,7 @@ export default function App() {
               layoutRegion="main"
               layoutKey={`video-${recordingMode}-${streamGeneration}`}
               tunerInstrument={settings.tunerInstrument}
-              onClose={() => setShowPitch(false)}
+              onClose={handleClosePitch}
             />
           )}
         </AnimatePresence>
