@@ -271,6 +271,26 @@ export function isInTune(cents: number, tolerance = TUNING_GREEN_CENTS): boolean
   return Math.abs(cents) <= tolerance
 }
 
+/** Maps sustained in-tune glow (0–~1.6) to CSS/canvas-friendly glow styles. */
+export function formatInTuneGlowStyles(glow: number): {
+  textShadow: string
+  filter: string
+  ringStrokeWidth: number
+  ringOpacity: number
+} {
+  const clamped = Math.max(0, glow)
+  const t = Math.min(1, clamped)
+  const spread = 10 + clamped * 38
+  const alpha = 0.28 + t * 0.52
+  const outerAlpha = 0.12 + t * 0.28
+  return {
+    textShadow: `0 0 ${spread}px rgba(34, 197, 94, ${alpha}), 0 0 ${spread * 1.8}px rgba(34, 197, 94, ${outerAlpha})`,
+    filter: `drop-shadow(0 0 ${5 + clamped * 16}px rgba(34, 197, 94, ${0.28 + t * 0.55}))`,
+    ringStrokeWidth: 2.4 + clamped * 2.4,
+    ringOpacity: 0.72 + t * 0.28,
+  }
+}
+
 export function smoothFrequency(
   previous: number | null,
   next: number,

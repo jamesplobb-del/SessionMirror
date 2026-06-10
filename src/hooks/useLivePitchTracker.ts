@@ -26,13 +26,28 @@ import {
 
 const HISTORY_LENGTH = 140
 
-/** Sustained in-tune time before the chart band begins turning green. */
-const IN_TUNE_BAND_GLOW_HOLD_MS = 520
-/** Fade-in duration once hold is satisfied. */
-const IN_TUNE_BAND_GLOW_RAMP_MS = 900
+/** Brief hold before glow begins (~220ms). */
+const IN_TUNE_GLOW_HOLD_MS = 220
+/** Initial ramp to visible glow (~450ms). */
+const IN_TUNE_GLOW_RAMP_MS = 450
+/** Extra brightness while holding in tune (up to ~5s). */
+const IN_TUNE_GLOW_SUSTAIN_MS = 5000
+/** Hysteresis: leave glow zone above this |cents|. */
+const IN_TUNE_GLOW_EXIT_CENTS = 8
 
 function lerpValue(a: number, b: number, t: number): number {
   return a + (b - a) * t
+}
+
+function computeInTuneGlowTarget(heldMs: number): number {
+  if (heldMs < IN_TUNE_GLOW_HOLD_MS) return 0
+  const elapsed = heldMs - IN_TUNE_GLOW_HOLD_MS
+  const ramp = Math.min(0.78, elapsed / IN_TUNE_GLOW_RAMP_MS)
+  const sustain =
+    elapsed > IN_TUNE_GLOW_RAMP_MS
+      ? Math.min(0.82, (elapsed - IN_TUNE_GLOW_RAMP_MS) / IN_TUNE_GLOW_SUSTAIN_MS)
+      : 0
+  return ramp + sustain
 }
 
 function updateInTuneBandGlow(
@@ -44,35 +59,42 @@ function updateInTuneBandGlow(
 ): void {
   if (inTune) {
     if (inTuneSince.current === 0) inTuneSince.current = now
-    const held = now - inTuneSince.current
-    let target = 0
-    if (held >= IN_TUNE_BAND_GLOW_HOLD_MS) {
-      target = Math.min(
-        1,
-        (held - IN_TUNE_BAND_GLOW_HOLD_MS) / IN_TUNE_BAND_GLOW_RAMP_MS,
-      )
-    }
-    const ease = Math.min(1, dtMs * 0.0032)
+    const target = computeInTuneGlowTarget(now - inTuneSince.current)
+    const ease = Math.min(1, dtMs * 0.0055)
     glow.current += (target - glow.current) * ease
   } else {
     inTuneSince.current = 0
-    const ease = Math.min(1, dtMs * 0.0022)
+    const ease = Math.min(1, dtMs * 0.003)
     glow.current += (0 - glow.current) * ease
   }
+}
+
+function isInTuneForGlow(
+  readout: PitchReadout,
+  eligible: { current: boolean },
+): boolean {
+  if (readout.noteName === '—') {
+    eligible.current = false
+    return false
+  }
+  const abs = Math.abs(readout.cents)
+  if (abs <= TUNING_GREEN_CENTS) eligible.current = true
+  else if (abs >= IN_TUNE_GLOW_EXIT_CENTS) eligible.current = false
+  return eligible.current
 }
 
 function sampleInTuneBandGlow(
   glow: { current: number },
   inTuneSince: { current: number },
   lastFrameAt: { current: number },
+  glowEligible: { current: boolean },
   readout: PitchReadout,
 ): number {
   const now = performance.now()
   const dtMs =
     lastFrameAt.current > 0 ? Math.min(48, now - lastFrameAt.current) : 16
   lastFrameAt.current = now
-  const inTune =
-    readout.noteName !== '—' && Math.abs(readout.cents) <= TUNING_GREEN_CENTS
+  const inTune = isInTuneForGlow(readout, glowEligible)
   updateInTuneBandGlow(glow, inTuneSince, now, dtMs, inTune)
   return glow.current
 }
@@ -87,32 +109,40 @@ function drawInTuneBandRegion(
   const yBottom = centsToY(-TUNING_GREEN_CENTS)
   const bandTop = Math.min(yTop, yBottom)
   const bandHeight = Math.abs(yBottom - yTop)
+  const t = Math.min(1, inTuneHighlight)
+  const boost = Math.max(0, inTuneHighlight)
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.085)'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.09)'
   ctx.fillRect(0, bandTop, width, bandHeight)
 
-  if (inTuneHighlight > 0.002) {
-    ctx.fillStyle = `rgba(34, 197, 94, ${0.15 * inTuneHighlight})`
+  if (boost > 0.01) {
+    ctx.fillStyle = `rgba(34, 197, 94, ${0.07 + t * 0.26})`
     ctx.fillRect(0, bandTop, width, bandHeight)
   }
 
-  const lineAlpha = lerpValue(0.36, 0.64, inTuneHighlight)
-  const red = Math.round(lerpValue(255, 34, inTuneHighlight))
-  const green = Math.round(lerpValue(255, 197, inTuneHighlight))
-  const blue = Math.round(lerpValue(255, 94, inTuneHighlight))
+  const lineAlpha = lerpValue(0.38, 0.82, t)
+  const red = Math.round(lerpValue(255, 34, t))
+  const green = Math.round(lerpValue(255, 197, t))
+  const blue = Math.round(lerpValue(255, 94, t))
 
-  ctx.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${lineAlpha})`
-  ctx.lineWidth = lerpValue(1.05, 1.4, inTuneHighlight)
+  ctx.lineWidth = lerpValue(1.1, 1.65, t)
   ctx.setLineDash([])
-  ctx.shadowBlur = 0
 
   for (const cents of [TUNING_GREEN_CENTS, -TUNING_GREEN_CENTS]) {
     const y = centsToY(cents)
+    if (boost > 0.12) {
+      ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + t * 0.55})`
+      ctx.shadowBlur = 2 + boost * 14
+    } else {
+      ctx.shadowBlur = 0
+    }
+    ctx.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${lineAlpha})`
     ctx.beginPath()
     ctx.moveTo(0, y)
     ctx.lineTo(width, y)
     ctx.stroke()
   }
+  ctx.shadowBlur = 0
 }
 
 /** Dispatched when an element-routed pitch graph is torn down (requires media remount). */
@@ -578,17 +608,25 @@ function drawTraceEndpointDot(
   ctx: CanvasRenderingContext2D,
   point: TraceDisplayPoint,
   theme: PitchCanvasTheme,
+  inTuneGlow = 0,
 ): void {
   if (isSilenceFloorSample(point.cents)) return
 
   const dotColor = getIntonationColor(point.cents)
   const dotGlow = glowColorForCents(point.cents)
-  const radius = theme === 'glass' ? 5 : 4.5
-  const glowRadius = theme === 'glass' ? 7 : 6
+  const isGreen = Math.abs(point.cents) <= TUNING_GREEN_CENTS
+  const glowBoost = isGreen ? Math.max(0, inTuneGlow) : 0
+  const radius = theme === 'glass' ? 5 + glowBoost * 1.2 : 4.5
+  const glowRadius = theme === 'glass' ? 7 + glowBoost * 5 : 6
+
+  if (glowBoost > 0.08) {
+    ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + Math.min(1, glowBoost) * 0.5})`
+    ctx.shadowBlur = 4 + glowBoost * 12
+  }
 
   ctx.beginPath()
   ctx.arc(point.x, point.y, glowRadius, 0, Math.PI * 2)
-  ctx.fillStyle = dotGlow.replace('0.55', '0.3')
+  ctx.fillStyle = dotGlow.replace('0.55', String(0.28 + Math.min(1, glowBoost) * 0.25))
   ctx.fill()
   ctx.beginPath()
   ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
@@ -597,6 +635,7 @@ function drawTraceEndpointDot(
   ctx.strokeStyle = 'rgba(255,255,255,0.9)'
   ctx.lineWidth = 1.75
   ctx.stroke()
+  ctx.shadowBlur = 0
 }
 
 function drawPitchCanvas(
@@ -728,7 +767,7 @@ function drawPitchCanvas(
   }
 
   if (active && tracePoints.length > 0) {
-    drawTraceEndpointDot(ctx, tracePoints[tracePoints.length - 1], theme)
+    drawTraceEndpointDot(ctx, tracePoints[tracePoints.length - 1], theme, inTuneHighlight)
   }
 
   if (isGlass) return
@@ -769,6 +808,12 @@ function drawPitchCanvas(
   ctx.stroke()
 }
 
+export interface LivePitchTrackerState {
+  readout: PitchReadout
+  /** 0 = no glow, rises with sustained in-tune time (can exceed 1). */
+  inTuneGlow: number
+}
+
 export function useLivePitchTracker(
   mediaRef: RefObject<HTMLMediaElement | null>,
   enabled: boolean,
@@ -777,7 +822,7 @@ export function useLivePitchTracker(
   canvasRef?: RefObject<HTMLCanvasElement | null>,
   canvasTheme: PitchCanvasTheme = 'solid',
   options: PitchTrackerOptions = {},
-): PitchReadout {
+): LivePitchTrackerState {
   const source = options.source ?? 'media'
   const micStreamRef = options.micStreamRef
   const persistWhenPaused = options.persistWhenPaused ?? false
@@ -790,6 +835,7 @@ export function useLivePitchTracker(
 
   const emptyReadout = frequencyToPitchReadout(0, profile.minHz, profile.maxHz)
   const [readout, setReadout] = useState<PitchReadout>(emptyReadout)
+  const [inTuneGlow, setInTuneGlow] = useState(0)
   const graphRef = useRef<ActivePitchGraph | null>(null)
   const tickRef = useRef<number | null>(null)
   const readoutRef = useRef<PitchReadout>(emptyReadout)
@@ -806,6 +852,14 @@ export function useLivePitchTracker(
   const inTuneGlowRef = useRef(0)
   const inTuneSinceRef = useRef(0)
   const inTuneBandFrameRef = useRef(0)
+  const inTuneGlowEligibleRef = useRef(false)
+  const lastPublishedGlowRef = useRef(0)
+
+  const publishInTuneGlow = (value: number) => {
+    if (Math.abs(value - lastPublishedGlowRef.current) < 0.01) return
+    lastPublishedGlowRef.current = value
+    if (mountedRef.current) setInTuneGlow(value)
+  }
 
   useEffect(() => {
     mountedRef.current = true
@@ -825,6 +879,9 @@ export function useLivePitchTracker(
     inTuneGlowRef.current = 0
     inTuneSinceRef.current = 0
     inTuneBandFrameRef.current = 0
+    inTuneGlowEligibleRef.current = false
+    lastPublishedGlowRef.current = 0
+    setInTuneGlow(0)
   }, [mediaKey, source, tunerInstrument])
 
   useEffect(() => {
@@ -1022,6 +1079,9 @@ export function useLivePitchTracker(
         inTuneGlowRef.current = 0
         inTuneSinceRef.current = 0
         inTuneBandFrameRef.current = 0
+        inTuneGlowEligibleRef.current = false
+        lastPublishedGlowRef.current = 0
+        setInTuneGlow(0)
       }
       return
     }
@@ -1059,8 +1119,10 @@ export function useLivePitchTracker(
             inTuneGlowRef,
             inTuneSinceRef,
             inTuneBandFrameRef,
+            inTuneGlowEligibleRef,
             readoutRef.current,
           )
+          publishInTuneGlow(bandGlow)
           drawPitchCanvas(
             canvas,
             new Float32Array(activeProfile.frameSize),
@@ -1274,8 +1336,10 @@ export function useLivePitchTracker(
           inTuneGlowRef,
           inTuneSinceRef,
           inTuneBandFrameRef,
+          inTuneGlowEligibleRef,
           readoutRef.current,
         )
+        publishInTuneGlow(bandGlow)
         drawPitchCanvas(
           canvas,
           graph.buffer,
@@ -1312,7 +1376,7 @@ export function useLivePitchTracker(
     tunerInstrument,
   ])
 
-  return readout
+  return { readout, inTuneGlow }
 }
 
 /** Pause pitch graphs for review teardown without blocking the UI thread. */

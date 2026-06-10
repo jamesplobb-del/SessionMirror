@@ -4,10 +4,12 @@ import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
   formatFrequencyHz,
+  formatInTuneGlowStyles,
   getIntonationColor,
   getIntonationZone,
   isInTune,
   TUNING_GREEN_CENTS,
+  type PitchReadout,
 } from '../utils/pitchUtils'
 import type { TunerInstrument } from '../utils/pitchConfig'
 
@@ -224,11 +226,13 @@ function NoteOrbitReadout({
   frequencyHz,
   cents,
   active,
+  inTuneGlow = 0,
 }: {
   noteName: string
   frequencyHz: number
   cents: number
   active: boolean
+  inTuneGlow?: number
 }) {
   const inTune = active && isInTune(cents, TUNING_GREEN_CENTS)
   const zone = active ? getIntonationZone(cents) : null
@@ -236,31 +240,35 @@ function NoteOrbitReadout({
   const isSharp = active && cents > TUNING_GREEN_CENTS
   const isFlat = active && cents < -TUNING_GREEN_CENTS
   const pulseDuration = zone === 'red' ? 0.38 : zone === 'yellow' ? 0.58 : 0.85
-  const readoutGlow = active ? `0 0 28px ${accent}44` : 'none'
+  const sustainedGlow = inTune && inTuneGlow > 0 ? formatInTuneGlowStyles(inTuneGlow) : null
+  const accentGlow = active && !sustainedGlow ? `0 0 20px ${accent}33` : 'none'
+  const textShadow = sustainedGlow?.textShadow ?? accentGlow
   const fillRatio = active ? Math.min(1, Math.abs(cents) / 50) : 0
   const arcSpan = 28 + fillRatio * 52
 
   return (
     <div
       className={`pitch-note-orbit ${inTune ? 'pitch-note-orbit--in-tune' : ''} ${isSharp ? 'pitch-note-orbit--sharp' : ''} ${isFlat ? 'pitch-note-orbit--flat' : ''}`}
-      style={{ ['--orbit-accent' as string]: accent }}
+      style={{
+        ['--orbit-accent' as string]: accent,
+        ['--in-tune-glow' as string]: String(inTuneGlow),
+        filter: sustainedGlow?.filter,
+      }}
     >
       <div className="pitch-note-orbit__ring">
         <svg className="pitch-note-orbit__svg" viewBox="0 0 200 200" aria-hidden>
           <circle className="pitch-note-orbit__ring-track" cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS} />
 
           {inTune && (
-            <motion.circle
+            <circle
               className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--in-tune"
               cx={ORBIT_CENTER}
               cy={ORBIT_CENTER}
               r={ORBIT_RADIUS}
               fill="none"
               stroke="#22c55e"
-              strokeWidth={3}
-              initial={false}
-              animate={{ opacity: [0.78, 1, 0.78] }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+              strokeWidth={sustainedGlow?.ringStrokeWidth ?? 2.5}
+              strokeOpacity={sustainedGlow?.ringOpacity ?? 0.82}
             />
           )}
 
@@ -308,16 +316,16 @@ function NoteOrbitReadout({
         <div className="pitch-note-orbit__core">
           <p
             className="pitch-note-orbit__note pitch-readout-display"
-            style={{ color: accent, textShadow: readoutGlow }}
+            style={{ color: accent, textShadow }}
           >
             {noteName}
           </p>
           <div className="pitch-note-orbit__meta pitch-readout-display">
-            <span style={{ color: accent }}>{formatFrequencyHz(frequencyHz)}</span>
+            <span style={{ color: accent, textShadow }}>{formatFrequencyHz(frequencyHz)}</span>
             <span className="pitch-note-orbit__sep" aria-hidden>
               ·
             </span>
-            <span style={{ color: accent }}>
+            <span style={{ color: accent, textShadow }}>
               {active ? formatDisplayCents(cents) : '—'}
             </span>
           </div>
@@ -329,9 +337,11 @@ function NoteOrbitReadout({
 
 function LiveAudioTunerPane({
   readout,
+  inTuneGlow,
   canvasRef,
 }: {
-  readout: ReturnType<typeof useLivePitchTracker>
+  readout: PitchReadout
+  inTuneGlow: number
   canvasRef: RefObject<HTMLCanvasElement | null>
 }) {
   const active = readout.noteName !== '—'
@@ -345,6 +355,7 @@ function LiveAudioTunerPane({
           frequencyHz={readout.frequencyHz}
           cents={displayCents}
           active={active}
+          inTuneGlow={inTuneGlow}
         />
       </div>
 
@@ -361,7 +372,7 @@ function AudioTunerPane({
   mode,
   takeName,
 }: {
-  readout: ReturnType<typeof useLivePitchTracker>
+  readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
   mode: 'playback'
   takeName?: string
@@ -433,7 +444,7 @@ function LivePitchTunerAudio({
   const showLive = !isPlaying && liveMicEnabled
   const showPlayback = isPlaying
 
-  const liveReadout = useLivePitchTracker(
+  const liveTracker = useLivePitchTracker(
     mediaRef,
     enabled && showLive,
     showLive,
@@ -443,7 +454,7 @@ function LivePitchTunerAudio({
     { source: 'microphone', micStreamRef, continuousScroll: true, tunerInstrument },
   )
 
-  const playbackReadout = useLivePitchTracker(
+  const playbackTracker = useLivePitchTracker(
     mediaRef,
     enabled && showPlayback,
     showPlayback,
@@ -469,14 +480,18 @@ function LivePitchTunerAudio({
           {showPlayback ? (
             <div className="pitch-glass-panel pitch-glass-panel--audio flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden">
               <AudioTunerPane
-                readout={playbackReadout}
+                readout={playbackTracker.readout}
                 canvasRef={playbackCanvasRef}
                 mode="playback"
                 takeName={takeName}
               />
             </div>
           ) : showLive ? (
-            <LiveAudioTunerPane readout={liveReadout} canvasRef={liveCanvasRef} />
+            <LiveAudioTunerPane
+              readout={liveTracker.readout}
+              inTuneGlow={liveTracker.inTuneGlow}
+              canvasRef={liveCanvasRef}
+            />
           ) : (
             <div className="pitch-audio-idle-pane flex flex-1 flex-col items-center justify-center px-6 text-center">
               <p className="pitch-audio-idle-pane__title">Pitch Analysis</p>
@@ -512,7 +527,7 @@ export default function LivePitchTuner({
   const canvasTheme = isPanel || isWidget || isAudio ? 'glass' : 'solid'
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const widgetContinuousScroll = isWidget && persistWhenPaused
-  const readout = useLivePitchTracker(
+  const { readout, inTuneGlow: _inTuneGlow } = useLivePitchTracker(
     mediaRef,
     enabled && !isAudio,
     isPlaying,
@@ -526,6 +541,7 @@ export default function LivePitchTuner({
       tunerInstrument,
     },
   )
+  void _inTuneGlow
 
   if (isAudio) {
     return (
