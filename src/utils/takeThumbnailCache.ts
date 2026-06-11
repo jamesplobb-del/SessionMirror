@@ -4,8 +4,11 @@ import type { MediaType } from '../types'
 import type { RecordingOrientation } from './takeVideoTransform'
 import { THUMBNAIL_DIR, initAppFilesystem, isFilesystemMissingError } from './filesystemInit'
 
-/** Avoid repeated native stat calls for thumbnails known to be missing this session. */
+/** Paths confirmed absent this session — avoids repeat lookups. */
 const missingThumbnailPaths = new Set<string>()
+
+/** Filenames in thumbnails/ from a single readdir (avoids N native stat misses). */
+let thumbnailIndexPromise: Promise<Set<string>> | null = null
 
 export interface ThumbnailHealSource {
   filePath: string
@@ -14,11 +17,60 @@ export interface ThumbnailHealSource {
   mirrorPreview?: boolean
 }
 
-function thumbnailPath(takeId: string, orientation: RecordingOrientation = 'portrait'): string {
+function thumbnailFileName(
+  takeId: string,
+  orientation: RecordingOrientation = 'portrait',
+): string {
   if (orientation === 'landscape') {
-    return `${THUMBNAIL_DIR}/${takeId}-landscape-v2.jpg`
+    return `${takeId}-landscape-v2.jpg`
   }
-  return `${THUMBNAIL_DIR}/${takeId}.jpg`
+  return `${takeId}.jpg`
+}
+
+function thumbnailPath(takeId: string, orientation: RecordingOrientation = 'portrait'): string {
+  return `${THUMBNAIL_DIR}/${thumbnailFileName(takeId, orientation)}`
+}
+
+function fileNameFromPath(path: string): string {
+  const slash = path.lastIndexOf('/')
+  return slash >= 0 ? path.slice(slash + 1) : path
+}
+
+async function loadThumbnailIndex(): Promise<Set<string>> {
+  await initAppFilesystem()
+
+  try {
+    const { files } = await Filesystem.readdir({
+      path: THUMBNAIL_DIR,
+      directory: Directory.Data,
+    })
+
+    const names = new Set<string>()
+    for (const entry of files) {
+      const name = typeof entry === 'string' ? entry : entry.name
+      if (name) names.add(name)
+    }
+    return names
+  } catch {
+    return new Set()
+  }
+}
+
+async function getThumbnailIndex(): Promise<Set<string>> {
+  if (!thumbnailIndexPromise) {
+    thumbnailIndexPromise = loadThumbnailIndex()
+  }
+  return thumbnailIndexPromise
+}
+
+/** Warm the thumbnail filename index before batch vault hydration. */
+export async function primeThumbnailCacheIndex(): Promise<void> {
+  await getThumbnailIndex()
+}
+
+export function invalidateThumbnailCacheIndex(): void {
+  thumbnailIndexPromise = null
+  missingThumbnailPaths.clear()
 }
 
 async function readCachedThumbnailUri(path: string): Promise<string | null> {
@@ -26,16 +78,10 @@ async function readCachedThumbnailUri(path: string): Promise<string | null> {
     return null
   }
 
-  try {
-    await Filesystem.stat({
-      path,
-      directory: Directory.Data,
-    })
-  } catch (err) {
-    if (isFilesystemMissingError(err)) {
-      missingThumbnailPaths.add(path)
-      return null
-    }
+  const index = await getThumbnailIndex()
+  const fileName = fileNameFromPath(path)
+
+  if (!index.has(fileName)) {
     missingThumbnailPaths.add(path)
     return null
   }
@@ -57,7 +103,8 @@ async function readCachedThumbnailUri(path: string): Promise<string | null> {
     return `data:image/jpeg;base64,${data}`
   } catch (err) {
     if (isFilesystemMissingError(err)) {
-      return null
+      missingThumbnailPaths.add(path)
+      index.delete(fileName)
     }
     return null
   }
@@ -101,6 +148,10 @@ export async function persistTakeThumbnail(
     return dataUrl
   }
 
+  const index = await getThumbnailIndex()
+  index.add(thumbnailFileName(takeId, recordingOrientation))
+  missingThumbnailPaths.delete(path)
+
   try {
     const { uri } = await Filesystem.getUri({
       path,
@@ -134,7 +185,10 @@ export async function resolveCachedTakeThumbnail(
 }
 
 export async function deleteCachedTakeThumbnail(takeId: string): Promise<void> {
-  for (const path of [thumbnailPath(takeId, 'portrait'), thumbnailPath(takeId, 'landscape')]) {
+  for (const orientation of ['portrait', 'landscape'] as const) {
+    const path = thumbnailPath(takeId, orientation)
+    missingThumbnailPaths.add(path)
+
     try {
       await Filesystem.deleteFile({
         path,
@@ -144,4 +198,6 @@ export async function deleteCachedTakeThumbnail(takeId: string): Promise<void> {
       /* already removed */
     }
   }
+
+  invalidateThumbnailCacheIndex()
 }

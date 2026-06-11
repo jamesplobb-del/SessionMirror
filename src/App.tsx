@@ -714,6 +714,16 @@ export default function App() {
     deferHudMediaPause()
   }, [deferHudMediaPause])
 
+  const handleRecordingModeChange = useCallback(
+    (mode: RecordingMode) => {
+      if (mode !== recordingModeRef.current) {
+        setShowPitch(false)
+      }
+      changeRecordingMode(mode)
+    },
+    [changeRecordingMode],
+  )
+
   const handleCloseSettings = useCallback(() => {
     startTransition(() => {
       setIsSettingsOpen(false)
@@ -1374,7 +1384,7 @@ export default function App() {
             elapsed={elapsed}
             ready={ready}
             recordingMode={recordingMode}
-            onRecordingModeChange={changeRecordingMode}
+            onRecordingModeChange={handleRecordingModeChange}
             onToggleRecord={toggleRecording}
             onOpenVault={handleOpenVault}
             onOpenSettings={handleOpenSettings}

@@ -1,7 +1,9 @@
 import type { Take } from '../types'
 import { resolveTakePlaybackUrl } from '../utils/takeStorage'
-import { resolveCachedTakeThumbnail } from '../utils/takeThumbnailCache'
-import { agentDebugLog } from '../utils/agentDebugLog'
+import {
+  primeThumbnailCacheIndex,
+  resolveCachedTakeThumbnail,
+} from '../utils/takeThumbnailCache'
 import { getTakesByProject } from './vaultRepository'
 import type { VaultTake } from './types'
 
@@ -46,6 +48,8 @@ export function uiTakesFromVaultRowsFast(rows: VaultTake[]): Take[] {
 }
 
 export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
+  await primeThumbnailCacheIndex()
+
   const chronological = [...rows].reverse()
 
   const takes = await Promise.all(
@@ -59,41 +63,26 @@ export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
         videoUrl = ''
       }
 
-      try {
-        cachedThumbnail = await resolveCachedTakeThumbnail(
-          row.id,
-          row.recordingOrientation ?? 'portrait',
-          row.mediaType === 'video'
-            ? {
-                filePath: row.filePath,
-                videoUrl,
-                mediaType: row.mediaType,
-                mirrorPreview: true,
-              }
-            : undefined,
-        )
-      } catch {
-        cachedThumbnail = null
+      if (row.mediaType === 'video') {
+        try {
+          cachedThumbnail = await resolveCachedTakeThumbnail(
+            row.id,
+            row.recordingOrientation ?? 'portrait',
+            {
+              filePath: row.filePath,
+              videoUrl,
+              mediaType: row.mediaType,
+              mirrorPreview: true,
+            },
+          )
+        } catch {
+          cachedThumbnail = null
+        }
       }
 
       return vaultTakeToUiTake(row, index + 1, videoUrl, cachedThumbnail ?? '')
     }),
   )
-
-  // #region agent log
-  agentDebugLog(
-    'takeBridge.ts:uiTakesFromVaultRows',
-    'takes loaded from vault',
-    {
-      rowCount: rows.length,
-      cacheHits: takes.filter((t) => t.thumbnailUrl.length > 0).length,
-      cacheMisses: takes.filter((t) => t.thumbnailUrl.length === 0 && t.mediaType === 'video')
-        .length,
-      landscapeCount: takes.filter((t) => t.recordingOrientation === 'landscape').length,
-    },
-    'H-V3',
-  )
-  // #endregion
 
   return takes.reverse()
 }

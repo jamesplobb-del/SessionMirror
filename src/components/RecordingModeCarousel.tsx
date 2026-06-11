@@ -58,7 +58,7 @@ function ModeSlot({
       aria-label={ariaLabel}
       aria-pressed={isCenter}
       onClick={onActivate}
-      className={`record-carousel-slot record-carousel-slot--${position} ${
+      className={`record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
         isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
       } ${isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
         isCenter && isRecording ? 'record-carousel-slot--recording' : ''
@@ -124,7 +124,7 @@ export default function RecordingModeCarousel({
 
   return (
     <div
-      className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+      className={`record-carousel-viewport pointer-events-auto ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
       role="group"
       aria-label="Recording mode"
       onTouchStart={handleTouchStart}

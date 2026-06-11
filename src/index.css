@@ -194,6 +194,17 @@ body.settings-branch-open * {
   z-index: 30;
 }
 
+.app-ui-overlay--pitch-hud-lock .record-carousel-viewport,
+.app-ui-overlay--pitch-hud-lock .record-carousel-track,
+.app-ui-overlay--pitch-hud-lock .record-carousel-slot {
+  pointer-events: auto !important;
+  z-index: 40;
+}
+
+.app-ui-overlay--pitch-hud-lock .control-deck {
+  z-index: 40;
+}
+
 .pitch-display-layer {
   position: fixed;
   inset: 0;
