@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -65,6 +66,15 @@ import {
   updateVaultTake,
   type Project,
 } from './db'
+
+/** Stable pitch source — same object reference when signature unchanged. */
+interface MainAudioPitchSource {
+  mediaRef: RefObject<HTMLMediaElement | null>
+  take: Take | null
+  isPlaying: boolean
+  mediaKey: string
+  liveMicOnly: boolean
+}
 
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
@@ -124,6 +134,10 @@ export default function App() {
   activeProjectIdRef.current = activeProjectId
 
   const pitchUserDismissedRef = useRef(false)
+  const mainAudioPitchSourceCacheRef = useRef<{
+    signature: string
+    value: MainAudioPitchSource | null
+  }>({ signature: '', value: null })
 
   const isReviewOpen = reviewSlot !== null
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
@@ -770,60 +784,69 @@ export default function App() {
   )
 
   const mainAudioPitchSource = useMemo(() => {
-    if (!settings.pitchTrackerEnabled || recordingMode !== 'audio') return null
-    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
+    let next: MainAudioPitchSource | null = null
 
-    if (isRecording && ready) {
-      return {
-        mediaRef: liveMicPlaceholderRef,
-        take: null,
-        isPlaying: true,
-        mediaKey: `main-recording-audio-${streamGeneration}`,
-        liveMicOnly: true,
+    if (settings.pitchTrackerEnabled && recordingMode === 'audio') {
+      if (!isReviewOpen && !isVaultOpen && !isSettingsOpen) {
+        if (isRecording && ready) {
+          next = {
+            mediaRef: liveMicPlaceholderRef,
+            take: null,
+            isPlaying: true,
+            mediaKey: 'main-recording-audio',
+            liveMicOnly: true,
+          }
+        } else if (autoPlaybackTakeId && autoPlaybackTake) {
+          next = {
+            mediaRef: autoPlaybackAudioRef,
+            take: autoPlaybackTake,
+            isPlaying: autoPlaybackPlaying,
+            mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackAudioKey}`,
+            liveMicOnly: false,
+          }
+        } else if (challengerTake?.mediaType === 'audio' && challengerTake.videoUrl) {
+          next = {
+            mediaRef: challengerPipVideoRef,
+            take: challengerTake,
+            isPlaying: challengerPipPlaying,
+            mediaKey: `main-pip-ch-${challengerTake.id}-${challengerTake.filePath}`,
+            liveMicOnly: false,
+          }
+        } else if (benchmarkTake?.mediaType === 'audio' && benchmarkTake.videoUrl) {
+          next = {
+            mediaRef: benchmarkPipVideoRef,
+            take: benchmarkTake,
+            isPlaying: benchmarkPipPlaying,
+            mediaKey: `main-pip-bm-${benchmarkTake.id}-${benchmarkTake.filePath}`,
+            liveMicOnly: false,
+          }
+        } else if (settings.liveMicTunerEnabled && ready) {
+          next = {
+            mediaRef: liveMicPlaceholderRef,
+            take: null,
+            isPlaying: false,
+            mediaKey: 'main-live-mic-audio',
+            liveMicOnly: true,
+          }
+        }
       }
     }
 
-    if (autoPlaybackTakeId && autoPlaybackTake) {
-      return {
-        mediaRef: autoPlaybackAudioRef,
-        take: autoPlaybackTake,
-        isPlaying: autoPlaybackPlaying,
-        mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackAudioKey}`,
-        liveMicOnly: false,
+    const signature = next
+      ? `${next.mediaKey}|${next.isPlaying}|${next.liveMicOnly}|${next.take?.id ?? ''}`
+      : 'null'
+
+    if (signature === mainAudioPitchSourceCacheRef.current.signature) {
+      const cached = mainAudioPitchSourceCacheRef.current.value
+      if (cached && next) {
+        cached.isPlaying = next.isPlaying
+        cached.take = next.take
       }
+      return cached
     }
 
-    if (challengerTake?.mediaType === 'audio' && challengerTake.videoUrl) {
-      return {
-        mediaRef: challengerPipVideoRef,
-        take: challengerTake,
-        isPlaying: challengerPipPlaying,
-        mediaKey: `main-pip-ch-${challengerTake.id}-${challengerTake.filePath}`,
-        liveMicOnly: false,
-      }
-    }
-
-    if (benchmarkTake?.mediaType === 'audio' && benchmarkTake.videoUrl) {
-      return {
-        mediaRef: benchmarkPipVideoRef,
-        take: benchmarkTake,
-        isPlaying: benchmarkPipPlaying,
-        mediaKey: `main-pip-bm-${benchmarkTake.id}-${benchmarkTake.filePath}`,
-        liveMicOnly: false,
-      }
-    }
-
-    if (settings.liveMicTunerEnabled && ready) {
-      return {
-        mediaRef: liveMicPlaceholderRef,
-        take: null,
-        isPlaying: false,
-        mediaKey: `main-live-mic-${streamGeneration}`,
-        liveMicOnly: true,
-      }
-    }
-
-    return null
+    mainAudioPitchSourceCacheRef.current = { signature, value: next }
+    return next
   }, [
     settings.pitchTrackerEnabled,
     settings.liveMicTunerEnabled,
@@ -839,7 +862,6 @@ export default function App() {
     challengerPipPlaying,
     benchmarkTake,
     benchmarkPipPlaying,
-    streamGeneration,
     ready,
     isRecording,
   ])
@@ -872,7 +894,7 @@ export default function App() {
     return {
       mediaRef: liveMicPlaceholderRef,
       isPlaying: true,
-      mediaKey: `main-video-live-${streamGeneration}`,
+      mediaKey: 'main-video-live',
     }
   }, [
     settings.pitchTrackerEnabled,
@@ -880,7 +902,6 @@ export default function App() {
     isReviewOpen,
     isVaultOpen,
     isSettingsOpen,
-    streamGeneration,
     ready,
     isRecording,
   ])
@@ -1234,7 +1255,7 @@ export default function App() {
               liveMicEnabled={settings.liveMicTunerEnabled}
               micStreamRef={streamRef}
               layoutRegion="main"
-              layoutKey={`audio-${recordingMode}-${streamGeneration}`}
+              layoutKey={`audio-${recordingMode}`}
               liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
               tunerInstrument={settings.tunerInstrument}
               onClose={handleClosePitch}
@@ -1252,7 +1273,7 @@ export default function App() {
               pitchSource="microphone"
               micStreamRef={streamRef}
               layoutRegion="main"
-              layoutKey={`video-${recordingMode}-${streamGeneration}`}
+              layoutKey={`video-${recordingMode}`}
               tunerInstrument={settings.tunerInstrument}
               onClose={handleClosePitch}
             />

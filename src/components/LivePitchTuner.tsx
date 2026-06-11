@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
@@ -476,6 +476,27 @@ function LivePitchTunerAudio({
 
   const showPlayback = isPlaying && !liveMicOnly
   const showLive = liveMicOnly && (isPlaying || liveMicEnabled)
+  const liveTrackerEnabled = enabled && showLive
+  const playbackTrackerEnabled = enabled && showPlayback
+
+  const liveTrackerOptions = useMemo(
+    () => ({
+      source: 'microphone' as const,
+      micStreamRef,
+      continuousScroll: true,
+      tunerInstrument,
+    }),
+    [micStreamRef, tunerInstrument],
+  )
+
+  const playbackTrackerOptions = useMemo(
+    () => ({
+      source: 'media' as const,
+      persistWhenPaused: true,
+      tunerInstrument,
+    }),
+    [tunerInstrument],
+  )
 
   useEffect(() => {
     // #region agent log
@@ -498,22 +519,22 @@ function LivePitchTunerAudio({
 
   const liveTracker = useLivePitchTracker(
     mediaRef,
-    enabled && showLive,
-    showLive,
+    liveTrackerEnabled,
+    liveTrackerEnabled,
     `live-mic-${mediaKey}`,
     liveCanvasRef,
     'glass',
-    { source: 'microphone', micStreamRef, continuousScroll: true, tunerInstrument },
+    liveTrackerOptions,
   )
 
   const playbackTracker = useLivePitchTracker(
     mediaRef,
-    enabled && showPlayback,
-    showPlayback,
+    playbackTrackerEnabled,
+    playbackTrackerEnabled,
     `${mediaKey}-playback`,
     playbackCanvasRef,
     'glass',
-    { source: 'media', persistWhenPaused: true, tunerInstrument },
+    playbackTrackerOptions,
   )
 
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'

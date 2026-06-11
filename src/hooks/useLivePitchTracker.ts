@@ -880,7 +880,13 @@ export function useLivePitchTracker(
   const lastNoteRef = useRef('—')
   const goodFrameCountRef = useRef(0)
   const lastStableCentsRef = useRef<number | null>(null)
-  const attachInFlightRef = useRef(false)
+  const isAttaching = useRef(false)
+  const sourceRef = useRef(source)
+  sourceRef.current = source
+  const micStreamRefStable = useRef(micStreamRef)
+  micStreamRefStable.current = micStreamRef
+  const mediaRefStable = useRef(mediaRef)
+  mediaRefStable.current = mediaRef
   const framesSinceAttachAttemptRef = useRef(0)
   const tryAttachRef = useRef<(() => Promise<void>) | null>(null)
   const inTuneGlowRef = useRef(0)
@@ -916,7 +922,7 @@ export function useLivePitchTracker(
     inTuneGlowEligibleRef.current = false
     lastPublishedGlowRef.current = 0
     setInTuneGlow(0)
-  }, [mediaKey, source, tunerInstrument])
+  }, [mediaKey])
 
   useEffect(() => {
     readoutRef.current = readout
@@ -934,7 +940,7 @@ export function useLivePitchTracker(
       }
       graphRef.current = null
     }
-  }, [mediaKey, source, tunerInstrument])
+  }, [mediaKey])
 
   useEffect(() => {
     if (source !== 'media' || !enabled) return
@@ -1002,7 +1008,7 @@ export function useLivePitchTracker(
     let retryTimer: number | null = null
     let initTimer: number | null = null
     let attachAttempt = 0
-    const MAX_ATTACH_ATTEMPTS = source === 'microphone' ? 12 : 36
+    const MAX_ATTACH_ATTEMPTS = sourceRef.current === 'microphone' ? 12 : 36
 
     const scheduleRetry = (delayMs: number) => {
       if (cancelled || attachAttempt >= MAX_ATTACH_ATTEMPTS) return
@@ -1013,9 +1019,22 @@ export function useLivePitchTracker(
     }
 
     const tryAttach = async () => {
-      if (cancelled || attachInFlightRef.current) return
-      attachInFlightRef.current = true
+      if (cancelled || isAttaching.current) return
+
+      if (
+        graphRef.current &&
+        sourceRef.current === 'microphone' &&
+        !isMediaPitchGraph(graphRef.current)
+      ) {
+        return
+      }
+
+      isAttaching.current = true
       attachAttempt += 1
+
+      const source = sourceRef.current
+      const micStreamRef = micStreamRefStable.current
+      const mediaRef = mediaRefStable.current
 
       try {
         if (source === 'microphone') {
@@ -1080,18 +1099,18 @@ export function useLivePitchTracker(
         safeDisposeActiveGraph(graphRef.current && !isMediaPitchGraph(graphRef.current) ? graphRef.current : null)
         graphRef.current = graph
       } catch {
-        scheduleRetry(source === 'microphone' ? 120 : 80)
+        scheduleRetry(sourceRef.current === 'microphone' ? 120 : 80)
       } finally {
-        attachInFlightRef.current = false
+        isAttaching.current = false
       }
     }
 
     const beginAttach = () => {
-      if (cancelled) return
+      if (cancelled || isAttaching.current) return
       void tryAttach()
     }
 
-    if (source === 'microphone') {
+    if (sourceRef.current === 'microphone') {
       initTimer = window.setTimeout(beginAttach, MIC_PITCH_ATTACH_DEFER_MS)
     } else {
       beginAttach()
@@ -1113,8 +1132,9 @@ export function useLivePitchTracker(
         safeDisposeMicGraph(graph)
       }
       graphRef.current = null
+      isAttaching.current = false
     }
-  }, [enabled, mediaKey, mediaRef, micStreamRef, source, tunerInstrument])
+  }, [enabled, mediaKey])
 
   useEffect(() => {
     const shouldTick = enabled && (isPlaying || persistWhenPaused)
