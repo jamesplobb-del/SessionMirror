@@ -23,12 +23,15 @@ import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
-  primeTakePlaybackAudio,
+  primeTakePlaybackAudioSync,
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
 } from './utils/takePlaybackAudio'
-
-const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
+import {
+  prepareInlineMediaElement,
+  safePlayMedia,
+  waitForMediaReady,
+} from './utils/mediaPlayback'
 import {
   generateThumbnailFromBlob,
   captureAndPersistTakeThumbnail,
@@ -74,6 +77,8 @@ import {
   type Project,
 } from './db'
 
+const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
+
 /** Stable pitch source — same object reference when signature unchanged. */
 interface MainAudioPitchSource {
   mediaRef: RefObject<HTMLMediaElement | null>
@@ -116,7 +121,6 @@ export default function App() {
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
-  const [autoPlaybackRequestId, setAutoPlaybackRequestId] = useState(0)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(
     null,
   )
@@ -131,6 +135,7 @@ export default function App() {
   const recordingModeRef = useRef<RecordingMode>('video')
   const pitchCommitTimerRef = useRef<number | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
+  const autoPlaybackGenerationRef = useRef(0)
   const playAutoTakeAudioRef = useRef<(playbackUrl: string, takeId: string) => void>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
@@ -217,11 +222,19 @@ export default function App() {
   }, [])
 
   const stopAutoPlaybackAudio = useCallback(() => {
+    autoPlaybackGenerationRef.current += 1
     queuedAutoPlayRef.current = null
     pendingAutoPlaybackRef.current = false
     teardownAutoPlaybackMedia()
     setAutoPlaybackTakeId(null)
   }, [teardownAutoPlaybackMedia])
+
+  const finishAutoPlayback = useCallback(() => {
+    void releaseTakePlaybackAudio().finally(() => {
+      stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
+    })
+  }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const playAutoTakeAudio = useCallback(
     (playbackUrl: string, takeId: string) => {
@@ -230,13 +243,61 @@ export default function App() {
         return
       }
 
+      const playbackGeneration = autoPlaybackGenerationRef.current + 1
+      autoPlaybackGenerationRef.current = playbackGeneration
+
       teardownAutoPlaybackMedia()
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
+
+      const audio = autoPlaybackAudioRef.current
+      if (!audio) return
+
+      prepareInlineMediaElement(audio)
+      audio.preload = 'auto'
+      audio.src = playbackUrl
+      audio.load()
+
       setAutoPlaybackTakeId(takeId)
       setAutoRecordStartSuppressed(true)
-      setAutoPlaybackRequestId((requestId) => requestId + 1)
+      setAutoPlaybackPlaying(false)
+
+      void (async () => {
+        const ready = await waitForMediaReady(audio)
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+        if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) return
+
+        audio.onended = () => finishAutoPlayback()
+        audio.onerror = () => finishAutoPlayback()
+
+        primeTakePlaybackAudioSync(audio)
+        const started = await safePlayMedia(audio)
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+
+        if (started) {
+          setAutoPlaybackPlaying(true)
+          return
+        }
+
+        console.warn('Auto playback blocked — retrying once after canplay')
+        const retryReady = await waitForMediaReady(audio, 1200)
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+        if (!retryReady) {
+          finishAutoPlayback()
+          return
+        }
+
+        primeTakePlaybackAudioSync(audio)
+        const retryStarted = await safePlayMedia(audio)
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+
+        if (retryStarted) {
+          setAutoPlaybackPlaying(true)
+        } else {
+          finishAutoPlayback()
+        }
+      })()
     },
-    [teardownAutoPlaybackMedia],
+    [finishAutoPlayback, teardownAutoPlaybackMedia],
   )
 
   playAutoTakeAudioRef.current = playAutoTakeAudio
@@ -514,94 +575,6 @@ export default function App() {
     stopAutoPlaybackAudio()
     releaseAutoRecordSuppress(0)
   }, [recordingMode, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
-
-  useEffect(() => {
-    const queued = queuedAutoPlayRef.current
-    if (!queued) return
-
-    let cancelled = false
-    let cleanupListeners: (() => void) | null = null
-
-    const startPlayback = async () => {
-      if (cancelled) return
-
-      const audio = autoPlaybackAudioRef.current
-      if (!audio) {
-        window.requestAnimationFrame(() => {
-          void startPlayback()
-        })
-        return
-      }
-
-      const { url } = queued
-      queuedAutoPlayRef.current = null
-
-      const finish = () => {
-        void releaseTakePlaybackAudio().finally(() => {
-          stopAutoPlaybackAudio()
-          releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
-        })
-      }
-
-      audio.preload = 'auto'
-      audio.muted = false
-      audio.defaultMuted = false
-      audio.volume = 1
-      audio.setAttribute('playsinline', 'true')
-      audio.src = url
-      audio.load()
-
-      await new Promise<void>((resolve) => {
-        if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-          resolve()
-          return
-        }
-
-        const onReady = () => {
-          audio.removeEventListener('loadeddata', onReady)
-          audio.removeEventListener('canplay', onReady)
-          resolve()
-        }
-
-        audio.addEventListener('loadeddata', onReady, { once: true })
-        audio.addEventListener('canplay', onReady, { once: true })
-        cleanupListeners = () => {
-          audio.removeEventListener('loadeddata', onReady)
-          audio.removeEventListener('canplay', onReady)
-        }
-        window.setTimeout(onReady, 1500)
-      })
-
-      if (cancelled) return
-
-      audio.onended = finish
-      audio.onerror = finish
-
-      const tryPlay = async () => {
-        await primeTakePlaybackAudio(audio)
-        await audio.play()
-        setAutoPlaybackPlaying(true)
-      }
-
-      try {
-        await tryPlay()
-      } catch {
-        await new Promise((resolve) => window.setTimeout(resolve, 120))
-        try {
-          await tryPlay()
-        } catch {
-          finish()
-        }
-      }
-    }
-
-    void startPlayback()
-
-    return () => {
-      cancelled = true
-      cleanupListeners?.()
-    }
-  }, [autoPlaybackRequestId, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   useEffect(() => {
     const audio = autoPlaybackAudioRef.current
@@ -898,7 +871,7 @@ export default function App() {
             mediaRef: autoPlaybackAudioRef,
             take: autoPlaybackTake,
             isPlaying: autoPlaybackPlaying,
-            mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackRequestId}`,
+            mediaKey: `main-auto-${autoPlaybackTake.id}`,
             liveMicOnly: false,
           }
         } else if (
@@ -957,7 +930,6 @@ export default function App() {
     autoPlaybackTakeId,
     autoPlaybackTake,
     autoPlaybackPlaying,
-    autoPlaybackRequestId,
     challengerTake,
     challengerPipPlaying,
     benchmarkTake,
@@ -1346,6 +1318,7 @@ export default function App() {
         className="sr-only"
         preload="auto"
         playsInline
+        {...({ 'webkit-playsinline': 'true' } as React.AudioHTMLAttributes<HTMLAudioElement>)}
       />
 
       <LiveCameraBackground

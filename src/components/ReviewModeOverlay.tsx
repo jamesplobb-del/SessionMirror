@@ -12,14 +12,15 @@ import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
-import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { primeTakePlaybackAudioSync, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { playMediaOnUserGesture } from '../utils/mediaPlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 1000
 
 function primeReviewPlaybackAudio(video: HTMLMediaElement): void {
-  void primeTakePlaybackAudio(video)
+  primeTakePlaybackAudioSync(video)
 }
 
 interface ReviewTakeLayerProps {
@@ -367,18 +368,6 @@ export default function ReviewModeOverlay({
     [duration, getActiveVideo, scheduleTimeUpdate],
   )
 
-  const startReviewPlayback = useCallback(() => {
-    if (!reviewAutoplayEnabledRef.current || isScrubbingRef.current) return
-    const video = getActiveVideo()
-    if (!video) return
-    video.muted = false
-    video.volume = 1
-    primeReviewPlaybackAudio(video)
-    void video.play().catch(() => {
-      revealPlayOverlay(false)
-    })
-  }, [getActiveVideo, revealPlayOverlay])
-
   const handleCloseClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
@@ -402,13 +391,12 @@ export default function ReviewModeOverlay({
     const video = getActiveVideo()
     if (!video) return
 
-    video.muted = false
-    video.volume = 1
-    primeReviewPlaybackAudio(video)
-
     if (video.paused) {
-      void primeTakePlaybackAudio(video)
-      void video.play().catch(() => revealPlayOverlay(false))
+      playMediaOnUserGesture(video, () => {
+        primeReviewPlaybackAudio(video)
+      }).then((started) => {
+        if (!started) revealPlayOverlay(false)
+      })
     } else {
       video.pause()
       void releaseTakePlaybackAudio()
@@ -467,28 +455,12 @@ export default function ReviewModeOverlay({
     setDuration(0)
     setIsPlaying(false)
     setShowPlayOverlay(true)
-
-    const playWhenReady = () => {
-      if (!reviewAutoplayEnabledRef.current) return
-      startReviewPlayback()
-    }
-
-    video.addEventListener('loadeddata', playWhenReady, { once: true })
-    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      playWhenReady()
-    } else {
-      video.load()
-    }
-
-    return () => {
-      video.removeEventListener('loadeddata', playWhenReady)
-    }
+    video.load()
   }, [
     activeSlot,
     getActiveVideo,
     isOpen,
     isVault,
-    startReviewPlayback,
     vaultTake?.id,
     vaultIndex,
   ])
@@ -578,10 +550,12 @@ export default function ReviewModeOverlay({
       syncDurationFromVideo(video)
 
       if (wasPlayingBeforeScrubRef.current) {
-        video.muted = false
-        void video.play().then(() => {
-          setIsPlaying(true)
-        }).catch(() => revealPlayOverlay(false))
+        playMediaOnUserGesture(video, () => {
+          primeReviewPlaybackAudio(video)
+        }).then((started) => {
+          if (started) setIsPlaying(true)
+          else revealPlayOverlay(false)
+        })
       }
     }
 
@@ -861,7 +835,7 @@ export default function ReviewModeOverlay({
                 type="button"
                 intensity="icon"
                 data-play-overlay
-                onClick={(e) => {
+                onPointerUp={(e) => {
                   e.stopPropagation()
                   togglePlayPause()
                 }}

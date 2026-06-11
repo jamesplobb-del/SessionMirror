@@ -165,6 +165,8 @@ export default function TakeVideoPlayer({
           {...audioRest}
           muted={!audible}
           autoPlay={false}
+          playsInline
+          {...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>)}
         />
         <div
           className="pointer-events-none absolute inset-0 flex items-center justify-center"

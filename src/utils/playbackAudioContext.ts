@@ -25,8 +25,22 @@ export async function getPlaybackAudioContext(): Promise<AudioContext> {
 }
 
 export function resumePlaybackAudioContext(): void {
-  if (!playbackContext || playbackContext.state === 'closed') return
-  void playbackContext.resume().catch(() => {})
+  primePlaybackAudioContextSync()
+}
+
+/** Create or resume the shared playback context — call synchronously inside a user gesture. */
+export function primePlaybackAudioContextSync(): AudioContext {
+  if (!playbackContext || playbackContext.state === 'closed') {
+    playbackContext = createPlaybackContext()
+  }
+
+  if (playbackContext.state === 'suspended') {
+    void playbackContext.resume().catch((error: unknown) => {
+      console.warn('Playback AudioContext resume blocked:', error)
+    })
+  }
+
+  return playbackContext
 }
 
 export function isSharedPlaybackContext(context: AudioContext): boolean {

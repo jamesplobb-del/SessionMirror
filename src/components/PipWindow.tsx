@@ -3,6 +3,8 @@ import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
+import { playMediaOnUserGesture } from '../utils/mediaPlayback'
+import { primeTakePlaybackAudioSync, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 
 import type { Take } from '../types'
 
@@ -105,7 +107,7 @@ function PipWindow({
   }, [suspendPlayback, videoRef, videoSourceKey])
 
   const handlePlayPauseClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
+    (event: PointerEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback) return
@@ -113,13 +115,15 @@ function PipWindow({
       if (!video) return
 
       if (video.paused) {
-        video.muted = false
-        video.volume = 1
-        void video.play()
-        setIsPlaying(true)
+        playMediaOnUserGesture(video, () => {
+          primeTakePlaybackAudioSync(video)
+        }).then((started) => {
+          setIsPlaying(started)
+        })
       } else {
         video.pause()
-        video.muted = true
+        if ('muted' in video) video.muted = true
+        void releaseTakePlaybackAudio()
         setIsPlaying(false)
       }
     },
@@ -241,7 +245,7 @@ function PipWindow({
                 onPointerDown={stopEventBubble}
                 onTouchStart={stopEventBubble}
                 onTouchEnd={stopEventBubble}
-                onClick={handlePlayPauseClick}
+                onPointerUp={handlePlayPauseClick}
                 className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >

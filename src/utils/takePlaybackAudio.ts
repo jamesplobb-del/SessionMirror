@@ -1,5 +1,5 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
-import { resumePlaybackAudioContext } from './playbackAudioContext'
+import { primePlaybackAudioContextSync } from './playbackAudioContext'
 
 type MicHandler = () => void | Promise<void>
 
@@ -15,21 +15,29 @@ export function registerTakePlaybackMicHandlers(handlers: {
 }
 
 /** Prepare HTML media elements for audible speaker playback using standard Web APIs. */
-export async function primeTakePlaybackAudio(
+export function primeTakePlaybackAudioSync(
   ...media: Array<HTMLMediaElement | null | undefined>
-): Promise<void> {
-  await suspendMicInput?.()
-
-  resumePlaybackAudioContext()
+): void {
+  void suspendMicInput?.()
+  primePlaybackAudioContextSync()
 
   for (const element of media) {
     if (!element) continue
     element.muted = false
     element.defaultMuted = false
     element.volume = 1
+    element.setAttribute('playsinline', 'true')
+    element.setAttribute('webkit-playsinline', 'true')
   }
 
   resumePitchGraphsForMedia(...media)
+}
+
+/** Async wrapper — prefer primeTakePlaybackAudioSync inside gesture handlers. */
+export async function primeTakePlaybackAudio(
+  ...media: Array<HTMLMediaElement | null | undefined>
+): Promise<void> {
+  primeTakePlaybackAudioSync(...media)
 }
 
 /** Restore mic capture after take playback finishes. */
