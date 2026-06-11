@@ -612,16 +612,17 @@ function drawSmoothPitchTrace(
   ctx: CanvasRenderingContext2D,
   points: TraceDisplayPoint[],
   theme: PitchCanvasTheme,
+  responsiveTrace = false,
 ): void {
   if (points.length < 2) return
 
-  if (theme === 'glass-legacy') {
+  if (theme === 'glass-legacy' && !responsiveTrace) {
     drawColoredTraceSegments(ctx, points, 4.5, 0.34, true)
     drawColoredTraceSegments(ctx, points, 3.1, 0.96)
     return
   }
 
-  if (theme === 'glass') {
+  if (theme === 'glass-widget' || theme === 'glass-legacy') {
     drawColoredTraceSegments(ctx, points, 3.1, 0.96)
     return
   }
@@ -668,12 +669,12 @@ function drawTraceEndpointDot(
   const dotGlow = glowColorForCents(point.cents)
   const isGreen = Math.abs(point.cents) <= TUNING_GREEN_CENTS
   const glowBoost = isGreen ? Math.max(0, inTuneGlow) : 0
-  const isModernGlass = theme === 'glass'
-  const isGlassStyle = theme === 'glass' || theme === 'glass-legacy'
+  const isWidgetGlass = theme === 'glass-widget'
+  const isGlassStyle = theme === 'glass-widget' || theme === 'glass-legacy'
   const radius = isGlassStyle ? 5 + glowBoost * 1.2 : 4.5
   const glowRadius = isGlassStyle ? 7 + glowBoost * 5 : 6
 
-  if (glowBoost > 0.08 && !isModernGlass) {
+  if (glowBoost > 0.08 && !isWidgetGlass) {
     ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + Math.min(1, glowBoost) * 0.5})`
     ctx.shadowBlur = 4 + glowBoost * 12
   }
@@ -749,81 +750,36 @@ function drawGlassLegacyGrid(
 }
 
 /** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 2
+const GLASS_STATIC_GRID_VERSION = 4
+
+type GlassStaticVariant = 'widget' | 'legacy'
 
 interface GlassStaticLayerCache {
   width: number
   height: number
   dpr: number
   version: number
+  variant: GlassStaticVariant
   canvas: HTMLCanvasElement
 }
 
 const glassStaticLayerCache = new WeakMap<HTMLCanvasElement, GlassStaticLayerCache>()
 
-function drawGlassStaticContent(
+function drawGlassWidgetStaticContent(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
 ): void {
-  const { pitchTop, pitchBottom, pitchHeight, centsToY } = getGlassLayoutMetrics(height)
+  const { pitchTop, pitchBottom } = getGlassLayoutMetrics(height)
 
   ctx.clearRect(0, 0, width, height)
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
-  ctx.lineWidth = 1
-  ctx.lineCap = 'round'
-  ctx.setLineDash([1, 4])
-
-  const gridXStep = Math.max(14, Math.floor(width / 12))
-  for (let x = gridXStep; x < width; x += gridXStep) {
-    ctx.beginPath()
-    ctx.moveTo(x + 0.5, pitchTop)
-    ctx.lineTo(x + 0.5, pitchBottom)
-    ctx.stroke()
-  }
-
-  const gridYStep = pitchHeight / 8
-  for (let i = 1; i < 8; i += 1) {
-    const y = pitchTop + i * gridYStep
-    ctx.beginPath()
-    ctx.moveTo(0, y + 0.5)
-    ctx.lineTo(width, y + 0.5)
-    ctx.stroke()
-  }
-
-  ctx.setLineDash([])
-  ctx.lineCap = 'butt'
-
-  const labelFont =
-    '300 9px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
-  ctx.font = labelFont
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('Sharp', 2, centsToY(50) - 10)
-  ctx.font = '300 8px ui-monospace, SFMono-Regular, Menlo, monospace'
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.28)'
-  ctx.fillText('+50', 2, centsToY(50))
-  ctx.fillText('0', 2, centsToY(0))
-  ctx.fillText('-50', 2, centsToY(-50))
-  ctx.font = labelFont
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
-  ctx.fillText('Flat', 2, centsToY(-50) + 10)
-
-  const centerY = centsToY(0)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
-  ctx.lineWidth = 5
-  ctx.beginPath()
-  ctx.moveTo(0, centerY)
-  ctx.lineTo(width, centerY)
-  ctx.stroke()
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(0, centerY)
-  ctx.lineTo(width, centerY)
-  ctx.stroke()
+  const bg = ctx.createLinearGradient(0, pitchTop, 0, pitchBottom)
+  bg.addColorStop(0, 'rgba(8, 10, 14, 0.92)')
+  bg.addColorStop(0.55, 'rgba(6, 7, 10, 0.96)')
+  bg.addColorStop(1, 'rgba(3, 4, 6, 0.98)')
+  ctx.fillStyle = bg
+  ctx.fillRect(0, pitchTop, width, pitchBottom - pitchTop)
 }
 
 function blitGlassStaticLayer(
@@ -832,6 +788,7 @@ function blitGlassStaticLayer(
   width: number,
   height: number,
   dpr: number,
+  variant: GlassStaticVariant,
 ): ReturnType<typeof getGlassLayoutMetrics> {
   let cache = glassStaticLayerCache.get(canvas)
   if (
@@ -839,7 +796,8 @@ function blitGlassStaticLayer(
     cache.width !== width ||
     cache.height !== height ||
     cache.dpr !== dpr ||
-    cache.version !== GLASS_STATIC_GRID_VERSION
+    cache.version !== GLASS_STATIC_GRID_VERSION ||
+    cache.variant !== variant
   ) {
     const off = cache?.canvas ?? document.createElement('canvas')
     off.width = Math.floor(width * dpr)
@@ -847,8 +805,14 @@ function blitGlassStaticLayer(
     const offCtx = off.getContext('2d')
     if (!offCtx) return getGlassLayoutMetrics(height)
     offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    drawGlassStaticContent(offCtx, width, height)
-    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, canvas: off }
+    if (variant === 'widget') {
+      drawGlassWidgetStaticContent(offCtx, width, height)
+    } else {
+      const { pitchTop, pitchBottom, pitchHeight, centsToY } = getGlassLayoutMetrics(height)
+      offCtx.clearRect(0, 0, width, height)
+      drawGlassLegacyGrid(offCtx, width, pitchTop, pitchBottom, pitchHeight, centsToY)
+    }
+    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, variant, canvas: off }
     glassStaticLayerCache.set(canvas, cache)
   }
 
@@ -881,8 +845,8 @@ function drawPitchCanvas(
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
-  const isGlass = theme === 'glass' || theme === 'glass-legacy'
-  const isModernGlass = theme === 'glass'
+  const isGlass = theme === 'glass-widget' || theme === 'glass-legacy'
+  const isWidgetGlass = theme === 'glass-widget'
   const isLegacyGlass = theme === 'glass-legacy'
   const pitchTop = isGlass ? height * 0.12 : height * 0.04
   const pitchBottom = isGlass ? height * 0.92 : height * 0.86
@@ -895,13 +859,12 @@ function drawPitchCanvas(
 
   let centsToY: (cents: number) => number
 
-  if (isModernGlass) {
-    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr)
+  if (isWidgetGlass) {
+    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'widget')
     centsToY = metrics.centsToY
   } else if (isLegacyGlass) {
-    centsToY = (cents: number) =>
-      midPitchY - (Math.max(-50, Math.min(50, cents)) / 50) * (pitchHeight * 0.46)
-    drawGlassLegacyGrid(ctx, width, pitchTop, pitchBottom, pitchHeight, centsToY)
+    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'legacy')
+    centsToY = metrics.centsToY
   } else {
     const bg = ctx.createLinearGradient(0, 0, 0, height)
     bg.addColorStop(0, '#0c1018')
@@ -943,7 +906,7 @@ function drawPitchCanvas(
     ctx.lineTo(width, centerY)
     ctx.stroke()
     ctx.setLineDash([])
-  } else if (isModernGlass) {
+  } else if (isWidgetGlass) {
     drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight, true)
   } else {
     const centerY = centsToY(0)
@@ -968,7 +931,7 @@ function drawPitchCanvas(
   )
 
   if (tracePoints.length > 1) {
-    drawSmoothPitchTrace(ctx, tracePoints, theme)
+    drawSmoothPitchTrace(ctx, tracePoints, theme, responsiveTrace)
   }
 
   if (active && tracePoints.length > 0) {
@@ -1335,7 +1298,10 @@ export function useLivePitchTracker(
     }
 
     if (sourceRef.current === 'microphone') {
-      initTimer = window.setTimeout(beginAttach, MIC_PITCH_ATTACH_DEFER_MS)
+      initTimer = window.setTimeout(
+        beginAttach,
+        realtimeModeRef.current ? 0 : MIC_PITCH_ATTACH_DEFER_MS,
+      )
     } else {
       beginAttach()
     }

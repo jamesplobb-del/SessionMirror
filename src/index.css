@@ -1314,6 +1314,17 @@ video.camera-preview.camera-preview--hidden {
   min-height: 3.5rem;
   contain: layout paint;
   transform: translateZ(0);
+  background: rgba(4, 5, 8, 0.55);
+  border-radius: 0.75rem;
+}
+
+.control-deck__vault-btn {
+  transform: none !important;
+}
+
+html.physical-landscape-left .control-deck__vault-btn,
+html.physical-landscape-right .control-deck__vault-btn {
+  transform: none !important;
 }
 
 .pitch-widget-hint {

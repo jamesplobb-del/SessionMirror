@@ -485,6 +485,7 @@ function LivePitchTunerAudio({
       micStreamRef,
       continuousScroll: true,
       tunerInstrument,
+      realtimeMode: true,
     }),
     [micStreamRef, tunerInstrument],
   )
@@ -494,6 +495,7 @@ function LivePitchTunerAudio({
       source: 'media' as const,
       persistWhenPaused: true,
       tunerInstrument,
+      realtimeMode: true,
     }),
     [tunerInstrument],
   )
@@ -599,7 +601,7 @@ export default function LivePitchTuner({
   const isWidget = variant === 'widget'
   const isAudio = variant === 'audio'
   const isStage = variant === 'stage'
-  const canvasTheme = isPanel || isWidget || isAudio ? 'glass' : 'solid'
+  const canvasTheme = isWidget ? 'glass-widget' : isPanel ? 'glass-legacy' : 'solid'
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const widgetContinuousScroll = isWidget && persistWhenPaused
   const liveMicWidget = isWidget && pitchSource === 'microphone'
