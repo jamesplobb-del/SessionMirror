@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type 
 import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
-import { setMediaPlaybackVolume } from '../hooks/useLivePitchTracker'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { playMediaOnUserGesture } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudioSync, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
@@ -135,7 +134,7 @@ function PipWindow({
     (value: number) => {
       const video = videoRef.current
       if (!video) return
-      setMediaPlaybackVolume(video, value)
+      video.volume = value
       setVolume(value)
     },
     [videoRef],
@@ -216,7 +215,6 @@ function PipWindow({
               recordingOrientation={recordingOrientation}
               controls={false}
               manualPlayOnly
-              audible={isPlaying && !suspendPlayback}
               eagerLoad
               preload="auto"
             />

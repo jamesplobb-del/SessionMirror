@@ -1,8 +1,4 @@
-import { resumePitchGraphsForMedia, setMediaPlaybackVolume } from '../hooks/useLivePitchTracker'
-import {
-  primeNativeSpeakerPlayback,
-  restoreNativeRecordingSession,
-} from '../plugins/sessionMirrorAudio'
+import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import { primePlaybackAudioContextSync } from './playbackAudioContext'
 
 type MicHandler = () => void | Promise<void>
@@ -22,14 +18,14 @@ export function registerTakePlaybackMicHandlers(handlers: {
 export function primeTakePlaybackAudioSync(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  void primeNativeSpeakerPlayback()
   void suspendMicInput?.()
   primePlaybackAudioContextSync()
 
   for (const element of media) {
     if (!element) continue
-    setMediaPlaybackVolume(element, element.volume > 0 ? element.volume : 1)
+    element.muted = false
     element.defaultMuted = false
+    element.volume = 1
     element.setAttribute('playsinline', 'true')
     element.setAttribute('webkit-playsinline', 'true')
   }
@@ -44,8 +40,7 @@ export async function primeTakePlaybackAudio(
   primeTakePlaybackAudioSync(...media)
 }
 
-/** Restore mic capture and the recording audio session after take playback finishes. */
+/** Restore mic capture after take playback finishes. */
 export async function releaseTakePlaybackAudio(): Promise<void> {
-  await restoreNativeRecordingSession()
   await resumeMicInput?.()
 }
