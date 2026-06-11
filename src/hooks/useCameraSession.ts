@@ -17,11 +17,8 @@ import {
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream } from '../utils/audioCapture'
-import {
-  agentDebugLog,
-  readAudioTrackSettings,
-  readVideoTrackSettings,
-} from '../utils/agentDebugLog'
+import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
+import { agentDebugLog } from '../utils/agentDebugLog'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
   applyViewportCssVars,
@@ -99,18 +96,6 @@ function attachPreviewStream(
 
   if (video.srcObject !== stream) {
     video.srcObject = stream
-    // #region agent log
-    agentDebugLog(
-      'useCameraSession.ts:attachPreviewStream',
-      'preview stream attached',
-      {
-        mode,
-        width: window.innerWidth,
-        height: window.innerHeight,
-      },
-      'H-O2',
-    )
-    // #endregion
   }
   video.muted = true
   void video.play().catch(() => {})
@@ -267,18 +252,6 @@ export function useCameraSession({
       }
       await tuneMusicRecordingStream(mediaStream)
       streamRef.current = mediaStream
-      // #region agent log
-      agentDebugLog(
-        'useCameraSession.ts:acquireStream',
-        'stream acquired',
-        {
-          mode,
-          video: readVideoTrackSettings(mediaStream),
-          audio: readAudioTrackSettings(mediaStream),
-        },
-        'H-C',
-      )
-      // #endregion
       attachPreviewStream(previewRef.current, mediaStream, mode)
       setStreamGeneration((generation) => generation + 1)
       setReady(true)
@@ -319,34 +292,10 @@ export function useCameraSession({
         attachPreviewStream(previewRef.current, streamRef.current, mode)
         setReady(true)
         activeStream = streamRef.current
-        // #region agent log
-        agentDebugLog(
-          'useCameraSession.ts:startWithRecovery',
-          'reused compatible stream',
-          {
-            mode,
-            videoTracks: streamRef.current.getVideoTracks().length,
-            audioTracks: streamRef.current.getAudioTracks().length,
-          },
-          'H6',
-        )
-        // #endregion
         return
       }
 
       if (streamRef.current && isStreamRecordable(streamRef.current, mode)) {
-        // #region agent log
-        agentDebugLog(
-          'useCameraSession.ts:startWithRecovery',
-          'stream recordable but incompatible — forcing re-acquire',
-          {
-            mode,
-            videoTracks: streamRef.current.getVideoTracks().length,
-            audioTracks: streamRef.current.getAudioTracks().length,
-          },
-          'H6',
-        )
-        // #endregion
       }
 
       await new Promise<void>((resolve) => {
@@ -493,25 +442,6 @@ export function useCameraSession({
           const completedMode = recordingModeRef.current
           const durationSeconds = elapsedRef.current
 
-          // #region agent log
-          agentDebugLog(
-            'useCameraSession.ts:onstop',
-            'recording finalized',
-            {
-              takeId: stoppedTakeId,
-              durationSeconds,
-              capturedChunks: capturedChunks.length,
-              capturedBytes: capturedChunks.reduce(
-                (sum, chunk) => sum + (chunk instanceof Blob ? chunk.size : 0),
-                0,
-              ),
-              usedWriter: Boolean(activeWriter),
-              mimeType: recorderMimeTypeRef.current,
-            },
-            'H-E',
-          )
-          // #endregion
-
           try {
             if (activeWriter) {
               const persisted = await activeWriter.finalize()
@@ -616,8 +546,23 @@ export function useCameraSession({
       recordingModeRef.current !== 'audio' ||
       isRecordingRef.current ||
       armedAutoAudioRef.current ||
-      warmAutoAudioInFlightRef.current
+      warmAutoAudioInFlightRef.current ||
+      isAutoPlaybackHoldingMicWarmup()
     ) {
+      // #region agent log
+      agentDebugLog(
+        'useCameraSession.ts:warmAutoAudioRecorder',
+        'warm skipped',
+        {
+          mode: recordingModeRef.current,
+          isRecording: isRecordingRef.current,
+          armed: Boolean(armedAutoAudioRef.current),
+          inFlight: warmAutoAudioInFlightRef.current,
+          playbackHold: isAutoPlaybackHoldingMicWarmup(),
+        },
+        'H-B',
+      )
+      // #endregion
       return
     }
 
@@ -660,6 +605,17 @@ export function useCameraSession({
 
   scheduleWarmAutoAudioRef.current = () => {
     if (recordingModeRef.current !== 'audio') return
+    if (isAutoPlaybackHoldingMicWarmup()) {
+      // #region agent log
+      agentDebugLog(
+        'useCameraSession.ts:scheduleWarmAutoAudio',
+        'deferred warm — auto-playback hold',
+        {},
+        'H-B',
+      )
+      // #endregion
+      return
+    }
     window.setTimeout(() => {
       void warmAutoAudioRecorder()
     }, 200)
@@ -671,19 +627,6 @@ export function useCameraSession({
     void (async () => {
       const currentStream = await ensureRecordableStream()
       if (!currentStream || isRecordingRef.current) return
-
-      // #region agent log
-      agentDebugLog(
-        'useCameraSession.ts:startRecording:beforeTune',
-        'record start (no mid-stream retune)',
-        {
-          video: readVideoTrackSettings(currentStream),
-          audio: readAudioTrackSettings(currentStream),
-          orientation: readRecordingOrientation(),
-        },
-        'H-A',
-      )
-      // #endregion
 
       const takeId = crypto.randomUUID()
       const mode = recordingModeRef.current
@@ -788,28 +731,12 @@ export function useCameraSession({
     if (shouldUseRecordingTimeslice(mimeType)) {
       try {
         if (recorder.state === 'recording') {
-          // #region agent log
-          agentDebugLog(
-            'useCameraSession.ts:stopRecording',
-            'requestData before stop (timesliced)',
-            { state: recorder.state, mimeType },
-            'H-E',
-          )
-          // #endregion
           recorder.requestData()
         }
       } catch {
         /* requestData may throw if already stopping */
       }
     } else {
-      // #region agent log
-      agentDebugLog(
-        'useCameraSession.ts:stopRecording',
-        'stop without requestData (single-blob mp4)',
-        { state: recorder.state, mimeType },
-        'H-E',
-      )
-      // #endregion
     }
 
     recorder.stop()
@@ -829,15 +756,6 @@ export function useCameraSession({
 
       cancelScheduledRelease()
       setError(null)
-
-      // #region agent log
-      agentDebugLog(
-        'useCameraSession.ts:changeRecordingMode',
-        'recording mode change requested',
-        { from: recordingModeRef.current, to: mode },
-        'H6',
-      )
-      // #endregion
 
       startTransition(() => {
         setReady(false)
@@ -869,14 +787,6 @@ export function useCameraSession({
       if (isStreamRecordable(stream, mode)) {
         attachPreviewStream(previewRef.current, stream, mode)
         setReady(true)
-        // #region agent log
-        agentDebugLog(
-          'useCameraSession.ts:restartCameraAfterForeground',
-          'reused live stream on foreground',
-          { mode },
-          'H-C',
-        )
-        // #endregion
         return
       }
 
@@ -940,17 +850,6 @@ export function useCameraSession({
     }
 
     attachPreviewStream(previewRef.current, stream, mode)
-    // #region agent log
-    agentDebugLog(
-      'useCameraSession.ts:refreshCameraSession',
-      'preview refreshed without streamGeneration bump',
-      {
-        mode,
-        streamLive: isStreamRecordable(stream, mode),
-      },
-      'H-C',
-    )
-    // #endregion
   }, [cancelScheduledRelease, restartCameraAfterForeground])
 
   const suspendMicForPlayback = useCallback(async () => {
@@ -962,14 +861,6 @@ export function useCameraSession({
         track.stop()
       }
     }
-    // #region agent log
-    agentDebugLog(
-      'useCameraSession.ts:suspendMicForPlayback',
-      'mic audio tracks stopped for playback',
-      { remainingLive: stream.getAudioTracks().filter((t) => t.readyState === 'live').length },
-      'H-B',
-    )
-    // #endregion
   }, [])
 
   const resumeMicAfterPlayback = useCallback(async () => {

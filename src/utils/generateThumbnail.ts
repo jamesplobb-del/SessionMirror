@@ -8,7 +8,6 @@ import {
   drawTakeVideoFrame,
   type RecordingOrientation,
 } from './takeVideoTransform'
-import { agentDebugLog } from './agentDebugLog'
 import type { Take } from '../types'
 
 const THUMBNAIL_SEEK_SECONDS = 0.1
@@ -118,29 +117,8 @@ export async function regenerateTakeThumbnailFromVideo(
           recordingOrientation,
         })
         const persisted = await persistTakeThumbnail(takeId, dataUrl, recordingOrientation)
-        // #region agent log
-        agentDebugLog(
-          'generateThumbnail.ts:regenerateTakeThumbnailFromVideo',
-          'thumbnail self-healed',
-          { takeId, mirror, orientation: recordingOrientation, ok: true },
-          'H-V2',
-        )
-        // #endregion
         return persisted
       } catch (err) {
-        // #region agent log
-        agentDebugLog(
-          'generateThumbnail.ts:regenerateTakeThumbnailFromVideo',
-          'thumbnail heal failed',
-          {
-            takeId,
-            mirror,
-            orientation: recordingOrientation,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          'H-V2',
-        )
-        // #endregion
       }
     }
 
@@ -304,23 +282,6 @@ export async function hydrateTakeThumbnailsInBackground(
   const targets = takes.filter((take) => !isAudioTake(take) && !take.thumbnailUrl)
   if (targets.length === 0) return
 
-  const hydrateStarted = Date.now()
-  // #region agent log
-  agentDebugLog(
-    'generateThumbnail.ts:hydrateTakeThumbnailsInBackground',
-    'hydrate started',
-    {
-      targetCount: targets.length,
-      missingUrl: targets.filter((t) => !t.thumbnailUrl).length,
-      landscapeRecapture: targets.filter(
-        (t) => t.thumbnailUrl && t.recordingOrientation === 'landscape',
-      ).length,
-      concurrency: Math.min(THUMBNAIL_CONCURRENCY, targets.length),
-    },
-    'H-V1',
-  )
-  // #endregion
-
   let cursor = 0
   const pending = new Map<string, string>()
 
@@ -346,15 +307,4 @@ export async function hydrateTakeThumbnailsInBackground(
   const workerCount = Math.min(THUMBNAIL_CONCURRENCY, targets.length)
   await Promise.all(Array.from({ length: workerCount }, () => worker()))
   flushPending()
-  // #region agent log
-  agentDebugLog(
-    'generateThumbnail.ts:hydrateTakeThumbnailsInBackground',
-    'hydrate finished',
-    {
-      targetCount: targets.length,
-      elapsedMs: Date.now() - hydrateStarted,
-    },
-    'H-V6',
-  )
-  // #endregion
 }

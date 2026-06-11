@@ -13,8 +13,6 @@ import {
   type PitchReadout,
 } from '../utils/pitchUtils'
 import type { TunerInstrument } from '../utils/pitchConfig'
-import { agentDebugLog } from '../utils/agentDebugLog'
-
 interface LivePitchTunerProps {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -371,22 +369,6 @@ function LivePitchTunerAudio({
   )
 
   useEffect(() => {
-    // #region agent log
-    agentDebugLog(
-      'LivePitchTuner.tsx:LivePitchTunerAudio',
-      'audio pitch pane state',
-      {
-        mediaKey,
-        showLive,
-        showPlayback,
-        liveMicOnly,
-        isPlaying,
-        liveMicEnabled,
-        enabled,
-      },
-      'H2',
-    )
-    // #endregion
   }, [enabled, isPlaying, liveMicEnabled, liveMicOnly, mediaKey, showLive, showPlayback])
 
   const liveTracker = useLivePitchTracker(
@@ -541,10 +523,10 @@ export default function LivePitchTuner({
             </p>
           </div>
 
-          <div className="pitch-widget-chart relative min-h-0 flex-1 overflow-hidden px-3.5 pb-3">
+          <div className="pitch-widget-chart relative min-h-0 flex-1 overflow-hidden">
             <PitchChartCanvas canvasRef={canvasRef} glass fill />
             {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
-              <p className="pitch-widget-hint pointer-events-none absolute inset-x-3 bottom-2 text-center">
+              <p className="pitch-widget-hint pointer-events-none absolute inset-x-3.5 bottom-2 text-center">
                 Pitch trace during playback
               </p>
             )}

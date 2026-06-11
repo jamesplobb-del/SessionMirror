@@ -28,8 +28,6 @@ import {
   tuneMusicRecordingStream,
 } from '../utils/audioCapture'
 import { getPlaybackAudioContext, isSharedPlaybackContext, resumePlaybackAudioContext } from '../utils/playbackAudioContext'
-import { agentDebugLog } from '../utils/agentDebugLog'
-
 const HISTORY_LENGTH = 140
 
 /** Brief hold before glow begins (~220ms). */
@@ -118,6 +116,23 @@ function drawInTuneBandRegion(
   const bandHeight = Math.abs(yBottom - yTop)
   const t = Math.min(1, inTuneHighlight)
   const boost = Math.max(0, inTuneHighlight)
+
+  if (lite) {
+    if (boost > 0.01) {
+      ctx.fillStyle = `rgba(34, 197, 94, ${0.05 + t * 0.14})`
+      ctx.fillRect(0, bandTop, width, bandHeight)
+    }
+
+    const centerY = centsToY(0)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.moveTo(0, centerY)
+    ctx.lineTo(width, centerY)
+    ctx.stroke()
+    return
+  }
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.09)'
   ctx.fillRect(0, bandTop, width, bandHeight)
@@ -233,25 +248,8 @@ async function createMicPitchGraph(
 
   if (!stream) {
     if (requireExistingStream) {
-      // #region agent log
-      agentDebugLog(
-        'useLivePitchTracker.ts:createMicPitchGraph',
-        'shared mic not ready',
-        { requireExistingStream, hasRef: Boolean(existingStream), active: existingStream?.active ?? false },
-        'H3',
-      )
-      // #endregion
       throw new Error('Shared mic stream not ready')
     }
-
-    // #region agent log
-    agentDebugLog(
-      'useLivePitchTracker.ts:createMicPitchGraph',
-      'calling getUserMedia for pitch',
-      { requireExistingStream },
-      'H1',
-    )
-    // #endregion
 
     stream = await navigator.mediaDevices.getUserMedia({
       audio: getMusicRecordingAudioConstraints(),
@@ -260,14 +258,6 @@ async function createMicPitchGraph(
     await tuneMusicRecordingStream(stream)
     ownsStream = true
   } else {
-    // #region agent log
-    agentDebugLog(
-      'useLivePitchTracker.ts:createMicPitchGraph',
-      'using shared mic stream (skip retune)',
-      { trackCount: stream.getAudioTracks().length },
-      'H1',
-    )
-    // #endregion
     /* Shared session mic is already tuned in useCameraSession.acquireStream. */
   }
 
@@ -564,24 +554,6 @@ async function createPitchGraph(
   }
 
   elementGraphs.set(media, graph)
-  // #region agent log
-  agentDebugLog(
-    'useLivePitchTracker.ts:createPitchGraph',
-    'pitch graph attached',
-    {
-      mode,
-      hasPassthrough: Boolean(passthrough),
-      contextState: context.state,
-      srcKind: media.src.startsWith('blob:')
-        ? 'blob'
-        : media.src.includes('capacitor')
-          ? 'capacitor'
-          : 'other',
-      tag: media.getAttribute('data-debug-playback-tag') ?? 'unknown',
-    },
-    'H-C',
-  )
-  // #endregion
   return graph
 }
 
@@ -784,8 +756,8 @@ function drawTraceEndpointDot(
 }
 
 function getGlassLayoutMetrics(height: number) {
-  const pitchTop = height * 0.12
-  const pitchBottom = height * 0.92
+  const pitchTop = height * 0.06
+  const pitchBottom = height * 0.96
   const pitchHeight = pitchBottom - pitchTop
   const midPitchY = pitchTop + pitchHeight * 0.5
   const centsToY = (cents: number) =>
@@ -840,7 +812,7 @@ function drawGlassLegacyGrid(
 }
 
 /** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 4
+const GLASS_STATIC_GRID_VERSION = 5
 
 type GlassStaticVariant = 'widget' | 'legacy'
 
@@ -860,16 +832,13 @@ function drawGlassWidgetStaticContent(
   width: number,
   height: number,
 ): void {
-  const { pitchTop, pitchBottom } = getGlassLayoutMetrics(height)
-
   ctx.clearRect(0, 0, width, height)
 
-  const bg = ctx.createLinearGradient(0, pitchTop, 0, pitchBottom)
-  bg.addColorStop(0, 'rgba(8, 10, 14, 0.92)')
-  bg.addColorStop(0.55, 'rgba(6, 7, 10, 0.96)')
-  bg.addColorStop(1, 'rgba(3, 4, 6, 0.98)')
+  const bg = ctx.createLinearGradient(0, 0, 0, height)
+  bg.addColorStop(0, 'rgba(6, 8, 12, 0.72)')
+  bg.addColorStop(1, 'rgba(2, 3, 5, 0.82)')
   ctx.fillStyle = bg
-  ctx.fillRect(0, pitchTop, width, pitchBottom - pitchTop)
+  ctx.fillRect(0, 0, width, height)
 }
 
 function blitGlassStaticLayer(
@@ -1321,14 +1290,6 @@ export function useLivePitchTracker(
           const sharedStream = micStreamRef?.current
 
           if (requireSharedMic && !micStreamIsLive(sharedStream)) {
-            // #region agent log
-            agentDebugLog(
-              'useLivePitchTracker.ts:tryAttach',
-              'mic attach retry — shared stream not live',
-              { attachAttempt, mediaKey, sharedActive: sharedStream?.active ?? false },
-              'H3',
-            )
-            // #endregion
             scheduleRetry(100)
             return
           }
@@ -1349,14 +1310,6 @@ export function useLivePitchTracker(
               : null,
           )
           graphRef.current = graph
-          // #region agent log
-          agentDebugLog(
-            'useLivePitchTracker.ts:tryAttach',
-            'mic pitch graph attached',
-            { attachAttempt, mediaKey },
-            'H4',
-          )
-          // #endregion
           return
         }
 
@@ -1517,23 +1470,6 @@ export function useLivePitchTracker(
           (isPlaying || persistWhenPaused) &&
           framesSinceAttachAttemptRef.current % 12 === 0
         ) {
-          // #region agent log
-          if (tickStats.frames % 120 === 0) {
-            agentDebugLog(
-              'useLivePitchTracker.ts:tick',
-              'tick calling tryAttach without graph',
-              {
-                mediaKey,
-                source,
-                enabled,
-                isPlaying,
-                frames: tickStats.frames,
-                attachAttempts: framesSinceAttachAttemptRef.current,
-              },
-              'H5',
-            )
-          }
-          // #endregion
           void tryAttachRef.current?.()
         }
 

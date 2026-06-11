@@ -5,8 +5,6 @@ import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { playMediaOnUserGesture } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
-import { debugSamplePlaybackLevel, agentDebugLog } from '../utils/agentDebugLog'
-
 import type { Take } from '../types'
 
 interface PipWindowProps {
@@ -116,21 +114,8 @@ function PipWindow({
       if (!video) return
 
       if (video.paused) {
-        // #region agent log
-        agentDebugLog(
-          'PipWindow.tsx:handlePlayPauseClick',
-          'pip play requested',
-          { variant, suspendPlayback, srcKind: video.src?.slice(0, 12) ?? 'empty' },
-          'H-E',
-        )
-        // #endregion
         video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
         playMediaOnUserGesture(video, () => primeTakePlaybackAudio(video)).then((started) => {
-          // #region agent log
-          if (started) {
-            debugSamplePlaybackLevel(video, `pip-${variant}`, 'H-A')
-          }
-          // #endregion
           setIsPlaying(started)
         })
       } else {

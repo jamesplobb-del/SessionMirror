@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { agentDebugLog } from '../utils/agentDebugLog'
 import {
   classifyDeviceTilt,
   classifyDeviceTiltFromAcceleration,
@@ -51,20 +50,6 @@ export function usePhysicalOrientation(): PhysicalOrientation {
       stableOrientation = next
       syncPhysicalOrientationClass(next)
       setOrientation(next)
-      // #region agent log
-      agentDebugLog(
-        'usePhysicalOrientation.ts:commit',
-        'orientation committed',
-        {
-          orientation: next,
-          gamma: lastGamma,
-          beta: lastBeta,
-          accelX: lastAccelX,
-          accelY: lastAccelY,
-        },
-        'H-O7',
-      )
-      // #endregion
     }
 
     const handleSample = (next: PhysicalOrientation) => {
@@ -90,20 +75,6 @@ export function usePhysicalOrientation(): PhysicalOrientation {
       const next = resolvePhysicalTilt(lastGamma, lastBeta, lastAccelX, lastAccelY)
       if (!loggedFirstSample) {
         loggedFirstSample = true
-        // #region agent log
-        agentDebugLog(
-          'usePhysicalOrientation.ts:sample',
-          'first motion sample',
-          {
-            gamma: lastGamma,
-            beta: lastBeta,
-            accelX: lastAccelX,
-            accelY: lastAccelY,
-            resolved: next,
-          },
-          'H-O6',
-        )
-        // #endregion
       }
       handleSample(next)
     }
@@ -143,14 +114,6 @@ export function usePhysicalOrientation(): PhysicalOrientation {
         startListening()
         document.removeEventListener('pointerdown', onUserGesture, true)
         document.removeEventListener('touchend', onUserGesture, true)
-        // #region agent log
-        agentDebugLog(
-          'usePhysicalOrientation.ts:onUserGesture',
-          'motion sensors enabled',
-          {},
-          'H-O6',
-        )
-        // #endregion
       })
     }
 

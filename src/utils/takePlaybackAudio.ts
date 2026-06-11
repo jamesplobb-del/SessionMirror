@@ -1,11 +1,11 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
-import { agentDebugLog } from './agentDebugLog'
 import { primePlaybackAudioContextSync } from './playbackAudioContext'
 
 type MicHandler = () => void | Promise<void>
 
 let suspendMicInput: MicHandler | null = null
 let resumeMicInput: MicHandler | null = null
+let autoPlaybackHoldCheck: (() => boolean) | null = null
 
 export function registerTakePlaybackMicHandlers(handlers: {
   suspendMic: MicHandler
@@ -13,6 +13,15 @@ export function registerTakePlaybackMicHandlers(handlers: {
 }): void {
   suspendMicInput = handlers.suspendMic
   resumeMicInput = handlers.resumeMic
+}
+
+/** Block mic warm-up / re-acquire while hands-free playback is pending or active. */
+export function registerAutoPlaybackHold(check: () => boolean): void {
+  autoPlaybackHoldCheck = check
+}
+
+export function isAutoPlaybackHoldingMicWarmup(): boolean {
+  return autoPlaybackHoldCheck?.() ?? false
 }
 
 function primeMediaElements(
@@ -25,23 +34,6 @@ function primeMediaElements(
     element.volume = 1
     element.setAttribute('playsinline', 'true')
     element.setAttribute('webkit-playsinline', 'true')
-    // #region agent log
-    agentDebugLog(
-      'takePlaybackAudio.ts:primeMediaElements',
-      'primed media for playback',
-      {
-        srcKind: element.src.startsWith('blob:')
-          ? 'blob'
-          : element.src.includes('capacitor')
-            ? 'capacitor'
-            : 'other',
-        muted: element.muted,
-        volume: element.volume,
-        tag: element.getAttribute('data-debug-playback-tag') ?? 'unknown',
-      },
-      'H-B',
-    )
-    // #endregion
   }
 }
 

@@ -2,7 +2,6 @@ import { motion, useMotionValue } from 'framer-motion'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
-import { agentDebugLog } from '../utils/agentDebugLog'
 import { getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
 
 type TunerProps = Omit<
@@ -100,14 +99,6 @@ export default function DraggablePitchWidget({
   } = usePinchResize(pinchLimits)
 
   useEffect(() => {
-    // #region agent log
-    agentDebugLog(
-      'DraggablePitchWidget.tsx:mount',
-      'pitch widget mounted',
-      { isAudioMode, mediaKey, liveMicOnly, layoutRegion },
-      'H7',
-    )
-    // #endregion
   }, [isAudioMode, layoutRegion, liveMicOnly, mediaKey])
 
   useLayoutEffect(() => {

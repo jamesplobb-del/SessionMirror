@@ -6,9 +6,6 @@ import { initVaultDatabase } from './db'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
-import { agentDebugLog } from './utils/agentDebugLog'
-
-const bootStartedAt = typeof performance !== 'undefined' ? performance.now() : 0
 
 function showVaultBootError(): void {
   const root = document.getElementById('root')
@@ -30,25 +27,7 @@ function bootstrap() {
     </StrictMode>,
   )
 
-  // #region agent log
-  agentDebugLog(
-    'main.tsx:bootstrap',
-    'react tree mounted',
-    { msSinceBoot: Math.round(performance.now() - bootStartedAt) },
-    'H-BOOT',
-  )
-  // #endregion
-
-  void Promise.all([initVaultDatabase(), initAppFilesystem()]).then(() => {
-    // #region agent log
-    agentDebugLog(
-      'main.tsx:bootstrap',
-      'vault database ready',
-      { msSinceBoot: Math.round(performance.now() - bootStartedAt) },
-      'H-BOOT',
-    )
-    // #endregion
-  }).catch((error) => {
+  void Promise.all([initVaultDatabase(), initAppFilesystem()]).catch((error) => {
     console.error('Failed to initialize vault database', error)
     showVaultBootError()
   })

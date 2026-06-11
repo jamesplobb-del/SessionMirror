@@ -1,5 +1,3 @@
-import { agentDebugLog } from './agentDebugLog'
-
 export type RecordingOrientation = 'portrait' | 'landscape'
 export type PhysicalOrientation = 'portrait' | 'landscape-left' | 'landscape-right'
 
@@ -39,15 +37,6 @@ export function syncPhysicalOrientationClass(orientation: PhysicalOrientation): 
   }
 
   currentPhysicalOrientation = orientation
-
-  // #region agent log
-  agentDebugLog(
-    'physicalOrientation.ts:syncPhysicalOrientationClass',
-    'physical orientation updated',
-    { orientation },
-    'H-O4',
-  )
-  // #endregion
 }
 
 export function classifyDeviceTilt(
@@ -134,14 +123,6 @@ export function requestMotionSensorAccessFromGesture(): Promise<boolean> {
       const state = await requesters[index]!()
       const granted = state === 'granted'
       if (granted) {
-        // #region agent log
-        agentDebugLog(
-          'physicalOrientation.ts:requestMotionSensorAccessFromGesture',
-          'motion permission granted',
-          { index, state },
-          'H-O6',
-        )
-        // #endregion
         return true
       }
     } catch {
