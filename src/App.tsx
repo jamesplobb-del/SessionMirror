@@ -749,8 +749,28 @@ export default function App() {
     [updateSettings],
   )
 
+  const handleQuickPitchTrackerChange = useCallback(
+    (enabled: boolean) => {
+      if (pitchCommitTimerRef.current !== null) {
+        window.clearTimeout(pitchCommitTimerRef.current)
+        pitchCommitTimerRef.current = null
+      }
+      setPendingPitchTrackerEnabled(null)
+      if (!enabled) {
+        setShowPitch(false)
+      }
+      startTransition(() => {
+        updateSettings({ pitchTrackerEnabled: enabled })
+      })
+    },
+    [updateSettings],
+  )
+
   const handlePitchTrackerChange = useCallback(
     (enabled: boolean) => {
+      if (!enabled) {
+        setShowPitch(false)
+      }
       if (recordingModeRef.current === 'audio') {
         schedulePitchTrackerCommit(enabled)
         return
@@ -1288,7 +1308,6 @@ export default function App() {
                   layoutKey={`audio-${recordingMode}`}
                   liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
                   tunerInstrument={settings.tunerInstrument}
-                  onClose={handleClosePitch}
                 />
               )}
             </AnimatePresence>
@@ -1393,9 +1412,9 @@ export default function App() {
             recordDropRef={recordDeleteDropRef}
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
-            pitchTrackerEnabled={settings.pitchTrackerEnabled}
+            pitchTrackerEnabled={pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled}
             showTakeCards={settings.showTakeCards}
-            onPitchTrackerChange={handlePitchTrackerChange}
+            onPitchTrackerChange={handleQuickPitchTrackerChange}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
             onBranchOpenChange={handleQuickSettingsOpenChange}

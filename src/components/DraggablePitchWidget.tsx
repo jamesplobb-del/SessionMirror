@@ -176,7 +176,6 @@ export default function DraggablePitchWidget({
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="pitch-widget-audio__stage relative flex min-h-0 max-h-full w-full flex-col">
-          {onClose && <PitchWidgetCloseButton onClose={onClose} />}
           {tuner}
         </div>
       </motion.div>

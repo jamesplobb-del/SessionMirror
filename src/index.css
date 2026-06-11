@@ -205,6 +205,11 @@ body.settings-branch-open * {
   z-index: 40;
 }
 
+.app-ui-overlay--pitch-hud-lock .control-deck__settings-btn {
+  pointer-events: auto !important;
+  z-index: 41;
+}
+
 .pitch-display-layer {
   position: fixed;
   inset: 0;
@@ -215,10 +220,6 @@ body.settings-branch-open * {
 
 .pitch-display-layer * {
   pointer-events: none !important;
-}
-
-.pitch-display-layer .pitch-widget-close {
-  pointer-events: auto !important;
 }
 
 .app-hud-bottom {
