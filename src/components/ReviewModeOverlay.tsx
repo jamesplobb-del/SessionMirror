@@ -11,11 +11,19 @@ import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
-import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
+import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT, resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
+import { resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 1000
+
+function primeReviewPlaybackAudio(video: HTMLMediaElement): void {
+  video.muted = false
+  video.volume = 1
+  resumePlaybackAudioContext()
+  resumePitchGraphsForMedia(video)
+}
 
 interface ReviewTakeLayerProps {
   takeKey: string
@@ -368,6 +376,7 @@ export default function ReviewModeOverlay({
     if (!video) return
     video.muted = false
     video.volume = 1
+    primeReviewPlaybackAudio(video)
     void video.play().catch(() => {
       revealPlayOverlay(false)
     })
@@ -397,6 +406,7 @@ export default function ReviewModeOverlay({
 
     video.muted = false
     video.volume = 1
+    primeReviewPlaybackAudio(video)
 
     if (video.paused) {
       void video.play().catch(() => revealPlayOverlay(false))

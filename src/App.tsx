@@ -22,6 +22,7 @@ import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia, resumePitchGraphsForMedia } from './hooks/useLivePitchTracker'
+import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 import {
@@ -562,6 +563,7 @@ export default function App() {
       audio.onerror = finish
 
       const tryPlay = async () => {
+        resumePlaybackAudioContext()
         resumePitchGraphsForMedia(audio)
         await audio.play()
         setAutoPlaybackPlaying(true)
@@ -613,6 +615,11 @@ export default function App() {
     enabled: settings.autoSoundRecording,
     monitoringAllowed: autoMonitoringAllowed,
     suppressStart: autoRecordStartSuppressed,
+    monitoringPaused:
+      autoRecordStartSuppressed ||
+      autoPlaybackPlaying ||
+      benchmarkPipPlaying ||
+      challengerPipPlaying,
     recordingMode,
     ready,
     isRecording,

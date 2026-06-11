@@ -4,6 +4,8 @@ import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
+import { resumePlaybackAudioContext } from '../utils/playbackAudioContext'
+import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
   buildPlaybackShellStyle,
@@ -82,6 +84,8 @@ export default function TakeVideoPlayer({
     const ensureAudible = () => {
       media.muted = false
       media.volume = 1
+      resumePlaybackAudioContext()
+      resumePitchGraphsForMedia(media)
     }
 
     ensureAudible()

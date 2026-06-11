@@ -27,6 +27,7 @@ import {
   getMusicRecordingAudioConstraints,
   tuneMusicRecordingStream,
 } from '../utils/audioCapture'
+import { getPlaybackAudioContext, isSharedPlaybackContext, resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import { agentDebugLog } from '../utils/agentDebugLog'
 
 const HISTORY_LENGTH = 140
@@ -156,8 +157,8 @@ export const PITCH_GRAPH_RELEASED_EVENT = 'pitchgraph-released'
 
 type PitchGraphMode = 'stream' | 'element'
 
-/** Boost playback routed through Web Audio — iOS captureStream paths skip the element output. */
-const MEDIA_PLAYBACK_GAIN = 2
+/** Speaker boost when playback is routed through Web Audio (required on iOS). */
+const MEDIA_PLAYBACK_GAIN = 5
 
 interface PitchGraph {
   context: AudioContext
@@ -457,6 +458,10 @@ async function createPitchGraph(
     if (existing.analyser.fftSize === profile.frameSize) {
       existing.detector.clarityThreshold = profile.clarityMin
       existing.detector.minVolumeDecibels = profile.rmsGateDbMedia
+      if (existing.passthrough) {
+        existing.passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+      }
+      resumePlaybackAudioContext()
       return existing
     }
     safeDisposePitchGraph(existing)
@@ -466,43 +471,34 @@ async function createPitchGraph(
     elementGraphs.delete(media)
   }
 
-  const context = new AudioContext({ latencyHint: 'playback' })
-  await context.resume()
+  const context = await getPlaybackAudioContext()
 
   const analyser = context.createAnalyser()
   analyser.fftSize = profile.frameSize
 
+  await waitForMediaAudio(media)
+
   let source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null
   let passthrough: GainNode | null = null
-  let mode: PitchGraphMode = 'stream'
+  let mode: PitchGraphMode = 'element'
 
-  const streamAttach = tryAttachStreamSource(context, analyser, media)
-  if (streamAttach) {
+  try {
+    const elementSource = context.createMediaElementSource(media)
+    passthrough = context.createGain()
+    passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+    elementSource.connect(analyser)
+    elementSource.connect(passthrough)
+    passthrough.connect(context.destination)
+    source = elementSource
+    mode = 'element'
+  } catch {
+    const streamAttach = tryAttachStreamSource(context, analyser, media)
+    if (!streamAttach) {
+      throw new Error('Unable to attach pitch tracker to this playback source')
+    }
     source = streamAttach.source
     passthrough = streamAttach.passthrough
     mode = 'stream'
-  } else {
-    await waitForMediaAudio(media)
-    const retryStreamAttach = tryAttachStreamSource(context, analyser, media)
-    if (retryStreamAttach) {
-      source = retryStreamAttach.source
-      passthrough = retryStreamAttach.passthrough
-      mode = 'stream'
-    } else {
-      try {
-        const elementSource = context.createMediaElementSource(media)
-        passthrough = context.createGain()
-        passthrough.gain.value = MEDIA_PLAYBACK_GAIN
-        elementSource.connect(analyser)
-        elementSource.connect(passthrough)
-        passthrough.connect(context.destination)
-        source = elementSource
-        mode = 'element'
-      } catch {
-        await context.close()
-        throw new Error('Unable to attach pitch tracker to this playback source')
-      }
-    }
   }
 
   const detector = PitchDetector.forFloat32Array(profile.frameSize)
@@ -540,7 +536,9 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
   }
 
   const { context } = graph
-  void context.close().catch(() => {})
+  if (!isSharedPlaybackContext(context)) {
+    void context.close().catch(() => {})
+  }
   notifyPitchGraphReleased(media, mode)
 }
 
@@ -1749,12 +1747,13 @@ export function useLivePitchTracker(
 export function resumePitchGraphsForMedia(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
+  resumePlaybackAudioContext()
+
   for (const element of media) {
     if (!element) continue
     const graph = elementGraphs.get(element)
     if (!graph) continue
 
-    void graph.context.resume().catch(() => {})
     if (graph.passthrough) {
       graph.passthrough.gain.value = MEDIA_PLAYBACK_GAIN
     }

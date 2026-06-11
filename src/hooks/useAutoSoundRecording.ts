@@ -20,6 +20,8 @@ interface UseAutoSoundRecordingOptions {
   monitoringAllowed: boolean
   /** Block new auto-starts (e.g. while take is playing back through speakers). */
   suppressStart: boolean
+  /** Tear down mic analyser while takes play so iOS does not duck speaker output. */
+  monitoringPaused?: boolean
   recordingMode: RecordingMode
   ready: boolean
   isRecording: boolean
@@ -65,6 +67,7 @@ export function useAutoSoundRecording({
   enabled,
   monitoringAllowed,
   suppressStart,
+  monitoringPaused = false,
   recordingMode,
   ready,
   isRecording,
@@ -130,7 +133,7 @@ export function useAutoSoundRecording({
   )
 
   const shouldMonitor =
-    enabled && monitoringAllowed && recordingMode === 'audio' && ready
+    enabled && monitoringAllowed && recordingMode === 'audio' && ready && !monitoringPaused
 
   const clearStartFailureTimer = () => {
     if (startFailureTimerRef.current !== null) {
