@@ -953,6 +953,39 @@ export function useCameraSession({
     // #endregion
   }, [cancelScheduledRelease, restartCameraAfterForeground])
 
+  const suspendMicForPlayback = useCallback(() => {
+    const stream = streamRef.current
+    if (!stream) return
+
+    for (const track of stream.getAudioTracks()) {
+      track.enabled = false
+    }
+  }, [])
+
+  const resumeMicAfterPlayback = useCallback(async () => {
+    if (recordingModeRef.current !== 'audio') return
+
+    const stream = streamRef.current
+    if (stream) {
+      for (const track of stream.getAudioTracks()) {
+        if (track.readyState === 'live') {
+          track.enabled = true
+        }
+      }
+
+      if (isStreamRecordable(stream, 'audio')) {
+        setStreamGeneration((generation) => generation + 1)
+        return
+      }
+    }
+
+    await refreshCameraSession()
+    if (!isStreamRecordable(streamRef.current, 'audio')) {
+      await restartCameraAfterForeground()
+    }
+    setStreamGeneration((generation) => generation + 1)
+  }, [refreshCameraSession, restartCameraAfterForeground])
+
   useEffect(() => {
     const bindAppLifecycle = async () => {
       if (Capacitor.isNativePlatform()) {
@@ -1021,5 +1054,7 @@ export function useCameraSession({
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
     refreshCameraSession,
+    suspendMicForPlayback,
+    resumeMicAfterPlayback,
   }
 }

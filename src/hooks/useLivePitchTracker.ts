@@ -157,8 +157,8 @@ export const PITCH_GRAPH_RELEASED_EVENT = 'pitchgraph-released'
 
 type PitchGraphMode = 'stream' | 'element'
 
-/** Speaker boost when playback is routed through Web Audio (required on iOS). */
-const MEDIA_PLAYBACK_GAIN = 5
+/** Speaker passthrough when Web Audio routes playback (element is already full scale). */
+const MEDIA_PLAYBACK_GAIN = 1
 
 interface PitchGraph {
   context: AudioContext

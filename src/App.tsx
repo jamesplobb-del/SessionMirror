@@ -21,8 +21,12 @@ import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
-import { pausePitchGraphsForMedia, resumePitchGraphsForMedia } from './hooks/useLivePitchTracker'
-import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
+import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
+import {
+  primeTakePlaybackAudio,
+  registerTakePlaybackMicHandlers,
+  releaseTakePlaybackAudio,
+} from './utils/takePlaybackAudio'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 import {
@@ -488,11 +492,20 @@ export default function App() {
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
     refreshCameraSession,
+    suspendMicForPlayback,
+    resumeMicAfterPlayback,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
   })
 
   recordingModeRef.current = recordingMode
+
+  useEffect(() => {
+    registerTakePlaybackMicHandlers({
+      suspendMic: suspendMicForPlayback,
+      resumeMic: resumeMicAfterPlayback,
+    })
+  }, [resumeMicAfterPlayback, suspendMicForPlayback])
 
   useEffect(() => {
     if (recordingMode === 'audio') return
@@ -524,8 +537,10 @@ export default function App() {
       queuedAutoPlayRef.current = null
 
       const finish = () => {
-        stopAutoPlaybackAudio()
-        releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
+        void releaseTakePlaybackAudio().finally(() => {
+          stopAutoPlaybackAudio()
+          releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
+        })
       }
 
       audio.preload = 'auto'
@@ -563,8 +578,7 @@ export default function App() {
       audio.onerror = finish
 
       const tryPlay = async () => {
-        resumePlaybackAudioContext()
-        resumePitchGraphsForMedia(audio)
+        await primeTakePlaybackAudio(audio)
         await audio.play()
         setAutoPlaybackPlaying(true)
       }
