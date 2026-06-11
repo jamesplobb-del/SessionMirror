@@ -188,7 +188,7 @@ body.settings-branch-open * {
   transform-origin: center bottom;
 }
 
-/** Live audio pitch — HUD plane stays interactive; pitch layer below absorbs stray pass-through. */
+/** Live audio pitch — full HUD plane captures touches (iOS pass-through fix). Metronome sits above at z-36. */
 .app-ui-overlay--pitch-hud-lock {
   pointer-events: auto !important;
   z-index: 30;
@@ -243,19 +243,10 @@ body.settings-branch-open * {
   pointer-events: none !important;
 }
 
-/** iOS pass-through guard — layer captures touches; widgets above stay interactive. */
-.pitch-display-layer--touch-shield {
-  pointer-events: auto !important;
-}
-
-.pitch-display-layer--touch-shield * {
-  pointer-events: none !important;
-}
-
 .metronome-display-layer {
   position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: 36;
   pointer-events: none !important;
   overflow: hidden;
 }

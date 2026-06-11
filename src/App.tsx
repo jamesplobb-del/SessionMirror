@@ -783,6 +783,7 @@ export default function App() {
   }, [])
 
   const handleOpenVault = useCallback(() => {
+    setShowPitch(false)
     startTransition(() => {
       setIsSettingsOpen(false)
       setIsVaultOpen(true)
@@ -801,6 +802,7 @@ export default function App() {
   }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
+    setShowPitch(false)
     startTransition(() => {
       setIsVaultOpen(false)
       setIsSettingsOpen(true)
@@ -1044,8 +1046,6 @@ export default function App() {
     mainAudioPitchSource !== null &&
     hudModalState === 'idle' &&
     !pitchHudSuspended
-
-  const pitchAudioTouchShield = pitchAudioHudLock
 
   const pitchContextKey =
     mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
@@ -1381,7 +1381,7 @@ export default function App() {
       />
 
       <div
-        className={`pitch-display-layer${pitchAudioTouchShield ? ' pitch-display-layer--touch-shield' : ''}${pitchHudSuspended ? ' floating-widget-layer--inert' : ''}`}
+        className={`pitch-display-layer${pitchHudSuspended ? ' floating-widget-layer--inert' : ''}`}
         aria-hidden={!showPitch || !mainAudioPitchSource || pitchHudSuspended}
       >
         {showMainPitchWidget && (
@@ -1466,8 +1466,9 @@ export default function App() {
         transition={iosHudDim}
         style={{
           ...motionGpuLayer,
-          pointerEvents:
-            hudModalState !== 'idle'
+          pointerEvents: pitchAudioHudLock
+            ? 'auto'
+            : hudModalState !== 'idle'
               ? 'none'
               : undefined,
         }}
