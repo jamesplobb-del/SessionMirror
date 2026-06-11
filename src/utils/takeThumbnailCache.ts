@@ -4,6 +4,9 @@ import type { MediaType } from '../types'
 import type { RecordingOrientation } from './takeVideoTransform'
 import { THUMBNAIL_DIR, initAppFilesystem, isFilesystemMissingError } from './filesystemInit'
 
+/** Avoid repeated native stat calls for thumbnails known to be missing this session. */
+const missingThumbnailPaths = new Set<string>()
+
 export interface ThumbnailHealSource {
   filePath: string
   videoUrl?: string
@@ -19,6 +22,10 @@ function thumbnailPath(takeId: string, orientation: RecordingOrientation = 'port
 }
 
 async function readCachedThumbnailUri(path: string): Promise<string | null> {
+  if (missingThumbnailPaths.has(path)) {
+    return null
+  }
+
   try {
     await Filesystem.stat({
       path,
@@ -26,8 +33,10 @@ async function readCachedThumbnailUri(path: string): Promise<string | null> {
     })
   } catch (err) {
     if (isFilesystemMissingError(err)) {
+      missingThumbnailPaths.add(path)
       return null
     }
+    missingThumbnailPaths.add(path)
     return null
   }
 

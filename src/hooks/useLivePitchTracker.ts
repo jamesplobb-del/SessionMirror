@@ -186,6 +186,9 @@ function isMediaPitchGraph(graph: ActivePitchGraph): graph is PitchGraph {
 }
 
 const MIC_PITCH_ATTACH_DEFER_MS = 400
+/** ~14fps cap for live mic audio stage — keeps main thread responsive for HUD taps. */
+const MIC_LIVE_TICK_MS = 72
+const READOUT_PUBLISH_MS = 100
 
 export type PitchTrackerSource = 'media' | 'microphone'
 
@@ -894,6 +897,23 @@ export function useLivePitchTracker(
   const inTuneBandFrameRef = useRef(0)
   const inTuneGlowEligibleRef = useRef(false)
   const lastPublishedGlowRef = useRef(0)
+  const lastMicTickAtRef = useRef(0)
+  const lastReadoutPublishAtRef = useRef(0)
+
+  const publishReadout = (next: PitchReadout, force = false) => {
+    const noteChanged = next.noteName !== readoutRef.current.noteName
+    readoutRef.current = next
+    const now = performance.now()
+    if (
+      !force &&
+      !noteChanged &&
+      now - lastReadoutPublishAtRef.current < READOUT_PUBLISH_MS
+    ) {
+      return
+    }
+    lastReadoutPublishAtRef.current = now
+    if (mountedRef.current) setReadout(next)
+  }
 
   const publishInTuneGlow = (value: number) => {
     if (Math.abs(value - lastPublishedGlowRef.current) < 0.01) return
@@ -1174,6 +1194,15 @@ export function useLivePitchTracker(
     const tickStats = { frames: 0 }
 
     const tick = () => {
+      const frameNow = performance.now()
+      if (sourceRef.current === 'microphone' && continuousScroll) {
+        if (frameNow - lastMicTickAtRef.current < MIC_LIVE_TICK_MS) {
+          tickRef.current = requestAnimationFrame(tick)
+          return
+        }
+        lastMicTickAtRef.current = frameNow
+      }
+
       const activeProfile = profileRef.current
       framesSinceAttachAttemptRef.current += 1
       tickStats.frames += 1
@@ -1310,8 +1339,7 @@ export function useLivePitchTracker(
       }
 
       const clearReadoutAfterSilence = () => {
-        readoutRef.current = emptyReadout
-        if (mountedRef.current) setReadout(emptyReadout)
+        publishReadout(emptyReadout, true)
         graph.smoothed = null
         needleCentsRef.current = null
         lastStableCentsRef.current = null
@@ -1409,9 +1437,7 @@ export function useLivePitchTracker(
                 }
 
                 readoutRef.current = displayReadout
-                if (mountedRef.current) {
-                  setReadout(displayReadout)
-                }
+                publishReadout(displayReadout)
 
                 lastPitchAtRef.current = now
                 lastStableCentsRef.current = intonationCents

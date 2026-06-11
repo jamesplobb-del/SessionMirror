@@ -687,6 +687,7 @@ export default function App() {
   }, [])
 
   const handleOpenVault = useCallback(() => {
+    setShowPitch(false)
     startTransition(() => {
       setIsSettingsOpen(false)
       setIsVaultOpen(true)
@@ -705,6 +706,7 @@ export default function App() {
   }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
+    setShowPitch(false)
     startTransition(() => {
       setIsVaultOpen(false)
       setIsSettingsOpen(true)
@@ -914,6 +916,12 @@ export default function App() {
   ])
 
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
+
+  const pitchAudioHudLock =
+    showPitch &&
+    recordingMode === 'audio' &&
+    mainAudioPitchSource?.liveMicOnly === true &&
+    hudModalState === 'idle'
 
   const pitchContextKey =
     mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
@@ -1244,32 +1252,44 @@ export default function App() {
         }
       />
 
+      <div
+        className="pitch-display-layer"
+        aria-hidden={!showPitch || !mainAudioPitchSource}
+      >
+        {showMainPitchWidget && (
+          <Suspense fallback={null}>
+            <AnimatePresence>
+              {showPitch && mainAudioPitchSource && (
+                <DraggablePitchWidget
+                  boundaryRef={appShellRef}
+                  defaultBottomOffset={200}
+                  mediaRef={mainAudioPitchSource.mediaRef}
+                  enabled={settings.pitchTrackerEnabled}
+                  isPlaying={mainAudioPitchSource.isPlaying}
+                  mediaKey={mainAudioPitchSource.mediaKey}
+                  takeName={mainAudioPitchSource.take?.name}
+                  label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
+                  isAudioMode
+                  liveMicEnabled={
+                    settings.liveMicTunerEnabled || mainAudioPitchSource.liveMicOnly === true
+                  }
+                  micStreamRef={streamRef}
+                  layoutRegion="main"
+                  layoutKey={`audio-${recordingMode}`}
+                  liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
+                  tunerInstrument={settings.tunerInstrument}
+                  onClose={handleClosePitch}
+                />
+              )}
+            </AnimatePresence>
+          </Suspense>
+        )}
+      </div>
+
       <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
-      {showMainPitchWidget && (
+      {showMainPitchWidget && mainVideoPitchSource && (
         <Suspense fallback={null}>
         <AnimatePresence>
-          {showPitch && mainAudioPitchSource && (
-            <DraggablePitchWidget
-              boundaryRef={appShellRef}
-              defaultBottomOffset={200}
-              mediaRef={mainAudioPitchSource.mediaRef}
-              enabled={settings.pitchTrackerEnabled}
-              isPlaying={mainAudioPitchSource.isPlaying}
-              mediaKey={mainAudioPitchSource.mediaKey}
-              takeName={mainAudioPitchSource.take?.name}
-              label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
-              isAudioMode
-              liveMicEnabled={
-                settings.liveMicTunerEnabled || mainAudioPitchSource.liveMicOnly === true
-              }
-              micStreamRef={streamRef}
-              layoutRegion="main"
-              layoutKey={`audio-${recordingMode}`}
-              liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
-              tunerInstrument={settings.tunerInstrument}
-              onClose={handleClosePitch}
-            />
-          )}
           {showPitch && mainVideoPitchSource && (
             <DraggablePitchWidget
               boundaryRef={appShellRef}
@@ -1292,7 +1312,7 @@ export default function App() {
       )}
 
       <motion.div
-        className={`app-ui-overlay relative z-30 ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -1301,7 +1321,11 @@ export default function App() {
         transition={iosHudDim}
         style={{
           ...motionGpuLayer,
-          pointerEvents: hudModalState !== 'idle' ? 'none' : undefined,
+          pointerEvents: pitchAudioHudLock
+            ? 'auto'
+            : hudModalState !== 'idle'
+              ? 'none'
+              : undefined,
         }}
       >
         <HudHeader

@@ -169,7 +169,7 @@ export default function DraggablePitchWidget({
       <motion.div
         key={`audio-${mediaKey}`}
         ref={widgetRef}
-        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} pitch-widget-audio--stage absolute z-[5] flex min-h-0 flex-col`}
+        className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} pitch-widget-audio--stage pointer-events-none absolute z-[5] flex min-h-0 flex-col`}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 10 }}

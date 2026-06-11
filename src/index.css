@@ -188,6 +188,28 @@ body.settings-branch-open * {
   transform-origin: center bottom;
 }
 
+/** Live audio pitch sits below — capture touches on the HUD plane (iOS pass-through fix). */
+.app-ui-overlay--pitch-hud-lock {
+  pointer-events: auto !important;
+  z-index: 30;
+}
+
+.pitch-display-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none !important;
+  overflow: hidden;
+}
+
+.pitch-display-layer * {
+  pointer-events: none !important;
+}
+
+.pitch-display-layer .pitch-widget-close {
+  pointer-events: auto !important;
+}
+
 .app-hud-bottom {
   margin-top: auto;
   width: 100%;
