@@ -78,6 +78,7 @@ interface MainAudioPitchSource {
 
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
+const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 
@@ -794,6 +795,15 @@ export default function App() {
     })
   }, [])
 
+  const handleShowMetronomeChange = useCallback(
+    (show: boolean) => {
+      startTransition(() => {
+        updateSettings({ showMetronome: show })
+      })
+    },
+    [updateSettings],
+  )
+
   const suspendPipPlayback =
     isVaultOpen || isReviewOpen || isSettingsOpen || autoRecordStartSuppressed
 
@@ -946,6 +956,13 @@ export default function App() {
   ])
 
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
+
+  const showMetronomeWidget =
+    settings.showMetronome &&
+    !isVaultOpen &&
+    !isSettingsOpen &&
+    !isReviewOpen &&
+    (ready || isRecording)
 
   const pitchAudioHudLock =
     showPitch &&
@@ -1315,6 +1332,20 @@ export default function App() {
         )}
       </div>
 
+      <div className="metronome-display-layer" aria-hidden={!showMetronomeWidget}>
+        {showMetronomeWidget && (
+          <Suspense fallback={null}>
+            <AnimatePresence>
+              <DraggableMetronomeWidget
+                key="main-metronome"
+                boundaryRef={appShellRef}
+                layoutKey={`metronome-${recordingMode}`}
+              />
+            </AnimatePresence>
+          </Suspense>
+        )}
+      </div>
+
       <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
       {showMainPitchWidget && mainVideoPitchSource && (
         <Suspense fallback={null}>
@@ -1416,6 +1447,8 @@ export default function App() {
             showTakeCards={settings.showTakeCards}
             onPitchTrackerChange={handleQuickPitchTrackerChange}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
+            showMetronome={settings.showMetronome}
+            onShowMetronomeChange={handleShowMetronomeChange}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
             onBranchOpenChange={handleQuickSettingsOpenChange}
           />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { startTransition, useCallback, useEffect, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -313,6 +313,17 @@ export default function SettingsDrawer({
               description="Show Best Take and Current Take on the main screen. Turn off to keep new recordings in the vault only."
               checked={settings.showTakeCards}
               onChange={(checked) => onUpdate({ showTakeCards: checked })}
+            />
+
+            <SettingToggle
+              label="Metronome"
+              description="Show a draggable metronome on the main screen. Plays through the speaker only — never recorded into takes."
+              checked={settings.showMetronome}
+              onChange={(checked) => {
+                startTransition(() => {
+                  onUpdate({ showMetronome: checked })
+                })
+              }}
             />
           </section>
 

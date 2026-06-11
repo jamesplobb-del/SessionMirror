@@ -222,6 +222,179 @@ body.settings-branch-open * {
   pointer-events: none !important;
 }
 
+.metronome-display-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none !important;
+  overflow: hidden;
+}
+
+.metronome-display-layer * {
+  pointer-events: none !important;
+}
+
+.metronome-display-layer .metronome-widget-draggable,
+.metronome-display-layer .pointer-events-auto {
+  pointer-events: auto !important;
+}
+
+.metronome-widget-draggable {
+  cursor: grab;
+  max-width: min(calc(100vw - 1.5rem), 20rem);
+  filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.18));
+  border-radius: 1.5rem;
+}
+
+.metronome-widget-draggable--pinching {
+  cursor: grabbing;
+}
+
+.metronome-widget-draggable:active:not(.metronome-widget-draggable--pinching) {
+  cursor: grabbing;
+}
+
+.metronome-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  height: 100%;
+  padding: 0.625rem 0.75rem 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.metronome-widget__accent {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.14), transparent 58%);
+  transition: opacity 0.08s ease-out;
+}
+
+.metronome-widget__accent--pulse {
+  opacity: 1;
+}
+
+.metronome-widget__row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.metronome-widget__row--main {
+  min-height: 2.5rem;
+}
+
+.metronome-widget__row--meters {
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.metronome-widget__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+}
+
+.metronome-widget__btn:active {
+  transform: scale(0.96);
+}
+
+.metronome-widget__btn--active {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(125, 211, 252, 0.42);
+  color: rgb(224, 242, 254);
+}
+
+.metronome-widget__play {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+}
+
+.metronome-widget__bpm-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.metronome-widget__bpm {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.95);
+  touch-action: none;
+}
+
+.metronome-widget__bpm-value {
+  font-size: clamp(1.35rem, 6cqw, 1.75rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.metronome-widget__bpm-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.metronome-widget__bpm-input {
+  width: 4.5rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: white;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  padding: 0.25rem 0.35rem;
+}
+
+.metronome-widget__meter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.metronome-widget__meter-btn {
+  min-width: 2.1rem;
+  height: 1.55rem;
+  padding: 0 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.metronome-widget__meter-divider {
+  width: 1px;
+  align-self: stretch;
+  margin-inline: 0.1rem;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .app-hud-bottom {
   margin-top: auto;
   width: 100%;

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { AudioLines, LayoutGrid } from 'lucide-react'
+import { AudioLines, LayoutGrid, Timer } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
@@ -12,8 +12,10 @@ interface SettingsBranchWheelProps {
   anchorRef: RefObject<HTMLElement | null>
   pitchTrackerEnabled: boolean
   showTakeCards: boolean
+  showMetronome: boolean
   onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
+  onShowMetronomeChange: (show: boolean) => void
 }
 
 interface BranchItem {
@@ -36,8 +38,10 @@ export default function SettingsBranchWheel({
   anchorRef,
   pitchTrackerEnabled,
   showTakeCards,
+  showMetronome,
   onPitchTrackerChange,
   onShowTakeCardsChange,
+  onShowMetronomeChange,
 }: SettingsBranchWheelProps) {
   const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
     null,
@@ -114,8 +118,22 @@ export default function SettingsBranchWheel({
         active: showTakeCards,
         onSelect: () => onShowTakeCardsChange(!showTakeCards),
       },
+      {
+        id: 'metronome',
+        label: 'Metronome',
+        icon: Timer,
+        active: showMetronome,
+        onSelect: () => onShowMetronomeChange(!showMetronome),
+      },
     ],
-    [onPitchTrackerChange, onShowTakeCardsChange, pitchTrackerEnabled, showTakeCards],
+    [
+      onPitchTrackerChange,
+      onShowMetronomeChange,
+      onShowTakeCardsChange,
+      pitchTrackerEnabled,
+      showMetronome,
+      showTakeCards,
+    ],
   )
 
   const positions = anchor ? layoutBranchItems(branchItems.length, anchor.rect) : []

@@ -17,6 +17,8 @@ export interface AppSettings {
   tunerInstrument: TunerInstrument
   /** Show Best Take and Current Take cards on the main HUD. */
   showTakeCards: boolean
+  /** Floating metronome widget on the main camera/audio HUD. */
+  showMetronome: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -28,6 +30,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
   showTakeCards: true,
+  showMetronome: false,
 }
 
 function parseTunerInstrument(value: unknown): TunerInstrument {
@@ -78,6 +81,10 @@ export function loadAppSettings(): AppSettings {
         parsed.showTakeCards !== undefined
           ? Boolean(parsed.showTakeCards)
           : DEFAULT_APP_SETTINGS.showTakeCards,
+      showMetronome:
+        parsed.showMetronome !== undefined
+          ? Boolean(parsed.showMetronome)
+          : DEFAULT_APP_SETTINGS.showMetronome,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

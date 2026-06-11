@@ -23,8 +23,10 @@ interface ControlDeckProps {
   dragOverDelete?: boolean
   pitchTrackerEnabled?: boolean
   showTakeCards?: boolean
+  showMetronome?: boolean
   onPitchTrackerChange?: (enabled: boolean) => void
   onShowTakeCardsChange?: (show: boolean) => void
+  onShowMetronomeChange?: (show: boolean) => void
   settingsBranchDisabled?: boolean
   onBranchOpenChange?: (open: boolean) => void
 }
@@ -51,8 +53,10 @@ export default function ControlDeck({
   dragOverDelete = false,
   pitchTrackerEnabled = false,
   showTakeCards = true,
+  showMetronome = false,
   onPitchTrackerChange,
   onShowTakeCardsChange,
+  onShowMetronomeChange,
   settingsBranchDisabled = false,
   onBranchOpenChange,
 }: ControlDeckProps) {
@@ -106,8 +110,10 @@ export default function ControlDeck({
         anchorRef={settingsButtonRef}
         pitchTrackerEnabled={pitchTrackerEnabled}
         showTakeCards={showTakeCards}
+        showMetronome={showMetronome}
         onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
+        onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}
       />
 
       <div className="relative flex w-full max-w-xs items-center justify-center">
