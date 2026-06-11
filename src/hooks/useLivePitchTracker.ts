@@ -739,9 +739,10 @@ function drawPitchCanvas(
       ctx.stroke()
     }
   } else {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
     ctx.lineWidth = 1
-    ctx.setLineDash([3, 3])
+    ctx.lineCap = 'round'
+    ctx.setLineDash([1, 5])
 
     const gridXStep = Math.max(16, Math.floor(width / 14))
     for (let x = gridXStep; x < width; x += gridXStep) {
@@ -761,34 +762,64 @@ function drawPitchCanvas(
     }
 
     ctx.setLineDash([])
+    ctx.lineCap = 'butt'
 
-    ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
+    const labelFont =
+      '300 9px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
+    ctx.font = labelFont
+    if ('letterSpacing' in ctx) {
+      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0.14em'
+    }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     ctx.fillText('Sharp', 2, centsToY(50) - 10)
-    ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
+    ctx.font = '300 8px ui-monospace, SFMono-Regular, Menlo, monospace'
+    if ('letterSpacing' in ctx) {
+      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0.08em'
+    }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)'
     ctx.fillText('+50', 2, centsToY(50))
     ctx.fillText('0', 2, centsToY(0))
     ctx.fillText('-50', 2, centsToY(-50))
-    ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
+    ctx.font = labelFont
+    if ('letterSpacing' in ctx) {
+      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0.14em'
+    }
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
     ctx.fillText('Flat', 2, centsToY(-50) + 10)
+    if ('letterSpacing' in ctx) {
+      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px'
+    }
   }
 
   if (isGlass) {
     drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight)
   }
 
-  ctx.strokeStyle = isGlass ? 'rgba(255, 255, 255, 0.14)' : 'rgba(52, 211, 153, 0.35)'
-  ctx.setLineDash(isGlass ? [4, 7] : [4, 6])
-  ctx.lineWidth = isGlass ? 1 : 1
-  ctx.beginPath()
-  ctx.moveTo(0, centsToY(0))
-  ctx.lineTo(width, centsToY(0))
-  ctx.stroke()
-  ctx.setLineDash([])
+  const centerY = centsToY(0)
+  if (isGlass) {
+    ctx.save()
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)'
+    ctx.lineWidth = 2
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.2)'
+    ctx.shadowBlur = 10
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.moveTo(0, centerY)
+    ctx.lineTo(width, centerY)
+    ctx.stroke()
+    ctx.restore()
+  } else {
+    ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)'
+    ctx.setLineDash([4, 6])
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(0, centerY)
+    ctx.lineTo(width, centerY)
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
 
   const tracePoints = buildTraceDisplayPoints(
     centsHistory,

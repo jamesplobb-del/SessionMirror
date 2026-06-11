@@ -664,7 +664,7 @@ export default function LivePitchTuner({
               )}
             </p>
             <p
-              className="pitch-readout-display shrink-0 text-[clamp(0.6875rem,3.2cqw,0.75rem)] font-semibold"
+              className="pitch-widget-hz pitch-readout-display shrink-0"
               style={{ color: accent }}
             >
               {formatFrequencyHz(readout.frequencyHz)}

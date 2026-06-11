@@ -733,14 +733,20 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .pitch-glass-panel--compact {
-  border-radius: 22px;
+  border-radius: 1.5rem;
   padding: 0;
 }
 
 .pitch-glass-panel--widget {
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.03) 40%, rgba(255, 255, 255, 0) 100%),
-    rgba(26, 28, 36, 0.58);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
 }
 
 .pitch-glass-panel--audio {
@@ -1291,6 +1297,14 @@ video.camera-preview.camera-preview--hidden {
   font-family: ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', sans-serif;
 }
 
+.pitch-widget-hz {
+  font-weight: 300;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: clamp(0.625rem, 2.8cqw, 0.6875rem);
+  opacity: 0.92;
+}
+
 .pitch-widget-chart {
   min-height: 3.5rem;
 }
@@ -1394,7 +1408,8 @@ video.camera-preview.camera-preview--hidden {
   cursor: grab;
   max-width: min(calc(100vw - 1.5rem), 22.5rem);
   container-type: size;
-  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.24));
+  filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.18));
+  border-radius: 1.5rem;
 }
 
 .pitch-widget-draggable--pinching {
