@@ -4,4 +4,8 @@ export class SessionMirrorAudioWeb implements SessionMirrorAudioPlugin {
   async primeSpeakerPlayback(): Promise<void> {
     /* no-op on web */
   }
+
+  async restoreRecordingSession(): Promise<void> {
+    /* no-op on web */
+  }
 }
