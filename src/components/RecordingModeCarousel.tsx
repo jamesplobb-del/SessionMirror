@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { Camera, Mic, Square } from 'lucide-react'
+import { Camera, Mic, Square, AudioWaveform } from 'lucide-react'
 import type { RecordingMode } from '../types'
 
 const SWIPE_THRESHOLD_PX = 36
@@ -11,6 +11,8 @@ interface RecordingModeCarouselProps {
   isRecording: boolean
   ready: boolean
   disabled?: boolean
+  autoSoundRecording?: boolean
+  onAutoSoundRecordingChange?: (enabled: boolean) => void
 }
 
 type SlotPosition = 'center' | 'left' | 'right'
@@ -86,6 +88,8 @@ export default function RecordingModeCarousel({
   isRecording,
   ready,
   disabled = false,
+  autoSoundRecording = false,
+  onAutoSoundRecordingChange,
 }: RecordingModeCarouselProps) {
   const touchStartXRef = useRef(0)
   const modeSwitchLocked = disabled || isRecording
@@ -130,6 +134,21 @@ export default function RecordingModeCarousel({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {value === 'audio' && !isRecording && onAutoSoundRecordingChange && (
+        <button
+          type="button"
+          className={`record-carousel-auto-btn pointer-events-auto ${autoSoundRecording ? 'record-carousel-auto-btn--active' : ''}`}
+          aria-label={
+            autoSoundRecording
+              ? 'Turn off auto sound recording'
+              : 'Turn on auto sound recording'
+          }
+          aria-pressed={autoSoundRecording}
+          onClick={() => onAutoSoundRecordingChange(!autoSoundRecording)}
+        >
+          <AudioWaveform className="h-4 w-4" strokeWidth={2.25} />
+        </button>
+      )}
       <div className="record-carousel-track">
         <ModeSlot
           mode="video"

@@ -18,6 +18,8 @@ interface ControlDeckProps {
   onOpenSettings: () => void
   takeCount: number
   autoSoundListening?: boolean
+  autoSoundRecording?: boolean
+  onAutoSoundRecordingChange?: (enabled: boolean) => void
   recordDropRef?: RefObject<HTMLDivElement | null>
   dragDeleteActive?: boolean
   dragOverDelete?: boolean
@@ -48,6 +50,8 @@ export default function ControlDeck({
   onOpenSettings,
   takeCount,
   autoSoundListening = false,
+  autoSoundRecording = false,
+  onAutoSoundRecordingChange,
   recordDropRef,
   dragDeleteActive = false,
   dragOverDelete = false,
@@ -210,6 +214,10 @@ export default function ControlDeck({
                 onToggleRecord={onToggleRecord}
                 isRecording={isRecording}
                 ready={ready}
+                autoSoundRecording={autoSoundRecording}
+                onAutoSoundRecordingChange={
+                  recordingMode === 'audio' ? onAutoSoundRecordingChange : undefined
+                }
               />
             )}
           </div>

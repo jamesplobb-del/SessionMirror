@@ -28,6 +28,17 @@ const TIER_AUDIO: Record<
   subdivision: { hz: 600, peak: 0.2, decaySec: 0.028 },
 }
 
+type AudioContextCtor = typeof AudioContext
+
+function getAudioContextCtor(): AudioContextCtor | null {
+  if (typeof window === 'undefined') return null
+  return (
+    window.AudioContext ??
+    (window as Window & { webkitAudioContext?: AudioContextCtor }).webkitAudioContext ??
+    null
+  )
+}
+
 function scheduleTieredClick(
   ctx: AudioContext,
   when: number,
@@ -173,23 +184,18 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     [persistPrefs],
   )
 
-  const ensureContext = useCallback(async (): Promise<AudioContext | null> => {
-    if (typeof window === 'undefined') return null
-
+  /** JIT singleton — only call from user-gesture handlers (play tap). Never on mount. */
+  const acquireAudioContextOnUserGesture = useCallback((): AudioContext | null => {
     let ctx = audioCtxRef.current
-    if (!ctx || ctx.state === 'closed') {
-      ctx = new AudioContext({ latencyHint: 'interactive' })
-      audioCtxRef.current = ctx
+    if (ctx && ctx.state !== 'closed') {
+      return ctx
     }
 
-    if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume()
-      } catch {
-        return null
-      }
-    }
+    const Ctor = getAudioContextCtor()
+    if (!Ctor) return null
 
+    ctx = new Ctor({ latencyHint: 'interactive' })
+    audioCtxRef.current = ctx
     return ctx
   }, [])
 
@@ -203,63 +209,88 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     void audioCtxRef.current?.suspend()
   }, [])
 
+  const start = useCallback(async () => {
+    const ctx = acquireAudioContextOnUserGesture()
+    if (!ctx) return
+
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume()
+      } catch {
+        return
+      }
+    }
+
+    tickCounterRef.current = 0
+    setBeatIndex(0)
+    nextBeatTimeRef.current = 0
+    playingRef.current = true
+    setPlaying(true)
+  }, [acquireAudioContextOnUserGesture])
+
   const togglePlay = useCallback(() => {
     if (playingRef.current) {
       stop()
       return
     }
-    setPlaying(true)
-  }, [stop])
+    void start()
+  }, [start, stop])
 
   useEffect(() => {
     if (!playing) return
 
-    let cancelled = false
-
-    const runScheduler = async () => {
-      const ctx = await ensureContext()
-      if (!ctx || cancelled) return
-
-      nextBeatTimeRef.current = Math.max(
-        ctx.currentTime + 0.03,
-        nextBeatTimeRef.current > ctx.currentTime ? nextBeatTimeRef.current : ctx.currentTime + 0.03,
-      )
-
-      const tick = () => {
-        if (cancelled || !playingRef.current) return
-
-        const meter = meterRef.current
-        const barTicks = ticksPerBar(meter)
-        const secondsPerTick = secondsPerSchedulerTick(meter, bpmRef.current)
-        const outputNode = ensureMasterGain(ctx)
-        const muted = shouldMuteOutput()
-
-        let uiBeat = -1
-
-        while (nextBeatTimeRef.current < ctx.currentTime + SCHEDULE_AHEAD_SEC) {
-          const tickInBar = tickCounterRef.current % barTicks
-          const tier = resolveClickTier(meter, tickInBar)
-          scheduleTieredClick(ctx, nextBeatTimeRef.current, tier, outputNode, muted)
-
-          if (nextBeatTimeRef.current - ctx.currentTime <= LOOKAHEAD_MS / 1000) {
-            uiBeat = resolveUiBeatIndex(meter, tickInBar)
-          }
-
-          nextBeatTimeRef.current += secondsPerTick
-          tickCounterRef.current += 1
-        }
-
-        if (uiBeat >= 0) {
-          setBeatIndex(uiBeat)
-        }
-
-        schedulerTimerRef.current = window.setTimeout(tick, LOOKAHEAD_MS)
-      }
-
-      tick()
+    const ctx = audioCtxRef.current
+    if (!ctx || ctx.state === 'closed') {
+      playingRef.current = false
+      setPlaying(false)
+      return
     }
 
-    void runScheduler()
+    let cancelled = false
+
+    nextBeatTimeRef.current = Math.max(
+      ctx.currentTime + 0.03,
+      nextBeatTimeRef.current > ctx.currentTime ? nextBeatTimeRef.current : ctx.currentTime + 0.03,
+    )
+
+    const tick = () => {
+      if (cancelled || !playingRef.current) return
+
+      const activeCtx = audioCtxRef.current
+      if (!activeCtx || activeCtx.state === 'closed') {
+        stop()
+        return
+      }
+
+      const meter = meterRef.current
+      const barTicks = ticksPerBar(meter)
+      const secondsPerTick = secondsPerSchedulerTick(meter, bpmRef.current)
+      const outputNode = ensureMasterGain(activeCtx)
+      const muted = shouldMuteOutput()
+
+      let uiBeat = -1
+
+      while (nextBeatTimeRef.current < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
+        const tickInBar = tickCounterRef.current % barTicks
+        const tier = resolveClickTier(meter, tickInBar)
+        scheduleTieredClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted)
+
+        if (nextBeatTimeRef.current - activeCtx.currentTime <= LOOKAHEAD_MS / 1000) {
+          uiBeat = resolveUiBeatIndex(meter, tickInBar)
+        }
+
+        nextBeatTimeRef.current += secondsPerTick
+        tickCounterRef.current += 1
+      }
+
+      if (uiBeat >= 0) {
+        setBeatIndex(uiBeat)
+      }
+
+      schedulerTimerRef.current = window.setTimeout(tick, LOOKAHEAD_MS)
+    }
+
+    tick()
 
     return () => {
       cancelled = true
@@ -268,7 +299,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
         schedulerTimerRef.current = null
       }
     }
-  }, [playing, bpm, meter, ensureContext, ensureMasterGain, shouldMuteOutput])
+  }, [playing, bpm, meter, ensureMasterGain, shouldMuteOutput, stop])
 
   useEffect(() => {
     if (playing) {
@@ -280,8 +311,10 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
 
   useEffect(() => {
     return () => {
+      playingRef.current = false
       if (schedulerTimerRef.current !== null) {
         window.clearTimeout(schedulerTimerRef.current)
+        schedulerTimerRef.current = null
       }
       const ctx = audioCtxRef.current
       audioCtxRef.current = null

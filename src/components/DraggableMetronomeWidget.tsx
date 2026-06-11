@@ -12,7 +12,7 @@ import {
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
 import { usePinchResize } from '../hooks/usePinchResize'
-import { getFloatingWidgetTopCenter } from '../utils/floatingWidgetLayout'
+import { getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
 import {
   COMPOUND_METERS,
   MAX_BPM,
@@ -23,7 +23,7 @@ import {
 
 interface DraggableMetronomeWidgetProps {
   boundaryRef: RefObject<HTMLElement | null>
-  layoutKey?: string
+  positionId?: string
   isTakePlaying?: boolean
   muteDuringPlayback?: boolean
 }
@@ -65,7 +65,7 @@ function MetronomeControlButton({
 
 export default function DraggableMetronomeWidget({
   boundaryRef,
-  layoutKey = '',
+  positionId = 'main-metronome',
   isTakePlaying = false,
   muteDuringPlayback = true,
 }: DraggableMetronomeWidgetProps) {
@@ -73,6 +73,7 @@ export default function DraggableMetronomeWidget({
   const bpmInputId = useId()
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
+  const positionReadyRef = useRef(false)
   const { bpm, meter, playing, beatIndex, setBpm, setMeter, togglePlay } = useMetronome({
     isTakePlaying,
     muteDuringPlayback,
@@ -115,39 +116,57 @@ export default function DraggableMetronomeWidget({
     measureMax()
     window.addEventListener('resize', measureMax)
     return () => window.removeEventListener('resize', measureMax)
-  }, [layoutKey])
+  }, [])
 
   useLayoutEffect(() => {
-    const measureInitialPosition = () => {
+    if (positionReadyRef.current) return
+
+    const applyPosition = () => {
       const bounds = boundaryRef.current
       if (!bounds) return false
-      const width = widgetRef.current?.offsetWidth ?? DEFAULT_WIDGET_SIZE.width
-      const height = widgetRef.current?.offsetHeight ?? DEFAULT_WIDGET_SIZE.height
-      const { x, y } = getFloatingWidgetTopCenter(
-        bounds.clientWidth,
-        bounds.clientHeight,
-        width,
-        height,
-      )
-      dragX.set(x)
-      dragY.set(y)
+
+      const saved = loadWidgetPosition(positionId)
+      if (saved) {
+        dragX.set(saved.x)
+        dragY.set(saved.y)
+      } else {
+        const width = widgetRef.current?.offsetWidth ?? DEFAULT_WIDGET_SIZE.width
+        const height = widgetRef.current?.offsetHeight ?? DEFAULT_WIDGET_SIZE.height
+        const { x, y } = getFloatingWidgetTopCenter(
+          bounds.clientWidth,
+          bounds.clientHeight,
+          width,
+          height,
+        )
+        dragX.set(x)
+        dragY.set(y)
+      }
+
+      positionReadyRef.current = true
       return true
     }
 
-    if (!measureInitialPosition()) {
-      const { x, y } = getFloatingWidgetTopCenter(
-        window.innerWidth,
-        window.innerHeight,
-        DEFAULT_WIDGET_SIZE.width,
-        DEFAULT_WIDGET_SIZE.height,
-      )
-      dragX.set(x)
-      dragY.set(y)
+    if (!applyPosition()) {
+      const saved = loadWidgetPosition(positionId)
+      if (saved) {
+        dragX.set(saved.x)
+        dragY.set(saved.y)
+        positionReadyRef.current = true
+      }
     }
 
-    const retryFrame = window.requestAnimationFrame(measureInitialPosition)
+    const retryFrame = window.requestAnimationFrame(() => {
+      if (!positionReadyRef.current) {
+        applyPosition()
+      }
+    })
+
     return () => window.cancelAnimationFrame(retryFrame)
-  }, [boundaryRef, dragX, dragY, layoutKey])
+  }, [boundaryRef, dragX, dragY, positionId])
+
+  const persistPosition = useCallback(() => {
+    saveWidgetPosition(positionId, dragX.get(), dragY.get())
+  }, [dragX, dragY, positionId])
 
   const commitBpmDraft = useCallback(() => {
     const parsed = Number.parseInt(bpmDraft, 10)
@@ -243,6 +262,7 @@ export default function DraggableMetronomeWidget({
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
+      onDragEnd={persistPosition}
       onPointerDown={onPinchPointerDown}
       onPointerMove={onPinchPointerMove}
       onPointerUp={onPinchPointerUp}

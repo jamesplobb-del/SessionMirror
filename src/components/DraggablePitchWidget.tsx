@@ -1,9 +1,9 @@
 import { motion, useMotionValue } from 'framer-motion'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
 import { agentDebugLog } from '../utils/agentDebugLog'
-import { getFloatingWidgetTopCenter } from '../utils/floatingWidgetLayout'
+import { getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
 
 type TunerProps = Omit<
   ComponentProps<typeof LivePitchTuner>,
@@ -17,8 +17,8 @@ interface DraggablePitchWidgetProps extends TunerProps {
   liveMicEnabled?: boolean
   micStreamRef?: RefObject<MediaStream | null>
   layoutRegion?: 'main' | 'review'
-  /** Forces layout remeasure when the host surface opens or media changes. */
-  layoutKey?: string
+  /** Stable id for persisting drag position across modal open/close. */
+  positionId?: string
   tunerInstrument?: TunerProps['tunerInstrument']
   pitchSource?: 'media' | 'microphone'
   liveMicOnly?: boolean
@@ -65,15 +65,17 @@ export default function DraggablePitchWidget({
   liveMicEnabled = true,
   micStreamRef,
   layoutRegion = 'main',
-  layoutKey = '',
+  positionId,
   tunerInstrument = 'voice',
   pitchSource = 'media',
   liveMicOnly = false,
   ...tunerProps
 }: DraggablePitchWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
-  const dragX = useMotionValue(12)
+  const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
+  const positionReadyRef = useRef(false)
+  const resolvedPositionId = positionId ?? `pitch-${layoutRegion}`
   const [maxSize, setMaxSize] = useState(() => ({
     width: Math.min(360, window.innerWidth - 24),
     height: Math.min(280, Math.floor(window.innerHeight * 0.38)),
@@ -119,47 +121,58 @@ export default function DraggablePitchWidget({
     measureMax()
     window.addEventListener('resize', measureMax)
     return () => window.removeEventListener('resize', measureMax)
-  }, [layoutKey])
+  }, [])
 
   useLayoutEffect(() => {
-    if (isAudioMode) return
+    if (isAudioMode || positionReadyRef.current) return
 
-    const measureInitialPosition = () => {
+    const applyPosition = () => {
       const bounds = boundaryRef.current
       if (!bounds) return false
 
-      const width = widgetRef.current?.offsetWidth ?? DEFAULT_WIDGET_SIZE.width
-      const height = widgetRef.current?.offsetHeight ?? DEFAULT_WIDGET_SIZE.height
-      const { x, y } = getFloatingWidgetTopCenter(
-        bounds.clientWidth,
-        bounds.clientHeight,
-        width,
-        height,
-      )
-      dragX.set(x)
-      dragY.set(y)
+      const saved = loadWidgetPosition(resolvedPositionId)
+      if (saved) {
+        dragX.set(saved.x)
+        dragY.set(saved.y)
+      } else {
+        const width = widgetRef.current?.offsetWidth ?? DEFAULT_WIDGET_SIZE.width
+        const height = widgetRef.current?.offsetHeight ?? DEFAULT_WIDGET_SIZE.height
+        const { x, y } = getFloatingWidgetTopCenter(
+          bounds.clientWidth,
+          bounds.clientHeight,
+          width,
+          height,
+        )
+        dragX.set(x)
+        dragY.set(y)
+      }
+
+      positionReadyRef.current = true
       return true
     }
 
-    if (!measureInitialPosition()) {
-      const { x, y } = getFloatingWidgetTopCenter(
-        window.innerWidth,
-        window.innerHeight,
-        DEFAULT_WIDGET_SIZE.width,
-        DEFAULT_WIDGET_SIZE.height,
-      )
-      dragX.set(x)
-      dragY.set(y)
+    if (!applyPosition()) {
+      const saved = loadWidgetPosition(resolvedPositionId)
+      if (saved) {
+        dragX.set(saved.x)
+        dragY.set(saved.y)
+        positionReadyRef.current = true
+      }
     }
 
     const retryFrame = window.requestAnimationFrame(() => {
-      measureInitialPosition()
+      if (!positionReadyRef.current) {
+        applyPosition()
+      }
     })
 
-    return () => {
-      window.cancelAnimationFrame(retryFrame)
-    }
-  }, [boundaryRef, dragX, dragY, isAudioMode, layoutKey, mediaKey])
+    return () => window.cancelAnimationFrame(retryFrame)
+  }, [boundaryRef, dragX, dragY, isAudioMode, resolvedPositionId])
+
+  const persistPosition = useCallback(() => {
+    if (isAudioMode) return
+    saveWidgetPosition(resolvedPositionId, dragX.get(), dragY.get())
+  }, [dragX, dragY, isAudioMode, resolvedPositionId])
 
   const tuner = (
     <LivePitchTuner
@@ -201,6 +214,7 @@ export default function DraggablePitchWidget({
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
+      onDragEnd={persistPosition}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

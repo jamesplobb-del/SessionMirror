@@ -36,6 +36,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   muteMetronomeDuringPlayback: true,
 }
 
+/** Floating widgets — forced off on each cold app start. */
+const SESSION_START_WIDGET_OFF: Pick<AppSettings, 'pitchTrackerEnabled' | 'showMetronome'> = {
+  pitchTrackerEnabled: false,
+  showMetronome: false,
+}
+
 function parseTunerInstrument(value: unknown): TunerInstrument {
   if (value === 'strings' || value === 'brass' || value === 'voice') {
     return value
@@ -96,6 +102,14 @@ export function loadAppSettings(): AppSettings {
   } catch {
     return { ...DEFAULT_APP_SETTINGS }
   }
+}
+
+/** Load persisted prefs but start with floating widgets hidden. */
+export function loadAppSettingsForSessionStart(): AppSettings {
+  const loaded = loadAppSettings()
+  const sessionStart = { ...loaded, ...SESSION_START_WIDGET_OFF }
+  saveAppSettings(sessionStart)
+  return sessionStart
 }
 
 export function saveAppSettings(settings: AppSettings): void {

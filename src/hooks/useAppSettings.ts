@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react'
 import {
   DEFAULT_APP_SETTINGS,
-  loadAppSettings,
+  loadAppSettingsForSessionStart,
   saveAppSettings,
   type AppSettings,
 } from '../utils/appSettings'
 
 export function useAppSettings() {
-  const [settings, setSettings] = useState<AppSettings>(() => loadAppSettings())
+  const [settings, setSettings] = useState<AppSettings>(() => loadAppSettingsForSessionStart())
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettings((prev) => {

@@ -125,83 +125,6 @@ function StatusLabel({
   )
 }
 
-function VerticalPitchMeter({
-  cents,
-  active,
-}: {
-  cents: number
-  active: boolean
-}) {
-  const clamped = active ? Math.max(-50, Math.min(50, cents)) : 0
-  const inTune = active && isInTune(cents, TUNING_GREEN_CENTS)
-  const zone = active ? getIntonationZone(cents) : null
-  const color = active ? getIntonationColor(cents) : 'rgba(255,255,255,0.18)'
-  const fillRatio = active ? Math.abs(clamped) / 50 : 0
-  const isSharp = active && clamped > TUNING_GREEN_CENTS
-  const isFlat = active && clamped < -TUNING_GREEN_CENTS
-  const pulseDuration = zone === 'red' ? 0.38 : zone === 'yellow' ? 0.58 : 0.85
-
-  return (
-    <div
-      className={`pitch-vertical-meter ${active ? 'pitch-vertical-meter--active' : ''} ${inTune ? 'pitch-vertical-meter--in-tune' : ''}`}
-      aria-hidden={!active}
-    >
-      <div className="pitch-vertical-meter__track">
-        <div className="pitch-vertical-meter__zone pitch-vertical-meter__zone--sharp">
-          {isSharp && (
-            <motion.div
-              className="pitch-vertical-meter__fill"
-              style={{
-                height: `${fillRatio * 100}%`,
-                backgroundColor: color,
-                ['--meter-glow' as string]: color,
-              }}
-              initial={false}
-              animate={{
-                opacity: [0.72, 1, 0.72],
-                scaleX: zone === 'red' ? [0.92, 1.06, 0.92] : [0.96, 1, 0.96],
-              }}
-              transition={{
-                duration: pulseDuration,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            />
-          )}
-        </div>
-
-        <div
-          className={`pitch-vertical-meter__center ${inTune ? 'pitch-vertical-meter__center--in-tune' : ''}`}
-          style={!inTune && active ? { borderColor: `${color}55` } : undefined}
-        />
-
-        <div className="pitch-vertical-meter__zone pitch-vertical-meter__zone--flat">
-          {isFlat && (
-            <motion.div
-              className="pitch-vertical-meter__fill"
-              style={{
-                height: `${fillRatio * 100}%`,
-                backgroundColor: color,
-                ['--meter-glow' as string]: color,
-              }}
-              initial={false}
-              animate={{
-                opacity: [0.72, 1, 0.72],
-                scaleX: zone === 'red' ? [0.92, 1.06, 0.92] : [0.96, 1, 0.96],
-              }}
-              transition={{
-                duration: pulseDuration,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 const ORBIT_RADIUS = 93
 const ORBIT_CENTER = 100
 
@@ -397,64 +320,11 @@ function LiveAudioTunerPane({
   )
 }
 
-function AudioTunerPane({
-  readout,
-  canvasRef,
-  mode,
-  takeName,
-}: {
-  readout: PitchReadout
-  canvasRef: RefObject<HTMLCanvasElement | null>
-  mode: 'playback'
-  takeName?: string
-}) {
-  const active = readout.noteName !== '—'
-  const displayCents = active ? readout.cents : 0
-  const accent = active ? getIntonationColor(displayCents) : 'rgba(255,255,255,0.55)'
-  const modeLabel =
-    mode === 'playback' ? 'Recorded Take' : 'Pitch Analysis'
-
-  return (
-    <div className="pitch-audio-pane flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="pitch-audio-pane__header">
-        <div className="min-w-0">
-          <p className="pitch-audio-pane__eyebrow">{modeLabel}</p>
-          {takeName && mode === 'playback' && (
-            <p className="pitch-audio-pane__take-name">{takeName}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="pitch-audio-pane__readout">
-        <p className="pitch-audio-pane__note pitch-readout-display" style={{ color: accent }}>
-          {readout.noteName}
-        </p>
-        <div className="pitch-audio-pane__meta">
-          <p className="pitch-audio-pane__meta-freq pitch-readout-display" style={{ color: accent }}>
-            {formatFrequencyHz(readout.frequencyHz)}
-          </p>
-          <p className="pitch-audio-pane__cents pitch-readout-display" style={{ color: accent }}>
-            {active ? formatDisplayCents(readout.cents) : '—'}
-          </p>
-        </div>
-      </div>
-
-      <div className="pitch-audio-pane__needle">
-        <VerticalPitchMeter cents={displayCents} active={active} />
-      </div>
-
-      <div className="pitch-audio-pane__chart-well mt-4 min-h-[140px] flex-1">
-        <PitchChartCanvas canvasRef={canvasRef} glass />
-      </div>
-    </div>
-  )
-}
-
 function LivePitchTunerAudio({
   mediaRef,
   isPlaying,
   mediaKey,
-  takeName,
+  takeName: _takeName,
   enabled,
   liveMicEnabled,
   micStreamRef,
@@ -546,21 +416,18 @@ function LivePitchTunerAudio({
       <AnimatePresence mode="wait">
         <motion.div
           key={paneKey}
-          className={`flex min-h-0 flex-1 flex-col ${showLive ? 'pitch-tuner__live-body' : ''}`}
+          className={`flex min-h-0 flex-1 flex-col ${showLive || showPlayback ? 'pitch-tuner__live-body' : ''}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.22, ease: 'easeInOut' }}
         >
           {showPlayback ? (
-            <div className="pitch-glass-panel pitch-glass-panel--audio flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden">
-              <AudioTunerPane
-                readout={playbackTracker.readout}
-                canvasRef={playbackCanvasRef}
-                mode="playback"
-                takeName={takeName}
-              />
-            </div>
+            <LiveAudioTunerPane
+              readout={playbackTracker.readout}
+              inTuneGlow={playbackTracker.inTuneGlow}
+              canvasRef={playbackCanvasRef}
+            />
           ) : showLive ? (
             <LiveAudioTunerPane
               readout={liveTracker.readout}

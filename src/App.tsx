@@ -829,8 +829,7 @@ export default function App() {
     let next: MainAudioPitchSource | null = null
 
     if (settings.pitchTrackerEnabled && recordingMode === 'audio') {
-      if (!isReviewOpen && !isVaultOpen && !isSettingsOpen) {
-        if (isRecording && ready) {
+      if (isRecording && ready) {
           next = {
             mediaRef: liveMicPlaceholderRef,
             take: null,
@@ -879,7 +878,6 @@ export default function App() {
             liveMicOnly: true,
           }
         }
-      }
     }
 
     const signature = next
@@ -900,9 +898,6 @@ export default function App() {
   }, [
     settings.pitchTrackerEnabled,
     recordingMode,
-    isReviewOpen,
-    isVaultOpen,
-    isSettingsOpen,
     autoPlaybackTakeId,
     autoPlaybackTake,
     autoPlaybackPlaying,
@@ -937,7 +932,6 @@ export default function App() {
 
   const mainVideoPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'video') return null
-    if (isReviewOpen || isVaultOpen || isSettingsOpen) return null
     if (!ready && !isRecording) return null
 
     return {
@@ -948,21 +942,19 @@ export default function App() {
   }, [
     settings.pitchTrackerEnabled,
     recordingMode,
-    isReviewOpen,
-    isVaultOpen,
-    isSettingsOpen,
     ready,
     isRecording,
   ])
 
+  const pitchHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen
+
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
 
   const showMetronomeWidget =
-    settings.showMetronome &&
-    !isVaultOpen &&
-    !isSettingsOpen &&
-    !isReviewOpen &&
-    (ready || isRecording)
+    settings.showMetronome && (ready || isRecording)
+
+  const metronomeWidgetInteractive =
+    showMetronomeWidget && !isVaultOpen && !isSettingsOpen && !isReviewOpen
 
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
@@ -971,7 +963,8 @@ export default function App() {
     showPitch &&
     recordingMode === 'audio' &&
     mainAudioPitchSource !== null &&
-    hudModalState === 'idle'
+    hudModalState === 'idle' &&
+    !pitchHudSuspended
 
   const pitchAudioTouchShield = pitchAudioHudLock
 
@@ -1305,8 +1298,8 @@ export default function App() {
       />
 
       <div
-        className={`pitch-display-layer${pitchAudioTouchShield ? ' pitch-display-layer--touch-shield' : ''}`}
-        aria-hidden={!showPitch || !mainAudioPitchSource}
+        className={`pitch-display-layer${pitchAudioTouchShield ? ' pitch-display-layer--touch-shield' : ''}${pitchHudSuspended ? ' floating-widget-layer--inert' : ''}`}
+        aria-hidden={!showPitch || !mainAudioPitchSource || pitchHudSuspended}
       >
         {showMainPitchWidget && (
           <Suspense fallback={null}>
@@ -1315,7 +1308,7 @@ export default function App() {
                 <DraggablePitchWidget
                   boundaryRef={appShellRef}
                   mediaRef={mainAudioPitchSource.mediaRef}
-                  enabled={settings.pitchTrackerEnabled}
+                  enabled={settings.pitchTrackerEnabled && !pitchHudSuspended}
                   isPlaying={mainAudioPitchSource.isPlaying}
                   mediaKey={mainAudioPitchSource.mediaKey}
                   takeName={mainAudioPitchSource.take?.name}
@@ -1326,7 +1319,6 @@ export default function App() {
                   }
                   micStreamRef={streamRef}
                   layoutRegion="main"
-                  layoutKey={`audio-${recordingMode}`}
                   liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
                   tunerInstrument={settings.tunerInstrument}
                 />
@@ -1336,14 +1328,17 @@ export default function App() {
         )}
       </div>
 
-      <div className="metronome-display-layer" aria-hidden={!showMetronomeWidget}>
+      <div
+        className={`metronome-display-layer${metronomeWidgetInteractive ? '' : ' floating-widget-layer--inert'}`}
+        aria-hidden={!metronomeWidgetInteractive}
+      >
         {showMetronomeWidget && (
           <Suspense fallback={null}>
             <AnimatePresence>
               <DraggableMetronomeWidget
                 key="main-metronome"
                 boundaryRef={appShellRef}
-                layoutKey={`metronome-${recordingMode}`}
+                positionId="main-metronome"
                 isTakePlaying={takePlaybackActive}
                 muteDuringPlayback={settings.muteMetronomeDuringPlayback}
               />
@@ -1357,20 +1352,22 @@ export default function App() {
         <Suspense fallback={null}>
         <AnimatePresence>
           {showPitch && mainVideoPitchSource && (
+            <div className={pitchHudSuspended ? 'floating-widget-layer--inert fixed inset-0 z-[5]' : 'contents'}>
             <DraggablePitchWidget
               boundaryRef={appShellRef}
               mediaRef={mainVideoPitchSource.mediaRef}
-              enabled={settings.pitchTrackerEnabled}
+              enabled={settings.pitchTrackerEnabled && !pitchHudSuspended}
               isPlaying={mainVideoPitchSource.isPlaying}
               mediaKey={mainVideoPitchSource.mediaKey}
               label="Live Pitch"
               pitchSource="microphone"
               micStreamRef={streamRef}
               layoutRegion="main"
-              layoutKey={`video-${recordingMode}`}
+              positionId="main-pitch-video"
               tunerInstrument={settings.tunerInstrument}
               onClose={handleClosePitch}
             />
+            </div>
           )}
         </AnimatePresence>
         </Suspense>
@@ -1444,6 +1441,10 @@ export default function App() {
             onOpenSettings={handleOpenSettings}
             takeCount={takes.length}
             autoSoundListening={autoSoundListening}
+            autoSoundRecording={settings.autoSoundRecording}
+            onAutoSoundRecordingChange={(enabled) =>
+              updateSettings({ autoSoundRecording: enabled })
+            }
             recordDropRef={recordDeleteDropRef}
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
