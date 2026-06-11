@@ -325,6 +325,17 @@ export default function SettingsDrawer({
                 })
               }}
             />
+
+            <AnimatedExpand open={settings.showMetronome}>
+              <div className="pt-3">
+                <SettingToggle
+                  label="Mute Metronome During Playback"
+                  description="Silence metronome clicks while a take is playing. The beat keeps running so it stays on tempo when playback stops."
+                  checked={settings.muteMetronomeDuringPlayback}
+                  onChange={(checked) => onUpdate({ muteMetronomeDuringPlayback: checked })}
+                />
+              </div>
+            </AnimatedExpand>
           </section>
 
           <Pressable

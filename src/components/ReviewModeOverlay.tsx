@@ -877,7 +877,6 @@ export default function ReviewModeOverlay({
             {showPitch && (
               <DraggablePitchWidget
                 boundaryRef={reviewBoundsRef}
-                defaultBottomOffset={120}
                 layoutKey={`${isOpen}-${activePitchMediaKey}`}
                 mediaRef={activePitchMediaRef}
                 enabled={pitchTrackerEnabled}

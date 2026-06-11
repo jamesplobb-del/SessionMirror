@@ -4,15 +4,17 @@ export interface MetronomeMeterDef {
   label: string
   beatsPerBar: number
   group: 'simple' | 'compound'
+  /** Eighth-note subdivisions per bar (compound meters only). */
+  eighthNotesPerBar?: number
 }
 
 export const METRONOME_METERS: Record<MetronomeMeter, MetronomeMeterDef> = {
   '2/4': { label: '2/4', beatsPerBar: 2, group: 'simple' },
   '3/4': { label: '3/4', beatsPerBar: 3, group: 'simple' },
   '4/4': { label: '4/4', beatsPerBar: 4, group: 'simple' },
-  '6/8': { label: '6/8', beatsPerBar: 2, group: 'compound' },
-  '9/8': { label: '9/8', beatsPerBar: 3, group: 'compound' },
-  '12/8': { label: '12/8', beatsPerBar: 4, group: 'compound' },
+  '6/8': { label: '6/8', beatsPerBar: 2, group: 'compound', eighthNotesPerBar: 6 },
+  '9/8': { label: '9/8', beatsPerBar: 3, group: 'compound', eighthNotesPerBar: 9 },
+  '12/8': { label: '12/8', beatsPerBar: 4, group: 'compound', eighthNotesPerBar: 12 },
 }
 
 export const SIMPLE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4']
@@ -68,4 +70,26 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
 
 export function getBeatsPerBar(meter: MetronomeMeter): number {
   return METRONOME_METERS[meter].beatsPerBar
+}
+
+export function isCompoundMeter(meter: MetronomeMeter): boolean {
+  return METRONOME_METERS[meter].group === 'compound'
+}
+
+export function getEighthNotesPerBar(meter: MetronomeMeter): number {
+  const def = METRONOME_METERS[meter]
+  return def.eighthNotesPerBar ?? def.beatsPerBar
+}
+
+export type MetronomeClickTier = 'downbeat' | 'macro' | 'subdivision'
+
+/** Compound 8th-note accent: 1 = downbeat, 4/7/10… = macro pulse, others = fill. */
+export function getCompoundClickTier(eighthIndexInBar: number): MetronomeClickTier {
+  if (eighthIndexInBar === 0) return 'downbeat'
+  if (eighthIndexInBar % 3 === 0) return 'macro'
+  return 'subdivision'
+}
+
+export function getSimpleClickTier(beatIndexInBar: number): MetronomeClickTier {
+  return beatIndexInBar === 0 ? 'downbeat' : 'subdivision'
 }

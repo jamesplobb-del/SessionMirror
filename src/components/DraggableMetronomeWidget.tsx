@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
 import { usePinchResize } from '../hooks/usePinchResize'
+import { getFloatingWidgetTopCenter } from '../utils/floatingWidgetLayout'
 import {
   COMPOUND_METERS,
   MAX_BPM,
@@ -23,10 +24,12 @@ import {
 interface DraggableMetronomeWidgetProps {
   boundaryRef: RefObject<HTMLElement | null>
   layoutKey?: string
+  isTakePlaying?: boolean
+  muteDuringPlayback?: boolean
 }
 
 const DEFAULT_WIDGET_SIZE = { width: 268, height: 96 }
-const MIN_WIDGET_SIZE = { width: 220, height: 84 }
+const MIN_WIDGET_SIZE = { width: 180, height: 80 }
 const BPM_DRAG_SENSITIVITY = 0.35
 
 function MetronomeControlButton({
@@ -63,12 +66,17 @@ function MetronomeControlButton({
 export default function DraggableMetronomeWidget({
   boundaryRef,
   layoutKey = '',
+  isTakePlaying = false,
+  muteDuringPlayback = true,
 }: DraggableMetronomeWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const bpmInputId = useId()
-  const dragX = useMotionValue(12)
-  const dragY = useMotionValue(72)
-  const { bpm, meter, playing, beatIndex, setBpm, setMeter, togglePlay } = useMetronome()
+  const dragX = useMotionValue(0)
+  const dragY = useMotionValue(0)
+  const { bpm, meter, playing, beatIndex, setBpm, setMeter, togglePlay } = useMetronome({
+    isTakePlaying,
+    muteDuringPlayback,
+  })
 
   const [maxSize, setMaxSize] = useState(() => ({
     width: Math.min(320, window.innerWidth - 24),
@@ -76,7 +84,7 @@ export default function DraggableMetronomeWidget({
   }))
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState(String(bpm))
-  const bpmDragRef = useRef<{ startX: number; startBpm: number; moved: boolean } | null>(null)
+  const bpmDragRef = useRef<{ startY: number; startBpm: number; moved: boolean } | null>(null)
 
   const pinchLimits = useMemo(
     () => ({
@@ -113,13 +121,28 @@ export default function DraggableMetronomeWidget({
     const measureInitialPosition = () => {
       const bounds = boundaryRef.current
       if (!bounds) return false
-      dragX.set(12)
-      dragY.set(Math.max(72, bounds.clientHeight - 280))
+      const width = widgetRef.current?.offsetWidth ?? DEFAULT_WIDGET_SIZE.width
+      const height = widgetRef.current?.offsetHeight ?? DEFAULT_WIDGET_SIZE.height
+      const { x, y } = getFloatingWidgetTopCenter(
+        bounds.clientWidth,
+        bounds.clientHeight,
+        width,
+        height,
+      )
+      dragX.set(x)
+      dragY.set(y)
       return true
     }
 
     if (!measureInitialPosition()) {
-      dragY.set(72)
+      const { x, y } = getFloatingWidgetTopCenter(
+        window.innerWidth,
+        window.innerHeight,
+        DEFAULT_WIDGET_SIZE.width,
+        DEFAULT_WIDGET_SIZE.height,
+      )
+      dragX.set(x)
+      dragY.set(y)
     }
 
     const retryFrame = window.requestAnimationFrame(measureInitialPosition)
@@ -140,7 +163,7 @@ export default function DraggableMetronomeWidget({
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       if (editingBpm) return
-      bpmDragRef.current = { startX: event.clientX, startBpm: bpm, moved: false }
+      bpmDragRef.current = { startY: event.clientY, startBpm: bpm, moved: false }
       try {
         event.currentTarget.setPointerCapture(event.pointerId)
       } catch {
@@ -154,11 +177,11 @@ export default function DraggableMetronomeWidget({
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (!bpmDragRef.current) return
       event.stopPropagation()
-      const delta = event.clientX - bpmDragRef.current.startX
-      if (Math.abs(delta) > 3) {
+      const deltaY = event.clientY - bpmDragRef.current.startY
+      if (Math.abs(deltaY) > 3) {
         bpmDragRef.current.moved = true
       }
-      setBpm(bpmDragRef.current.startBpm + delta * BPM_DRAG_SENSITIVITY)
+      setBpm(bpmDragRef.current.startBpm - deltaY * BPM_DRAG_SENSITIVITY)
     },
     [setBpm],
   )
@@ -224,7 +247,7 @@ export default function DraggableMetronomeWidget({
       onPointerMove={onPinchPointerMove}
       onPointerUp={onPinchPointerUp}
       onPointerCancel={onPinchPointerCancel}
-      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[6] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''}`}
+      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[80px] min-w-[180px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
@@ -233,9 +256,10 @@ export default function DraggableMetronomeWidget({
         x: dragX,
         y: dragY,
         touchAction: 'none',
-        width: widgetSize.width,
-        height: widgetSize.height,
-        minHeight: widgetSize.height,
+        width: Math.max(MIN_WIDGET_SIZE.width, widgetSize.width),
+        height: Math.max(MIN_WIDGET_SIZE.height, widgetSize.height),
+        minWidth: MIN_WIDGET_SIZE.width,
+        minHeight: MIN_WIDGET_SIZE.height,
       }}
     >
       <div className="ui-orient-spin metronome-widget relative h-full min-h-0 w-full overflow-hidden rounded-3xl">
@@ -284,7 +308,7 @@ export default function DraggableMetronomeWidget({
               <button
                 type="button"
                 className="metronome-widget__bpm pointer-events-auto"
-                aria-label={`${bpm} beats per minute. Drag horizontally to adjust, or tap to edit.`}
+                aria-label={`${bpm} beats per minute. Drag vertically to adjust, or tap to edit.`}
                 onPointerDown={onBpmPointerDown}
                 onPointerMove={onBpmPointerMove}
                 onPointerUp={onBpmPointerUp}

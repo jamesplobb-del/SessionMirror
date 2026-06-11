@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentPr
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
 import { agentDebugLog } from '../utils/agentDebugLog'
+import { getFloatingWidgetTopCenter } from '../utils/floatingWidgetLayout'
 
 type TunerProps = Omit<
   ComponentProps<typeof LivePitchTuner>,
@@ -11,7 +12,6 @@ type TunerProps = Omit<
 
 interface DraggablePitchWidgetProps extends TunerProps {
   boundaryRef: RefObject<HTMLElement | null>
-  defaultBottomOffset?: number
   onClose?: () => void
   isAudioMode?: boolean
   liveMicEnabled?: boolean
@@ -59,7 +59,6 @@ function PitchWidgetCloseButton({ onClose }: { onClose: () => void }) {
 
 export default function DraggablePitchWidget({
   boundaryRef,
-  defaultBottomOffset = 130,
   mediaKey,
   onClose,
   isAudioMode = false,
@@ -129,16 +128,28 @@ export default function DraggablePitchWidget({
       const bounds = boundaryRef.current
       if (!bounds) return false
 
-      const boundsHeight = bounds.clientHeight
-      const widgetHeight = DEFAULT_WIDGET_SIZE.height
-      dragX.set(12)
-      dragY.set(Math.max(12, boundsHeight - defaultBottomOffset - widgetHeight))
+      const width = widgetRef.current?.offsetWidth ?? DEFAULT_WIDGET_SIZE.width
+      const height = widgetRef.current?.offsetHeight ?? DEFAULT_WIDGET_SIZE.height
+      const { x, y } = getFloatingWidgetTopCenter(
+        bounds.clientWidth,
+        bounds.clientHeight,
+        width,
+        height,
+      )
+      dragX.set(x)
+      dragY.set(y)
       return true
     }
 
     if (!measureInitialPosition()) {
-      dragX.set(12)
-      dragY.set(Math.max(12, 320 - defaultBottomOffset - DEFAULT_WIDGET_SIZE.height))
+      const { x, y } = getFloatingWidgetTopCenter(
+        window.innerWidth,
+        window.innerHeight,
+        DEFAULT_WIDGET_SIZE.width,
+        DEFAULT_WIDGET_SIZE.height,
+      )
+      dragX.set(x)
+      dragY.set(y)
     }
 
     const retryFrame = window.requestAnimationFrame(() => {
@@ -148,7 +159,7 @@ export default function DraggablePitchWidget({
     return () => {
       window.cancelAnimationFrame(retryFrame)
     }
-  }, [boundaryRef, defaultBottomOffset, dragX, dragY, isAudioMode, layoutKey, mediaKey])
+  }, [boundaryRef, dragX, dragY, isAudioMode, layoutKey, mediaKey])
 
   const tuner = (
     <LivePitchTuner

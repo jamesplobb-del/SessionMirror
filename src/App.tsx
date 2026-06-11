@@ -964,11 +964,16 @@ export default function App() {
     !isReviewOpen &&
     (ready || isRecording)
 
+  const takePlaybackActive =
+    autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
+
   const pitchAudioHudLock =
     showPitch &&
     recordingMode === 'audio' &&
-    mainAudioPitchSource?.liveMicOnly === true &&
+    mainAudioPitchSource !== null &&
     hudModalState === 'idle'
+
+  const pitchAudioTouchShield = pitchAudioHudLock
 
   const pitchContextKey =
     mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
@@ -1300,7 +1305,7 @@ export default function App() {
       />
 
       <div
-        className="pitch-display-layer"
+        className={`pitch-display-layer${pitchAudioTouchShield ? ' pitch-display-layer--touch-shield' : ''}`}
         aria-hidden={!showPitch || !mainAudioPitchSource}
       >
         {showMainPitchWidget && (
@@ -1309,7 +1314,6 @@ export default function App() {
               {showPitch && mainAudioPitchSource && (
                 <DraggablePitchWidget
                   boundaryRef={appShellRef}
-                  defaultBottomOffset={200}
                   mediaRef={mainAudioPitchSource.mediaRef}
                   enabled={settings.pitchTrackerEnabled}
                   isPlaying={mainAudioPitchSource.isPlaying}
@@ -1340,6 +1344,8 @@ export default function App() {
                 key="main-metronome"
                 boundaryRef={appShellRef}
                 layoutKey={`metronome-${recordingMode}`}
+                isTakePlaying={takePlaybackActive}
+                muteDuringPlayback={settings.muteMetronomeDuringPlayback}
               />
             </AnimatePresence>
           </Suspense>
@@ -1353,7 +1359,6 @@ export default function App() {
           {showPitch && mainVideoPitchSource && (
             <DraggablePitchWidget
               boundaryRef={appShellRef}
-              defaultBottomOffset={200}
               mediaRef={mainVideoPitchSource.mediaRef}
               enabled={settings.pitchTrackerEnabled}
               isPlaying={mainVideoPitchSource.isPlaying}
@@ -1381,9 +1386,8 @@ export default function App() {
         transition={iosHudDim}
         style={{
           ...motionGpuLayer,
-          pointerEvents: pitchAudioHudLock
-            ? 'auto'
-            : hudModalState !== 'idle'
+          pointerEvents:
+            hudModalState !== 'idle'
               ? 'none'
               : undefined,
         }}
@@ -1399,7 +1403,7 @@ export default function App() {
             {settings.showTakeCards && !quickSettingsOpen && (
               <motion.div
                 key="pip-row"
-                className="app-pip-row-wrap w-full"
+                className="app-pip-row-wrap pointer-events-auto w-full"
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}

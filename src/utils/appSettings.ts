@@ -19,6 +19,8 @@ export interface AppSettings {
   showTakeCards: boolean
   /** Floating metronome widget on the main camera/audio HUD. */
   showMetronome: boolean
+  /** Silence metronome clicks while a take is playing; internal clock keeps running. */
+  muteMetronomeDuringPlayback: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -31,6 +33,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   tunerInstrument: 'voice',
   showTakeCards: true,
   showMetronome: false,
+  muteMetronomeDuringPlayback: true,
 }
 
 function parseTunerInstrument(value: unknown): TunerInstrument {
@@ -85,6 +88,10 @@ export function loadAppSettings(): AppSettings {
         parsed.showMetronome !== undefined
           ? Boolean(parsed.showMetronome)
           : DEFAULT_APP_SETTINGS.showMetronome,
+      muteMetronomeDuringPlayback:
+        parsed.muteMetronomeDuringPlayback !== undefined
+          ? Boolean(parsed.muteMetronomeDuringPlayback)
+          : DEFAULT_APP_SETTINGS.muteMetronomeDuringPlayback,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }
