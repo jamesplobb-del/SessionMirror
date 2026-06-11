@@ -1,5 +1,3 @@
-import { Capacitor } from '@capacitor/core'
-import { SessionMirrorAudio } from 'capacitor-session-mirror-audio'
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import { resumePlaybackAudioContext } from './playbackAudioContext'
 
@@ -16,18 +14,11 @@ export function registerTakePlaybackMicHandlers(handlers: {
   resumeMicInput = handlers.resumeMic
 }
 
+/** Prepare HTML media elements for audible speaker playback using standard Web APIs. */
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
   await suspendMicInput?.()
-
-  if (Capacitor.isNativePlatform()) {
-    try {
-      await SessionMirrorAudio.prepareForTakePlayback()
-    } catch {
-      /* native session may already be in playback mode */
-    }
-  }
 
   resumePlaybackAudioContext()
 
@@ -41,14 +32,7 @@ export async function primeTakePlaybackAudio(
   resumePitchGraphsForMedia(...media)
 }
 
+/** Restore mic capture after take playback finishes. */
 export async function releaseTakePlaybackAudio(): Promise<void> {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      await SessionMirrorAudio.prepareForMicCapture()
-    } catch {
-      /* best effort */
-    }
-  }
-
   await resumeMicInput?.()
 }

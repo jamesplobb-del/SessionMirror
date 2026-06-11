@@ -78,16 +78,6 @@ npx cap sync ios
 
 Then rebuild in Xcode.
 
-### Take playback volume (iOS)
-
-The app includes a local Capacitor plugin (`plugins/capacitor-session-mirror-audio`) that switches
-`AVAudioSession` to **playback** on the loudspeaker while a take plays, then restores **playAndRecord**
-for the microphone. This is required because iOS otherwise routes take audio to the quiet earpiece
-while the mic is open.
-
-If playback is still quiet after `cap sync`, confirm the plugin pod is linked in Xcode
-(`CapacitorSessionMirrorAudio` under Pods).
-
 ## 8. App icon
 
 Source icon: `assets/icon.png` (1024×1024). After updating the icon:
