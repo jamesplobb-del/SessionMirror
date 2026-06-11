@@ -618,6 +618,7 @@ export default function LivePitchTuner({
       persistWhenPaused: widgetContinuousScroll,
       continuousScroll: liveMicWidget || widgetContinuousScroll,
       tunerInstrument,
+      realtimeMode: isWidget,
     },
   )
   void _inTuneGlow

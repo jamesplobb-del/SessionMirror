@@ -187,11 +187,12 @@ function isMediaPitchGraph(graph: ActivePitchGraph): graph is PitchGraph {
 }
 
 const MIC_PITCH_ATTACH_DEFER_MS = 400
-/** ~14fps cap for live mic audio stage — keeps main thread responsive for HUD taps. */
-const MIC_LIVE_TICK_MS = 72
-/** Glass chart redraw cap — pitch analysis still runs every frame. */
-const GLASS_CANVAS_TICK_MS = 33
-const READOUT_PUBLISH_MS = 100
+/** Economy mic tick (~14fps) for audio-mode HUD — keeps vault/settings responsive. */
+const MIC_ECONOMY_TICK_MS = 72
+/** Throttle React readout publishes in economy mode only. */
+const READOUT_PUBLISH_ECONOMY_MS = 100
+/** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
+const REALTIME_MIC_FRAME_SIZE = 2048
 
 export type PitchTrackerSource = 'media' | 'microphone'
 
@@ -204,6 +205,8 @@ export interface PitchTrackerOptions {
   continuousScroll?: boolean
   /** Voice, strings, or brass detection profile. */
   tunerInstrument?: TunerInstrument
+  /** Full-rate mic analysis + canvas (camera widget). Economy mode for audio HUD. */
+  realtimeMode?: boolean
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
@@ -218,6 +221,7 @@ async function createMicPitchGraph(
   profile: PitchTunerProfile,
   existingStream?: MediaStream | null,
   requireExistingStream = false,
+  frameSizeOverride?: number,
 ): Promise<MicPitchGraph> {
   let stream = micStreamIsLive(existingStream) ? existingStream! : null
   let ownsStream = false
@@ -265,13 +269,15 @@ async function createMicPitchGraph(
   const context = new AudioContext({ latencyHint: 'playback' })
   await context.resume()
 
+  const micFrameSize = frameSizeOverride ?? profile.frameSizeMic
+
   const analyser = context.createAnalyser()
-  analyser.fftSize = profile.frameSizeMic
+  analyser.fftSize = micFrameSize
 
   const source = context.createMediaStreamSource(stream)
   source.connect(analyser)
 
-  const detector = PitchDetector.forFloat32Array(profile.frameSizeMic)
+  const detector = PitchDetector.forFloat32Array(micFrameSize)
   detector.clarityThreshold = profile.clarityMinMic
   detector.minVolumeDecibels = profile.rmsGateDbMic
 
@@ -280,7 +286,7 @@ async function createMicPitchGraph(
     source,
     analyser,
     detector,
-    buffer: new Float32Array(profile.frameSizeMic),
+    buffer: new Float32Array(micFrameSize),
     smoothed: null,
     stream,
     ownsStream,
@@ -576,14 +582,15 @@ function buildTraceDisplayPoints(
   centsToY: (cents: number) => number,
   graphSmoothWindow: number,
   traceEndBlend: number,
+  singlePassSmooth = false,
 ): TraceDisplayPoint[] {
   if (centsHistory.length < 2) return []
 
   const pass1 = movingAverage(centsHistory, graphSmoothWindow)
   const smoothed =
-    graphSmoothWindow >= 4
-      ? movingAverage(pass1, Math.max(2, Math.floor(graphSmoothWindow / 2)))
-      : pass1
+    singlePassSmooth || graphSmoothWindow < 4
+      ? pass1
+      : movingAverage(pass1, Math.max(2, Math.floor(graphSmoothWindow / 2)))
 
   const rawLast = centsHistory[centsHistory.length - 1]
   if (!isSilenceFloorSample(rawLast)) {
@@ -799,6 +806,7 @@ function drawPitchCanvas(
   graphSmoothWindow: number,
   traceEndBlend: number,
   inTuneHighlight = 0,
+  responsiveTrace = false,
 ): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -880,6 +888,7 @@ function drawPitchCanvas(
     centsToY,
     graphSmoothWindow,
     traceEndBlend,
+    responsiveTrace,
   )
 
   if (tracePoints.length > 1) {
@@ -928,7 +937,7 @@ function drawPitchCanvas(
   ctx.stroke()
 }
 
-function drawPitchCanvasThrottled(
+function drawPitchCanvasIfDue(
   canvas: HTMLCanvasElement,
   timeDomain: Float32Array,
   centsHistory: number[],
@@ -937,15 +946,8 @@ function drawPitchCanvasThrottled(
   graphSmoothWindow: number,
   traceEndBlend: number,
   inTuneHighlight: number,
-  lastDrawAtRef: { current: number },
+  responsiveTrace: boolean,
 ): void {
-  const now = performance.now()
-  if (theme === 'glass' && now - lastDrawAtRef.current < GLASS_CANVAS_TICK_MS) {
-    return
-  }
-  if (theme === 'glass') {
-    lastDrawAtRef.current = now
-  }
   drawPitchCanvas(
     canvas,
     timeDomain,
@@ -955,6 +957,7 @@ function drawPitchCanvasThrottled(
     graphSmoothWindow,
     traceEndBlend,
     inTuneHighlight,
+    responsiveTrace,
   )
 }
 
@@ -978,6 +981,7 @@ export function useLivePitchTracker(
   const persistWhenPaused = options.persistWhenPaused ?? false
   const continuousScroll =
     options.continuousScroll ?? source === 'microphone'
+  const realtimeMode = options.realtimeMode ?? false
   const tunerInstrument = options.tunerInstrument ?? 'voice'
   const profile = getTunerProfile(tunerInstrument)
   const profileRef = useRef(profile)
@@ -999,6 +1003,8 @@ export function useLivePitchTracker(
   const isAttaching = useRef(false)
   const sourceRef = useRef(source)
   sourceRef.current = source
+  const realtimeModeRef = useRef(realtimeMode)
+  realtimeModeRef.current = realtimeMode
   const micStreamRefStable = useRef(micStreamRef)
   micStreamRefStable.current = micStreamRef
   const mediaRefStable = useRef(mediaRef)
@@ -1012,19 +1018,26 @@ export function useLivePitchTracker(
   const lastPublishedGlowRef = useRef(0)
   const lastMicTickAtRef = useRef(0)
   const lastReadoutPublishAtRef = useRef(0)
-  const lastGlassCanvasDrawAtRef = useRef(0)
 
   const publishReadout = (next: PitchReadout, force = false) => {
     const noteChanged = next.noteName !== readoutRef.current.noteName
-    readoutRef.current = next
+    const centsChanged =
+      Math.abs(next.cents - readoutRef.current.cents) >=
+      profileRef.current.readoutCentsStep * 0.5
     const now = performance.now()
+    const economyInterval = realtimeModeRef.current ? 0 : READOUT_PUBLISH_ECONOMY_MS
+
     if (
       !force &&
       !noteChanged &&
-      now - lastReadoutPublishAtRef.current < READOUT_PUBLISH_MS
+      !centsChanged &&
+      economyInterval > 0 &&
+      now - lastReadoutPublishAtRef.current < economyInterval
     ) {
       return
     }
+
+    readoutRef.current = next
     lastReadoutPublishAtRef.current = now
     if (mountedRef.current) setReadout(next)
   }
@@ -1192,6 +1205,7 @@ export function useLivePitchTracker(
             profileRef.current,
             sharedStream,
             requireSharedMic,
+            realtimeModeRef.current ? REALTIME_MIC_FRAME_SIZE : undefined,
           )
           if (cancelled) {
             safeDisposeMicGraph(graph)
@@ -1309,8 +1323,12 @@ export function useLivePitchTracker(
 
     const tick = () => {
       const frameNow = performance.now()
-      if (sourceRef.current === 'microphone' && continuousScroll) {
-        if (frameNow - lastMicTickAtRef.current < MIC_LIVE_TICK_MS) {
+      if (
+        sourceRef.current === 'microphone' &&
+        continuousScroll &&
+        !realtimeModeRef.current
+      ) {
+        if (frameNow - lastMicTickAtRef.current < MIC_ECONOMY_TICK_MS) {
           tickRef.current = requestAnimationFrame(tick)
           return
         }
@@ -1318,6 +1336,22 @@ export function useLivePitchTracker(
       }
 
       const activeProfile = profileRef.current
+      const responsiveTrace = realtimeModeRef.current
+      const traceBlend = responsiveTrace
+        ? Math.max(activeProfile.traceEndBlend, 0.92)
+        : activeProfile.traceEndBlend
+      const traceWindow = responsiveTrace
+        ? Math.min(activeProfile.graphSmoothWindow, 3)
+        : activeProfile.graphSmoothWindow
+      const traceSpikeCap = responsiveTrace
+        ? activeProfile.traceSpikeCapCents * 1.75
+        : activeProfile.traceSpikeCapCents
+      const traceNoteJumpCap = responsiveTrace
+        ? activeProfile.traceNoteJumpCapCents * 1.5
+        : activeProfile.traceNoteJumpCapCents
+      const freqSmoothAlpha = responsiveTrace
+        ? Math.max(activeProfile.smoothAlpha, 0.62)
+        : activeProfile.smoothAlpha
       framesSinceAttachAttemptRef.current += 1
       tickStats.frames += 1
       let graph = graphRef.current
@@ -1336,8 +1370,10 @@ export function useLivePitchTracker(
           ) {
             void tryAttachRef.current?.()
           }
-          // Avoid 60fps canvas work while waiting for mic graph attach.
-          tickRef.current = window.setTimeout(tick, 100) as unknown as number
+          // Avoid heavy canvas work while waiting for mic graph attach.
+          tickRef.current = realtimeModeRef.current
+            ? requestAnimationFrame(tick)
+            : (window.setTimeout(tick, 100) as unknown as number)
           return
         }
 
@@ -1384,16 +1420,16 @@ export function useLivePitchTracker(
             readoutRef.current,
           )
           publishInTuneGlow(bandGlow)
-          drawPitchCanvasThrottled(
+          drawPitchCanvasIfDue(
             canvas,
             new Float32Array(activeProfile.frameSize),
             historyRef.current,
             readoutRef.current.noteName !== '—',
             canvasTheme,
-            activeProfile.graphSmoothWindow,
-            activeProfile.traceEndBlend,
+            traceWindow,
+            traceBlend,
             bandGlow,
-            lastGlassCanvasDrawAtRef,
+            responsiveTrace,
           )
         }
         tickRef.current = requestAnimationFrame(tick)
@@ -1441,9 +1477,7 @@ export function useLivePitchTracker(
           !isSilenceFloorSample(last) &&
           !isSilenceFloorSample(targetCents)
         ) {
-          const cap = noteChanged
-            ? activeProfile.traceNoteJumpCapCents
-            : activeProfile.traceSpikeCapCents
+          const cap = noteChanged ? traceNoteJumpCap : traceSpikeCap
           const jump = Math.abs(targetCents - last)
           if (jump > cap) {
             sample = last + Math.sign(targetCents - last) * cap
@@ -1499,7 +1533,7 @@ export function useLivePitchTracker(
             graph.smoothed = smoothFrequency(
               graph.smoothed,
               pitch,
-              activeProfile.smoothAlpha,
+              freqSmoothAlpha,
             )
             const readoutHz =
               clarity >= clarityMin ? pitch : graph.smoothed ?? pitch
@@ -1599,16 +1633,16 @@ export function useLivePitchTracker(
           readoutRef.current,
         )
         publishInTuneGlow(bandGlow)
-        drawPitchCanvasThrottled(
+        drawPitchCanvasIfDue(
           canvas,
           graph.buffer,
           historyRef.current,
           active,
           canvasTheme,
-          activeProfile.graphSmoothWindow,
-          activeProfile.traceEndBlend,
+          traceWindow,
+          traceBlend,
           bandGlow,
-          lastGlassCanvasDrawAtRef,
+          responsiveTrace,
         )
       }
 
@@ -1633,6 +1667,7 @@ export function useLivePitchTracker(
     isPlaying,
     mediaKey,
     persistWhenPaused,
+    realtimeMode,
     source,
     tunerInstrument,
   ])
