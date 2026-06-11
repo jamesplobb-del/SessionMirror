@@ -140,7 +140,6 @@ export function useMetronome(): UseMetronomeResult {
       const ctx = await ensureContext()
       if (!ctx || cancelled) return
 
-      const secondsPerBeat = 60 / bpmRef.current
       nextBeatTimeRef.current = Math.max(
         ctx.currentTime + 0.03,
         nextBeatTimeRef.current > ctx.currentTime ? nextBeatTimeRef.current : ctx.currentTime + 0.03,
@@ -150,7 +149,7 @@ export function useMetronome(): UseMetronomeResult {
         if (cancelled || !playingRef.current) return
 
         const beatsPerBar = getBeatsPerBar(meterRef.current)
-        const interval = 60 / bpmRef.current
+        const secondsPerBeat = 60 / bpmRef.current
 
         let uiBeat = -1
 
@@ -163,7 +162,7 @@ export function useMetronome(): UseMetronomeResult {
             uiBeat = beatInBar
           }
 
-          nextBeatTimeRef.current += interval
+          nextBeatTimeRef.current += secondsPerBeat
           beatCounterRef.current += 1
         }
 
