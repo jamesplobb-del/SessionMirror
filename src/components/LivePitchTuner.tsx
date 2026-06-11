@@ -485,6 +485,7 @@ function LivePitchTunerAudio({
       micStreamRef,
       continuousScroll: true,
       tunerInstrument,
+      realtimeMode: true,
     }),
     [micStreamRef, tunerInstrument],
   )
@@ -494,6 +495,7 @@ function LivePitchTunerAudio({
       source: 'media' as const,
       persistWhenPaused: true,
       tunerInstrument,
+      realtimeMode: true,
     }),
     [tunerInstrument],
   )

@@ -694,10 +694,14 @@ function getGlassLayoutMetrics(height: number) {
   return { pitchTop, pitchBottom, pitchHeight, centsToY }
 }
 
+/** Bumped when static grid art changes — invalidates cached offscreen layers. */
+const GLASS_STATIC_GRID_VERSION = 2
+
 interface GlassStaticLayerCache {
   width: number
   height: number
   dpr: number
+  version: number
   canvas: HTMLCanvasElement
 }
 
@@ -712,12 +716,12 @@ function drawGlassStaticContent(
 
   ctx.clearRect(0, 0, width, height)
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
   ctx.lineWidth = 1
   ctx.lineCap = 'round'
-  ctx.setLineDash([1, 5])
+  ctx.setLineDash([1, 4])
 
-  const gridXStep = Math.max(16, Math.floor(width / 14))
+  const gridXStep = Math.max(14, Math.floor(width / 12))
   for (let x = gridXStep; x < width; x += gridXStep) {
     ctx.beginPath()
     ctx.moveTo(x + 0.5, pitchTop)
@@ -780,7 +784,8 @@ function blitGlassStaticLayer(
     !cache ||
     cache.width !== width ||
     cache.height !== height ||
-    cache.dpr !== dpr
+    cache.dpr !== dpr ||
+    cache.version !== GLASS_STATIC_GRID_VERSION
   ) {
     const off = cache?.canvas ?? document.createElement('canvas')
     off.width = Math.floor(width * dpr)
@@ -789,7 +794,7 @@ function blitGlassStaticLayer(
     if (!offCtx) return getGlassLayoutMetrics(height)
     offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
     drawGlassStaticContent(offCtx, width, height)
-    cache = { width, height, dpr, canvas: off }
+    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, canvas: off }
     glassStaticLayerCache.set(canvas, cache)
   }
 
