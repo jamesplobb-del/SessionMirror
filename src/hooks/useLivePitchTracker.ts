@@ -155,7 +155,7 @@ function drawInTuneBandRegion(
 /** Dispatched when an element-routed pitch graph is torn down (requires media remount). */
 export const PITCH_GRAPH_RELEASED_EVENT = 'pitchgraph-released'
 
-type PitchGraphMode = 'stream' | 'element'
+type PitchGraphMode = 'stream' | 'element' | 'capture'
 
 /** Speaker passthrough when Web Audio routes playback (element is already full scale). */
 const MEDIA_PLAYBACK_GAIN = 1
@@ -370,6 +370,33 @@ function connectStreamSourceToAnalyserAndSpeakers(
   return passthrough
 }
 
+function attachCaptureStreamToGraph(
+  graph: PitchGraph,
+  context: AudioContext,
+  analyser: AnalyserNode,
+  media: HTMLMediaElement,
+): boolean {
+  const stream = getMediaCaptureStream(media)
+  if (!stream || !streamHasAudio(stream)) return false
+
+  try {
+    try {
+      graph.passthrough?.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+
+    const streamSource = context.createMediaStreamSource(stream)
+    streamSource.connect(analyser)
+    graph.passthrough = null
+    graph.source = streamSource
+    graph.mode = 'capture'
+    return true
+  } catch {
+    return false
+  }
+}
+
 function attachStreamSourceToGraph(
   graph: PitchGraph,
   context: AudioContext,
@@ -420,6 +447,10 @@ function refreshMediaPitchStreamSource(graph: PitchGraph): boolean {
     graph.source.disconnect()
   } catch {
     /* already disconnected */
+  }
+
+  if (graph.mode === 'capture') {
+    return attachCaptureStreamToGraph(graph, graph.context, graph.analyser, graph.media)
   }
 
   return attachStreamSourceToGraph(graph, graph.context, graph.analyser, graph.media)
@@ -482,23 +513,38 @@ async function createPitchGraph(
   let passthrough: GainNode | null = null
   let mode: PitchGraphMode = 'element'
 
-  try {
-    const elementSource = context.createMediaElementSource(media)
-    passthrough = context.createGain()
-    passthrough.gain.value = MEDIA_PLAYBACK_GAIN
-    elementSource.connect(analyser)
-    elementSource.connect(passthrough)
-    passthrough.connect(context.destination)
-    source = elementSource
-    mode = 'element'
-  } catch {
-    const streamAttach = tryAttachStreamSource(context, analyser, media)
-    if (!streamAttach) {
-      throw new Error('Unable to attach pitch tracker to this playback source')
+  const captured = getMediaCaptureStream(media)
+  if (captured && streamHasAudio(captured)) {
+    try {
+      const streamSource = context.createMediaStreamSource(captured)
+      streamSource.connect(analyser)
+      source = streamSource
+      passthrough = null
+      mode = 'capture'
+    } catch {
+      /* fall through to element routing */
     }
-    source = streamAttach.source
-    passthrough = streamAttach.passthrough
-    mode = 'stream'
+  }
+
+  if (!source) {
+    try {
+      const elementSource = context.createMediaElementSource(media)
+      passthrough = context.createGain()
+      passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+      elementSource.connect(analyser)
+      elementSource.connect(passthrough)
+      passthrough.connect(context.destination)
+      source = elementSource
+      mode = 'element'
+    } catch {
+      const streamAttach = tryAttachStreamSource(context, analyser, media)
+      if (!streamAttach) {
+        throw new Error('Unable to attach pitch tracker to this playback source')
+      }
+      source = streamAttach.source
+      passthrough = streamAttach.passthrough
+      mode = 'stream'
+    }
   }
 
   const detector = PitchDetector.forFloat32Array(profile.frameSize)
@@ -1174,7 +1220,10 @@ export function useLivePitchTracker(
       const graph = graphRef.current
       if (graph && isMediaPitchGraph(graph)) {
         graph.smoothed = null
-        if (graph.mode === 'stream' && !refreshMediaPitchStreamSource(graph)) {
+        if (
+          (graph.mode === 'stream' || graph.mode === 'capture') &&
+          !refreshMediaPitchStreamSource(graph)
+        ) {
           elementGraphs.delete(graph.media)
           graphRef.current = null
           void tryAttachRef.current?.()
@@ -1755,8 +1804,21 @@ export function resumePitchGraphsForMedia(
     if (!graph) continue
 
     if (graph.passthrough) {
-      graph.passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+      graph.passthrough.gain.value = element.volume > 0 ? element.volume : MEDIA_PLAYBACK_GAIN
     }
+  }
+}
+
+/** Apply volume to native media output and any Web Audio passthrough graph. */
+export function setMediaPlaybackVolume(media: HTMLMediaElement, volume: number): void {
+  const clamped = Math.max(0, Math.min(1, volume))
+  media.volume = clamped
+  media.muted = clamped === 0
+  media.defaultMuted = false
+
+  const graph = elementGraphs.get(media)
+  if (graph?.passthrough) {
+    graph.passthrough.gain.value = clamped
   }
 }
 
