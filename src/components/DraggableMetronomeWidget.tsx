@@ -7,12 +7,13 @@ import {
   useMemo,
   useRef,
   useState,
+  useEffect,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
 import { usePinchResize } from '../hooks/usePinchResize'
-import { getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
+import { getFloatingWidgetTopCenter, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
 import {
   COMPOUND_METERS,
   MAX_BPM,
@@ -28,9 +29,10 @@ interface DraggableMetronomeWidgetProps {
   muteDuringPlayback?: boolean
 }
 
-const DEFAULT_WIDGET_SIZE = { width: 268, height: 96 }
-const MIN_WIDGET_SIZE = { width: 180, height: 80 }
+const DEFAULT_WIDGET_SIZE = { width: 268, height: 104 }
+const MIN_WIDGET_SIZE = { width: 200, height: 104 }
 const BPM_DRAG_SENSITIVITY = 0.35
+const DOUBLE_TAP_MS = 320
 
 function MetronomeControlButton({
   label,
@@ -86,14 +88,18 @@ export default function DraggableMetronomeWidget({
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState(String(bpm))
   const bpmDragRef = useRef<{ startY: number; startBpm: number; moved: boolean } | null>(null)
+  const lastTapAtRef = useRef(0)
+
+  const savedSize = useMemo(() => loadWidgetSize(positionId), [positionId])
+  const initialSize = savedSize ?? DEFAULT_WIDGET_SIZE
 
   const pinchLimits = useMemo(
     () => ({
-      initial: DEFAULT_WIDGET_SIZE,
+      initial: initialSize,
       min: MIN_WIDGET_SIZE,
       max: maxSize,
     }),
-    [maxSize],
+    [initialSize, maxSize],
   )
 
   const {
@@ -103,7 +109,15 @@ export default function DraggableMetronomeWidget({
     onPointerMove: onPinchPointerMove,
     onPointerUp: onPinchPointerUp,
     onPointerCancel: onPinchPointerCancel,
+    resetSize,
+    setSize,
   } = usePinchResize(pinchLimits)
+
+  useLayoutEffect(() => {
+    if (savedSize) {
+      setSize(savedSize)
+    }
+  }, [positionId, savedSize, setSize])
 
   useLayoutEffect(() => {
     const measureMax = () => {
@@ -167,6 +181,36 @@ export default function DraggableMetronomeWidget({
   const persistPosition = useCallback(() => {
     saveWidgetPosition(positionId, dragX.get(), dragY.get())
   }, [dragX, dragY, positionId])
+
+  const persistSize = useCallback(() => {
+    saveWidgetSize(positionId, widgetSize.width, widgetSize.height)
+  }, [positionId, widgetSize.height, widgetSize.width])
+
+  const wasPinchingRef = useRef(false)
+  useEffect(() => {
+    if (wasPinchingRef.current && !pinching) {
+      persistSize()
+    }
+    wasPinchingRef.current = pinching
+  }, [pinching, persistSize])
+
+  const handleShellPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      onPinchPointerUp(event)
+      if (pinching || editingBpm) return
+      if (event.button !== 0) return
+
+      const now = performance.now()
+      if (now - lastTapAtRef.current <= DOUBLE_TAP_MS) {
+        resetSize()
+        saveWidgetSize(positionId, DEFAULT_WIDGET_SIZE.width, DEFAULT_WIDGET_SIZE.height)
+        lastTapAtRef.current = 0
+        return
+      }
+      lastTapAtRef.current = now
+    },
+    [editingBpm, onPinchPointerUp, pinching, positionId, resetSize],
+  )
 
   const commitBpmDraft = useCallback(() => {
     const parsed = Number.parseInt(bpmDraft, 10)
@@ -262,12 +306,12 @@ export default function DraggableMetronomeWidget({
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
-      onDragEnd={persistPosition}
       onPointerDown={onPinchPointerDown}
       onPointerMove={onPinchPointerMove}
-      onPointerUp={onPinchPointerUp}
+      onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
-      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[80px] min-w-[180px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''}`}
+      onDragEnd={persistPosition}
+      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[104px] min-w-[200px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
@@ -276,13 +320,16 @@ export default function DraggableMetronomeWidget({
         x: dragX,
         y: dragY,
         touchAction: 'none',
-        width: Math.max(MIN_WIDGET_SIZE.width, widgetSize.width),
-        height: Math.max(MIN_WIDGET_SIZE.height, widgetSize.height),
+        width: widgetSize.width,
+        height: widgetSize.height,
         minWidth: MIN_WIDGET_SIZE.width,
         minHeight: MIN_WIDGET_SIZE.height,
       }}
     >
-      <div className="ui-orient-spin metronome-widget relative h-full min-h-0 w-full overflow-hidden rounded-3xl">
+      <div
+        className="ui-orient-spin metronome-widget relative h-full min-h-0 w-full rounded-3xl"
+        aria-label="Metronome. Pinch to resize. Double-tap empty space to reset size."
+      >
         <div
           className={`metronome-widget__accent ${beatIndex === 0 && playing ? 'metronome-widget__accent--pulse' : ''}`}
           aria-hidden

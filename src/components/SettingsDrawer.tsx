@@ -71,9 +71,9 @@ function SettingInstrumentPicker({
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
-      <p className="text-sm font-semibold text-stone-900">Instrument Profile</p>
+      <p className="text-sm font-semibold text-stone-900">Source Instrument</p>
       <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-        Tunes pitch detection sensitivity and trace smoothing for your source.
+        Adjusts how aggressively pitch is detected and how smooth the tuner trace looks.
       </p>
 
       <IOSSegmentedControl
@@ -197,7 +197,7 @@ export default function SettingsDrawer({
       <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
         <div>
           <h2 className="text-base font-semibold text-stone-900">Settings</h2>
-          <p className="text-xs text-stone-500">Toggle features and adjust recording behavior</p>
+          <p className="text-xs text-stone-500">Recording, pitch tools, and on-screen controls</p>
         </div>
         <Pressable
           type="button"
@@ -217,12 +217,12 @@ export default function SettingsDrawer({
         <div className="space-y-6 pb-2">
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Audio Mode
+              Audio Recording
             </h3>
 
             <SettingToggle
-              label="Auto Sound Recording"
-              description="In Audio mode, automatically starts recording when sound is detected and stops after silence. Plays back immediately when finished."
+              label="Hands-Free Record & Play"
+              description="In Audio mode, starts recording when your playing crosses the trigger level, stops after silence, then immediately plays the take back through the speaker."
               checked={settings.autoSoundRecording}
               onChange={(checked) => onUpdate({ autoSoundRecording: checked })}
             />
@@ -235,13 +235,13 @@ export default function SettingsDrawer({
                     animate={{ opacity: 1, y: 0 }}
                     className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"
                   >
-                    Switch to Audio mode on the record carousel for auto recording to run.
+                    Switch to Audio on the record carousel for hands-free recording to run.
                   </motion.p>
                 )}
 
                 <SettingSlider
-                  label="Silence Before Stop"
-                  description="How long to wait in silence before ending the take."
+                  label="Stop After Silence"
+                  description="How long the app waits in silence before ending the take."
                   value={settings.soundSilenceSeconds}
                   min={0.5}
                   max={6}
@@ -252,8 +252,8 @@ export default function SettingsDrawer({
                 />
 
                 <SettingSlider
-                  label="Start Loudness"
-                  description="Left = quiet playing triggers. Right = only very loud playing. Most instruments work on the left half."
+                  label="Trigger Sensitivity"
+                  description="How loud your playing must be to start recording. Left catches quieter playing; right needs a stronger signal."
                   value={settings.soundVolumeThreshold}
                   min={1}
                   max={100}
@@ -270,12 +270,12 @@ export default function SettingsDrawer({
 
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Tuner
+              Pitch & Tuning
             </h3>
 
             <SettingToggle
-              label="Live Pitch Tracker"
-              description="During playback, show a live A440 tuner. With auto recording in Audio mode, pitch analysis fills the main screen right after each take while it plays once."
+              label="Pitch Analysis"
+              description="Shows a live pitch graph and tuner during playback. With hands-free recording, analysis appears on the main screen while each take plays back."
               checked={pitchUiEnabled}
               onChange={handlePitchTrackerToggle}
             />
@@ -283,8 +283,8 @@ export default function SettingsDrawer({
             <AnimatedExpand open={pitchUiEnabled}>
               <div className="space-y-3 pt-3">
                 <SettingToggle
-                  label="Live Mic Tuner (Idle)"
-                  description="When an audio take is paused, listen through the microphone and show a full-screen live tuner. Turn off to only analyze pitch during playback."
+                  label="Idle Mic Tuner"
+                  description="Between takes, listen through the microphone and show a live tuner on the main screen. Turn off to analyze pitch only during playback."
                   checked={settings.liveMicTunerEnabled}
                   onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
                 />
@@ -298,26 +298,12 @@ export default function SettingsDrawer({
 
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Interface
+              On-Screen Tools
             </h3>
 
             <SettingToggle
-              label="Haptic Feedback"
-              description="Light vibration when arming a drag to pin a take."
-              checked={settings.hapticFeedback}
-              onChange={(checked) => onUpdate({ hapticFeedback: checked })}
-            />
-
-            <SettingToggle
-              label="Show Take Cards"
-              description="Show Best Take and Current Take on the main screen. Turn off to keep new recordings in the vault only."
-              checked={settings.showTakeCards}
-              onChange={(checked) => onUpdate({ showTakeCards: checked })}
-            />
-
-            <SettingToggle
-              label="Metronome"
-              description="Show a draggable metronome on the main screen. Plays through the speaker only — never recorded into takes."
+              label="Metronome Widget"
+              description="Shows a draggable metronome on the main screen. Pinch to resize; double-tap the widget to reset its size. Metronome audio is not recorded into takes."
               checked={settings.showMetronome}
               onChange={(checked) => {
                 startTransition(() => {
@@ -329,13 +315,27 @@ export default function SettingsDrawer({
             <AnimatedExpand open={settings.showMetronome}>
               <div className="pt-3">
                 <SettingToggle
-                  label="Mute Metronome During Playback"
-                  description="Silence metronome clicks while a take is playing. The beat keeps running so it stays on tempo when playback stops."
+                  label="Mute During Take Playback"
+                  description="Silences metronome clicks while a take is playing. Timing keeps running so tempo stays locked when playback ends."
                   checked={settings.muteMetronomeDuringPlayback}
                   onChange={(checked) => onUpdate({ muteMetronomeDuringPlayback: checked })}
                 />
               </div>
             </AnimatedExpand>
+
+            <SettingToggle
+              label="Take Comparison Cards"
+              description="Shows Best Take and Latest Take cards above the record button. Turn off to keep new recordings in the vault only."
+              checked={settings.showTakeCards}
+              onChange={(checked) => onUpdate({ showTakeCards: checked })}
+            />
+
+            <SettingToggle
+              label="Haptic Feedback"
+              description="Light vibration when you arm a drag to pin a take as Best Take."
+              checked={settings.hapticFeedback}
+              onChange={(checked) => onUpdate({ hapticFeedback: checked })}
+            />
           </section>
 
           <Pressable

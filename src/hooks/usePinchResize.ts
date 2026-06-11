@@ -19,11 +19,46 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+function clampSizeToBox(
+  width: number,
+  height: number,
+  min: PinchSize,
+  max: PinchSize,
+  aspect: number,
+): PinchSize {
+  let nextWidth = width
+  let nextHeight = height
+
+  if (nextWidth > max.width) {
+    nextWidth = max.width
+    nextHeight = nextWidth / aspect
+  }
+  if (nextHeight > max.height) {
+    nextHeight = max.height
+    nextWidth = nextHeight * aspect
+  }
+  if (nextWidth < min.width) {
+    nextWidth = min.width
+    nextHeight = nextWidth / aspect
+  }
+  if (nextHeight < min.height) {
+    nextHeight = min.height
+    nextWidth = nextHeight * aspect
+  }
+
+  return {
+    width: clamp(nextWidth, min.width, max.width),
+    height: clamp(nextHeight, min.height, max.height),
+  }
+}
+
 export function usePinchResize({ initial, min, max }: UsePinchResizeOptions) {
   const [size, setSize] = useState(initial)
   const [pinching, setPinching] = useState(false)
   const pointersRef = useRef(new Map<number, { x: number; y: number }>())
   const pinchStartRef = useRef<{ distance: number; width: number; height: number } | null>(null)
+  const aspectRef = useRef(initial.width / initial.height)
+  aspectRef.current = initial.width / initial.height
 
   const resetPinch = useCallback(() => {
     pointersRef.current.clear()
@@ -71,10 +106,9 @@ export function usePinchResize({ initial, min, max }: UsePinchResizeOptions) {
       if (nextDistance <= 0 || pinchStartRef.current.distance <= 0) return
 
       const scale = nextDistance / pinchStartRef.current.distance
-      setSize({
-        width: clamp(pinchStartRef.current.width * scale, min.width, max.width),
-        height: clamp(pinchStartRef.current.height * scale, min.height, max.height),
-      })
+      const scaledWidth = pinchStartRef.current.width * scale
+      const scaledHeight = scaledWidth / aspectRef.current
+      setSize(clampSizeToBox(scaledWidth, scaledHeight, min, max, aspectRef.current))
     },
     [max.height, max.width, min.height, min.width],
   )
@@ -107,6 +141,10 @@ export function usePinchResize({ initial, min, max }: UsePinchResizeOptions) {
     [resetPinch],
   )
 
+  const resetSize = useCallback(() => {
+    setSize(initial)
+  }, [initial.height, initial.width])
+
   return {
     size,
     pinching,
@@ -115,5 +153,7 @@ export function usePinchResize({ initial, min, max }: UsePinchResizeOptions) {
     onPointerUp,
     onPointerCancel,
     resetPinch,
+    resetSize,
+    setSize,
   }
 }

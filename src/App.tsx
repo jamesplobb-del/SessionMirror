@@ -21,7 +21,7 @@ import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
-import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from './hooks/useLivePitchTracker'
+import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
   generateThumbnailFromBlob,
   captureAndPersistTakeThumbnail,
@@ -109,7 +109,7 @@ export default function App() {
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
-  const [autoPlaybackAudioKey, setAutoPlaybackAudioKey] = useState(0)
+  const [autoPlaybackRequestId, setAutoPlaybackRequestId] = useState(0)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(
     null,
   )
@@ -214,7 +214,6 @@ export default function App() {
     pendingAutoPlaybackRef.current = false
     teardownAutoPlaybackMedia()
     setAutoPlaybackTakeId(null)
-    setAutoPlaybackAudioKey((key) => key + 1)
   }, [teardownAutoPlaybackMedia])
 
   const playAutoTakeAudio = useCallback(
@@ -228,7 +227,7 @@ export default function App() {
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
       setAutoPlaybackTakeId(takeId)
       setAutoRecordStartSuppressed(true)
-      setAutoPlaybackAudioKey((key) => key + 1)
+      setAutoPlaybackRequestId((requestId) => requestId + 1)
     },
     [teardownAutoPlaybackMedia],
   )
@@ -337,7 +336,10 @@ export default function App() {
     } = payload
 
     void (async () => {
-      const safeVideoUrl = await resolveTakePlaybackUrl(filePath, videoUrl)
+      const safeVideoUrl =
+        videoUrl && (videoUrl.startsWith('blob:') || filePath === '')
+          ? videoUrl
+          : await resolveTakePlaybackUrl(filePath, videoUrl)
       const projectId = activeProjectIdRef.current
 
       setTakes((prev) => {
@@ -502,13 +504,16 @@ export default function App() {
     if (!queued) return
 
     let cancelled = false
+    let cleanupListeners: (() => void) | null = null
 
-    const startPlayback = () => {
+    const startPlayback = async () => {
       if (cancelled) return
 
       const audio = autoPlaybackAudioRef.current
       if (!audio) {
-        window.requestAnimationFrame(startPlayback)
+        window.requestAnimationFrame(() => {
+          void startPlayback()
+        })
         return
       }
 
@@ -521,27 +526,53 @@ export default function App() {
       }
 
       audio.preload = 'auto'
-      audio.src = url
       audio.muted = false
+      audio.volume = 1
+      audio.src = url
+      audio.load()
+
+      await new Promise<void>((resolve) => {
+        if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          resolve()
+          return
+        }
+
+        const onReady = () => {
+          audio.removeEventListener('loadeddata', onReady)
+          audio.removeEventListener('canplay', onReady)
+          resolve()
+        }
+
+        audio.addEventListener('loadeddata', onReady, { once: true })
+        audio.addEventListener('canplay', onReady, { once: true })
+        cleanupListeners = () => {
+          audio.removeEventListener('loadeddata', onReady)
+          audio.removeEventListener('canplay', onReady)
+        }
+        window.setTimeout(onReady, 1500)
+      })
+
+      if (cancelled) return
+
       audio.onended = finish
       audio.onerror = finish
 
-      void audio.play().catch(() => {
+      try {
+        await audio.play()
+        setAutoPlaybackPlaying(true)
+      } catch {
         finish()
         releaseAutoRecordSuppress(0)
-      })
+      }
     }
 
-    startPlayback()
+    void startPlayback()
 
     return () => {
       cancelled = true
+      cleanupListeners?.()
     }
-  }, [
-    autoPlaybackAudioKey,
-    releaseAutoRecordSuppress,
-    stopAutoPlaybackAudio,
-  ])
+  }, [autoPlaybackRequestId, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   useEffect(() => {
     const audio = autoPlaybackAudioRef.current
@@ -555,18 +586,12 @@ export default function App() {
     audio.addEventListener('pause', syncPlaying)
     audio.addEventListener('ended', syncPlaying)
 
-    const onPitchReleased = () => {
-      setAutoPlaybackAudioKey((key) => key + 1)
-    }
-    audio.addEventListener(PITCH_GRAPH_RELEASED_EVENT, onPitchReleased)
-
     return () => {
       audio.removeEventListener('play', syncPlaying)
       audio.removeEventListener('pause', syncPlaying)
       audio.removeEventListener('ended', syncPlaying)
-      audio.removeEventListener(PITCH_GRAPH_RELEASED_EVENT, onPitchReleased)
     }
-  }, [autoPlaybackAudioKey])
+  }, [])
 
   const autoMonitoringAllowed =
     !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
@@ -618,13 +643,12 @@ export default function App() {
 
     const failsafe = window.setTimeout(() => {
       setAutoRecordStartSuppressed(false)
-      stopAutoPlaybackAudio()
-    }, 10000)
+    }, 120000)
 
     return () => {
       window.clearTimeout(failsafe)
     }
-  }, [autoRecordStartSuppressed, stopAutoPlaybackAudio])
+  }, [autoRecordStartSuppressed])
 
   const autoSoundListening =
     settings.autoSoundRecording &&
@@ -688,7 +712,6 @@ export default function App() {
   }, [])
 
   const handleOpenVault = useCallback(() => {
-    setShowPitch(false)
     startTransition(() => {
       setIsSettingsOpen(false)
       setIsVaultOpen(true)
@@ -707,7 +730,6 @@ export default function App() {
   }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
-    setShowPitch(false)
     startTransition(() => {
       setIsVaultOpen(false)
       setIsSettingsOpen(true)
@@ -837,12 +859,12 @@ export default function App() {
             mediaKey: 'main-recording-audio',
             liveMicOnly: true,
           }
-        } else if (autoPlaybackTakeId && autoPlaybackTake && autoPlaybackPlaying) {
+        } else if (autoPlaybackTakeId && autoPlaybackTake) {
           next = {
             mediaRef: autoPlaybackAudioRef,
             take: autoPlaybackTake,
             isPlaying: autoPlaybackPlaying,
-            mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackAudioKey}`,
+            mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackRequestId}`,
             liveMicOnly: false,
           }
         } else if (
@@ -901,7 +923,7 @@ export default function App() {
     autoPlaybackTakeId,
     autoPlaybackTake,
     autoPlaybackPlaying,
-    autoPlaybackAudioKey,
+    autoPlaybackRequestId,
     challengerTake,
     challengerPipPlaying,
     benchmarkTake,
@@ -950,11 +972,15 @@ export default function App() {
 
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
 
-  const showMetronomeWidget =
-    settings.showMetronome && (ready || isRecording)
+  const showMetronomeWidget = settings.showMetronome
 
-  const metronomeWidgetInteractive =
-    showMetronomeWidget && !isVaultOpen && !isSettingsOpen && !isReviewOpen
+  const metronomeHudSuspended =
+    isVaultOpen ||
+    isSettingsOpen ||
+    isReviewOpen ||
+    (!ready && !isRecording)
+
+  const metronomeWidgetInteractive = showMetronomeWidget && !metronomeHudSuspended
 
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
@@ -987,10 +1013,14 @@ export default function App() {
       return
     }
 
+    if (pitchHudSuspended) {
+      return
+    }
+
     if (!pitchUserDismissedRef.current) {
       setShowPitch(true)
     }
-  }, [settings.pitchTrackerEnabled, showMainPitchWidget])
+  }, [settings.pitchTrackerEnabled, showMainPitchWidget, pitchHudSuspended])
 
   const handleClosePitch = useCallback(() => {
     pitchUserDismissedRef.current = true
@@ -1278,7 +1308,6 @@ export default function App() {
   return (
     <div ref={appShellRef} className="app-shell">
       <audio
-        key={autoPlaybackAudioKey}
         ref={autoPlaybackAudioRef}
         className="sr-only"
         preload="auto"
