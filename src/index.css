@@ -188,9 +188,9 @@ body.settings-branch-open * {
   transform-origin: center bottom;
 }
 
-/** Live audio pitch — capture stray touches without blocking floating widgets or HUD controls. */
+/** Live audio pitch — HUD plane stays interactive; pitch layer below absorbs stray pass-through. */
 .app-ui-overlay--pitch-hud-lock {
-  pointer-events: none !important;
+  pointer-events: auto !important;
   z-index: 30;
 }
 
@@ -225,7 +225,8 @@ body.settings-branch-open * {
   pointer-events: auto !important;
 }
 
-.app-ui-overlay--pitch-hud-lock .control-deck__settings-btn {
+.app-ui-overlay--pitch-hud-lock .control-deck__settings-btn,
+.app-ui-overlay--pitch-hud-lock .control-deck__vault-btn {
   pointer-events: auto !important;
   z-index: 41;
 }

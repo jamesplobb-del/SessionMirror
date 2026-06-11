@@ -125,7 +125,7 @@ export default function ControlDeck({
           type="button"
           intensity="icon"
           onClick={onOpenVault}
-          className="control-deck__vault-btn absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/55"
+          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
           <span className="relative flex h-full w-full items-center justify-center">
