@@ -21,7 +21,9 @@ import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
-import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
+import { pausePitchGraphsForMedia, resumePitchGraphsForMedia } from './hooks/useLivePitchTracker'
+
+const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 import {
   generateThumbnailFromBlob,
   captureAndPersistTakeThumbnail,
@@ -522,12 +524,14 @@ export default function App() {
 
       const finish = () => {
         stopAutoPlaybackAudio()
-        releaseAutoRecordSuppress(500)
+        releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
       }
 
       audio.preload = 'auto'
       audio.muted = false
+      audio.defaultMuted = false
       audio.volume = 1
+      audio.setAttribute('playsinline', 'true')
       audio.src = url
       audio.load()
 
@@ -557,12 +561,21 @@ export default function App() {
       audio.onended = finish
       audio.onerror = finish
 
-      try {
+      const tryPlay = async () => {
+        resumePitchGraphsForMedia(audio)
         await audio.play()
         setAutoPlaybackPlaying(true)
+      }
+
+      try {
+        await tryPlay()
       } catch {
-        finish()
-        releaseAutoRecordSuppress(0)
+        await new Promise((resolve) => window.setTimeout(resolve, 120))
+        try {
+          await tryPlay()
+        } catch {
+          finish()
+        }
       }
     }
 
@@ -617,6 +630,7 @@ export default function App() {
     },
     onAutoRecordingFinished: () => {
       pendingAutoPlaybackRef.current = true
+      setAutoRecordStartSuppressed(true)
     },
     onMonitorStalled: () => {
       void refreshCameraSession()
@@ -626,8 +640,7 @@ export default function App() {
   useEffect(() => {
     if (!isRecording) return
     stopAutoPlaybackAudio()
-    releaseAutoRecordSuppress(0)
-  }, [isRecording, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+  }, [isRecording, stopAutoPlaybackAudio])
 
   useEffect(() => {
     return () => {

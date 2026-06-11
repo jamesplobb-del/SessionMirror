@@ -7,6 +7,7 @@ const POLL_INTERVAL_MS = 32
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 180
 const MONITOR_WARMUP_MS = 280
+const POST_PLAYBACK_WARMUP_MS = 900
 const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
 const HEALTH_CHECK_MS = 2500
@@ -111,6 +112,7 @@ export function useAutoSoundRecording({
   const silenceMsRef = useRef(silenceMs)
   const wasRecordingRef = useRef(isRecording)
   const appliedVolumeThresholdRef = useRef(volumeThreshold)
+  const prevSuppressStartRef = useRef(suppressStart)
 
   isRecordingRef.current = isRecording
   suppressStartRef.current = suppressStart
@@ -521,6 +523,23 @@ export function useAutoSoundRecording({
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [shouldMonitor])
+
+  useEffect(() => {
+    const wasSuppressed = prevSuppressStartRef.current
+    prevSuppressStartRef.current = suppressStart
+
+    if (!shouldMonitor || !wasSuppressed || suppressStart) return
+
+    loudSinceRef.current = null
+    attackSinceRef.current = null
+    silenceSinceRef.current = null
+    quietRmsEmaRef.current = 0
+    effectiveGateRef.current = profileRef.current.gate
+    monitorWarmUntilRef.current = performance.now() + POST_PLAYBACK_WARMUP_MS
+    clearStartLatch()
+    bumpMonitorEpoch()
+    void warmRecorderRef.current()
+  }, [suppressStart, shouldMonitor])
 
   return { teardownMonitor }
 }
