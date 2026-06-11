@@ -13,7 +13,7 @@ export interface AppSettings {
   pitchTrackerEnabled: boolean
   /** Audio mode idle: listen to the mic for a live tuner when playback is paused. */
   liveMicTunerEnabled: boolean
-  /** Pitch detection profile — voice, strings, or brass. */
+  /** Pitch detection profile — voice, strings, or winds. */
   tunerInstrument: TunerInstrument
   /** Show Best Take and Current Take cards on the main HUD. */
   showTakeCards: boolean
@@ -43,7 +43,8 @@ const SESSION_START_WIDGET_OFF: Pick<AppSettings, 'pitchTrackerEnabled' | 'showM
 }
 
 function parseTunerInstrument(value: unknown): TunerInstrument {
-  if (value === 'strings' || value === 'brass' || value === 'voice') {
+  if (value === 'brass') return 'winds'
+  if (value === 'strings' || value === 'winds' || value === 'voice') {
     return value
   }
   return DEFAULT_APP_SETTINGS.tunerInstrument
@@ -150,7 +151,7 @@ export interface AutoRecordProfile {
   gateCapMultiplier: number
   /** Silence stop threshold as fraction of user gate. */
   stopGateRatio: number
-  /** Peak weight in combined gate level (loud mode uses higher for brass). */
+  /** Peak weight in combined gate level (loud mode uses higher for piercing attacks). */
   peakWeight?: number
 }
 

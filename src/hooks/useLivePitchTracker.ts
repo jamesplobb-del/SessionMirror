@@ -20,6 +20,7 @@ import {
   normalizeInstrumentFrequency,
   quantizeDisplayCents,
   smoothFrequency,
+  stabilizePitchReadout,
   TUNING_GREEN_CENTS,
   type PitchReadout,
 } from '../utils/pitchUtils'
@@ -223,7 +224,7 @@ export interface PitchTrackerOptions {
   persistWhenPaused?: boolean
   /** Live mic: keep trace scrolling on the chart floor during silence. */
   continuousScroll?: boolean
-  /** Voice, strings, or brass detection profile. */
+  /** Voice, strings, or winds detection profile. */
   tunerInstrument?: TunerInstrument
   /** Full-rate mic analysis + canvas (camera widget). Economy mode for audio HUD. */
   realtimeMode?: boolean
@@ -1095,6 +1096,7 @@ export function useLivePitchTracker(
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
   const needleCentsRef = useRef<number | null>(null)
+  const readoutSmoothedHzRef = useRef<number | null>(null)
   const lastNoteRef = useRef('—')
   const goodFrameCountRef = useRef(0)
   const lastStableCentsRef = useRef<number | null>(null)
@@ -1155,6 +1157,7 @@ export function useLivePitchTracker(
 
   useEffect(() => {
     historyRef.current = []
+    readoutSmoothedHzRef.current = null
     needleCentsRef.current = null
     goodFrameCountRef.current = 0
     lastStableCentsRef.current = null
@@ -1195,7 +1198,8 @@ export function useLivePitchTracker(
 
     const onSeeked = () => {
       historyRef.current = []
-      needleCentsRef.current = null
+      readoutSmoothedHzRef.current = null
+    needleCentsRef.current = null
       goodFrameCountRef.current = 0
       lastStableCentsRef.current = null
       lastNoteRef.current = '—'
@@ -1231,7 +1235,8 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
       historyRef.current = []
-      needleCentsRef.current = null
+      readoutSmoothedHzRef.current = null
+    needleCentsRef.current = null
       goodFrameCountRef.current = 0
       lastStableCentsRef.current = null
       lastNoteRef.current = '—'
@@ -1388,7 +1393,8 @@ export function useLivePitchTracker(
           graphRef.current.smoothed = null
         }
         historyRef.current = []
-        needleCentsRef.current = null
+        readoutSmoothedHzRef.current = null
+    needleCentsRef.current = null
         goodFrameCountRef.current = 0
         lastStableCentsRef.current = null
         lastNoteRef.current = '—'
@@ -1424,20 +1430,22 @@ export function useLivePitchTracker(
       }
 
       const activeProfile = profileRef.current
-      const responsiveTrace = realtimeModeRef.current
-      const traceBlend = responsiveTrace
+      const snappyWidgetTrace =
+        realtimeModeRef.current && !activeProfile.widgetSmoothTrace
+      const responsiveTrace = snappyWidgetTrace
+      const traceBlend = snappyWidgetTrace
         ? Math.max(activeProfile.traceEndBlend, 0.92)
         : activeProfile.traceEndBlend
-      const traceWindow = responsiveTrace
+      const traceWindow = snappyWidgetTrace
         ? Math.min(activeProfile.graphSmoothWindow, 3)
         : activeProfile.graphSmoothWindow
-      const traceSpikeCap = responsiveTrace
+      const traceSpikeCap = snappyWidgetTrace
         ? activeProfile.traceSpikeCapCents * 1.75
         : activeProfile.traceSpikeCapCents
-      const traceNoteJumpCap = responsiveTrace
+      const traceNoteJumpCap = snappyWidgetTrace
         ? activeProfile.traceNoteJumpCapCents * 1.5
         : activeProfile.traceNoteJumpCapCents
-      const freqSmoothAlpha = responsiveTrace
+      const freqSmoothAlpha = snappyWidgetTrace
         ? Math.max(activeProfile.smoothAlpha, 0.62)
         : activeProfile.smoothAlpha
       framesSinceAttachAttemptRef.current += 1
@@ -1561,6 +1569,7 @@ export function useLivePitchTracker(
       const clearReadoutAfterSilence = () => {
         publishReadout(emptyReadout, true)
         graph.smoothed = null
+        readoutSmoothedHzRef.current = null
         needleCentsRef.current = null
         lastStableCentsRef.current = null
         lastNoteRef.current = '—'
@@ -1606,15 +1615,24 @@ export function useLivePitchTracker(
               pitch,
               freqSmoothAlpha,
             )
-            const readoutHz =
-              clarity >= clarityMin ? pitch : graph.smoothed ?? pitch
+            readoutSmoothedHzRef.current = smoothFrequency(
+              readoutSmoothedHzRef.current,
+              pitch,
+              activeProfile.readoutFreqAlpha,
+            )
+            const readoutHz = readoutSmoothedHzRef.current ?? pitch
             const preferMidi =
               readoutRef.current.noteName !== '—' ? readoutRef.current.midi : null
-            const next = frequencyToPitchReadout(
+            let next = frequencyToPitchReadout(
               readoutHz,
               activeProfile.minHz,
               activeProfile.maxHz,
               preferMidi,
+            )
+            next = stabilizePitchReadout(
+              readoutRef.current.noteName !== '—' ? readoutRef.current : null,
+              next,
+              activeProfile.noteHysteresisCents,
             )
 
             if (next.noteName !== '—') {
@@ -1628,7 +1646,7 @@ export function useLivePitchTracker(
                 !wasIdle &&
                 lastStableCentsRef.current != null &&
                 Math.abs(next.cents - lastStableCentsRef.current) > activeProfile.outlierCents &&
-                clarity < clarityMin + 0.03
+                clarity < clarityMin + 0.05
               ) {
                 acceptFrame = false
               }
@@ -1645,10 +1663,22 @@ export function useLivePitchTracker(
               if (acceptFrame && attackSatisfied) {
                 lastNoteRef.current = next.noteName
 
-                const intonationCents = Math.max(-50, Math.min(50, next.cents))
-                needleCentsRef.current = intonationCents
+                const rawCents = Math.max(-50, Math.min(50, next.cents))
+                const needleAlpha = noteChanged
+                  ? activeProfile.noteChangeSmoothAlpha
+                  : activeProfile.needleSmoothAlpha
+                const prevNeedle = needleCentsRef.current
+                const smoothedNeedle =
+                  prevNeedle == null
+                    ? rawCents
+                    : prevNeedle + (rawCents - prevNeedle) * needleAlpha
+
+                needleCentsRef.current = smoothedNeedle
+                const deadband = activeProfile.readoutDeadbandCents ?? 0
+                const centeredCents =
+                  deadband > 0 && Math.abs(smoothedNeedle) <= deadband ? 0 : smoothedNeedle
                 const displayCents = quantizeDisplayCents(
-                  intonationCents,
+                  centeredCents,
                   activeProfile.readoutCentsStep,
                 )
                 const displayReadout: PitchReadout = {
@@ -1660,9 +1690,9 @@ export function useLivePitchTracker(
                 publishReadout(displayReadout)
 
                 lastPitchAtRef.current = now
-                lastStableCentsRef.current = intonationCents
+                lastStableCentsRef.current = smoothedNeedle
                 active = true
-                pushTraceSample(intonationCents, noteChanged)
+                pushTraceSample(smoothedNeedle, noteChanged)
               }
             } else {
               goodFrameCountRef.current = 0

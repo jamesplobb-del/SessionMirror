@@ -6,7 +6,7 @@ export const MIN_INSTRUMENT_HZ = 65
 /** Upper singing voice / violin upper range. */
 export const MAX_INSTRUMENT_HZ = 1100
 
-export type TunerInstrument = 'voice' | 'strings' | 'brass'
+export type TunerInstrument = 'voice' | 'strings' | 'winds'
 
 export interface PitchTunerProfile {
   label: string
@@ -40,11 +40,15 @@ export interface PitchTunerProfile {
   traceNoteJumpCapCents: number
   /** Cents readout quantization step (smaller = finer display). */
   readoutCentsStep: number
+  /** Keep profile smoothing in widget/realtime mode (voice/strings). */
+  widgetSmoothTrace?: boolean
+  /** Snap readout to 0¢ inside this band (voice comfort zone). */
+  readoutDeadbandCents?: number
 }
 
 const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Voice',
-  description: 'Instant pitch readout with a trace that follows smoothly — no harsh jumps.',
+  description: 'Sensitive live mic with a smooth trace and forgiving intonation readout.',
   minHz: 65,
   maxHz: 1100,
   clarityMin: 0.7,
@@ -54,20 +58,22 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   rmsGateDbMedia: -54,
   rmsGateDbMic: -48,
   attackFrames: 1,
-  outlierCents: 22,
+  outlierCents: 30,
   holdMs: 260,
   holdMsMic: 300,
-  smoothAlpha: 0.4,
-  needleSmoothAlpha: 0.95,
-  noteChangeSmoothAlpha: 0.95,
-  graphSmoothWindow: 4,
-  noteHysteresisCents: 20,
+  smoothAlpha: 0.28,
+  needleSmoothAlpha: 0.36,
+  noteChangeSmoothAlpha: 0.55,
+  graphSmoothWindow: 6,
+  noteHysteresisCents: 28,
   readoutIntervalMs: 0,
-  readoutFreqAlpha: 0.98,
-  traceEndBlend: 0.78,
-  traceSpikeCapCents: 6,
-  traceNoteJumpCapCents: 12,
-  readoutCentsStep: 0.5,
+  readoutFreqAlpha: 0.68,
+  traceEndBlend: 0.5,
+  traceSpikeCapCents: 3.5,
+  traceNoteJumpCapCents: 10,
+  readoutCentsStep: 1,
+  widgetSmoothTrace: true,
+  readoutDeadbandCents: 2,
 }
 
 const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
@@ -96,15 +102,17 @@ const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   traceSpikeCapCents: 5,
   traceNoteJumpCapCents: 10,
   readoutCentsStep: 0.5,
+  widgetSmoothTrace: true,
 }
 
-const BRASS_TUNER_PROFILE: PitchTunerProfile = {
-  label: 'Brass',
-  description: 'Immediate trumpet/trombone/horn feedback with a controlled scrolling trace.',
-  minHz: 58,
-  maxHz: 988,
+const WINDS_TUNER_PROFILE: PitchTunerProfile = {
+  label: 'Winds',
+  description:
+    'Responsive tuning for flute, clarinet, saxophone, oboe, trumpet, horn, and other wind instruments.',
+  minHz: 55,
+  maxHz: 1760,
   clarityMin: 0.68,
-  clarityMinMic: 0.7,
+  clarityMinMic: 0.72,
   frameSize: 4096,
   frameSizeMic: 2048,
   rmsGateDbMedia: -50,
@@ -126,14 +134,14 @@ const BRASS_TUNER_PROFILE: PitchTunerProfile = {
   readoutCentsStep: 0.5,
 }
 
-export const TUNER_INSTRUMENTS: TunerInstrument[] = ['voice', 'strings', 'brass']
+export const TUNER_INSTRUMENTS: TunerInstrument[] = ['voice', 'strings', 'winds']
 
 export function getTunerProfile(instrument: TunerInstrument): PitchTunerProfile {
   switch (instrument) {
     case 'strings':
       return STRINGS_TUNER_PROFILE
-    case 'brass':
-      return BRASS_TUNER_PROFILE
+    case 'winds':
+      return WINDS_TUNER_PROFILE
     default:
       return VOICE_TUNER_PROFILE
   }
