@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from 'react'
 import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
