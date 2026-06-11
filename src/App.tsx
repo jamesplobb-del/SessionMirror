@@ -796,7 +796,7 @@ export default function App() {
             mediaKey: 'main-recording-audio',
             liveMicOnly: true,
           }
-        } else if (autoPlaybackTakeId && autoPlaybackTake) {
+        } else if (autoPlaybackTakeId && autoPlaybackTake && autoPlaybackPlaying) {
           next = {
             mediaRef: autoPlaybackAudioRef,
             take: autoPlaybackTake,
@@ -804,7 +804,11 @@ export default function App() {
             mediaKey: `main-auto-${autoPlaybackTake.id}-${autoPlaybackAudioKey}`,
             liveMicOnly: false,
           }
-        } else if (challengerTake?.mediaType === 'audio' && challengerTake.videoUrl) {
+        } else if (
+          challengerTake?.mediaType === 'audio' &&
+          challengerTake.videoUrl &&
+          challengerPipPlaying
+        ) {
           next = {
             mediaRef: challengerPipVideoRef,
             take: challengerTake,
@@ -812,7 +816,11 @@ export default function App() {
             mediaKey: `main-pip-ch-${challengerTake.id}-${challengerTake.filePath}`,
             liveMicOnly: false,
           }
-        } else if (benchmarkTake?.mediaType === 'audio' && benchmarkTake.videoUrl) {
+        } else if (
+          benchmarkTake?.mediaType === 'audio' &&
+          benchmarkTake.videoUrl &&
+          benchmarkPipPlaying
+        ) {
           next = {
             mediaRef: benchmarkPipVideoRef,
             take: benchmarkTake,
@@ -820,7 +828,7 @@ export default function App() {
             mediaKey: `main-pip-bm-${benchmarkTake.id}-${benchmarkTake.filePath}`,
             liveMicOnly: false,
           }
-        } else if (settings.liveMicTunerEnabled && ready) {
+        } else if (ready) {
           next = {
             mediaRef: liveMicPlaceholderRef,
             take: null,
@@ -849,7 +857,6 @@ export default function App() {
     return next
   }, [
     settings.pitchTrackerEnabled,
-    settings.liveMicTunerEnabled,
     recordingMode,
     isReviewOpen,
     isVaultOpen,
@@ -1252,7 +1259,9 @@ export default function App() {
               takeName={mainAudioPitchSource.take?.name}
               label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
               isAudioMode
-              liveMicEnabled={settings.liveMicTunerEnabled}
+              liveMicEnabled={
+                settings.liveMicTunerEnabled || mainAudioPitchSource.liveMicOnly === true
+              }
               micStreamRef={streamRef}
               layoutRegion="main"
               layoutKey={`audio-${recordingMode}`}
@@ -1283,7 +1292,7 @@ export default function App() {
       )}
 
       <motion.div
-        className={`app-ui-overlay ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
+        className={`app-ui-overlay relative z-30 ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,

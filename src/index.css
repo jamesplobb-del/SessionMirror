@@ -1279,6 +1279,7 @@ video.camera-preview.camera-preview--hidden {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
 }
 
 .pitch-widget-audio {
@@ -1291,6 +1292,7 @@ video.camera-preview.camera-preview--hidden {
   justify-content: flex-end;
   overflow: hidden;
   pointer-events: none;
+  z-index: 5;
 }
 
 .pitch-widget-audio--stage {
@@ -1301,7 +1303,7 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .pitch-widget-audio__stage {
-  pointer-events: auto;
+  pointer-events: none;
   width: 100%;
   max-height: 100%;
   display: flex;

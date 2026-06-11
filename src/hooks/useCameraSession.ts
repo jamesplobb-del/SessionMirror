@@ -145,7 +145,6 @@ export function useCameraSession({
     mimeType: string
   } | null>(null)
   const warmAutoAudioInFlightRef = useRef(false)
-  const modeSwitchCleanupTimerRef = useRef<number | null>(null)
   const autoAudioDisarmInFlightRef = useRef<Promise<void> | null>(null)
   const recordingOrientationRef = useRef<'portrait' | 'landscape'>('portrait')
   const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
@@ -666,32 +665,6 @@ export function useCameraSession({
     }, 200)
   }
 
-  const scheduleModeSwitchCleanup = useCallback(() => {
-    if (modeSwitchCleanupTimerRef.current !== null) {
-      window.clearTimeout(modeSwitchCleanupTimerRef.current)
-    }
-
-    modeSwitchCleanupTimerRef.current = window.setTimeout(() => {
-      modeSwitchCleanupTimerRef.current = null
-      // #region agent log
-      agentDebugLog(
-        'useCameraSession.ts:scheduleModeSwitchCleanup',
-        'mode switch cleanup firing',
-        {
-          mode: recordingModeRef.current,
-          hasStream: Boolean(streamRef.current),
-          ready: readyRef.current,
-        },
-        'H6',
-      )
-      // #endregion
-      stopStreamTracks(streamRef.current)
-      streamRef.current = null
-      detachPreviewStream(previewRef.current)
-      void disarmAutoAudioRecorder()
-    }, 48)
-  }, [disarmAutoAudioRecorder, stopStreamTracks])
-
   const startRecording = useCallback(() => {
     if (isRecording) return
 
@@ -871,12 +844,8 @@ export function useCameraSession({
         setStreamGeneration((generation) => generation + 1)
         setRecordingMode(mode)
       })
-
-      scheduleAfterPaint(() => {
-        scheduleModeSwitchCleanup()
-      })
     },
-    [cancelScheduledRelease, isRecording, scheduleModeSwitchCleanup],
+    [cancelScheduledRelease, isRecording],
   )
 
   const suspendCameraForBackground = useCallback(() => {

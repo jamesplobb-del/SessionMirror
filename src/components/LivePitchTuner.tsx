@@ -475,7 +475,7 @@ function LivePitchTunerAudio({
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const showPlayback = isPlaying && !liveMicOnly
-  const showLive = liveMicOnly && (isPlaying || liveMicEnabled)
+  const showLive = liveMicOnly && (isPlaying || liveMicEnabled || enabled)
   const liveTrackerEnabled = enabled && showLive
   const playbackTrackerEnabled = enabled && showPlayback
 
