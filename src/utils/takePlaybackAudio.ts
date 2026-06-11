@@ -1,4 +1,5 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
+import { agentDebugLog } from './agentDebugLog'
 import { primePlaybackAudioContextSync } from './playbackAudioContext'
 
 type MicHandler = () => void | Promise<void>
@@ -14,13 +15,9 @@ export function registerTakePlaybackMicHandlers(handlers: {
   resumeMicInput = handlers.resumeMic
 }
 
-/** Prepare HTML media elements for audible speaker playback using standard Web APIs. */
-export function primeTakePlaybackAudioSync(
+function primeMediaElements(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  void suspendMicInput?.()
-  primePlaybackAudioContextSync()
-
   for (const element of media) {
     if (!element) continue
     element.muted = false
@@ -28,16 +25,41 @@ export function primeTakePlaybackAudioSync(
     element.volume = 1
     element.setAttribute('playsinline', 'true')
     element.setAttribute('webkit-playsinline', 'true')
+    // #region agent log
+    agentDebugLog(
+      'takePlaybackAudio.ts:primeMediaElements',
+      'primed media for playback',
+      {
+        srcKind: element.src.startsWith('blob:')
+          ? 'blob'
+          : element.src.includes('capacitor')
+            ? 'capacitor'
+            : 'other',
+        muted: element.muted,
+        volume: element.volume,
+        tag: element.getAttribute('data-debug-playback-tag') ?? 'unknown',
+      },
+      'H-B',
+    )
+    // #endregion
   }
-
-  resumePitchGraphsForMedia(...media)
 }
 
-/** Async wrapper — prefer primeTakePlaybackAudioSync inside gesture handlers. */
+/** Prepare playback — await before calling .play() so mic is released first. */
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
-  primeTakePlaybackAudioSync(...media)
+  await suspendMicInput?.()
+  primePlaybackAudioContextSync()
+  primeMediaElements(...media)
+  resumePitchGraphsForMedia(...media)
+}
+
+/** Sync helper — prefer await primeTakePlaybackAudio() before play. */
+export function primeTakePlaybackAudioSync(
+  ...media: Array<HTMLMediaElement | null | undefined>
+): void {
+  void primeTakePlaybackAudio(...media)
 }
 
 /** Restore mic capture after take playback finishes. */

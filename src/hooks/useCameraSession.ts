@@ -953,36 +953,45 @@ export function useCameraSession({
     // #endregion
   }, [cancelScheduledRelease, restartCameraAfterForeground])
 
-  const suspendMicForPlayback = useCallback(() => {
+  const suspendMicForPlayback = useCallback(async () => {
     const stream = streamRef.current
     if (!stream) return
 
     for (const track of stream.getAudioTracks()) {
-      track.enabled = false
+      if (track.readyState === 'live') {
+        track.stop()
+      }
     }
+    // #region agent log
+    agentDebugLog(
+      'useCameraSession.ts:suspendMicForPlayback',
+      'mic audio tracks stopped for playback',
+      { remainingLive: stream.getAudioTracks().filter((t) => t.readyState === 'live').length },
+      'H-B',
+    )
+    // #endregion
   }, [])
 
   const resumeMicAfterPlayback = useCallback(async () => {
-    if (recordingModeRef.current !== 'audio') return
-
+    const mode = recordingModeRef.current
     const stream = streamRef.current
-    if (stream) {
+    const audioLive = stream
+      ?.getAudioTracks()
+      .some((track) => track.readyState === 'live')
+
+    if (!audioLive) {
+      await refreshCameraSession()
+      if (!isStreamRecordable(streamRef.current, mode)) {
+        await restartCameraAfterForeground()
+      }
+    } else if (stream) {
       for (const track of stream.getAudioTracks()) {
         if (track.readyState === 'live') {
           track.enabled = true
         }
       }
-
-      if (isStreamRecordable(stream, 'audio')) {
-        setStreamGeneration((generation) => generation + 1)
-        return
-      }
     }
 
-    await refreshCameraSession()
-    if (!isStreamRecordable(streamRef.current, 'audio')) {
-      await restartCameraAfterForeground()
-    }
     setStreamGeneration((generation) => generation + 1)
   }, [refreshCameraSession, restartCameraAfterForeground])
 

@@ -23,7 +23,7 @@ import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
-  primeTakePlaybackAudioSync,
+  primeTakePlaybackAudio,
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
 } from './utils/takePlaybackAudio'
@@ -59,7 +59,7 @@ import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
-import { agentDebugLog } from './utils/agentDebugLog'
+import { agentDebugLog, debugSamplePlaybackLevel } from './utils/agentDebugLog'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
   createProject,
@@ -269,12 +269,29 @@ export default function App() {
         audio.onended = () => finishAutoPlayback()
         audio.onerror = () => finishAutoPlayback()
 
-        primeTakePlaybackAudioSync(audio)
+        await primeTakePlaybackAudio(audio)
         const started = await safePlayMedia(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
 
         if (started) {
           setAutoPlaybackPlaying(true)
+          // #region agent log
+          audio.setAttribute('data-debug-playback-tag', 'auto-playback')
+          debugSamplePlaybackLevel(audio, 'auto-playback', 'H-A')
+          agentDebugLog(
+            'App.tsx:playAutoTakeAudio',
+            'auto playback started',
+            {
+              takeId,
+              srcKind: playbackUrl.startsWith('blob:')
+                ? 'blob'
+                : playbackUrl.includes('capacitor')
+                  ? 'capacitor'
+                  : 'other',
+            },
+            'H-D',
+          )
+          // #endregion
           return
         }
 
@@ -286,7 +303,7 @@ export default function App() {
           return
         }
 
-        primeTakePlaybackAudioSync(audio)
+        await primeTakePlaybackAudio(audio)
         const retryStarted = await safePlayMedia(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
 
@@ -421,6 +438,27 @@ export default function App() {
         }
         return [...prev, savedTake]
       })
+
+      // #region agent log
+      agentDebugLog(
+        'App.tsx:handleSaveTake',
+        'recorded take saved',
+        {
+          takeId,
+          mediaType,
+          mimeType,
+          srcKind: safeVideoUrl.startsWith('blob:')
+            ? 'blob'
+            : safeVideoUrl.includes('capacitor')
+              ? 'capacitor'
+              : 'other',
+          hasFilePath: Boolean(filePath),
+          blobBytes: blob?.size ?? 0,
+          autoPlaybackPending: pendingAutoPlaybackRef.current,
+        },
+        'H-A',
+      )
+      // #endregion
 
       if (
         mediaType === 'audio' &&
@@ -1143,6 +1181,25 @@ export default function App() {
           mirrorPlayback: false,
           thumbnailUrl: mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : '',
         }
+
+        // #region agent log
+        agentDebugLog(
+          'App.tsx:handleUploadBenchmark',
+          'uploaded benchmark take',
+          {
+            takeId,
+            mediaType,
+            mimeType,
+            srcKind: safeVideoUrl.startsWith('blob:')
+              ? 'blob'
+              : safeVideoUrl.includes('capacitor')
+                ? 'capacitor'
+                : 'other',
+            fileBytes: file.size,
+          },
+          'H-A',
+        )
+        // #endregion
 
         const projectId = activeProjectIdRef.current
         if (projectId && persisted.filePath) {

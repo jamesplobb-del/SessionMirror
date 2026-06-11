@@ -59,11 +59,11 @@ export function waitForMediaReady(
  * Call synchronously inside onClick / onPointerUp — must not be deferred to useEffect.
  * Returns a promise for callers that want to update UI after play resolves.
  */
-export function playMediaOnUserGesture(
+export async function playMediaOnUserGesture(
   media: HTMLMediaElement,
-  beforePlay?: () => void,
+  beforePlay?: () => void | Promise<void>,
 ): Promise<boolean> {
-  beforePlay?.()
+  await beforePlay?.()
   prepareInlineMediaElement(media)
   return safePlayMedia(media)
 }

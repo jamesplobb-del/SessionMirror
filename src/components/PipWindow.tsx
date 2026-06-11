@@ -4,7 +4,8 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { playMediaOnUserGesture } from '../utils/mediaPlayback'
-import { primeTakePlaybackAudioSync, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { debugSamplePlaybackLevel, agentDebugLog } from '../utils/agentDebugLog'
 
 import type { Take } from '../types'
 
@@ -115,9 +116,21 @@ function PipWindow({
       if (!video) return
 
       if (video.paused) {
-        playMediaOnUserGesture(video, () => {
-          primeTakePlaybackAudioSync(video)
-        }).then((started) => {
+        // #region agent log
+        agentDebugLog(
+          'PipWindow.tsx:handlePlayPauseClick',
+          'pip play requested',
+          { variant, suspendPlayback, srcKind: video.src?.slice(0, 12) ?? 'empty' },
+          'H-E',
+        )
+        // #endregion
+        video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
+        playMediaOnUserGesture(video, () => primeTakePlaybackAudio(video)).then((started) => {
+          // #region agent log
+          if (started) {
+            debugSamplePlaybackLevel(video, `pip-${variant}`, 'H-A')
+          }
+          // #endregion
           setIsPlaying(started)
         })
       } else {
@@ -127,7 +140,7 @@ function PipWindow({
         setIsPlaying(false)
       }
     },
-    [suspendPlayback, videoRef],
+    [suspendPlayback, variant, videoRef],
   )
 
   const handleVolume = useCallback(
@@ -215,6 +228,7 @@ function PipWindow({
               recordingOrientation={recordingOrientation}
               controls={false}
               manualPlayOnly
+              audible={isPlaying && !suspendPlayback}
               eagerLoad
               preload="auto"
             />

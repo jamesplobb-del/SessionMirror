@@ -12,15 +12,15 @@ import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
-import { primeTakePlaybackAudioSync, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import { playMediaOnUserGesture } from '../utils/mediaPlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 1000
 
-function primeReviewPlaybackAudio(video: HTMLMediaElement): void {
-  primeTakePlaybackAudioSync(video)
+function primeReviewPlaybackAudio(video: HTMLMediaElement): Promise<void> {
+  return primeTakePlaybackAudio(video)
 }
 
 interface ReviewTakeLayerProps {
