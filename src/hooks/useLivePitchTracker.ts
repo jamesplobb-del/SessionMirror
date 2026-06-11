@@ -109,6 +109,7 @@ function drawInTuneBandRegion(
   width: number,
   centsToY: (cents: number) => number,
   inTuneHighlight: number,
+  lite = false,
 ): void {
   const yTop = centsToY(TUNING_GREEN_CENTS)
   const yBottom = centsToY(-TUNING_GREEN_CENTS)
@@ -135,7 +136,7 @@ function drawInTuneBandRegion(
 
   for (const cents of [TUNING_GREEN_CENTS, -TUNING_GREEN_CENTS]) {
     const y = centsToY(cents)
-    if (boost > 0.12) {
+    if (!lite && boost > 0.12) {
       ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + t * 0.55})`
       ctx.shadowBlur = 2 + boost * 14
     } else {
@@ -188,6 +189,8 @@ function isMediaPitchGraph(graph: ActivePitchGraph): graph is PitchGraph {
 const MIC_PITCH_ATTACH_DEFER_MS = 400
 /** ~14fps cap for live mic audio stage — keeps main thread responsive for HUD taps. */
 const MIC_LIVE_TICK_MS = 72
+/** Glass chart redraw cap — pitch analysis still runs every frame. */
+const GLASS_CANVAS_TICK_MS = 33
 const READOUT_PUBLISH_MS = 100
 
 export type PitchTrackerSource = 'media' | 'microphone'
@@ -606,7 +609,6 @@ function drawSmoothPitchTrace(
   if (points.length < 2) return
 
   if (theme === 'glass') {
-    drawColoredTraceSegments(ctx, points, 4.5, 0.34, true)
     drawColoredTraceSegments(ctx, points, 3.1, 0.96)
     return
   }
@@ -656,7 +658,7 @@ function drawTraceEndpointDot(
   const radius = theme === 'glass' ? 5 + glowBoost * 1.2 : 4.5
   const glowRadius = theme === 'glass' ? 7 + glowBoost * 5 : 6
 
-  if (glowBoost > 0.08) {
+  if (glowBoost > 0.08 && theme !== 'glass') {
     ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + Math.min(1, glowBoost) * 0.5})`
     ctx.shadowBlur = 4 + glowBoost * 12
   }
@@ -673,6 +675,119 @@ function drawTraceEndpointDot(
   ctx.lineWidth = 1.75
   ctx.stroke()
   ctx.shadowBlur = 0
+}
+
+function getGlassLayoutMetrics(height: number) {
+  const pitchTop = height * 0.12
+  const pitchBottom = height * 0.92
+  const pitchHeight = pitchBottom - pitchTop
+  const midPitchY = pitchTop + pitchHeight * 0.5
+  const centsToY = (cents: number) =>
+    midPitchY - (Math.max(-50, Math.min(50, cents)) / 50) * (pitchHeight * 0.46)
+  return { pitchTop, pitchBottom, pitchHeight, centsToY }
+}
+
+interface GlassStaticLayerCache {
+  width: number
+  height: number
+  dpr: number
+  canvas: HTMLCanvasElement
+}
+
+const glassStaticLayerCache = new WeakMap<HTMLCanvasElement, GlassStaticLayerCache>()
+
+function drawGlassStaticContent(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  const { pitchTop, pitchBottom, pitchHeight, centsToY } = getGlassLayoutMetrics(height)
+
+  ctx.clearRect(0, 0, width, height)
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+  ctx.lineWidth = 1
+  ctx.lineCap = 'round'
+  ctx.setLineDash([1, 5])
+
+  const gridXStep = Math.max(16, Math.floor(width / 14))
+  for (let x = gridXStep; x < width; x += gridXStep) {
+    ctx.beginPath()
+    ctx.moveTo(x + 0.5, pitchTop)
+    ctx.lineTo(x + 0.5, pitchBottom)
+    ctx.stroke()
+  }
+
+  const gridYStep = pitchHeight / 8
+  for (let i = 1; i < 8; i += 1) {
+    const y = pitchTop + i * gridYStep
+    ctx.beginPath()
+    ctx.moveTo(0, y + 0.5)
+    ctx.lineTo(width, y + 0.5)
+    ctx.stroke()
+  }
+
+  ctx.setLineDash([])
+  ctx.lineCap = 'butt'
+
+  const labelFont =
+    '300 9px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
+  ctx.font = labelFont
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('Sharp', 2, centsToY(50) - 10)
+  ctx.font = '300 8px ui-monospace, SFMono-Regular, Menlo, monospace'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.28)'
+  ctx.fillText('+50', 2, centsToY(50))
+  ctx.fillText('0', 2, centsToY(0))
+  ctx.fillText('-50', 2, centsToY(-50))
+  ctx.font = labelFont
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
+  ctx.fillText('Flat', 2, centsToY(-50) + 10)
+
+  const centerY = centsToY(0)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+  ctx.lineWidth = 5
+  ctx.beginPath()
+  ctx.moveTo(0, centerY)
+  ctx.lineTo(width, centerY)
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, centerY)
+  ctx.lineTo(width, centerY)
+  ctx.stroke()
+}
+
+function blitGlassStaticLayer(
+  targetCtx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  dpr: number,
+): ReturnType<typeof getGlassLayoutMetrics> {
+  let cache = glassStaticLayerCache.get(canvas)
+  if (
+    !cache ||
+    cache.width !== width ||
+    cache.height !== height ||
+    cache.dpr !== dpr
+  ) {
+    const off = cache?.canvas ?? document.createElement('canvas')
+    off.width = Math.floor(width * dpr)
+    off.height = Math.floor(height * dpr)
+    const offCtx = off.getContext('2d')
+    if (!offCtx) return getGlassLayoutMetrics(height)
+    offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    drawGlassStaticContent(offCtx, width, height)
+    cache = { width, height, dpr, canvas: off }
+    glassStaticLayerCache.set(canvas, cache)
+  }
+
+  targetCtx.drawImage(cache.canvas, 0, 0, width, height)
+  return getGlassLayoutMetrics(height)
 }
 
 function drawPitchCanvas(
@@ -709,17 +824,21 @@ function drawPitchCanvas(
 
   ctx.clearRect(0, 0, width, height)
 
-  if (!isGlass) {
+  let centsToY: (cents: number) => number
+
+  if (isGlass) {
+    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr)
+    centsToY = metrics.centsToY
+  } else {
     const bg = ctx.createLinearGradient(0, 0, 0, height)
     bg.addColorStop(0, '#0c1018')
     bg.addColorStop(0.55, '#080b12')
     bg.addColorStop(1, '#050608')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, width, height)
+    centsToY = (cents: number) =>
+      midPitchY - (Math.max(-50, Math.min(50, cents)) / 50) * (pitchHeight * 0.46)
   }
-
-  const centsToY = (cents: number) =>
-    midPitchY - (Math.max(-50, Math.min(50, cents)) / 50) * (pitchHeight * 0.46)
 
   if (!isGlass) {
     ctx.fillStyle = 'rgba(16, 185, 129, 0.08)'
@@ -738,79 +857,12 @@ function drawPitchCanvas(
       ctx.lineTo(width, y)
       ctx.stroke()
     }
-  } else {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
-    ctx.lineWidth = 1
-    ctx.lineCap = 'round'
-    ctx.setLineDash([1, 5])
-
-    const gridXStep = Math.max(16, Math.floor(width / 14))
-    for (let x = gridXStep; x < width; x += gridXStep) {
-      ctx.beginPath()
-      ctx.moveTo(x + 0.5, pitchTop)
-      ctx.lineTo(x + 0.5, pitchBottom)
-      ctx.stroke()
-    }
-
-    const gridYStep = pitchHeight / 8
-    for (let i = 1; i < 8; i += 1) {
-      const y = pitchTop + i * gridYStep
-      ctx.beginPath()
-      ctx.moveTo(0, y + 0.5)
-      ctx.lineTo(width, y + 0.5)
-      ctx.stroke()
-    }
-
-    ctx.setLineDash([])
-    ctx.lineCap = 'butt'
-
-    const labelFont =
-      '300 9px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
-    ctx.font = labelFont
-    if ('letterSpacing' in ctx) {
-      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0.14em'
-    }
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('Sharp', 2, centsToY(50) - 10)
-    ctx.font = '300 8px ui-monospace, SFMono-Regular, Menlo, monospace'
-    if ('letterSpacing' in ctx) {
-      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0.08em'
-    }
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)'
-    ctx.fillText('+50', 2, centsToY(50))
-    ctx.fillText('0', 2, centsToY(0))
-    ctx.fillText('-50', 2, centsToY(-50))
-    ctx.font = labelFont
-    if ('letterSpacing' in ctx) {
-      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0.14em'
-    }
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)'
-    ctx.fillText('Flat', 2, centsToY(-50) + 10)
-    if ('letterSpacing' in ctx) {
-      ;(ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '0px'
-    }
   }
 
   if (isGlass) {
-    drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight)
-  }
-
-  const centerY = centsToY(0)
-  if (isGlass) {
-    ctx.save()
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)'
-    ctx.lineWidth = 2
-    ctx.shadowColor = 'rgba(255, 255, 255, 0.2)'
-    ctx.shadowBlur = 10
-    ctx.setLineDash([])
-    ctx.beginPath()
-    ctx.moveTo(0, centerY)
-    ctx.lineTo(width, centerY)
-    ctx.stroke()
-    ctx.restore()
+    drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight, true)
   } else {
+    const centerY = centsToY(0)
     ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)'
     ctx.setLineDash([4, 6])
     ctx.lineWidth = 1
@@ -876,6 +928,36 @@ function drawPitchCanvas(
   ctx.stroke()
 }
 
+function drawPitchCanvasThrottled(
+  canvas: HTMLCanvasElement,
+  timeDomain: Float32Array,
+  centsHistory: number[],
+  active: boolean,
+  theme: PitchCanvasTheme,
+  graphSmoothWindow: number,
+  traceEndBlend: number,
+  inTuneHighlight: number,
+  lastDrawAtRef: { current: number },
+): void {
+  const now = performance.now()
+  if (theme === 'glass' && now - lastDrawAtRef.current < GLASS_CANVAS_TICK_MS) {
+    return
+  }
+  if (theme === 'glass') {
+    lastDrawAtRef.current = now
+  }
+  drawPitchCanvas(
+    canvas,
+    timeDomain,
+    centsHistory,
+    active,
+    theme,
+    graphSmoothWindow,
+    traceEndBlend,
+    inTuneHighlight,
+  )
+}
+
 export interface LivePitchTrackerState {
   readout: PitchReadout
   /** 0 = no glow, rises with sustained in-tune time (can exceed 1). */
@@ -930,6 +1012,7 @@ export function useLivePitchTracker(
   const lastPublishedGlowRef = useRef(0)
   const lastMicTickAtRef = useRef(0)
   const lastReadoutPublishAtRef = useRef(0)
+  const lastGlassCanvasDrawAtRef = useRef(0)
 
   const publishReadout = (next: PitchReadout, force = false) => {
     const noteChanged = next.noteName !== readoutRef.current.noteName
@@ -1301,7 +1384,7 @@ export function useLivePitchTracker(
             readoutRef.current,
           )
           publishInTuneGlow(bandGlow)
-          drawPitchCanvas(
+          drawPitchCanvasThrottled(
             canvas,
             new Float32Array(activeProfile.frameSize),
             historyRef.current,
@@ -1310,6 +1393,7 @@ export function useLivePitchTracker(
             activeProfile.graphSmoothWindow,
             activeProfile.traceEndBlend,
             bandGlow,
+            lastGlassCanvasDrawAtRef,
           )
         }
         tickRef.current = requestAnimationFrame(tick)
@@ -1515,7 +1599,7 @@ export function useLivePitchTracker(
           readoutRef.current,
         )
         publishInTuneGlow(bandGlow)
-        drawPitchCanvas(
+        drawPitchCanvasThrottled(
           canvas,
           graph.buffer,
           historyRef.current,
@@ -1524,6 +1608,7 @@ export function useLivePitchTracker(
           activeProfile.graphSmoothWindow,
           activeProfile.traceEndBlend,
           bandGlow,
+          lastGlassCanvasDrawAtRef,
         )
       }
 

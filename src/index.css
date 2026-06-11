@@ -1297,6 +1297,11 @@ video.camera-preview.camera-preview--hidden {
   font-family: ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', sans-serif;
 }
 
+.pitch-widget-note {
+  width: 100%;
+  padding-inline: 2.5rem;
+}
+
 .pitch-widget-hz {
   font-weight: 300;
   letter-spacing: 0.14em;
@@ -1307,6 +1312,8 @@ video.camera-preview.camera-preview--hidden {
 
 .pitch-widget-chart {
   min-height: 3.5rem;
+  contain: layout paint;
+  transform: translateZ(0);
 }
 
 .pitch-widget-hint {

@@ -651,9 +651,9 @@ export default function LivePitchTuner({
     return (
       <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col">
         <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget flex h-full min-h-0 w-full flex-col overflow-hidden">
-          <div className="pitch-widget-chrome flex shrink-0 items-start justify-between gap-3 px-3.5 pt-3 pb-1 pr-10">
+          <div className="pitch-widget-chrome relative flex shrink-0 justify-center px-3.5 pt-3 pb-1 pr-10">
             <p
-              className="pitch-readout-display text-[clamp(0.875rem,4.5cqw,1rem)] font-bold leading-none tracking-tight"
+              className="pitch-widget-note pitch-readout-display text-center text-[clamp(0.875rem,4.5cqw,1rem)] font-bold leading-none tracking-tight"
               style={{ color: accent }}
             >
               {readout.noteName}
@@ -664,7 +664,7 @@ export default function LivePitchTuner({
               )}
             </p>
             <p
-              className="pitch-widget-hz pitch-readout-display shrink-0"
+              className="pitch-widget-hz pitch-readout-display absolute right-3.5 top-3 shrink-0"
               style={{ color: accent }}
             >
               {formatFrequencyHz(readout.frequencyHz)}
