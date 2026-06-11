@@ -28,17 +28,6 @@ const TIER_AUDIO: Record<
   subdivision: { hz: 600, peak: 0.2, decaySec: 0.028 },
 }
 
-type AudioContextCtor = typeof AudioContext
-
-function getAudioContextCtor(): AudioContextCtor | null {
-  if (typeof window === 'undefined') return null
-  return (
-    window.AudioContext ??
-    (window as Window & { webkitAudioContext?: AudioContextCtor }).webkitAudioContext ??
-    null
-  )
-}
-
 function scheduleTieredClick(
   ctx: AudioContext,
   when: number,
@@ -184,21 +173,6 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     [persistPrefs],
   )
 
-  /** JIT singleton — only call from user-gesture handlers (play tap). Never on mount. */
-  const acquireAudioContextOnUserGesture = useCallback((): AudioContext | null => {
-    let ctx = audioCtxRef.current
-    if (ctx && ctx.state !== 'closed') {
-      return ctx
-    }
-
-    const Ctor = getAudioContextCtor()
-    if (!Ctor) return null
-
-    ctx = new Ctor({ latencyHint: 'interactive' })
-    audioCtxRef.current = ctx
-    return ctx
-  }, [])
-
   const stop = useCallback(() => {
     playingRef.current = false
     setPlaying(false)
@@ -209,31 +183,46 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     void audioCtxRef.current?.suspend()
   }, [])
 
-  const start = useCallback(async () => {
-    const ctx = acquireAudioContextOnUserGesture()
-    if (!ctx) return
+  const start = useCallback(() => {
+    if (typeof window === 'undefined') return
 
-    if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume()
-      } catch {
-        return
-      }
+    if (!audioCtxRef.current) {
+      const WebkitAudioContext = (
+        window as Window & { webkitAudioContext?: typeof AudioContext }
+      ).webkitAudioContext
+      const Ctor = window.AudioContext ?? WebkitAudioContext
+      if (!Ctor) return
+      audioCtxRef.current = new Ctor()
     }
 
-    tickCounterRef.current = 0
-    setBeatIndex(0)
-    nextBeatTimeRef.current = 0
-    playingRef.current = true
-    setPlaying(true)
-  }, [acquireAudioContextOnUserGesture])
+    const ctx = audioCtxRef.current
+    if (!ctx || ctx.state === 'closed') return
+
+    const resumeAndPlay = async () => {
+      if (ctx.state === 'suspended') {
+        try {
+          await ctx.resume()
+        } catch {
+          return
+        }
+      }
+
+      tickCounterRef.current = 0
+      setBeatIndex(0)
+      nextBeatTimeRef.current = 0
+      playingRef.current = true
+      setPlaying(true)
+    }
+
+    void resumeAndPlay()
+  }, [])
 
   const togglePlay = useCallback(() => {
     if (playingRef.current) {
       stop()
       return
     }
-    void start()
+    start()
   }, [start, stop])
 
   useEffect(() => {
