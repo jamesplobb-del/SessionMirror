@@ -485,7 +485,6 @@ function LivePitchTunerAudio({
       micStreamRef,
       continuousScroll: true,
       tunerInstrument,
-      realtimeMode: true,
     }),
     [micStreamRef, tunerInstrument],
   )
@@ -495,7 +494,6 @@ function LivePitchTunerAudio({
       source: 'media' as const,
       persistWhenPaused: true,
       tunerInstrument,
-      realtimeMode: true,
     }),
     [tunerInstrument],
   )
@@ -525,7 +523,7 @@ function LivePitchTunerAudio({
     liveTrackerEnabled,
     `live-mic-${mediaKey}`,
     liveCanvasRef,
-    'glass',
+    'glass-legacy',
     liveTrackerOptions,
   )
 
@@ -535,7 +533,7 @@ function LivePitchTunerAudio({
     playbackTrackerEnabled,
     `${mediaKey}-playback`,
     playbackCanvasRef,
-    'glass',
+    'glass-legacy',
     playbackTrackerOptions,
   )
 

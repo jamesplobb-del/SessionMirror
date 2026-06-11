@@ -198,4 +198,4 @@ export const NOTE_HYSTERESIS_CENTS = 24
 
 export const INSTRUMENT_RANGE_LABEL = 'Voice · winds · strings'
 
-export type PitchCanvasTheme = 'glass' | 'solid'
+export type PitchCanvasTheme = 'glass' | 'glass-legacy' | 'solid'
