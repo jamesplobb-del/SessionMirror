@@ -1429,7 +1429,10 @@ export default function App() {
                   label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
                   isAudioMode
                   liveMicEnabled={
-                    settings.liveMicTunerEnabled || mainAudioPitchSource.liveMicOnly === true
+                    (settings.liveMicTunerEnabled ||
+                      mainAudioPitchSource.liveMicOnly === true) &&
+                    !handsFreePlaybackPending &&
+                    !autoPlaybackPlaying
                   }
                   micStreamRef={streamRef}
                   layoutRegion="main"
