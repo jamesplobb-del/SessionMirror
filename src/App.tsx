@@ -155,6 +155,8 @@ export default function App() {
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
+  const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
+  autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -214,12 +216,14 @@ export default function App() {
     }
 
     if (delayMs <= 0) {
+      autoRecordStartSuppressedRef.current = false
       setAutoRecordStartSuppressed(false)
       return
     }
 
     autoPlaybackReleaseTimerRef.current = window.setTimeout(() => {
       autoPlaybackReleaseTimerRef.current = null
+      autoRecordStartSuppressedRef.current = false
       setAutoRecordStartSuppressed(false)
     }, delayMs)
   }, [])
@@ -602,8 +606,6 @@ export default function App() {
 
   const autoPlaybackPlayingRef = useRef(autoPlaybackPlaying)
   autoPlaybackPlayingRef.current = autoPlaybackPlaying
-  const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
-  autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
 
   useEffect(() => {
     registerTakePlaybackMicHandlers({
@@ -614,7 +616,6 @@ export default function App() {
       () =>
         pendingAutoPlaybackRef.current ||
         autoPlaybackPlayingRef.current ||
-        autoRecordStartSuppressedRef.current ||
         handsFreePlaybackPending,
     )
   }, [handsFreePlaybackPending, resumeMicAfterPlayback, suspendMicForPlayback])
@@ -649,12 +650,11 @@ export default function App() {
   const autoMonitoringAllowed =
     !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
 
-  const { handsFreeRecording } = useAutoSoundRecording({
+  const { handsFreeRecording, restartHandsFreeMonitor } = useAutoSoundRecording({
     enabled: settings.autoSoundRecording,
     monitoringAllowed: autoMonitoringAllowed,
     suppressStart: autoRecordStartSuppressed,
     monitoringPaused:
-      autoRecordStartSuppressed ||
       handsFreePlaybackPending ||
       autoPlaybackPlaying ||
       benchmarkPipPlaying ||
@@ -703,6 +703,7 @@ export default function App() {
     if (!autoRecordStartSuppressed) return
 
     const failsafe = window.setTimeout(() => {
+      autoRecordStartSuppressedRef.current = false
       setAutoRecordStartSuppressed(false)
     }, 120000)
 
@@ -710,6 +711,44 @@ export default function App() {
       window.clearTimeout(failsafe)
     }
   }, [autoRecordStartSuppressed])
+
+  useEffect(() => {
+    if (!settings.autoSoundRecording || recordingMode !== 'audio') return
+
+    const recoverHandsFreeMonitor = () => {
+      if (document.visibilityState !== 'visible') return
+      void refreshCameraSession().finally(() => {
+        restartHandsFreeMonitor()
+      })
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      let removeListener: (() => void) | undefined
+      void import('@capacitor/app').then(({ App }) => {
+        void App.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) recoverHandsFreeMonitor()
+        }).then((sub) => {
+          removeListener = () => {
+            void sub.remove()
+          }
+        })
+      })
+
+      return () => {
+        removeListener?.()
+      }
+    }
+
+    document.addEventListener('visibilitychange', recoverHandsFreeMonitor)
+    return () => {
+      document.removeEventListener('visibilitychange', recoverHandsFreeMonitor)
+    }
+  }, [
+    recordingMode,
+    refreshCameraSession,
+    restartHandsFreeMonitor,
+    settings.autoSoundRecording,
+  ])
 
   const autoSoundListening =
     settings.autoSoundRecording &&

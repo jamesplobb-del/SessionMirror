@@ -117,6 +117,7 @@ export function useAutoSoundRecording({
   const wasRecordingRef = useRef(isRecording)
   const appliedVolumeThresholdRef = useRef(volumeThreshold)
   const prevSuppressStartRef = useRef(suppressStart)
+  const prevMonitoringPausedRef = useRef(monitoringPaused)
 
   isRecordingRef.current = isRecording
   suppressStartRef.current = suppressStart
@@ -269,6 +270,29 @@ export function useAutoSoundRecording({
 
     wasRecordingRef.current = isRecording
   }, [isRecording, shouldMonitor])
+
+  useEffect(() => {
+    if (!shouldMonitor) return
+    if (isStreamAudioLive(streamRef.current)) return
+
+    onMonitorStalledRef.current?.()
+
+    let cancelled = false
+    const retryTimer = window.setInterval(() => {
+      if (cancelled) return
+      if (isStreamAudioLive(streamRef.current)) {
+        window.clearInterval(retryTimer)
+        bumpMonitorEpoch()
+        return
+      }
+      onMonitorStalledRef.current?.()
+    }, 450)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(retryTimer)
+    }
+  }, [shouldMonitor, streamGeneration, streamRef])
 
   useEffect(() => {
     if (!shouldMonitor) return
@@ -548,9 +572,35 @@ export function useAutoSoundRecording({
   }, [suppressStart, shouldMonitor])
 
   useEffect(() => {
+    const wasPaused = prevMonitoringPausedRef.current
+    prevMonitoringPausedRef.current = monitoringPaused
+
+    if (!shouldMonitor || !wasPaused || monitoringPaused) return
+
+    loudSinceRef.current = null
+    attackSinceRef.current = null
+    silenceSinceRef.current = null
+    quietRmsEmaRef.current = 0
+    effectiveGateRef.current = profileRef.current.gate
+    monitorWarmUntilRef.current = performance.now() + POST_PLAYBACK_WARMUP_MS
+    clearStartLatch()
+    bumpMonitorEpoch()
+    void warmRecorderRef.current()
+  }, [monitoringPaused, shouldMonitor])
+
+  useEffect(() => {
     if (isRecording) return
     setHandsFreeRecording(false)
   }, [isRecording])
 
-  return { teardownMonitor, handsFreeRecording: handsFreeRecording && isRecording }
+  const restartHandsFreeMonitor = () => {
+    bumpMonitorEpoch()
+    void warmRecorderRef.current()
+  }
+
+  return {
+    teardownMonitor,
+    handsFreeRecording: handsFreeRecording && isRecording,
+    restartHandsFreeMonitor,
+  }
 }
