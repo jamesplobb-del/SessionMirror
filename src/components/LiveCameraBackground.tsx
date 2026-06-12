@@ -10,6 +10,8 @@ interface LiveCameraBackgroundProps {
   error: string | null
   recordingMode: RecordingMode
   isRecording: boolean
+  /** Brief overlay while switching between camera and audio capture. */
+  modePreparing?: boolean
   /** Hide the idle audio-mode mic UI while main-screen pitch analysis is showing. */
   pitchStageActive?: boolean
 }
@@ -21,6 +23,7 @@ function LiveCameraBackground({
   error,
   recordingMode,
   isRecording,
+  modePreparing = false,
   pitchStageActive = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
@@ -68,7 +71,7 @@ function LiveCameraBackground({
       )}
 
       {showAudioIdle && (
-        <div className="camera-background-overlay pitch-audio-idle flex flex-col items-center justify-center">
+        <div className="camera-background-overlay camera-background-overlay--audio-idle pitch-audio-idle flex flex-col items-center justify-center">
           <div
             className={`pitch-audio-idle__orb mb-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full ${
               isRecording ? 'pitch-audio-idle__orb--recording' : ''
@@ -107,6 +110,13 @@ function LiveCameraBackground({
           showAudioIdle ? 'opacity-40' : isAudioMode ? 'opacity-0' : 'opacity-100'
         }`}
       />
+
+      {modePreparing && (
+        <div
+          className="camera-background-overlay camera-background-overlay--preparing pointer-events-none"
+          aria-hidden
+        />
+      )}
     </div>
   )
 }
@@ -120,5 +130,6 @@ export default memo(
     prev.error === next.error &&
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
+    prev.modePreparing === next.modePreparing &&
     prev.pitchStageActive === next.pitchStageActive,
 )

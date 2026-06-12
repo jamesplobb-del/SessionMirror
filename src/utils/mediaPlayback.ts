@@ -41,6 +41,7 @@ export function waitForMediaReady(
       settled = true
       media.removeEventListener('loadeddata', onReady)
       media.removeEventListener('canplay', onReady)
+      media.removeEventListener('canplaythrough', onReady)
       window.clearTimeout(timeoutId)
       resolve(ready)
     }
@@ -52,7 +53,33 @@ export function waitForMediaReady(
     const timeoutId = window.setTimeout(() => done(false), timeoutMs)
     media.addEventListener('loadeddata', onReady)
     media.addEventListener('canplay', onReady)
+    media.addEventListener('canplaythrough', onReady)
   })
+}
+
+/** Poll until freshly saved native takes are readable by the media element. */
+export async function waitForMediaReadyWithRetry(
+  media: HTMLMediaElement,
+  options: { attempts?: number; intervalMs?: number; timeoutMs?: number } = {},
+): Promise<boolean> {
+  const { attempts = 10, intervalMs = 220, timeoutMs = 900 } = options
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (await waitForMediaReady(media, timeoutMs)) {
+      return true
+    }
+
+    if (attempt + 1 >= attempts) break
+
+    await new Promise((resolve) => window.setTimeout(resolve, intervalMs))
+    try {
+      media.load()
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return false
 }
 
 /**

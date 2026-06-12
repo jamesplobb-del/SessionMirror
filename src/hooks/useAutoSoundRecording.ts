@@ -103,6 +103,7 @@ export function useAutoSoundRecording({
   const effectiveGateRef = useRef(0)
   const lastTickAtRef = useRef(0)
   const [monitorEpoch, setMonitorEpoch] = useState(0)
+  const [handsFreeRecording, setHandsFreeRecording] = useState(false)
   const suppressStartRef = useRef(suppressStart)
   const isRecordingRef = useRef(isRecording)
   const startRecordingRef = useRef(startRecording)
@@ -183,6 +184,7 @@ export function useAutoSoundRecording({
     }
 
     autoTriggeredRef.current = true
+    setHandsFreeRecording(true)
     loudSinceRef.current = null
     attackSinceRef.current = null
     armStartLatch()
@@ -236,6 +238,7 @@ export function useAutoSoundRecording({
     quietRmsEmaRef.current = 0
     effectiveGateRef.current = profileRef.current.gate
     lastTickAtRef.current = 0
+    setHandsFreeRecording(false)
     void disarmRecorderRef.current()
   }
 
@@ -544,5 +547,10 @@ export function useAutoSoundRecording({
     void warmRecorderRef.current()
   }, [suppressStart, shouldMonitor])
 
-  return { teardownMonitor }
+  useEffect(() => {
+    if (isRecording) return
+    setHandsFreeRecording(false)
+  }, [isRecording])
+
+  return { teardownMonitor, handsFreeRecording: handsFreeRecording && isRecording }
 }

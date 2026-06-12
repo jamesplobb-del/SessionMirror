@@ -810,6 +810,7 @@ video.camera-preview {
   object-position: center center !important;
   z-index: 0 !important;
   pointer-events: none !important;
+  transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 video.camera-preview.camera-preview--live {
@@ -824,6 +825,40 @@ video.camera-preview.camera-preview--mirror {
 video.camera-preview.camera-preview--hidden {
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+.camera-background-overlay--audio-idle {
+  transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.camera-background-overlay--preparing {
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.28);
+  animation: camera-mode-preparing 0.38s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes camera-mode-preparing {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.auto-sound-hint {
+  animation: auto-sound-hint-in 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes auto-sound-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .camera-background-overlay {
@@ -1007,6 +1042,7 @@ video.camera-preview.camera-preview--hidden {
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1);
   background:
     radial-gradient(ellipse 90% 55% at 50% 18%, rgba(99, 102, 241, 0.22) 0%, transparent 62%),
     radial-gradient(ellipse 70% 45% at 82% 72%, rgba(56, 189, 248, 0.14) 0%, transparent 58%),
@@ -1028,6 +1064,7 @@ video.camera-preview.camera-preview--hidden {
 }
 
 .pitch-audio-idle {
+  transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1);
   background:
     radial-gradient(ellipse 80% 50% at 50% 30%, rgba(56, 189, 248, 0.12) 0%, transparent 60%),
     linear-gradient(180deg, #14161e 0%, #101218 100%);

@@ -18,7 +18,6 @@ import {
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream } from '../utils/audioCapture'
 import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
-import { agentDebugLog } from '../utils/agentDebugLog'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
   applyViewportCssVars,
@@ -70,6 +69,28 @@ function isStreamCompatibleForMode(stream: MediaStream | null, mode: RecordingMo
   if (mode !== 'audio') return true
 
   return !stream!
+    .getVideoTracks()
+    .some((track) => track.readyState === 'live' && track.enabled)
+}
+
+/** Drop camera video tracks but keep the live mic when switching video → audio. */
+function releaseVideoTracksOnly(stream: MediaStream | null) {
+  stream?.getVideoTracks().forEach((track) => {
+    try {
+      track.stop()
+    } catch {
+      /* ignore */
+    }
+  })
+}
+
+function canSoftHandoffToAudio(stream: MediaStream | null): boolean {
+  if (!stream) return false
+  const audioLive = stream
+    .getAudioTracks()
+    .some((track) => track.readyState === 'live' && track.enabled)
+  if (!audioLive) return false
+  return stream
     .getVideoTracks()
     .some((track) => track.readyState === 'live' && track.enabled)
 }
@@ -295,7 +316,19 @@ export function useCameraSession({
         return
       }
 
-      if (streamRef.current && isStreamRecordable(streamRef.current, mode)) {
+      const leavingAudioForVideo =
+        previousRecordingModeRef.current === 'audio' && mode === 'video'
+      const enteringAudioFromVideo =
+        previousRecordingModeRef.current === 'video' && mode === 'audio'
+
+      if (enteringAudioFromVideo && canSoftHandoffToAudio(streamRef.current)) {
+        releaseVideoTracksOnly(streamRef.current)
+        detachPreviewStream(previewRef.current)
+        previousRecordingModeRef.current = mode
+        setStreamGeneration((generation) => generation + 1)
+        setReady(true)
+        activeStream = streamRef.current
+        return
       }
 
       await new Promise<void>((resolve) => {
@@ -306,10 +339,6 @@ export function useCameraSession({
       if (streamRef.current) {
         forceClearCameraState()
       }
-      const leavingAudioForVideo =
-        previousRecordingModeRef.current === 'audio' && mode === 'video'
-      const enteringAudioFromVideo =
-        previousRecordingModeRef.current === 'video' && mode === 'audio'
 
       if (leavingAudioForVideo && Capacitor.isNativePlatform()) {
         await new Promise((resolve) =>
@@ -549,20 +578,6 @@ export function useCameraSession({
       warmAutoAudioInFlightRef.current ||
       isAutoPlaybackHoldingMicWarmup()
     ) {
-      // #region agent log
-      agentDebugLog(
-        'useCameraSession.ts:warmAutoAudioRecorder',
-        'warm skipped',
-        {
-          mode: recordingModeRef.current,
-          isRecording: isRecordingRef.current,
-          armed: Boolean(armedAutoAudioRef.current),
-          inFlight: warmAutoAudioInFlightRef.current,
-          playbackHold: isAutoPlaybackHoldingMicWarmup(),
-        },
-        'H-B',
-      )
-      // #endregion
       return
     }
 
@@ -606,14 +621,6 @@ export function useCameraSession({
   scheduleWarmAutoAudioRef.current = () => {
     if (recordingModeRef.current !== 'audio') return
     if (isAutoPlaybackHoldingMicWarmup()) {
-      // #region agent log
-      agentDebugLog(
-        'useCameraSession.ts:scheduleWarmAutoAudio',
-        'deferred warm — auto-playback hold',
-        {},
-        'H-B',
-      )
-      // #endregion
       return
     }
     window.setTimeout(() => {
@@ -705,6 +712,8 @@ export function useCameraSession({
         } else {
           armed.recorder.start()
         }
+        isRecordingRef.current = true
+        recordStreamRef.current = streamRef.current
         setIsRecording(true)
         setElapsed(0)
         elapsedRef.current = 0
@@ -757,8 +766,13 @@ export function useCameraSession({
       cancelScheduledRelease()
       setError(null)
 
+      const softAudioHandoff =
+        mode === 'audio' && canSoftHandoffToAudio(streamRef.current)
+
       startTransition(() => {
-        setReady(false)
+        if (!softAudioHandoff) {
+          setReady(false)
+        }
         setStreamGeneration((generation) => generation + 1)
         setRecordingMode(mode)
       })

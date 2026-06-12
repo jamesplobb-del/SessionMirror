@@ -28,11 +28,10 @@ import {
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
 } from './utils/takePlaybackAudio'
-import { agentDebugLog } from './utils/agentDebugLog'
 import {
   prepareInlineMediaElement,
   safePlayMedia,
-  waitForMediaReady,
+  waitForMediaReadyWithRetry,
 } from './utils/mediaPlayback'
 import {
   generateThumbnailFromBlob,
@@ -49,6 +48,8 @@ import {
   NATIVE_AUDIO_MIME,
   NATIVE_VIDEO_MIME,
   persistUploadedVideo,
+  isConvertedPlaybackUrl,
+  readCachedPlaybackSrc,
   resolveTakePlaybackUrl,
   type RecordingCompletePayload,
 } from './utils/takeStorage'
@@ -79,6 +80,19 @@ import {
 } from './db'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
+const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
+
+function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
+  if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
+    return readCachedPlaybackSrc(filePath, videoUrl) ?? videoUrl
+  }
+
+  if (!filePath && videoUrl) {
+    return videoUrl
+  }
+
+  return readCachedPlaybackSrc(filePath, videoUrl)
+}
 
 /** Stable pitch source — same object reference when signature unchanged. */
 interface MainAudioPitchSource {
@@ -140,6 +154,7 @@ export default function App() {
   const playAutoTakeAudioRef = useRef<(playbackUrl: string, takeId: string) => void>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
+  const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -222,13 +237,18 @@ export default function App() {
     setAutoPlaybackPlaying(false)
   }, [])
 
-  const stopAutoPlaybackAudio = useCallback(() => {
+  const teardownActiveAutoPlayback = useCallback(() => {
     autoPlaybackGenerationRef.current += 1
     queuedAutoPlayRef.current = null
-    pendingAutoPlaybackRef.current = false
     teardownAutoPlaybackMedia()
     setAutoPlaybackTakeId(null)
   }, [teardownAutoPlaybackMedia])
+
+  const stopAutoPlaybackAudio = useCallback(() => {
+    pendingAutoPlaybackRef.current = false
+    setHandsFreePlaybackPending(false)
+    teardownActiveAutoPlayback()
+  }, [teardownActiveAutoPlayback])
 
   const finishAutoPlayback = useCallback(() => {
     void releaseTakePlaybackAudio().finally(() => {
@@ -241,6 +261,14 @@ export default function App() {
     (playbackUrl: string, takeId: string) => {
       if (recordingModeRef.current !== 'audio') {
         pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        return
+      }
+
+      if (!playbackUrl) {
+        pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        finishAutoPlayback()
         return
       }
 
@@ -251,7 +279,11 @@ export default function App() {
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
 
       const audio = autoPlaybackAudioRef.current
-      if (!audio) return
+      if (!audio) {
+        pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        return
+      }
 
       prepareInlineMediaElement(audio)
       audio.preload = 'auto'
@@ -260,39 +292,25 @@ export default function App() {
 
       setAutoPlaybackTakeId(takeId)
       setAutoRecordStartSuppressed(true)
+      setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
 
-      // #region agent log
-      agentDebugLog(
-        'App.tsx:playAutoTakeAudio',
-        'auto-playback queued',
-        {
-          takeId,
-          srcKind: playbackUrl.startsWith('blob:')
-            ? 'blob'
-            : playbackUrl.includes('capacitor')
-              ? 'capacitor'
-              : 'other',
-        },
-        'H-A',
-      )
-      // #endregion
-
       void (async () => {
-        // Release mic before the post-record warm timer can re-acquire it (H-B).
         await primeTakePlaybackAudio(audio)
 
-        const ready = await waitForMediaReady(audio)
+        if (Capacitor.isNativePlatform()) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS),
+          )
+        }
+
+        const ready = await waitForMediaReadyWithRetry(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
         if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
-          // #region agent log
-          agentDebugLog(
-            'App.tsx:playAutoTakeAudio',
-            'media not ready',
-            { takeId, ready, readyState: audio.readyState },
-            'H-C',
-          )
-          // #endregion
+          console.warn('Auto playback media not ready', {
+            takeId,
+            readyState: audio.readyState,
+          })
           finishAutoPlayback()
           return
         }
@@ -303,48 +321,19 @@ export default function App() {
         const started = await safePlayMedia(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
 
-        // #region agent log
-        agentDebugLog(
-          'App.tsx:playAutoTakeAudio',
-          started ? 'auto-playback started' : 'auto-playback blocked',
-          {
-            takeId,
-            paused: audio.paused,
-            muted: audio.muted,
-            volume: audio.volume,
-            currentTime: audio.currentTime,
-          },
-          started ? 'H-D' : 'H-E',
-        )
-        // #endregion
-
         if (started) {
+          setHandsFreePlaybackPending(false)
           setAutoPlaybackPlaying(true)
           return
         }
 
-        console.warn('Auto playback blocked — retrying once after canplay')
-        const retryReady = await waitForMediaReady(audio, 1200)
-        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
-        if (!retryReady) {
-          finishAutoPlayback()
-          return
-        }
-
+        console.warn('Auto playback blocked — retrying after mic release')
         await primeTakePlaybackAudio(audio)
         const retryStarted = await safePlayMedia(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
 
-        // #region agent log
-        agentDebugLog(
-          'App.tsx:playAutoTakeAudio',
-          retryStarted ? 'auto-playback retry ok' : 'auto-playback retry failed',
-          { takeId },
-          'H-E',
-        )
-        // #endregion
-
         if (retryStarted) {
+          setHandsFreePlaybackPending(false)
           setAutoPlaybackPlaying(true)
         } else {
           finishAutoPlayback()
@@ -448,11 +437,16 @@ export default function App() {
       recordingOrientation,
     } = payload
 
+    const shouldAutoPlay =
+      mediaType === 'audio' &&
+      pendingAutoPlaybackRef.current &&
+      recordingModeRef.current === 'audio'
+
     void (async () => {
+
+      const immediateUrl = resolveTakePlaybackUrlFast(filePath, videoUrl)
       const safeVideoUrl =
-        videoUrl && (videoUrl.startsWith('blob:') || filePath === '')
-          ? videoUrl
-          : await resolveTakePlaybackUrl(filePath, videoUrl)
+        immediateUrl ?? (await resolveTakePlaybackUrl(filePath, videoUrl))
       const projectId = activeProjectIdRef.current
 
       setTakes((prev) => {
@@ -467,21 +461,13 @@ export default function App() {
         return [...prev, savedTake]
       })
 
-      if (
-        mediaType === 'audio' &&
-        pendingAutoPlaybackRef.current &&
-        recordingModeRef.current === 'audio'
-      ) {
+      if (shouldAutoPlay && safeVideoUrl) {
         pendingAutoPlaybackRef.current = false
-        // #region agent log
-        agentDebugLog(
-          'App.tsx:handleSaveTake',
-          'triggering auto-playback',
-          { takeId, srcKind: safeVideoUrl.slice(0, 20) },
-          'H-A',
-        )
-        // #endregion
         playAutoTakeAudioRef.current(safeVideoUrl, takeId)
+      } else if (shouldAutoPlay) {
+        pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        releaseAutoRecordSuppress(0)
       }
 
       if (mediaType === 'audio') {
@@ -628,9 +614,10 @@ export default function App() {
       () =>
         pendingAutoPlaybackRef.current ||
         autoPlaybackPlayingRef.current ||
-        autoRecordStartSuppressedRef.current,
+        autoRecordStartSuppressedRef.current ||
+        handsFreePlaybackPending,
     )
-  }, [resumeMicAfterPlayback, suspendMicForPlayback])
+  }, [handsFreePlaybackPending, resumeMicAfterPlayback, suspendMicForPlayback])
 
   useEffect(() => {
     if (recordingMode === 'audio') return
@@ -662,12 +649,13 @@ export default function App() {
   const autoMonitoringAllowed =
     !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
 
-  useAutoSoundRecording({
+  const { handsFreeRecording } = useAutoSoundRecording({
     enabled: settings.autoSoundRecording,
     monitoringAllowed: autoMonitoringAllowed,
     suppressStart: autoRecordStartSuppressed,
     monitoringPaused:
       autoRecordStartSuppressed ||
+      handsFreePlaybackPending ||
       autoPlaybackPlaying ||
       benchmarkPipPlaying ||
       challengerPipPlaying,
@@ -688,6 +676,8 @@ export default function App() {
     },
     onAutoRecordingFinished: () => {
       pendingAutoPlaybackRef.current = true
+      autoRecordStartSuppressedRef.current = true
+      setHandsFreePlaybackPending(true)
       setAutoRecordStartSuppressed(true)
     },
     onMonitorStalled: () => {
@@ -697,8 +687,8 @@ export default function App() {
 
   useEffect(() => {
     if (!isRecording) return
-    stopAutoPlaybackAudio()
-  }, [isRecording, stopAutoPlaybackAudio])
+    teardownActiveAutoPlayback()
+  }, [isRecording, teardownActiveAutoPlayback])
 
   useEffect(() => {
     return () => {
@@ -726,7 +716,8 @@ export default function App() {
     recordingMode === 'audio' &&
     autoMonitoringAllowed &&
     !isRecording &&
-    !autoRecordStartSuppressed
+    !autoRecordStartSuppressed &&
+    !handsFreePlaybackPending
 
   const wasVaultOpenRef = useRef(false)
   const vaultEnterLoadDoneRef = useRef(false)
@@ -1375,6 +1366,7 @@ export default function App() {
         error={cameraError}
         recordingMode={recordingMode}
         isRecording={isRecording}
+        modePreparing={!ready && !isRecording}
         pitchStageActive={
           showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
         }
@@ -1525,6 +1517,8 @@ export default function App() {
             onOpenSettings={handleOpenSettings}
             takeCount={takes.length}
             autoSoundListening={autoSoundListening}
+            handsFreeRecording={handsFreeRecording}
+            handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
             autoSoundRecording={settings.autoSoundRecording}
             onAutoSoundRecordingChange={(enabled) =>
               updateSettings({ autoSoundRecording: enabled })

@@ -18,6 +18,8 @@ interface ControlDeckProps {
   onOpenSettings: () => void
   takeCount: number
   autoSoundListening?: boolean
+  handsFreeRecording?: boolean
+  handsFreePlaybackPending?: boolean
   autoSoundRecording?: boolean
   onAutoSoundRecordingChange?: (enabled: boolean) => void
   recordDropRef?: RefObject<HTMLDivElement | null>
@@ -50,6 +52,8 @@ export default function ControlDeck({
   onOpenSettings,
   takeCount,
   autoSoundListening = false,
+  handsFreeRecording = false,
+  handsFreePlaybackPending = false,
   autoSoundRecording = false,
   onAutoSoundRecordingChange,
   recordDropRef,
@@ -223,12 +227,24 @@ export default function ControlDeck({
           </div>
 
           {autoSoundListening && !isRecording && !showDeleteDrop && (
-            <span className="text-[10px] font-medium tracking-wide text-sky-300/90">
-              Listening…
-            </span>
+            <p className="auto-sound-hint auto-sound-hint--listening max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-sky-200/95">
+              Listening for your playing — a take starts automatically when you begin
+            </p>
           )}
 
-          {isRecording && (
+          {handsFreeRecording && isRecording && !showDeleteDrop && (
+            <p className="auto-sound-hint auto-sound-hint--recording max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/88">
+              Recording hands-free — playback starts when you stop playing
+            </p>
+          )}
+
+          {handsFreePlaybackPending && !isRecording && !showDeleteDrop && (
+            <p className="auto-sound-hint auto-sound-hint--playback max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-emerald-200/90">
+              Playing your take back…
+            </p>
+          )}
+
+          {isRecording && !handsFreeRecording && (
             <span
               className="text-xs font-medium tabular-nums tracking-wide text-white/90"
               aria-live="polite"
