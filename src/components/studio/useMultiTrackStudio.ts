@@ -1,77 +1,27 @@
-/**
- * useMultiTrackStudio
- *
- * Recording engine for Studio Sandbox:
- *   - Hardware init (getUserMedia)
- *   - Web Audio count-in (oscillator clicks at 120 BPM)
- *   - Synchronized MediaRecorder launch at downbeat
- *   - Anti-drift requestAnimationFrame playback loop
- *   - Per-track volume / mute wired to playback <video> elements
- *   - Mirrored thumbnail generation after each take
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { generateThumbnailFromBlob } from '../../utils/generateThumbnail'
-import { playMediaOnUserGesture } from '../../utils/mediaPlayback'
-import {
-  primeTakePlaybackAudio,
-  releaseTakePlaybackAudio,
-} from '../../utils/takePlaybackAudio'
 
-// ─── Public types ─────────────────────────────────────────────────────────────
+export type TrackStatus = 'IDLE' | 'RECORDING' | 'PLAYING'
 
 export interface StudioTrack {
-  id: string
-  label: string
-  color: string
+  id: 1 | 2 | 3 | 4
   stream: MediaStream | null
-  recordedBlobUrl: string | null
-  thumbnailUrl: string | null
-  isRecording: boolean
-  isMuted: boolean
-  volume: number
+  recordedUrl: string | null
+  status: TrackStatus
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const BPM = 120
-const BEAT_MS = (60 / BPM) * 1000
-
-const TRACK_DEFS = [
-  { id: 'track-1', label: 'Track 1', color: '#38bdf8' },
-  { id: 'track-2', label: 'Track 2', color: '#c084fc' },
-  { id: 'track-3', label: 'Track 3', color: '#34d399' },
-  { id: 'track-4', label: 'Track 4', color: '#fb923c' },
-] as const
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const TRACK_IDS = [1, 2, 3, 4] as const
 
 function makeInitialTracks(): StudioTrack[] {
-  return TRACK_DEFS.map((def) => ({
-    ...def,
+  return TRACK_IDS.map((id) => ({
+    id,
     stream: null,
-    recordedBlobUrl: null,
-    thumbnailUrl: null,
-    isRecording: false,
-    isMuted: false,
-    volume: 0.8,
+    recordedUrl: null,
+    status: 'IDLE' as TrackStatus,
   }))
 }
 
-function playClick(ctx: AudioContext, hz: number): void {
-  try {
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.frequency.value = hz
-    gain.gain.setValueAtTime(0.55, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.055)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.06)
-  } catch {
-    // Context may already be closed
-  }
+function trackIndex(id: 1 | 2 | 3 | 4): number {
+  return id - 1
 }
 
 function getBestMimeType(): string {
@@ -84,321 +34,144 @@ function getBestMimeType(): string {
   return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
 }
 
-function applyTrackVolume(el: HTMLMediaElement, track: StudioTrack): void {
-  el.volume = track.isMuted ? 0 : track.volume
-}
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useMultiTrackStudio() {
   const [tracks, setTracks] = useState<StudioTrack[]>(makeInitialTracks)
-  const [isCountingIn, setIsCountingIn] = useState(false)
-  const [currentCount, setCurrentCount] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const tracksRef = useRef<StudioTrack[]>(tracks)
+  const tracksRef = useRef(tracks)
   tracksRef.current = tracks
 
-  /** Playback refs — wired to TakeVideoPlayer instances in the UI. */
-  const playbackVideoRefs = useRef<(HTMLMediaElement | null)[]>([
-    null,
-    null,
-    null,
-    null,
-  ])
+  /** videoRefs[0] = track 1, videoRefs[3] = track 4 */
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null])
 
-  const audioCtxRef = useRef<AudioContext | null>(null)
-  const liveStreamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const recordingTrackIdRef = useRef<string | null>(null)
-  const countIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const driftRafRef = useRef<number>(0)
+  const recordingIdRef = useRef<1 | 2 | 3 | 4 | null>(null)
+  const liveStreamRef = useRef<MediaStream | null>(null)
 
-  function getAudioCtx(): AudioContext {
-    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-      audioCtxRef.current = new AudioContext()
-    }
-    if (audioCtxRef.current.state === 'suspended') {
-      void audioCtxRef.current.resume()
-    }
-    return audioCtxRef.current
-  }
+  const setVideoRef = useCallback((index: number, el: HTMLVideoElement | null) => {
+    videoRefs.current[index] = el
+  }, [])
 
-  // Keep playback element volume in sync with track state
-  useEffect(() => {
-    tracks.forEach((track, i) => {
-      const el = playbackVideoRefs.current[i]
-      if (!el || !track.recordedBlobUrl) return
-      applyTrackVolume(el, track)
+  const pauseTrack = useCallback((id: 1 | 2 | 3 | 4) => {
+    videoRefs.current[trackIndex(id)]?.pause()
+    setTracks((prev) =>
+      prev.map((t) => (t.id === id && t.status === 'PLAYING' ? { ...t, status: 'IDLE' } : t)),
+    )
+  }, [])
+
+  const pauseAllExcept = useCallback((keepId: 1 | 2 | 3 | 4 | null) => {
+    TRACK_IDS.forEach((id) => {
+      if (id !== keepId) pauseTrack(id)
     })
-  }, [tracks])
+  }, [pauseTrack])
 
-  const initHardware = useCallback(async (trackId: string) => {
-    setError(null)
+  const startRecording = useCallback(async (id: 1 | 2 | 3 | 4) => {
+    pauseAllExcept(null)
+
+    liveStreamRef.current?.getTracks().forEach((t) => t.stop())
+    liveStreamRef.current = null
+
     try {
-      liveStreamRef.current?.getTracks().forEach((t) => t.stop())
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
         audio: true,
       })
+
       liveStreamRef.current = stream
+      chunksRef.current = []
+      recordingIdRef.current = id
+
+      const mimeType = getBestMimeType()
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = () => {
+        const trackId = recordingIdRef.current
+        if (!trackId) return
+
+        stream.getTracks().forEach((t) => t.stop())
+        liveStreamRef.current = null
+
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' })
+        const url = URL.createObjectURL(blob)
+        chunksRef.current = []
+        recordingIdRef.current = null
+        recorderRef.current = null
+
+        setTracks((prev) => {
+          const old = prev.find((t) => t.id === trackId)?.recordedUrl
+          if (old) URL.revokeObjectURL(old)
+          return prev.map((t) =>
+            t.id === trackId
+              ? { ...t, stream: null, recordedUrl: url, status: 'IDLE' as TrackStatus }
+              : t,
+          )
+        })
+      }
+
+      recorder.start()
+      recorderRef.current = recorder
+
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id === id
+            ? { ...t, stream, status: 'RECORDING' as TrackStatus }
+            : { ...t, stream: null, status: t.status === 'PLAYING' ? ('IDLE' as TrackStatus) : t.status },
+        ),
+      )
+    } catch (err) {
+      console.error('startRecording failed', err)
+      setTracks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, stream: null, status: 'IDLE' as TrackStatus } : t)),
+      )
+    }
+  }, [pauseAllExcept])
+
+  const stopRecording = useCallback((id: 1 | 2 | 3 | 4) => {
+    if (recordingIdRef.current !== id) return
+    const recorder = recorderRef.current
+    if (recorder?.state === 'recording') recorder.stop()
+  }, [])
+
+  const playTrack = useCallback(
+    (id: 1 | 2 | 3 | 4) => {
+      const track = tracksRef.current.find((t) => t.id === id)
+      if (!track?.recordedUrl) return
+
+      pauseAllExcept(id)
 
       setTracks((prev) =>
         prev.map((t) => {
-          if (t.id === trackId) return { ...t, stream }
-          if (t.stream && t.stream !== stream) return { ...t, stream: null }
+          if (t.id === id) return { ...t, status: 'PLAYING' as TrackStatus }
+          if (t.status === 'PLAYING') return { ...t, status: 'IDLE' as TrackStatus }
           return t
         }),
       )
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Camera / mic access denied'
-      setError(msg)
-    }
-  }, [])
-
-  const startRecording = useCallback((trackId: string) => {
-    if (!liveStreamRef.current) {
-      setError('Tap the camera button first to arm this track')
-      return
-    }
-
-    if (countIntervalRef.current) clearInterval(countIntervalRef.current)
-
-    recordingTrackIdRef.current = trackId
-    const ctx = getAudioCtx()
-
-    setIsCountingIn(true)
-    setCurrentCount(4)
-    playClick(ctx, 1_000)
-
-    let pending = 3
-
-    countIntervalRef.current = setInterval(() => {
-      if (pending > 0) {
-        setCurrentCount(pending)
-        playClick(ctx, pending === 1 ? 1_500 : 1_000)
-        pending--
-      } else {
-        clearInterval(countIntervalRef.current!)
-        countIntervalRef.current = null
-        setIsCountingIn(false)
-        setCurrentCount(0)
-        _doLaunchRecording()
-      }
-    }, BEAT_MS)
-  }, [])
-
-  function _doLaunchRecording(): void {
-    const trackId = recordingTrackIdRef.current
-    const liveStream = liveStreamRef.current
-    if (!trackId || !liveStream) return
-
-    setTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, isRecording: true } : t)),
-    )
-
-    chunksRef.current = []
-    let recorder: MediaRecorder
-    try {
-      const mimeType = getBestMimeType()
-      recorder = mimeType
-        ? new MediaRecorder(liveStream, { mimeType })
-        : new MediaRecorder(liveStream)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'MediaRecorder unavailable')
-      return
-    }
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data)
-    }
-
-    recorder.onstop = () => {
-      void (async () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType })
-        const url = URL.createObjectURL(blob)
-        let thumbnailUrl: string | null = null
-        try {
-          thumbnailUrl = await generateThumbnailFromBlob(blob, true)
-        } catch {
-          // Thumbnail is optional — playback still works
-        }
-
-        setTracks((prev) =>
-          prev.map((t) =>
-            t.id === trackId
-              ? {
-                  ...t,
-                  isRecording: false,
-                  recordedBlobUrl: url,
-                  thumbnailUrl,
-                  stream: null,
-                }
-              : t,
-          ),
-        )
-      })()
-    }
-
-    recorder.start()
-    recorderRef.current = recorder
-
-    const current = tracksRef.current
-    playbackVideoRefs.current.forEach((el, i) => {
-      if (!el) return
-      const t = current[i]
-      if (!t || t.id === trackId || !t.recordedBlobUrl) return
-      el.currentTime = 0
-      void playMediaOnUserGesture(el, () => primeTakePlaybackAudio(el))
-    })
-  }
-
-  const stopRecording = useCallback(() => {
-    if (countIntervalRef.current) {
-      clearInterval(countIntervalRef.current)
-      countIntervalRef.current = null
-    }
-    setIsCountingIn(false)
-    setCurrentCount(0)
-    if (recorderRef.current?.state === 'recording') {
-      recorderRef.current.stop()
-    }
-    playbackVideoRefs.current.forEach((el) => el?.pause())
-    void releaseTakePlaybackAudio()
-  }, [])
-
-  const playAll = useCallback(() => {
-    const current = tracksRef.current
-    setIsPlaying(true)
-
-    playbackVideoRefs.current.forEach((el, i) => {
-      if (!el || !current[i]?.recordedBlobUrl) return
-      el.currentTime = 0
-      void playMediaOnUserGesture(el, () => primeTakePlaybackAudio(el))
-    })
-
-    _startDriftLoop()
-  }, [])
-
-  const stopAll = useCallback(() => {
-    setIsPlaying(false)
-    cancelAnimationFrame(driftRafRef.current)
-    playbackVideoRefs.current.forEach((el) => el?.pause())
-    void releaseTakePlaybackAudio()
-  }, [])
-
-  function _startDriftLoop(): void {
-    cancelAnimationFrame(driftRafRef.current)
-
-    const tick = () => {
-      const current = tracksRef.current
-
-      let masterEl: HTMLMediaElement | null = null
-      let masterDuration = 0
-      const refs = playbackVideoRefs.current
-      for (let i = 0; i < refs.length; i++) {
-        const el = refs[i]
-        if (!el || !current[i]?.recordedBlobUrl) continue
-        const d = el.duration || 0
-        if (d > masterDuration) {
-          masterDuration = d
-          masterEl = el
-        }
-      }
-
-      if (masterEl !== null) {
-        const masterTime = masterEl.currentTime
-        for (let i = 0; i < refs.length; i++) {
-          const el = refs[i]
-          if (!el || el === masterEl || !current[i]?.recordedBlobUrl) continue
-          if (Math.abs(el.currentTime - masterTime) > 0.08) {
-            el.currentTime = masterTime
-          }
-        }
-      }
-
-      driftRafRef.current = requestAnimationFrame(tick)
-    }
-
-    driftRafRef.current = requestAnimationFrame(tick)
-  }
-
-  const setTrackVolume = useCallback((trackId: string, volume: number) => {
-    setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, volume } : t)))
-    const idx = tracksRef.current.findIndex((t) => t.id === trackId)
-    const el = playbackVideoRefs.current[idx]
-    const track = tracksRef.current[idx]
-    if (el && track?.recordedBlobUrl) {
-      el.volume = track.isMuted ? 0 : volume
-    }
-  }, [])
-
-  const setTrackMuted = useCallback((trackId: string, muted: boolean) => {
-    setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, isMuted: muted } : t)))
-    const idx = tracksRef.current.findIndex((t) => t.id === trackId)
-    const el = playbackVideoRefs.current[idx]
-    const track = tracksRef.current[idx]
-    if (el && track?.recordedBlobUrl) {
-      el.volume = muted ? 0 : track.volume
-    }
-  }, [])
-
-  const clearTrack = useCallback((trackId: string) => {
-    const idx = tracksRef.current.findIndex((t) => t.id === trackId)
-    const el = playbackVideoRefs.current[idx]
-    if (el) {
-      el.pause()
-    }
-
-    const old = tracksRef.current[idx]
-    if (old?.recordedBlobUrl) URL.revokeObjectURL(old.recordedBlobUrl)
-
-    setTracks((prev) =>
-      prev.map((t) =>
-        t.id === trackId
-          ? {
-              ...t,
-              recordedBlobUrl: null,
-              thumbnailUrl: null,
-              isRecording: false,
-              stream: liveStreamRef.current ?? null,
-            }
-          : t,
-      ),
-    )
-  }, [])
+    },
+    [pauseAllExcept],
+  )
 
   useEffect(() => {
     return () => {
-      if (countIntervalRef.current) clearInterval(countIntervalRef.current)
-      cancelAnimationFrame(driftRafRef.current)
       liveStreamRef.current?.getTracks().forEach((t) => t.stop())
-      audioCtxRef.current?.close().catch(() => {})
+      recorderRef.current?.stop()
       tracksRef.current.forEach((t) => {
-        if (t.recordedBlobUrl) URL.revokeObjectURL(t.recordedBlobUrl)
+        if (t.recordedUrl) URL.revokeObjectURL(t.recordedUrl)
       })
-      void releaseTakePlaybackAudio()
     }
   }, [])
 
   return {
     tracks,
-    isCountingIn,
-    currentCount,
-    isPlaying,
-    error,
-    playbackVideoRefs,
-    initHardware,
+    videoRefs,
+    setVideoRef,
     startRecording,
     stopRecording,
-    playAll,
-    stopAll,
-    setTrackVolume,
-    setTrackMuted,
-    clearTrack,
-    setError,
+    playTrack,
+    pauseTrack,
   }
 }
