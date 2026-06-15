@@ -456,7 +456,7 @@ function AudioDrawer({
     return () => cancelAnimationFrame(rafRef.current)
   }, [tracks, playbackVideoRefs])
 
-  const handleSeek = (trackId: string, idx: number, value: number) => {
+  const handleSeek = (idx: number, value: number) => {
     const el = playbackVideoRefs.current[idx]
     if (el) el.currentTime = value
   }
@@ -574,7 +574,7 @@ function AudioDrawer({
                         max={scrubMax || 1}
                         step={0.01}
                         value={scrubVal}
-                        onChange={(e) => handleSeek(track.id, idx, Number(e.target.value))}
+                        onChange={(e) => handleSeek(idx, Number(e.target.value))}
                         aria-label={`${track.label} seek`}
                         className="studio-scrubber w-full"
                       />
