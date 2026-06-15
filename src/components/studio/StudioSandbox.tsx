@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Square, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
+import { ArrowLeft, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { mobileVideoProps } from '../../utils/mobileVideo'
 import { useMultiTrackStudio, type StudioTrack } from './useMultiTrackStudio'
@@ -13,32 +13,33 @@ const CIRCLE_BTN =
 
 function TrackBox({
   track,
-  setVideoRef,
+  slotIndex,
+  videoRefs,
+  countdownValue,
+  isCountingDownHere,
   onAction,
   onClear,
+  onToggleMute,
   onEnded,
 }: {
   track: StudioTrack
-  setVideoRef: (index: number, el: HTMLVideoElement | null) => void
+  slotIndex: number
+  videoRefs: MutableRefObject<(HTMLVideoElement | null)[]>
+  countdownValue: number
+  isCountingDownHere: boolean
   onAction: () => void
   onClear: () => void
+  onToggleMute: () => void
   onEnded: () => void
 }) {
-  const index = track.id - 1
   const videoElRef = useRef<HTMLVideoElement | null>(null)
-
-  const bindRef = useCallback(
-    (el: HTMLVideoElement | null) => {
-      videoElRef.current = el
-      setVideoRef(index, el)
-    },
-    [index, setVideoRef],
-  )
 
   // Single source of truth for srcObject / src on this box's <video>
   useEffect(() => {
     const el = videoElRef.current
     if (!el) return
+
+    el.muted = track.status === 'RECORDING' || track.isMuted
 
     if (track.status === 'RECORDING' && track.stream) {
       if (el.srcObject !== track.stream) {
@@ -67,7 +68,7 @@ function TrackBox({
     if (el.srcObject) el.srcObject = null
     el.removeAttribute('src')
     el.load()
-  }, [track.stream, track.recordedUrl, track.status])
+  }, [track.stream, track.recordedUrl, track.status, track.isMuted])
 
   useEffect(() => {
     const el = videoElRef.current
@@ -77,26 +78,65 @@ function TrackBox({
   }, [onEnded])
 
   const showStop = track.status === 'RECORDING' || track.status === 'PLAYING'
-  const showPlay = track.status === 'IDLE' && !!track.recordedUrl
-  const showRecord = track.status === 'IDLE' && !track.recordedUrl
+  const showPlay = track.status === 'IDLE' && !!track.recordedUrl && !isCountingDownHere
+  const showRecord = track.status === 'IDLE' && !track.recordedUrl && !isCountingDownHere
 
   return (
     <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden border border-white/15 bg-stone-900">
       <video
-        ref={bindRef}
+        ref={(el) => {
+          videoElRef.current = el
+          videoRefs.current[slotIndex] = el
+        }}
         playsInline
-        muted={track.status === 'RECORDING'}
+        muted={track.status === 'RECORDING' || track.isMuted}
         {...mobileVideoProps}
         className="absolute inset-0 h-full w-full object-cover"
       />
 
-      {/* Track number */}
-      <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white/80">
+      {/* Localized 3-second count-in overlay */}
+      {isCountingDownHere && countdownValue > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/65 backdrop-blur-[2px]">
+          <span
+            className="font-black tabular-nums leading-none text-white"
+            style={{
+              fontSize: 'clamp(48px, 18vw, 96px)',
+              textShadow: '0 0 40px rgba(255,255,255,0.35)',
+            }}
+          >
+            {countdownValue}
+          </span>
+        </div>
+      )}
+
+      {/* Mute — top-left */}
+      {track.recordedUrl && track.status !== 'RECORDING' && (
+        <button
+          type="button"
+          aria-label={track.isMuted ? 'Unmute track' : 'Mute track'}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleMute()
+          }}
+          className={`absolute left-2 top-2 z-10 ${CIRCLE_BTN} h-7 w-7 ${
+            track.isMuted ? 'border-amber-400/50 bg-amber-500/80' : 'border-white/15 bg-black/70'
+          }`}
+        >
+          {track.isMuted ? (
+            <VolumeX className="h-3.5 w-3.5" />
+          ) : (
+            <Volume2 className="h-3.5 w-3.5 text-white/85" />
+          )}
+        </button>
+      )}
+
+      {/* Track number — bottom-left */}
+      <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white/80">
         {track.id}
       </span>
 
-      {/* Retake — top-right, only when a take exists and not actively recording */}
-      {track.recordedUrl && track.status !== 'RECORDING' && (
+      {/* Retake — top-right */}
+      {track.recordedUrl && track.status !== 'RECORDING' && !isCountingDownHere && (
         <button
           type="button"
           aria-label={`Clear track ${track.id}`}
@@ -110,21 +150,21 @@ function TrackBox({
         </button>
       )}
 
-      {/* Per-box transport — bottom-right icon button */}
-      <button
-        type="button"
-        aria-label={
-          showStop ? 'Stop' : showPlay ? 'Play track' : 'Record track'
-        }
-        onClick={onAction}
-        className={`absolute bottom-2 right-2 z-10 ${CIRCLE_BTN} ${
-          showRecord ? 'border-red-400/50 bg-red-500/80' : ''
-        }`}
-      >
-        {showStop && <Square className="h-3.5 w-3.5 fill-white" />}
-        {showPlay && <Play className="h-3.5 w-3.5 fill-white" style={{ marginLeft: 1 }} />}
-        {showRecord && <span className="h-3 w-3 rounded-full bg-white" />}
-      </button>
+      {/* Per-box transport — bottom-right */}
+      {!isCountingDownHere && (
+        <button
+          type="button"
+          aria-label={showStop ? 'Stop' : showPlay ? 'Play track' : 'Record track'}
+          onClick={onAction}
+          className={`absolute bottom-2 right-2 z-10 ${CIRCLE_BTN} ${
+            showRecord ? 'border-red-400/50 bg-red-500/80' : ''
+          }`}
+        >
+          {showStop && <Square className="h-3.5 w-3.5 fill-white" />}
+          {showPlay && <Play className="h-3.5 w-3.5 fill-white" style={{ marginLeft: 1 }} />}
+          {showRecord && <span className="h-3 w-3 rounded-full bg-white" />}
+        </button>
+      )}
     </div>
   )
 }
@@ -132,10 +172,13 @@ function TrackBox({
 export default function StudioSandbox({ onExit }: StudioSandboxProps) {
   const {
     tracks,
-    setVideoRef,
+    videoRefs,
     isGlobalPlaying,
     hasAnyRecording,
     isAnyRecording,
+    isCountingDown,
+    countdownTrackId,
+    countdownValue,
     startRecording,
     stopRecording,
     playTrack,
@@ -143,10 +186,13 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     playAll,
     stopAll,
     clearTrack,
+    toggleTrackMute,
   } = useMultiTrackStudio()
 
   const handleAction = useCallback(
     (track: StudioTrack) => {
+      if (isCountingDown) return
+
       if (track.status === 'RECORDING') {
         stopRecording(track.id)
         return
@@ -159,9 +205,9 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         playTrack(track.id)
         return
       }
-      void startRecording(track.id)
+      startRecording(track.id)
     },
-    [pauseTrack, playTrack, startRecording, stopRecording],
+    [isCountingDown, pauseTrack, playTrack, startRecording, stopRecording],
   )
 
   const handleGlobalPlayStop = useCallback(() => {
@@ -192,9 +238,13 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             <TrackBox
               key={track.id}
               track={track}
-              setVideoRef={setVideoRef}
+              slotIndex={track.id - 1}
+              videoRefs={videoRefs}
+              countdownValue={countdownTrackId === track.id ? countdownValue : 0}
+              isCountingDownHere={countdownTrackId === track.id}
               onAction={() => handleAction(track)}
               onClear={() => clearTrack(track.id)}
+              onToggleMute={() => toggleTrackMute(track.id)}
               onEnded={() => pauseTrack(track.id)}
             />
           ))}
@@ -210,7 +260,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           type="button"
           aria-label={isGlobalPlaying ? 'Stop all tracks' : 'Play all tracks'}
           onClick={handleGlobalPlayStop}
-          disabled={!hasAnyRecording || isAnyRecording}
+          disabled={!hasAnyRecording || isAnyRecording || isCountingDown}
           className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/8 px-6 py-3 text-sm font-semibold text-white/85 shadow-[0_4px_24px_rgba(0,0,0,0.45)] backdrop-blur-md transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
         >
           {isGlobalPlaying ? (

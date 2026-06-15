@@ -3,7 +3,7 @@ import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { playMediaOnUserGesture } from '../utils/mediaPlayback'
+import { playMediaOnUserGesture, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import type { Take } from '../types'
 
@@ -33,6 +33,10 @@ interface PipWindowProps {
     onPointerCancel: (event: PointerEvent<HTMLElement>) => void
   }
   onPlaybackChange?: (playing: boolean) => void
+  /** When this matches takeId, auto-start inline preview (hands-free auto-playback). */
+  autoPlayRequestId?: string | null
+  takeId?: string | null
+  onAutoPlayComplete?: () => void
 }
 
 const FLOAT_BADGE =
@@ -59,10 +63,14 @@ function PipWindow({
   dragSourceArming = false,
   dragSourceProps,
   onPlaybackChange,
+  autoPlayRequestId = null,
+  takeId = null,
+  onAutoPlayComplete,
 }: PipWindowProps) {
   const videoSourceKey = src || filePath || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
+  const autoPlaySessionRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
 
@@ -105,6 +113,17 @@ function PipWindow({
     setIsPlaying(false)
   }, [suspendPlayback, videoRef, videoSourceKey])
 
+  const startInlinePreview = useCallback(async (): Promise<boolean> => {
+    if (suspendPlayback) return false
+    const video = videoRef.current
+    if (!video) return false
+
+    video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
+    const started = await playMediaOnUserGesture(video, () => primeTakePlaybackAudio(video))
+    setIsPlaying(started)
+    return started
+  }, [suspendPlayback, variant, videoRef])
+
   const handlePlayPauseClick = useCallback(
     (event: PointerEvent<HTMLButtonElement>) => {
       event.stopPropagation()
@@ -114,10 +133,7 @@ function PipWindow({
       if (!video) return
 
       if (video.paused) {
-        video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
-        playMediaOnUserGesture(video, () => primeTakePlaybackAudio(video)).then((started) => {
-          setIsPlaying(started)
-        })
+        void startInlinePreview()
       } else {
         video.pause()
         if ('muted' in video) video.muted = true
@@ -125,8 +141,76 @@ function PipWindow({
         setIsPlaying(false)
       }
     },
-    [suspendPlayback, variant, videoRef],
+    [startInlinePreview, suspendPlayback, videoRef],
   )
+
+  // Hands-free auto-playback — same path as tapping the quick preview button
+  useEffect(() => {
+    const wantsAutoPlay =
+      Boolean(autoPlayRequestId) &&
+      Boolean(takeId) &&
+      autoPlayRequestId === takeId &&
+      Boolean(src)
+
+    if (!wantsAutoPlay || suspendPlayback) {
+      autoPlaySessionRef.current = false
+      return
+    }
+
+    autoPlaySessionRef.current = true
+    let cancelled = false
+
+    void (async () => {
+      const media = videoRef.current
+      if (!media) {
+        onAutoPlayComplete?.()
+        return
+      }
+
+      const ready = await waitForMediaReadyWithRetry(media)
+      if (cancelled || !autoPlaySessionRef.current) return
+
+      if (!ready) {
+        console.warn('Auto pip preview media not ready', { takeId, readyState: media.readyState })
+        onAutoPlayComplete?.()
+        return
+      }
+
+      const onEnded = () => {
+        if (!autoPlaySessionRef.current) return
+        autoPlaySessionRef.current = false
+        onAutoPlayComplete?.()
+      }
+
+      media.addEventListener('ended', onEnded, { once: true })
+
+      const started = await startInlinePreview()
+      if (cancelled || !autoPlaySessionRef.current) {
+        media.removeEventListener('ended', onEnded)
+        return
+      }
+
+      if (!started) {
+        media.removeEventListener('ended', onEnded)
+        autoPlaySessionRef.current = false
+        onAutoPlayComplete?.()
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      autoPlaySessionRef.current = false
+    }
+  }, [
+    autoPlayRequestId,
+    onAutoPlayComplete,
+    src,
+    startInlinePreview,
+    suspendPlayback,
+    takeId,
+    videoRef,
+    videoSourceKey,
+  ])
 
   const handleVolume = useCallback(
     (value: number) => {

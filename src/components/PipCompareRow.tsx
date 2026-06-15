@@ -22,6 +22,8 @@ interface PipCompareRowProps {
   onDragStateChange?: (state: PipDragUiState) => void
   onBenchmarkPlaybackChange?: (playing: boolean) => void
   onChallengerPlaybackChange?: (playing: boolean) => void
+  challengerAutoPlayRequestId?: string | null
+  onChallengerAutoPlayComplete?: () => void
   hapticFeedback?: boolean
 }
 
@@ -96,6 +98,8 @@ export default function PipCompareRow({
   onDragStateChange,
   onBenchmarkPlaybackChange,
   onChallengerPlaybackChange,
+  challengerAutoPlayRequestId = null,
+  onChallengerAutoPlayComplete,
   hapticFeedback = true,
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
@@ -163,6 +167,9 @@ export default function PipCompareRow({
             challengerTake?.videoUrl ? dragSourceProps : undefined
           }
           onPlaybackChange={onChallengerPlaybackChange}
+          autoPlayRequestId={challengerAutoPlayRequestId}
+          takeId={challengerTake?.id ?? null}
+          onAutoPlayComplete={onChallengerAutoPlayComplete}
         />
       </div>
 

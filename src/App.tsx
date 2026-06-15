@@ -297,6 +297,17 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       teardownAutoPlaybackMedia()
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
 
+      setAutoPlaybackTakeId(takeId)
+      setAutoRecordStartSuppressed(true)
+      setHandsFreePlaybackPending(true)
+      setAutoPlaybackPlaying(false)
+
+      // Take cards visible → PipWindow auto-starts inline quick preview
+      if (showTakeCardsRef.current) {
+        return
+      }
+
+      // Fallback when PiP row is hidden — use hidden audio element
       const audio = autoPlaybackAudioRef.current
       if (!audio) {
         pendingAutoPlaybackRef.current = false
@@ -308,11 +319,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       audio.preload = 'auto'
       audio.src = playbackUrl
       audio.load()
-
-      setAutoPlaybackTakeId(takeId)
-      setAutoRecordStartSuppressed(true)
-      setHandsFreePlaybackPending(true)
-      setAutoPlaybackPlaying(false)
 
       void (async () => {
         await primeTakePlaybackAudio(audio)
@@ -944,8 +950,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     [updateSettings],
   )
 
-  const suspendPipPlayback =
-    isVaultOpen || isReviewOpen || isSettingsOpen || autoRecordStartSuppressed
+  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
 
   const autoPlaybackTake = useMemo(
     () =>
@@ -977,12 +982,17 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
             mediaKey: 'main-recording-audio',
             liveMicOnly: true,
           }
-        } else if (autoPlaybackTakeId && autoPlaybackTake) {
+        } else if (
+          autoPlaybackTakeId &&
+          autoPlaybackTake &&
+          challengerTake?.id === autoPlaybackTakeId &&
+          (challengerPipPlaying || autoPlaybackPlaying)
+        ) {
           next = {
-            mediaRef: autoPlaybackAudioRef,
+            mediaRef: challengerPipVideoRef,
             take: autoPlaybackTake,
-            isPlaying: autoPlaybackPlaying,
-            mediaKey: `main-auto-${autoPlaybackTake.id}`,
+            isPlaying: challengerPipPlaying || autoPlaybackPlaying,
+            mediaKey: `main-auto-pip-${autoPlaybackTake.id}`,
             liveMicOnly: false,
           }
         } else if (
@@ -1391,17 +1401,39 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   )
 
   useLayoutEffect(() => {
-    for (const ref of [benchmarkPipVideoRef, challengerPipVideoRef]) {
-      resetVideoPlayback(ref.current)
+    resetVideoPlayback(benchmarkPipVideoRef.current)
+
+    const skipChallengerReset =
+      autoPlaybackTakeId !== null && autoPlaybackTakeId === challengerId
+
+    if (!skipChallengerReset) {
+      resetVideoPlayback(challengerPipVideoRef.current)
     }
   }, [
-    benchmarkId,
+    autoPlaybackTakeId,
     challengerId,
+    benchmarkId,
     benchmarkTake?.videoUrl,
     benchmarkTake?.filePath,
     challengerTake?.videoUrl,
     challengerTake?.filePath,
   ])
+
+  const handleChallengerAutoPlayComplete = useCallback(() => {
+    finishAutoPlayback()
+  }, [finishAutoPlayback])
+
+  const handleChallengerPlaybackChange = useCallback(
+    (playing: boolean) => {
+      setChallengerPipPlaying(playing)
+      if (playing && autoPlaybackTakeId) {
+        pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        setAutoPlaybackPlaying(true)
+      }
+    },
+    [autoPlaybackTakeId],
+  )
 
   return (
     <div ref={appShellRef} className="app-shell">
@@ -1556,7 +1588,9 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
                   onExpandChallenger={handleExpandChallenger}
                   onDragStateChange={handlePipDragStateChange}
                   onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
-                  onChallengerPlaybackChange={setChallengerPipPlaying}
+                  onChallengerPlaybackChange={handleChallengerPlaybackChange}
+                  challengerAutoPlayRequestId={autoPlaybackTakeId}
+                  onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                   hapticFeedback={settings.hapticFeedback}
                 />
               </motion.div>
