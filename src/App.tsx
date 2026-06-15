@@ -108,11 +108,26 @@ const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidge
 const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
+const StudioSandbox = lazy(() => import('./components/studio/StudioSandbox'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
 
 export default function App() {
+  const [studioMode, setStudioMode] = useState(false)
+
+  if (studioMode) {
+    return (
+      <Suspense fallback={<div className="app-shell bg-black" aria-hidden />}>
+        <StudioSandbox onExit={() => setStudioMode(false)} />
+      </Suspense>
+    )
+  }
+
+  return <StandardApp onEnterStudio={() => setStudioMode(true)} />
+}
+
+function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   usePhysicalOrientation()
   const [takes, setTakes] = useState<Take[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -1660,6 +1675,7 @@ export default function App() {
         onPitchTrackerChange={handlePitchTrackerChange}
         onReset={resetSettings}
         recordingMode={recordingMode}
+        onEnterStudio={onEnterStudio}
       />
       </Suspense>
       </div>
