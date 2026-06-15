@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
@@ -96,10 +97,13 @@ function fmtTime(s: number): string {
 
 // ─── Studio Track Cell ────────────────────────────────────────────────────────
 
+/** grid = normal 2×2 tile · fullscreen = recording overlay · hidden-playback = off-screen media only */
+type CellLayout = 'grid' | 'fullscreen' | 'hidden-playback'
+
 interface StudioTrackCellProps {
   track: StudioTrack
   trackIndex: number
-  isAnyTrackRecording: boolean
+  layout?: CellLayout
   playbackVideoRef: (el: HTMLMediaElement | null) => void
   onArm: () => void
   onRecord: () => void
@@ -113,7 +117,7 @@ interface StudioTrackCellProps {
 function StudioTrackCell({
   track,
   trackIndex,
-  isAnyTrackRecording,
+  layout = 'grid',
   playbackVideoRef,
   onArm,
   onRecord,
@@ -219,34 +223,46 @@ function StudioTrackCell({
     [onVolumeChange],
   )
 
-  // ── When THIS track is recording, go full-screen (fixed). ─────────────────
-  // When ANOTHER track is recording, hide so it doesn't clutter the screen.
-  const isHidden = isAnyTrackRecording && !isRecording
+  const isFullscreen = layout === 'fullscreen'
+  const isHiddenPlayback = layout === 'hidden-playback'
   const containerRing = isRecording
     ? 'ring-red-500/60 border-red-400/70'
     : `${accent.ring} border-white/15`
 
+  // Off-screen mount — keeps backing-track <video> refs alive during recording
+  if (isHiddenPlayback) {
+    if (!hasRecording || !track.recordedBlobUrl) return null
+    return (
+      <div aria-hidden className="studio-track-cell--hidden-playback">
+        <TakeVideoPlayer
+          filePath=""
+          videoUrl={track.recordedBlobUrl}
+          videoRef={playbackRef}
+          videoSourceKey={videoSourceKey}
+          className="h-px w-px"
+          loadingClassName="h-px w-px"
+          mirror
+          controls={false}
+          manualPlayOnly
+          audible={!track.isMuted}
+          eagerLoad
+          preload="auto"
+        />
+      </div>
+    )
+  }
+
   return (
     <div
-      className={`studio-track-cell group relative min-h-0 flex-1 transition-opacity duration-200 ${
-        isHidden ? 'pointer-events-none opacity-0' : 'opacity-100'
-      } ${isRecording ? 'fixed z-[220]' : ''}`}
-      style={
-        isRecording
-          ? {
-              top: 'env(safe-area-inset-top, 0px)',
-              right: 0,
-              bottom: 0,
-              left: 0,
-            }
-          : undefined
-      }
+      className={`studio-track-cell group relative min-h-0 ${
+        isFullscreen ? 'h-full w-full flex-1' : 'flex-1'
+      }`}
     >
       {/* Inner video container */}
       <div
-        className={`relative h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[box-shadow,border-color] duration-200 ${containerRing} ${
-          isRecording ? 'studio-track-cell--recording' : ''
-        }`}
+        className={`relative h-full w-full overflow-hidden border bg-stone-900/95 shadow-lg shadow-black/50 transition-[box-shadow,border-color] duration-200 ${containerRing} ${
+          isFullscreen ? 'rounded-none ring-0' : 'rounded-xl ring-1 shadow-black/50'
+        } ${isRecording ? 'studio-track-cell--recording' : ''}`}
       >
         {/* Track label — top-left, inside overflow clip */}
         <span
@@ -713,7 +729,7 @@ function FullscreenPreview({ track, onClose }: FullscreenPreviewProps) {
 
 function CountInOverlay({ count }: { count: number }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm">
+    <div className="pointer-events-none absolute inset-0 z-[60] flex items-center justify-center bg-black/72 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-3">
         <span
           className="font-black leading-none tabular-nums text-white"
@@ -766,6 +782,19 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
 
   const isAnyTrackRecording = tracks.some((t) => t.isRecording)
 
+  /** Index of the track that owns the full-screen recording overlay (-1 = grid mode). */
+  const expandedTrackIndex = useMemo(() => {
+    const recording = tracks.findIndex((t) => t.isRecording)
+    if (recording >= 0) return recording
+    if (isCountingIn) {
+      const armed = tracks.findIndex((t) => !!t.stream && !t.recordedBlobUrl)
+      if (armed >= 0) return armed
+    }
+    return -1
+  }, [tracks, isCountingIn])
+
+  const isExpanded = expandedTrackIndex >= 0
+
   const handlePlayStop = useCallback(() => {
     if (isPlaying) stopAll()
     else playAll()
@@ -773,14 +802,14 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
 
   const dismissError = useCallback(() => setError(null), [setError])
 
-  const renderTrack = (index: 0 | 1 | 2 | 3) => {
+  const renderTrack = (index: 0 | 1 | 2 | 3, layout: CellLayout = 'grid') => {
     const track = tracks[index]!
     return (
       <StudioTrackCell
-        key={track.id}
+        key={`${track.id}-${layout}`}
         track={track}
         trackIndex={index}
-        isAnyTrackRecording={isAnyTrackRecording}
+        layout={layout}
         playbackVideoRef={(el) => { playbackVideoRefs.current[index] = el }}
         onArm={() => initHardware(track.id)}
         onRecord={() => startRecording(track.id)}
@@ -833,15 +862,38 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
       </header>
 
       {/* ── 2×2 Camera Grid ──────────────────────────────────────────────────── */}
-      <main className="relative flex min-h-0 flex-1 flex-col gap-2.5 p-2.5">
-        <div className="flex min-h-0 flex-1 gap-2.5">
-          {renderTrack(0)}
-          {renderTrack(1)}
-        </div>
-        <div className="flex min-h-0 flex-1 gap-2.5">
-          {renderTrack(2)}
-          {renderTrack(3)}
-        </div>
+      <main className="relative flex min-h-0 flex-1 flex-col">
+        {/* Full-screen recording / count-in overlay — only the active track */}
+        {isExpanded && (
+          <div className="absolute inset-0 z-50 flex flex-col bg-black">
+            {renderTrack(expandedTrackIndex as 0 | 1 | 2 | 3, 'fullscreen')}
+          </div>
+        )}
+
+        {/* Normal 2×2 grid — fully unmounted while a track is expanded */}
+        {!isExpanded && (
+          <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-2.5">
+            <div className="flex min-h-0 flex-1 gap-2.5">
+              {renderTrack(0)}
+              {renderTrack(1)}
+            </div>
+            <div className="flex min-h-0 flex-1 gap-2.5">
+              {renderTrack(2)}
+              {renderTrack(3)}
+            </div>
+          </div>
+        )}
+
+        {/* Hidden backing-track players — keep sync playback alive during recording */}
+        {isExpanded && (
+          <div aria-hidden className="studio-track-cell--hidden-playback">
+            {tracks.map((t, i) =>
+              i !== expandedTrackIndex && t.recordedBlobUrl
+                ? renderTrack(i as 0 | 1 | 2 | 3, 'hidden-playback')
+                : null,
+            )}
+          </div>
+        )}
 
         {isCountingIn && currentCount > 0 && <CountInOverlay count={currentCount} />}
 

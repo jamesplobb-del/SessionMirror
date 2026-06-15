@@ -1852,6 +1852,19 @@ html.physical-landscape-right .control-deck__vault-btn {
   user-select: none;
 }
 
+/* Off-screen backing-track mount — keeps media refs alive, never painted */
+.studio-track-cell--hidden-playback {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .studio-track-cell--recording {
   animation: studio-rec-pulse 1.4s ease-in-out infinite;
 }
