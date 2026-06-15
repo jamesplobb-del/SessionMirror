@@ -1807,6 +1807,44 @@ html.physical-landscape-right .control-deck__vault-btn {
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
 }
 
+/* Studio Sandbox — scrubber (seek bar in mixer) */
+.studio-scrubber {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
+}
+
+.studio-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s, background 0.1s;
+}
+
+.studio-scrubber::-webkit-slider-thumb:active {
+  transform: scale(1.4);
+  background: #fff;
+}
+
+.studio-scrubber::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  border: none;
+  cursor: pointer;
+}
+
 /* Studio Sandbox — 2×2 track grid cells (PiP-inspired) */
 .studio-track-cell {
   overflow: visible;
