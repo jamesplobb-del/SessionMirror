@@ -298,23 +298,26 @@ export function useMultiTrackStudio() {
 
       let masterEl: HTMLMediaElement | null = null
       let masterDuration = 0
-      playbackVideoRefs.current.forEach((el, i) => {
-        if (!el || !current[i]?.recordedBlobUrl) return
+      const refs = playbackVideoRefs.current
+      for (let i = 0; i < refs.length; i++) {
+        const el = refs[i]
+        if (!el || !current[i]?.recordedBlobUrl) continue
         const d = el.duration || 0
         if (d > masterDuration) {
           masterDuration = d
           masterEl = el
         }
-      })
+      }
 
-      if (masterEl) {
+      if (masterEl !== null) {
         const masterTime = masterEl.currentTime
-        playbackVideoRefs.current.forEach((el, i) => {
-          if (!el || el === masterEl || !current[i]?.recordedBlobUrl) return
+        for (let i = 0; i < refs.length; i++) {
+          const el = refs[i]
+          if (!el || el === masterEl || !current[i]?.recordedBlobUrl) continue
           if (Math.abs(el.currentTime - masterTime) > 0.08) {
             el.currentTime = masterTime
           }
-        })
+        }
       }
 
       driftRafRef.current = requestAnimationFrame(tick)
