@@ -1770,49 +1770,76 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 /* ── Studio Sandbox ── */
 
+/* Studio Sandbox — premium DAW volume fader
+   Uses CSS custom props --fill-pct and --fill-color set inline by React
+   to render a colored progress track proportional to the current value. */
 .studio-vol-slider {
   -webkit-appearance: none;
   appearance: none;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.12);
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--fill-color, #38bdf8) 0%,
+    var(--fill-color, #38bdf8) var(--fill-pct, 80%),
+    rgba(255, 255, 255, 0.1) var(--fill-pct, 80%),
+    rgba(255, 255, 255, 0.1) 100%
+  );
   border-radius: 999px;
   cursor: pointer;
   outline: none;
   min-width: 0;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.studio-vol-slider:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .studio-vol-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #e2e8f0;
-  border: none;
+  background: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.25);
   cursor: pointer;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
-  transition: transform 0.1s;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+  transition: transform 0.1s, box-shadow 0.1s;
 }
 
 .studio-vol-slider::-webkit-slider-thumb:active {
-  transform: scale(1.25);
+  transform: scale(1.3);
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.8),
+    0 0 0 3px rgba(255, 255, 255, 0.15);
 }
 
 .studio-vol-slider::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #e2e8f0;
-  border: none;
+  background: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.25);
   cursor: pointer;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
-/* Studio Sandbox — scrubber (seek bar in mixer) */
+/* Studio Sandbox — scrubber / seek bar
+   Same gradient-fill trick as the volume fader but smaller and more subtle. */
 .studio-scrubber {
   -webkit-appearance: none;
   appearance: none;
   height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    to right,
+    var(--fill-color, rgba(255, 255, 255, 0.6)) 0%,
+    var(--fill-color, rgba(255, 255, 255, 0.6)) var(--fill-pct, 0%),
+    rgba(255, 255, 255, 0.08) var(--fill-pct, 0%),
+    rgba(255, 255, 255, 0.08) 100%
+  );
   border-radius: 999px;
   cursor: pointer;
   outline: none;
@@ -1821,28 +1848,29 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 .studio-scrubber::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.55);
+  background: #ffffff;
   border: none;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-  transition: transform 0.1s, background 0.1s;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+  transition: transform 0.1s, box-shadow 0.1s;
 }
 
 .studio-scrubber::-webkit-slider-thumb:active {
   transform: scale(1.4);
-  background: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
 .studio-scrubber::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.55);
+  background: #ffffff;
   border: none;
   cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
 }
 
 /* Studio Sandbox — 2×2 track grid cells (PiP-inspired) */

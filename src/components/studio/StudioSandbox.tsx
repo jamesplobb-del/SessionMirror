@@ -5,9 +5,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type MutableRefObject,
 } from 'react'
-import type { MouseEvent, PointerEvent } from 'react'
+import type { MouseEvent } from 'react'
 import {
   ArrowLeft,
   ChevronDown,
@@ -33,60 +34,19 @@ import {
   releaseTakePlaybackAudio,
 } from '../../utils/takePlaybackAudio'
 
-// ─── Accent palette (mirrors Best Take / Current Take PiP) ───────────────────
+// ─── Accent palette ───────────────────────────────────────────────────────────
 
 const TRACK_ACCENTS = [
-  { ring: 'ring-sky-400/50',     badge: 'bg-sky-500/90',     label: 'text-sky-300'     },
-  { ring: 'ring-violet-400/50',  badge: 'bg-violet-500/90',  label: 'text-violet-300'  },
-  { ring: 'ring-emerald-400/50', badge: 'bg-emerald-500/90', label: 'text-emerald-300' },
-  { ring: 'ring-orange-400/50',  badge: 'bg-orange-500/90',  label: 'text-orange-300'  },
+  { ring: 'ring-sky-400/50',     badge: 'bg-sky-500/90',     label: 'text-sky-300',     hex: '#38bdf8' },
+  { ring: 'ring-violet-400/50',  badge: 'bg-violet-500/90',  label: 'text-violet-300',  hex: '#c084fc' },
+  { ring: 'ring-emerald-400/50', badge: 'bg-emerald-500/90', label: 'text-emerald-300', hex: '#34d399' },
+  { ring: 'ring-orange-400/50',  badge: 'bg-orange-500/90',  label: 'text-orange-300',  hex: '#fb923c' },
 ] as const
 
 const FLOAT_BTN =
   'flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90 active:scale-90'
 
-// ─── Waveform decoration ─────────────────────────────────────────────────────
-
-function makePeaks(seed: number, n = 60): number[] {
-  return Array.from({ length: n }, (_, i) =>
-    Math.min(
-      0.95,
-      Math.abs(
-        Math.sin(i * 0.31 + seed) * 0.42 +
-          Math.sin(i * 0.17 + seed * 1.7) * 0.31 +
-          Math.sin(i * 0.53 + seed * 0.4) * 0.18 +
-          0.12,
-      ),
-    ),
-  )
-}
-const PEAKS = [makePeaks(1.2), makePeaks(3.8), makePeaks(2.1), makePeaks(5.5)]
-
-function MiniWaveform({ peaks, color }: { peaks: number[]; color: string }) {
-  return (
-    <svg
-      viewBox={`0 0 ${peaks.length} 1`}
-      preserveAspectRatio="none"
-      className="absolute inset-0 h-full w-full"
-      aria-hidden
-    >
-      {peaks.map((h, i) => (
-        <rect
-          key={i}
-          x={i + 0.1}
-          y={(1 - h) / 2}
-          width={0.72}
-          height={h}
-          fill={color}
-          opacity={0.7}
-          rx={0.1}
-        />
-      ))}
-    </svg>
-  )
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtTime(s: number): string {
   if (!isFinite(s) || s < 0) return '0:00'
@@ -96,14 +56,19 @@ function fmtTime(s: number): string {
 }
 
 // ─── Studio Track Cell ────────────────────────────────────────────────────────
-
-/** grid = normal 2×2 tile · fullscreen = recording overlay · hidden-playback = off-screen media only */
-type CellLayout = 'grid' | 'fullscreen' | 'hidden-playback'
+// NOTE: isExpanded / isHidden use CSS-only state changes — the component is
+// NEVER unmounted during the recording flow so the live MediaStream stays
+// attached to its <video> element without iOS re-attachment failures.
 
 interface StudioTrackCellProps {
   track: StudioTrack
   trackIndex: number
-  layout?: CellLayout
+  /** True → this cell should cover the full main area (position: absolute inset-0) */
+  isExpanded: boolean
+  /** True → another cell is expanded; render invisible but keep alive for backing-track audio */
+  isHidden: boolean
+  /** Whether this specific track is currently solo-quick-playing */
+  isQuickPlaying: boolean
   playbackVideoRef: (el: HTMLMediaElement | null) => void
   onArm: () => void
   onRecord: () => void
@@ -111,13 +76,17 @@ interface StudioTrackCellProps {
   onClear: () => void
   onMuteToggle: () => void
   onVolumeChange: (volume: number) => void
+  onQuickPlayToggle: () => void
+  onPlaybackEnded: () => void
   onExpand: () => void
 }
 
 function StudioTrackCell({
   track,
   trackIndex,
-  layout = 'grid',
+  isExpanded,
+  isHidden,
+  isQuickPlaying,
   playbackVideoRef,
   onArm,
   onRecord,
@@ -125,11 +94,14 @@ function StudioTrackCell({
   onClear,
   onMuteToggle,
   onVolumeChange,
+  onQuickPlayToggle,
+  onPlaybackEnded,
   onExpand,
 }: StudioTrackCellProps) {
   const livePreviewRef = useRef<HTMLVideoElement>(null)
   const playbackRef = useRef<HTMLMediaElement | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
+  // Track actual video play state so the thumbnail poster hides correctly
+  // for both solo-play and global-play (not just isQuickPlaying).
   const [showPoster, setShowPoster] = useState(true)
 
   const accent = TRACK_ACCENTS[trackIndex % TRACK_ACCENTS.length]!
@@ -138,13 +110,41 @@ function StudioTrackCell({
   const isRecording = track.isRecording
   const videoSourceKey = track.recordedBlobUrl ?? 'empty'
 
-  // Keep the engine's ref array in sync — useLayoutEffect ensures the
-  // TakeVideoPlayer ref is already assigned before we propagate it.
+  // Propagate the TakeVideoPlayer ref up to the engine's ref array.
+  // useLayoutEffect ensures the ref is already assigned before propagation.
   useLayoutEffect(() => {
     playbackVideoRef(playbackRef.current)
   })
 
-  // Live camera stream
+  // Sync poster visibility to the video element's actual play/pause state.
+  // This works for both solo quick-play and global transport play.
+  useEffect(() => {
+    const media = playbackRef.current
+    if (!media || !hasRecording) {
+      setShowPoster(true)
+      return
+    }
+    const sync = () => setShowPoster(media.paused || media.ended)
+    media.addEventListener('play', sync)
+    media.addEventListener('pause', sync)
+    media.addEventListener('ended', sync)
+    sync()
+    return () => {
+      media.removeEventListener('play', sync)
+      media.removeEventListener('pause', sync)
+      media.removeEventListener('ended', sync)
+    }
+  }, [hasRecording, videoSourceKey])
+
+  // Listen for playback-ended so the parent can clear solo-play state
+  useEffect(() => {
+    const media = playbackRef.current
+    if (!media || !hasRecording) return
+    media.addEventListener('ended', onPlaybackEnded)
+    return () => media.removeEventListener('ended', onPlaybackEnded)
+  }, [hasRecording, onPlaybackEnded, videoSourceKey])
+
+  // Live camera stream — attach/play when available, detach when recording done
   useEffect(() => {
     const video = livePreviewRef.current
     if (!video || !track.stream || hasRecording) {
@@ -159,112 +159,41 @@ function StudioTrackCell({
     }
   }, [track.stream, hasRecording])
 
-  // Sync play/poster state from the playback media element
-  useEffect(() => {
-    const media = playbackRef.current
-    if (!media || !hasRecording) {
-      setIsPlaying(false)
-      setShowPoster(true)
-      return
-    }
-
-    const sync = () => {
-      const playing = !media.paused && !media.ended
-      setIsPlaying(playing)
-      setShowPoster(!playing)
-    }
-
-    media.addEventListener('play', sync)
-    media.addEventListener('pause', sync)
-    media.addEventListener('ended', sync)
-    sync()
-
-    return () => {
-      media.removeEventListener('play', sync)
-      media.removeEventListener('pause', sync)
-      media.removeEventListener('ended', sync)
-    }
-  }, [hasRecording, videoSourceKey])
-
-  // ── Quick play — shared handler for both onClick and MiniPipControls ────────
-  // Using a generic SyntheticEvent base so it satisfies both callers.
-  const doPlayPause = useCallback(() => {
-    const media = playbackRef.current
-    if (!media) return
-
-    if (media.paused) {
-      media.currentTime = 0
-      void playMediaOnUserGesture(media, () => primeTakePlaybackAudio(media)).then(
-        (started) => {
-          setIsPlaying(started)
-          setShowPoster(!started)
-        },
-      )
-    } else {
-      media.pause()
-      void releaseTakePlaybackAudio()
-      setIsPlaying(false)
-      setShowPoster(true)
-    }
-  }, [])
-
-  const handlePlayPauseClick = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); doPlayPause() },
-    [doPlayPause],
-  )
-
-  const handlePlayPausePip = useCallback(
-    (_e: PointerEvent<HTMLButtonElement>) => { doPlayPause() },
-    [doPlayPause],
-  )
-
   const handleVolume = useCallback(
     (value: number) => onVolumeChange(value),
     [onVolumeChange],
   )
 
-  const isFullscreen = layout === 'fullscreen'
-  const isHiddenPlayback = layout === 'hidden-playback'
+  const handlePlayPauseBtn = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onQuickPlayToggle() },
+    [onQuickPlayToggle],
+  )
+
   const containerRing = isRecording
     ? 'ring-red-500/60 border-red-400/70'
     : `${accent.ring} border-white/15`
 
-  // Off-screen mount — keeps backing-track <video> refs alive during recording
-  if (isHiddenPlayback) {
-    if (!hasRecording || !track.recordedBlobUrl) return null
-    return (
-      <div aria-hidden className="studio-track-cell--hidden-playback">
-        <TakeVideoPlayer
-          filePath=""
-          videoUrl={track.recordedBlobUrl}
-          videoRef={playbackRef}
-          videoSourceKey={videoSourceKey}
-          className="h-px w-px"
-          loadingClassName="h-px w-px"
-          mirror
-          controls={false}
-          manualPlayOnly
-          audible={!track.isMuted}
-          eagerLoad
-          preload="auto"
-        />
-      </div>
-    )
-  }
+  // ── Outer wrapper decides layout mode ─────────────────────────────────────
+  // expanded  → absolute, covers <main> (positioning parent is `relative`)
+  // hidden    → invisible but NOT unmounted; backing-track audio stays alive
+  // normal    → flex-1 cell in the 2×2 grid
+  // overflow-hidden is on the INNER video container; the outer cell must stay
+  // overflow-visible so the floating action buttons can bleed outside the border.
+  const outerCls = isExpanded
+    ? 'absolute inset-0 z-50 bg-black'
+    : isHidden
+      ? 'relative flex-1 min-h-0 invisible pointer-events-none'
+      : 'relative flex-1 min-h-0'
 
   return (
-    <div
-      className={`studio-track-cell group relative min-h-0 ${
-        isFullscreen ? 'h-full w-full flex-1' : 'flex-1'
-      }`}
-    >
+    <div className={`studio-track-cell group ${outerCls}`}>
       {/* Inner video container */}
       <div
         className={`relative h-full w-full overflow-hidden border bg-stone-900/95 shadow-lg shadow-black/50 transition-[box-shadow,border-color] duration-200 ${containerRing} ${
-          isFullscreen ? 'rounded-none ring-0' : 'rounded-xl ring-1 shadow-black/50'
+          isExpanded ? 'rounded-none ring-0' : 'rounded-xl ring-1'
         } ${isRecording ? 'studio-track-cell--recording' : ''}`}
       >
-        {/* Track label — top-left, inside overflow clip */}
+        {/* Track label */}
         <span
           className={`pointer-events-none absolute z-20 max-w-[calc(100%-5rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider text-white ${accent.badge}`}
           style={{ top: 6, left: 8 }}
@@ -285,7 +214,7 @@ function StudioTrackCell({
           />
         )}
 
-        {/* Recorded playback (mirrored like in-app takes) */}
+        {/* Recorded playback */}
         {hasRecording && track.recordedBlobUrl && (
           <TakeVideoPlayer
             filePath=""
@@ -297,14 +226,14 @@ function StudioTrackCell({
             mirror
             controls={false}
             manualPlayOnly
-            audible={isPlaying && !track.isMuted}
+            audible={!track.isMuted}
             eagerLoad
             preload="auto"
             loop
           />
         )}
 
-        {/* Thumbnail poster */}
+        {/* Thumbnail poster — hidden while video is actually playing */}
         {hasRecording && showPoster && track.thumbnailUrl && (
           <img
             src={track.thumbnailUrl}
@@ -324,8 +253,8 @@ function StudioTrackCell({
           </div>
         )}
 
-        {/* Tap-to-expand — whole video area, sits below the play button */}
-        {hasRecording && (
+        {/* Tap-to-expand — sits below the play button */}
+        {hasRecording && !isRecording && (
           <button
             type="button"
             className="absolute inset-0 z-[4] cursor-pointer border-0 bg-transparent p-0"
@@ -334,19 +263,19 @@ function StudioTrackCell({
           />
         )}
 
-        {/* Center quick-play button — plain onClick so iOS touch works */}
-        {hasRecording && (
+        {/* Center quick-play button */}
+        {hasRecording && !isRecording && (
           <div className="pointer-events-none absolute inset-0 z-[5]">
             <button
               type="button"
-              onClick={handlePlayPauseClick}
+              onClick={handlePlayPauseBtn}
               className={`pointer-events-auto absolute left-1/2 top-1/2 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center p-3 transition-opacity ${
-                isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
+                isQuickPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
               }`}
-              aria-label={isPlaying ? 'Pause track' : 'Play track'}
+              aria-label={isQuickPlaying ? 'Pause track' : 'Play track'}
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/65 shadow-[0_2px_8px_rgba(0,0,0,0.5)] backdrop-blur-sm transition hover:bg-black/80">
-                {isPlaying ? (
+                {isQuickPlaying ? (
                   <Pause className="h-3.5 w-3.5 fill-white text-white" />
                 ) : (
                   <Play className="h-3.5 w-3.5 fill-white text-white" style={{ marginLeft: 1 }} />
@@ -357,31 +286,29 @@ function StudioTrackCell({
         )}
 
         {/* Bottom hover volume strip */}
-        {hasRecording && (
+        {hasRecording && !isRecording && (
           <div
             className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/65 px-2.5 py-1.5 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
             onClick={(e) => e.stopPropagation()}
           >
             <MiniPipControls
-              isPlaying={isPlaying}
+              isPlaying={isQuickPlaying}
               volume={track.isMuted ? 0 : track.volume}
-              onPlayPauseClick={handlePlayPausePip}
+              onPlayPauseClick={onQuickPlayToggle}
               onVolumeChange={handleVolume}
             />
           </div>
         )}
       </div>
 
-      {/* ── Floating top-RIGHT controls — outside overflow clip ────────────── */}
+      {/* ── Floating top-RIGHT controls (outside overflow clip) ─────────────── */}
       <div className="absolute right-1.5 top-1.5 z-30 flex gap-1.5">
-        {/* Clear / delete */}
         {hasRecording && !isRecording && (
           <button type="button" aria-label={`Clear ${track.label}`} onClick={onClear} className={FLOAT_BTN}>
             <X className="h-3.5 w-3.5" />
           </button>
         )}
 
-        {/* Mute */}
         {hasRecording && !isRecording && (
           <button
             type="button"
@@ -395,7 +322,6 @@ function StudioTrackCell({
           </button>
         )}
 
-        {/* Arm / Record (empty or live-preview state) */}
         {!hasRecording && !isRecording && (
           <button
             type="button"
@@ -411,7 +337,6 @@ function StudioTrackCell({
           </button>
         )}
 
-        {/* Stop recording */}
         {isRecording && (
           <button
             type="button"
@@ -449,7 +374,7 @@ function AudioDrawer({
   onMuteToggle,
   onClose,
 }: AudioDrawerProps) {
-  // Poll currentTime / duration from DOM elements via rAF
+  // Poll currentTime / duration from DOM elements each animation frame
   const [positions, setPositions] = useState<Record<string, TrackPosition>>({})
   const rafRef = useRef(0)
 
@@ -472,10 +397,13 @@ function AudioDrawer({
     return () => cancelAnimationFrame(rafRef.current)
   }, [tracks, playbackVideoRefs])
 
-  const handleSeek = (idx: number, value: number) => {
-    const el = playbackVideoRefs.current[idx]
-    if (el) el.currentTime = value
-  }
+  const handleSeek = useCallback(
+    (idx: number, value: number) => {
+      const el = playbackVideoRefs.current[idx]
+      if (el) el.currentTime = value
+    },
+    [playbackVideoRefs],
+  )
 
   return (
     <>
@@ -483,14 +411,14 @@ function AudioDrawer({
       <div className="absolute inset-0 z-30 bg-black/55" onClick={onClose} aria-hidden />
 
       {/* Sheet */}
-      <div className="absolute inset-x-0 bottom-0 z-40 flex max-h-[80%] flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl">
+      <div className="absolute inset-x-0 bottom-0 z-40 flex max-h-[82%] flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-zinc-900 shadow-2xl">
         {/* Drag handle */}
         <div className="flex shrink-0 justify-center pb-1 pt-3">
           <div className="h-1 w-10 rounded-full bg-white/20" />
         </div>
 
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-5 pb-3 pt-2">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-5 pb-3 pt-1">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-white/40" />
             <h2 className="text-[13px] font-bold tracking-tight">Audio Mixer</h2>
@@ -506,104 +434,135 @@ function AudioDrawer({
         </div>
 
         {/* Track rows */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           {tracks.map((track, idx) => {
             const hasAudio = !!track.recordedBlobUrl
             const vol = Math.round(track.volume * 100)
             const pos = positions[track.id]
             const accent = TRACK_ACCENTS[idx % TRACK_ACCENTS.length]!
-            const scrubMax = pos?.duration ?? 0
-            const scrubVal = pos?.time ?? 0
+            const duration = pos?.duration ?? 0
+            const currentTime = pos?.time ?? 0
+            const volPct = vol
+            const scrubPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
             return (
               <div
                 key={track.id}
-                className={`px-4 py-3.5 ${idx < tracks.length - 1 ? 'border-b border-white/6' : ''}`}
+                className={`flex items-center gap-3 px-4 py-3 ${
+                  idx < tracks.length - 1 ? 'border-b border-white/6' : ''
+                } ${!hasAudio ? 'opacity-45' : ''}`}
               >
-                {/* Row header: thumbnail + label + mute */}
-                <div className="mb-2.5 flex items-center gap-3">
+                {/* LEFT — Thumbnail / placeholder + label */}
+                <div className="flex w-[52px] shrink-0 flex-col items-center gap-1.5">
                   {track.thumbnailUrl ? (
                     <img
                       src={track.thumbnailUrl}
                       alt=""
-                      className="h-9 w-14 shrink-0 rounded-md border border-white/12 object-cover"
+                      className="h-10 w-full rounded-lg border border-white/12 object-cover shadow-md"
                     />
                   ) : (
-                    <div className="flex h-9 w-14 shrink-0 items-center justify-center rounded-md border border-white/10 bg-stone-800/70">
-                      <User className="h-4 w-4 text-white/20" />
+                    <div
+                      className="flex h-10 w-full items-center justify-center rounded-lg border border-white/10 bg-stone-800"
+                      style={{ boxShadow: `0 0 0 1px ${accent.hex}22` }}
+                    >
+                      <User className="h-4 w-4 text-white/25" />
                     </div>
                   )}
+                  <span className={`text-center text-[8px] font-bold uppercase tracking-wide ${accent.label}`}>
+                    {track.label}
+                  </span>
+                </div>
 
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className={`text-[11px] font-bold ${accent.label}`}>{track.label}</span>
-                    <span className="text-[9px] tabular-nums text-white/30">
-                      {hasAudio ? `Vol ${vol}%` : 'No recording'}
-                    </span>
-                  </div>
+                {/* CENTER — Volume fader + Scrubber (stacked) */}
+                <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                  {hasAudio ? (
+                    <>
+                      {/* Volume fader */}
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 shrink-0 text-right text-[8px] font-semibold tabular-nums text-white/35">
+                          VOL
+                        </span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={volPct}
+                          onChange={(e) => onVolumeChange(track.id, Number(e.target.value) / 100)}
+                          aria-label={`${track.label} volume`}
+                          className="studio-vol-slider flex-1"
+                          style={
+                            {
+                              '--fill-pct': `${volPct}%`,
+                              '--fill-color': track.color,
+                            } as CSSProperties
+                          }
+                        />
+                        <span className="w-7 shrink-0 text-left text-[9px] tabular-nums text-white/35">
+                          {volPct}%
+                        </span>
+                      </div>
 
+                      {/* Scrubber */}
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 shrink-0 text-right text-[8px] tabular-nums text-white/30">
+                          {fmtTime(currentTime)}
+                        </span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={duration || 1}
+                          step={0.01}
+                          value={currentTime}
+                          onChange={(e) => handleSeek(idx, Number(e.target.value))}
+                          aria-label={`${track.label} seek`}
+                          className="studio-scrubber flex-1"
+                          style={
+                            {
+                              '--fill-pct': `${scrubPct}%`,
+                              '--fill-color': accent.hex,
+                            } as CSSProperties
+                          }
+                        />
+                        <span className="w-7 shrink-0 text-left text-[9px] tabular-nums text-white/30">
+                          {fmtTime(duration)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    /* Empty state — no ghost waveform */
+                    <div className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/4 px-3 py-2">
+                      <span className="text-[10px] italic text-white/40">
+                        Track Empty — Tap Grid to Record
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT — Mute toggle */}
+                <div className="flex w-9 shrink-0 flex-col items-center gap-1">
                   <button
                     type="button"
                     aria-label={track.isMuted ? 'Unmute' : 'Mute'}
                     onClick={() => onMuteToggle(track.id)}
                     disabled={!hasAudio}
-                    className={`${FLOAT_BTN} h-8 w-8 shrink-0 disabled:opacity-25 ${
-                      track.isMuted ? 'border-amber-400/60 bg-amber-500/90 shadow-[0_0_8px_rgba(245,158,11,0.5)]' : ''
+                    className={`${FLOAT_BTN} h-9 w-9 disabled:cursor-not-allowed disabled:opacity-25 ${
+                      track.isMuted
+                        ? 'border-amber-400/60 bg-amber-500/90 shadow-[0_0_10px_rgba(245,158,11,0.55)]'
+                        : 'border-white/12'
                     }`}
                   >
-                    {track.isMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5 text-white/70" />}
-                  </button>
-                </div>
-
-                {/* Volume fader */}
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="w-5 shrink-0 text-right text-[8px] font-semibold text-white/30">
-                    VOL
-                  </span>
-                  <div className="relative flex-1">
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={vol}
-                      disabled={!hasAudio}
-                      onChange={(e) => onVolumeChange(track.id, Number(e.target.value) / 100)}
-                      aria-label={`${track.label} volume`}
-                      className="studio-vol-slider w-full disabled:opacity-30"
-                      style={{ accentColor: track.color }}
-                    />
-                  </div>
-                  <span className="w-7 shrink-0 text-left text-[9px] tabular-nums text-white/40">
-                    {vol}%
-                  </span>
-                </div>
-
-                {/* Scrub / seek bar */}
-                <div className="flex items-center gap-2">
-                  <span className="w-5 shrink-0 text-right text-[8px] font-semibold text-white/30">
-                    {hasAudio ? fmtTime(scrubVal) : '--'}
-                  </span>
-                  <div className="relative flex-1">
-                    {hasAudio ? (
-                      <input
-                        type="range"
-                        min={0}
-                        max={scrubMax || 1}
-                        step={0.01}
-                        value={scrubVal}
-                        onChange={(e) => handleSeek(idx, Number(e.target.value))}
-                        aria-label={`${track.label} seek`}
-                        className="studio-scrubber w-full"
-                      />
+                    {track.isMuted ? (
+                      <MicOff className="h-4 w-4" />
                     ) : (
-                      /* Static decoration when empty */
-                      <div className="relative h-6 overflow-hidden rounded">
-                        <MiniWaveform peaks={PEAKS[idx] ?? []} color={track.color} />
-                        <div className="absolute inset-0 bg-black/30" />
-                      </div>
+                      <Mic className="h-4 w-4 text-white/70" />
                     )}
-                  </div>
-                  <span className="w-7 shrink-0 text-left text-[9px] tabular-nums text-white/40">
-                    {hasAudio ? fmtTime(scrubMax) : '--'}
+                  </button>
+                  <span
+                    className={`text-[7px] font-semibold uppercase tracking-wide ${
+                      track.isMuted ? 'text-amber-400' : 'text-white/25'
+                    }`}
+                  >
+                    {track.isMuted ? 'Muted' : 'Live'}
                   </span>
                 </div>
               </div>
@@ -628,7 +587,6 @@ function FullscreenPreview({ track, onClose }: FullscreenPreviewProps) {
   const videoRef = useRef<HTMLMediaElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  // Auto-play when overlay opens
   useEffect(() => {
     const media = videoRef.current
     if (!media || !track.recordedBlobUrl) return
@@ -662,7 +620,6 @@ function FullscreenPreview({ track, onClose }: FullscreenPreviewProps) {
       className="fixed inset-0 z-[300] flex flex-col bg-black"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      {/* Video */}
       {track.recordedBlobUrl && (
         <TakeVideoPlayer
           filePath=""
@@ -680,7 +637,7 @@ function FullscreenPreview({ track, onClose }: FullscreenPreviewProps) {
         />
       )}
 
-      {/* Transparent tap area — play/pause on tap anywhere */}
+      {/* Tap anywhere to play/pause */}
       <button
         type="button"
         className="absolute inset-0 z-10 cursor-pointer border-0 bg-transparent p-0"
@@ -688,24 +645,18 @@ function FullscreenPreview({ track, onClose }: FullscreenPreviewProps) {
         aria-label={isPlaying ? 'Pause' : 'Play'}
       />
 
-      {/* Top bar — close + label */}
+      {/* Top bar */}
       <div className="relative z-20 flex items-center justify-between px-4 py-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className={`${FLOAT_BTN} h-9 w-9`}
-          aria-label="Close fullscreen"
-        >
+        <button type="button" onClick={onClose} className={`${FLOAT_BTN} h-9 w-9`} aria-label="Close fullscreen">
           <X className="h-4 w-4" />
         </button>
         <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/70 backdrop-blur-sm">
           {track.label}
         </span>
-        {/* Empty spacer to balance flex */}
         <div className="h-9 w-9" />
       </div>
 
-      {/* Center play/pause indicator (fades in/out) */}
+      {/* Center play indicator */}
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
         <div
           className={`flex h-16 w-16 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm transition-opacity duration-300 ${
@@ -716,9 +667,8 @@ function FullscreenPreview({ track, onClose }: FullscreenPreviewProps) {
         </div>
       </div>
 
-      {/* Bottom safe-area spacer */}
       <div
-        className="absolute bottom-0 inset-x-0 z-20"
+        className="absolute inset-x-0 bottom-0 z-20"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       />
     </div>
@@ -732,7 +682,7 @@ function CountInOverlay({ count }: { count: number }) {
     <div className="pointer-events-none absolute inset-0 z-[60] flex items-center justify-center bg-black/72 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-3">
         <span
-          className="font-black leading-none tabular-nums text-white"
+          className="font-black leading-none tabular-nums"
           style={{
             fontSize: 'clamp(100px, 28vw, 200px)',
             color: count === 1 ? '#f87171' : '#ffffff',
@@ -762,6 +712,9 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
   const [mixerOpen, setMixerOpen] = useState(false)
   const [previewIndex, setPreviewIndex] = useState<0 | 1 | 2 | 3 | null>(null)
 
+  // ── Which track index is solo-quick-playing (null = none) ────────────────
+  const [soloPlayIdx, setSoloPlayIdx] = useState<number | null>(null)
+
   const {
     tracks,
     isCountingIn,
@@ -780,9 +733,21 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     setError,
   } = useMultiTrackStudio()
 
+  // Reset solo play when global play starts / recording starts
+  useEffect(() => {
+    if (isPlaying || isCountingIn || tracks.some((t) => t.isRecording)) {
+      setSoloPlayIdx(null)
+    }
+  }, [isPlaying, isCountingIn, tracks])
+
   const isAnyTrackRecording = tracks.some((t) => t.isRecording)
 
-  /** Index of the track that owns the full-screen recording overlay (-1 = grid mode). */
+  /**
+   * The index of the track that should be shown full-screen.
+   * -1 means normal 2×2 grid.
+   * Uses CSS positioning (never unmounts) so the live MediaStream stays
+   * attached and doesn't go black on iOS when re-attaching.
+   */
   const expandedTrackIndex = useMemo(() => {
     const recording = tracks.findIndex((t) => t.isRecording)
     if (recording >= 0) return recording
@@ -793,30 +758,79 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     return -1
   }, [tracks, isCountingIn])
 
-  const isExpanded = expandedTrackIndex >= 0
+  // ── Quick-play / solo handler ────────────────────────────────────────────
+
+  const handleQuickPlayToggle = useCallback(
+    (index: number) => {
+      const el = playbackVideoRefs.current[index]
+      if (!el || !tracks[index]?.recordedBlobUrl) return
+
+      if (!el.paused) {
+        // Pause this track
+        el.pause()
+        void releaseTakePlaybackAudio()
+        setSoloPlayIdx(null)
+      } else {
+        // Pause any currently solo-playing track
+        if (soloPlayIdx !== null && soloPlayIdx !== index) {
+          const other = playbackVideoRefs.current[soloPlayIdx]
+          if (other && !other.paused) {
+            other.pause()
+          }
+        }
+        // Start this track from beginning
+        el.currentTime = 0
+        setSoloPlayIdx(index)
+        void playMediaOnUserGesture(el, () => primeTakePlaybackAudio(el))
+      }
+    },
+    [playbackVideoRefs, soloPlayIdx, tracks],
+  )
+
+  const handlePlaybackEnded = useCallback(
+    (index: number) => {
+      setSoloPlayIdx((prev) => (prev === index ? null : prev))
+    },
+    [],
+  )
 
   const handlePlayStop = useCallback(() => {
-    if (isPlaying) stopAll()
-    else playAll()
+    if (isPlaying) {
+      stopAll()
+    } else {
+      setSoloPlayIdx(null)
+      playAll()
+    }
   }, [isPlaying, playAll, stopAll])
 
   const dismissError = useCallback(() => setError(null), [setError])
 
-  const renderTrack = (index: 0 | 1 | 2 | 3, layout: CellLayout = 'grid') => {
+  // ── Render a single track cell ───────────────────────────────────────────
+
+  const renderTrack = (index: 0 | 1 | 2 | 3) => {
     const track = tracks[index]!
+    const isExpanded = expandedTrackIndex === index
+    const isHidden = expandedTrackIndex >= 0 && expandedTrackIndex !== index
+
     return (
       <StudioTrackCell
-        key={`${track.id}-${layout}`}
+        key={track.id}
         track={track}
         trackIndex={index}
-        layout={layout}
-        playbackVideoRef={(el) => { playbackVideoRefs.current[index] = el }}
+        isExpanded={isExpanded}
+        isHidden={isHidden}
+        isQuickPlaying={soloPlayIdx === index}
+        playbackVideoRef={(el) => {
+          playbackVideoRefs.current[index] = el
+        }}
         onArm={() => initHardware(track.id)}
         onRecord={() => startRecording(track.id)}
         onStop={stopRecording}
         onClear={() => clearTrack(track.id)}
         onMuteToggle={() => setTrackMuted(track.id, !track.isMuted)}
         onVolumeChange={(v) => setTrackVolume(track.id, v)}
+        onQuickPlayToggle={() => handleQuickPlayToggle(index)}
+        onPlaybackEnded={() => handlePlaybackEnded(index)}
         onExpand={() => setPreviewIndex(index)}
       />
     )
@@ -827,7 +841,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
       className="fixed inset-0 z-[200] flex h-screen w-screen flex-col overflow-hidden bg-black text-white"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 items-center justify-between px-4 py-2.5">
         <Pressable
           intensity="soft"
@@ -856,51 +870,42 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             aria-hidden
           />
           <span className="text-[9px] font-semibold uppercase tracking-wider text-white/40">
-            {isCountingIn ? 'Count In' : isAnyTrackRecording ? 'Recording' : isPlaying ? 'Playing' : 'Ready'}
+            {isCountingIn
+              ? 'Count In'
+              : isAnyTrackRecording
+                ? 'Recording'
+                : isPlaying
+                  ? 'Playing'
+                  : 'Ready'}
           </span>
         </div>
       </header>
 
-      {/* ── 2×2 Camera Grid ──────────────────────────────────────────────────── */}
+      {/* ── 2×2 Camera Grid ───────────────────────────────────────────────── */}
+      {/*
+        ALL 4 cells are always in the DOM. When a cell is expanded:
+          - It uses `absolute inset-0 z-50` (relative to <main>) to fill the area.
+          - Other cells use `invisible pointer-events-none` — never unmounted,
+            so live MediaStream refs remain attached (prevents iOS black screen).
+      */}
       <main className="relative flex min-h-0 flex-1 flex-col">
-        {/* Full-screen recording / count-in overlay — only the active track */}
-        {isExpanded && (
-          <div className="absolute inset-0 z-50 flex flex-col bg-black">
-            {renderTrack(expandedTrackIndex as 0 | 1 | 2 | 3, 'fullscreen')}
+        <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-2.5">
+          <div className="flex min-h-0 flex-1 gap-2.5">
+            {renderTrack(0)}
+            {renderTrack(1)}
           </div>
-        )}
-
-        {/* Normal 2×2 grid — fully unmounted while a track is expanded */}
-        {!isExpanded && (
-          <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-2.5">
-            <div className="flex min-h-0 flex-1 gap-2.5">
-              {renderTrack(0)}
-              {renderTrack(1)}
-            </div>
-            <div className="flex min-h-0 flex-1 gap-2.5">
-              {renderTrack(2)}
-              {renderTrack(3)}
-            </div>
+          <div className="flex min-h-0 flex-1 gap-2.5">
+            {renderTrack(2)}
+            {renderTrack(3)}
           </div>
-        )}
-
-        {/* Hidden backing-track players — keep sync playback alive during recording */}
-        {isExpanded && (
-          <div aria-hidden className="studio-track-cell--hidden-playback">
-            {tracks.map((t, i) =>
-              i !== expandedTrackIndex && t.recordedBlobUrl
-                ? renderTrack(i as 0 | 1 | 2 | 3, 'hidden-playback')
-                : null,
-            )}
-          </div>
-        )}
+        </div>
 
         {isCountingIn && currentCount > 0 && <CountInOverlay count={currentCount} />}
 
         {error && (
           <button
             type="button"
-            className="absolute inset-x-4 top-2 z-50 rounded-xl border border-red-500/40 bg-red-950/90 px-4 py-3 text-left text-xs text-red-300 backdrop-blur-md active:scale-[0.98]"
+            className="absolute inset-x-4 top-2 z-[70] rounded-xl border border-red-500/40 bg-red-950/90 px-4 py-3 text-left text-xs text-red-300 backdrop-blur-md active:scale-[0.98]"
             onClick={dismissError}
             aria-live="assertive"
           >
@@ -924,7 +929,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         )}
       </main>
 
-      {/* ── Transport Bar ────────────────────────────────────────────────────── */}
+      {/* ── Transport Bar ─────────────────────────────────────────────────── */}
       <footer
         className="shrink-0 border-t border-white/8 bg-zinc-950/90 backdrop-blur-md"
         style={{
@@ -934,7 +939,6 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         }}
       >
         <div className="flex items-center justify-between gap-3">
-          {/* Mixer toggle */}
           <button
             type="button"
             aria-label="Open audio mixer"
@@ -968,7 +972,6 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             )}
           </button>
 
-          {/* Mixdown */}
           <button
             type="button"
             aria-label="Mixdown and export"
