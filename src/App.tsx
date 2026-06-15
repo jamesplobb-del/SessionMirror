@@ -118,8 +118,8 @@ export default function App() {
 
   if (studioMode) {
     return (
-      <Suspense fallback={<div className="app-shell bg-black" aria-hidden />}>
-        <StudioSandbox onExit={() => setStudioMode(false)} />
+      <Suspense fallback={<div className="fixed inset-0 bg-black" aria-hidden />}>
+        <StudioSandbox key="studio-sandbox" onExit={() => setStudioMode(false)} />
       </Suspense>
     )
   }
