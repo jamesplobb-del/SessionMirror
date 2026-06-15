@@ -1768,77 +1768,42 @@ html.physical-landscape-right .control-deck__vault-btn {
   background-color: transparent;
 }
 
-/* ── Studio DAW (isolated multi-track mode) ── */
+/* ── Studio Sandbox (isolated multi-track DAW mode) ── */
 
-.studio-daw {
-  background:
-    radial-gradient(120% 70% at 50% -15%, rgba(56, 189, 248, 0.1), transparent 50%),
-    linear-gradient(180deg, #09090b 0%, #000 100%);
-}
-
-.studio-daw__slider {
+/* Volume slider — shared across all 4 track rows */
+.studio-vol-slider {
   -webkit-appearance: none;
   appearance: none;
-  background: rgba(255, 255, 255, 0.12);
+  height: 3px;
+  background: rgba(100, 116, 139, 0.35);
   border-radius: 999px;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
 }
 
-.studio-daw__slider::-webkit-slider-thumb {
+.studio-vol-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 999px;
-  background: #38bdf8;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  transition: background 0.15s;
 }
 
-.studio-waveform__shade {
-  position: absolute;
-  inset-block: 0;
-  background: rgba(0, 0, 0, 0.55);
-  pointer-events: none;
+.studio-vol-slider::-webkit-slider-thumb:active {
+  background: #e2e8f0;
 }
 
-.studio-waveform__shade--left {
-  left: 0;
-}
-
-.studio-waveform__shade--right {
-  right: 0;
-}
-
-.studio-waveform__selection {
-  position: absolute;
-  inset-block: 0;
-  border-inline: 1px solid rgba(56, 189, 248, 0.45);
-  background: rgba(56, 189, 248, 0.08);
-  pointer-events: none;
-}
-
-.studio-waveform__handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 2;
-  cursor: ew-resize;
-  touch-action: none;
-}
-
-.studio-waveform__handle::after {
-  content: '';
-  position: absolute;
-  top: 0.35rem;
-  bottom: 0.35rem;
-  width: 3px;
-  border-radius: 999px;
-  background: #38bdf8;
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.55);
-}
-
-.studio-waveform__handle--start::after {
-  right: 2px;
-}
-
-.studio-waveform__handle--end::after {
-  left: 2px;
+.studio-vol-slider::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
