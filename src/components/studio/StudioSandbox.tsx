@@ -127,9 +127,7 @@ function TrackRow({
   // Each handle div calls parentElement.getBoundingClientRect() to measure
   // the timeline container — no extra refs needed.
 
-  const makeHandlePointerDown = (side: 'start' | 'end') => (
-    e: React.PointerEvent<HTMLDivElement>,
-  ) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -280,7 +278,7 @@ function TrackRow({
               aria-label="Trim start"
               className="absolute inset-y-0 z-[4] flex w-4 cursor-ew-resize touch-none select-none items-center justify-center"
               style={{ left: `calc(${trimStart}% - 8px)` }}
-              onPointerDown={makeHandlePointerDown('start')}
+              onPointerDown={handlePointerDown}
               onPointerMove={makeHandlePointerMove('start')}
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
@@ -294,7 +292,7 @@ function TrackRow({
               aria-label="Trim end"
               className="absolute inset-y-0 z-[4] flex w-4 cursor-ew-resize touch-none select-none items-center justify-center"
               style={{ left: `calc(${trimEnd}% - 8px)` }}
-              onPointerDown={makeHandlePointerDown('end')}
+              onPointerDown={handlePointerDown}
               onPointerMove={makeHandlePointerMove('end')}
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
