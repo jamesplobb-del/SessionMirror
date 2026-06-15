@@ -1768,14 +1768,13 @@ html.physical-landscape-right .control-deck__vault-btn {
   background-color: transparent;
 }
 
-/* ── Studio Sandbox (isolated multi-track DAW mode) ── */
+/* ── Studio Sandbox ── */
 
-/* Volume slider — shared across all 4 track rows */
 .studio-vol-slider {
   -webkit-appearance: none;
   appearance: none;
   height: 3px;
-  background: rgba(100, 116, 139, 0.35);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   cursor: pointer;
   outline: none;
@@ -1784,26 +1783,26 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 .studio-vol-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  background: #94a3b8;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #e2e8f0;
+  border: none;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-  transition: background 0.15s;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+  transition: transform 0.1s;
 }
 
 .studio-vol-slider::-webkit-slider-thumb:active {
-  background: #e2e8f0;
+  transform: scale(1.25);
 }
 
 .studio-vol-slider::-moz-range-thumb {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  background: #94a3b8;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #e2e8f0;
+  border: none;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
 }
