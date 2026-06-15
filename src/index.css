@@ -1806,3 +1806,28 @@ html.physical-landscape-right .control-deck__vault-btn {
   cursor: pointer;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
 }
+
+/* Studio Sandbox — 2×2 track grid cells (PiP-inspired) */
+.studio-track-cell {
+  overflow: visible;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.studio-track-cell--recording {
+  animation: studio-rec-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes studio-rec-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(239, 68, 68, 0.35),
+      0 4px 16px rgba(0, 0, 0, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(239, 68, 68, 0.25),
+      0 4px 20px rgba(239, 68, 68, 0.2);
+  }
+}

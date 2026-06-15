@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import {
   ArrowLeft,
   ChevronDown,
@@ -6,16 +6,43 @@ import {
   Layers,
   Mic,
   MicOff,
+  Pause,
   Play,
   Square,
-  Trash2,
   User,
   Video,
+  X,
 } from 'lucide-react'
 import Pressable from '../ui/Pressable'
+import TakeVideoPlayer from '../TakeVideoPlayer'
+import MiniPipControls from '../MiniPipControls'
 import { useMultiTrackStudio, type StudioTrack } from './useMultiTrackStudio'
+import { stopEventBubble } from '../../utils/eventBubbling'
+import { playMediaOnUserGesture } from '../../utils/mediaPlayback'
+import { mobileVideoProps } from '../../utils/mobileVideo'
+import {
+  primeTakePlaybackAudio,
+  releaseTakePlaybackAudio,
+} from '../../utils/takePlaybackAudio'
 
-// ─── Waveform data (static visual decoration inside the mixer drawer) ─────────
+// ─── Track accent styling (mirrors Best Take / Current Take PiP palette) ─────
+
+const TRACK_ACCENTS = [
+  { ring: 'ring-sky-400/50', badge: 'bg-sky-500/90', label: 'text-sky-300' },
+  { ring: 'ring-violet-400/50', badge: 'bg-violet-500/90', label: 'text-violet-300' },
+  { ring: 'ring-emerald-400/50', badge: 'bg-emerald-500/90', label: 'text-emerald-300' },
+  { ring: 'ring-orange-400/50', badge: 'bg-orange-500/90', label: 'text-orange-300' },
+] as const
+
+const FLOAT_BTN =
+  'pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90 active:scale-90'
+
+const PIP_PLAY_TARGET =
+  'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
+const PIP_PLAY_ICON =
+  'flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/95 shadow-[0_2px_8px_rgba(0,0,0,0.45)] backdrop-blur-sm transition hover:bg-black/80'
+
+// ─── Waveform decoration (mixer drawer) ──────────────────────────────────────
 
 function makePeaks(seed: number, count = 60): number[] {
   return Array.from({ length: count }, (_, i) =>
@@ -31,8 +58,6 @@ function makePeaks(seed: number, count = 60): number[] {
   )
 }
 const PEAKS = [makePeaks(1.2), makePeaks(3.8), makePeaks(2.1), makePeaks(5.5)]
-
-// ─── Mini waveform ────────────────────────────────────────────────────────────
 
 function MiniWaveform({ peaks, color }: { peaks: number[]; color: string }) {
   return (
@@ -58,140 +83,295 @@ function MiniWaveform({ peaks, color }: { peaks: number[]; color: string }) {
   )
 }
 
-// ─── Camera Cell ──────────────────────────────────────────────────────────────
+// ─── Studio Track Cell ────────────────────────────────────────────────────────
 
-interface CameraCellProps {
+interface StudioTrackCellProps {
   track: StudioTrack
-  videoRef: (el: HTMLVideoElement | null) => void
-  onArm: () => void           // triggers initHardware → shows live preview
-  onRecord: () => void        // triggers count-in → MediaRecorder
+  trackIndex: number
+  playbackVideoRef: (el: HTMLMediaElement | null) => void
+  onArm: () => void
+  onRecord: () => void
   onStop: () => void
   onClear: () => void
   onMuteToggle: () => void
+  onVolumeChange: (volume: number) => void
 }
 
-function CameraCell({
+function StudioTrackCell({
   track,
-  videoRef,
+  trackIndex,
+  playbackVideoRef,
   onArm,
   onRecord,
   onStop,
   onClear,
   onMuteToggle,
-}: CameraCellProps) {
+  onVolumeChange,
+}: StudioTrackCellProps) {
+  const livePreviewRef = useRef<HTMLVideoElement>(null)
+  const playbackRef = useRef<HTMLMediaElement | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [showPoster, setShowPoster] = useState(true)
+
+  const accent = TRACK_ACCENTS[trackIndex % TRACK_ACCENTS.length]!
   const hasLive = !!track.stream && !track.recordedBlobUrl
   const hasRecording = !!track.recordedBlobUrl
   const isRecording = track.isRecording
+  const videoSourceKey = track.recordedBlobUrl ?? 'empty'
+
+  // Wire playback ref into the shared engine
+  useEffect(() => {
+    playbackVideoRef(playbackRef.current)
+  })
+
+  // Mount live camera stream with front-camera mirror (same as main app)
+  useEffect(() => {
+    const video = livePreviewRef.current
+    if (!video || !track.stream || hasRecording) {
+      if (video?.srcObject) video.srcObject = null
+      return
+    }
+    if (video.srcObject !== track.stream) {
+      video.srcObject = track.stream
+      void video.play().catch(() => {})
+    } else if (video.paused) {
+      void video.play().catch(() => {})
+    }
+  }, [track.stream, hasRecording])
+
+  // Sync play / poster state from the playback media element
+  useEffect(() => {
+    const media = playbackRef.current
+    if (!media || !hasRecording) {
+      setIsPlaying(false)
+      setShowPoster(true)
+      return
+    }
+
+    const syncPlaying = () => {
+      const playing = !media.paused && !media.ended
+      setIsPlaying(playing)
+      setShowPoster(!playing)
+    }
+
+    media.addEventListener('play', syncPlaying)
+    media.addEventListener('pause', syncPlaying)
+    media.addEventListener('ended', syncPlaying)
+    syncPlaying()
+
+    return () => {
+      media.removeEventListener('play', syncPlaying)
+      media.removeEventListener('pause', syncPlaying)
+      media.removeEventListener('ended', syncPlaying)
+    }
+  }, [hasRecording, videoSourceKey])
+
+  const handlePlayPause = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      stopEventBubble(event)
+      const media = playbackRef.current
+      if (!media) return
+
+      if (media.paused) {
+        media.currentTime = 0
+        void playMediaOnUserGesture(media, () => primeTakePlaybackAudio(media)).then(
+          (started) => {
+            setIsPlaying(started)
+            setShowPoster(!started)
+          },
+        )
+      } else {
+        media.pause()
+        void releaseTakePlaybackAudio()
+        setIsPlaying(false)
+        setShowPoster(true)
+      }
+    },
+    [],
+  )
+
+  const handleVolume = useCallback(
+    (value: number) => {
+      onVolumeChange(value)
+    },
+    [onVolumeChange],
+  )
+
+  const containerRing = isRecording
+    ? 'ring-red-500/60 border-red-400/70 studio-track-cell--recording'
+    : `${accent.ring} border-white/15`
 
   return (
-    <div
-      className="relative flex-1 overflow-hidden rounded-2xl border"
-      style={{
-        borderColor: isRecording ? 'rgba(239,68,68,0.7)' : 'rgba(255,255,255,0.08)',
-        background: '#0d1117',
-        boxShadow: isRecording ? '0 0 18px rgba(239,68,68,0.3)' : undefined,
-      }}
-    >
-      {/* ── Video element (live OR playback) ─────────────────────────── */}
-      <video
-        ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover"
-        playsInline
-        // muted is set programmatically in the hook based on live vs playback
-        muted
-        loop={hasRecording}
-      />
+    <div className="studio-track-cell group relative min-h-0 flex-1">
+      <div
+        data-studio-track={track.id}
+        className={`relative h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[box-shadow,border-color] duration-200 ${containerRing}`}
+      >
+        {/* Track label badge — same style as Best Take / Current Take pills */}
+        <span
+          className={`pointer-events-none absolute z-20 max-w-[calc(100%-4rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider text-white ${accent.badge}`}
+          style={{ top: 6, left: 8 }}
+        >
+          {isRecording ? '● Recording' : track.label}
+        </span>
 
-      {/* ── Empty-cell placeholder (hidden when stream/recording active) ─ */}
-      {!hasLive && !hasRecording && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 opacity-20">
-          <User className="h-9 w-9 text-white" strokeWidth={1.2} />
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white">
-            {track.label}
-          </span>
-        </div>
-      )}
+        {/* Live camera preview (mirrored like main app) */}
+        {hasLive && (
+          <video
+            ref={livePreviewRef}
+            autoPlay
+            muted
+            playsInline
+            disablePictureInPicture
+            {...mobileVideoProps}
+            className="camera-preview camera-preview--mirror camera-preview--live absolute inset-0 h-full w-full object-cover"
+          />
+        )}
 
-      {/* ── Recording blink ring ─────────────────────────────────────── */}
-      {isRecording && (
-        <div
-          className="pointer-events-none absolute inset-0 rounded-2xl animate-pulse"
-          style={{ boxShadow: 'inset 0 0 0 2.5px rgba(239,68,68,0.85)' }}
-          aria-hidden
-        />
-      )}
+        {/* Recorded take playback (mirrored like in-app takes) */}
+        {hasRecording && track.recordedBlobUrl && (
+          <TakeVideoPlayer
+            filePath=""
+            videoUrl={track.recordedBlobUrl}
+            videoRef={playbackRef}
+            videoSourceKey={videoSourceKey}
+            className="absolute inset-0 h-full w-full object-cover"
+            loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
+            mirror
+            controls={false}
+            manualPlayOnly
+            audible={isPlaying && !track.isMuted}
+            eagerLoad
+            preload="auto"
+            loop
+          />
+        )}
 
-      {/* ── Top-left controls ────────────────────────────────────────── */}
-      <div className="absolute left-2 top-2 flex gap-1.5">
-        {/* Arm / Record button */}
+        {/* Thumbnail poster — shown when take exists but is not playing */}
+        {hasRecording && showPoster && track.thumbnailUrl && (
+          <img
+            src={track.thumbnailUrl}
+            alt=""
+            className="pointer-events-none absolute inset-0 z-[2] h-full w-full object-cover"
+            draggable={false}
+          />
+        )}
+
+        {/* Empty state */}
+        {!hasLive && !hasRecording && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-stone-800/90 px-3 pt-6">
+            <User className="h-8 w-8 text-white/25" strokeWidth={1.2} />
+            <p className="text-center text-[9px] leading-snug text-white/40">
+              Tap camera to arm
+            </p>
+          </div>
+        )}
+
+        {/* Center play/pause — matches PiP inline preview */}
+        {hasRecording && (
+          <div className="absolute inset-0 z-[5] pointer-events-none">
+            <button
+              type="button"
+              onPointerDown={stopEventBubble}
+              onTouchStart={stopEventBubble}
+              onTouchEnd={stopEventBubble}
+              onPointerUp={handlePlayPause}
+              className={`${PIP_PLAY_TARGET} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
+                isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
+              } transition-opacity`}
+              aria-label={isPlaying ? 'Pause take' : 'Play take'}
+            >
+              <span className={PIP_PLAY_ICON}>
+                {isPlaying ? (
+                  <Pause className="h-3.5 w-3.5 fill-white" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 fill-white" />
+                )}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Bottom volume strip — slides up on hover like PiP */}
+        {hasRecording && (
+          <div
+            className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/65 px-2.5 py-1.5 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MiniPipControls
+              isPlaying={isPlaying}
+              volume={track.isMuted ? 0 : track.volume}
+              onPlayPauseClick={handlePlayPause}
+              onVolumeChange={handleVolume}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Floating corner controls — outside overflow clip like PiP badges */}
+      <div className="absolute left-1.5 top-1.5 z-30 flex gap-1.5">
         {!hasRecording && !isRecording && (
           <button
             type="button"
             aria-label={hasLive ? `Record ${track.label}` : `Arm ${track.label}`}
             onClick={hasLive ? onRecord : onArm}
-            className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all active:scale-90 ${
+            className={`${FLOAT_BTN} ${
               hasLive
-                ? 'border-red-400/70 bg-red-500/90 shadow-[0_0_10px_rgba(239,68,68,0.6)]'
-                : 'border-white/20 bg-black/50 backdrop-blur-sm'
+                ? 'border-red-400/60 bg-red-500/90 shadow-[0_0_10px_rgba(239,68,68,0.55)]'
+                : ''
             }`}
           >
             {hasLive ? (
               <div className="h-2.5 w-2.5 rounded-full bg-white" />
             ) : (
-              <Video className="h-3 w-3 text-white/60" />
+              <Video className="h-3.5 w-3.5 text-white/80" />
             )}
           </button>
         )}
 
-        {/* Stop recording */}
         {isRecording && (
           <button
             type="button"
             aria-label="Stop recording"
             onClick={onStop}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-red-400/70 bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.7)] active:scale-90"
+            className={`${FLOAT_BTN} border-red-400/60 bg-red-500/90 shadow-[0_0_12px_rgba(239,68,68,0.65)]`}
           >
             <Square className="h-3 w-3 text-white" fill="currentColor" />
           </button>
         )}
 
-        {/* Mute toggle (only for recorded tracks) */}
         {hasRecording && (
           <button
             type="button"
             aria-label={track.isMuted ? 'Unmute' : 'Mute'}
             onClick={onMuteToggle}
-            className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all active:scale-90 ${
+            className={`${FLOAT_BTN} ${
               track.isMuted
-                ? 'border-amber-400/60 bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.6)]'
-                : 'border-white/20 bg-black/50 backdrop-blur-sm'
+                ? 'border-amber-400/60 bg-amber-500/90 shadow-[0_0_10px_rgba(245,158,11,0.55)]'
+                : ''
             }`}
           >
             {track.isMuted ? (
-              <MicOff className="h-3.5 w-3.5 text-white" />
+              <MicOff className="h-3.5 w-3.5" />
             ) : (
-              <Mic className="h-3.5 w-3.5 text-white/70" />
+              <Mic className="h-3.5 w-3.5 text-white/80" />
             )}
           </button>
         )}
       </div>
 
-      {/* ── Bottom-right: label chip + clear button ───────────────────── */}
-      <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-        {hasRecording && (
-          <button
-            type="button"
-            aria-label={`Clear ${track.label}`}
-            onClick={onClear}
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/50 transition active:scale-90 hover:text-white/80 backdrop-blur-sm"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
-        )}
-        <span className="rounded-full bg-black/55 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/45 backdrop-blur-sm">
-          {isRecording ? '● REC' : track.label}
-        </span>
-      </div>
+      {hasRecording && (
+        <button
+          type="button"
+          aria-label={`Clear ${track.label}`}
+          onClick={onClear}
+          className={FLOAT_BTN}
+          style={{ position: 'absolute', top: -10, right: -10, zIndex: 30 }}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   )
 }
@@ -208,17 +388,13 @@ interface AudioDrawerProps {
 function AudioDrawer({ tracks, onVolumeChange, onMuteToggle, onClose }: AudioDrawerProps) {
   return (
     <>
-      {/* Scrim */}
       <div className="absolute inset-0 z-30 bg-black/55" onClick={onClose} aria-hidden />
 
-      {/* Sheet */}
       <div className="absolute inset-x-0 bottom-0 z-40 flex max-h-[72%] flex-col overflow-hidden rounded-t-3xl border-t border-white/10 bg-zinc-900/98 shadow-2xl backdrop-blur-xl">
-        {/* Handle pill */}
         <div className="flex shrink-0 flex-col items-center pb-1 pt-3">
           <div className="h-1 w-10 rounded-full bg-white/20" />
         </div>
 
-        {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-5 py-3">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-white/50" />
@@ -228,17 +404,17 @@ function AudioDrawer({ tracks, onVolumeChange, onMuteToggle, onClose }: AudioDra
             type="button"
             aria-label="Close mixer"
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 transition active:scale-90 hover:bg-white/15"
+            className={`${FLOAT_BTN} h-7 w-7 bg-white/10 hover:bg-white/15`}
           >
             <ChevronDown className="h-4 w-4 text-white/70" />
           </button>
         </div>
 
-        {/* Track rows */}
         <div className="flex-1 overflow-y-auto">
           {tracks.map((track, idx) => {
             const vol = Math.round(track.volume * 100)
             const hasAudio = !!track.recordedBlobUrl
+            const accent = TRACK_ACCENTS[idx % TRACK_ACCENTS.length]!
             return (
               <div
                 key={track.id}
@@ -246,43 +422,40 @@ function AudioDrawer({ tracks, onVolumeChange, onMuteToggle, onClose }: AudioDra
                   idx < tracks.length - 1 ? 'border-b border-white/6' : ''
                 }`}
               >
-                {/* Label */}
-                <div className="flex w-16 shrink-0 flex-col gap-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <div
-                      className="h-2 w-2 rounded-full"
-                      style={{ background: track.color }}
-                      aria-hidden
+                <div className="flex w-[4.5rem] shrink-0 flex-col gap-0.5">
+                  {track.thumbnailUrl ? (
+                    <img
+                      src={track.thumbnailUrl}
+                      alt=""
+                      className="mb-1 h-8 w-full rounded-md border border-white/10 object-cover"
                     />
-                    <span className="text-[11px] font-bold" style={{ color: track.color }}>
-                      {track.label}
-                    </span>
-                  </div>
+                  ) : (
+                    <div className="mb-1 flex h-8 w-full items-center justify-center rounded-md border border-white/10 bg-stone-800/80">
+                      <span className="text-[8px] text-white/25">empty</span>
+                    </div>
+                  )}
+                  <span className={`text-[10px] font-bold ${accent.label}`}>{track.label}</span>
                   <span className="text-[9px] tabular-nums text-white/30">
-                    {hasAudio ? `${vol}%` : 'empty'}
+                    {hasAudio ? `${vol}%` : '—'}
                   </span>
                 </div>
 
-                {/* Mute toggle */}
                 <button
                   type="button"
                   aria-label={track.isMuted ? 'Unmute' : 'Mute'}
                   onClick={() => onMuteToggle(track.id)}
                   disabled={!hasAudio}
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all active:scale-90 disabled:opacity-25 ${
-                    track.isMuted
-                      ? 'border-amber-400/60 bg-amber-500/90'
-                      : 'border-white/15 bg-white/8'
+                  className={`${FLOAT_BTN} h-7 w-7 shrink-0 disabled:opacity-25 ${
+                    track.isMuted ? 'border-amber-400/60 bg-amber-500/90' : ''
                   }`}
                 >
                   {track.isMuted ? (
-                    <MicOff className="h-3 w-3 text-white" />
+                    <MicOff className="h-3 w-3" />
                   ) : (
-                    <Mic className="h-3 w-3 text-white/60" />
+                    <Mic className="h-3 w-3 text-white/70" />
                   )}
                 </button>
 
-                {/* Volume slider — wired to live video element via hook */}
                 <input
                   type="range"
                   min={0}
@@ -294,7 +467,6 @@ function AudioDrawer({ tracks, onVolumeChange, onMuteToggle, onClose }: AudioDra
                   className="studio-vol-slider w-20 shrink-0 disabled:opacity-25"
                 />
 
-                {/* Static waveform decoration */}
                 <div
                   className="relative min-w-0 flex-1 overflow-hidden rounded-lg border border-white/8 bg-black/30"
                   style={{ height: 36 }}
@@ -312,7 +484,6 @@ function AudioDrawer({ tracks, onVolumeChange, onMuteToggle, onClose }: AudioDra
           })}
         </div>
 
-        {/* Safe-area spacer */}
         <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
       </div>
     </>
@@ -326,7 +497,7 @@ function CountInOverlay({ count }: { count: number }) {
     <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-3">
         <span
-          className="font-black text-white leading-none tabular-nums"
+          className="font-black leading-none tabular-nums text-white"
           style={{
             fontSize: 'clamp(100px, 28vw, 200px)',
             textShadow:
@@ -361,7 +532,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     currentCount,
     isPlaying,
     error,
-    videoRefs,
+    playbackVideoRefs,
     initHardware,
     startRecording,
     stopRecording,
@@ -374,22 +545,37 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
   } = useMultiTrackStudio()
 
   const handlePlayStop = useCallback(() => {
-    if (isPlaying) {
-      stopAll()
-    } else {
-      playAll()
-    }
+    if (isPlaying) stopAll()
+    else playAll()
   }, [isPlaying, playAll, stopAll])
 
-  // Dismiss error on tap
   const dismissError = useCallback(() => setError(null), [setError])
+
+  const renderTrack = (index: 0 | 1 | 2 | 3) => {
+    const track = tracks[index]!
+    return (
+      <StudioTrackCell
+        key={track.id}
+        track={track}
+        trackIndex={index}
+        playbackVideoRef={(el) => {
+          playbackVideoRefs.current[index] = el
+        }}
+        onArm={() => initHardware(track.id)}
+        onRecord={() => startRecording(track.id)}
+        onStop={stopRecording}
+        onClear={() => clearTrack(track.id)}
+        onMuteToggle={() => setTrackMuted(track.id, !track.isMuted)}
+        onVolumeChange={(v) => setTrackVolume(track.id, v)}
+      />
+    )
+  }
 
   return (
     <div
       className="fixed inset-0 z-[200] flex h-screen w-screen flex-col overflow-hidden bg-black text-white"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 items-center justify-between px-4 py-2.5">
         <Pressable
           intensity="soft"
@@ -408,7 +594,6 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           </p>
         </div>
 
-        {/* Status indicator */}
         <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/6 px-2.5 py-1.5">
           <div
             className={`h-2 w-2 rounded-full transition-all ${
@@ -421,54 +606,29 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             aria-hidden
           />
           <span className="text-[9px] font-semibold uppercase tracking-wider text-white/40">
-            {isCountingIn ? 'Count In' : tracks.some((t) => t.isRecording) ? 'Recording' : isPlaying ? 'Playing' : 'Ready'}
+            {isCountingIn
+              ? 'Count In'
+              : tracks.some((t) => t.isRecording)
+                ? 'Recording'
+                : isPlaying
+                  ? 'Playing'
+                  : 'Ready'}
           </span>
         </div>
       </header>
 
-      {/* ── 2×2 Camera Grid ──────────────────────────────────────────────── */}
-      <main className="relative flex min-h-0 flex-1 flex-col gap-2 p-2">
-        {/* Row 1 */}
-        <div className="flex min-h-0 flex-1 gap-2">
-          {([0, 1] as const).map((i) => {
-            const track = tracks[i]!
-            return (
-              <CameraCell
-                key={track.id}
-                track={track}
-                videoRef={(el) => { videoRefs.current[i] = el }}
-                onArm={() => initHardware(track.id)}
-                onRecord={() => startRecording(track.id)}
-                onStop={stopRecording}
-                onClear={() => clearTrack(track.id)}
-                onMuteToggle={() => setTrackMuted(track.id, !track.isMuted)}
-              />
-            )
-          })}
+      <main className="relative flex min-h-0 flex-1 flex-col gap-2.5 p-2.5">
+        <div className="flex min-h-0 flex-1 gap-2.5">
+          {renderTrack(0)}
+          {renderTrack(1)}
         </div>
-        {/* Row 2 */}
-        <div className="flex min-h-0 flex-1 gap-2">
-          {([2, 3] as const).map((i) => {
-            const track = tracks[i]!
-            return (
-              <CameraCell
-                key={track.id}
-                track={track}
-                videoRef={(el) => { videoRefs.current[i] = el }}
-                onArm={() => initHardware(track.id)}
-                onRecord={() => startRecording(track.id)}
-                onStop={stopRecording}
-                onClear={() => clearTrack(track.id)}
-                onMuteToggle={() => setTrackMuted(track.id, !track.isMuted)}
-              />
-            )
-          })}
+        <div className="flex min-h-0 flex-1 gap-2.5">
+          {renderTrack(2)}
+          {renderTrack(3)}
         </div>
 
-        {/* Count-in overlay */}
         {isCountingIn && currentCount > 0 && <CountInOverlay count={currentCount} />}
 
-        {/* Error toast */}
         {error && (
           <button
             type="button"
@@ -476,12 +636,12 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             onClick={dismissError}
             aria-live="assertive"
           >
-            <span className="font-bold">Error: </span>{error}
+            <span className="font-bold">Error: </span>
+            {error}
             <span className="ml-2 text-red-500/60">tap to dismiss</span>
           </button>
         )}
 
-        {/* Mixer drawer */}
         {mixerOpen && (
           <AudioDrawer
             tracks={tracks}
@@ -495,7 +655,6 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         )}
       </main>
 
-      {/* ── Transport Bar ─────────────────────────────────────────────────── */}
       <footer
         className="shrink-0 border-t border-white/8 bg-zinc-950/90 backdrop-blur-md"
         style={{
@@ -505,7 +664,6 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         }}
       >
         <div className="flex items-center justify-between gap-3">
-          {/* Mixer toggle */}
           <button
             type="button"
             aria-label="Open audio mixer"
@@ -520,13 +678,12 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             Mixer
           </button>
 
-          {/* Play / Stop */}
           <button
             type="button"
-            aria-label={isPlaying ? 'Stop' : 'Play all tracks'}
+            aria-label={isPlaying ? 'Stop all tracks' : 'Play all tracks'}
             onClick={handlePlayStop}
-            disabled={isCountingIn}
-            className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all active:scale-90 disabled:opacity-40 ${
+            disabled={isCountingIn || !tracks.some((t) => t.recordedBlobUrl)}
+            className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all active:scale-90 disabled:opacity-35 ${
               isPlaying
                 ? 'border-red-500/70 bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.55)]'
                 : 'border-white/25 bg-white shadow-[0_0_16px_rgba(255,255,255,0.2)]'
@@ -543,7 +700,6 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             )}
           </button>
 
-          {/* Mixdown */}
           <button
             type="button"
             aria-label="Mixdown and export"
