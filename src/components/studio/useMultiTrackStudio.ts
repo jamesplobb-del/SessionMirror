@@ -100,9 +100,16 @@ export function useMultiTrackStudio() {
   const countAudioCtxRef = useRef<AudioContext | null>(null)
   const startingSessionRef = useRef(false)
 
-  const releaseLiveStream = useCallback(() => {
-    liveStreamRef.current?.getTracks().forEach((t) => t.stop())
+  const releaseLiveStream = useCallback(async (): Promise<void> => {
+    const stream = liveStreamRef.current
+    if (!stream) return
+
+    stream.getTracks().forEach((t) => t.stop())
     liveStreamRef.current = null
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
   }, [])
 
   const clearTrackPreviewStream = useCallback((id: 1 | 2 | 3 | 4) => {
@@ -268,14 +275,14 @@ export function useMultiTrackStudio() {
   }, [])
 
   const cancelRecordingSession = useCallback(
-    (id: 1 | 2 | 3 | 4) => {
+    async (id: 1 | 2 | 3 | 4) => {
       cancelCountdown()
       startingSessionRef.current = false
       if (recordingIdRef.current === id) {
         const recorder = recorderRef.current
         if (recorder?.state === 'recording') recorder.stop()
       } else {
-        releaseLiveStream()
+        await releaseLiveStream()
         clearTrackPreviewStream(id)
       }
     },
@@ -490,7 +497,16 @@ export function useMultiTrackStudio() {
   const openCameraAndCountdown = useCallback(
     async (id: 1 | 2 | 3 | 4) => {
       setArmingTrackId(id)
-      releaseLiveStream()
+      // #region agent log
+      agentDebugLog(
+        'useMultiTrackStudio.ts:openCamera',
+        'camera session start',
+        { id },
+        'H4',
+        'studio-camera',
+      )
+      // #endregion
+      await releaseLiveStream()
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -499,6 +515,21 @@ export function useMultiTrackStudio() {
         })
 
         liveStreamRef.current = stream
+
+        // #region agent log
+        agentDebugLog(
+          'useMultiTrackStudio.ts:openCamera',
+          'getUserMedia ok',
+          {
+            id,
+            videoTracks: stream.getVideoTracks().length,
+            audioTracks: stream.getAudioTracks().length,
+            videoReadyState: stream.getVideoTracks()[0]?.readyState ?? 'none',
+          },
+          'H4',
+          'studio-camera',
+        )
+        // #endregion
 
         setTracks((prev) =>
           prev.map((t) =>
@@ -511,9 +542,18 @@ export function useMultiTrackStudio() {
         startCountdownAfterPreview(id)
       } catch (err) {
         console.error('openCameraAndCountdown failed', err)
+        // #region agent log
+        agentDebugLog(
+          'useMultiTrackStudio.ts:openCamera',
+          'getUserMedia failed',
+          { id, error: err instanceof Error ? err.name : String(err) },
+          'H4',
+          'studio-camera',
+        )
+        // #endregion
         startingSessionRef.current = false
         setArmingTrackId(null)
-        releaseLiveStream()
+        await releaseLiveStream()
         clearTrackPreviewStream(id)
       }
     },

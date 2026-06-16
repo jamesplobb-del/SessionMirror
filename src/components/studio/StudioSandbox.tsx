@@ -4,6 +4,7 @@ import Pressable from '../ui/Pressable'
 import { mobileVideoProps } from '../../utils/mobileVideo'
 import { agentDebugLog } from '../../utils/agentDebugLog'
 import { useMultiTrackStudio, type StudioTrack } from './useMultiTrackStudio'
+import { attachLiveStreamPreview } from './studioLivePreview'
 
 interface StudioSandboxProps {
   onExit: () => void
@@ -25,6 +26,7 @@ function TrackBox({
   slotIndex,
   videoRefs,
   showPostRecordReview,
+  suppressLivePreview,
   onAction,
   onClear,
   onToggleMute,
@@ -36,6 +38,7 @@ function TrackBox({
   slotIndex: number
   videoRefs: MutableRefObject<(HTMLVideoElement | null)[]>
   showPostRecordReview: boolean
+  suppressLivePreview: boolean
   onAction: () => void
   onClear: () => void
   onToggleMute: () => void
@@ -71,23 +74,31 @@ function TrackBox({
     )
     // #endregion
 
-    if (track.stream) {
+    if (track.stream && !suppressLivePreview) {
       // #region agent log
       agentDebugLog(
         'StudioSandbox.tsx:TrackBox',
         'video bind live stream',
         { partId: track.id, status: track.status, hasSrcObject: !!el.srcObject },
-        'B',
-        'studio-ui',
+        'H7',
+        'studio-camera',
       )
       // #endregion
-      if (el.srcObject !== track.stream) {
-        el.srcObject = track.stream
-        el.removeAttribute('src')
-      }
-      el.muted = true
-      void el.play().catch(() => {})
+      void attachLiveStreamPreview(el, track.stream, `grid-part-${track.id}`)
       return
+    }
+
+    if (track.stream && suppressLivePreview) {
+      // #region agent log
+      agentDebugLog(
+        'StudioSandbox.tsx:TrackBox',
+        'skipped grid live bind (immersive owns stream)',
+        { partId: track.id, status: track.status },
+        'H7',
+        'studio-camera',
+      )
+      // #endregion
+      if (el.srcObject) el.srcObject = null
     }
 
     if (track.recordedUrl) {
@@ -119,7 +130,7 @@ function TrackBox({
     if (el.srcObject) el.srcObject = null
     el.removeAttribute('src')
     el.load()
-  }, [track.stream, track.recordedUrl, track.status])
+  }, [track.stream, track.recordedUrl, track.status, suppressLivePreview])
 
   useEffect(() => {
     const el = videoElRef.current
@@ -288,29 +299,42 @@ function ImmersiveRecordingLayer({
   const isRecording = track.status === 'RECORDING'
   const showCamera = !!track.stream
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = previewRef.current
-    if (!el || !track.stream) return
-
-    if (el.srcObject !== track.stream) {
-      el.srcObject = track.stream
-      el.removeAttribute('src')
+    if (!el || !track.stream) {
+      if (el?.srcObject) el.srcObject = null
+      return
     }
-    el.muted = true
-    void el.play().catch(() => {})
-  }, [track.stream])
+
+    // #region agent log
+    agentDebugLog(
+      'StudioSandbox.tsx:ImmersiveLayer',
+      'binding immersive preview',
+      {
+        partId: track.id,
+        hasRef: !!el,
+        streamId: track.stream.id,
+        isRecording,
+      },
+      'H2',
+      'studio-camera',
+    )
+    // #endregion
+
+    void attachLiveStreamPreview(el, track.stream, `immersive-part-${track.id}`)
+  }, [track.stream, track.id, isRecording])
 
   return (
     <div className="fixed inset-0 z-[250] flex flex-col bg-black">
-      {showCamera && (
-        <video
-          ref={previewRef}
-          playsInline
-          muted
-          {...mobileVideoProps}
-          className="studio-immersive-preview absolute inset-0 h-full w-full object-cover camera-preview camera-preview--mirror"
-        />
-      )}
+      <video
+        ref={previewRef}
+        playsInline
+        muted
+        {...mobileVideoProps}
+        className={`studio-immersive-preview absolute inset-0 h-full w-full object-cover camera-preview camera-preview--mirror ${
+          showCamera ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      />
 
       {isCountingDown && countdownValue > 0 && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/35">
@@ -605,6 +629,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
               slotIndex={track.id - 1}
               videoRefs={videoRefs}
               showPostRecordReview={postRecordReviewId === track.id}
+              suppressLivePreview={isImmersive}
               onAction={() => handleAction(track)}
               onClear={() => clearTrack(track.id)}
               onToggleMute={() => toggleTrackMute(track.id)}
