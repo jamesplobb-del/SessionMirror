@@ -5,14 +5,14 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import {
-  prepareInlineMediaElement,
   safePlayMedia,
   waitForMediaReadyWithRetry,
 } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
+import type { Take } from '../types'
 
 const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
-import type { Take } from '../types'
 
 interface PipWindowProps {
   src: string | null
@@ -133,7 +133,6 @@ function PipWindow({
 
     // Unmute and release mic before .play() — iOS routes muted playback to the earpiece.
     await primeTakePlaybackAudio(video)
-    prepareInlineMediaElement(video)
 
     if (Capacitor.isNativePlatform()) {
       await new Promise((resolve) => window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS))
@@ -192,7 +191,6 @@ function PipWindow({
       }
 
       await primeTakePlaybackAudio(media)
-      prepareInlineMediaElement(media)
 
       const ready = await waitForMediaReadyWithRetry(media)
       if (cancelled || !autoPlaySessionRef.current) return
@@ -244,6 +242,7 @@ function PipWindow({
       const video = videoRef.current
       if (!video) return
       video.volume = value
+      updateTakePlaybackSpeakerGain(video, value, false)
       setVolume(value)
     },
     [videoRef],

@@ -26,7 +26,13 @@ import {
   registerAutoPlaybackHold,
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
+  primeTakePlaybackAudio,
 } from './utils/takePlaybackAudio'
+import {
+  prepareInlineMediaElement,
+  safePlayMedia,
+  waitForMediaReadyWithRetry,
+} from './utils/mediaPlayback'
 import {
   generateThumbnailFromBlob,
   captureAndPersistTakeThumbnail,
@@ -74,6 +80,7 @@ import {
 } from './db'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
+const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
   if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
@@ -290,12 +297,59 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       teardownAutoPlaybackMedia()
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
 
-      setAutoPlaybackTakeId(takeId)
       setAutoRecordStartSuppressed(true)
       setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
+
+      if (showTakeCardsRef.current) {
+        setAutoPlaybackTakeId(takeId)
+        return
+      }
+
+      const audio = autoPlaybackAudioRef.current
+      if (!audio) {
+        pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        finishAutoPlayback()
+        return
+      }
+
+      prepareInlineMediaElement(audio)
+      audio.preload = 'auto'
+      audio.src = playbackUrl
+      audio.load()
+
+      void (async () => {
+        await primeTakePlaybackAudio(audio)
+
+        if (Capacitor.isNativePlatform()) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS),
+          )
+        }
+
+        const ready = await waitForMediaReadyWithRetry(audio)
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+        if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
+          finishAutoPlayback()
+          return
+        }
+
+        audio.onended = () => finishAutoPlayback()
+        audio.onerror = () => finishAutoPlayback()
+
+        const started = await safePlayMedia(audio)
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+
+        if (started) {
+          setHandsFreePlaybackPending(false)
+          setAutoPlaybackPlaying(true)
+        } else {
+          finishAutoPlayback()
+        }
+      })()
     },
-    [teardownAutoPlaybackMedia],
+    [finishAutoPlayback, teardownAutoPlaybackMedia],
   )
 
   playAutoTakeAudioRef.current = playAutoTakeAudio
@@ -404,7 +458,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         immediateUrl ?? (await resolveTakePlaybackUrl(filePath, videoUrl))
       const projectId = activeProjectIdRef.current
 
-      if (shouldAutoPlay) {
+      if (showTakeCardsRef.current || shouldAutoPlay) {
         setChallengerId(takeId)
       }
 
@@ -1068,17 +1122,25 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
 
   useEffect(() => {
     if (!settings.showTakeCards) {
-      setChallengerId(null)
+      if (!autoPlaybackTakeId && !autoPlaybackPlaying && !handsFreePlaybackPending) {
+        setChallengerId(null)
+      }
       return
     }
 
     setChallengerId((current) => {
       if (current && takes.some((take) => take.id === current)) return current
-      const bestId = benchmarkId
-      const candidate = takes.find((take) => take.id !== bestId)
+      const candidate = takes.find((take) => take.id !== benchmarkId)
       return candidate?.id ?? null
     })
-  }, [settings.showTakeCards, takes, benchmarkId])
+  }, [
+    settings.showTakeCards,
+    takes,
+    benchmarkId,
+    autoPlaybackTakeId,
+    autoPlaybackPlaying,
+    handsFreePlaybackPending,
+  ])
 
   const sortedTakes = useMemo(
     () => sortTakes(takes, sortMode),
@@ -1491,16 +1553,12 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {!quickSettingsOpen && (settings.showTakeCards || autoPlaybackTakeId !== null) && (
+          {!quickSettingsOpen && settings.showTakeCards && (
               <motion.div
                 key="pip-row"
-                className={`app-pip-row-wrap w-full ${
-                  settings.showTakeCards
-                    ? 'pointer-events-auto'
-                    : 'pointer-events-none invisible h-0 min-h-0 overflow-hidden opacity-0'
-                }`}
-                initial={settings.showTakeCards ? { opacity: 0, y: 14 } : false}
-                animate={settings.showTakeCards ? { opacity: 1, y: 0 } : { opacity: 0, y: 0 }}
+                className="app-pip-row-wrap pointer-events-auto w-full"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={iosHudDim}
                 style={motionGpuLayer}
               >

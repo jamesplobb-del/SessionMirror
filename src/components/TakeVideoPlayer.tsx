@@ -4,7 +4,6 @@ import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
-import { prepareInlineMediaElement } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
@@ -82,7 +81,6 @@ export default function TakeVideoPlayer({
     if (!media) return
 
     const ensureAudible = () => {
-      prepareInlineMediaElement(media)
       void primeTakePlaybackAudio(media)
     }
 
@@ -165,7 +163,7 @@ export default function TakeVideoPlayer({
           src={mediaSrc}
           preload={preload}
           {...audioRest}
-          muted={!audible}
+          muted
           autoPlay={false}
           playsInline
           {...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>)}
@@ -208,7 +206,6 @@ export default function TakeVideoPlayer({
     playsInline: true,
     disablePictureInPicture: true,
     ...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>),
-    ...(audible ? {} : { muted: true as const }),
   }
 
   const videoElement = (
@@ -228,7 +225,7 @@ export default function TakeVideoPlayer({
       }}
       {...videoRest}
       {...replayElementProps}
-      muted={!audible}
+      muted
       autoPlay={false}
       controls={
         thumbnailPreview ? false : mirror && !mirroredControls ? false : controls

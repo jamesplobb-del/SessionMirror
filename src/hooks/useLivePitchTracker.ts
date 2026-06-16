@@ -28,7 +28,12 @@ import {
   getMusicRecordingAudioConstraints,
   tuneMusicRecordingStream,
 } from '../utils/audioCapture'
-import { getPlaybackAudioContext, isSharedPlaybackContext, resumePlaybackAudioContext } from '../utils/playbackAudioContext'
+import {
+  getPlaybackAudioContext,
+  isSharedPlaybackContext,
+  resumePlaybackAudioContext,
+} from '../utils/playbackAudioContext'
+import { getTakePlaybackSpeakerNodes } from '../utils/takePlaybackSpeaker'
 const HISTORY_LENGTH = 140
 
 /** Brief hold before glow begins (~220ms). */
@@ -485,13 +490,26 @@ async function createPitchGraph(
     source = elementSource
     mode = 'element'
   } catch {
-    const streamAttach = tryAttachStreamSource(context, analyser, media)
-    if (!streamAttach) {
-      throw new Error('Unable to attach pitch tracker to this playback source')
+    const speakerNodes = getTakePlaybackSpeakerNodes(media)
+    if (speakerNodes) {
+      try {
+        speakerNodes.source.connect(analyser)
+      } catch {
+        /* analyser may already be connected */
+      }
+      passthrough = speakerNodes.gain
+      passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+      source = speakerNodes.source
+      mode = 'element'
+    } else {
+      const streamAttach = tryAttachStreamSource(context, analyser, media)
+      if (!streamAttach) {
+        throw new Error('Unable to attach pitch tracker to this playback source')
+      }
+      source = streamAttach.source
+      passthrough = streamAttach.passthrough
+      mode = 'stream'
     }
-    source = streamAttach.source
-    passthrough = streamAttach.passthrough
-    mode = 'stream'
   }
 
   const detector = PitchDetector.forFloat32Array(profile.frameSize)

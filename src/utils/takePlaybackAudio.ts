@@ -1,5 +1,7 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
+import { prepareInlineMediaElement } from './mediaPlayback'
 import { primePlaybackAudioContextSync } from './playbackAudioContext'
+import { routeTakePlaybackToSpeaker } from './takePlaybackSpeaker'
 
 type MicHandler = () => void | Promise<void>
 
@@ -24,26 +26,19 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
 }
 
-function primeMediaElements(
-  ...media: Array<HTMLMediaElement | null | undefined>
-): void {
-  for (const element of media) {
-    if (!element) continue
-    element.muted = false
-    element.defaultMuted = false
-    element.volume = 1
-    element.setAttribute('playsinline', 'true')
-    element.setAttribute('webkit-playsinline', 'true')
-  }
-}
-
 /** Prepare playback — await before calling .play() so mic is released first. */
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
   await suspendMicInput?.()
   primePlaybackAudioContextSync()
-  primeMediaElements(...media)
+
+  for (const element of media) {
+    if (!element) continue
+    prepareInlineMediaElement(element)
+    routeTakePlaybackToSpeaker(element, element.volume, false)
+  }
+
   resumePitchGraphsForMedia(...media)
 }
 
