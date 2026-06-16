@@ -29,11 +29,6 @@ import {
   releaseTakePlaybackAudio,
 } from './utils/takePlaybackAudio'
 import {
-  prepareInlineMediaElement,
-  safePlayMedia,
-  waitForMediaReadyWithRetry,
-} from './utils/mediaPlayback'
-import {
   generateThumbnailFromBlob,
   captureAndPersistTakeThumbnail,
   hydrateTakeThumbnailsInBackground,
@@ -80,7 +75,6 @@ import {
 } from './db'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
-const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
   if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
@@ -302,68 +296,8 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
 
-      // Take cards visible → PipWindow auto-starts inline quick preview
-      if (showTakeCardsRef.current) {
-        return
-      }
-
-      // Fallback when PiP row is hidden — use hidden audio element
-      const audio = autoPlaybackAudioRef.current
-      if (!audio) {
-        pendingAutoPlaybackRef.current = false
-        setHandsFreePlaybackPending(false)
-        return
-      }
-
-      prepareInlineMediaElement(audio)
-      audio.preload = 'auto'
-      audio.src = playbackUrl
-      audio.load()
-
-      void (async () => {
-        await primeTakePlaybackAudio(audio)
-
-        if (Capacitor.isNativePlatform()) {
-          await new Promise((resolve) =>
-            window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS),
-          )
-        }
-
-        const ready = await waitForMediaReadyWithRetry(audio)
-        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
-        if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
-          console.warn('Auto playback media not ready', {
-            takeId,
-            readyState: audio.readyState,
-          })
-          finishAutoPlayback()
-          return
-        }
-
-        audio.onended = () => finishAutoPlayback()
-        audio.onerror = () => finishAutoPlayback()
-
-        const started = await safePlayMedia(audio)
-        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
-
-        if (started) {
-          setHandsFreePlaybackPending(false)
-          setAutoPlaybackPlaying(true)
-          return
-        }
-
-        console.warn('Auto playback blocked — retrying after mic release')
-        await primeTakePlaybackAudio(audio)
-        const retryStarted = await safePlayMedia(audio)
-        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
-
-        if (retryStarted) {
-          setHandsFreePlaybackPending(false)
-          setAutoPlaybackPlaying(true)
-        } else {
-          finishAutoPlayback()
-        }
-      })()
+      // PipWindow handles speaker-routed playback (visible row or off-screen mount).
+      return
     },
     [finishAutoPlayback, teardownAutoPlaybackMedia],
   )
@@ -480,7 +414,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
           ...createTake(takeId, index, safeVideoUrl, filePath, mimeType, mediaType),
           recordingOrientation: recordingOrientation ?? 'portrait',
         }
-        if (showTakeCardsRef.current) {
+        if (showTakeCardsRef.current || shouldAutoPlay) {
           setChallengerId(takeId)
         }
         return [...prev, savedTake]
@@ -1561,14 +1495,16 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         />
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          <AnimatePresence>
-            {settings.showTakeCards && !quickSettingsOpen && (
+          {!quickSettingsOpen && (settings.showTakeCards || autoPlaybackTakeId !== null) && (
               <motion.div
                 key="pip-row"
-                className="app-pip-row-wrap pointer-events-auto w-full"
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
+                className={`app-pip-row-wrap w-full ${
+                  settings.showTakeCards
+                    ? 'pointer-events-auto'
+                    : 'pointer-events-none invisible h-0 min-h-0 overflow-hidden opacity-0'
+                }`}
+                initial={settings.showTakeCards ? { opacity: 0, y: 14 } : false}
+                animate={settings.showTakeCards ? { opacity: 1, y: 0 } : { opacity: 0, y: 0 }}
                 transition={iosHudDim}
                 style={motionGpuLayer}
               >
@@ -1594,8 +1530,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
                   hapticFeedback={settings.hapticFeedback}
                 />
               </motion.div>
-            )}
-          </AnimatePresence>
+          )}
 
           <ControlDeck
             isRecording={isRecording}

@@ -4,6 +4,7 @@ import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
+import { prepareInlineMediaElement } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
@@ -81,6 +82,7 @@ export default function TakeVideoPlayer({
     if (!media) return
 
     const ensureAudible = () => {
+      prepareInlineMediaElement(media)
       void primeTakePlaybackAudio(media)
     }
 

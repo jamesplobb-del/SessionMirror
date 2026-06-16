@@ -1,10 +1,17 @@
+import { Capacitor } from '@capacitor/core'
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from 'react'
 import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { playMediaOnUserGesture, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
+import {
+  prepareInlineMediaElement,
+  safePlayMedia,
+  waitForMediaReadyWithRetry,
+} from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+
+const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
 import type { Take } from '../types'
 
 interface PipWindowProps {
@@ -76,6 +83,10 @@ function PipWindow({
 
   const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && Boolean(src)
   const pillLeft = showUploadBadge ? 32 : 8
+  const isAutoPlayArmed = Boolean(
+    autoPlayRequestId && takeId && autoPlayRequestId === takeId,
+  )
+  const playbackAudible = (isAutoPlayArmed || isPlaying) && !suspendPlayback
 
   useEffect(() => {
     setIsPlaying(false)
@@ -119,8 +130,21 @@ function PipWindow({
     if (!video) return false
 
     video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
-    const started = await playMediaOnUserGesture(video, () => primeTakePlaybackAudio(video))
-    setIsPlaying(started)
+
+    // Unmute and release mic before .play() — iOS routes muted playback to the earpiece.
+    await primeTakePlaybackAudio(video)
+    prepareInlineMediaElement(video)
+
+    if (Capacitor.isNativePlatform()) {
+      await new Promise((resolve) => window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS))
+    }
+
+    setIsPlaying(true)
+    const started = await safePlayMedia(video)
+    if (!started) {
+      setIsPlaying(false)
+      void releaseTakePlaybackAudio()
+    }
     return started
   }, [suspendPlayback, variant, videoRef])
 
@@ -166,6 +190,9 @@ function PipWindow({
         onAutoPlayComplete?.()
         return
       }
+
+      await primeTakePlaybackAudio(media)
+      prepareInlineMediaElement(media)
 
       const ready = await waitForMediaReadyWithRetry(media)
       if (cancelled || !autoPlaySessionRef.current) return
@@ -297,7 +324,7 @@ function PipWindow({
               recordingOrientation={recordingOrientation}
               controls={false}
               manualPlayOnly
-              audible={isPlaying && !suspendPlayback}
+              audible={playbackAudible}
               eagerLoad
               preload="auto"
             />
