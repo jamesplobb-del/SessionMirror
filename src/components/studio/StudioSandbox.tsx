@@ -13,12 +13,22 @@ const CIRCLE_BTN =
 
 const TRACK_COLORS = ['#38bdf8', '#c084fc', '#34d399', '#fb923c'] as const
 
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
 function TrackBox({
   track,
   slotIndex,
   videoRefs,
   countdownValue,
   isCountingDownHere,
+  isArmingHere,
+  isImmersive,
+  isImmersiveActive,
+  recordingElapsed,
   showPostRecordReview,
   onAction,
   onClear,
@@ -32,6 +42,10 @@ function TrackBox({
   videoRefs: MutableRefObject<(HTMLVideoElement | null)[]>
   countdownValue: number
   isCountingDownHere: boolean
+  isArmingHere: boolean
+  isImmersive: boolean
+  isImmersiveActive: boolean
+  recordingElapsed: number
   showPostRecordReview: boolean
   onAction: () => void
   onClear: () => void
@@ -43,7 +57,6 @@ function TrackBox({
   const videoElRef = useRef<HTMLVideoElement | null>(null)
   const accent = TRACK_COLORS[slotIndex] ?? TRACK_COLORS[0]
 
-  // Bind ref synchronously — slotIndex is stable (track.id - 1)
   useLayoutEffect(() => {
     videoRefs.current[slotIndex] = videoElRef.current
   })
@@ -86,19 +99,43 @@ function TrackBox({
   const showStop = track.status === 'RECORDING' || track.status === 'PLAYING'
   const showPlay = track.status === 'IDLE' && !!track.recordedUrl && !isCountingDownHere && !showPostRecordReview
   const showRecord =
-    track.status === 'IDLE' && !track.recordedUrl && !isCountingDownHere && !showPostRecordReview
+    track.status === 'IDLE' && !track.recordedUrl && !isCountingDownHere && !showPostRecordReview && !isArmingHere
   const hasTake = !!track.recordedUrl
+  const isRecording = track.status === 'RECORDING'
+
+  const cellClass = isImmersiveActive
+    ? `fixed inset-0 z-50 overflow-hidden bg-black${isRecording ? ' studio-track-cell--recording' : ''}`
+    : isImmersive
+      ? 'studio-track-cell--hidden-playback'
+      : `relative min-h-0 min-w-0 flex-1 overflow-hidden border-2 bg-stone-900 transition-colors ${
+          isRecording
+            ? 'border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.25)]'
+            : hasTake
+              ? 'border-white/20'
+              : 'border-white/8 border-dashed'
+        }`
+
+  const handleCellTap = () => {
+    if (showRecord) onAction()
+  }
 
   return (
     <div
-      className={`relative min-h-0 min-w-0 flex-1 overflow-hidden border-2 bg-stone-900 transition-colors ${
-        track.status === 'RECORDING'
-          ? 'border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.25)]'
-          : hasTake
-            ? 'border-white/20'
-            : 'border-white/8 border-dashed'
-      }`}
-      style={hasTake ? { boxShadow: `inset 0 0 0 1px ${accent}33` } : undefined}
+      className={cellClass}
+      style={!isImmersive && hasTake ? { boxShadow: `inset 0 0 0 1px ${accent}33` } : undefined}
+      onClick={handleCellTap}
+      role={showRecord ? 'button' : undefined}
+      tabIndex={showRecord ? 0 : undefined}
+      onKeyDown={
+        showRecord
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onAction()
+              }
+            }
+          : undefined
+      }
     >
       <video
         ref={videoElRef}
@@ -106,12 +143,12 @@ function TrackBox({
         muted
         {...mobileVideoProps}
         className={`absolute inset-0 h-full w-full object-cover camera-preview ${
-          track.status === 'RECORDING' || hasTake ? 'camera-preview--mirror' : ''
+          isRecording || hasTake ? 'camera-preview--mirror' : ''
         }`}
       />
 
-      {/* Empty slot hint — Acapella-style tap to record */}
-      {!hasTake && track.status !== 'RECORDING' && !isCountingDownHere && (
+      {/* Empty slot hint — tap anywhere to record */}
+      {!isImmersive && !hasTake && !isRecording && !isCountingDownHere && !isArmingHere && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-2">
           <span className="text-[10px] font-medium uppercase tracking-widest text-white/25">
             Tap to record
@@ -119,8 +156,66 @@ function TrackBox({
         </div>
       )}
 
-      {/* Count-in overlay */}
-      {isCountingDownHere && countdownValue > 0 && (
+      {/* Immersive count-in */}
+      {isImmersiveActive && isCountingDownHere && countdownValue > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/60">
+          <span
+            className="font-black tabular-nums leading-none text-white"
+            style={{
+              fontSize: 'clamp(72px, 28vw, 140px)',
+              textShadow: countdownValue === 1 ? '0 0 48px rgba(248,113,113,0.7)' : undefined,
+              color: countdownValue === 1 ? '#fca5a5' : '#fff',
+            }}
+          >
+            {countdownValue}
+          </span>
+        </div>
+      )}
+
+      {/* Arming camera between count-in and stream */}
+      {isImmersiveActive && isArmingHere && !isRecording && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/80">
+          <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/20 border-t-white" />
+          <span className="text-sm font-semibold text-white/70">Starting camera…</span>
+        </div>
+      )}
+
+      {/* Immersive recording HUD — minimal chrome only */}
+      {isImmersiveActive && isRecording && (
+        <>
+          <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-sm">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-red-400">REC</span>
+              <span className="text-xs tabular-nums text-white/80">{formatElapsed(recordingElapsed)}</span>
+            </div>
+            <span
+              className="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90"
+              style={{ backgroundColor: `${accent}cc` }}
+            >
+              Part {track.id}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Stop recording"
+            onClick={(e) => {
+              e.stopPropagation()
+              onAction()
+            }}
+            className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 z-30 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-2 border-white/40 bg-red-500/90 text-white shadow-[0_4px_24px_rgba(239,68,68,0.45)] active:scale-90"
+          >
+            <Square className="h-6 w-6 fill-white" />
+          </button>
+        </>
+      )}
+
+      {/* Grid count-in (non-immersive fallback — should not show if immersive works) */}
+      {!isImmersive && isCountingDownHere && countdownValue > 0 && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-[2px]">
           <span
             className="font-black tabular-nums leading-none text-white"
@@ -135,7 +230,7 @@ function TrackBox({
         </div>
       )}
 
-      {/* Acapella-style Keep / Re-record after each take */}
+      {/* Keep / Re-record after each take */}
       {showPostRecordReview && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Take saved</p>
@@ -158,64 +253,68 @@ function TrackBox({
         </div>
       )}
 
-      {/* Mute */}
-      {hasTake && track.status !== 'RECORDING' && !showPostRecordReview && (
-        <button
-          type="button"
-          aria-label={track.isMuted ? 'Unmute track' : 'Mute track'}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleMute()
-          }}
-          className={`absolute left-2 top-2 z-10 ${CIRCLE_BTN} h-7 w-7 ${
-            track.isMuted ? 'border-amber-400/50 bg-amber-500/80' : 'border-white/15 bg-black/70'
-          }`}
-        >
-          {track.isMuted ? (
-            <VolumeX className="h-3.5 w-3.5" />
-          ) : (
-            <Volume2 className="h-3.5 w-3.5 text-white/85" />
+      {/* Grid-only controls — hidden during immersive recording/count-in */}
+      {!isImmersive && (
+        <>
+          {hasTake && !isRecording && !showPostRecordReview && (
+            <button
+              type="button"
+              aria-label={track.isMuted ? 'Unmute track' : 'Mute track'}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleMute()
+              }}
+              className={`absolute left-2 top-2 z-10 ${CIRCLE_BTN} h-7 w-7 ${
+                track.isMuted ? 'border-amber-400/50 bg-amber-500/80' : 'border-white/15 bg-black/70'
+              }`}
+            >
+              {track.isMuted ? (
+                <VolumeX className="h-3.5 w-3.5" />
+              ) : (
+                <Volume2 className="h-3.5 w-3.5 text-white/85" />
+              )}
+            </button>
           )}
-        </button>
-      )}
 
-      {/* Part label */}
-      <span
-        className="pointer-events-none absolute bottom-2 left-2 rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/90"
-        style={{ backgroundColor: `${accent}cc` }}
-      >
-        Part {track.id}
-      </span>
+          <span
+            className="pointer-events-none absolute bottom-2 left-2 rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/90"
+            style={{ backgroundColor: `${accent}cc` }}
+          >
+            Part {track.id}
+          </span>
 
-      {/* Clear take */}
-      {hasTake && track.status !== 'RECORDING' && !isCountingDownHere && !showPostRecordReview && (
-        <button
-          type="button"
-          aria-label={`Clear part ${track.id}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onClear()
-          }}
-          className={`absolute right-2 top-2 z-10 ${CIRCLE_BTN} h-7 w-7 border-white/15 bg-black/70`}
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      )}
+          {hasTake && !isRecording && !isCountingDownHere && !showPostRecordReview && (
+            <button
+              type="button"
+              aria-label={`Clear part ${track.id}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onClear()
+              }}
+              className={`absolute right-2 top-2 z-10 ${CIRCLE_BTN} h-7 w-7 border-white/15 bg-black/70`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
 
-      {/* Per-part transport */}
-      {!isCountingDownHere && !showPostRecordReview && (
-        <button
-          type="button"
-          aria-label={showStop ? 'Stop' : showPlay ? 'Play part' : 'Record part'}
-          onClick={onAction}
-          className={`absolute bottom-2 right-2 z-10 ${CIRCLE_BTN} ${
-            showRecord ? 'border-red-400/50 bg-red-500/85' : ''
-          }`}
-        >
-          {showStop && <Square className="h-3.5 w-3.5 fill-white" />}
-          {showPlay && <Play className="h-3.5 w-3.5 fill-white" style={{ marginLeft: 1 }} />}
-          {showRecord && <span className="h-3 w-3 rounded-full bg-white" />}
-        </button>
+          {!isCountingDownHere && !showPostRecordReview && !isArmingHere && (
+            <button
+              type="button"
+              aria-label={showStop ? 'Stop' : showPlay ? 'Play part' : 'Record part'}
+              onClick={(e) => {
+                e.stopPropagation()
+                onAction()
+              }}
+              className={`absolute bottom-2 right-2 z-10 ${CIRCLE_BTN} ${
+                showRecord ? 'border-red-400/50 bg-red-500/85' : ''
+              }`}
+            >
+              {showStop && <Square className="h-3.5 w-3.5 fill-white" />}
+              {showPlay && <Play className="h-3.5 w-3.5 fill-white" style={{ marginLeft: 1 }} />}
+              {showRecord && <span className="h-3 w-3 rounded-full bg-white" />}
+            </button>
+          )}
+        </>
       )}
     </div>
   )
@@ -294,9 +393,13 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     hasAnyRecording,
     isAnyRecording,
     isCountingDown,
+    isImmersive,
+    immersiveTrackId,
+    armingTrackId,
     countdownTrackId,
     countdownValue,
     postRecordReviewId,
+    recordingElapsed,
     startRecording,
     stopRecording,
     playTrack,
@@ -309,6 +412,10 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     keepRecordedTake,
     redoRecordedTake,
   } = useMultiTrackStudio()
+
+  useEffect(() => {
+    if (isImmersive) setMixerOpen(false)
+  }, [isImmersive])
 
   const handleAction = useCallback(
     (track: StudioTrack) => {
@@ -339,39 +446,53 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
   return (
     <div
       className="fixed inset-0 z-[200] flex h-screen w-screen flex-col bg-black text-white"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      style={{ paddingTop: isImmersive ? 0 : 'env(safe-area-inset-top)' }}
     >
-      <header className="flex shrink-0 items-center justify-between px-3 py-2">
-        <Pressable
-          intensity="soft"
-          onClick={onExit}
-          className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/70 active:scale-95"
-          aria-label="Exit Studio"
+      {!isImmersive && (
+        <header className="flex shrink-0 items-center justify-between px-3 py-2">
+          <Pressable
+            intensity="soft"
+            onClick={onExit}
+            className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/70 active:scale-95"
+            aria-label="Exit Studio"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Exit
+          </Pressable>
+
+          <div className="flex flex-col items-center">
+            <span className="text-xs font-bold tracking-tight">Acapella Studio</span>
+            <span className="text-[9px] text-white/35">Use headphones when recording</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMixerOpen((o) => !o)}
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold active:scale-95 ${
+              mixerOpen ? 'border-sky-400/50 bg-sky-500/15 text-sky-300' : 'border-white/15 bg-white/8 text-white/70'
+            }`}
+            aria-label="Open mixer"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            Mix
+          </button>
+        </header>
+      )}
+
+      <div
+        className={
+          isImmersive
+            ? 'relative min-h-0 flex-1'
+            : 'relative flex min-h-0 flex-1 flex-col p-2 pb-1'
+        }
+      >
+        <div
+          className={
+            isImmersive
+              ? 'relative h-full w-full'
+              : 'grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5'
+          }
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Exit
-        </Pressable>
-
-        <div className="flex flex-col items-center">
-          <span className="text-xs font-bold tracking-tight">Acapella Studio</span>
-          <span className="text-[9px] text-white/35">Use headphones when recording</span>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setMixerOpen((o) => !o)}
-          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold active:scale-95 ${
-            mixerOpen ? 'border-sky-400/50 bg-sky-500/15 text-sky-300' : 'border-white/15 bg-white/8 text-white/70'
-          }`}
-          aria-label="Open mixer"
-        >
-          <Layers className="h-3.5 w-3.5" />
-          Mix
-        </button>
-      </header>
-
-      <div className="relative flex min-h-0 flex-1 flex-col p-2 pb-1">
-        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5">
           {tracks.map((track) => (
             <TrackBox
               key={track.id}
@@ -380,6 +501,10 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
               videoRefs={videoRefs}
               countdownValue={countdownTrackId === track.id ? countdownValue : 0}
               isCountingDownHere={countdownTrackId === track.id}
+              isArmingHere={armingTrackId === track.id}
+              isImmersive={isImmersive}
+              isImmersiveActive={immersiveTrackId === track.id}
+              recordingElapsed={recordingElapsed}
               showPostRecordReview={postRecordReviewId === track.id}
               onAction={() => handleAction(track)}
               onClear={() => clearTrack(track.id)}
@@ -391,7 +516,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           ))}
         </div>
 
-        {mixerOpen && (
+        {mixerOpen && !isImmersive && (
           <MixerDrawer
             tracks={tracks}
             onVolumeChange={setTrackVolume}
@@ -401,28 +526,29 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         )}
       </div>
 
-      {/* Global transport */}
-      <div
-        className="flex shrink-0 items-center justify-center gap-4 px-4"
-        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-      >
-        <button
-          type="button"
-          aria-label={isGlobalPlaying ? 'Stop all parts' : 'Play all parts'}
-          onClick={handleGlobalPlayStop}
-          disabled={!hasAnyRecording || isAnyRecording || isCountingDown || postRecordReviewId !== null}
-          className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/30 bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.15)] transition active:scale-90 disabled:opacity-35"
+      {!isImmersive && (
+        <div
+          className="flex shrink-0 items-center justify-center gap-4 px-4"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
-          {isGlobalPlaying ? (
-            <Square className="h-5 w-5 fill-black" />
-          ) : (
-            <Play className="h-5 w-5 fill-black" style={{ marginLeft: 2 }} />
-          )}
-        </button>
-        <span className="text-[10px] font-medium uppercase tracking-widest text-white/40">
-          {isGlobalPlaying ? 'Stop All' : 'Play All'}
-        </span>
-      </div>
+          <button
+            type="button"
+            aria-label={isGlobalPlaying ? 'Stop all parts' : 'Play all parts'}
+            onClick={handleGlobalPlayStop}
+            disabled={!hasAnyRecording || isAnyRecording || isCountingDown || postRecordReviewId !== null}
+            className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/30 bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.15)] transition active:scale-90 disabled:opacity-35"
+          >
+            {isGlobalPlaying ? (
+              <Square className="h-5 w-5 fill-black" />
+            ) : (
+              <Play className="h-5 w-5 fill-black" style={{ marginLeft: 2 }} />
+            )}
+          </button>
+          <span className="text-[10px] font-medium uppercase tracking-widest text-white/40">
+            {isGlobalPlaying ? 'Stop All' : 'Play All'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
