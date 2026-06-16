@@ -266,6 +266,8 @@ export function useMultiTrackStudio() {
 
   const playAll = useCallback(async () => {
     stopDriftLoopInternal()
+    setPostRecordReviewId(null)
+
     const current = tracksRef.current
     const toPlay: StudioTrack[] = []
 
@@ -278,6 +280,8 @@ export function useMultiTrackStudio() {
 
     if (toPlay.length === 0) return
 
+    pauseAllExcept(null)
+
     const elements = toPlay
       .map((t) => getVideoForTrack(t.id))
       .filter((el): el is HTMLVideoElement => el !== null)
@@ -285,12 +289,23 @@ export function useMultiTrackStudio() {
     await primeTakePlaybackAudio(...elements)
     resumeMixContext()
 
+    for (const track of toPlay) {
+      wireMixForTrack(track)
+    }
+
     await Promise.all(toPlay.map((track) => playRecordedTrack(track, true)))
 
     startDriftLoop()
     isGlobalPlayingRef.current = true
     setIsGlobalPlaying(true)
-  }, [getVideoForTrack, playRecordedTrack, startDriftLoop, stopDriftLoopInternal])
+  }, [
+    getVideoForTrack,
+    pauseAllExcept,
+    playRecordedTrack,
+    startDriftLoop,
+    stopDriftLoopInternal,
+    wireMixForTrack,
+  ])
 
   const clearTrackInternal = useCallback(
     (id: 1 | 2 | 3 | 4) => {
@@ -374,6 +389,20 @@ export function useMultiTrackStudio() {
 
           setArmingTrackId(null)
           setPostRecordReviewId(trackId)
+
+          // Reset backing tracks to first frame so they stay visible in their boxes
+          for (let slot = 0; slot < TRACK_IDS.length; slot++) {
+            const trackIdAtSlot = TRACK_IDS[slot]!
+            if (trackIdAtSlot === trackId) continue
+            const el = videoRefs.current[slot]
+            if (!el) continue
+            el.pause()
+            try {
+              el.currentTime = 0
+            } catch {
+              /* metadata may not be ready */
+            }
+          }
         }
 
         recorder.start()
