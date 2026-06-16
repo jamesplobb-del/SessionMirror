@@ -477,11 +477,24 @@ export function useMultiTrackStudio() {
   const stopRecording = useCallback(
     (id: 1 | 2 | 3 | 4) => {
       if (recordingIdRef.current !== id) return
+
+      pauseOverdubPlayback(id)
+
+      const el = getVideoForTrack(id)
+      if (el) {
+        el.pause()
+        el.srcObject = null
+      }
+
+      // Drop live preview immediately so immersive overlay closes while the blob finalizes.
+      setTracks((prev) =>
+        prev.map((t) => (t.id === id && t.stream ? { ...t, stream: null } : t)),
+      )
+
       const recorder = recorderRef.current
       if (recorder?.state === 'recording') recorder.stop()
-      pauseOverdubPlayback(id)
     },
-    [pauseOverdubPlayback],
+    [getVideoForTrack, pauseOverdubPlayback],
   )
 
   const playTrack = useCallback(
@@ -577,11 +590,13 @@ export function useMultiTrackStudio() {
   const isAnyRecording = tracks.some((t) => t.status === 'RECORDING')
   const isCountingDown = countdownTrackId !== null
 
-  /** Track that owns immersive fullscreen (count-in, arming, or active record). */
+  /** Track that owns immersive fullscreen (count-in, arming, or active live record). */
   const immersiveTrackId: 1 | 2 | 3 | 4 | null =
-    countdownTrackId ??
-    armingTrackId ??
-    (tracks.find((t) => t.status === 'RECORDING')?.id ?? null)
+    postRecordReviewId !== null
+      ? null
+      : countdownTrackId ??
+        armingTrackId ??
+        (tracks.find((t) => t.status === 'RECORDING' && t.stream)?.id ?? null)
 
   const isImmersive = immersiveTrackId !== null
 

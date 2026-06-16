@@ -294,11 +294,8 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       setAutoRecordStartSuppressed(true)
       setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
-
-      // PipWindow handles speaker-routed playback (visible row or off-screen mount).
-      return
     },
-    [finishAutoPlayback, teardownAutoPlaybackMedia],
+    [teardownAutoPlaybackMedia],
   )
 
   playAutoTakeAudioRef.current = playAutoTakeAudio
@@ -407,14 +404,15 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         immediateUrl ?? (await resolveTakePlaybackUrl(filePath, videoUrl))
       const projectId = activeProjectIdRef.current
 
+      if (shouldAutoPlay) {
+        setChallengerId(takeId)
+      }
+
       setTakes((prev) => {
         const index = prev.length + 1
         const savedTake: Take = {
           ...createTake(takeId, index, safeVideoUrl, filePath, mimeType, mediaType),
           recordingOrientation: recordingOrientation ?? 'portrait',
-        }
-        if (showTakeCardsRef.current || shouldAutoPlay) {
-          setChallengerId(takeId)
         }
         return [...prev, savedTake]
       })
@@ -1336,8 +1334,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   useLayoutEffect(() => {
     resetVideoPlayback(benchmarkPipVideoRef.current)
 
-    const skipChallengerReset =
-      autoPlaybackTakeId !== null && autoPlaybackTakeId === challengerId
+    const skipChallengerReset = autoPlaybackTakeId !== null
 
     if (!skipChallengerReset) {
       resetVideoPlayback(challengerPipVideoRef.current)

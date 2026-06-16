@@ -495,9 +495,8 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         {/* Grid always stays in layout — videos remain in their boxes for playback */}
         <div
           className={`grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5 ${
-            isImmersive ? 'pointer-events-none invisible' : ''
+            isImmersive ? 'pointer-events-none' : ''
           }`}
-          aria-hidden={isImmersive}
         >
           {tracks.map((track) => (
             <TrackBox
@@ -505,7 +504,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
               track={track}
               slotIndex={track.id - 1}
               videoRefs={videoRefs}
-              showPostRecordReview={!isImmersive && postRecordReviewId === track.id}
+              showPostRecordReview={postRecordReviewId === track.id}
               onAction={() => handleAction(track)}
               onClear={() => clearTrack(track.id)}
               onToggleMute={() => toggleTrackMute(track.id)}
@@ -550,7 +549,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         </div>
       )}
 
-      {isImmersive && immersiveTrack && (
+      {isImmersive && immersiveTrack && (immersiveTrack.stream || countdownTrackId === immersiveTrack.id || armingTrackId === immersiveTrack.id) && (
         <ImmersiveRecordingLayer
           track={immersiveTrack}
           slotIndex={immersiveTrack.id - 1}
