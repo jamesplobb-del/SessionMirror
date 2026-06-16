@@ -1880,7 +1880,17 @@ html.physical-landscape-right .control-deck__vault-btn {
   user-select: none;
 }
 
-/* Global .camera-preview is position:fixed for LiveCameraBackground — contain grid previews */
+/* Recorded take playback — lightweight (no global camera-preview fixed positioning) */
+.studio-track-video {
+  contain: strict;
+  transform: translateZ(0);
+}
+
+.studio-grid--playing .studio-track-video {
+  will-change: auto;
+}
+
+/* Live camera in grid cells (if ever shown outside immersive) */
 .studio-track-cell video.camera-preview {
   position: absolute !important;
   inset: 0 !important;

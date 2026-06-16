@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { safePlayMedia } from '../../utils/mediaPlayback'
+import { safePlayMedia, waitForMediaReady } from '../../utils/mediaPlayback'
 import { releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
-import { agentDebugLog } from '../../utils/agentDebugLog'
+import { closeCountdownAudio, playCountdownTick } from './studioCountdownAudio'
 import {
   closeMixContext,
   connectVideoToMix,
@@ -22,7 +22,9 @@ export interface StudioTrack {
 
 const TRACK_IDS = [1, 2, 3, 4] as const
 const COUNTDOWN_SECONDS = 3
-const DRIFT_THRESHOLD_SEC = 0.08
+/** Wider threshold + less frequent sync avoids decode stutter from constant seeking. */
+const DRIFT_THRESHOLD_SEC = 0.2
+const DRIFT_SYNC_INTERVAL_MS = 500
 
 function makeInitialTracks(): StudioTrack[] {
   return TRACK_IDS.map((id) => ({
@@ -57,19 +59,19 @@ function primeRecordedVideo(el: HTMLVideoElement, url: string): void {
   }
 }
 
-function playClick(ctx: AudioContext, hz: number): void {
+function seekVideoTo(el: HTMLVideoElement, time: number): void {
+  if (typeof el.fastSeek === 'function') {
+    try {
+      el.fastSeek(time)
+      return
+    } catch {
+      /* fall through */
+    }
+  }
   try {
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.frequency.value = hz
-    gain.gain.setValueAtTime(0.45, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.07)
+    el.currentTime = time
   } catch {
-    /* context may be closed */
+    /* ignore */
   }
 }
 
@@ -78,7 +80,6 @@ export function useMultiTrackStudio() {
   const tracksRef = useRef(tracks)
   tracksRef.current = tracks
 
-  /** videoRefs[0] = track 1 … videoRefs[3] = track 4 */
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null])
 
   const [isGlobalPlaying, setIsGlobalPlaying] = useState(false)
@@ -95,9 +96,8 @@ export function useMultiTrackStudio() {
   const countIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordStartedAtRef = useRef(0)
-  const driftRafRef = useRef(0)
+  const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isGlobalPlayingRef = useRef(false)
-  const countAudioCtxRef = useRef<AudioContext | null>(null)
   const startingSessionRef = useRef(false)
 
   const releaseLiveStream = useCallback(async (): Promise<void> => {
@@ -144,7 +144,7 @@ export function useMultiTrackStudio() {
       wireMixForTrack(track)
       resumeMixContext()
 
-      if (fromStart) el.currentTime = 0
+      if (fromStart) seekVideoTo(el, 0)
       return safePlayMedia(el)
     },
     [getVideoForTrack, wireMixForTrack],
@@ -173,10 +173,17 @@ export function useMultiTrackStudio() {
     }
   }, [])
 
-  const startDriftLoop = useCallback(() => {
-    cancelAnimationFrame(driftRafRef.current)
+  const stopDriftLoopInternal = useCallback(() => {
+    if (driftIntervalRef.current) {
+      clearInterval(driftIntervalRef.current)
+      driftIntervalRef.current = null
+    }
+  }, [])
 
-    const tick = () => {
+  const startDriftLoop = useCallback(() => {
+    stopDriftLoopInternal()
+
+    driftIntervalRef.current = setInterval(() => {
       const current = tracksRef.current
       let masterEl: HTMLVideoElement | null = null
       let masterDuration = 0
@@ -193,37 +200,29 @@ export function useMultiTrackStudio() {
         }
       }
 
-      if (masterEl) {
-        const masterTime = masterEl.currentTime
-        for (let slot = 0; slot < TRACK_IDS.length; slot++) {
-          const el = videoRefs.current[slot]
-          if (!el || el === masterEl || el.paused) continue
-          if (Math.abs(el.currentTime - masterTime) > DRIFT_THRESHOLD_SEC) {
-            el.currentTime = masterTime
-          }
-        }
+      if (!masterEl) return
 
-        if (isGlobalPlayingRef.current && masterEl.ended) {
-          cancelAnimationFrame(driftRafRef.current)
-          for (let slot = 0; slot < TRACK_IDS.length; slot++) {
-            videoRefs.current[slot]?.pause()
-          }
-          isGlobalPlayingRef.current = false
-          setIsGlobalPlaying(false)
-          void releaseTakePlaybackAudio()
-          return
+      if (isGlobalPlayingRef.current && masterEl.ended) {
+        stopDriftLoopInternal()
+        for (let slot = 0; slot < TRACK_IDS.length; slot++) {
+          videoRefs.current[slot]?.pause()
         }
+        isGlobalPlayingRef.current = false
+        setIsGlobalPlaying(false)
+        void releaseTakePlaybackAudio()
+        return
       }
 
-      driftRafRef.current = requestAnimationFrame(tick)
-    }
-
-    driftRafRef.current = requestAnimationFrame(tick)
-  }, [])
-
-  const stopDriftLoopInternal = useCallback(() => {
-    cancelAnimationFrame(driftRafRef.current)
-  }, [])
+      const masterTime = masterEl.currentTime
+      for (let slot = 0; slot < TRACK_IDS.length; slot++) {
+        const el = videoRefs.current[slot]
+        if (!el || el === masterEl || el.paused) continue
+        if (Math.abs(el.currentTime - masterTime) > DRIFT_THRESHOLD_SEC) {
+          seekVideoTo(el, masterTime)
+        }
+      }
+    }, DRIFT_SYNC_INTERVAL_MS)
+  }, [stopDriftLoopInternal])
 
   const stopRecordTimer = useCallback(() => {
     if (recordTimerRef.current) {
@@ -309,53 +308,32 @@ export function useMultiTrackStudio() {
       }
     }
 
-    if (toPlay.length === 0) {
-      // #region agent log
-      agentDebugLog(
-        'useMultiTrackStudio.ts:playAll',
-        'playAll aborted — no tracks',
-        { trackCount: current.filter((t) => !!t.recordedUrl).length },
-        'P1',
-        'studio-playback',
-      )
-      // #endregion
-      return
-    }
+    if (toPlay.length === 0) return
 
     pauseAllExcept(null)
     resumeMixContext()
 
+    const elements: HTMLVideoElement[] = []
     for (const track of toPlay) {
+      const el = getVideoForTrack(track.id)
+      if (!el || !track.recordedUrl) continue
+      primeRecordedVideo(el, track.recordedUrl)
       wireMixForTrack(track)
+      seekVideoTo(el, 0)
+      elements.push(el)
     }
 
-    const results = await Promise.all(toPlay.map((track) => playRecordedTrack(track, true)))
+    if (elements.length === 0) return
 
-    // #region agent log
-    agentDebugLog(
-      'useMultiTrackStudio.ts:playAll',
-      'playAll finished',
-      {
-        trackIds: toPlay.map((t) => t.id),
-        playResults: results,
-      },
-      'P1',
-      'studio-playback',
-    )
-    // #endregion
+    await Promise.all(elements.map((el) => waitForMediaReady(el, 2000)))
 
+    const results = await Promise.all(elements.map((el) => safePlayMedia(el)))
     if (!results.some(Boolean)) return
 
     startDriftLoop()
     isGlobalPlayingRef.current = true
     setIsGlobalPlaying(true)
-  }, [
-    pauseAllExcept,
-    playRecordedTrack,
-    startDriftLoop,
-    stopDriftLoopInternal,
-    wireMixForTrack,
-  ])
+  }, [getVideoForTrack, pauseAllExcept, startDriftLoop, stopDriftLoopInternal, wireMixForTrack])
 
   const clearTrackInternal = useCallback(
     (id: 1 | 2 | 3 | 4) => {
@@ -407,16 +385,6 @@ export function useMultiTrackStudio() {
       recorder.onstop = () => {
         const trackId = recordingIdRef.current
         if (!trackId) return
-
-        // #region agent log
-        agentDebugLog(
-          'useMultiTrackStudio.ts:onstop',
-          'recorder stopped',
-          { trackId, chunkCount: chunksRef.current.length },
-          'D',
-          'studio-ui',
-        )
-        // #endregion
 
         stream.getTracks().forEach((t) => t.stop())
         liveStreamRef.current = null
@@ -480,12 +448,7 @@ export function useMultiTrackStudio() {
 
   const startCountdownAfterPreview = useCallback(
     (id: 1 | 2 | 3 | 4) => {
-      if (!countAudioCtxRef.current || countAudioCtxRef.current.state === 'closed') {
-        countAudioCtxRef.current = new AudioContext()
-      }
-      const countCtx = countAudioCtxRef.current
-      void countCtx.resume()
-      playClick(countCtx, 880)
+      void playCountdownTick()
 
       setCountdownTrackId(id)
       setCountdownValue(COUNTDOWN_SECONDS)
@@ -501,7 +464,7 @@ export function useMultiTrackStudio() {
             beginRecording(id)
             return 0
           }
-          playClick(countCtx, prev - 1 === 1 ? 1320 : 880)
+          void playCountdownTick()
           return prev - 1
         })
       }, 1000)
@@ -512,15 +475,6 @@ export function useMultiTrackStudio() {
   const openCameraAndCountdown = useCallback(
     async (id: 1 | 2 | 3 | 4) => {
       setArmingTrackId(id)
-      // #region agent log
-      agentDebugLog(
-        'useMultiTrackStudio.ts:openCamera',
-        'camera session start',
-        { id },
-        'H4',
-        'studio-camera',
-      )
-      // #endregion
       await releaseLiveStream()
 
       try {
@@ -530,21 +484,6 @@ export function useMultiTrackStudio() {
         })
 
         liveStreamRef.current = stream
-
-        // #region agent log
-        agentDebugLog(
-          'useMultiTrackStudio.ts:openCamera',
-          'getUserMedia ok',
-          {
-            id,
-            videoTracks: stream.getVideoTracks().length,
-            audioTracks: stream.getAudioTracks().length,
-            videoReadyState: stream.getVideoTracks()[0]?.readyState ?? 'none',
-          },
-          'H4',
-          'studio-camera',
-        )
-        // #endregion
 
         setTracks((prev) =>
           prev.map((t) =>
@@ -557,15 +496,6 @@ export function useMultiTrackStudio() {
         startCountdownAfterPreview(id)
       } catch (err) {
         console.error('openCameraAndCountdown failed', err)
-        // #region agent log
-        agentDebugLog(
-          'useMultiTrackStudio.ts:openCamera',
-          'getUserMedia failed',
-          { id, error: err instanceof Error ? err.name : String(err) },
-          'H4',
-          'studio-camera',
-        )
-        // #endregion
         startingSessionRef.current = false
         setArmingTrackId(null)
         await releaseLiveStream()
@@ -576,7 +506,7 @@ export function useMultiTrackStudio() {
   )
 
   const startRecording = useCallback(
-    (id: 1 | 2 | 3 | 4, source = 'unknown') => {
+    (id: 1 | 2 | 3 | 4) => {
       if (
         startingSessionRef.current ||
         countdownTrackId !== null ||
@@ -584,27 +514,8 @@ export function useMultiTrackStudio() {
         recordingIdRef.current !== null ||
         tracksRef.current.some((t) => t.status === 'RECORDING')
       ) {
-        // #region agent log
-        agentDebugLog(
-          'useMultiTrackStudio.ts:startRecording',
-          'start blocked by guard',
-          { id, source, countdownTrackId, armingTrackId },
-          'G1',
-          'studio-ui',
-        )
-        // #endregion
         return
       }
-
-      // #region agent log
-      agentDebugLog(
-        'useMultiTrackStudio.ts:startRecording',
-        'start requested',
-        { id, source },
-        'G1',
-        'studio-ui',
-      )
-      // #endregion
 
       setPostRecordReviewId(null)
       stopAll()
@@ -626,19 +537,6 @@ export function useMultiTrackStudio() {
 
   const stopRecording = useCallback(
     (id: 1 | 2 | 3 | 4) => {
-      // #region agent log
-      agentDebugLog(
-        'useMultiTrackStudio.ts:stopRecording',
-        'stop requested',
-        {
-          id,
-          recordingIdRef: recordingIdRef.current,
-          recorderState: recorderRef.current?.state ?? 'none',
-        },
-        'D',
-        'studio-ui',
-      )
-      // #endregion
       if (recordingIdRef.current !== id) return
 
       pauseOverdubPlayback(id)
@@ -649,12 +547,9 @@ export function useMultiTrackStudio() {
         el.srcObject = null
       }
 
-      // Drop live preview + recording flag immediately so overlay/footer return while blob finalizes.
       setTracks((prev) =>
         prev.map((t) =>
-          t.id === id
-            ? { ...t, stream: null, status: 'IDLE' as TrackStatus }
-            : t,
+          t.id === id ? { ...t, stream: null, status: 'IDLE' as TrackStatus } : t,
         ),
       )
 
@@ -725,7 +620,7 @@ export function useMultiTrackStudio() {
     (id: 1 | 2 | 3 | 4) => {
       setPostRecordReviewId(null)
       clearTrackInternal(id)
-      startRecording(id, 'redo')
+      startRecording(id)
     },
     [clearTrackInternal, startRecording],
   )
@@ -748,7 +643,7 @@ export function useMultiTrackStudio() {
       tracksRef.current.forEach((t) => {
         if (t.recordedUrl) URL.revokeObjectURL(t.recordedUrl)
       })
-      countAudioCtxRef.current?.close().catch(() => {})
+      closeCountdownAudio()
       closeMixContext()
     }
   }, [stopDriftLoopInternal])
@@ -757,7 +652,6 @@ export function useMultiTrackStudio() {
   const isAnyRecording = tracks.some((t) => t.status === 'RECORDING')
   const isCountingDown = countdownTrackId !== null
 
-  /** Track that owns immersive fullscreen (camera preview, count-in, or active record). */
   const immersiveTrackId: 1 | 2 | 3 | 4 | null =
     postRecordReviewId !== null
       ? null

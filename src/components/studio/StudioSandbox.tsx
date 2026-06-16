@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { mobileVideoProps } from '../../utils/mobileVideo'
-import { agentDebugLog } from '../../utils/agentDebugLog'
 import { useMultiTrackStudio, type StudioTrack } from './useMultiTrackStudio'
 import { attachLiveStreamPreview } from './studioLivePreview'
 
@@ -59,65 +58,16 @@ function TrackBox({
     const el = videoElRef.current
     if (!el) return
 
-    // #region agent log
-    const computed = typeof getComputedStyle !== 'undefined' ? getComputedStyle(el) : null
-    agentDebugLog(
-      'StudioSandbox.tsx:TrackBox',
-      'video computed layout',
-      {
-        partId: track.id,
-        status: track.status,
-        position: computed?.position ?? 'unknown',
-        hasStream: !!track.stream,
-        hasRecordedUrl: !!track.recordedUrl,
-      },
-      'F',
-      'studio-ui',
-    )
-    // #endregion
-
     if (track.stream && !suppressLivePreview) {
-      // #region agent log
-      agentDebugLog(
-        'StudioSandbox.tsx:TrackBox',
-        'video bind live stream',
-        { partId: track.id, status: track.status, hasSrcObject: !!el.srcObject },
-        'H7',
-        'studio-camera',
-      )
-      // #endregion
-      void attachLiveStreamPreview(el, track.stream, `grid-part-${track.id}`)
+      void attachLiveStreamPreview(el, track.stream)
       return
     }
 
     if (track.stream && suppressLivePreview) {
-      // #region agent log
-      agentDebugLog(
-        'StudioSandbox.tsx:TrackBox',
-        'skipped grid live bind (immersive owns stream)',
-        { partId: track.id, status: track.status },
-        'H7',
-        'studio-camera',
-      )
-      // #endregion
       if (el.srcObject) el.srcObject = null
     }
 
     if (track.recordedUrl) {
-      // #region agent log
-      agentDebugLog(
-        'StudioSandbox.tsx:TrackBox',
-        'video bind recordedUrl',
-        {
-          partId: track.id,
-          status: track.status,
-          hasSrcObject: !!el.srcObject,
-          srcPrefix: track.recordedUrl.slice(0, 20),
-        },
-        'B',
-        'studio-ui',
-      )
-      // #endregion
       if (el.srcObject) el.srcObject = null
       if (el.src !== track.recordedUrl) {
         el.src = track.recordedUrl
@@ -148,18 +98,7 @@ function TrackBox({
   const isRecording = track.status === 'RECORDING'
 
   const handleCellTap = () => {
-    if (!acceptGridInput) {
-      // #region agent log
-      agentDebugLog(
-        'StudioSandbox.tsx:TrackBox',
-        'blocked cell tap during mount guard',
-        { partId: track.id },
-        'G1',
-        'studio-ui',
-      )
-      // #endregion
-      return
-    }
+    if (!acceptGridInput) return
     if (showRecord) onAction()
   }
 
@@ -191,9 +130,10 @@ function TrackBox({
         ref={videoElRef}
         playsInline
         muted
+        preload="auto"
         {...mobileVideoProps}
-        className={`absolute inset-0 h-full w-full object-cover camera-preview ${
-          isRecording || hasTake ? 'camera-preview--mirror' : ''
+        className={`studio-track-video absolute inset-0 h-full w-full object-cover ${
+          isRecording || hasTake ? '-scale-x-100' : ''
         }`}
       />
 
@@ -320,23 +260,8 @@ function ImmersiveRecordingLayer({
       return
     }
 
-    // #region agent log
-    agentDebugLog(
-      'StudioSandbox.tsx:ImmersiveLayer',
-      'binding immersive preview',
-      {
-        partId: track.id,
-        hasRef: !!el,
-        streamId: track.stream.id,
-        isRecording,
-      },
-      'H2',
-      'studio-camera',
-    )
-    // #endregion
-
-    void attachLiveStreamPreview(el, track.stream, `immersive-part-${track.id}`)
-  }, [track.stream, track.id, isRecording])
+    void attachLiveStreamPreview(el, track.stream)
+  }, [track.stream, track.id])
 
   return (
     <div className="fixed inset-0 z-[250] flex flex-col bg-black">
@@ -520,54 +445,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     ? tracks.find((t) => t.id === immersiveTrackId)
     : undefined
 
-  // #region agent log
-  useEffect(() => {
-    agentDebugLog(
-      'StudioSandbox.tsx:render',
-      'studio UI state',
-      {
-        isImmersive,
-        immersiveTrackId,
-        postRecordReviewId,
-        isAnyRecording,
-        hasAnyRecording,
-        isCountingDown,
-        showFooter: !isImmersive,
-        showHeader: !isImmersive,
-        tracks: tracks.map((t) => ({
-          id: t.id,
-          status: t.status,
-          hasStream: !!t.stream,
-          hasRecordedUrl: !!t.recordedUrl,
-        })),
-      },
-      'A',
-      'studio-ui',
-    )
-  }, [
-    isImmersive,
-    immersiveTrackId,
-    postRecordReviewId,
-    isAnyRecording,
-    hasAnyRecording,
-    isCountingDown,
-    tracks,
-  ])
-  // #endregion
-
   const showImmersiveOverlay = Boolean(isImmersive && immersiveTrack)
-
-  // #region agent log
-  useEffect(() => {
-    agentDebugLog(
-      'StudioSandbox.tsx:overlay',
-      'immersive overlay visibility',
-      { showImmersiveOverlay, immersiveTrackId, postRecordReviewId },
-      'C',
-      'studio-ui',
-    )
-  }, [showImmersiveOverlay, immersiveTrackId, postRecordReviewId])
-  // #endregion
 
   useEffect(() => {
     if (isImmersive) setMixerOpen(false)
@@ -589,7 +467,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         void playTrack(track.id)
         return
       }
-      startRecording(track.id, 'track-action')
+      startRecording(track.id)
     },
     [isCountingDown, pauseTrack, playTrack, postRecordReviewId, startRecording, stopRecording],
   )
@@ -640,9 +518,9 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
       <div className="relative flex min-h-0 flex-1 flex-col p-2 pb-1">
         {/* Grid always stays in layout — videos remain in their boxes for playback */}
         <div
-          className={`grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5 ${
+          className={`studio-grid grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5 ${
             isImmersive ? 'pointer-events-none' : ''
-          }`}
+          } ${isGlobalPlaying ? 'studio-grid--playing' : ''}`}
         >
           {tracks.map((track) => (
             <TrackBox
