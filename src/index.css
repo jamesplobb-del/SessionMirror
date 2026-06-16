@@ -1892,6 +1892,15 @@ html.physical-landscape-right .control-deck__vault-btn {
   z-index: 0 !important;
 }
 
+/* Immersive studio preview — fullscreen live camera inside fixed overlay */
+.studio-immersive-preview.camera-preview {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0 !important;
+}
+
 /* Off-screen backing-track mount — keeps media refs alive, never painted */
 .studio-track-cell--hidden-playback {
   position: fixed;

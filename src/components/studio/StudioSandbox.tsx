@@ -71,12 +71,12 @@ function TrackBox({
     )
     // #endregion
 
-    if (track.status === 'RECORDING' && track.stream) {
+    if (track.stream) {
       // #region agent log
       agentDebugLog(
         'StudioSandbox.tsx:TrackBox',
         'video bind live stream',
-        { partId: track.id, hasSrcObject: !!el.srcObject },
+        { partId: track.id, status: track.status, hasSrcObject: !!el.srcObject },
         'B',
         'studio-ui',
       )
@@ -272,6 +272,7 @@ function ImmersiveRecordingLayer({
   isArming,
   recordingElapsed,
   onStop,
+  onCancel,
 }: {
   track: StudioTrack
   slotIndex: number
@@ -280,42 +281,39 @@ function ImmersiveRecordingLayer({
   isArming: boolean
   recordingElapsed: number
   onStop: () => void
+  onCancel: () => void
 }) {
   const previewRef = useRef<HTMLVideoElement | null>(null)
   const accent = TRACK_COLORS[slotIndex] ?? TRACK_COLORS[0]
   const isRecording = track.status === 'RECORDING'
+  const showCamera = !!track.stream
 
   useEffect(() => {
     const el = previewRef.current
-    if (!el) return
+    if (!el || !track.stream) return
 
-    if (isRecording && track.stream) {
-      if (el.srcObject !== track.stream) {
-        el.srcObject = track.stream
-        el.removeAttribute('src')
-      }
-      el.muted = true
-      void el.play().catch(() => {})
-      return
+    if (el.srcObject !== track.stream) {
+      el.srcObject = track.stream
+      el.removeAttribute('src')
     }
-
-    if (el.srcObject) el.srcObject = null
-  }, [isRecording, track.stream])
+    el.muted = true
+    void el.play().catch(() => {})
+  }, [track.stream])
 
   return (
     <div className="fixed inset-0 z-[250] flex flex-col bg-black">
-      {isRecording && track.stream && (
+      {showCamera && (
         <video
           ref={previewRef}
           playsInline
           muted
           {...mobileVideoProps}
-          className="absolute inset-0 h-full w-full object-cover camera-preview camera-preview--mirror"
+          className="studio-immersive-preview absolute inset-0 h-full w-full object-cover camera-preview camera-preview--mirror"
         />
       )}
 
       {isCountingDown && countdownValue > 0 && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/35">
           <span
             className="font-black tabular-nums leading-none text-white"
             style={{
@@ -329,7 +327,7 @@ function ImmersiveRecordingLayer({
         </div>
       )}
 
-      {isArming && !isRecording && (
+      {isArming && !showCamera && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black">
           <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/20 border-t-white" />
           <span className="text-sm font-semibold text-white/70">Starting camera…</span>
@@ -364,6 +362,17 @@ function ImmersiveRecordingLayer({
             <Square className="h-6 w-6 fill-white" />
           </button>
         </>
+      )}
+
+      {(isCountingDown || (isArming && showCamera)) && !isRecording && (
+        <button
+          type="button"
+          aria-label="Cancel recording"
+          onClick={onCancel}
+          className="absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-30 rounded-full border border-white/25 bg-black/55 px-3 py-1.5 text-xs font-semibold text-white/80 active:scale-95"
+        >
+          Cancel
+        </button>
       )}
     </div>
   )
@@ -451,6 +460,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     recordingElapsed,
     startRecording,
     stopRecording,
+    cancelRecordingSession,
     playTrack,
     pauseTrack,
     playAll,
@@ -501,13 +511,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
   ])
   // #endregion
 
-  const showImmersiveOverlay = Boolean(
-    isImmersive &&
-      immersiveTrack &&
-      (immersiveTrack.stream ||
-        countdownTrackId === immersiveTrack.id ||
-        armingTrackId === immersiveTrack.id),
-  )
+  const showImmersiveOverlay = Boolean(isImmersive && immersiveTrack)
 
   // #region agent log
   useEffect(() => {
@@ -654,6 +658,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           isArming={armingTrackId === immersiveTrack.id}
           recordingElapsed={recordingElapsed}
           onStop={() => stopRecording(immersiveTrack.id)}
+          onCancel={() => cancelRecordingSession(immersiveTrack.id)}
         />
       )}
     </div>
