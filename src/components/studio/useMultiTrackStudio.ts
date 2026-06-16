@@ -510,9 +510,13 @@ export function useMultiTrackStudio() {
         el.srcObject = null
       }
 
-      // Drop live preview immediately so immersive overlay closes while the blob finalizes.
+      // Drop live preview + recording flag immediately so overlay/footer return while blob finalizes.
       setTracks((prev) =>
-        prev.map((t) => (t.id === id && t.stream ? { ...t, stream: null } : t)),
+        prev.map((t) =>
+          t.id === id
+            ? { ...t, stream: null, status: 'IDLE' as TrackStatus }
+            : t,
+        ),
       )
 
       const recorder = recorderRef.current

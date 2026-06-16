@@ -54,6 +54,23 @@ function TrackBox({
     const el = videoElRef.current
     if (!el) return
 
+    // #region agent log
+    const computed = typeof getComputedStyle !== 'undefined' ? getComputedStyle(el) : null
+    agentDebugLog(
+      'StudioSandbox.tsx:TrackBox',
+      'video computed layout',
+      {
+        partId: track.id,
+        status: track.status,
+        position: computed?.position ?? 'unknown',
+        hasStream: !!track.stream,
+        hasRecordedUrl: !!track.recordedUrl,
+      },
+      'F',
+      'studio-ui',
+    )
+    // #endregion
+
     if (track.status === 'RECORDING' && track.stream) {
       // #region agent log
       agentDebugLog(

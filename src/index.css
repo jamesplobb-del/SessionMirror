@@ -1875,9 +1875,21 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 /* Studio Sandbox — 2×2 track grid cells (PiP-inspired) */
 .studio-track-cell {
-  overflow: visible;
+  overflow: hidden;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Global .camera-preview is position:fixed for LiveCameraBackground — contain grid previews */
+.studio-track-cell video.camera-preview {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  z-index: 0 !important;
 }
 
 /* Off-screen backing-track mount — keeps media refs alive, never painted */
