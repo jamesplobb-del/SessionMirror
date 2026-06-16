@@ -7,15 +7,6 @@ export function prepareInlineMediaElement(media: HTMLMediaElement): void {
   media.setAttribute('webkit-playsinline', 'true')
 }
 
-/** Inline playback attributes required by iOS WebKit. */
-export function prepareInlineMediaElement(media: HTMLMediaElement): void {
-  media.muted = false
-  media.defaultMuted = false
-  media.volume = 1
-  media.setAttribute('playsinline', 'true')
-  media.setAttribute('webkit-playsinline', 'true')
-}
-
 /** Play with promise catch so iOS blocks never stall the main thread. */
 export function safePlayMedia(media: HTMLMediaElement): Promise<boolean> {
   return media
