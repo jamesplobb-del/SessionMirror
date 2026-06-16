@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { mobileVideoProps } from '../../utils/mobileVideo'
+import { agentDebugLog } from '../../utils/agentDebugLog'
 import { useMultiTrackStudio, type StudioTrack } from './useMultiTrackStudio'
 
 interface StudioSandboxProps {
@@ -54,6 +55,15 @@ function TrackBox({
     if (!el) return
 
     if (track.status === 'RECORDING' && track.stream) {
+      // #region agent log
+      agentDebugLog(
+        'StudioSandbox.tsx:TrackBox',
+        'video bind live stream',
+        { partId: track.id, hasSrcObject: !!el.srcObject },
+        'B',
+        'studio-ui',
+      )
+      // #endregion
       if (el.srcObject !== track.stream) {
         el.srcObject = track.stream
         el.removeAttribute('src')
@@ -64,6 +74,20 @@ function TrackBox({
     }
 
     if (track.recordedUrl) {
+      // #region agent log
+      agentDebugLog(
+        'StudioSandbox.tsx:TrackBox',
+        'video bind recordedUrl',
+        {
+          partId: track.id,
+          status: track.status,
+          hasSrcObject: !!el.srcObject,
+          srcPrefix: track.recordedUrl.slice(0, 20),
+        },
+        'B',
+        'studio-ui',
+      )
+      // #endregion
       if (el.srcObject) el.srcObject = null
       if (el.src !== track.recordedUrl) {
         el.src = track.recordedUrl
@@ -425,6 +449,61 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     ? tracks.find((t) => t.id === immersiveTrackId)
     : undefined
 
+  // #region agent log
+  useEffect(() => {
+    agentDebugLog(
+      'StudioSandbox.tsx:render',
+      'studio UI state',
+      {
+        isImmersive,
+        immersiveTrackId,
+        postRecordReviewId,
+        isAnyRecording,
+        hasAnyRecording,
+        isCountingDown,
+        showFooter: !isImmersive,
+        showHeader: !isImmersive,
+        tracks: tracks.map((t) => ({
+          id: t.id,
+          status: t.status,
+          hasStream: !!t.stream,
+          hasRecordedUrl: !!t.recordedUrl,
+        })),
+      },
+      'A',
+      'studio-ui',
+    )
+  }, [
+    isImmersive,
+    immersiveTrackId,
+    postRecordReviewId,
+    isAnyRecording,
+    hasAnyRecording,
+    isCountingDown,
+    tracks,
+  ])
+  // #endregion
+
+  const showImmersiveOverlay = Boolean(
+    isImmersive &&
+      immersiveTrack &&
+      (immersiveTrack.stream ||
+        countdownTrackId === immersiveTrack.id ||
+        armingTrackId === immersiveTrack.id),
+  )
+
+  // #region agent log
+  useEffect(() => {
+    agentDebugLog(
+      'StudioSandbox.tsx:overlay',
+      'immersive overlay visibility',
+      { showImmersiveOverlay, immersiveTrackId, postRecordReviewId },
+      'C',
+      'studio-ui',
+    )
+  }, [showImmersiveOverlay, immersiveTrackId, postRecordReviewId])
+  // #endregion
+
   useEffect(() => {
     if (isImmersive) setMixerOpen(false)
   }, [isImmersive])
@@ -549,7 +628,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         </div>
       )}
 
-      {isImmersive && immersiveTrack && (immersiveTrack.stream || countdownTrackId === immersiveTrack.id || armingTrackId === immersiveTrack.id) && (
+      {showImmersiveOverlay && immersiveTrack && (
         <ImmersiveRecordingLayer
           track={immersiveTrack}
           slotIndex={immersiveTrack.id - 1}

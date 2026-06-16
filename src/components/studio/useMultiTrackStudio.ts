@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { safePlayMedia } from '../../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
+import { agentDebugLog } from '../../utils/agentDebugLog'
 import {
   closeMixContext,
   connectVideoToMix,
@@ -366,6 +367,16 @@ export function useMultiTrackStudio() {
           const trackId = recordingIdRef.current
           if (!trackId) return
 
+          // #region agent log
+          agentDebugLog(
+            'useMultiTrackStudio.ts:onstop',
+            'recorder stopped',
+            { trackId, chunkCount: chunksRef.current.length },
+            'D',
+            'studio-ui',
+          )
+          // #endregion
+
           stream.getTracks().forEach((t) => t.stop())
           liveStreamRef.current = null
           pauseOverdubPlayback(trackId)
@@ -476,6 +487,19 @@ export function useMultiTrackStudio() {
 
   const stopRecording = useCallback(
     (id: 1 | 2 | 3 | 4) => {
+      // #region agent log
+      agentDebugLog(
+        'useMultiTrackStudio.ts:stopRecording',
+        'stop requested',
+        {
+          id,
+          recordingIdRef: recordingIdRef.current,
+          recorderState: recorderRef.current?.state ?? 'none',
+        },
+        'D',
+        'studio-ui',
+      )
+      // #endregion
       if (recordingIdRef.current !== id) return
 
       pauseOverdubPlayback(id)
