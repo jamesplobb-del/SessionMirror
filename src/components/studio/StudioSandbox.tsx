@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
-import { ArrowLeft, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
+import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { mobileVideoProps } from '../../utils/mobileVideo'
 import { useMultiTrackStudio, type StudioTrack } from './useMultiTrackStudio'
@@ -11,15 +11,20 @@ interface StudioSandboxProps {
 const CIRCLE_BTN =
   'flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-[0_2px_8px_rgba(0,0,0,0.5)] backdrop-blur-sm transition active:scale-90'
 
+const TRACK_COLORS = ['#38bdf8', '#c084fc', '#34d399', '#fb923c'] as const
+
 function TrackBox({
   track,
   slotIndex,
   videoRefs,
   countdownValue,
   isCountingDownHere,
+  showPostRecordReview,
   onAction,
   onClear,
   onToggleMute,
+  onKeepTake,
+  onRedoTake,
   onEnded,
 }: {
   track: StudioTrack
@@ -27,25 +32,32 @@ function TrackBox({
   videoRefs: MutableRefObject<(HTMLVideoElement | null)[]>
   countdownValue: number
   isCountingDownHere: boolean
+  showPostRecordReview: boolean
   onAction: () => void
   onClear: () => void
   onToggleMute: () => void
+  onKeepTake: () => void
+  onRedoTake: () => void
   onEnded: () => void
 }) {
   const videoElRef = useRef<HTMLVideoElement | null>(null)
+  const accent = TRACK_COLORS[slotIndex] ?? TRACK_COLORS[0]
 
-  // Single source of truth for srcObject / src on this box's <video>
+  // Bind ref synchronously — slotIndex is stable (track.id - 1)
+  useLayoutEffect(() => {
+    videoRefs.current[slotIndex] = videoElRef.current
+  })
+
   useEffect(() => {
     const el = videoElRef.current
     if (!el) return
-
-    el.muted = track.status === 'RECORDING' || track.isMuted
 
     if (track.status === 'RECORDING' && track.stream) {
       if (el.srcObject !== track.stream) {
         el.srcObject = track.stream
         el.removeAttribute('src')
       }
+      el.muted = true
       void el.play().catch(() => {})
       return
     }
@@ -56,19 +68,13 @@ function TrackBox({
         el.src = track.recordedUrl
         el.load()
       }
-
-      if (track.status === 'PLAYING') {
-        el.currentTime = 0
-        void el.play().catch(() => {})
-      }
       return
     }
 
-    // Cleared / empty — reset element without unmounting
     if (el.srcObject) el.srcObject = null
     el.removeAttribute('src')
     el.load()
-  }, [track.stream, track.recordedUrl, track.status, track.isMuted])
+  }, [track.stream, track.recordedUrl, track.status])
 
   useEffect(() => {
     const el = videoElRef.current
@@ -78,30 +84,50 @@ function TrackBox({
   }, [onEnded])
 
   const showStop = track.status === 'RECORDING' || track.status === 'PLAYING'
-  const showPlay = track.status === 'IDLE' && !!track.recordedUrl && !isCountingDownHere
-  const showRecord = track.status === 'IDLE' && !track.recordedUrl && !isCountingDownHere
+  const showPlay = track.status === 'IDLE' && !!track.recordedUrl && !isCountingDownHere && !showPostRecordReview
+  const showRecord =
+    track.status === 'IDLE' && !track.recordedUrl && !isCountingDownHere && !showPostRecordReview
+  const hasTake = !!track.recordedUrl
 
   return (
-    <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden border border-white/15 bg-stone-900">
+    <div
+      className={`relative min-h-0 min-w-0 flex-1 overflow-hidden border-2 bg-stone-900 transition-colors ${
+        track.status === 'RECORDING'
+          ? 'border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.25)]'
+          : hasTake
+            ? 'border-white/20'
+            : 'border-white/8 border-dashed'
+      }`}
+      style={hasTake ? { boxShadow: `inset 0 0 0 1px ${accent}33` } : undefined}
+    >
       <video
-        ref={(el) => {
-          videoElRef.current = el
-          videoRefs.current[slotIndex] = el
-        }}
+        ref={videoElRef}
         playsInline
-        muted={track.status === 'RECORDING' || track.isMuted}
+        muted
         {...mobileVideoProps}
-        className="absolute inset-0 h-full w-full object-cover"
+        className={`absolute inset-0 h-full w-full object-cover camera-preview ${
+          track.status === 'RECORDING' || hasTake ? 'camera-preview--mirror' : ''
+        }`}
       />
 
-      {/* Localized 3-second count-in overlay */}
+      {/* Empty slot hint — Acapella-style tap to record */}
+      {!hasTake && track.status !== 'RECORDING' && !isCountingDownHere && (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-2">
+          <span className="text-[10px] font-medium uppercase tracking-widest text-white/25">
+            Tap to record
+          </span>
+        </div>
+      )}
+
+      {/* Count-in overlay */}
       {isCountingDownHere && countdownValue > 0 && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/65 backdrop-blur-[2px]">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/70 backdrop-blur-[2px]">
           <span
             className="font-black tabular-nums leading-none text-white"
             style={{
-              fontSize: 'clamp(48px, 18vw, 96px)',
-              textShadow: '0 0 40px rgba(255,255,255,0.35)',
+              fontSize: 'clamp(52px, 20vw, 100px)',
+              textShadow: countdownValue === 1 ? '0 0 40px rgba(248,113,113,0.6)' : undefined,
+              color: countdownValue === 1 ? '#fca5a5' : '#fff',
             }}
           >
             {countdownValue}
@@ -109,8 +135,31 @@ function TrackBox({
         </div>
       )}
 
-      {/* Mute — top-left */}
-      {track.recordedUrl && track.status !== 'RECORDING' && (
+      {/* Acapella-style Keep / Re-record after each take */}
+      {showPostRecordReview && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Take saved</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onKeepTake}
+              className="rounded-full bg-emerald-500/90 px-4 py-2 text-xs font-bold text-white active:scale-95"
+            >
+              Keep
+            </button>
+            <button
+              type="button"
+              onClick={onRedoTake}
+              className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-bold text-white active:scale-95"
+            >
+              Re-record
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mute */}
+      {hasTake && track.status !== 'RECORDING' && !showPostRecordReview && (
         <button
           type="button"
           aria-label={track.isMuted ? 'Unmute track' : 'Mute track'}
@@ -130,16 +179,19 @@ function TrackBox({
         </button>
       )}
 
-      {/* Track number — bottom-left */}
-      <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white/80">
-        {track.id}
+      {/* Part label */}
+      <span
+        className="pointer-events-none absolute bottom-2 left-2 rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/90"
+        style={{ backgroundColor: `${accent}cc` }}
+      >
+        Part {track.id}
       </span>
 
-      {/* Retake — top-right */}
-      {track.recordedUrl && track.status !== 'RECORDING' && !isCountingDownHere && (
+      {/* Clear take */}
+      {hasTake && track.status !== 'RECORDING' && !isCountingDownHere && !showPostRecordReview && (
         <button
           type="button"
-          aria-label={`Clear track ${track.id}`}
+          aria-label={`Clear part ${track.id}`}
           onClick={(e) => {
             e.stopPropagation()
             onClear()
@@ -150,14 +202,14 @@ function TrackBox({
         </button>
       )}
 
-      {/* Per-box transport — bottom-right */}
-      {!isCountingDownHere && (
+      {/* Per-part transport */}
+      {!isCountingDownHere && !showPostRecordReview && (
         <button
           type="button"
-          aria-label={showStop ? 'Stop' : showPlay ? 'Play track' : 'Record track'}
+          aria-label={showStop ? 'Stop' : showPlay ? 'Play part' : 'Record part'}
           onClick={onAction}
           className={`absolute bottom-2 right-2 z-10 ${CIRCLE_BTN} ${
-            showRecord ? 'border-red-400/50 bg-red-500/80' : ''
+            showRecord ? 'border-red-400/50 bg-red-500/85' : ''
           }`}
         >
           {showStop && <Square className="h-3.5 w-3.5 fill-white" />}
@@ -169,7 +221,72 @@ function TrackBox({
   )
 }
 
+function MixerDrawer({
+  tracks,
+  onVolumeChange,
+  onMuteToggle,
+  onClose,
+}: {
+  tracks: StudioTrack[]
+  onVolumeChange: (id: 1 | 2 | 3 | 4, volume: number) => void
+  onMuteToggle: (id: 1 | 2 | 3 | 4) => void
+  onClose: () => void
+}) {
+  return (
+    <>
+      <div className="absolute inset-0 z-30 bg-black/50" onClick={onClose} aria-hidden />
+      <div className="absolute inset-x-0 bottom-0 z-40 max-h-[45%] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-zinc-900/95 px-4 pb-6 pt-3 backdrop-blur-xl">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-white/40" />
+            <span className="text-sm font-bold">Mixer</span>
+          </div>
+          <button type="button" onClick={onClose} className={`${CIRCLE_BTN} h-7 w-7`} aria-label="Close mixer">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {tracks.map((track, idx) => {
+          const color = TRACK_COLORS[idx] ?? TRACK_COLORS[0]
+          const vol = Math.round(track.volume * 100)
+          return (
+            <div
+              key={track.id}
+              className={`flex items-center gap-3 py-2.5 ${idx < tracks.length - 1 ? 'border-b border-white/6' : ''} ${!track.recordedUrl ? 'opacity-40' : ''}`}
+            >
+              <span className="w-12 shrink-0 text-[10px] font-bold uppercase" style={{ color }}>
+                Part {track.id}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={vol}
+                disabled={!track.recordedUrl}
+                onChange={(e) => onVolumeChange(track.id, Number(e.target.value) / 100)}
+                className="studio-vol-slider min-w-0 flex-1"
+                style={{ '--fill-pct': `${vol}%`, '--fill-color': color } as CSSProperties}
+                aria-label={`Part ${track.id} volume`}
+              />
+              <button
+                type="button"
+                disabled={!track.recordedUrl}
+                onClick={() => onMuteToggle(track.id)}
+                className={`${CIRCLE_BTN} h-7 w-7 shrink-0 disabled:opacity-30 ${track.isMuted ? 'border-amber-400/50 bg-amber-500/80' : ''}`}
+                aria-label={track.isMuted ? 'Unmute' : 'Mute'}
+              >
+                {track.isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
 export default function StudioSandbox({ onExit }: StudioSandboxProps) {
+  const [mixerOpen, setMixerOpen] = useState(false)
+
   const {
     tracks,
     videoRefs,
@@ -179,6 +296,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     isCountingDown,
     countdownTrackId,
     countdownValue,
+    postRecordReviewId,
     startRecording,
     stopRecording,
     playTrack,
@@ -187,11 +305,14 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     stopAll,
     clearTrack,
     toggleTrackMute,
+    setTrackVolume,
+    keepRecordedTake,
+    redoRecordedTake,
   } = useMultiTrackStudio()
 
   const handleAction = useCallback(
     (track: StudioTrack) => {
-      if (isCountingDown) return
+      if (isCountingDown || postRecordReviewId === track.id) return
 
       if (track.status === 'RECORDING') {
         stopRecording(track.id)
@@ -202,17 +323,17 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         return
       }
       if (track.recordedUrl) {
-        playTrack(track.id)
+        void playTrack(track.id)
         return
       }
       startRecording(track.id)
     },
-    [isCountingDown, pauseTrack, playTrack, startRecording, stopRecording],
+    [isCountingDown, pauseTrack, playTrack, postRecordReviewId, startRecording, stopRecording],
   )
 
   const handleGlobalPlayStop = useCallback(() => {
     if (isGlobalPlaying) stopAll()
-    else playAll()
+    else void playAll()
   }, [isGlobalPlaying, playAll, stopAll])
 
   return (
@@ -220,7 +341,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
       className="fixed inset-0 z-[200] flex h-screen w-screen flex-col bg-black text-white"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="flex shrink-0 justify-start px-3 py-2">
+      <header className="flex shrink-0 items-center justify-between px-3 py-2">
         <Pressable
           intensity="soft"
           onClick={onExit}
@@ -230,10 +351,27 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           <ArrowLeft className="h-3.5 w-3.5" />
           Exit
         </Pressable>
-      </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center p-3 pb-2">
-        <div className="grid aspect-square h-full max-h-[65vh] w-full max-w-2xl grid-cols-2 grid-rows-2 gap-2">
+        <div className="flex flex-col items-center">
+          <span className="text-xs font-bold tracking-tight">Acapella Studio</span>
+          <span className="text-[9px] text-white/35">Use headphones when recording</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setMixerOpen((o) => !o)}
+          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold active:scale-95 ${
+            mixerOpen ? 'border-sky-400/50 bg-sky-500/15 text-sky-300' : 'border-white/15 bg-white/8 text-white/70'
+          }`}
+          aria-label="Open mixer"
+        >
+          <Layers className="h-3.5 w-3.5" />
+          Mix
+        </button>
+      </header>
+
+      <div className="relative flex min-h-0 flex-1 flex-col p-2 pb-1">
+        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5">
           {tracks.map((track) => (
             <TrackBox
               key={track.id}
@@ -242,39 +380,48 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
               videoRefs={videoRefs}
               countdownValue={countdownTrackId === track.id ? countdownValue : 0}
               isCountingDownHere={countdownTrackId === track.id}
+              showPostRecordReview={postRecordReviewId === track.id}
               onAction={() => handleAction(track)}
               onClear={() => clearTrack(track.id)}
               onToggleMute={() => toggleTrackMute(track.id)}
+              onKeepTake={() => keepRecordedTake(track.id)}
+              onRedoTake={() => redoRecordedTake(track.id)}
               onEnded={() => pauseTrack(track.id)}
             />
           ))}
         </div>
+
+        {mixerOpen && (
+          <MixerDrawer
+            tracks={tracks}
+            onVolumeChange={setTrackVolume}
+            onMuteToggle={toggleTrackMute}
+            onClose={() => setMixerOpen(false)}
+          />
+        )}
       </div>
 
-      {/* Global transport — native play/pause only, no track status changes */}
+      {/* Global transport */}
       <div
-        className="flex shrink-0 justify-center px-4"
+        className="flex shrink-0 items-center justify-center gap-4 px-4"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
         <button
           type="button"
-          aria-label={isGlobalPlaying ? 'Stop all tracks' : 'Play all tracks'}
+          aria-label={isGlobalPlaying ? 'Stop all parts' : 'Play all parts'}
           onClick={handleGlobalPlayStop}
-          disabled={!hasAnyRecording || isAnyRecording || isCountingDown}
-          className="flex items-center gap-2.5 rounded-full border border-white/15 bg-white/8 px-6 py-3 text-sm font-semibold text-white/85 shadow-[0_4px_24px_rgba(0,0,0,0.45)] backdrop-blur-md transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+          disabled={!hasAnyRecording || isAnyRecording || isCountingDown || postRecordReviewId !== null}
+          className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/30 bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.15)] transition active:scale-90 disabled:opacity-35"
         >
           {isGlobalPlaying ? (
-            <>
-              <Square className="h-4 w-4 fill-white" />
-              Stop All
-            </>
+            <Square className="h-5 w-5 fill-black" />
           ) : (
-            <>
-              <Play className="h-4 w-4 fill-white" style={{ marginLeft: 1 }} />
-              Play All
-            </>
+            <Play className="h-5 w-5 fill-black" style={{ marginLeft: 2 }} />
           )}
         </button>
+        <span className="text-[10px] font-medium uppercase tracking-widest text-white/40">
+          {isGlobalPlaying ? 'Stop All' : 'Play All'}
+        </span>
       </div>
     </div>
   )

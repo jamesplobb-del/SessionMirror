@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { safePlayMedia } from '../../utils/mediaPlayback'
+import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
+import {
+  closeMixContext,
+  connectVideoToMix,
+  resumeMixContext,
+  updateMixGain,
+} from './studioPlaybackMix'
 
 export type TrackStatus = 'IDLE' | 'RECORDING' | 'PLAYING'
 
@@ -8,10 +16,12 @@ export interface StudioTrack {
   recordedUrl: string | null
   status: TrackStatus
   isMuted: boolean
+  volume: number
 }
 
 const TRACK_IDS = [1, 2, 3, 4] as const
 const COUNTDOWN_SECONDS = 3
+const DRIFT_THRESHOLD_SEC = 0.08
 
 function makeInitialTracks(): StudioTrack[] {
   return TRACK_IDS.map((id) => ({
@@ -20,6 +30,7 @@ function makeInitialTracks(): StudioTrack[] {
     recordedUrl: null,
     status: 'IDLE' as TrackStatus,
     isMuted: false,
+    volume: 1,
   }))
 }
 
@@ -37,7 +48,6 @@ function getBestMimeType(): string {
   return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
 }
 
-/** Ensure a video element is wired to a recorded blob before playback. */
 function primeRecordedVideo(el: HTMLVideoElement, url: string): void {
   if (el.srcObject) el.srcObject = null
   if (el.src !== url) {
@@ -46,46 +56,86 @@ function primeRecordedVideo(el: HTMLVideoElement, url: string): void {
   }
 }
 
+function playClick(ctx: AudioContext, hz: number): void {
+  try {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = hz
+    gain.gain.setValueAtTime(0.45, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.07)
+  } catch {
+    /* context may be closed */
+  }
+}
+
 export function useMultiTrackStudio() {
   const [tracks, setTracks] = useState<StudioTrack[]>(makeInitialTracks)
   const tracksRef = useRef(tracks)
   tracksRef.current = tracks
 
-  /** videoRefs[0] = track 1, videoRefs[3] = track 4 — never resized or reordered */
+  /** videoRefs[0] = track 1 … videoRefs[3] = track 4 */
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null])
 
   const [isGlobalPlaying, setIsGlobalPlaying] = useState(false)
   const [countdownTrackId, setCountdownTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [countdownValue, setCountdownValue] = useState(0)
+  const [postRecordReviewId, setPostRecordReviewId] = useState<1 | 2 | 3 | 4 | null>(null)
 
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const recordingIdRef = useRef<1 | 2 | 3 | 4 | null>(null)
   const liveStreamRef = useRef<MediaStream | null>(null)
   const countIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const driftRafRef = useRef(0)
+  const countAudioCtxRef = useRef<AudioContext | null>(null)
 
-  const applyVideoMuted = useCallback((id: 1 | 2 | 3 | 4, track: StudioTrack) => {
-    const el = videoRefs.current[trackIndex(id)]
-    if (!el) return
-    el.muted = track.status === 'RECORDING' || track.isMuted
+  const getVideoForTrack = useCallback((id: 1 | 2 | 3 | 4): HTMLVideoElement | null => {
+    return videoRefs.current[trackIndex(id)] ?? null
   }, [])
 
-  /** Play every other track that has a take — used for overdub and kept in sync at t=0. */
-  const startOverdubPlayback = useCallback((recordingId: 1 | 2 | 3 | 4) => {
-    for (let slot = 0; slot < TRACK_IDS.length; slot++) {
-      const trackId = TRACK_IDS[slot]!
-      if (trackId === recordingId) continue
+  const wireMixForTrack = useCallback(
+    (track: StudioTrack) => {
+      const el = getVideoForTrack(track.id)
+      if (!el || !track.recordedUrl) return
+      connectVideoToMix(el, track.volume, track.isMuted)
+    },
+    [getVideoForTrack],
+  )
 
-      const track = tracksRef.current.find((t) => t.id === trackId)
-      const el = videoRefs.current[slot]
-      if (!el || !track?.recordedUrl) continue
+  const playRecordedTrack = useCallback(
+    async (track: StudioTrack, fromStart = true): Promise<boolean> => {
+      const el = getVideoForTrack(track.id)
+      if (!el || !track.recordedUrl || track.status === 'RECORDING') return false
 
       primeRecordedVideo(el, track.recordedUrl)
-      el.muted = track.isMuted
-      el.currentTime = 0
-      void el.play().catch(() => {})
-    }
-  }, [])
+      wireMixForTrack(track)
+      resumeMixContext()
+
+      if (fromStart) el.currentTime = 0
+      return safePlayMedia(el)
+    },
+    [getVideoForTrack, wireMixForTrack],
+  )
+
+  const startOverdubPlayback = useCallback(
+    async (recordingId: 1 | 2 | 3 | 4) => {
+      resumeMixContext()
+      const current = tracksRef.current
+
+      await Promise.all(
+        TRACK_IDS.filter((id) => id !== recordingId).map(async (trackId) => {
+          const track = current.find((t) => t.id === trackId)
+          if (!track?.recordedUrl) return
+          await playRecordedTrack(track, true)
+        }),
+      )
+    },
+    [playRecordedTrack],
+  )
 
   const pauseOverdubPlayback = useCallback((recordingId: 1 | 2 | 3 | 4) => {
     for (let slot = 0; slot < TRACK_IDS.length; slot++) {
@@ -95,18 +145,65 @@ export function useMultiTrackStudio() {
     }
   }, [])
 
-  const pauseTrack = useCallback((id: 1 | 2 | 3 | 4) => {
-    videoRefs.current[trackIndex(id)]?.pause()
-    setTracks((prev) =>
-      prev.map((t) => (t.id === id && t.status === 'PLAYING' ? { ...t, status: 'IDLE' } : t)),
-    )
+  const startDriftLoop = useCallback(() => {
+    cancelAnimationFrame(driftRafRef.current)
+
+    const tick = () => {
+      const current = tracksRef.current
+      let masterEl: HTMLVideoElement | null = null
+      let masterDuration = 0
+
+      for (let slot = 0; slot < TRACK_IDS.length; slot++) {
+        const trackId = TRACK_IDS[slot]!
+        const track = current.find((t) => t.id === trackId)
+        const el = videoRefs.current[slot]
+        if (!el || !track?.recordedUrl || el.paused) continue
+        const d = el.duration || 0
+        if (d > masterDuration) {
+          masterDuration = d
+          masterEl = el
+        }
+      }
+
+      if (masterEl) {
+        const masterTime = masterEl.currentTime
+        for (let slot = 0; slot < TRACK_IDS.length; slot++) {
+          const el = videoRefs.current[slot]
+          if (!el || el === masterEl || el.paused) continue
+          if (Math.abs(el.currentTime - masterTime) > DRIFT_THRESHOLD_SEC) {
+            el.currentTime = masterTime
+          }
+        }
+      }
+
+      driftRafRef.current = requestAnimationFrame(tick)
+    }
+
+    driftRafRef.current = requestAnimationFrame(tick)
   }, [])
 
-  const pauseAllExcept = useCallback((keepId: 1 | 2 | 3 | 4 | null) => {
-    TRACK_IDS.forEach((id) => {
-      if (id !== keepId) pauseTrack(id)
-    })
-  }, [pauseTrack])
+  const stopDriftLoop = useCallback(() => {
+    cancelAnimationFrame(driftRafRef.current)
+  }, [])
+
+  const pauseTrack = useCallback(
+    (id: 1 | 2 | 3 | 4) => {
+      getVideoForTrack(id)?.pause()
+      setTracks((prev) =>
+        prev.map((t) => (t.id === id && t.status === 'PLAYING' ? { ...t, status: 'IDLE' } : t)),
+      )
+    },
+    [getVideoForTrack],
+  )
+
+  const pauseAllExcept = useCallback(
+    (keepId: 1 | 2 | 3 | 4 | null) => {
+      TRACK_IDS.forEach((id) => {
+        if (id !== keepId) pauseTrack(id)
+      })
+    },
+    [pauseTrack],
+  )
 
   const cancelCountdown = useCallback(() => {
     if (countIntervalRef.current) {
@@ -117,31 +214,71 @@ export function useMultiTrackStudio() {
     setCountdownValue(0)
   }, [])
 
-  /** Native pause on every recorded track — does NOT touch per-track status. */
   const stopAll = useCallback(() => {
+    stopDriftLoop()
     for (let slot = 0; slot < TRACK_IDS.length; slot++) {
       videoRefs.current[slot]?.pause()
     }
     setIsGlobalPlaying(false)
-  }, [])
+    void releaseTakePlaybackAudio()
+  }, [stopDriftLoop])
 
-  /** Native play on every recorded track — does NOT touch per-track status. */
-  const playAll = useCallback(() => {
-    for (let slot = 0; slot < TRACK_IDS.length; slot++) {
-      const trackId = TRACK_IDS[slot]!
-      const track = tracksRef.current.find((t) => t.id === trackId)
-      const el = videoRefs.current[slot]
+  const playAll = useCallback(async () => {
+    stopDriftLoop()
+    const current = tracksRef.current
+    const toPlay: StudioTrack[] = []
 
-      if (!el || !track?.recordedUrl || track.status === 'RECORDING') continue
-
-      primeRecordedVideo(el, track.recordedUrl)
-      el.muted = track.isMuted
-      el.currentTime = 0
-      void el.play().catch(() => {})
+    for (const trackId of TRACK_IDS) {
+      const track = current.find((t) => t.id === trackId)
+      if (track?.recordedUrl && track.status !== 'RECORDING') {
+        toPlay.push(track)
+      }
     }
 
+    if (toPlay.length === 0) return
+
+    const elements = toPlay
+      .map((t) => getVideoForTrack(t.id))
+      .filter((el): el is HTMLVideoElement => el !== null)
+
+    await primeTakePlaybackAudio(...elements)
+    resumeMixContext()
+
+    await Promise.all(toPlay.map((track) => playRecordedTrack(track, true)))
+
+    startDriftLoop()
     setIsGlobalPlaying(true)
-  }, [])
+  }, [getVideoForTrack, playRecordedTrack, startDriftLoop, stopDriftLoop])
+
+  const clearTrackInternal = useCallback(
+    (id: 1 | 2 | 3 | 4) => {
+      const el = getVideoForTrack(id)
+      el?.pause()
+      if (el) {
+        el.srcObject = null
+        el.removeAttribute('src')
+        el.load()
+      }
+
+      setTracks((prev) => {
+        const target = prev.find((t) => t.id === id)
+        if (target?.recordedUrl) URL.revokeObjectURL(target.recordedUrl)
+        return prev.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                recordedUrl: null,
+                stream: null,
+                status: 'IDLE' as TrackStatus,
+                isMuted: false,
+                volume: 1,
+              }
+            : t,
+        )
+      })
+    },
+    [getVideoForTrack],
+  )
 
   const launchRecording = useCallback(
     async (id: 1 | 2 | 3 | 4) => {
@@ -173,7 +310,6 @@ export function useMultiTrackStudio() {
 
           stream.getTracks().forEach((t) => t.stop())
           liveStreamRef.current = null
-
           pauseOverdubPlayback(trackId)
 
           const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' })
@@ -191,6 +327,8 @@ export function useMultiTrackStudio() {
                 : t,
             )
           })
+
+          setPostRecordReviewId(trackId)
         }
 
         recorder.start()
@@ -208,8 +346,7 @@ export function useMultiTrackStudio() {
           ),
         )
 
-        // Synchronized overdub — start existing takes at the same instant as the recorder
-        startOverdubPlayback(id)
+        await startOverdubPlayback(id)
       } catch (err) {
         console.error('launchRecording failed', err)
         setTracks((prev) =>
@@ -220,14 +357,21 @@ export function useMultiTrackStudio() {
     [pauseOverdubPlayback, startOverdubPlayback],
   )
 
-  /** Arm a 3-second localized count-in, then launch recording + overdub at zero. */
   const startRecording = useCallback(
     (id: 1 | 2 | 3 | 4) => {
       if (countdownTrackId !== null) return
 
+      setPostRecordReviewId(null)
       stopAll()
       pauseAllExcept(null)
       cancelCountdown()
+
+      if (!countAudioCtxRef.current || countAudioCtxRef.current.state === 'closed') {
+        countAudioCtxRef.current = new AudioContext()
+      }
+      const countCtx = countAudioCtxRef.current
+      void countCtx.resume()
+      playClick(countCtx, 880)
 
       setCountdownTrackId(id)
       setCountdownValue(COUNTDOWN_SECONDS)
@@ -243,6 +387,7 @@ export function useMultiTrackStudio() {
             void launchRecording(id)
             return 0
           }
+          playClick(countCtx, prev - 1 === 1 ? 1320 : 880)
           return prev - 1
         })
       }, 1000)
@@ -261,11 +406,12 @@ export function useMultiTrackStudio() {
   )
 
   const playTrack = useCallback(
-    (id: 1 | 2 | 3 | 4) => {
+    async (id: 1 | 2 | 3 | 4) => {
       const track = tracksRef.current.find((t) => t.id === id)
       if (!track?.recordedUrl) return
 
       setIsGlobalPlaying(false)
+      stopDriftLoop()
       pauseAllExcept(id)
 
       setTracks((prev) =>
@@ -275,8 +421,10 @@ export function useMultiTrackStudio() {
           return t
         }),
       )
+
+      await playRecordedTrack(track, true)
     },
-    [pauseAllExcept],
+    [pauseAllExcept, playRecordedTrack, stopDriftLoop],
   )
 
   const toggleTrackMute = useCallback(
@@ -285,57 +433,64 @@ export function useMultiTrackStudio() {
         prev.map((t) => {
           if (t.id !== id) return t
           const next = { ...t, isMuted: !t.isMuted }
-          applyVideoMuted(id, next)
+          const el = getVideoForTrack(id)
+          if (el) updateMixGain(el, next.volume, next.isMuted)
           return next
         }),
       )
     },
-    [applyVideoMuted],
+    [getVideoForTrack],
   )
 
-  const clearTrack = useCallback((id: 1 | 2 | 3 | 4) => {
-    const idx = trackIndex(id)
-    const el = videoRefs.current[idx]
-
-    el?.pause()
-    if (el) {
-      el.srcObject = null
-      el.removeAttribute('src')
-      el.load()
-    }
-
-    setTracks((prev) => {
-      const target = prev.find((t) => t.id === id)
-      if (target?.recordedUrl) URL.revokeObjectURL(target.recordedUrl)
-      return prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              recordedUrl: null,
-              stream: null,
-              status: 'IDLE' as TrackStatus,
-              isMuted: false,
-            }
-          : t,
+  const setTrackVolume = useCallback(
+    (id: 1 | 2 | 3 | 4, volume: number) => {
+      setTracks((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t
+          const next = { ...t, volume }
+          const el = getVideoForTrack(id)
+          if (el) updateMixGain(el, volume, next.isMuted)
+          return next
+        }),
       )
-    })
+    },
+    [getVideoForTrack],
+  )
+
+  const keepRecordedTake = useCallback((id: 1 | 2 | 3 | 4) => {
+    setPostRecordReviewId((current) => (current === id ? null : current))
   }, [])
 
-  // Keep native .muted in sync whenever track mute/recording state changes
-  useEffect(() => {
-    tracks.forEach((track) => applyVideoMuted(track.id, track))
-  }, [tracks, applyVideoMuted])
+  const redoRecordedTake = useCallback(
+    (id: 1 | 2 | 3 | 4) => {
+      setPostRecordReviewId(null)
+      clearTrackInternal(id)
+      startRecording(id)
+    },
+    [clearTrackInternal, startRecording],
+  )
+
+  const clearTrack = useCallback(
+    (id: 1 | 2 | 3 | 4) => {
+      setPostRecordReviewId((current) => (current === id ? null : current))
+      clearTrackInternal(id)
+    },
+    [clearTrackInternal],
+  )
 
   useEffect(() => {
     return () => {
       if (countIntervalRef.current) clearInterval(countIntervalRef.current)
+      stopDriftLoop()
       liveStreamRef.current?.getTracks().forEach((t) => t.stop())
       recorderRef.current?.stop()
       tracksRef.current.forEach((t) => {
         if (t.recordedUrl) URL.revokeObjectURL(t.recordedUrl)
       })
+      countAudioCtxRef.current?.close().catch(() => {})
+      closeMixContext()
     }
-  }, [])
+  }, [stopDriftLoop])
 
   const hasAnyRecording = tracks.some((t) => !!t.recordedUrl)
   const isAnyRecording = tracks.some((t) => t.status === 'RECORDING')
@@ -350,6 +505,7 @@ export function useMultiTrackStudio() {
     isCountingDown,
     countdownTrackId,
     countdownValue,
+    postRecordReviewId,
     startRecording,
     stopRecording,
     playTrack,
@@ -358,5 +514,8 @@ export function useMultiTrackStudio() {
     stopAll,
     clearTrack,
     toggleTrackMute,
+    setTrackVolume,
+    keepRecordedTake,
+    redoRecordedTake,
   }
 }
