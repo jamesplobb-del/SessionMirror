@@ -23,7 +23,6 @@ import { useAppSettings } from './hooks/useAppSettings'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
-  primeTakePlaybackAudio,
   registerAutoPlaybackHold,
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
