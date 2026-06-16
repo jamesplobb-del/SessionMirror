@@ -236,9 +236,12 @@ export default function SettingsDrawer({
                   type="button"
                   intensity="soft"
                   className="mt-3 w-full rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-100"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
                     onClose()
-                    onEnterStudio()
+                    // Defer mount so the Enter tap does not ghost-click the studio grid.
+                    requestAnimationFrame(() => onEnterStudio())
                   }}
                 >
                   Enter Studio Mode

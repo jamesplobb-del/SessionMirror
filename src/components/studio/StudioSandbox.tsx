@@ -27,6 +27,7 @@ function TrackBox({
   videoRefs,
   showPostRecordReview,
   suppressLivePreview,
+  acceptGridInput,
   onAction,
   onClear,
   onToggleMute,
@@ -39,6 +40,7 @@ function TrackBox({
   videoRefs: MutableRefObject<(HTMLVideoElement | null)[]>
   showPostRecordReview: boolean
   suppressLivePreview: boolean
+  acceptGridInput: boolean
   onAction: () => void
   onClear: () => void
   onToggleMute: () => void
@@ -146,6 +148,18 @@ function TrackBox({
   const isRecording = track.status === 'RECORDING'
 
   const handleCellTap = () => {
+    if (!acceptGridInput) {
+      // #region agent log
+      agentDebugLog(
+        'StudioSandbox.tsx:TrackBox',
+        'blocked cell tap during mount guard',
+        { partId: track.id },
+        'G1',
+        'studio-ui',
+      )
+      // #endregion
+      return
+    }
     if (showRecord) onAction()
   }
 
@@ -467,6 +481,12 @@ function MixerDrawer({
 
 export default function StudioSandbox({ onExit }: StudioSandboxProps) {
   const [mixerOpen, setMixerOpen] = useState(false)
+  const [acceptGridInput, setAcceptGridInput] = useState(false)
+
+  useEffect(() => {
+    const unlockTimer = window.setTimeout(() => setAcceptGridInput(true), 350)
+    return () => window.clearTimeout(unlockTimer)
+  }, [])
 
   const {
     tracks,
@@ -569,7 +589,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
         void playTrack(track.id)
         return
       }
-      startRecording(track.id)
+      startRecording(track.id, 'track-action')
     },
     [isCountingDown, pauseTrack, playTrack, postRecordReviewId, startRecording, stopRecording],
   )
@@ -581,7 +601,9 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex h-screen w-screen flex-col bg-black text-white"
+      className={`fixed inset-0 z-[200] flex h-screen w-screen flex-col bg-black text-white ${
+        acceptGridInput ? '' : 'pointer-events-none'
+      }`}
       style={{ paddingTop: isImmersive ? 0 : 'env(safe-area-inset-top)' }}
     >
       {!isImmersive && (
@@ -630,6 +652,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
               videoRefs={videoRefs}
               showPostRecordReview={postRecordReviewId === track.id}
               suppressLivePreview={isImmersive}
+              acceptGridInput={acceptGridInput}
               onAction={() => handleAction(track)}
               onClear={() => clearTrack(track.id)}
               onToggleMute={() => toggleTrackMute(track.id)}

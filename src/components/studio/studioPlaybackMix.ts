@@ -32,12 +32,17 @@ export function connectVideoToMix(
 
   let nodes = mixNodesByElement.get(el)
   if (!nodes) {
-    const source = ctx.createMediaElementSource(el)
-    const gain = ctx.createGain()
-    source.connect(gain)
-    gain.connect(ctx.destination)
-    nodes = { source, gain }
-    mixNodesByElement.set(el, nodes)
+    try {
+      const source = ctx.createMediaElementSource(el)
+      const gain = ctx.createGain()
+      source.connect(gain)
+      gain.connect(ctx.destination)
+      nodes = { source, gain }
+      mixNodesByElement.set(el, nodes)
+    } catch {
+      // Element may already be wired by another audio graph — skip silently.
+      return
+    }
   }
 
   nodes.gain.gain.value = muted ? 0 : volume

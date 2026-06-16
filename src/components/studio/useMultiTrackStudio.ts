@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { safePlayMedia } from '../../utils/mediaPlayback'
-import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
+import { releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
 import { agentDebugLog } from '../../utils/agentDebugLog'
 import {
   closeMixContext,
@@ -160,13 +160,9 @@ export function useMultiTrackStudio() {
 
       if (backing.length === 0) return
 
-      await primeTakePlaybackAudio(
-        ...backing.map((t) => getVideoForTrack(t.id)).filter(Boolean),
-      )
-
       await Promise.all(backing.map((track) => playRecordedTrack(track, true)))
     },
-    [getVideoForTrack, playRecordedTrack],
+    [playRecordedTrack],
   )
 
   const pauseOverdubPlayback = useCallback((recordingId: 1 | 2 | 3 | 4) => {
@@ -313,28 +309,47 @@ export function useMultiTrackStudio() {
       }
     }
 
-    if (toPlay.length === 0) return
+    if (toPlay.length === 0) {
+      // #region agent log
+      agentDebugLog(
+        'useMultiTrackStudio.ts:playAll',
+        'playAll aborted — no tracks',
+        { trackCount: current.filter((t) => !!t.recordedUrl).length },
+        'P1',
+        'studio-playback',
+      )
+      // #endregion
+      return
+    }
 
     pauseAllExcept(null)
-
-    const elements = toPlay
-      .map((t) => getVideoForTrack(t.id))
-      .filter((el): el is HTMLVideoElement => el !== null)
-
-    await primeTakePlaybackAudio(...elements)
     resumeMixContext()
 
     for (const track of toPlay) {
       wireMixForTrack(track)
     }
 
-    await Promise.all(toPlay.map((track) => playRecordedTrack(track, true)))
+    const results = await Promise.all(toPlay.map((track) => playRecordedTrack(track, true)))
+
+    // #region agent log
+    agentDebugLog(
+      'useMultiTrackStudio.ts:playAll',
+      'playAll finished',
+      {
+        trackIds: toPlay.map((t) => t.id),
+        playResults: results,
+      },
+      'P1',
+      'studio-playback',
+    )
+    // #endregion
+
+    if (!results.some(Boolean)) return
 
     startDriftLoop()
     isGlobalPlayingRef.current = true
     setIsGlobalPlaying(true)
   }, [
-    getVideoForTrack,
     pauseAllExcept,
     playRecordedTrack,
     startDriftLoop,
@@ -561,7 +576,7 @@ export function useMultiTrackStudio() {
   )
 
   const startRecording = useCallback(
-    (id: 1 | 2 | 3 | 4) => {
+    (id: 1 | 2 | 3 | 4, source = 'unknown') => {
       if (
         startingSessionRef.current ||
         countdownTrackId !== null ||
@@ -569,8 +584,27 @@ export function useMultiTrackStudio() {
         recordingIdRef.current !== null ||
         tracksRef.current.some((t) => t.status === 'RECORDING')
       ) {
+        // #region agent log
+        agentDebugLog(
+          'useMultiTrackStudio.ts:startRecording',
+          'start blocked by guard',
+          { id, source, countdownTrackId, armingTrackId },
+          'G1',
+          'studio-ui',
+        )
+        // #endregion
         return
       }
+
+      // #region agent log
+      agentDebugLog(
+        'useMultiTrackStudio.ts:startRecording',
+        'start requested',
+        { id, source },
+        'G1',
+        'studio-ui',
+      )
+      // #endregion
 
       setPostRecordReviewId(null)
       stopAll()
@@ -691,7 +725,7 @@ export function useMultiTrackStudio() {
     (id: 1 | 2 | 3 | 4) => {
       setPostRecordReviewId(null)
       clearTrackInternal(id)
-      startRecording(id)
+      startRecording(id, 'redo')
     },
     [clearTrackInternal, startRecording],
   )
