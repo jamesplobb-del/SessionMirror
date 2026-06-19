@@ -14,6 +14,8 @@ interface LiveCameraBackgroundProps {
   modePreparing?: boolean
   /** Hide the idle audio-mode mic UI while main-screen pitch analysis is showing. */
   pitchStageActive?: boolean
+  /** fullscreen = behind HUD; embedded = inside split-view panel; hidden = not rendered */
+  variant?: 'fullscreen' | 'embedded' | 'hidden'
 }
 
 function LiveCameraBackground({
@@ -25,11 +27,17 @@ function LiveCameraBackground({
   isRecording,
   modePreparing = false,
   pitchStageActive = false,
+  variant = 'fullscreen',
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
   const showAudioIdle = isAudioMode && !pitchStageActive
+  const isEmbedded = variant === 'embedded'
+  const overlayClass = isEmbedded
+    ? 'camera-background-overlay camera-background-overlay--embedded'
+    : 'camera-background-overlay'
 
   useEffect(() => {
+    if (variant === 'hidden') return
     const video = previewRef.current
     if (!video || isAudioMode) {
       if (video?.srcObject) {
@@ -47,10 +55,19 @@ function LiveCameraBackground({
     } else if (video.paused) {
       void video.play().catch(() => {})
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, variant])
+
+  if (variant === 'hidden') {
+    return null
+  }
 
   return (
-    <div className="camera-background" aria-hidden>
+    <div
+      className={
+        isEmbedded ? 'camera-background camera-background--embedded' : 'camera-background'
+      }
+      aria-hidden={!isEmbedded}
+    >
       <video
         ref={previewRef}
         autoPlay
@@ -61,7 +78,9 @@ function LiveCameraBackground({
         {...({
           'webkit-playsinline': 'true',
         } as VideoHTMLAttributes<HTMLVideoElement>)}
-        className={`camera-preview camera-preview--mirror camera-preview--live ${
+        className={`${
+          isEmbedded ? 'camera-preview--embedded' : 'camera-preview'
+        } camera-preview--mirror camera-preview--live ${
           isAudioMode ? 'camera-preview--hidden' : ''
         }`}
       />
@@ -71,7 +90,9 @@ function LiveCameraBackground({
       )}
 
       {showAudioIdle && (
-        <div className="camera-background-overlay camera-background-overlay--audio-idle pitch-audio-idle flex flex-col items-center justify-center">
+        <div
+          className={`${overlayClass} camera-background-overlay--audio-idle pitch-audio-idle flex flex-col items-center justify-center`}
+        >
           <div
             className={`pitch-audio-idle__orb mb-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full ${
               isRecording ? 'pitch-audio-idle__orb--recording' : ''
@@ -100,20 +121,20 @@ function LiveCameraBackground({
       )}
 
       {error && (
-        <div className="camera-background-overlay flex items-center justify-center bg-stone-900">
+        <div className={`${overlayClass} flex items-center justify-center bg-stone-900`}>
           <p className="max-w-sm px-6 text-center text-sm text-white/70">{error}</p>
         </div>
       )}
 
       <div
-        className={`camera-background-overlay pointer-events-none bg-gradient-to-b from-black/10 via-transparent to-black/25 ${
+        className={`${overlayClass} pointer-events-none bg-gradient-to-b from-black/10 via-transparent to-black/25 ${
           showAudioIdle ? 'opacity-40' : isAudioMode ? 'opacity-0' : 'opacity-100'
         }`}
       />
 
       {modePreparing && (
         <div
-          className="camera-background-overlay camera-background-overlay--preparing pointer-events-none"
+          className={`${overlayClass} camera-background-overlay--preparing pointer-events-none`}
           aria-hidden
         />
       )}
@@ -131,5 +152,6 @@ export default memo(
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
     prev.modePreparing === next.modePreparing &&
-    prev.pitchStageActive === next.pitchStageActive,
+    prev.pitchStageActive === next.pitchStageActive &&
+    prev.variant === next.variant,
 )

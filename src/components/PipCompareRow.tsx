@@ -1,4 +1,5 @@
 import { useRef, type RefObject } from 'react'
+import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
@@ -8,6 +9,7 @@ import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 interface PipCompareRowProps {
   benchmarkTake: Take | null
   challengerTake: Take | null
+  youtubeEmbedUrl: string | null
   suspendPipPlayback: boolean
   benchmarkPipVideoRef: RefObject<HTMLMediaElement | null>
   challengerPipVideoRef: RefObject<HTMLMediaElement | null>
@@ -17,6 +19,9 @@ interface PipCompareRowProps {
   onUnpinBenchmark: () => void
   onUnpinChallenger: () => void
   onUploadBenchmark: (file: File) => void
+  onLoadYoutube: () => void
+  onClearYoutube: () => void
+  onToggleSplitView: () => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onDragStateChange?: (state: PipDragUiState) => void
@@ -84,6 +89,7 @@ function PipDragGhost({
 export default function PipCompareRow({
   benchmarkTake,
   challengerTake,
+  youtubeEmbedUrl,
   suspendPipPlayback,
   benchmarkPipVideoRef,
   challengerPipVideoRef,
@@ -93,6 +99,9 @@ export default function PipCompareRow({
   onUnpinBenchmark,
   onUnpinChallenger,
   onUploadBenchmark,
+  onLoadYoutube,
+  onClearYoutube,
+  onToggleSplitView,
   onExpandBenchmark,
   onExpandChallenger,
   onDragStateChange,
@@ -120,25 +129,19 @@ export default function PipCompareRow({
     <>
       <div className="app-pip-row">
         <div ref={benchmarkDropRef} className="pointer-events-auto shrink-0">
-          <PipWindow
-            src={benchmarkTake?.videoUrl ?? null}
-            filePath={benchmarkTake?.filePath}
-            mimeType={
-              benchmarkTake?.videoMimeType ??
-              (benchmarkTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-            }
-            takeName={benchmarkTake?.name}
-            label="Best Take"
-            variant="benchmark"
-            emptyMessage="Drag Current Take here or upload."
-            mirror={benchmarkTake?.mirrorPlayback !== false}
-            recordingOrientation={benchmarkTake?.recordingOrientation}
+          <BestTakeBox
+            layout="pip"
+            take={benchmarkTake}
+            youtubeEmbedUrl={youtubeEmbedUrl}
             suspendPlayback={suspendPipPlayback}
             videoRef={benchmarkPipVideoRef}
-            onUnpin={onUnpinBenchmark}
-            onUpload={onUploadBenchmark}
-            onExpand={benchmarkTake?.videoUrl ? onExpandBenchmark : undefined}
             dropHighlight={ghost?.overPin ?? false}
+            onUnpinTake={onUnpinBenchmark}
+            onClearYoutube={onClearYoutube}
+            onLoadYoutube={onLoadYoutube}
+            onUpload={onUploadBenchmark}
+            onToggleSplitView={onToggleSplitView}
+            onExpand={benchmarkTake?.videoUrl ? onExpandBenchmark : undefined}
             onPlaybackChange={onBenchmarkPlaybackChange}
           />
         </div>

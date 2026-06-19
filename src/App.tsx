@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
+import SplitCompareLayout from './components/SplitCompareLayout'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
 import { useCameraSession } from './hooks/useCameraSession'
@@ -60,6 +61,7 @@ import { scheduleViewportSync } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
+import { parseYoutubeEmbedUrl } from './utils/youtubeEmbed'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
@@ -154,6 +156,9 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(
     null,
   )
+  const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
+  const [isSplitView, setIsSplitView] = useState(false)
+  const [splitRatio, setSplitRatio] = useState(50)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
@@ -1427,6 +1432,21 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     [autoPlaybackTakeId],
   )
 
+  const handleLoadYoutube = useCallback(() => {
+    const raw = window.prompt('Paste YouTube URL')
+    if (!raw) return
+    const embedUrl = parseYoutubeEmbedUrl(raw)
+    if (embedUrl) setYoutubeUrl(embedUrl)
+  }, [])
+
+  const handleClearYoutube = useCallback(() => {
+    setYoutubeUrl(null)
+  }, [])
+
+  const handleToggleSplitView = useCallback(() => {
+    setIsSplitView((current) => !current)
+  }, [])
+
   return (
     <div ref={appShellRef} className="app-shell">
       <audio
@@ -1448,6 +1468,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         pitchStageActive={
           showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
         }
+        variant={isSplitView ? 'hidden' : 'fullscreen'}
       />
 
       <div
@@ -1552,8 +1573,38 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
           className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
         />
 
+        {!quickSettingsOpen && settings.showTakeCards && isSplitView && (
+          <div className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2">
+            <SplitCompareLayout
+              splitRatio={splitRatio}
+              onSplitRatioChange={setSplitRatio}
+              benchmarkTake={benchmarkTake}
+              youtubeEmbedUrl={youtubeUrl}
+              suspendPipPlayback={suspendPipPlayback}
+              benchmarkPipVideoRef={benchmarkPipVideoRef}
+              previewRef={previewRef}
+              streamRef={streamRef}
+              streamGeneration={streamGeneration}
+              cameraError={cameraError}
+              recordingMode={recordingMode}
+              isRecording={isRecording}
+              cameraReady={ready}
+              pitchStageActive={
+                showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
+              }
+              onUnpinBenchmark={handleUnpinBenchmark}
+              onClearYoutube={handleClearYoutube}
+              onLoadYoutube={handleLoadYoutube}
+              onUploadBenchmark={handleUploadBenchmark}
+              onToggleSplitView={handleToggleSplitView}
+              onExpandBenchmark={handleExpandBenchmark}
+              onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+            />
+          </div>
+        )}
+
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {!quickSettingsOpen && settings.showTakeCards && (
+          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && (
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"
@@ -1565,6 +1616,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
                 <PipCompareRow
                   benchmarkTake={benchmarkTake}
                   challengerTake={challengerTake}
+                  youtubeEmbedUrl={youtubeUrl}
                   suspendPipPlayback={suspendPipPlayback}
                   benchmarkPipVideoRef={benchmarkPipVideoRef}
                   challengerPipVideoRef={challengerPipVideoRef}
@@ -1574,6 +1626,9 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
                   onUnpinBenchmark={handleUnpinBenchmark}
                   onUnpinChallenger={handleUnpinChallenger}
                   onUploadBenchmark={handleUploadBenchmark}
+                  onLoadYoutube={handleLoadYoutube}
+                  onClearYoutube={handleClearYoutube}
+                  onToggleSplitView={handleToggleSplitView}
                   onExpandBenchmark={handleExpandBenchmark}
                   onExpandChallenger={handleExpandChallenger}
                   onDragStateChange={handlePipDragStateChange}
