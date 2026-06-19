@@ -213,7 +213,7 @@ function BestTakeBox({
           {hasYoutube ? (
             <>
               <iframe
-                src={`${youtubeEmbedUrl}?playsinline=1&rel=0`}
+                src={youtubeEmbedUrl}
                 className="absolute inset-0 h-full w-full border-0"
                 referrerPolicy="strict-origin-when-cross-origin"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
