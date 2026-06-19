@@ -8,7 +8,7 @@ import {
   type PointerEvent,
   type RefObject,
 } from 'react'
-import { Expand, Play, Pause, Upload, X, Youtube } from 'lucide-react'
+import { Expand, Play, Pause, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
@@ -23,6 +23,9 @@ const FLOAT_BADGE =
 
 const emptyUploadClass =
   'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
+
+const loadYoutubeFabClass =
+  'pointer-events-auto absolute top-2 right-2 z-20 bg-black/60 text-white text-xs px-2 py-1 rounded-md border border-white/20 transition hover:bg-black/80'
 
 export interface BestTakeBoxProps {
   layout: 'pip' | 'fill'
@@ -212,6 +215,7 @@ function BestTakeBox({
               <iframe
                 src={`${youtubeEmbedUrl}?playsinline=1&rel=0`}
                 className="absolute inset-0 h-full w-full border-0"
+                referrerPolicy="strict-origin-when-cross-origin"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
                 title="YouTube reference"
@@ -294,23 +298,31 @@ function BestTakeBox({
               )}
             </>
           ) : (
-            <div className="absolute inset-0 flex flex-col bg-stone-800/90 px-2 pb-2 pt-6">
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
+            <div className="absolute inset-0 bg-stone-800/90 px-2 pb-2 pt-6">
+              <button
+                type="button"
+                onPointerDown={stopEventBubble}
+                onTouchStart={stopEventBubble}
+                onTouchEnd={stopEventBubble}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onLoadYoutube()
+                }}
+                className={loadYoutubeFabClass}
+                aria-label="Load YouTube reference"
+              >
+                + YT URL
+              </button>
+              <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2">
                 <p className={`text-center leading-snug text-white/50 ${isFill ? 'text-xs' : 'text-[8px]'}`}>
-                  Drag Current Take here, upload, or load a YouTube reference.
+                  Drag Current Take here or upload.
                 </p>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {onUpload && (
-                    <label htmlFor="benchmark-upload" className={emptyUploadClass}>
-                      <Upload className="h-3 w-3" />
-                      Upload Best Take
-                    </label>
-                  )}
-                  <button type="button" className={emptyUploadClass} onClick={onLoadYoutube}>
-                    <Youtube className="h-3 w-3" />
-                    Load YouTube
-                  </button>
-                </div>
+                {onUpload && (
+                  <label htmlFor="benchmark-upload" className={emptyUploadClass}>
+                    <Upload className="h-3 w-3" />
+                    Upload Best Take
+                  </label>
+                )}
               </div>
             </div>
           )}
