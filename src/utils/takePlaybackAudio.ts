@@ -3,18 +3,15 @@ import { prepareInlineMediaElement, safePlayMedia } from './mediaPlayback'
 import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from './playbackAudioContext'
 import { routeTakePlaybackToSpeaker } from './takePlaybackSpeaker'
 
-type MicHandler = () => void | Promise<void>
-
-let suspendMicInput: MicHandler | null = null
-let resumeMicInput: MicHandler | null = null
 let autoPlaybackHoldCheck: (() => boolean) | null = null
 
-export function registerTakePlaybackMicHandlers(handlers: {
-  suspendMic: MicHandler
-  resumeMic: MicHandler
+export function registerTakePlaybackMicHandlers(_handlers: {
+  suspendMic: () => void | Promise<void>
+  resumeMic: () => void | Promise<void>
 }): void {
-  suspendMicInput = handlers.suspendMic
-  resumeMicInput = handlers.resumeMic
+  // Mic tracks are no longer disabled during playback (disabling them causes iOS
+  // to auto-suspend the AudioContext after ~1 second → silence). No-op kept so
+  // all call sites compile without changes.
 }
 
 export function registerAutoPlaybackHold(check: () => boolean): void {
@@ -25,48 +22,12 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
 }
 
-export interface PrimeTakePlaybackOptions {
-  /** Keep mic live (studio overdub backing tracks). Default true for take playback. */
-  suspendMic?: boolean
-}
-
-function isPrimeTakePlaybackOptions(
-  value: PrimeTakePlaybackOptions | HTMLMediaElement | null | undefined,
-): value is PrimeTakePlaybackOptions {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'suspendMic' in value &&
-    !('currentSrc' in value)
-  )
-}
-
-/** Prepare playback — await before calling .play() so mic is released first. */
+/** Prepare playback — routes audio through Web Audio so iOS uses the main speaker. */
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
-): Promise<void>
-export async function primeTakePlaybackAudio(
-  options: PrimeTakePlaybackOptions,
-  ...media: Array<HTMLMediaElement | null | undefined>
-): Promise<void>
-export async function primeTakePlaybackAudio(
-  optionsOrMedia: PrimeTakePlaybackOptions | HTMLMediaElement | null | undefined,
-  ...rest: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
-  let suspendMic = true
-  let media: Array<HTMLMediaElement | null | undefined>
-
-  if (isPrimeTakePlaybackOptions(optionsOrMedia)) {
-    suspendMic = optionsOrMedia.suspendMic !== false
-    media = rest
-  } else {
-    media = [optionsOrMedia, ...rest]
-  }
-
-  if (suspendMic) {
-    await suspendMicInput?.()
-  }
-
+  // Do NOT disable mic tracks here — iOS auto-suspends the AudioContext when
+  // there is no active audio input, causing the ~1 second cutout.
   primePlaybackAudioContextSync()
 
   for (const element of media) {
@@ -86,7 +47,8 @@ export function primeTakePlaybackAudioSync(
 }
 
 export async function releaseTakePlaybackAudio(): Promise<void> {
-  await resumeMicInput?.()
+  // Mic tracks are never disabled during playback — nothing to restore.
+  // Kept for call-site compatibility.
 }
 
 export async function playTakeMedia(media: HTMLMediaElement): Promise<boolean> {
@@ -94,11 +56,8 @@ export async function playTakeMedia(media: HTMLMediaElement): Promise<boolean> {
   return safePlayMedia(media)
 }
 
-export async function playTakeMediaBatch(
-  media: HTMLMediaElement[],
-  options: PrimeTakePlaybackOptions = {},
-): Promise<boolean[]> {
+export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {
   if (media.length === 0) return []
-  await primeTakePlaybackAudio(options, ...media)
+  await primeTakePlaybackAudio(...media)
   return Promise.all(media.map((element) => safePlayMedia(element)))
 }

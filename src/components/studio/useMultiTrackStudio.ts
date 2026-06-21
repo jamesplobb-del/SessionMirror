@@ -183,7 +183,7 @@ export function useMultiTrackStudio() {
       resumeMixContext()
 
       if (fromStart) seekVideoTo(el, 0)
-      await primeTakePlaybackAudio({ suspendMic: !keepMic }, el)
+      await primeTakePlaybackAudio(el)
       return safePlayMedia(el)
     },
     [getVideoForTrack, wireMixForTrack],
@@ -210,7 +210,7 @@ export function useMultiTrackStudio() {
       }
 
       if (elements.length === 0) return
-      await playTakeMediaBatch(elements, { suspendMic: false })
+      await playTakeMediaBatch(elements)
     },
     [getVideoForTrack, wireMixForTrack],
   )
