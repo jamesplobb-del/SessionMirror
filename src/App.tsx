@@ -79,9 +79,6 @@ import {
   updateVaultTake,
   type Project,
 } from './db'
-import {
-  type AudioEnhancerSettings,
-} from './utils/audioEnhancer'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
@@ -114,7 +111,6 @@ const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetron
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const StudioSandbox = lazy(() => import('./components/studio/StudioSandbox'))
-const AudioEnhancer = lazy(() => import('./components/AudioEnhancer'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -163,7 +159,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [isSplitView, setIsSplitView] = useState(false)
   const [splitRatio, setSplitRatio] = useState(50)
-  const [audioEnhancerPanelHidden, setAudioEnhancerPanelHidden] = useState(false)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
@@ -311,11 +306,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       setAutoRecordStartSuppressed(true)
       setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
-
-      if (showTakeCardsRef.current) {
-        setAutoPlaybackTakeId(takeId)
-        return
-      }
+      setAutoPlaybackTakeId(takeId)
 
       const audio = autoPlaybackAudioRef.current
       if (!audio) {
@@ -959,7 +950,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     (enabled: boolean) => {
       startTransition(() => {
         updateSettings({ audioEnhancerEnabled: enabled })
-        setAudioEnhancerPanelHidden(!enabled)
       })
     },
     [updateSettings],
@@ -996,6 +986,18 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
             isPlaying: true,
             mediaKey: 'main-recording-audio',
             liveMicOnly: true,
+          }
+        } else if (
+          autoPlaybackPlaying &&
+          autoPlaybackTake &&
+          autoPlaybackAudioRef.current
+        ) {
+          next = {
+            mediaRef: autoPlaybackAudioRef,
+            take: autoPlaybackTake,
+            isPlaying: true,
+            mediaKey: `main-auto-${autoPlaybackTake.id}`,
+            liveMicOnly: false,
           }
         } else if (
           autoPlaybackTakeId &&
@@ -1107,31 +1109,12 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
 
-  const showAudioEnhancerPanel =
-    settings.audioEnhancerEnabled &&
-    !audioEnhancerPanelHidden &&
-    hudModalState === 'idle' &&
-    !pitchHudSuspended
-
-  useEffect(() => {
-    if (!settings.audioEnhancerEnabled) {
-      setAudioEnhancerPanelHidden(false)
-    }
-  }, [settings.audioEnhancerEnabled])
-
   useEffect(() => {
     setTakePlaybackEnhancerState(
       settings.audioEnhancerEnabled,
       settings.audioEnhancerEnabled ? settings.audioEnhancerSettings : undefined,
     )
   }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings])
-
-  const handleAudioEnhancerChange = useCallback(
-    (next: AudioEnhancerSettings) => {
-      updateSettings({ audioEnhancerSettings: next })
-    },
-    [updateSettings],
-  )
 
   const pitchAudioHudLock =
     showPitch &&
@@ -1660,7 +1643,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
               onExpandChallenger={handleExpandChallenger}
               onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
               onChallengerPlaybackChange={handleChallengerPlaybackChange}
-              challengerAutoPlayRequestId={autoPlaybackTakeId}
               onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
             />
           </div>
@@ -1697,7 +1679,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
                   onDragStateChange={handlePipDragStateChange}
                   onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
                   onChallengerPlaybackChange={handleChallengerPlaybackChange}
-                  challengerAutoPlayRequestId={autoPlaybackTakeId}
                   onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                   hapticFeedback={settings.hapticFeedback}
                 />
@@ -1821,14 +1802,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         recordingMode={recordingMode}
         onEnterStudio={onEnterStudio}
       />
-
-      {showAudioEnhancerPanel && (
-        <AudioEnhancer
-          settings={settings.audioEnhancerSettings}
-          onChange={handleAudioEnhancerChange}
-          onClose={() => setAudioEnhancerPanelHidden(true)}
-        />
-      )}
       </Suspense>
       </div>
     </div>

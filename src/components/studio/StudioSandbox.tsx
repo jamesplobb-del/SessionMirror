@@ -3,7 +3,7 @@ import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-rea
 import Pressable from '../ui/Pressable'
 import { mobileVideoProps } from '../../utils/mobileVideo'
 import { useMultiTrackStudio, type StudioCountInPrefs, type StudioTrack } from './useMultiTrackStudio'
-import { attachLiveStreamPreview } from './studioLivePreview'
+import { attachLiveStreamPreview, isLiveMediaStream } from './studioLivePreview'
 
 interface StudioSandboxProps {
   onExit: () => void
@@ -258,6 +258,7 @@ function FullscreenTrackLayer({
   isCountingDown,
   isRecording,
   recordingElapsed,
+  cameraError,
   onBack,
   onStop,
 }: {
@@ -266,12 +267,13 @@ function FullscreenTrackLayer({
   isCountingDown: boolean
   isRecording: boolean
   recordingElapsed: number
+  cameraError: string | null
   onBack: () => void
   onStop: () => void
 }) {
   const previewRef = useRef<HTMLVideoElement | null>(null)
   const accent = TRACK_COLORS[slotIndex] ?? TRACK_COLORS[0]
-  const showCamera = Boolean(track.stream)
+  const showCamera = isLiveMediaStream(track.stream)
 
   useLayoutEffect(() => {
     const el = previewRef.current
@@ -280,7 +282,24 @@ function FullscreenTrackLayer({
       return
     }
 
-    void attachLiveStreamPreview(el, track.stream)
+    let cancelled = false
+    let retryTimer: number | null = null
+
+    const attach = async (attempt = 0) => {
+      if (cancelled || !track.stream) return
+      const ok = await attachLiveStreamPreview(el, track.stream)
+      if (cancelled) return
+      if (!ok && attempt < 3) {
+        retryTimer = window.setTimeout(() => void attach(attempt + 1), 200)
+      }
+    }
+
+    void attach()
+
+    return () => {
+      cancelled = true
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
+    }
   }, [track.stream, track.id])
 
   return (
@@ -296,9 +315,11 @@ function FullscreenTrackLayer({
       />
 
       {!showCamera && !isRecording && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black px-6 text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/20 border-t-white" />
-          <span className="text-sm font-semibold text-white/70">Starting camera…</span>
+          <span className="text-sm font-semibold text-white/70">
+            {cameraError ?? 'Starting camera…'}
+          </span>
         </div>
       )}
 
@@ -508,6 +529,8 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     countInPrefs,
     postRecordReviewId,
     recordingElapsed,
+    isArmingCamera,
+    cameraError,
     selectTrack,
     beginRecordingSession,
     setCountInPrefs,
@@ -603,6 +626,12 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           <StudioCountInControls prefs={countInPrefs} onChange={setCountInPrefs} />
         )}
 
+        {cameraError && !isImmersive && (
+          <p className="mb-1 px-2 text-center text-[10px] font-medium text-amber-300/90">
+            {cameraError}
+          </p>
+        )}
+
         <div
           className={`studio-grid grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5 ${
             isImmersive ? 'pointer-events-none' : ''
@@ -658,6 +687,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
                     !selectedTrackId ||
                     isAnyRecording ||
                     isCountingDown ||
+                    isArmingCamera ||
                     Boolean(armingTrackId)
                   }
                   className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-red-400/60 bg-red-500/90 text-white shadow-[0_0_24px_rgba(239,68,68,0.35)] transition active:scale-90 disabled:opacity-35"
@@ -711,6 +741,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           isCountingDown={countdownTrackId === immersiveTrack.id}
           isRecording={immersiveTrack.status === 'RECORDING'}
           recordingElapsed={recordingElapsed}
+          cameraError={cameraError}
           onBack={() => void deselectTrack()}
           onStop={() => stopRecording(immersiveTrack.id)}
         />

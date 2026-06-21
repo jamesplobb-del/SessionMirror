@@ -14,11 +14,24 @@ interface MixNodes {
 const mixNodesByElement = new WeakMap<HTMLVideoElement, MixNodes>()
 
 let mixContext: AudioContext | null = null
+let contextWatchAttached = false
+
+function attachContextWatch(ctx: AudioContext): void {
+  if (contextWatchAttached) return
+  contextWatchAttached = true
+  ctx.addEventListener('statechange', () => {
+    if (ctx.state === 'suspended') {
+      void ctx.resume().catch(() => {})
+    }
+  })
+}
 
 function getMixContext(): AudioContext {
   if (!mixContext || mixContext.state === 'closed') {
     mixContext = primePlaybackAudioContextSync()
+    contextWatchAttached = false
   }
+  attachContextWatch(mixContext)
   return mixContext
 }
 
@@ -64,7 +77,19 @@ export function resumeMixContext(): void {
   }
 }
 
+/** Free the audio device for camera capture / MediaRecorder on iOS. */
+export function suspendMixContext(): void {
+  if (!mixContext || mixContext.state !== 'running') return
+  void mixContext.suspend().catch(() => {})
+}
+
+/** Keep mix alive during multi-track playback — call from sync loops. */
+export function keepMixContextAlive(): void {
+  resumeMixContext()
+}
+
+/** Detach studio mix bookkeeping without closing the shared app AudioContext. */
 export function closeMixContext(): void {
-  mixContext?.close().catch(() => {})
   mixContext = null
+  contextWatchAttached = false
 }

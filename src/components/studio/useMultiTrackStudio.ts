@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { safePlayMedia, waitForMediaReady } from '../../utils/mediaPlayback'
-import { releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
 import {
   beatIntervalMs,
   closeStudioMetronomeAudio,
   playMetronomeClick,
   primeStudioMetronomeAudioSync,
 } from './studioMetronome'
+import { isLiveMediaStream } from './studioLivePreview'
 import {
   closeMixContext,
   connectVideoToMix,
+  keepMixContextAlive,
   resumeMixContext,
+  suspendMixContext,
   updateMixGain,
 } from './studioPlaybackMix'
+import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
 
 export type TrackStatus = 'IDLE' | 'RECORDING' | 'PLAYING'
 
@@ -110,6 +113,8 @@ export function useMultiTrackStudio() {
   const [armingTrackId, setArmingTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [postRecordReviewId, setPostRecordReviewId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [recordingElapsed, setRecordingElapsed] = useState(0)
+  const [isArmingCamera, setIsArmingCamera] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
 
   const studioPrefsRef = useRef(countInPrefs)
   studioPrefsRef.current = countInPrefs
@@ -126,7 +131,7 @@ export function useMultiTrackStudio() {
   const recordStartedAtRef = useRef(0)
   const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isGlobalPlayingRef = useRef(false)
-  const startingSessionRef = useRef(false)
+  const armLockRef = useRef<Promise<boolean> | null>(null)
 
   const releaseLiveStream = useCallback(async (): Promise<void> => {
     const stream = liveStreamRef.current
@@ -237,9 +242,13 @@ export function useMultiTrackStudio() {
         }
         isGlobalPlayingRef.current = false
         setIsGlobalPlaying(false)
-        void releaseTakePlaybackAudio()
+        setTracks((prev) =>
+          prev.map((t) => (t.status === 'PLAYING' ? { ...t, status: 'IDLE' as TrackStatus } : t)),
+        )
         return
       }
+
+      keepMixContextAlive()
 
       const masterTime = masterEl.currentTime
       for (let slot = 0; slot < TRACK_IDS.length; slot++) {
@@ -307,7 +316,6 @@ export function useMultiTrackStudio() {
   const cancelRecordingSession = useCallback(
     async (id: 1 | 2 | 3 | 4) => {
       cancelCountdown()
-      startingSessionRef.current = false
       if (recordingIdRef.current === id) {
         const recorder = recorderRef.current
         if (recorder?.state === 'recording') recorder.stop()
@@ -326,7 +334,9 @@ export function useMultiTrackStudio() {
     }
     isGlobalPlayingRef.current = false
     setIsGlobalPlaying(false)
-    void releaseTakePlaybackAudio()
+    setTracks((prev) =>
+      prev.map((t) => (t.status === 'PLAYING' ? { ...t, status: 'IDLE' as TrackStatus } : t)),
+    )
   }, [stopDriftLoopInternal])
 
   const playAll = useCallback(async () => {
@@ -364,6 +374,17 @@ export function useMultiTrackStudio() {
 
     const results = await Promise.all(elements.map((el) => safePlayMedia(el)))
     if (!results.some(Boolean)) return
+
+    const playingIds = new Set(toPlay.map((t) => t.id))
+    setTracks((prev) =>
+      prev.map((t) =>
+        playingIds.has(t.id)
+          ? { ...t, status: 'PLAYING' as TrackStatus }
+          : t.status === 'PLAYING'
+            ? { ...t, status: 'IDLE' as TrackStatus }
+            : t,
+      ),
+    )
 
     startDriftLoop()
     isGlobalPlayingRef.current = true
@@ -403,8 +424,12 @@ export function useMultiTrackStudio() {
   const beginRecording = useCallback(
     (id: 1 | 2 | 3 | 4) => {
       const stream = liveStreamRef.current
-      if (!stream || recordingIdRef.current !== null) return
+      if (!stream || !isLiveMediaStream(stream) || recordingIdRef.current !== null) {
+        setCameraError('Camera lost — tap the part to re-open preview, then Record again.')
+        return
+      }
 
+      suspendMixContext()
       chunksRef.current = []
       recordingIdRef.current = id
 
@@ -433,7 +458,6 @@ export function useMultiTrackStudio() {
         chunksRef.current = []
         recordingIdRef.current = null
         recorderRef.current = null
-        startingSessionRef.current = false
 
         setTracks((prev) => {
           const old = prev.find((t) => t.id === trackId)?.recordedUrl
@@ -528,35 +552,76 @@ export function useMultiTrackStudio() {
   )
 
   const armTrackPreview = useCallback(
-    async (id: 1 | 2 | 3 | 4) => {
-      setArmingTrackId(id)
-      await releaseLiveStream()
+    async (id: 1 | 2 | 3 | 4): Promise<boolean> => {
+      if (armLockRef.current) {
+        const prior = await armLockRef.current
+        if (prior && isLiveMediaStream(liveStreamRef.current)) {
+          return liveStreamRef.current !== null
+        }
+      }
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
-          audio: true,
+      const armWork = (async (): Promise<boolean> => {
+        setIsArmingCamera(true)
+        setCameraError(null)
+        setArmingTrackId(id)
+
+        await releaseLiveStream()
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         })
 
-        liveStreamRef.current = stream
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: true,
+          })
 
-        setTracks((prev) =>
-          prev.map((t) =>
-            t.id === id ? { ...t, stream, status: 'IDLE' as TrackStatus } : { ...t, stream: null },
-          ),
-        )
+          if (!isLiveMediaStream(stream)) {
+            stream.getTracks().forEach((t) => t.stop())
+            throw new Error('Camera stream ended before preview started')
+          }
 
-        setArmingTrackId(null)
-        return true
-      } catch (err) {
-        console.error('armTrackPreview failed', err)
-        setArmingTrackId(null)
-        await releaseLiveStream()
-        clearTrackPreviewStream(id)
-        return false
+          liveStreamRef.current = stream
+
+          setTracks((prev) =>
+            prev.map((t) =>
+              t.id === id ? { ...t, stream, status: 'IDLE' as TrackStatus } : { ...t, stream: null },
+            ),
+          )
+
+          setArmingTrackId(null)
+          return true
+        } catch (err) {
+          console.error('armTrackPreview failed', err)
+          setCameraError('Could not start camera. Try again in a moment.')
+          setArmingTrackId(null)
+          await releaseLiveStream()
+          clearTrackPreviewStream(id)
+          return false
+        } finally {
+          setIsArmingCamera(false)
+        }
+      })()
+
+      armLockRef.current = armWork
+      try {
+        return await armWork
+      } finally {
+        if (armLockRef.current === armWork) {
+          armLockRef.current = null
+        }
       }
     },
     [clearTrackPreviewStream, releaseLiveStream],
+  )
+
+  const ensureLiveCamera = useCallback(
+    async (id: 1 | 2 | 3 | 4): Promise<boolean> => {
+      if (isLiveMediaStream(liveStreamRef.current)) return true
+      liveStreamRef.current = null
+      return armTrackPreview(id)
+    },
+    [armTrackPreview],
   )
 
   const selectTrack = useCallback(
@@ -579,10 +644,8 @@ export function useMultiTrackStudio() {
       }
 
       const track = tracksRef.current.find((t) => t.id === id)
-      if (!track?.recordedUrl && !liveStreamRef.current && armingTrackId === null) {
-        startingSessionRef.current = true
+      if (!track?.recordedUrl && !isLiveMediaStream(liveStreamRef.current) && armingTrackId === null) {
         await armTrackPreview(id)
-        startingSessionRef.current = false
       }
     },
     [armingTrackId, armTrackPreview, countdownTrackId, releaseLiveStream],
@@ -593,7 +656,8 @@ export function useMultiTrackStudio() {
     if (!id) return
 
     if (
-      startingSessionRef.current ||
+      isArmingCamera ||
+      armLockRef.current !== null ||
       countdownTrackId !== null ||
       armingTrackId !== null ||
       recordingIdRef.current !== null ||
@@ -608,20 +672,21 @@ export function useMultiTrackStudio() {
     stopAll()
     pauseAllExcept(null)
     cancelCountdown()
+    suspendMixContext()
 
-    if (!liveStreamRef.current) {
-      startingSessionRef.current = true
-      const armed = await armTrackPreview(id)
-      startingSessionRef.current = false
-      if (!armed || !liveStreamRef.current) return
+    const cameraReady = await ensureLiveCamera(id)
+    if (!cameraReady || !isLiveMediaStream(liveStreamRef.current)) {
+      setCameraError('Camera is not ready. Tap the part again, then Record.')
+      return
     }
 
     startMetronomeCountIn(id)
   }, [
-    armTrackPreview,
     armingTrackId,
     cancelCountdown,
     countdownTrackId,
+    ensureLiveCamera,
+    isArmingCamera,
     pauseAllExcept,
     startMetronomeCountIn,
     stopAll,
@@ -756,6 +821,8 @@ export function useMultiTrackStudio() {
       })
       closeStudioMetronomeAudio()
       closeMixContext()
+      resumeMixContext()
+      resumePlaybackAudioContext()
     }
   }, [stopDriftLoopInternal])
 
@@ -793,6 +860,8 @@ export function useMultiTrackStudio() {
     countInPrefs,
     postRecordReviewId,
     recordingElapsed,
+    isArmingCamera,
+    cameraError,
     selectTrack,
     beginRecordingSession,
     setCountInPrefs,

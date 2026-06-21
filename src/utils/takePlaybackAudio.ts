@@ -1,6 +1,6 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import { prepareInlineMediaElement } from './mediaPlayback'
-import { primePlaybackAudioContextSync } from './playbackAudioContext'
+import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from './playbackAudioContext'
 import { routeTakePlaybackToSpeaker } from './takePlaybackSpeaker'
 
 type MicHandler = () => void | Promise<void>
@@ -38,6 +38,8 @@ export async function primeTakePlaybackAudio(
     prepareInlineMediaElement(element)
     routeTakePlaybackToSpeaker(element, element.volume, false)
   }
+
+  resumePlaybackAudioContext()
 
   resumePitchGraphsForMedia(...media)
 }

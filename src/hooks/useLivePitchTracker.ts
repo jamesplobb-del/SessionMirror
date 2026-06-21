@@ -538,10 +538,18 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
   const { media, mode } = graph
   elementGraphs.delete(media)
 
+  const speakerNodes = getTakePlaybackSpeakerNodes(media)
+  const onSharedSpeakerBus = Boolean(speakerNodes && graph.source === speakerNodes.source)
+
   try {
-    graph.source.disconnect()
-    graph.analyser.disconnect()
-    graph.passthrough?.disconnect()
+    if (onSharedSpeakerBus) {
+      // Pitch tapped the shared speaker bus — only remove the analyser tap.
+      graph.analyser.disconnect()
+    } else {
+      graph.source.disconnect()
+      graph.analyser.disconnect()
+      graph.passthrough?.disconnect()
+    }
   } catch {
     /* graph may already be disconnected */
   }

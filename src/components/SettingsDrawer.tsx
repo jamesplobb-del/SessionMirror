@@ -5,6 +5,7 @@ import type { AppSettings } from '../utils/appSettings'
 import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import AnimatedExpand from './ui/AnimatedExpand'
+import AudioEnhancer from './AudioEnhancer'
 import { SettingsDrawerSkeleton } from './ui/DrawerSkeletons'
 import IOSSegmentedControl from './ui/IOSSegmentedControl'
 import IOSSwitch from './ui/IOSSwitch'
@@ -342,6 +343,16 @@ export default function SettingsDrawer({
               checked={settings.audioEnhancerEnabled}
               onChange={(checked) => onUpdate({ audioEnhancerEnabled: checked })}
             />
+
+            <AnimatedExpand open={settings.audioEnhancerEnabled}>
+              <div className="pt-3">
+                <AudioEnhancer
+                  variant="inline"
+                  settings={settings.audioEnhancerSettings}
+                  onChange={(audioEnhancerSettings) => onUpdate({ audioEnhancerSettings })}
+                />
+              </div>
+            </AnimatedExpand>
           </section>
 
           <section className="space-y-3">
