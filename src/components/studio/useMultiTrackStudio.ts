@@ -667,12 +667,12 @@ export function useMultiTrackStudio() {
     }
 
     primeStudioMetronomeAudioSync()
+    resumeMixContext()
 
     setPostRecordReviewId(null)
     stopAll()
     pauseAllExcept(null)
     cancelCountdown()
-    suspendMixContext()
 
     const cameraReady = await ensureLiveCamera(id)
     if (!cameraReady || !isLiveMediaStream(liveStreamRef.current)) {

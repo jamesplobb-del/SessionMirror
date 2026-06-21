@@ -911,7 +911,7 @@ export function useCameraSession({
 
     for (const track of stream.getAudioTracks()) {
       if (track.readyState === 'live') {
-        track.stop()
+        track.enabled = false
       }
     }
   }, [])

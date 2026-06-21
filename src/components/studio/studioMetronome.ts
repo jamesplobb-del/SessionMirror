@@ -40,12 +40,19 @@ export function primeStudioMetronomeAudioSync(): void {
 
 async function ensureMetronomeAudio(): Promise<AudioContext | null> {
   primeStudioMetronomeAudioSync()
+  if (countCtx?.state === 'suspended') {
+    await countCtx.resume().catch(() => {})
+  }
   return countCtx
 }
 
 export async function playMetronomeClick(accent = false): Promise<void> {
   const ctx = await ensureMetronomeAudio()
   if (!ctx || !masterGain) return
+  if (ctx.state === 'suspended') {
+    await ctx.resume().catch(() => {})
+  }
+  if (ctx.state !== 'running') return
 
   const t = ctx.currentTime
   const osc = ctx.createOscillator()

@@ -6,7 +6,6 @@ import { isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import { safePlayMedia } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
-import { hasTakePlaybackSpeakerRoute } from '../utils/takePlaybackSpeaker'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
   buildPlaybackShellStyle,
@@ -82,16 +81,8 @@ export default function TakeVideoPlayer({
     const media = mediaRef.current
     if (!media) return
 
-    const ensureAudible = () => {
-      void primeTakePlaybackAudio(media)
-    }
-
     const onPlay = () => {
       void (async () => {
-        if (hasTakePlaybackSpeakerRoute(media)) {
-          await primeTakePlaybackAudio(media)
-          return
-        }
         const resumeTime = media.currentTime
         media.pause()
         await primeTakePlaybackAudio(media)
@@ -100,8 +91,6 @@ export default function TakeVideoPlayer({
       })()
     }
 
-    ensureAudible()
-    media.addEventListener('loadeddata', ensureAudible)
     media.addEventListener('play', onPlay)
 
     const releaseAudible = () => {
@@ -112,7 +101,6 @@ export default function TakeVideoPlayer({
 
     return () => {
       media.removeEventListener('play', onPlay)
-      media.removeEventListener('loadeddata', ensureAudible)
       media.removeEventListener('pause', releaseAudible)
       media.removeEventListener('ended', releaseAudible)
     }
