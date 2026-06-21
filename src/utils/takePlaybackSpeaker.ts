@@ -29,7 +29,7 @@ let enhancerEnabled = false
 let enhancerSettings: AudioEnhancerSettings | null = null
 
 function resumePlaybackBus(): void {
-  resumePlaybackAudioContext()
+  void resumePlaybackAudioContext()
 }
 
 export function setTakePlaybackEnhancerState(
@@ -108,6 +108,46 @@ function ensureEnhancerForElement(_el: HTMLMediaElement, nodes: TakeSpeakerNodes
   nodes.enhancer = chain
 }
 
+/** Reconnect source→gain and gain→destination after graph teardown. */
+function ensureGainReachableDestination(nodes: TakeSpeakerNodes): void {
+  const ctx = nodes.source.context as AudioContext
+
+  if (nodes.enhancer) {
+    try {
+      nodes.gain.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+    try {
+      nodes.gain.connect(nodes.enhancer.input)
+    } catch {
+      /* already connected */
+    }
+    try {
+      nodes.enhancer.output.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+    try {
+      nodes.enhancer.output.connect(ctx.destination)
+    } catch {
+      /* already connected */
+    }
+    return
+  }
+
+  try {
+    nodes.gain.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+  try {
+    nodes.gain.connect(ctx.destination)
+  } catch {
+    /* already connected */
+  }
+}
+
 /** Reconnect source→gain after pitch analysis teardown left the bus open. */
 function repairSpeakerBus(el: HTMLMediaElement, nodes: TakeSpeakerNodes): void {
   try {
@@ -125,12 +165,37 @@ function repairSpeakerBus(el: HTMLMediaElement, nodes: TakeSpeakerNodes): void {
   }
 
   disconnectEnhancer(nodes)
+  ensureGainReachableDestination(nodes)
 }
 
 export function getTakePlaybackSpeakerNodes(
   el: HTMLMediaElement,
 ): TakeSpeakerNodes | undefined {
   return speakerNodesByElement.get(el)
+}
+
+/**
+ * Register an existing element→gain route (e.g. from pitch analysis) as the
+ * shared speaker bus so enhancer state and repair logic apply consistently.
+ */
+export function registerTakePlaybackSpeakerRoute(
+  el: HTMLMediaElement,
+  source: MediaElementAudioSourceNode,
+  gain: GainNode,
+): void {
+  const existing = speakerNodesByElement.get(el)
+  if (existing) {
+    if (existing.source === source && existing.gain === gain) {
+      repairSpeakerBus(el, existing)
+      el.muted = true
+    }
+    return
+  }
+
+  speakerNodesByElement.set(el, { source, gain })
+  routedSpeakerElements.add(el)
+  el.muted = true
+  repairSpeakerBus(el, { source, gain })
 }
 
 export function hasTakePlaybackSpeakerRoute(el: HTMLMediaElement): boolean {
@@ -155,16 +220,23 @@ export function routeTakePlaybackToSpeaker(
       nodes = { source, gain }
       speakerNodesByElement.set(el, nodes)
       routedSpeakerElements.add(el)
-      el.muted = true
     } catch {
-      // Element may already be wired (e.g. pitch graph) — bail without muting.
-      resumePlaybackBus()
-      return
+      // Element may already be wired (e.g. pitch graph registered the bus).
+      nodes = speakerNodesByElement.get(el)
+      if (!nodes) {
+        resumePlaybackBus()
+        // No Web Audio route — fall back to native output (quiet earpiece beats silence).
+        el.muted = muted
+        el.volume = muted ? 0 : volume
+        return
+      }
+      repairSpeakerBus(el, nodes)
     }
   } else {
     repairSpeakerBus(el, nodes)
   }
 
+  el.muted = true
   nodes.gain.gain.value = muted ? 0 : volume
 
   if (enhancerEnabled && enhancerSettings) {
@@ -174,6 +246,7 @@ export function routeTakePlaybackToSpeaker(
     }
   } else {
     disconnectEnhancer(nodes)
+    ensureGainReachableDestination(nodes)
   }
 
   resumePlaybackBus()

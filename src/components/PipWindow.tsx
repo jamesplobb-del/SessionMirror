@@ -4,10 +4,7 @@ import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import {
-  safePlayMedia,
-  waitForMediaReadyWithRetry,
-} from '../utils/mediaPlayback'
+import { safePlayMedia, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'

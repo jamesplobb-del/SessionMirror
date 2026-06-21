@@ -13,8 +13,7 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import YoutubeUrlDialog from './YoutubeUrlDialog'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { safePlayMedia } from '../utils/mediaPlayback'
-import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { playTakeMedia, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
@@ -117,9 +116,8 @@ function BestTakeBox({
     const video = videoRef.current
     if (!video) return false
 
-    await primeTakePlaybackAudio(video)
     setIsPlaying(true)
-    const started = await safePlayMedia(video)
+    const started = await playTakeMedia(video)
     if (!started) {
       setIsPlaying(false)
       void releaseTakePlaybackAudio()

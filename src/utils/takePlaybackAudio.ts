@@ -1,5 +1,5 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
-import { prepareInlineMediaElement } from './mediaPlayback'
+import { prepareInlineMediaElement, safePlayMedia } from './mediaPlayback'
 import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from './playbackAudioContext'
 import { routeTakePlaybackToSpeaker } from './takePlaybackSpeaker'
 
@@ -39,7 +39,7 @@ export async function primeTakePlaybackAudio(
     routeTakePlaybackToSpeaker(element, element.volume, false)
   }
 
-  resumePlaybackAudioContext()
+  await resumePlaybackAudioContext()
 
   resumePitchGraphsForMedia(...media)
 }
@@ -54,4 +54,12 @@ export function primeTakePlaybackAudioSync(
 /** Restore mic capture after take playback finishes. */
 export async function releaseTakePlaybackAudio(): Promise<void> {
   await resumeMicInput?.()
+}
+
+/** Prime speaker routing then play — use for all take audio playback. */
+export async function playTakeMedia(
+  media: HTMLMediaElement,
+): Promise<boolean> {
+  await primeTakePlaybackAudio(media)
+  return safePlayMedia(media)
 }

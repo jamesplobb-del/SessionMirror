@@ -33,7 +33,11 @@ import {
   isSharedPlaybackContext,
   resumePlaybackAudioContext,
 } from '../utils/playbackAudioContext'
-import { getTakePlaybackSpeakerNodes } from '../utils/takePlaybackSpeaker'
+import {
+  getTakePlaybackSpeakerNodes,
+  registerTakePlaybackSpeakerRoute,
+  routeTakePlaybackToSpeaker,
+} from '../utils/takePlaybackSpeaker'
 const HISTORY_LENGTH = 140
 
 /** Brief hold before glow begins (~220ms). */
@@ -487,6 +491,8 @@ async function createPitchGraph(
     elementSource.connect(analyser)
     elementSource.connect(passthrough)
     passthrough.connect(context.destination)
+    registerTakePlaybackSpeakerRoute(media, elementSource, passthrough)
+    media.muted = true
     source = elementSource
     mode = 'element'
   } catch {
@@ -509,6 +515,7 @@ async function createPitchGraph(
       source = streamAttach.source
       passthrough = streamAttach.passthrough
       mode = 'stream'
+      media.muted = true
     }
   }
 
@@ -1759,7 +1766,7 @@ export function useLivePitchTracker(
 export function resumePitchGraphsForMedia(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  resumePlaybackAudioContext()
+  void resumePlaybackAudioContext()
 
   for (const element of media) {
     if (!element) continue
@@ -1768,6 +1775,12 @@ export function resumePitchGraphsForMedia(
 
     if (graph.passthrough) {
       graph.passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+    }
+
+    if (graph.mode === 'element' && getTakePlaybackSpeakerNodes(element)) {
+      routeTakePlaybackToSpeaker(element, element.volume, false)
+    } else if (graph.mode === 'stream' && graph.context.state !== 'closed') {
+      refreshMediaPitchStreamSource(graph)
     }
   }
 }

@@ -822,7 +822,7 @@ export function useMultiTrackStudio() {
       closeStudioMetronomeAudio()
       closeMixContext()
       resumeMixContext()
-      resumePlaybackAudioContext()
+      void resumePlaybackAudioContext()
     }
   }, [stopDriftLoopInternal])
 
