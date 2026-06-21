@@ -174,7 +174,7 @@ export function useMultiTrackStudio() {
   )
 
   const playRecordedTrack = useCallback(
-    async (track: StudioTrack, fromStart = true, mode: 'take' | 'overdub' = 'take'): Promise<boolean> => {
+    async (track: StudioTrack, fromStart = true, keepMic = false): Promise<boolean> => {
       const el = getVideoForTrack(track.id)
       if (!el || !track.recordedUrl || track.status === 'RECORDING') return false
 
@@ -183,7 +183,7 @@ export function useMultiTrackStudio() {
       resumeMixContext()
 
       if (fromStart) seekVideoTo(el, 0)
-      await primeTakePlaybackAudio(mode, el)
+      await primeTakePlaybackAudio({ suspendMic: !keepMic }, el)
       return safePlayMedia(el)
     },
     [getVideoForTrack, wireMixForTrack],
@@ -210,7 +210,7 @@ export function useMultiTrackStudio() {
       }
 
       if (elements.length === 0) return
-      await playTakeMediaBatch(elements, 'overdub')
+      await playTakeMediaBatch(elements, { suspendMic: false })
     },
     [getVideoForTrack, wireMixForTrack],
   )
@@ -219,7 +219,6 @@ export function useMultiTrackStudio() {
     for (let slot = 0; slot < TRACK_IDS.length; slot++) {
       videoRefs.current[slot]?.pause()
     }
-    void releaseTakePlaybackAudio()
   }, [])
 
   const stopDriftLoopInternal = useCallback(() => {
@@ -361,8 +360,6 @@ export function useMultiTrackStudio() {
     stopDriftLoopInternal()
     setPostRecordReviewId(null)
 
-    void releaseTakePlaybackAudio()
-
     const current = tracksRef.current
     const toPlay: StudioTrack[] = []
 
@@ -392,11 +389,8 @@ export function useMultiTrackStudio() {
 
     await Promise.all(elements.map((el) => waitForMediaReady(el, 2000)))
 
-    const results = await playTakeMediaBatch(elements, 'take')
-    if (!results.some(Boolean)) {
-      void releaseTakePlaybackAudio()
-      return
-    }
+    const results = await playTakeMediaBatch(elements)
+    if (!results.some(Boolean)) return
 
     const playingIds = new Set(toPlay.map((t) => t.id))
     setTracks((prev) =>
@@ -748,7 +742,6 @@ export function useMultiTrackStudio() {
       setIsGlobalPlaying(false)
       isGlobalPlayingRef.current = false
       stopDriftLoopInternal()
-      void releaseTakePlaybackAudio()
       pauseAllExcept(id)
 
       setTracks((prev) =>

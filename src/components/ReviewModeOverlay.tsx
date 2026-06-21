@@ -12,7 +12,7 @@ import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
-import { playTakeMedia, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { playTakeMedia, primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
@@ -470,6 +470,7 @@ export default function ReviewModeOverlay({
       }
     }
     const onPlay = () => {
+      void primeTakePlaybackAudio(video)
       setIsPlaying(true)
       revealPlayOverlay(true)
       startProgressLoop()
@@ -478,11 +479,13 @@ export default function ReviewModeOverlay({
       setIsPlaying(true)
     }
     const onPause = () => {
+      void releaseTakePlaybackAudio()
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
     }
     const onEnded = () => {
+      void releaseTakePlaybackAudio()
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()

@@ -4,8 +4,6 @@ import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
-import { safePlayMedia } from '../utils/mediaPlayback'
-import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
   buildPlaybackShellStyle,
@@ -26,9 +24,8 @@ export interface TakeVideoPlayerProps
   eagerLoad?: boolean
   thumbnailPreview?: boolean
   manualPlayOnly?: boolean
-  /** Play audio through the device speaker (default muted for PiP previews). */
+  /** Caller primes speaker routing before play when true (Review / PiP). */
   audible?: boolean
-  /** Show native controls on mirrored recorded takes. */
   mirroredControls?: boolean
   videoSourceKey?: string
   preload?: 'auto' | 'metadata' | 'none'
@@ -75,36 +72,6 @@ export default function TakeVideoPlayer({
   useEffect(() => {
     setVideoDimensions({ width: 0, height: 0 })
   }, [mediaSrc, videoSourceKey])
-
-  useEffect(() => {
-    if (!audible || !mediaSrc) return
-    const media = mediaRef.current
-    if (!media) return
-
-    const onPlay = () => {
-      void (async () => {
-        const resumeTime = media.currentTime
-        media.pause()
-        await primeTakePlaybackAudio(media)
-        media.currentTime = resumeTime
-        await safePlayMedia(media)
-      })()
-    }
-
-    media.addEventListener('play', onPlay)
-
-    const releaseAudible = () => {
-      void releaseTakePlaybackAudio()
-    }
-    media.addEventListener('pause', releaseAudible)
-    media.addEventListener('ended', releaseAudible)
-
-    return () => {
-      media.removeEventListener('play', onPlay)
-      media.removeEventListener('pause', releaseAudible)
-      media.removeEventListener('ended', releaseAudible)
-    }
-  }, [audible, mediaSrc, mediaRef])
 
   useEffect(() => {
     if (manualPlayOnly || audible) return

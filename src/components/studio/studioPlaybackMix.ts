@@ -1,34 +1,82 @@
 /**
- * Routes multiple <video> elements through the shared take speaker bus so
- * iOS outputs every track simultaneously on the main speaker.
+ * Routes multiple <video> elements through one shared AudioContext so
+ * iOS Safari can output every track simultaneously (native .play() alone
+ * only audibly plays the last element).
  */
 
-import { routeTakePlaybackToSpeaker, updateTakePlaybackSpeakerGain } from '../../utils/takePlaybackSpeaker'
 import { primePlaybackAudioContextSync } from '../../utils/playbackAudioContext'
 
-/** Wire a video element into the shared mix bus (once per element lifetime). */
+interface MixNodes {
+  source: MediaElementAudioSourceNode
+  gain: GainNode
+}
+
+const mixNodesByElement = new WeakMap<HTMLVideoElement, MixNodes>()
+
+let mixContext: AudioContext | null = null
+let contextWatchAttached = false
+
+function attachContextWatch(ctx: AudioContext): void {
+  if (contextWatchAttached) return
+  contextWatchAttached = true
+  ctx.addEventListener('statechange', () => {
+    if (ctx.state === 'suspended') {
+      void ctx.resume().catch(() => {})
+    }
+  })
+}
+
+function getMixContext(): AudioContext {
+  if (!mixContext || mixContext.state === 'closed') {
+    mixContext = primePlaybackAudioContextSync()
+    contextWatchAttached = false
+  }
+  attachContextWatch(mixContext)
+  return mixContext
+}
+
 export function connectVideoToMix(
   el: HTMLVideoElement,
   volume: number,
   muted: boolean,
 ): void {
-  primePlaybackAudioContextSync()
-  routeTakePlaybackToSpeaker(el, volume, muted)
+  const ctx = getMixContext()
+
+  let nodes = mixNodesByElement.get(el)
+  if (!nodes) {
+    try {
+      const source = ctx.createMediaElementSource(el)
+      const gain = ctx.createGain()
+      source.connect(gain)
+      gain.connect(ctx.destination)
+      nodes = { source, gain }
+      mixNodesByElement.set(el, nodes)
+    } catch {
+      return
+    }
+  }
+
+  nodes.gain.gain.value = muted ? 0 : volume
+  el.muted = true
 }
 
 export function updateMixGain(el: HTMLVideoElement, volume: number, muted: boolean): void {
-  updateTakePlaybackSpeakerGain(el, volume, muted)
+  const nodes = mixNodesByElement.get(el)
+  if (nodes) {
+    nodes.gain.gain.value = muted ? 0 : volume
+  }
 }
 
 export function resumeMixContext(): void {
-  primePlaybackAudioContextSync()
+  const ctx = getMixContext()
+  if (ctx.state === 'suspended') {
+    void ctx.resume().catch(() => {})
+  }
 }
 
-/** Suspend shared playback context before MediaRecorder on iOS. */
 export function suspendMixContext(): void {
-  const ctx = primePlaybackAudioContextSync()
-  if (ctx.state !== 'running') return
-  void ctx.suspend().catch(() => {})
+  if (!mixContext || mixContext.state !== 'running') return
+  void mixContext.suspend().catch(() => {})
 }
 
 export function keepMixContextAlive(): void {
@@ -36,5 +84,6 @@ export function keepMixContextAlive(): void {
 }
 
 export function closeMixContext(): void {
-  /* Shared app AudioContext — only clear local bookkeeping if added later. */
+  mixContext = null
+  contextWatchAttached = false
 }

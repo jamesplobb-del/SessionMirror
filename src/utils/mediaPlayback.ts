@@ -1,5 +1,7 @@
-/** Inline playback attributes required by iOS WebKit (does not touch muted — routing sets that). */
+/** Inline playback attributes required by iOS WebKit. */
 export function prepareInlineMediaElement(media: HTMLMediaElement): void {
+  media.muted = false
+  media.defaultMuted = false
   media.volume = 1
   media.setAttribute('playsinline', 'true')
   media.setAttribute('webkit-playsinline', 'true')
@@ -79,10 +81,6 @@ export async function waitForMediaReadyWithRetry(
   return false
 }
 
-/**
- * Call synchronously inside onClick / onPointerUp — must not be deferred to useEffect.
- * Returns a promise for callers that want to update UI after play resolves.
- */
 export async function playMediaOnUserGesture(
   media: HTMLMediaElement,
   beforePlay?: () => void | Promise<void>,
