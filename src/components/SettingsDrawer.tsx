@@ -365,6 +365,27 @@ export default function SettingsDrawer({
               onChange={(checked) => onUpdate({ showTakeCards: checked })}
             />
 
+            <AnimatedExpand open={settings.showTakeCards}>
+              <div className="space-y-2 pt-3">
+                <label className="block space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-stone-800">Take Card Size</span>
+                    <span className="text-xs tabular-nums text-stone-500">{settings.takeCardScale}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={85}
+                    max={125}
+                    step={5}
+                    value={settings.takeCardScale}
+                    onChange={(e) => onUpdate({ takeCardScale: Number(e.target.value) })}
+                    className="w-full accent-stone-700"
+                    aria-label="Take card size"
+                  />
+                </label>
+              </div>
+            </AnimatedExpand>
+
             <SettingToggle
               label="Haptic Feedback"
               description="Light vibration when you arm a drag to pin a take as Best Take."

@@ -21,6 +21,8 @@ export interface AppSettings {
   showMetronome: boolean
   /** Silence metronome clicks while a take is playing; internal clock keeps running. */
   muteMetronomeDuringPlayback: boolean
+  /** Scale factor for Best Take / Current Take cards (85–125). */
+  takeCardScale: number
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -34,6 +36,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showTakeCards: true,
   showMetronome: false,
   muteMetronomeDuringPlayback: true,
+  takeCardScale: 100,
 }
 
 /** Floating widgets — forced off on each cold app start. */
@@ -99,6 +102,11 @@ export function loadAppSettings(): AppSettings {
         parsed.muteMetronomeDuringPlayback !== undefined
           ? Boolean(parsed.muteMetronomeDuringPlayback)
           : DEFAULT_APP_SETTINGS.muteMetronomeDuringPlayback,
+      takeCardScale: clamp(
+        Number(parsed.takeCardScale) || DEFAULT_APP_SETTINGS.takeCardScale,
+        85,
+        125,
+      ),
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

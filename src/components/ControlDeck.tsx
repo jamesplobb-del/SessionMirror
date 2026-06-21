@@ -59,10 +59,8 @@ export default function ControlDeck({
   recordDropRef,
   dragDeleteActive = false,
   dragOverDelete = false,
-  pitchTrackerEnabled = false,
   showTakeCards = true,
   showMetronome = false,
-  onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
   settingsBranchDisabled = false,
@@ -116,10 +114,8 @@ export default function ControlDeck({
         onClose={closeBranch}
         onExitComplete={handleBranchExitComplete}
         anchorRef={settingsButtonRef}
-        pitchTrackerEnabled={pitchTrackerEnabled}
         showTakeCards={showTakeCards}
         showMetronome={showMetronome}
-        onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
         onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}
       />

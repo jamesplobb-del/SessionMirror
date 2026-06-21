@@ -93,7 +93,18 @@ function LiveCameraBackground({
       video?.removeEventListener('stalled', revivePreview)
       video?.removeEventListener('suspend', revivePreview)
     }
-  }, [isAudioMode, previewRef, streamRef, streamGeneration])
+  }, [isAudioMode, previewRef, streamRef, streamGeneration, visuallySuppressed])
+
+  useEffect(() => {
+    if (visuallySuppressed || isAudioMode) return
+    const video = previewRef.current
+    const stream = streamRef.current
+    if (!video || !stream) return
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+    }
+    void video.play().catch(() => {})
+  }, [isAudioMode, previewRef, streamRef, streamGeneration, visuallySuppressed])
 
   const shellClass = isEmbedded
     ? 'camera-background camera-background--embedded'

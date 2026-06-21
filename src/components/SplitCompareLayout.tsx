@@ -20,7 +20,7 @@ interface SplitCompareLayoutProps {
   pitchStageActive: boolean
   onUnpinBenchmark: () => void
   onClearYoutube: () => void
-  onLoadYoutube: () => void
+  onSubmitYoutube: (embedUrl: string) => void
   onUploadBenchmark: (file: File) => void
   onToggleSplitView: () => void
   onExpandBenchmark?: () => void
@@ -44,7 +44,7 @@ export default function SplitCompareLayout({
   pitchStageActive,
   onUnpinBenchmark,
   onClearYoutube,
-  onLoadYoutube,
+  onSubmitYoutube,
   onUploadBenchmark,
   onToggleSplitView,
   onExpandBenchmark,
@@ -66,7 +66,7 @@ export default function SplitCompareLayout({
           videoRef={benchmarkPipVideoRef}
           onUnpinTake={onUnpinBenchmark}
           onClearYoutube={onClearYoutube}
-          onLoadYoutube={onLoadYoutube}
+          onSubmitYoutube={onSubmitYoutube}
           onUpload={onUploadBenchmark}
           onToggleSplitView={onToggleSplitView}
           splitViewActive

@@ -280,7 +280,7 @@ function PipWindow({
 
   return (
     <div
-      className={`pip-video-container group relative aspect-video w-[9rem] min-h-[5.0625rem] min-w-[9rem] sm:w-[10rem] sm:min-h-[5.625rem] sm:min-w-[10rem] ${className}`}
+      className={`pip-video-container group relative aspect-video ${className}`}
     >
       {variant === 'benchmark' && onUpload && (
         <input

@@ -61,7 +61,6 @@ import { scheduleViewportSync } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
-import { parseYoutubeEmbedUrl } from './utils/youtubeEmbed'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
@@ -616,8 +615,11 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   })
 
   useEffect(() => {
-    if (!isSplitView || recordingMode !== 'video') return
-    void refreshCameraSession()
+    if (recordingMode !== 'video') return
+    const frameId = window.requestAnimationFrame(() => {
+      void refreshCameraSession()
+    })
+    return () => window.cancelAnimationFrame(frameId)
   }, [isSplitView, recordingMode, refreshCameraSession])
 
   recordingModeRef.current = recordingMode
@@ -1439,11 +1441,8 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     [autoPlaybackTakeId],
   )
 
-  const handleLoadYoutube = useCallback(() => {
-    const raw = window.prompt('Paste YouTube URL')
-    if (!raw) return
-    const embedUrl = parseYoutubeEmbedUrl(raw)
-    if (embedUrl) setYoutubeUrl(embedUrl)
+  const handleSubmitYoutube = useCallback((embedUrl: string) => {
+    setYoutubeUrl(embedUrl)
   }, [])
 
   const handleClearYoutube = useCallback(() => {
@@ -1453,6 +1452,14 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   const handleToggleSplitView = useCallback(() => {
     setIsSplitView((current) => !current)
   }, [])
+
+  const handleExitSplitView = useCallback(() => {
+    setIsSplitView(false)
+  }, [])
+
+  const pipScaleStyle = {
+    '--pip-scale': settings.takeCardScale / 100,
+  } as React.CSSProperties
 
   return (
     <div ref={appShellRef} className="app-shell">
@@ -1567,6 +1574,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         transition={iosHudDim}
         style={{
           ...motionGpuLayer,
+          ...pipScaleStyle,
           pointerEvents: pitchAudioHudLock
             ? 'auto'
             : hudModalState !== 'idle'
@@ -1601,9 +1609,9 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
               }
               onUnpinBenchmark={handleUnpinBenchmark}
               onClearYoutube={handleClearYoutube}
-              onLoadYoutube={handleLoadYoutube}
+              onSubmitYoutube={handleSubmitYoutube}
               onUploadBenchmark={handleUploadBenchmark}
-              onToggleSplitView={handleToggleSplitView}
+              onToggleSplitView={handleExitSplitView}
               onExpandBenchmark={handleExpandBenchmark}
               onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
             />
@@ -1633,7 +1641,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
                   onUnpinBenchmark={handleUnpinBenchmark}
                   onUnpinChallenger={handleUnpinChallenger}
                   onUploadBenchmark={handleUploadBenchmark}
-                  onLoadYoutube={handleLoadYoutube}
+                  onSubmitYoutube={handleSubmitYoutube}
                   onClearYoutube={handleClearYoutube}
                   onToggleSplitView={handleToggleSplitView}
                   onExpandBenchmark={handleExpandBenchmark}

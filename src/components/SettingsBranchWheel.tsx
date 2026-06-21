@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { AudioLines, LayoutGrid, Timer } from 'lucide-react'
+import { LayoutGrid } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import MetronomeIcon from './icons/MetronomeIcon'
 import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
 import { motionGpuLayer } from '../utils/motionPresets'
 
@@ -10,10 +11,8 @@ interface SettingsBranchWheelProps {
   onClose: () => void
   onExitComplete?: () => void
   anchorRef: RefObject<HTMLElement | null>
-  pitchTrackerEnabled: boolean
   showTakeCards: boolean
   showMetronome: boolean
-  onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
   onShowMetronomeChange: (show: boolean) => void
 }
@@ -21,7 +20,7 @@ interface SettingsBranchWheelProps {
 interface BranchItem {
   id: string
   label: string
-  icon: typeof AudioLines
+  icon: 'take-cards' | 'metronome'
   active: boolean
   onSelect: () => void
 }
@@ -36,10 +35,8 @@ export default function SettingsBranchWheel({
   onClose,
   onExitComplete,
   anchorRef,
-  pitchTrackerEnabled,
   showTakeCards,
   showMetronome,
-  onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
 }: SettingsBranchWheelProps) {
@@ -105,35 +102,21 @@ export default function SettingsBranchWheel({
   const branchItems = useMemo<BranchItem[]>(
     () => [
       {
-        id: 'pitch',
-        label: 'Pitch Analysis',
-        icon: AudioLines,
-        active: pitchTrackerEnabled,
-        onSelect: () => onPitchTrackerChange(!pitchTrackerEnabled),
-      },
-      {
         id: 'take-cards',
         label: 'Take Cards',
-        icon: LayoutGrid,
+        icon: 'take-cards',
         active: showTakeCards,
         onSelect: () => onShowTakeCardsChange(!showTakeCards),
       },
       {
         id: 'metronome',
         label: 'Metronome',
-        icon: Timer,
+        icon: 'metronome',
         active: showMetronome,
         onSelect: () => onShowMetronomeChange(!showMetronome),
       },
     ],
-    [
-      onPitchTrackerChange,
-      onShowMetronomeChange,
-      onShowTakeCardsChange,
-      pitchTrackerEnabled,
-      showMetronome,
-      showTakeCards,
-    ],
+    [onShowMetronomeChange, onShowTakeCardsChange, showMetronome, showTakeCards],
   )
 
   const positions = anchor ? layoutBranchItems(branchItems.length, anchor.rect) : []
@@ -176,7 +159,6 @@ export default function SettingsBranchWheel({
               style={motionGpuLayer}
             >
             {branchItems.map((item, index) => {
-              const Icon = item.icon
               const { x, y } = positions[index] ?? { x: 0, y: -88 }
 
               return (
@@ -208,7 +190,11 @@ export default function SettingsBranchWheel({
                   >
                     <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
                     <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
-                      <Icon className="h-5 w-5" strokeWidth={2.1} />
+                      {item.icon === 'take-cards' ? (
+                        <LayoutGrid className="h-5 w-5" strokeWidth={2.1} />
+                      ) : (
+                        <MetronomeIcon className="h-5 w-5" />
+                      )}
                     </span>
                     <span className="settings-branch-wheel__label block max-w-[5.5rem] text-center text-[10px] font-semibold leading-snug tracking-wide">
                       {item.label}

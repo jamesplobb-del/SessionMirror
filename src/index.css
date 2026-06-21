@@ -104,9 +104,9 @@ video.media-display-enhance:not(.camera-preview) {
 
 .pip-video-container {
   overflow: visible;
-  width: 9rem;
-  min-width: 9rem;
-  min-height: calc(9rem * 9 / 16);
+  width: calc(9.5rem * var(--pip-scale, 1));
+  min-width: calc(9.5rem * var(--pip-scale, 1));
+  min-height: calc(9.5rem * 9 / 16 * var(--pip-scale, 1));
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;

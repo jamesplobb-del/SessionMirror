@@ -8,9 +8,10 @@ import {
   type PointerEvent,
   type RefObject,
 } from 'react'
-import { Expand, Play, Pause, Upload, X } from 'lucide-react'
+import { Expand, Play, Pause, Upload, X, Youtube } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
+import YoutubeUrlDialog from './YoutubeUrlDialog'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { safePlayMedia } from '../utils/mediaPlayback'
 import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
@@ -27,11 +28,8 @@ const UPLOAD_BADGE_BTN =
 const NORMAL_VIEW_BTN =
   'pointer-events-auto shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-[10px] font-medium text-white transition hover:bg-black/80'
 
-const emptyUploadClass =
-  'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
-
-const loadYoutubeFabClass =
-  'pointer-events-auto absolute top-2 right-2 z-30 bg-black/60 text-white text-xs px-2 py-1 rounded-md border border-white/20 transition hover:bg-black/80'
+const emptyActionClass =
+  'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition hover:bg-white/10'
 
 export interface BestTakeBoxProps {
   layout: 'pip' | 'fill'
@@ -42,7 +40,7 @@ export interface BestTakeBoxProps {
   dropHighlight?: boolean
   onUnpinTake: () => void
   onClearYoutube: () => void
-  onLoadYoutube: () => void
+  onSubmitYoutube: (embedUrl: string) => void
   onUpload?: (file: File) => void
   onToggleSplitView?: () => void
   splitViewActive?: boolean
@@ -59,7 +57,7 @@ function BestTakeBox({
   dropHighlight = false,
   onUnpinTake,
   onClearYoutube,
-  onLoadYoutube,
+  onSubmitYoutube,
   onUpload,
   onToggleSplitView,
   splitViewActive = false,
@@ -72,6 +70,7 @@ function BestTakeBox({
   const videoRef = externalVideoRef ?? internalVideoRef
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
+  const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
 
   const hasTake = Boolean(src)
   const hasYoutube = Boolean(youtubeEmbedUrl)
@@ -185,37 +184,48 @@ function BestTakeBox({
 
   const shellClass = isFill
     ? 'relative h-full w-full min-h-0 overflow-hidden'
-    : 'pip-video-container group relative aspect-video w-[9rem] min-h-[5.0625rem] min-w-[9rem] sm:w-[10rem] sm:min-h-[5.625rem] sm:min-w-[10rem]'
+    : 'pip-video-container group relative aspect-video'
 
   const innerClass = `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
     hasReference ? 'opacity-100' : 'opacity-90'
   } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
 
   const pillLeft = showUploadBadge ? 32 : 8
-  const chromeUsesInlineLayout = isFill || hasYoutube
+  const chromeUsesInlineLayout = isFill || hasYoutube || splitViewActive
+
+  const renderSplitChrome = () => {
+    if (!splitViewActive || !onToggleSplitView) return null
+
+    return (
+      <div className="absolute top-2 right-2 z-40 pointer-events-auto">
+        <button
+          type="button"
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleSplitView()
+          }}
+          className={NORMAL_VIEW_BTN}
+          aria-label="Return to normal view"
+        >
+          Normal View
+        </button>
+      </div>
+    )
+  }
 
   const renderReferenceChrome = () => {
     if (!hasReference) return null
 
     if (chromeUsesInlineLayout) {
       return (
-        <div className="absolute top-2 right-2 z-40 flex items-center gap-1.5 pointer-events-auto">
-          {splitViewActive && onToggleSplitView && (
-            <button
-              type="button"
-              onPointerDown={stopEventBubble}
-              onTouchStart={stopEventBubble}
-              onTouchEnd={stopEventBubble}
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleSplitView()
-              }}
-              className={NORMAL_VIEW_BTN}
-              aria-label="Return to normal view"
-            >
-              Normal View
-            </button>
-          )}
+        <div
+          className={`absolute top-2 z-40 flex items-center gap-1.5 pointer-events-auto ${
+            splitViewActive && onToggleSplitView ? 'right-24' : 'right-2'
+          }`}
+        >
           <button
             type="button"
             onPointerDown={stopEventBubble}
@@ -393,35 +403,39 @@ function BestTakeBox({
               )}
             </>
           ) : (
-            <div className="absolute inset-0 bg-stone-800/90 px-2 pb-2 pt-6">
-              <button
-                type="button"
-                onPointerDown={stopEventBubble}
-                onTouchStart={stopEventBubble}
-                onTouchEnd={stopEventBubble}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onLoadYoutube()
-                }}
-                className={loadYoutubeFabClass}
-                aria-label="Load YouTube reference"
-              >
-                + YT URL
-              </button>
-              <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2">
+            <div className="absolute inset-0 flex flex-col bg-stone-800/90">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 pb-2 pt-7">
                 <p className={`text-center leading-snug text-white/50 ${isFill ? 'text-xs' : 'text-[8px]'}`}>
                   Drag Current Take here or upload.
                 </p>
+              </div>
+              <div className="flex shrink-0 gap-1.5 border-t border-white/10 bg-black/20 p-1.5">
                 {onUpload && (
-                  <label htmlFor="benchmark-upload" className={emptyUploadClass}>
+                  <label htmlFor="benchmark-upload" className={emptyActionClass}>
                     <Upload className="h-3 w-3" />
-                    Upload Best Take
+                    Upload
                   </label>
                 )}
+                <button
+                  type="button"
+                  onPointerDown={stopEventBubble}
+                  onTouchStart={stopEventBubble}
+                  onTouchEnd={stopEventBubble}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setYoutubeDialogOpen(true)
+                  }}
+                  className={emptyActionClass}
+                  aria-label="Load YouTube reference"
+                >
+                  <Youtube className="h-3 w-3 text-red-300" />
+                  YouTube
+                </button>
               </div>
             </div>
           )}
 
+          {renderSplitChrome()}
           {renderReferenceChrome()}
         </div>
 
@@ -440,6 +454,12 @@ function BestTakeBox({
           </label>
         )}
       </div>
+
+      <YoutubeUrlDialog
+        open={youtubeDialogOpen}
+        onClose={() => setYoutubeDialogOpen(false)}
+        onSubmit={onSubmitYoutube}
+      />
     </div>
   )
 }

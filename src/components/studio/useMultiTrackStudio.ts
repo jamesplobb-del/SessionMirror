@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { safePlayMedia, waitForMediaReady } from '../../utils/mediaPlayback'
 import { releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
-import { closeCountdownAudio, playCountdownTick } from './studioCountdownAudio'
+import { closeCountdownAudio } from './studioCountdownAudio'
+import {
+  beatIntervalMs,
+  closeStudioMetronomeAudio,
+  playMetronomeClick,
+} from './studioMetronome'
 import {
   closeMixContext,
   connectVideoToMix,
@@ -21,10 +26,23 @@ export interface StudioTrack {
 }
 
 const TRACK_IDS = [1, 2, 3, 4] as const
-const COUNTDOWN_SECONDS = 3
 /** Wider threshold + less frequent sync avoids decode stutter from constant seeking. */
 const DRIFT_THRESHOLD_SEC = 0.2
 const DRIFT_SYNC_INTERVAL_MS = 500
+
+export type StudioCountInBeats = 8 | 16
+
+export interface StudioCountInPrefs {
+  bpm: number
+  countInBeats: StudioCountInBeats
+  metronomeDuringRep: boolean
+}
+
+const DEFAULT_STUDIO_PREFS: StudioCountInPrefs = {
+  bpm: 120,
+  countInBeats: 8,
+  metronomeDuringRep: false,
+}
 
 function makeInitialTracks(): StudioTrack[] {
   return TRACK_IDS.map((id) => ({
@@ -83,17 +101,24 @@ export function useMultiTrackStudio() {
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null, null])
 
   const [isGlobalPlaying, setIsGlobalPlaying] = useState(false)
+  const [selectedTrackId, setSelectedTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
+  const [countInPrefs, setCountInPrefs] = useState<StudioCountInPrefs>(DEFAULT_STUDIO_PREFS)
   const [countdownTrackId, setCountdownTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
-  const [countdownValue, setCountdownValue] = useState(0)
   const [armingTrackId, setArmingTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [postRecordReviewId, setPostRecordReviewId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [recordingElapsed, setRecordingElapsed] = useState(0)
+
+  const studioPrefsRef = useRef(countInPrefs)
+  studioPrefsRef.current = countInPrefs
+  const selectedTrackIdRef = useRef(selectedTrackId)
+  selectedTrackIdRef.current = selectedTrackId
 
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const recordingIdRef = useRef<1 | 2 | 3 | 4 | null>(null)
   const liveStreamRef = useRef<MediaStream | null>(null)
-  const countIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const repMetronomeRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordStartedAtRef = useRef(0)
   const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -259,15 +284,22 @@ export function useMultiTrackStudio() {
     [pauseTrack],
   )
 
-  const cancelCountdown = useCallback(() => {
-    if (countIntervalRef.current) {
-      clearInterval(countIntervalRef.current)
-      countIntervalRef.current = null
+  const stopMetronome = useCallback(() => {
+    if (countTimeoutRef.current) {
+      clearTimeout(countTimeoutRef.current)
+      countTimeoutRef.current = null
+    }
+    if (repMetronomeRef.current) {
+      clearInterval(repMetronomeRef.current)
+      repMetronomeRef.current = null
     }
     setCountdownTrackId(null)
-    setCountdownValue(0)
-    setArmingTrackId(null)
   }, [])
+
+  const cancelCountdown = useCallback(() => {
+    stopMetronome()
+    setArmingTrackId(null)
+  }, [stopMetronome])
 
   const cancelRecordingSession = useCallback(
     async (id: 1 | 2 | 3 | 4) => {
@@ -386,6 +418,8 @@ export function useMultiTrackStudio() {
         const trackId = recordingIdRef.current
         if (!trackId) return
 
+        stopMetronome()
+
         stream.getTracks().forEach((t) => t.stop())
         liveStreamRef.current = null
         pauseOverdubPlayback(trackId)
@@ -443,36 +477,52 @@ export function useMultiTrackStudio() {
 
       void startOverdubPlayback(id)
     },
-    [pauseOverdubPlayback, startOverdubPlayback, startRecordTimer, stopRecordTimer],
+    [pauseOverdubPlayback, startOverdubPlayback, startRecordTimer, stopMetronome, stopRecordTimer],
   )
 
-  const startCountdownAfterPreview = useCallback(
+  const startRepMetronome = useCallback((bpm: number) => {
+    if (repMetronomeRef.current) {
+      clearInterval(repMetronomeRef.current)
+      repMetronomeRef.current = null
+    }
+    const beatMs = beatIntervalMs(bpm)
+    let repBeat = 0
+    repMetronomeRef.current = setInterval(() => {
+      void playMetronomeClick(repBeat % 4 === 0)
+      repBeat++
+    }, beatMs)
+  }, [])
+
+  const startMetronomeCountIn = useCallback(
     (id: 1 | 2 | 3 | 4) => {
-      void playCountdownTick()
+      const prefs = studioPrefsRef.current
+      const beatMs = beatIntervalMs(prefs.bpm)
+      let beatsPlayed = 0
 
       setCountdownTrackId(id)
-      setCountdownValue(COUNTDOWN_SECONDS)
 
-      countIntervalRef.current = setInterval(() => {
-        setCountdownValue((prev) => {
-          if (prev <= 1) {
-            if (countIntervalRef.current) {
-              clearInterval(countIntervalRef.current)
-              countIntervalRef.current = null
-            }
-            setCountdownTrackId(null)
-            beginRecording(id)
-            return 0
+      const playNextBeat = () => {
+        if (beatsPlayed >= prefs.countInBeats) {
+          countTimeoutRef.current = null
+          setCountdownTrackId(null)
+          beginRecording(id)
+          if (prefs.metronomeDuringRep) {
+            startRepMetronome(prefs.bpm)
           }
-          void playCountdownTick()
-          return prev - 1
-        })
-      }, 1000)
+          return
+        }
+
+        void playMetronomeClick(beatsPlayed % 4 === 0)
+        beatsPlayed++
+        countTimeoutRef.current = setTimeout(playNextBeat, beatMs)
+      }
+
+      playNextBeat()
     },
-    [beginRecording],
+    [beginRecording, startRepMetronome],
   )
 
-  const openCameraAndCountdown = useCallback(
+  const armTrackPreview = useCallback(
     async (id: 1 | 2 | 3 | 4) => {
       setArmingTrackId(id)
       await releaseLiveStream()
@@ -487,58 +537,94 @@ export function useMultiTrackStudio() {
 
         setTracks((prev) =>
           prev.map((t) =>
-            t.id === id ? { ...t, stream, status: 'IDLE' as TrackStatus } : t,
+            t.id === id ? { ...t, stream, status: 'IDLE' as TrackStatus } : { ...t, stream: null },
           ),
         )
 
         setArmingTrackId(null)
-        startingSessionRef.current = false
-        startCountdownAfterPreview(id)
+        return true
       } catch (err) {
-        console.error('openCameraAndCountdown failed', err)
-        startingSessionRef.current = false
+        console.error('armTrackPreview failed', err)
         setArmingTrackId(null)
         await releaseLiveStream()
         clearTrackPreviewStream(id)
+        return false
       }
     },
-    [clearTrackPreviewStream, releaseLiveStream, startCountdownAfterPreview],
+    [clearTrackPreviewStream, releaseLiveStream],
   )
 
-  const startRecording = useCallback(
-    (id: 1 | 2 | 3 | 4) => {
+  const selectTrack = useCallback(
+    async (id: 1 | 2 | 3 | 4) => {
       if (
-        startingSessionRef.current ||
-        countdownTrackId !== null ||
-        armingTrackId !== null ||
         recordingIdRef.current !== null ||
+        countdownTrackId !== null ||
         tracksRef.current.some((t) => t.status === 'RECORDING')
       ) {
         return
       }
 
       setPostRecordReviewId(null)
-      stopAll()
-      pauseAllExcept(null)
-      cancelCountdown()
+      setSelectedTrackId(id)
 
-      startingSessionRef.current = true
-      void openCameraAndCountdown(id)
+      const currentPreviewId = tracksRef.current.find((t) => t.stream)?.id ?? null
+      if (currentPreviewId !== null && currentPreviewId !== id) {
+        await releaseLiveStream()
+        setTracks((prev) => prev.map((t) => ({ ...t, stream: null })))
+      }
+
+      const track = tracksRef.current.find((t) => t.id === id)
+      if (!track?.recordedUrl && !liveStreamRef.current && armingTrackId === null) {
+        startingSessionRef.current = true
+        await armTrackPreview(id)
+        startingSessionRef.current = false
+      }
     },
-    [
-      armingTrackId,
-      cancelCountdown,
-      countdownTrackId,
-      openCameraAndCountdown,
-      pauseAllExcept,
-      stopAll,
-    ],
+    [armingTrackId, armTrackPreview, countdownTrackId, releaseLiveStream],
   )
+
+  const beginRecordingSession = useCallback(async () => {
+    const id = selectedTrackIdRef.current
+    if (!id) return
+
+    if (
+      startingSessionRef.current ||
+      countdownTrackId !== null ||
+      armingTrackId !== null ||
+      recordingIdRef.current !== null ||
+      tracksRef.current.some((t) => t.status === 'RECORDING')
+    ) {
+      return
+    }
+
+    setPostRecordReviewId(null)
+    stopAll()
+    pauseAllExcept(null)
+    cancelCountdown()
+
+    if (!liveStreamRef.current) {
+      startingSessionRef.current = true
+      const armed = await armTrackPreview(id)
+      startingSessionRef.current = false
+      if (!armed || !liveStreamRef.current) return
+    }
+
+    startMetronomeCountIn(id)
+  }, [
+    armTrackPreview,
+    armingTrackId,
+    cancelCountdown,
+    countdownTrackId,
+    pauseAllExcept,
+    startMetronomeCountIn,
+    stopAll,
+  ])
 
   const stopRecording = useCallback(
     (id: 1 | 2 | 3 | 4) => {
       if (recordingIdRef.current !== id) return
 
+      stopMetronome()
       pauseOverdubPlayback(id)
 
       const el = getVideoForTrack(id)
@@ -556,7 +642,7 @@ export function useMultiTrackStudio() {
       const recorder = recorderRef.current
       if (recorder?.state === 'recording') recorder.stop()
     },
-    [getVideoForTrack, pauseOverdubPlayback],
+    [getVideoForTrack, pauseOverdubPlayback, stopMetronome],
   )
 
   const playTrack = useCallback(
@@ -620,9 +706,10 @@ export function useMultiTrackStudio() {
     (id: 1 | 2 | 3 | 4) => {
       setPostRecordReviewId(null)
       clearTrackInternal(id)
-      startRecording(id)
+      setSelectedTrackId(id)
+      void selectTrack(id)
     },
-    [clearTrackInternal, startRecording],
+    [clearTrackInternal, selectTrack],
   )
 
   const clearTrack = useCallback(
@@ -635,7 +722,8 @@ export function useMultiTrackStudio() {
 
   useEffect(() => {
     return () => {
-      if (countIntervalRef.current) clearInterval(countIntervalRef.current)
+      if (countTimeoutRef.current) clearTimeout(countTimeoutRef.current)
+      if (repMetronomeRef.current) clearInterval(repMetronomeRef.current)
       if (recordTimerRef.current) clearInterval(recordTimerRef.current)
       stopDriftLoopInternal()
       liveStreamRef.current?.getTracks().forEach((t) => t.stop())
@@ -644,6 +732,7 @@ export function useMultiTrackStudio() {
         if (t.recordedUrl) URL.revokeObjectURL(t.recordedUrl)
       })
       closeCountdownAudio()
+      closeStudioMetronomeAudio()
       closeMixContext()
     }
   }, [stopDriftLoopInternal])
@@ -655,11 +744,7 @@ export function useMultiTrackStudio() {
   const immersiveTrackId: 1 | 2 | 3 | 4 | null =
     postRecordReviewId !== null
       ? null
-      : countdownTrackId ??
-        armingTrackId ??
-        tracks.find((t) => t.status === 'RECORDING' && t.stream)?.id ??
-        tracks.find((t) => t.stream && t.status === 'IDLE')?.id ??
-        null
+      : tracks.find((t) => t.status === 'RECORDING')?.id ?? null
 
   const isImmersive = immersiveTrackId !== null
 
@@ -674,10 +759,13 @@ export function useMultiTrackStudio() {
     immersiveTrackId,
     armingTrackId,
     countdownTrackId,
-    countdownValue,
+    selectedTrackId,
+    countInPrefs,
     postRecordReviewId,
     recordingElapsed,
-    startRecording,
+    selectTrack,
+    beginRecordingSession,
+    setCountInPrefs,
     stopRecording,
     cancelRecordingSession,
     playTrack,

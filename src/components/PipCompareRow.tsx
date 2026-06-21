@@ -19,7 +19,7 @@ interface PipCompareRowProps {
   onUnpinBenchmark: () => void
   onUnpinChallenger: () => void
   onUploadBenchmark: (file: File) => void
-  onLoadYoutube: () => void
+  onSubmitYoutube: (embedUrl: string) => void
   onClearYoutube: () => void
   onToggleSplitView: () => void
   onExpandBenchmark?: () => void
@@ -99,7 +99,7 @@ export default function PipCompareRow({
   onUnpinBenchmark,
   onUnpinChallenger,
   onUploadBenchmark,
-  onLoadYoutube,
+  onSubmitYoutube,
   onClearYoutube,
   onToggleSplitView,
   onExpandBenchmark,
@@ -138,7 +138,7 @@ export default function PipCompareRow({
             dropHighlight={ghost?.overPin ?? false}
             onUnpinTake={onUnpinBenchmark}
             onClearYoutube={onClearYoutube}
-            onLoadYoutube={onLoadYoutube}
+            onSubmitYoutube={onSubmitYoutube}
             onUpload={onUploadBenchmark}
             onToggleSplitView={onToggleSplitView}
             onExpand={benchmarkTake?.videoUrl ? onExpandBenchmark : undefined}
