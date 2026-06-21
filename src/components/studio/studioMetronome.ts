@@ -9,21 +9,38 @@ const TICK_PEAK = 0.48
 const ACCENT_PEAK = 0.58
 const TICK_DURATION_SEC = 0.07
 
-async function ensureMetronomeAudio(): Promise<AudioContext | null> {
+function createMetronomeContext(): AudioContext | null {
   try {
-    if (!countCtx || countCtx.state === 'closed') {
-      countCtx = new AudioContext()
+    const WebkitAudioContext = (
+      window as Window & { webkitAudioContext?: typeof AudioContext }
+    ).webkitAudioContext
+    const Ctor = window.AudioContext ?? WebkitAudioContext
+    if (!Ctor) return null
+    return new Ctor()
+  } catch {
+    return null
+  }
+}
+
+/** Call synchronously inside a user gesture before count-in. */
+export function primeStudioMetronomeAudioSync(): void {
+  if (!countCtx || countCtx.state === 'closed') {
+    countCtx = createMetronomeContext()
+    if (countCtx) {
       masterGain = countCtx.createGain()
       masterGain.gain.value = 1
       masterGain.connect(countCtx.destination)
     }
-    if (countCtx.state === 'suspended') {
-      await countCtx.resume()
-    }
-    return countCtx
-  } catch {
-    return null
   }
+
+  if (countCtx?.state === 'suspended') {
+    void countCtx.resume().catch(() => {})
+  }
+}
+
+async function ensureMetronomeAudio(): Promise<AudioContext | null> {
+  primeStudioMetronomeAudioSync()
+  return countCtx
 }
 
 export async function playMetronomeClick(accent = false): Promise<void> {

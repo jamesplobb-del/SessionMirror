@@ -1,5 +1,5 @@
 import { motion, useMotionValue } from 'framer-motion'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
 import { getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
@@ -97,9 +97,6 @@ export default function DraggablePitchWidget({
     onPointerUp,
     onPointerCancel,
   } = usePinchResize(pinchLimits)
-
-  useEffect(() => {
-  }, [isAudioMode, layoutRegion, liveMicOnly, mediaKey])
 
   useLayoutEffect(() => {
     const measureMax = () => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Youtube } from 'lucide-react'
 import { parseYoutubeEmbedUrl } from '../utils/youtubeEmbed'
 
@@ -11,6 +12,7 @@ interface YoutubeUrlDialogProps {
 export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrlDialogProps) {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [keyboardInset, setKeyboardInset] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -19,6 +21,30 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     setError(null)
     const id = window.requestAnimationFrame(() => inputRef.current?.focus())
     return () => window.cancelAnimationFrame(id)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    const updateInset = () => {
+      const vv = window.visualViewport
+      if (!vv) {
+        setKeyboardInset(0)
+        return
+      }
+      const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      setKeyboardInset(overlap > 48 ? overlap : 0)
+    }
+
+    updateInset()
+    window.visualViewport?.addEventListener('resize', updateInset)
+    window.visualViewport?.addEventListener('scroll', updateInset)
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', updateInset)
+      window.visualViewport?.removeEventListener('scroll', updateInset)
+      setKeyboardInset(0)
+    }
   }, [open])
 
   const handleSubmit = useCallback(() => {
@@ -31,22 +57,23 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     onClose()
   }, [onClose, onSubmit, value])
 
-  if (!open) return null
+  if (!open || typeof document === 'undefined') return null
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-4 sm:items-center"
+      className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70 p-4 sm:items-center"
+      style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : undefined }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/15 bg-stone-900 p-4 shadow-2xl"
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-black p-4 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="youtube-url-title"
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Youtube className="h-4 w-4 text-red-400" />
+            <Youtube className="h-4 w-4 text-red-500" />
             <h2 id="youtube-url-title" className="text-sm font-semibold text-white">
               YouTube Reference
             </h2>
@@ -54,7 +81,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/80"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/80"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -78,10 +105,10 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
             if (e.key === 'Enter') handleSubmit()
             if (e.key === 'Escape') onClose()
           }}
-          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-amber-400/50 focus:outline-none"
+          className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-red-500/60 focus:outline-none"
         />
 
-        {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+        {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
 
         <div className="mt-4 flex justify-end gap-2">
           <button
@@ -94,12 +121,13 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
           <button
             type="button"
             onClick={handleSubmit}
-            className="rounded-lg bg-amber-500/90 px-4 py-2 text-xs font-semibold text-white"
+            className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-500"
           >
             Load
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

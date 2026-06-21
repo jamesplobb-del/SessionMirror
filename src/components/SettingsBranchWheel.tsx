@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutGrid } from 'lucide-react'
+import { AudioLines, LayoutGrid } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import MetronomeIcon from './icons/MetronomeIcon'
@@ -11,8 +11,11 @@ interface SettingsBranchWheelProps {
   onClose: () => void
   onExitComplete?: () => void
   anchorRef: RefObject<HTMLElement | null>
+  pitchTrackerEnabled: boolean
   showTakeCards: boolean
   showMetronome: boolean
+  pitchToggleVisible: boolean
+  onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
   onShowMetronomeChange: (show: boolean) => void
 }
@@ -20,7 +23,7 @@ interface SettingsBranchWheelProps {
 interface BranchItem {
   id: string
   label: string
-  icon: 'take-cards' | 'metronome'
+  icon: 'pitch' | 'take-cards' | 'metronome'
   active: boolean
   onSelect: () => void
 }
@@ -35,8 +38,11 @@ export default function SettingsBranchWheel({
   onClose,
   onExitComplete,
   anchorRef,
+  pitchTrackerEnabled,
   showTakeCards,
   showMetronome,
+  pitchToggleVisible,
+  onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
 }: SettingsBranchWheelProps) {
@@ -99,8 +105,20 @@ export default function SettingsBranchWheel({
     }
   }, [onClose, open])
 
-  const branchItems = useMemo<BranchItem[]>(
-    () => [
+  const branchItems = useMemo<BranchItem[]>(() => {
+    const items: BranchItem[] = []
+
+    if (pitchToggleVisible) {
+      items.push({
+        id: 'pitch-analysis',
+        label: 'Pitch Analysis',
+        icon: 'pitch',
+        active: pitchTrackerEnabled,
+        onSelect: () => onPitchTrackerChange(!pitchTrackerEnabled),
+      })
+    }
+
+    items.push(
       {
         id: 'take-cards',
         label: 'Take Cards',
@@ -115,9 +133,18 @@ export default function SettingsBranchWheel({
         active: showMetronome,
         onSelect: () => onShowMetronomeChange(!showMetronome),
       },
-    ],
-    [onShowMetronomeChange, onShowTakeCardsChange, showMetronome, showTakeCards],
-  )
+    )
+
+    return items
+  }, [
+    onPitchTrackerChange,
+    onShowMetronomeChange,
+    onShowTakeCardsChange,
+    pitchToggleVisible,
+    pitchTrackerEnabled,
+    showMetronome,
+    showTakeCards,
+  ])
 
   const positions = anchor ? layoutBranchItems(branchItems.length, anchor.rect) : []
 
@@ -158,52 +185,54 @@ export default function SettingsBranchWheel({
               transition={BRANCH_MOTION}
               style={motionGpuLayer}
             >
-            {branchItems.map((item, index) => {
-              const { x, y } = positions[index] ?? { x: 0, y: -88 }
+              {branchItems.map((item, index) => {
+                const { x, y } = positions[index] ?? { x: 0, y: -88 }
 
-              return (
-                <div
-                  key={item.id}
-                  className="settings-branch-wheel__slot pointer-events-none absolute"
-                  style={{
-                    left: x,
-                    top: y,
-                    width: BRANCH_ITEM_WIDTH,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  <motion.button
-                    type="button"
-                    role="menuitem"
-                    className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${
-                      item.active ? 'settings-branch-wheel__item--active' : ''
-                    }`}
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.85 }}
-                    transition={{ ...BRANCH_MOTION, delay: index * 0.04 }}
-                    style={motionGpuLayer}
-                    aria-label={item.label}
-                    aria-pressed={item.active}
-                    onClick={item.onSelect}
-                    whileTap={{ scale: 0.94 }}
+                return (
+                  <div
+                    key={item.id}
+                    className="settings-branch-wheel__slot pointer-events-none absolute"
+                    style={{
+                      left: x,
+                      top: y,
+                      width: BRANCH_ITEM_WIDTH,
+                      transform: 'translate(-50%, -50%)',
+                    }}
                   >
-                    <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
-                    <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
-                      {item.icon === 'take-cards' ? (
-                        <LayoutGrid className="h-5 w-5" strokeWidth={2.1} />
-                      ) : (
-                        <MetronomeIcon className="h-5 w-5" />
-                      )}
-                    </span>
-                    <span className="settings-branch-wheel__label block max-w-[5.5rem] text-center text-[10px] font-semibold leading-snug tracking-wide">
-                      {item.label}
-                    </span>
-                    </span>
-                  </motion.button>
-                </div>
-              )
-            })}
+                    <motion.button
+                      type="button"
+                      role="menuitem"
+                      className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${
+                        item.active ? 'settings-branch-wheel__item--active' : ''
+                      }`}
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.85 }}
+                      transition={{ ...BRANCH_MOTION, delay: index * 0.04 }}
+                      style={motionGpuLayer}
+                      aria-label={item.label}
+                      aria-pressed={item.active}
+                      onClick={item.onSelect}
+                      whileTap={{ scale: 0.94 }}
+                    >
+                      <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
+                        <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
+                          {item.icon === 'pitch' ? (
+                            <AudioLines className="h-5 w-5" strokeWidth={2.1} />
+                          ) : item.icon === 'take-cards' ? (
+                            <LayoutGrid className="h-5 w-5" strokeWidth={2.1} />
+                          ) : (
+                            <MetronomeIcon className="h-5 w-5" />
+                          )}
+                        </span>
+                        <span className="settings-branch-wheel__label block max-w-[5.5rem] text-center text-[10px] font-semibold leading-snug tracking-wide">
+                          {item.label}
+                        </span>
+                      </span>
+                    </motion.button>
+                  </div>
+                )
+              })}
             </motion.div>
           </div>
         </>

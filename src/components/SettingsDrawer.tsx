@@ -333,6 +333,19 @@ export default function SettingsDrawer({
 
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Playback
+            </h3>
+
+            <SettingToggle
+              label="Audio Enhancer"
+              description="Applies smart EQ, compression, and reverb presets during take playback. Off keeps the original flat mix."
+              checked={settings.audioEnhancerEnabled}
+              onChange={(checked) => onUpdate({ audioEnhancerEnabled: checked })}
+            />
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               On-Screen Tools
             </h3>
 

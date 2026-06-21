@@ -79,6 +79,10 @@ import {
   updateVaultTake,
   type Project,
 } from './db'
+import {
+  type AudioEnhancerSettings,
+} from './utils/audioEnhancer'
+import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
@@ -110,6 +114,7 @@ const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetron
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const StudioSandbox = lazy(() => import('./components/studio/StudioSandbox'))
+const AudioEnhancer = lazy(() => import('./components/AudioEnhancer'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -1058,9 +1063,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     isRecording,
   ])
 
-  useEffect(() => {
-  }, [mainAudioPitchSource, ready, isRecording, settings.pitchTrackerEnabled, showPitch])
-
   const mainVideoPitchSource = useMemo(() => {
     if (!settings.pitchTrackerEnabled || recordingMode !== 'video') return null
     if (!ready && !isRecording) return null
@@ -1093,6 +1095,26 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
 
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
+
+  const showAudioEnhancerPanel =
+    settings.audioEnhancerEnabled &&
+    takePlaybackActive &&
+    hudModalState === 'idle' &&
+    !pitchHudSuspended
+
+  useEffect(() => {
+    setTakePlaybackEnhancerState(
+      settings.audioEnhancerEnabled,
+      settings.audioEnhancerEnabled ? settings.audioEnhancerSettings : undefined,
+    )
+  }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings])
+
+  const handleAudioEnhancerChange = useCallback(
+    (next: AudioEnhancerSettings) => {
+      updateSettings({ audioEnhancerSettings: next })
+    },
+    [updateSettings],
+  )
 
   const pitchAudioHudLock =
     showPitch &&
@@ -1677,6 +1699,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
             pitchTrackerEnabled={pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled}
+            pitchToggleVisible={recordingMode === 'audio'}
             showTakeCards={settings.showTakeCards}
             onPitchTrackerChange={handleQuickPitchTrackerChange}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
@@ -1770,6 +1793,13 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         recordingMode={recordingMode}
         onEnterStudio={onEnterStudio}
       />
+
+      {showAudioEnhancerPanel && (
+        <AudioEnhancer
+          settings={settings.audioEnhancerSettings}
+          onChange={handleAudioEnhancerChange}
+        />
+      )}
       </Suspense>
       </div>
     </div>

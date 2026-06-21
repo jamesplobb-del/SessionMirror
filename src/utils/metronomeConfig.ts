@@ -24,12 +24,23 @@ export const MIN_BPM = 1
 export const MAX_BPM = 400
 export const DEFAULT_BPM = 120
 export const DEFAULT_METER: MetronomeMeter = '4/4'
+export const DEFAULT_SUBDIVISION: MetronomeSubdivision = 'off'
+
+export type MetronomeSubdivision = 'off' | '8ths' | 'triplets' | '16ths'
+
+export const METRONOME_SUBDIVISIONS: { value: MetronomeSubdivision; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: '8ths', label: '8ths' },
+  { value: 'triplets', label: 'Triplets' },
+  { value: '16ths', label: '16ths' },
+]
 
 const STORAGE_KEY = 'sessionmirror:metronome-prefs'
 
 export interface MetronomePrefs {
   bpm: number
   meter: MetronomeMeter
+  subdivision: MetronomeSubdivision
 }
 
 export function clampBpm(value: number): number {
@@ -43,17 +54,40 @@ function parseMeter(value: unknown): MetronomeMeter {
   return DEFAULT_METER
 }
 
+function parseSubdivision(value: unknown): MetronomeSubdivision {
+  if (value === '8ths' || value === 'triplets' || value === '16ths' || value === 'off') {
+    return value
+  }
+  return DEFAULT_SUBDIVISION
+}
+
+export function subdivisionsPerBeat(subdivision: MetronomeSubdivision): number {
+  switch (subdivision) {
+    case '8ths':
+      return 2
+    case 'triplets':
+      return 3
+    case '16ths':
+      return 4
+    default:
+      return 1
+  }
+}
+
 export function loadMetronomePrefs(): MetronomePrefs {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { bpm: DEFAULT_BPM, meter: DEFAULT_METER }
+    if (!raw) {
+      return { bpm: DEFAULT_BPM, meter: DEFAULT_METER, subdivision: DEFAULT_SUBDIVISION }
+    }
     const parsed = JSON.parse(raw) as Partial<MetronomePrefs>
     return {
       bpm: clampBpm(Number(parsed.bpm) || DEFAULT_BPM),
       meter: parseMeter(parsed.meter),
+      subdivision: parseSubdivision(parsed.subdivision),
     }
   } catch {
-    return { bpm: DEFAULT_BPM, meter: DEFAULT_METER }
+    return { bpm: DEFAULT_BPM, meter: DEFAULT_METER, subdivision: DEFAULT_SUBDIVISION }
   }
 }
 
@@ -61,7 +95,11 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
   try {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ bpm: clampBpm(prefs.bpm), meter: prefs.meter }),
+      JSON.stringify({
+        bpm: clampBpm(prefs.bpm),
+        meter: prefs.meter,
+        subdivision: prefs.subdivision,
+      }),
     )
   } catch {
     /* private mode / quota */

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useMemo, useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
@@ -367,9 +367,6 @@ function LivePitchTunerAudio({
     }),
     [tunerInstrument],
   )
-
-  useEffect(() => {
-  }, [enabled, isPlaying, liveMicEnabled, liveMicOnly, mediaKey, showLive, showPlayback])
 
   const liveTracker = useLivePitchTracker(
     mediaRef,

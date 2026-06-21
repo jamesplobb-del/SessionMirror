@@ -8,8 +8,10 @@ import {
   isCompoundMeter,
   loadMetronomePrefs,
   saveMetronomePrefs,
+  subdivisionsPerBeat,
   type MetronomeClickTier,
   type MetronomeMeter,
+  type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
 
 /** How far ahead to schedule audio events (seconds). */
@@ -55,30 +57,55 @@ function scheduleTieredClick(
   osc.stop(when + decaySec + 0.01)
 }
 
-function secondsPerSchedulerTick(meter: MetronomeMeter, bpm: number): number {
+function secondsPerSchedulerTick(
+  meter: MetronomeMeter,
+  bpm: number,
+  subdivision: MetronomeSubdivision,
+): number {
   const macroBeatSec = 60 / bpm
-  if (isCompoundMeter(meter)) {
+  if (isCompoundMeter(meter) && subdivision === 'off') {
     return macroBeatSec / 3
   }
-  return macroBeatSec
+  const ticksPerBeat = subdivisionsPerBeat(subdivision)
+  return macroBeatSec / ticksPerBeat
 }
 
-function resolveClickTier(meter: MetronomeMeter, tickIndexInBar: number): MetronomeClickTier {
-  if (isCompoundMeter(meter)) {
+function resolveClickTier(
+  meter: MetronomeMeter,
+  tickIndexInBar: number,
+  subdivision: MetronomeSubdivision,
+): MetronomeClickTier {
+  if (isCompoundMeter(meter) && subdivision === 'off') {
     return getCompoundClickTier(tickIndexInBar)
   }
-  return getSimpleClickTier(tickIndexInBar)
+
+  const ticksPerBeat = subdivisionsPerBeat(subdivision)
+  const beatIndex = Math.floor(tickIndexInBar / ticksPerBeat)
+  const tickInBeat = tickIndexInBar % ticksPerBeat
+
+  if (tickInBeat === 0) {
+    return getSimpleClickTier(beatIndex)
+  }
+  return 'subdivision'
 }
 
-function resolveUiBeatIndex(meter: MetronomeMeter, tickIndexInBar: number): number {
-  if (isCompoundMeter(meter)) {
+function resolveUiBeatIndex(
+  meter: MetronomeMeter,
+  tickIndexInBar: number,
+  subdivision: MetronomeSubdivision,
+): number {
+  if (isCompoundMeter(meter) && subdivision === 'off') {
     return Math.floor(tickIndexInBar / 3) % getBeatsPerBar(meter)
   }
-  return tickIndexInBar % getBeatsPerBar(meter)
+  const ticksPerBeat = subdivisionsPerBeat(subdivision)
+  return Math.floor(tickIndexInBar / ticksPerBeat) % getBeatsPerBar(meter)
 }
 
-function ticksPerBar(meter: MetronomeMeter): number {
-  return isCompoundMeter(meter) ? getEighthNotesPerBar(meter) : getBeatsPerBar(meter)
+function ticksPerBar(meter: MetronomeMeter, subdivision: MetronomeSubdivision): number {
+  if (isCompoundMeter(meter) && subdivision === 'off') {
+    return getEighthNotesPerBar(meter)
+  }
+  return getBeatsPerBar(meter) * subdivisionsPerBeat(subdivision)
 }
 
 export interface UseMetronomeOptions {
@@ -91,10 +118,12 @@ export interface UseMetronomeOptions {
 export interface UseMetronomeResult {
   bpm: number
   meter: MetronomeMeter
+  subdivision: MetronomeSubdivision
   playing: boolean
   beatIndex: number
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
+  setSubdivision: (subdivision: MetronomeSubdivision) => void
   togglePlay: () => void
   stop: () => void
 }
@@ -103,6 +132,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   const initial = loadMetronomePrefs()
   const [bpm, setBpmState] = useState(initial.bpm)
   const [meter, setMeterState] = useState<MetronomeMeter>(initial.meter)
+  const [subdivision, setSubdivisionState] = useState<MetronomeSubdivision>(initial.subdivision)
   const [playing, setPlaying] = useState(false)
   const [beatIndex, setBeatIndex] = useState(0)
 
@@ -116,12 +146,14 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   const tickCounterRef = useRef(0)
   const bpmRef = useRef(bpm)
   const meterRef = useRef(meter)
+  const subdivisionRef = useRef(subdivision)
   const playingRef = useRef(false)
   const isTakePlayingRef = useRef(isTakePlaying)
   const muteDuringPlaybackRef = useRef(muteDuringPlayback)
 
   bpmRef.current = bpm
   meterRef.current = meter
+  subdivisionRef.current = subdivision
   playingRef.current = playing
   isTakePlayingRef.current = isTakePlaying
   muteDuringPlaybackRef.current = muteDuringPlayback
@@ -150,15 +182,18 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     master.gain.setValueAtTime(shouldMuteOutput() ? 0 : 1, ctx.currentTime)
   }, [isTakePlaying, muteDuringPlayback, shouldMuteOutput])
 
-  const persistPrefs = useCallback((nextBpm: number, nextMeter: MetronomeMeter) => {
-    saveMetronomePrefs({ bpm: nextBpm, meter: nextMeter })
-  }, [])
+  const persistPrefs = useCallback(
+    (nextBpm: number, nextMeter: MetronomeMeter, nextSubdivision: MetronomeSubdivision) => {
+      saveMetronomePrefs({ bpm: nextBpm, meter: nextMeter, subdivision: nextSubdivision })
+    },
+    [],
+  )
 
   const setBpm = useCallback(
     (value: number) => {
       const next = clampBpm(value)
       setBpmState(next)
-      persistPrefs(next, meterRef.current)
+      persistPrefs(next, meterRef.current, subdivisionRef.current)
     },
     [persistPrefs],
   )
@@ -168,7 +203,17 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       setMeterState(nextMeter)
       tickCounterRef.current = 0
       setBeatIndex(0)
-      persistPrefs(bpmRef.current, nextMeter)
+      persistPrefs(bpmRef.current, nextMeter, subdivisionRef.current)
+    },
+    [persistPrefs],
+  )
+
+  const setSubdivision = useCallback(
+    (nextSubdivision: MetronomeSubdivision) => {
+      setSubdivisionState(nextSubdivision)
+      tickCounterRef.current = 0
+      setBeatIndex(0)
+      persistPrefs(bpmRef.current, meterRef.current, nextSubdivision)
     },
     [persistPrefs],
   )
@@ -252,8 +297,9 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       }
 
       const meter = meterRef.current
-      const barTicks = ticksPerBar(meter)
-      const secondsPerTick = secondsPerSchedulerTick(meter, bpmRef.current)
+      const subdivision = subdivisionRef.current
+      const barTicks = ticksPerBar(meter, subdivision)
+      const secondsPerTick = secondsPerSchedulerTick(meter, bpmRef.current, subdivision)
       const outputNode = ensureMasterGain(activeCtx)
       const muted = shouldMuteOutput()
 
@@ -261,11 +307,11 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
 
       while (nextBeatTimeRef.current < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
         const tickInBar = tickCounterRef.current % barTicks
-        const tier = resolveClickTier(meter, tickInBar)
+        const tier = resolveClickTier(meter, tickInBar, subdivision)
         scheduleTieredClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted)
 
         if (nextBeatTimeRef.current - activeCtx.currentTime <= LOOKAHEAD_MS / 1000) {
-          uiBeat = resolveUiBeatIndex(meter, tickInBar)
+          uiBeat = resolveUiBeatIndex(meter, tickInBar, subdivision)
         }
 
         nextBeatTimeRef.current += secondsPerTick
@@ -288,7 +334,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
         schedulerTimerRef.current = null
       }
     }
-  }, [playing, bpm, meter, ensureMasterGain, shouldMuteOutput, stop])
+  }, [playing, bpm, meter, subdivision, ensureMasterGain, shouldMuteOutput, stop])
 
   useEffect(() => {
     if (playing) {
@@ -296,7 +342,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       setBeatIndex(0)
       nextBeatTimeRef.current = 0
     }
-  }, [bpm, meter, playing])
+  }, [bpm, meter, subdivision, playing])
 
   useEffect(() => {
     return () => {
@@ -317,10 +363,12 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   return {
     bpm,
     meter,
+    subdivision,
     playing,
     beatIndex,
     setBpm,
     setMeter,
+    setSubdivision,
     togglePlay,
     stop,
   }

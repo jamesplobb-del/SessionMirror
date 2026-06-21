@@ -1,4 +1,9 @@
 import type { TunerInstrument } from './pitchConfig'
+import {
+  DEFAULT_AUDIO_ENHANCER_SETTINGS,
+  parseAudioEnhancerSettings,
+  type AudioEnhancerSettings,
+} from './audioEnhancer'
 
 export interface AppSettings {
   /** Audio mode: auto-start/stop recording from mic levels. */
@@ -23,6 +28,10 @@ export interface AppSettings {
   muteMetronomeDuringPlayback: boolean
   /** Scale factor for Best Take / Current Take cards (85–125). */
   takeCardScale: number
+  /** Dolby On-style playback enhancer (EQ, compression, reverb). */
+  audioEnhancerEnabled: boolean
+  /** Persisted enhancer preset and slider values. */
+  audioEnhancerSettings: AudioEnhancerSettings
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -37,6 +46,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showMetronome: false,
   muteMetronomeDuringPlayback: true,
   takeCardScale: 100,
+  audioEnhancerEnabled: false,
+  audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
 }
 
 /** Floating widgets — forced off on each cold app start. */
@@ -106,6 +117,13 @@ export function loadAppSettings(): AppSettings {
         Number(parsed.takeCardScale) || DEFAULT_APP_SETTINGS.takeCardScale,
         85,
         125,
+      ),
+      audioEnhancerEnabled:
+        parsed.audioEnhancerEnabled !== undefined
+          ? Boolean(parsed.audioEnhancerEnabled)
+          : DEFAULT_APP_SETTINGS.audioEnhancerEnabled,
+      audioEnhancerSettings: parseAudioEnhancerSettings(
+        parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),
     }
   } catch {

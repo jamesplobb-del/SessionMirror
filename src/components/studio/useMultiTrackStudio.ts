@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { safePlayMedia, waitForMediaReady } from '../../utils/mediaPlayback'
 import { releaseTakePlaybackAudio } from '../../utils/takePlaybackAudio'
-import { closeCountdownAudio } from './studioCountdownAudio'
 import {
   beatIntervalMs,
   closeStudioMetronomeAudio,
   playMetronomeClick,
+  primeStudioMetronomeAudioSync,
 } from './studioMetronome'
 import {
   closeMixContext,
@@ -31,16 +31,19 @@ const DRIFT_THRESHOLD_SEC = 0.2
 const DRIFT_SYNC_INTERVAL_MS = 500
 
 export type StudioCountInBeats = 8 | 16
+export type StudioBeatsPerBar = 2 | 3 | 4
 
 export interface StudioCountInPrefs {
   bpm: number
   countInBeats: StudioCountInBeats
+  beatsPerBar: StudioBeatsPerBar
   metronomeDuringRep: boolean
 }
 
 const DEFAULT_STUDIO_PREFS: StudioCountInPrefs = {
   bpm: 120,
   countInBeats: 8,
+  beatsPerBar: 4,
   metronomeDuringRep: false,
 }
 
@@ -480,7 +483,7 @@ export function useMultiTrackStudio() {
     [pauseOverdubPlayback, startOverdubPlayback, startRecordTimer, stopMetronome, stopRecordTimer],
   )
 
-  const startRepMetronome = useCallback((bpm: number) => {
+  const startRepMetronome = useCallback((bpm: number, beatsPerBar: StudioBeatsPerBar) => {
     if (repMetronomeRef.current) {
       clearInterval(repMetronomeRef.current)
       repMetronomeRef.current = null
@@ -488,7 +491,7 @@ export function useMultiTrackStudio() {
     const beatMs = beatIntervalMs(bpm)
     let repBeat = 0
     repMetronomeRef.current = setInterval(() => {
-      void playMetronomeClick(repBeat % 4 === 0)
+      void playMetronomeClick(repBeat % beatsPerBar === 0)
       repBeat++
     }, beatMs)
   }, [])
@@ -497,8 +500,10 @@ export function useMultiTrackStudio() {
     (id: 1 | 2 | 3 | 4) => {
       const prefs = studioPrefsRef.current
       const beatMs = beatIntervalMs(prefs.bpm)
+      const beatsPerBar = prefs.beatsPerBar
       let beatsPlayed = 0
 
+      primeStudioMetronomeAudioSync()
       setCountdownTrackId(id)
 
       const playNextBeat = () => {
@@ -507,12 +512,12 @@ export function useMultiTrackStudio() {
           setCountdownTrackId(null)
           beginRecording(id)
           if (prefs.metronomeDuringRep) {
-            startRepMetronome(prefs.bpm)
+            startRepMetronome(prefs.bpm, beatsPerBar)
           }
           return
         }
 
-        void playMetronomeClick(beatsPlayed % 4 === 0)
+        void playMetronomeClick(beatsPlayed % beatsPerBar === 0)
         beatsPlayed++
         countTimeoutRef.current = setTimeout(playNextBeat, beatMs)
       }
@@ -596,6 +601,8 @@ export function useMultiTrackStudio() {
     ) {
       return
     }
+
+    primeStudioMetronomeAudioSync()
 
     setPostRecordReviewId(null)
     stopAll()
@@ -720,6 +727,22 @@ export function useMultiTrackStudio() {
     [clearTrackInternal],
   )
 
+  const deselectTrack = useCallback(async () => {
+    if (
+      recordingIdRef.current !== null ||
+      tracksRef.current.some((t) => t.status === 'RECORDING')
+    ) {
+      return
+    }
+
+    if (countdownTrackId !== null) {
+      cancelCountdown()
+    }
+    await releaseLiveStream()
+    setTracks((prev) => prev.map((t) => ({ ...t, stream: null })))
+    setSelectedTrackId(null)
+  }, [cancelCountdown, countdownTrackId, releaseLiveStream])
+
   useEffect(() => {
     return () => {
       if (countTimeoutRef.current) clearTimeout(countTimeoutRef.current)
@@ -731,7 +754,6 @@ export function useMultiTrackStudio() {
       tracksRef.current.forEach((t) => {
         if (t.recordedUrl) URL.revokeObjectURL(t.recordedUrl)
       })
-      closeCountdownAudio()
       closeStudioMetronomeAudio()
       closeMixContext()
     }
@@ -744,7 +766,15 @@ export function useMultiTrackStudio() {
   const immersiveTrackId: 1 | 2 | 3 | 4 | null =
     postRecordReviewId !== null
       ? null
-      : tracks.find((t) => t.status === 'RECORDING')?.id ?? null
+      : selectedTrackId !== null &&
+          (countdownTrackId !== null ||
+            tracks.some(
+              (t) =>
+                t.id === selectedTrackId &&
+                (t.status === 'RECORDING' || Boolean(t.stream)),
+            ))
+        ? selectedTrackId
+        : null
 
   const isImmersive = immersiveTrackId !== null
 
@@ -777,5 +807,6 @@ export function useMultiTrackStudio() {
     setTrackVolume,
     keepRecordedTake,
     redoRecordedTake,
+    deselectTrack,
   }
 }

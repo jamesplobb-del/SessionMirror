@@ -17,9 +17,11 @@ import { getFloatingWidgetTopCenter, loadWidgetPosition, loadWidgetSize, saveWid
 import {
   COMPOUND_METERS,
   MAX_BPM,
+  METRONOME_SUBDIVISIONS,
   MIN_BPM,
   SIMPLE_METERS,
   type MetronomeMeter,
+  type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
 
 interface DraggableMetronomeWidgetProps {
@@ -29,8 +31,8 @@ interface DraggableMetronomeWidgetProps {
   muteDuringPlayback?: boolean
 }
 
-const DEFAULT_WIDGET_SIZE = { width: 268, height: 104 }
-const MIN_WIDGET_SIZE = { width: 200, height: 104 }
+const DEFAULT_WIDGET_SIZE = { width: 268, height: 128 }
+const MIN_WIDGET_SIZE = { width: 200, height: 120 }
 const BPM_DRAG_SENSITIVITY = 0.35
 const DOUBLE_TAP_MS = 320
 
@@ -76,7 +78,8 @@ export default function DraggableMetronomeWidget({
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
   const positionReadyRef = useRef(false)
-  const { bpm, meter, playing, beatIndex, setBpm, setMeter, togglePlay } = useMetronome({
+  const { bpm, meter, subdivision, playing, beatIndex, setBpm, setMeter, setSubdivision, togglePlay } =
+    useMetronome({
     isTakePlaying,
     muteDuringPlayback,
   })
@@ -299,6 +302,18 @@ export default function DraggableMetronomeWidget({
     </MetronomeControlButton>
   )
 
+  const renderSubdivisionButton = (value: MetronomeSubdivision, label: string) => (
+    <MetronomeControlButton
+      key={value}
+      label={`${label} subdivisions`}
+      active={subdivision === value}
+      onPress={() => setSubdivision(value)}
+      className="metronome-widget__subdivision-btn"
+    >
+      {label}
+    </MetronomeControlButton>
+  )
+
   return (
     <motion.div
       ref={widgetRef}
@@ -396,6 +411,10 @@ export default function DraggableMetronomeWidget({
           <div className="metronome-widget__meter-group">
             {COMPOUND_METERS.map(renderMeterButton)}
           </div>
+        </div>
+
+        <div className="metronome-widget__row metronome-widget__row--subdivisions pointer-events-auto">
+          {METRONOME_SUBDIVISIONS.map(({ value, label }) => renderSubdivisionButton(value, label))}
         </div>
       </div>
     </motion.div>

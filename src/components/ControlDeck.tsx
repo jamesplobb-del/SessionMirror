@@ -28,6 +28,7 @@ interface ControlDeckProps {
   pitchTrackerEnabled?: boolean
   showTakeCards?: boolean
   showMetronome?: boolean
+  pitchToggleVisible?: boolean
   onPitchTrackerChange?: (enabled: boolean) => void
   onShowTakeCardsChange?: (show: boolean) => void
   onShowMetronomeChange?: (show: boolean) => void
@@ -59,8 +60,11 @@ export default function ControlDeck({
   recordDropRef,
   dragDeleteActive = false,
   dragOverDelete = false,
+  pitchTrackerEnabled = false,
   showTakeCards = true,
   showMetronome = false,
+  pitchToggleVisible = false,
+  onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
   settingsBranchDisabled = false,
@@ -114,8 +118,11 @@ export default function ControlDeck({
         onClose={closeBranch}
         onExitComplete={handleBranchExitComplete}
         anchorRef={settingsButtonRef}
+        pitchTrackerEnabled={pitchTrackerEnabled}
         showTakeCards={showTakeCards}
         showMetronome={showMetronome}
+        pitchToggleVisible={pitchToggleVisible}
+        onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
         onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}
       />

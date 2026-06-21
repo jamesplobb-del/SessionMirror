@@ -197,7 +197,7 @@ function BestTakeBox({
     if (!splitViewActive || !onToggleSplitView) return null
 
     return (
-      <div className="absolute top-2 right-2 z-40 pointer-events-auto">
+      <div className="absolute -top-1 right-1 z-40 pointer-events-auto">
         <button
           type="button"
           onPointerDown={stopEventBubble}
@@ -428,7 +428,7 @@ function BestTakeBox({
                   className={emptyActionClass}
                   aria-label="Load YouTube reference"
                 >
-                  <Youtube className="h-3 w-3 text-red-300" />
+                  <Youtube className="h-3 w-3 text-red-500" />
                   YouTube
                 </button>
               </div>

@@ -423,6 +423,22 @@ body.settings-branch-open * {
   letter-spacing: 0.02em;
 }
 
+.metronome-widget__row--subdivisions {
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+  overflow: hidden;
+}
+
+.metronome-widget__subdivision-btn {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: clamp(1.2rem, 16cqh, 1.45rem);
+  padding: 0 0.2rem;
+  font-size: clamp(0.48rem, 11cqh, 0.58rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .metronome-widget__meter-divider {
   width: 1px;
   align-self: stretch;
