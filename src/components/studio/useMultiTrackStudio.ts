@@ -174,7 +174,7 @@ export function useMultiTrackStudio() {
   )
 
   const playRecordedTrack = useCallback(
-    async (track: StudioTrack, fromStart = true, keepMic = false): Promise<boolean> => {
+    async (track: StudioTrack, fromStart = true): Promise<boolean> => {
       const el = getVideoForTrack(track.id)
       if (!el || !track.recordedUrl || track.status === 'RECORDING') return false
 
