@@ -1,4 +1,8 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
+import {
+  activateNativePlaybackSession,
+  activateNativeRecordingSession,
+} from '../plugins/audioSession'
 import { prepareInlineMediaElement, safePlayMedia } from './mediaPlayback'
 import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from './playbackAudioContext'
 import { routeTakePlaybackToSpeaker } from './takePlaybackSpeaker'
@@ -30,6 +34,7 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
+  await activateNativePlaybackSession()
   await suspendMicInput?.()
   primePlaybackAudioContextSync()
 
@@ -54,6 +59,7 @@ export function primeTakePlaybackAudioSync(
 /** Restore mic capture after take playback finishes. */
 export async function releaseTakePlaybackAudio(): Promise<void> {
   await resumeMicInput?.()
+  await activateNativeRecordingSession()
 }
 
 /** Prime speaker routing then play — use for all take audio playback. */
