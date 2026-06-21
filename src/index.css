@@ -878,6 +878,18 @@ video.camera-preview.camera-preview--hidden {
   background: #000;
 }
 
+.camera-background--visually-suppressed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
 .camera-background-overlay--embedded {
   position: absolute;
   inset: 0;

@@ -14,8 +14,10 @@ interface LiveCameraBackgroundProps {
   modePreparing?: boolean
   /** Hide the idle audio-mode mic UI while main-screen pitch analysis is showing. */
   pitchStageActive?: boolean
-  /** fullscreen = behind HUD; embedded = inside split-view panel; hidden = not rendered */
-  variant?: 'fullscreen' | 'embedded' | 'hidden'
+  /** fullscreen = behind HUD; embedded = inside split-view panel */
+  variant?: 'fullscreen' | 'embedded'
+  /** Keep the preview element mounted but off-screen (split view uses embedded preview). */
+  visuallySuppressed?: boolean
 }
 
 function LiveCameraBackground({
@@ -28,6 +30,7 @@ function LiveCameraBackground({
   modePreparing = false,
   pitchStageActive = false,
   variant = 'fullscreen',
+  visuallySuppressed = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
   const showAudioIdle = isAudioMode && !pitchStageActive
@@ -37,7 +40,6 @@ function LiveCameraBackground({
     : 'camera-background-overlay'
 
   useEffect(() => {
-    if (variant === 'hidden') return
     const video = previewRef.current
     if (!video || isAudioMode) {
       if (video?.srcObject) {
@@ -55,19 +57,52 @@ function LiveCameraBackground({
     } else if (video.paused) {
       void video.play().catch(() => {})
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, variant])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode])
 
-  if (variant === 'hidden') {
-    return null
-  }
+  useEffect(() => {
+    if (isAudioMode) return
+
+    const revivePreview = () => {
+      const video = previewRef.current
+      const stream = streamRef.current
+      if (!video || !stream) return
+
+      const videoLive = stream
+        .getVideoTracks()
+        .some((track) => track.readyState === 'live' && track.enabled)
+      if (!videoLive) return
+
+      if (video.srcObject !== stream) {
+        video.srcObject = stream
+      }
+      if (video.paused) {
+        void video.play().catch(() => {})
+      }
+    }
+
+    revivePreview()
+    const intervalId = window.setInterval(revivePreview, 350)
+    const video = previewRef.current
+    video?.addEventListener('pause', revivePreview)
+    video?.addEventListener('stalled', revivePreview)
+    video?.addEventListener('suspend', revivePreview)
+
+    return () => {
+      window.clearInterval(intervalId)
+      video?.removeEventListener('pause', revivePreview)
+      video?.removeEventListener('stalled', revivePreview)
+      video?.removeEventListener('suspend', revivePreview)
+    }
+  }, [isAudioMode, previewRef, streamRef, streamGeneration])
+
+  const shellClass = isEmbedded
+    ? 'camera-background camera-background--embedded'
+    : visuallySuppressed
+      ? 'camera-background camera-background--visually-suppressed'
+      : 'camera-background'
 
   return (
-    <div
-      className={
-        isEmbedded ? 'camera-background camera-background--embedded' : 'camera-background'
-      }
-      aria-hidden={!isEmbedded}
-    >
+    <div className={shellClass} aria-hidden={!isEmbedded && !visuallySuppressed}>
       <video
         ref={previewRef}
         autoPlay
@@ -153,5 +188,6 @@ export default memo(
     prev.isRecording === next.isRecording &&
     prev.modePreparing === next.modePreparing &&
     prev.pitchStageActive === next.pitchStageActive &&
-    prev.variant === next.variant,
+    prev.variant === next.variant &&
+    prev.visuallySuppressed === next.visuallySuppressed,
 )

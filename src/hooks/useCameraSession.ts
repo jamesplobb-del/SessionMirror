@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Capacitor } from '@capacitor/core'
 import type { RecordingMode } from '../types'
 import {
@@ -27,6 +27,7 @@ import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
+  secondaryPreviewRef?: RefObject<HTMLVideoElement | null>
 }
 
 const CAMERA_INIT_MAX_ATTEMPTS = 3
@@ -122,8 +123,27 @@ function attachPreviewStream(
   void video.play().catch(() => {})
 }
 
+function attachPreviewTargets(
+  primary: HTMLVideoElement | null,
+  secondary: HTMLVideoElement | null,
+  stream: MediaStream | null,
+  mode: RecordingMode,
+) {
+  attachPreviewStream(primary, stream, mode)
+  attachPreviewStream(secondary, stream, mode)
+}
+
+function detachPreviewTargets(
+  primary: HTMLVideoElement | null,
+  secondary: HTMLVideoElement | null,
+) {
+  detachPreviewStream(primary)
+  detachPreviewStream(secondary)
+}
+
 export function useCameraSession({
   onRecordingComplete,
+  secondaryPreviewRef,
 }: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -166,6 +186,25 @@ export function useCameraSession({
   recordingModeRef.current = recordingMode
   isRecordingRef.current = isRecording
   readyRef.current = ready
+
+  const syncPreviewTargets = useCallback(
+    (stream: MediaStream | null, mode?: RecordingMode) => {
+      attachPreviewTargets(
+        previewRef.current,
+        secondaryPreviewRef?.current ?? null,
+        stream,
+        mode ?? recordingModeRef.current,
+      )
+    },
+    [secondaryPreviewRef],
+  )
+
+  const detachAllPreviewTargets = useCallback(() => {
+    detachPreviewTargets(
+      previewRef.current,
+      secondaryPreviewRef?.current ?? null,
+    )
+  }, [secondaryPreviewRef])
 
   const cancelScheduledRelease = useCallback(() => {
     if (releaseTimerRef.current !== null) {
@@ -224,16 +263,16 @@ export function useCameraSession({
     setReady(false)
     setStreamGeneration((generation) => generation + 1)
 
-    detachPreviewStream(previewRef.current)
-  }, [])
+    detachAllPreviewTargets()
+  }, [detachAllPreviewTargets])
 
   const releaseLiveStream = useCallback(() => {
     stopStreamTracks(streamRef.current)
     streamRef.current = null
     setReady(false)
     setStreamGeneration((generation) => generation + 1)
-    detachPreviewStream(previewRef.current)
-  }, [stopStreamTracks])
+    detachAllPreviewTargets()
+  }, [detachAllPreviewTargets, stopStreamTracks])
 
   const scheduleReleaseCameraState = useCallback(() => {
     cancelScheduledRelease()
@@ -249,14 +288,14 @@ export function useCameraSession({
 
       const existing = streamRef.current
       if (existing && isStreamRecordable(existing, mode)) {
-        attachPreviewStream(previewRef.current, existing, mode)
+        syncPreviewTargets(existing, mode)
         setReady(true)
         return existing
       }
 
       stopStreamTracks(streamRef.current)
       streamRef.current = null
-      detachPreviewStream(previewRef.current)
+      detachAllPreviewTargets()
 
       const constraints: MediaStreamConstraints =
         mode === 'audio'
@@ -273,12 +312,12 @@ export function useCameraSession({
       }
       await tuneMusicRecordingStream(mediaStream)
       streamRef.current = mediaStream
-      attachPreviewStream(previewRef.current, mediaStream, mode)
+      syncPreviewTargets(mediaStream, mode)
       setStreamGeneration((generation) => generation + 1)
       setReady(true)
       return mediaStream
     },
-    [stopStreamTracks],
+    [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets],
   )
 
   const ensureRecordableStream = useCallback(async (): Promise<MediaStream | null> => {
@@ -310,7 +349,7 @@ export function useCameraSession({
       const mode = recordingMode
       if (streamRef.current && isStreamCompatibleForMode(streamRef.current, mode)) {
         previousRecordingModeRef.current = mode
-        attachPreviewStream(previewRef.current, streamRef.current, mode)
+        syncPreviewTargets(streamRef.current, mode)
         setReady(true)
         activeStream = streamRef.current
         return
@@ -323,7 +362,7 @@ export function useCameraSession({
 
       if (enteringAudioFromVideo && canSoftHandoffToAudio(streamRef.current)) {
         releaseVideoTracksOnly(streamRef.current)
-        detachPreviewStream(previewRef.current)
+        detachAllPreviewTargets()
         previousRecordingModeRef.current = mode
         setStreamGeneration((generation) => generation + 1)
         setReady(true)
@@ -404,7 +443,7 @@ export function useCameraSession({
       if (streamRef.current === activeStream) {
         streamRef.current = null
       }
-      attachPreviewStream(previewRef.current, null, recordingMode)
+      syncPreviewTargets(null, recordingMode)
       setReady(false)
     }
   }, [
@@ -799,7 +838,7 @@ export function useCameraSession({
       const mode = recordingModeRef.current
       const stream = streamRef.current
       if (isStreamRecordable(stream, mode)) {
-        attachPreviewStream(previewRef.current, stream, mode)
+        syncPreviewTargets(stream, mode)
         setReady(true)
         return
       }
@@ -863,8 +902,8 @@ export function useCameraSession({
       return
     }
 
-    attachPreviewStream(previewRef.current, stream, mode)
-  }, [cancelScheduledRelease, restartCameraAfterForeground])
+    syncPreviewTargets(stream, mode)
+  }, [cancelScheduledRelease, restartCameraAfterForeground, syncPreviewTargets])
 
   const suspendMicForPlayback = useCallback(async () => {
     const stream = streamRef.current
@@ -950,6 +989,29 @@ export function useCameraSession({
       removeListener?.()
     }
   }, [scheduleBackgroundSuspend, scheduleForegroundRecovery, suspendCameraForBackground])
+
+  useEffect(() => {
+    if (recordingMode !== 'video') return
+
+    const revivePreview = () => {
+      const stream = streamRef.current
+      if (!stream || recordingModeRef.current !== 'video') return
+
+      const videoLive = stream
+        .getVideoTracks()
+        .some((track) => track.readyState === 'live' && track.enabled)
+      if (!videoLive) return
+
+      syncPreviewTargets(stream, 'video')
+    }
+
+    revivePreview()
+    const intervalId = window.setInterval(revivePreview, 350)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [recordingMode, streamGeneration, syncPreviewTargets])
 
   return {
     previewRef,

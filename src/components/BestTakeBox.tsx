@@ -18,8 +18,14 @@ import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
-const FLOAT_BADGE =
+const INLINE_CHROME_BTN =
+  'pointer-events-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
+
+const UPLOAD_BADGE_BTN =
   'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
+
+const NORMAL_VIEW_BTN =
+  'pointer-events-auto shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-[10px] font-medium text-white transition hover:bg-black/80'
 
 const emptyUploadClass =
   'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
@@ -39,6 +45,7 @@ export interface BestTakeBoxProps {
   onLoadYoutube: () => void
   onUpload?: (file: File) => void
   onToggleSplitView?: () => void
+  splitViewActive?: boolean
   onExpand?: () => void
   onPlaybackChange?: (playing: boolean) => void
 }
@@ -55,6 +62,7 @@ function BestTakeBox({
   onLoadYoutube,
   onUpload,
   onToggleSplitView,
+  splitViewActive = false,
   onExpand,
   onPlaybackChange,
 }: BestTakeBoxProps) {
@@ -184,6 +192,101 @@ function BestTakeBox({
   } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
 
   const pillLeft = showUploadBadge ? 32 : 8
+  const chromeUsesInlineLayout = isFill || hasYoutube
+
+  const renderReferenceChrome = () => {
+    if (!hasReference) return null
+
+    if (chromeUsesInlineLayout) {
+      return (
+        <div className="absolute top-2 right-2 z-40 flex items-center gap-1.5 pointer-events-auto">
+          {splitViewActive && onToggleSplitView && (
+            <button
+              type="button"
+              onPointerDown={stopEventBubble}
+              onTouchStart={stopEventBubble}
+              onTouchEnd={stopEventBubble}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSplitView()
+              }}
+              className={NORMAL_VIEW_BTN}
+              aria-label="Return to normal view"
+            >
+              Normal View
+            </button>
+          )}
+          <button
+            type="button"
+            onPointerDown={stopEventBubble}
+            onTouchStart={stopEventBubble}
+            onTouchEnd={stopEventBubble}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClearReference()
+            }}
+            className={INLINE_CHROME_BTN}
+            aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
+          >
+            <X className="h-3 w-3" />
+          </button>
+          {onToggleSplitView && !splitViewActive && (
+            <button
+              type="button"
+              onPointerDown={stopEventBubble}
+              onTouchStart={stopEventBubble}
+              onTouchEnd={stopEventBubble}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSplitView()
+              }}
+              className={INLINE_CHROME_BTN}
+              aria-label="Open split view layout"
+            >
+              <Expand className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <>
+        <button
+          type="button"
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={(e) => {
+            e.stopPropagation()
+            handleClearReference()
+          }}
+          className={INLINE_CHROME_BTN}
+          style={{ top: -12, right: onToggleSplitView ? 28 : -12, position: 'absolute', zIndex: 40 }}
+          aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
+        >
+          <X className="h-3 w-3" />
+        </button>
+        {onToggleSplitView && (
+          <button
+            type="button"
+            onPointerDown={stopEventBubble}
+            onTouchStart={stopEventBubble}
+            onTouchEnd={stopEventBubble}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSplitView()
+            }}
+            className={INLINE_CHROME_BTN}
+            style={{ top: -12, right: -12, position: 'absolute', zIndex: 40 }}
+            aria-label="Toggle split view layout"
+          >
+            <Expand className="h-3 w-3" />
+          </button>
+        )}
+      </>
+    )
+  }
 
   return (
     <div className={shellClass}>
@@ -220,14 +323,6 @@ function BestTakeBox({
                 allowFullScreen
                 title="YouTube reference"
               />
-              {onExpand && (
-                <button
-                  type="button"
-                  className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
-                  onClick={onExpand}
-                  aria-label="Open Best Take in full screen"
-                />
-              )}
             </>
           ) : hasTake ? (
             <>
@@ -326,6 +421,8 @@ function BestTakeBox({
               </div>
             </div>
           )}
+
+          {renderReferenceChrome()}
         </div>
 
         {showUploadBadge && (
@@ -335,50 +432,12 @@ function BestTakeBox({
             onTouchStart={stopEventBubble}
             onTouchEnd={stopEventBubble}
             onClick={stopEventBubble}
-            className={FLOAT_BADGE}
+            className={UPLOAD_BADGE_BTN}
             style={{ top: -12, left: -12 }}
             aria-label="Upload best take media"
           >
             <Upload className="h-3 w-3" />
           </label>
-        )}
-
-        {hasReference && (
-          <>
-            <button
-              type="button"
-              onPointerDown={stopEventBubble}
-              onTouchStart={stopEventBubble}
-              onTouchEnd={stopEventBubble}
-              onClick={(e) => {
-                e.stopPropagation()
-                handleClearReference()
-              }}
-              className={FLOAT_BADGE}
-              style={{ top: -12, right: onToggleSplitView ? 28 : -12 }}
-              aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
-            >
-              <X className="h-3 w-3" />
-            </button>
-
-            {onToggleSplitView && (
-              <button
-                type="button"
-                onPointerDown={stopEventBubble}
-                onTouchStart={stopEventBubble}
-                onTouchEnd={stopEventBubble}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleSplitView()
-                }}
-                className={FLOAT_BADGE}
-                style={{ top: -12, right: -12 }}
-                aria-label="Toggle split view layout"
-              >
-                <Expand className="h-3 w-3" />
-              </button>
-            )}
-          </>
         )}
       </div>
     </div>

@@ -10,7 +10,7 @@ interface SplitCompareLayoutProps {
   youtubeEmbedUrl: string | null
   suspendPipPlayback: boolean
   benchmarkPipVideoRef: RefObject<HTMLMediaElement | null>
-  previewRef: RefObject<HTMLVideoElement | null>
+  splitPreviewRef: RefObject<HTMLVideoElement | null>
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   cameraError: string | null
@@ -34,7 +34,7 @@ export default function SplitCompareLayout({
   youtubeEmbedUrl,
   suspendPipPlayback,
   benchmarkPipVideoRef,
-  previewRef,
+  splitPreviewRef,
   streamRef,
   streamGeneration,
   cameraError,
@@ -69,6 +69,7 @@ export default function SplitCompareLayout({
           onLoadYoutube={onLoadYoutube}
           onUpload={onUploadBenchmark}
           onToggleSplitView={onToggleSplitView}
+          splitViewActive
           onExpand={onExpandBenchmark}
           onPlaybackChange={onBenchmarkPlaybackChange}
         />
@@ -94,7 +95,7 @@ export default function SplitCompareLayout({
         <div className="relative h-full w-full overflow-hidden">
           <LiveCameraBackground
             variant="embedded"
-            previewRef={previewRef}
+            previewRef={splitPreviewRef}
             streamRef={streamRef}
             streamGeneration={streamGeneration}
             error={cameraError}

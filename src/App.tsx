@@ -180,6 +180,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
+  const splitPreviewRef = useRef<HTMLVideoElement>(null)
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
@@ -611,7 +612,13 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     resumeMicAfterPlayback,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
+    secondaryPreviewRef: splitPreviewRef,
   })
+
+  useEffect(() => {
+    if (!isSplitView || recordingMode !== 'video') return
+    void refreshCameraSession()
+  }, [isSplitView, recordingMode, refreshCameraSession])
 
   recordingModeRef.current = recordingMode
 
@@ -1468,7 +1475,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         pitchStageActive={
           showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
         }
-        variant={isSplitView ? 'hidden' : 'fullscreen'}
+        visuallySuppressed={isSplitView}
       />
 
       <div
@@ -1582,7 +1589,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
               youtubeEmbedUrl={youtubeUrl}
               suspendPipPlayback={suspendPipPlayback}
               benchmarkPipVideoRef={benchmarkPipVideoRef}
-              previewRef={previewRef}
+              splitPreviewRef={splitPreviewRef}
               streamRef={streamRef}
               streamGeneration={streamGeneration}
               cameraError={cameraError}
