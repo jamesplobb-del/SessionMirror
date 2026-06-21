@@ -34,7 +34,7 @@ function clampBranchPoint(
   }
 }
 
-/** Three quick-setting boxes in a vertical column above the settings cog. */
+/** Up to four quick-setting boxes in a vertical column above the settings cog. */
 export function layoutBranchItems(count: number, anchorRect: DOMRect): ViewportPoint[] {
   const nearestCenterY = -(COG_CLEARANCE + DECK_TEXT_CLEARANCE + ITEM_HEIGHT / 2)
 

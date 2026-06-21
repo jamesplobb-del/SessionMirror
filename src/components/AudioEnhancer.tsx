@@ -1,5 +1,4 @@
-import { useCallback, useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useCallback } from 'react'
 import {
   DEFAULT_AUDIO_ENHANCER_SETTINGS,
   settingsFromPreset,
@@ -57,9 +56,11 @@ function Fader({
   )
 }
 
-export default function AudioEnhancer({ settings, onChange, onClose }: AudioEnhancerProps) {
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+function activePresetLabel(settings: AudioEnhancerSettings): string {
+  return settings.preset === 'Custom' ? 'Custom' : settings.preset
+}
 
+export default function AudioEnhancer({ settings, onChange, onClose }: AudioEnhancerProps) {
   const selectPreset = useCallback(
     (preset: Exclude<AudioEnhancerPreset, 'Custom'>) => {
       onChange(settingsFromPreset(preset))
@@ -67,24 +68,26 @@ export default function AudioEnhancer({ settings, onChange, onClose }: AudioEnha
     [onChange],
   )
 
-  const patchAdvanced = useCallback(
+  const patchSettings = useCallback(
     (patch: Partial<AudioEnhancerSettings>) => {
       onChange({
         ...settings,
         ...patch,
         eq: patch.eq ? { ...settings.eq, ...patch.eq } : settings.eq,
-        preset: 'Custom',
       })
     },
     [onChange, settings],
   )
+
+  const presetSelectValue =
+    settings.preset === 'Custom' ? 'Custom' : settings.preset
 
   return (
     <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-[90] mx-auto max-w-lg rounded-t-xl border border-white/10 bg-black/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.55)] backdrop-blur-md">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-white">Audio Enhancer</p>
-          <p className="text-[10px] text-white/45">Smart presets for playback — off uses plain audio</p>
+          <p className="text-[10px] text-white/45">Tune EQ, compression, and reverb per mode</p>
         </div>
         {onClose && (
           <button
@@ -96,6 +99,32 @@ export default function AudioEnhancer({ settings, onChange, onClose }: AudioEnha
           </button>
         )}
       </div>
+
+      <label className="mb-3 block space-y-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+          Mode
+        </span>
+        <select
+          value={presetSelectValue}
+          onChange={(e) => {
+            const value = e.target.value
+            if (value === 'Custom') return
+            selectPreset(value as Exclude<AudioEnhancerPreset, 'Custom'>)
+          }}
+          className="w-full rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white focus:border-sky-400/60 focus:outline-none"
+        >
+          {PRESET_ORDER.map((preset) => (
+            <option key={preset} value={preset} className="bg-stone-900 text-white">
+              {preset}
+            </option>
+          ))}
+          {settings.preset === 'Custom' && (
+            <option value="Custom" className="bg-stone-900 text-white">
+              Custom
+            </option>
+          )}
+        </select>
+      </label>
 
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {PRESET_ORDER.map((preset) => {
@@ -115,90 +144,70 @@ export default function AudioEnhancer({ settings, onChange, onClose }: AudioEnha
             </button>
           )
         })}
-        {settings.preset === 'Custom' && (
-          <span className="shrink-0 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-white/85">
-            Custom
-          </span>
-        )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setAdvancedOpen((open) => !open)}
-        className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80"
-      >
-        Advanced Settings
-        {advancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-      </button>
+      <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+          {activePresetLabel(settings)} adjustments
+        </p>
+        <Fader
+          label="Low"
+          value={settings.eq.low}
+          min={-12}
+          max={12}
+          step={1}
+          format={(v) => `${v > 0 ? '+' : ''}${v} dB`}
+          onChange={(low) => patchSettings({ eq: { ...settings.eq, low } })}
+        />
+        <Fader
+          label="Mid"
+          value={settings.eq.mid}
+          min={-12}
+          max={12}
+          step={1}
+          format={(v) => `${v > 0 ? '+' : ''}${v} dB`}
+          onChange={(mid) => patchSettings({ eq: { ...settings.eq, mid } })}
+        />
+        <Fader
+          label="High"
+          value={settings.eq.high}
+          min={-12}
+          max={12}
+          step={1}
+          format={(v) => `${v > 0 ? '+' : ''}${v} dB`}
+          onChange={(high) => patchSettings({ eq: { ...settings.eq, high } })}
+        />
 
-      {advancedOpen && (
-        <div className="mt-3 space-y-3 rounded-lg border border-white/8 bg-black/35 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">3-Band EQ</p>
-          <Fader
-            label="Low"
-            value={settings.eq.low}
-            min={-12}
-            max={12}
-            step={1}
-            format={(v) => `${v > 0 ? '+' : ''}${v} dB`}
-            onChange={(low) => patchAdvanced({ eq: { ...settings.eq, low } })}
-          />
-          <Fader
-            label="Mid"
-            value={settings.eq.mid}
-            min={-12}
-            max={12}
-            step={1}
-            format={(v) => `${v > 0 ? '+' : ''}${v} dB`}
-            onChange={(mid) => patchAdvanced({ eq: { ...settings.eq, mid } })}
-          />
-          <Fader
-            label="High"
-            value={settings.eq.high}
-            min={-12}
-            max={12}
-            step={1}
-            format={(v) => `${v > 0 ? '+' : ''}${v} dB`}
-            onChange={(high) => patchAdvanced({ eq: { ...settings.eq, high } })}
-          />
+        <p className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+          Dynamics &amp; Space
+        </p>
+        <Fader
+          label="Compression"
+          value={settings.compression}
+          min={0}
+          max={100}
+          step={1}
+          format={(v) => `${v}%`}
+          onChange={(compression) => patchSettings({ compression })}
+        />
+        <Fader
+          label="Reverb Mix"
+          value={settings.reverb}
+          min={0}
+          max={100}
+          step={1}
+          format={(v) => `${v}%`}
+          onChange={(reverb) => patchSettings({ reverb })}
+        />
 
-          <p className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-            Dynamics &amp; Space
-          </p>
-          <Fader
-            label="Compression"
-            value={settings.compression}
-            min={0}
-            max={100}
-            step={1}
-            format={(v) => `${v}%`}
-            onChange={(compression) => patchAdvanced({ compression })}
-          />
-          <Fader
-            label="Reverb Mix"
-            value={settings.reverb}
-            min={0}
-            max={100}
-            step={1}
-            format={(v) => `${v}%`}
-            onChange={(reverb) => patchAdvanced({ reverb })}
-          />
-
-          <button
-            type="button"
-            onClick={() => onChange({ ...DEFAULT_AUDIO_ENHANCER_SETTINGS })}
-            className="text-[10px] font-medium text-white/45 underline"
-          >
-            Reset advanced sliders
-          </button>
-        </div>
-      )}
-
-      <p className="mt-2 text-[10px] leading-snug text-white/35">
-        {settings.preset !== 'Custom'
-          ? `${settings.preset} preset active`
-          : 'Manual tweaks — preset set to Custom'}
-      </p>
+        <button
+          type="button"
+          onClick={() => onChange({ ...DEFAULT_AUDIO_ENHANCER_SETTINGS })}
+          className="text-[10px] font-medium text-white/45 underline"
+        >
+          Reset to defaults
+        </button>
+      </div>
     </div>
   )
 }

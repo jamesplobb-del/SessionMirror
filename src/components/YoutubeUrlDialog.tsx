@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { App } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { X, Youtube } from 'lucide-react'
 import { parseYoutubeEmbedUrl } from '../utils/youtubeEmbed'
+import { isIOSNative } from '../utils/viewportSync'
 
 interface YoutubeUrlDialogProps {
   open: boolean
@@ -14,13 +17,28 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
   const [error, setError] = useState<string | null>(null)
   const [keyboardInset, setKeyboardInset] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const openRef = useRef(open)
+
+  openRef.current = open
+
+  const releaseInputFocus = useCallback(() => {
+    inputRef.current?.blur()
+    setKeyboardInset(0)
+  }, [])
 
   useEffect(() => {
     if (!open) return
     setValue('')
     setError(null)
-    const id = window.requestAnimationFrame(() => inputRef.current?.focus())
-    return () => window.cancelAnimationFrame(id)
+
+    if (!isIOSNative()) {
+      const id = window.requestAnimationFrame(() => {
+        if (openRef.current) inputRef.current?.focus()
+      })
+      return () => window.cancelAnimationFrame(id)
+    }
+
+    return undefined
   }, [open])
 
   useEffect(() => {
@@ -36,16 +54,34 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
       setKeyboardInset(overlap > 48 ? overlap : 0)
     }
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        releaseInputFocus()
+      }
+    }
+
     updateInset()
     window.visualViewport?.addEventListener('resize', updateInset)
     window.visualViewport?.addEventListener('scroll', updateInset)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    let removeAppListener: (() => void) | undefined
+    if (Capacitor.isNativePlatform()) {
+      void App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) releaseInputFocus()
+      }).then((handle) => {
+        removeAppListener = () => void handle.remove()
+      })
+    }
 
     return () => {
       window.visualViewport?.removeEventListener('resize', updateInset)
       window.visualViewport?.removeEventListener('scroll', updateInset)
-      setKeyboardInset(0)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      removeAppListener?.()
+      releaseInputFocus()
     }
-  }, [open])
+  }, [open, releaseInputFocus])
 
   const handleSubmit = useCallback(() => {
     const embedUrl = parseYoutubeEmbedUrl(value)
@@ -53,9 +89,15 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
       setError('Paste a valid YouTube link or video ID.')
       return
     }
+    releaseInputFocus()
     onSubmit(embedUrl)
     onClose()
-  }, [onClose, onSubmit, value])
+  }, [onClose, onSubmit, releaseInputFocus, value])
+
+  const handleClose = useCallback(() => {
+    releaseInputFocus()
+    onClose()
+  }, [onClose, releaseInputFocus])
 
   if (!open || typeof document === 'undefined') return null
 
@@ -63,11 +105,13 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     <div
       className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70 p-4 sm:items-center"
       style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : undefined }}
-      onClick={onClose}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) handleClose()
+      }}
     >
       <div
         className="w-full max-w-sm rounded-2xl border border-white/10 bg-black p-4 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="youtube-url-title"
       >
@@ -80,7 +124,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/80"
             aria-label="Close"
           >
@@ -88,13 +132,19 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
           </button>
         </div>
 
+        <p className="mb-2 text-[11px] leading-snug text-white/45">
+          Paste a link here, or switch to YouTube and copy the URL — tap the field when you return.
+        </p>
+
         <input
           ref={inputRef}
-          type="url"
+          type="text"
           inputMode="url"
           autoComplete="off"
           autoCorrect="off"
+          autoCapitalize="off"
           spellCheck={false}
+          enterKeyHint="done"
           placeholder="Paste YouTube URL or video ID"
           value={value}
           onChange={(e) => {
@@ -103,7 +153,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleSubmit()
-            if (e.key === 'Escape') onClose()
+            if (e.key === 'Escape') handleClose()
           }}
           className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-red-500/60 focus:outline-none"
         />
@@ -113,7 +163,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-lg px-3 py-2 text-xs font-medium text-white/70"
           >
             Cancel

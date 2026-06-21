@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { AudioLines, LayoutGrid } from 'lucide-react'
+import { AudioLines, LayoutGrid, Sparkles } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import MetronomeIcon from './icons/MetronomeIcon'
@@ -14,16 +14,18 @@ interface SettingsBranchWheelProps {
   pitchTrackerEnabled: boolean
   showTakeCards: boolean
   showMetronome: boolean
+  audioEnhancerEnabled: boolean
   pitchToggleVisible: boolean
   onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
   onShowMetronomeChange: (show: boolean) => void
+  onAudioEnhancerChange: (enabled: boolean) => void
 }
 
 interface BranchItem {
   id: string
   label: string
-  icon: 'pitch' | 'take-cards' | 'metronome'
+  icon: 'pitch' | 'take-cards' | 'metronome' | 'enhancer'
   active: boolean
   onSelect: () => void
 }
@@ -41,10 +43,12 @@ export default function SettingsBranchWheel({
   pitchTrackerEnabled,
   showTakeCards,
   showMetronome,
+  audioEnhancerEnabled,
   pitchToggleVisible,
   onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
+  onAudioEnhancerChange,
 }: SettingsBranchWheelProps) {
   const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
     null,
@@ -133,10 +137,19 @@ export default function SettingsBranchWheel({
         active: showMetronome,
         onSelect: () => onShowMetronomeChange(!showMetronome),
       },
+      {
+        id: 'audio-enhancer',
+        label: 'Audio Enhancer',
+        icon: 'enhancer',
+        active: audioEnhancerEnabled,
+        onSelect: () => onAudioEnhancerChange(!audioEnhancerEnabled),
+      },
     )
 
     return items
   }, [
+    audioEnhancerEnabled,
+    onAudioEnhancerChange,
     onPitchTrackerChange,
     onShowMetronomeChange,
     onShowTakeCardsChange,
@@ -221,6 +234,8 @@ export default function SettingsBranchWheel({
                             <AudioLines className="h-5 w-5" strokeWidth={2.1} />
                           ) : item.icon === 'take-cards' ? (
                             <LayoutGrid className="h-5 w-5" strokeWidth={2.1} />
+                          ) : item.icon === 'enhancer' ? (
+                            <Sparkles className="h-5 w-5" strokeWidth={2.1} />
                           ) : (
                             <MetronomeIcon className="h-5 w-5" />
                           )}

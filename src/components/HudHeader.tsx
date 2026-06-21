@@ -5,13 +5,33 @@ interface HudHeaderProps {
   sessionName: string
   onOpenVault: () => void
   className?: string
+  splitViewActive?: boolean
+  onExitSplitView?: () => void
 }
 
-export default function HudHeader({ sessionName, onOpenVault, className = '' }: HudHeaderProps) {
+export default function HudHeader({
+  sessionName,
+  onOpenVault,
+  className = '',
+  splitViewActive = false,
+  onExitSplitView,
+}: HudHeaderProps) {
   return (
     <header
-      className={`pointer-events-none flex shrink-0 justify-center px-4 pt-2 transition-opacity duration-200 ${className}`}
+      className={`pointer-events-none relative flex shrink-0 items-center justify-center px-4 pt-2 transition-opacity duration-200 ${className}`}
     >
+      {splitViewActive && onExitSplitView && (
+        <Pressable
+          type="button"
+          intensity="soft"
+          onClick={onExitSplitView}
+          className="pointer-events-auto absolute right-4 top-2 z-10 rounded-md border-2 border-white/70 bg-black/75 px-2.5 py-1 text-[10px] font-semibold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.25),0_2px_12px_rgba(0,0,0,0.45)] ring-1 ring-sky-400/50 backdrop-blur-md hover:border-white hover:bg-black/90"
+          aria-label="Return to normal view"
+        >
+          Normal View
+        </Pressable>
+      )}
+
       <Pressable
         type="button"
         intensity="soft"

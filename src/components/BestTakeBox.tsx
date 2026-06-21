@@ -25,9 +25,6 @@ const INLINE_CHROME_BTN =
 const UPLOAD_BADGE_BTN =
   'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
 
-const NORMAL_VIEW_BTN =
-  'pointer-events-auto shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-[10px] font-medium text-white transition hover:bg-black/80'
-
 const emptyActionClass =
   'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition hover:bg-white/10'
 
@@ -193,39 +190,12 @@ function BestTakeBox({
   const pillLeft = showUploadBadge ? 32 : 8
   const chromeUsesInlineLayout = isFill || hasYoutube || splitViewActive
 
-  const renderSplitChrome = () => {
-    if (!splitViewActive || !onToggleSplitView) return null
-
-    return (
-      <div className="absolute -top-1 right-1 z-40 pointer-events-auto">
-        <button
-          type="button"
-          onPointerDown={stopEventBubble}
-          onTouchStart={stopEventBubble}
-          onTouchEnd={stopEventBubble}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleSplitView()
-          }}
-          className={NORMAL_VIEW_BTN}
-          aria-label="Return to normal view"
-        >
-          Normal View
-        </button>
-      </div>
-    )
-  }
-
   const renderReferenceChrome = () => {
     if (!hasReference) return null
 
     if (chromeUsesInlineLayout) {
       return (
-        <div
-          className={`absolute top-2 z-40 flex items-center gap-1.5 pointer-events-auto ${
-            splitViewActive && onToggleSplitView ? 'right-24' : 'right-2'
-          }`}
-        >
+        <div className="absolute top-2 right-2 z-40 flex items-center gap-1.5 pointer-events-auto">
           <button
             type="button"
             onPointerDown={stopEventBubble}
@@ -435,7 +405,6 @@ function BestTakeBox({
             </div>
           )}
 
-          {renderSplitChrome()}
           {renderReferenceChrome()}
         </div>
 

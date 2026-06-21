@@ -28,10 +28,12 @@ interface ControlDeckProps {
   pitchTrackerEnabled?: boolean
   showTakeCards?: boolean
   showMetronome?: boolean
+  audioEnhancerEnabled?: boolean
   pitchToggleVisible?: boolean
   onPitchTrackerChange?: (enabled: boolean) => void
   onShowTakeCardsChange?: (show: boolean) => void
   onShowMetronomeChange?: (show: boolean) => void
+  onAudioEnhancerChange?: (enabled: boolean) => void
   settingsBranchDisabled?: boolean
   onBranchOpenChange?: (open: boolean) => void
 }
@@ -63,10 +65,12 @@ export default function ControlDeck({
   pitchTrackerEnabled = false,
   showTakeCards = true,
   showMetronome = false,
-  pitchToggleVisible = false,
+  audioEnhancerEnabled = false,
+  pitchToggleVisible = true,
   onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
+  onAudioEnhancerChange,
   settingsBranchDisabled = false,
   onBranchOpenChange,
 }: ControlDeckProps) {
@@ -121,10 +125,12 @@ export default function ControlDeck({
         pitchTrackerEnabled={pitchTrackerEnabled}
         showTakeCards={showTakeCards}
         showMetronome={showMetronome}
+        audioEnhancerEnabled={audioEnhancerEnabled}
         pitchToggleVisible={pitchToggleVisible}
         onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
         onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}
+        onAudioEnhancerChange={(enabled) => onAudioEnhancerChange?.(enabled)}
       />
 
       <div className="relative flex w-full max-w-xs items-center justify-center">

@@ -163,6 +163,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [isSplitView, setIsSplitView] = useState(false)
   const [splitRatio, setSplitRatio] = useState(50)
+  const [audioEnhancerPanelHidden, setAudioEnhancerPanelHidden] = useState(false)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
@@ -954,6 +955,16 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     [updateSettings],
   )
 
+  const handleQuickAudioEnhancerChange = useCallback(
+    (enabled: boolean) => {
+      startTransition(() => {
+        updateSettings({ audioEnhancerEnabled: enabled })
+        setAudioEnhancerPanelHidden(!enabled)
+      })
+    },
+    [updateSettings],
+  )
+
   const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
 
   const autoPlaybackTake = useMemo(
@@ -1098,9 +1109,15 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
 
   const showAudioEnhancerPanel =
     settings.audioEnhancerEnabled &&
-    takePlaybackActive &&
+    !audioEnhancerPanelHidden &&
     hudModalState === 'idle' &&
     !pitchHudSuspended
+
+  useEffect(() => {
+    if (!settings.audioEnhancerEnabled) {
+      setAudioEnhancerPanelHidden(false)
+    }
+  }, [settings.audioEnhancerEnabled])
 
   useEffect(() => {
     setTakePlaybackEnhancerState(
@@ -1607,6 +1624,8 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         <HudHeader
           sessionName={activeProject?.name ?? 'BestTake'}
           onOpenVault={handleOpenVault}
+          splitViewActive={isSplitView}
+          onExitSplitView={handleExitSplitView}
           className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
         />
 
@@ -1616,9 +1635,11 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
               splitRatio={splitRatio}
               onSplitRatioChange={setSplitRatio}
               benchmarkTake={benchmarkTake}
+              challengerTake={challengerTake}
               youtubeEmbedUrl={youtubeUrl}
               suspendPipPlayback={suspendPipPlayback}
               benchmarkPipVideoRef={benchmarkPipVideoRef}
+              challengerPipVideoRef={challengerPipVideoRef}
               splitPreviewRef={splitPreviewRef}
               streamRef={streamRef}
               streamGeneration={streamGeneration}
@@ -1630,12 +1651,17 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
                 showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
               }
               onUnpinBenchmark={handleUnpinBenchmark}
+              onUnpinChallenger={handleUnpinChallenger}
               onClearYoutube={handleClearYoutube}
               onSubmitYoutube={handleSubmitYoutube}
               onUploadBenchmark={handleUploadBenchmark}
               onToggleSplitView={handleExitSplitView}
               onExpandBenchmark={handleExpandBenchmark}
+              onExpandChallenger={handleExpandChallenger}
               onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+              onChallengerPlaybackChange={handleChallengerPlaybackChange}
+              challengerAutoPlayRequestId={autoPlaybackTakeId}
+              onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
             />
           </div>
         )}
@@ -1699,12 +1725,14 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
             pitchTrackerEnabled={pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled}
-            pitchToggleVisible={recordingMode === 'audio'}
+            pitchToggleVisible
             showTakeCards={settings.showTakeCards}
             onPitchTrackerChange={handleQuickPitchTrackerChange}
             onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
             showMetronome={settings.showMetronome}
             onShowMetronomeChange={handleShowMetronomeChange}
+            audioEnhancerEnabled={settings.audioEnhancerEnabled}
+            onAudioEnhancerChange={handleQuickAudioEnhancerChange}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
             onBranchOpenChange={handleQuickSettingsOpenChange}
           />
@@ -1798,6 +1826,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         <AudioEnhancer
           settings={settings.audioEnhancerSettings}
           onChange={handleAudioEnhancerChange}
+          onClose={() => setAudioEnhancerPanelHidden(true)}
         />
       )}
       </Suspense>
