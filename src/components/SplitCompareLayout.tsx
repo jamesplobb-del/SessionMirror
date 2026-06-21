@@ -53,7 +53,7 @@ export default function SplitCompareLayout({
   const bottomHeight = 100 - splitRatio
 
   return (
-    <div className="split-compare-layout flex h-full min-h-0 w-full flex-col">
+    <div className="split-compare-layout flex h-full w-full min-h-0 flex-col">
       <div
         className="split-compare-layout__top relative min-h-0 w-full shrink-0 overflow-hidden"
         style={{ height: `${splitRatio}%` }}

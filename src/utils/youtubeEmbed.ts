@@ -1,4 +1,4 @@
-const YOUTUBE_PROXY_ORIGIN = 'https://splendid-lamington-5b2e1c.netlify.app'
+const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 
 /** Build the Capacitor-safe proxy iframe URL for a YouTube video ID. */
 export function buildYoutubeProxyUrl(videoId: string): string {
@@ -18,7 +18,7 @@ export function parseYoutubeVideoId(input: string): string | null {
     const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
     const host = url.hostname.replace(/^www\./, '')
 
-    if (host === 'splendid-lamington-5b2e1c.netlify.app') {
+    if (host === 'singular-manatee-b52df8.netlify.app') {
       const fromQuery = url.searchParams.get('v')
       return fromQuery && /^[\w-]{11}$/.test(fromQuery) ? fromQuery : null
     }
