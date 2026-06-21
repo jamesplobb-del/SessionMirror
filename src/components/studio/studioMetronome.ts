@@ -1,7 +1,7 @@
 /** Studio count-in and optional recording metronome clicks. */
 
-let countCtx: AudioContext | null = null
-let masterGain: GainNode | null = null
+import { routeNativeOutputToSpeaker } from '../../plugins/audioSession'
+import { getPlaybackAudioContext } from '../../utils/playbackAudioContext'
 
 const TICK_HZ = 880
 const ACCENT_HZ = 1320
@@ -9,47 +9,34 @@ const TICK_PEAK = 0.48
 const ACCENT_PEAK = 0.58
 const TICK_DURATION_SEC = 0.07
 
-function createMetronomeContext(): AudioContext | null {
-  try {
-    const WebkitAudioContext = (
-      window as Window & { webkitAudioContext?: typeof AudioContext }
-    ).webkitAudioContext
-    const Ctor = window.AudioContext ?? WebkitAudioContext
-    if (!Ctor) return null
-    return new Ctor()
-  } catch {
-    return null
-  }
-}
+let masterGain: GainNode | null = null
 
 /** Call synchronously inside a user gesture before count-in. */
 export function primeStudioMetronomeAudioSync(): void {
-  if (!countCtx || countCtx.state === 'closed') {
-    countCtx = createMetronomeContext()
-    if (countCtx) {
-      masterGain = countCtx.createGain()
+  void getPlaybackAudioContext().then((ctx) => {
+    if (!masterGain || masterGain.context !== ctx) {
+      masterGain = ctx.createGain()
       masterGain.gain.value = 1
-      masterGain.connect(countCtx.destination)
+      masterGain.connect(ctx.destination)
     }
-  }
-
-  if (countCtx?.state === 'suspended') {
-    void countCtx.resume().catch(() => {})
-  }
+  })
 }
 
 async function ensureMetronomeAudio(): Promise<AudioContext | null> {
-  primeStudioMetronomeAudioSync()
-  if (countCtx?.state === 'suspended') {
-    await countCtx.resume().catch(() => {})
+  await routeNativeOutputToSpeaker()
+  const ctx = await getPlaybackAudioContext()
+  if (!masterGain || masterGain.context !== ctx) {
+    masterGain = ctx.createGain()
+    masterGain.gain.value = 1
+    masterGain.connect(ctx.destination)
   }
-  return countCtx
+  return ctx
 }
 
 export async function playMetronomeClick(accent = false): Promise<void> {
   const ctx = await ensureMetronomeAudio()
   if (!ctx || !masterGain) return
-  if (ctx.state === 'suspended') {
+  if (ctx.state !== 'running') {
     await ctx.resume().catch(() => {})
   }
   if (ctx.state !== 'running') return
@@ -75,7 +62,10 @@ export function beatIntervalMs(bpm: number): number {
 }
 
 export function closeStudioMetronomeAudio(): void {
-  countCtx?.close().catch(() => {})
-  countCtx = null
+  try {
+    masterGain?.disconnect()
+  } catch {
+    /* ignore */
+  }
   masterGain = null
 }

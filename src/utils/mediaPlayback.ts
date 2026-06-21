@@ -1,7 +1,5 @@
-/** Inline playback attributes required by iOS WebKit. */
+/** Inline playback attributes required by iOS WebKit (does not touch muted — routing sets that). */
 export function prepareInlineMediaElement(media: HTMLMediaElement): void {
-  media.muted = false
-  media.defaultMuted = false
   media.volume = 1
   media.setAttribute('playsinline', 'true')
   media.setAttribute('webkit-playsinline', 'true')

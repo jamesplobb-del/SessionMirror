@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { safePlayMedia, waitForMediaReady } from '../../utils/mediaPlayback'
 import {
+  playTakeMediaBatch,
+  primeTakePlaybackAudio,
+  releaseTakePlaybackAudio,
+} from '../../utils/takePlaybackAudio'
+import {
   beatIntervalMs,
   closeStudioMetronomeAudio,
   playMetronomeClick,
@@ -169,7 +174,7 @@ export function useMultiTrackStudio() {
   )
 
   const playRecordedTrack = useCallback(
-    async (track: StudioTrack, fromStart = true): Promise<boolean> => {
+    async (track: StudioTrack, fromStart = true, mode: 'take' | 'overdub' = 'take'): Promise<boolean> => {
       const el = getVideoForTrack(track.id)
       if (!el || !track.recordedUrl || track.status === 'RECORDING') return false
 
@@ -178,6 +183,7 @@ export function useMultiTrackStudio() {
       resumeMixContext()
 
       if (fromStart) seekVideoTo(el, 0)
+      await primeTakePlaybackAudio(mode, el)
       return safePlayMedia(el)
     },
     [getVideoForTrack, wireMixForTrack],
@@ -193,17 +199,27 @@ export function useMultiTrackStudio() {
 
       if (backing.length === 0) return
 
-      await Promise.all(backing.map((track) => playRecordedTrack(track, true)))
+      const elements: HTMLVideoElement[] = []
+      for (const track of backing) {
+        const el = getVideoForTrack(track.id)
+        if (!el || !track.recordedUrl) continue
+        primeRecordedVideo(el, track.recordedUrl)
+        wireMixForTrack(track)
+        seekVideoTo(el, 0)
+        elements.push(el)
+      }
+
+      if (elements.length === 0) return
+      await playTakeMediaBatch(elements, 'overdub')
     },
-    [playRecordedTrack],
+    [getVideoForTrack, wireMixForTrack],
   )
 
-  const pauseOverdubPlayback = useCallback((recordingId: 1 | 2 | 3 | 4) => {
+  const pauseOverdubPlayback = useCallback((_recordingId: 1 | 2 | 3 | 4) => {
     for (let slot = 0; slot < TRACK_IDS.length; slot++) {
-      const trackId = TRACK_IDS[slot]!
-      if (trackId === recordingId) continue
       videoRefs.current[slot]?.pause()
     }
+    void releaseTakePlaybackAudio()
   }, [])
 
   const stopDriftLoopInternal = useCallback(() => {
@@ -240,6 +256,7 @@ export function useMultiTrackStudio() {
         for (let slot = 0; slot < TRACK_IDS.length; slot++) {
           videoRefs.current[slot]?.pause()
         }
+        void releaseTakePlaybackAudio()
         isGlobalPlayingRef.current = false
         setIsGlobalPlaying(false)
         setTracks((prev) =>
@@ -332,6 +349,7 @@ export function useMultiTrackStudio() {
     for (let slot = 0; slot < TRACK_IDS.length; slot++) {
       videoRefs.current[slot]?.pause()
     }
+    void releaseTakePlaybackAudio()
     isGlobalPlayingRef.current = false
     setIsGlobalPlaying(false)
     setTracks((prev) =>
@@ -342,6 +360,8 @@ export function useMultiTrackStudio() {
   const playAll = useCallback(async () => {
     stopDriftLoopInternal()
     setPostRecordReviewId(null)
+
+    void releaseTakePlaybackAudio()
 
     const current = tracksRef.current
     const toPlay: StudioTrack[] = []
@@ -372,8 +392,11 @@ export function useMultiTrackStudio() {
 
     await Promise.all(elements.map((el) => waitForMediaReady(el, 2000)))
 
-    const results = await Promise.all(elements.map((el) => safePlayMedia(el)))
-    if (!results.some(Boolean)) return
+    const results = await playTakeMediaBatch(elements, 'take')
+    if (!results.some(Boolean)) {
+      void releaseTakePlaybackAudio()
+      return
+    }
 
     const playingIds = new Set(toPlay.map((t) => t.id))
     setTracks((prev) =>
@@ -725,6 +748,7 @@ export function useMultiTrackStudio() {
       setIsGlobalPlaying(false)
       isGlobalPlayingRef.current = false
       stopDriftLoopInternal()
+      void releaseTakePlaybackAudio()
       pauseAllExcept(id)
 
       setTracks((prev) =>
