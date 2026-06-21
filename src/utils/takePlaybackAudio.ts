@@ -30,6 +30,17 @@ export interface PrimeTakePlaybackOptions {
   suspendMic?: boolean
 }
 
+function isPrimeTakePlaybackOptions(
+  value: PrimeTakePlaybackOptions | HTMLMediaElement | null | undefined,
+): value is PrimeTakePlaybackOptions {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'suspendMic' in value &&
+    !('currentSrc' in value)
+  )
+}
+
 /** Prepare playback — await before calling .play() so mic is released first. */
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
@@ -45,14 +56,8 @@ export async function primeTakePlaybackAudio(
   let suspendMic = true
   let media: Array<HTMLMediaElement | null | undefined>
 
-  if (
-    optionsOrMedia &&
-    typeof optionsOrMedia === 'object' &&
-    'suspendMic' in optionsOrMedia &&
-    !('currentSrc' in optionsOrMedia)
-  ) {
-    const options = optionsOrMedia as PrimeTakePlaybackOptions
-    suspendMic = options.suspendMic !== false
+  if (isPrimeTakePlaybackOptions(optionsOrMedia)) {
+    suspendMic = optionsOrMedia.suspendMic !== false
     media = rest
   } else {
     media = [optionsOrMedia, ...rest]
