@@ -27,10 +27,11 @@ import {
   registerAutoPlaybackHold,
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
-  playTakeMedia,
+  playTakeMediaMuted,
 } from './utils/takePlaybackAudio'
 import {
   prepareInlineMediaElement,
+  assignMediaPlaybackSrc,
   resolveMediaPlaybackSrc,
   waitForMediaReadyWithRetry,
 } from './utils/mediaPlayback'
@@ -325,7 +326,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
 
       prepareInlineMediaElement(audio)
       audio.preload = 'auto'
-      audio.src = resolveMediaPlaybackSrc(playbackUrl)
+      assignMediaPlaybackSrc(audio, playbackUrl)
       audio.load()
 
       void (async () => {
@@ -345,7 +346,9 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         audio.onended = () => finishAutoPlayback()
         audio.onerror = () => finishAutoPlayback()
 
-        const started = await playTakeMedia(audio)
+        const started = await playTakeMediaMuted(audio, {
+          onFailure: () => setAutoPlaybackPlaying(false),
+        })
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
 
         if (started) {
@@ -461,8 +464,9 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     void (async () => {
 
       const immediateUrl = resolveTakePlaybackUrlFast(filePath, videoUrl)
-      const safeVideoUrl =
-        immediateUrl ?? (await resolveTakePlaybackUrl(filePath, videoUrl))
+      const safeVideoUrl = resolveMediaPlaybackSrc(
+        immediateUrl ?? (await resolveTakePlaybackUrl(filePath, videoUrl)),
+      )
       const projectId = activeProjectIdRef.current
 
       if (showTakeCardsRef.current || shouldAutoPlay) {
@@ -1494,6 +1498,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         ref={autoPlaybackAudioRef}
         className="sr-only"
         preload="auto"
+        muted
         playsInline
         {...({ 'webkit-playsinline': 'true' } as React.AudioHTMLAttributes<HTMLAudioElement>)}
       />

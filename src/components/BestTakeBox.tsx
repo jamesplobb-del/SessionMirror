@@ -116,10 +116,12 @@ function BestTakeBox({
     const video = videoRef.current
     if (!video) return false
 
-    setIsPlaying(true)
-    const started = await playTakeMedia(video)
-    if (!started) {
-      setIsPlaying(false)
+    const started = await playTakeMedia(video, {
+      onFailure: () => setIsPlaying(false),
+    })
+    if (started) {
+      setIsPlaying(true)
+    } else {
       void releaseTakePlaybackAudio()
     }
     return started

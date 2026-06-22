@@ -8,7 +8,7 @@ import {
   drawTakeVideoFrame,
   type RecordingOrientation,
 } from './takeVideoTransform'
-import { resolveMediaPlaybackSrc } from './mediaPlayback'
+import { assignMediaPlaybackSrc } from './mediaPlayback'
 import { applyBulletproofVideoElement } from './mobileVideo'
 import type { Take } from '../types'
 
@@ -253,7 +253,7 @@ function captureThumbnailFromVideoUrl(
       { once: true },
     )
 
-    video.src = resolveMediaPlaybackSrc(url)
+    assignMediaPlaybackSrc(video, url)
     video.load()
   })
 }

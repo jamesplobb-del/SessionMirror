@@ -5,7 +5,11 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
-import { playTakeMedia, primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import {
+  playTakeMedia,
+  playTakeMediaMuted,
+  releaseTakePlaybackAudio,
+} from '../utils/takePlaybackAudio'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 
@@ -132,10 +136,12 @@ function PipWindow({
       await new Promise((resolve) => window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS))
     }
 
-    setIsPlaying(true)
-    const started = await playTakeMedia(video)
-    if (!started) {
-      setIsPlaying(false)
+    const started = await playTakeMedia(video, {
+      onFailure: () => setIsPlaying(false),
+    })
+    if (started) {
+      setIsPlaying(true)
+    } else {
       void releaseTakePlaybackAudio()
     }
     return started
@@ -161,7 +167,7 @@ function PipWindow({
     [startInlinePreview, suspendPlayback, videoRef],
   )
 
-  // Hands-free auto-playback — same path as tapping the quick preview button
+  // Hands-free auto-playback — muted programmatic play (iOS allows muted autoplay).
   useEffect(() => {
     const wantsAutoPlay =
       Boolean(autoPlayRequestId) &&
@@ -184,8 +190,6 @@ function PipWindow({
         return
       }
 
-      await primeTakePlaybackAudio(media)
-
       const ready = await waitForMediaReadyWithRetry(media)
       if (cancelled || !autoPlaySessionRef.current) return
 
@@ -198,18 +202,23 @@ function PipWindow({
       const onEnded = () => {
         if (!autoPlaySessionRef.current) return
         autoPlaySessionRef.current = false
+        setIsPlaying(false)
         onAutoPlayComplete?.()
       }
 
       media.addEventListener('ended', onEnded, { once: true })
 
-      const started = await startInlinePreview()
+      const started = await playTakeMediaMuted(media, {
+        onFailure: () => setIsPlaying(false),
+      })
       if (cancelled || !autoPlaySessionRef.current) {
         media.removeEventListener('ended', onEnded)
         return
       }
 
-      if (!started) {
+      if (started) {
+        setIsPlaying(true)
+      } else {
         media.removeEventListener('ended', onEnded)
         autoPlaySessionRef.current = false
         onAutoPlayComplete?.()
@@ -224,7 +233,6 @@ function PipWindow({
     autoPlayRequestId,
     onAutoPlayComplete,
     src,
-    startInlinePreview,
     suspendPlayback,
     takeId,
     videoRef,

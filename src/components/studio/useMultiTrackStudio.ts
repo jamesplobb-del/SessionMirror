@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { resolveMediaPlaybackSrc, waitForMediaReady } from '../../utils/mediaPlayback'
+import { assignMediaPlaybackSrc, waitForMediaReady } from '../../utils/mediaPlayback'
 import { applyBulletproofVideoElement } from '../../utils/mobileVideo'
 import {
   playTakeMedia,
@@ -84,9 +84,8 @@ function getBestMimeType(): string {
 function primeRecordedVideo(el: HTMLVideoElement, url: string): void {
   if (el.srcObject) el.srcObject = null
   applyBulletproofVideoElement(el)
-  const safeSrc = resolveMediaPlaybackSrc(url)
+  const safeSrc = assignMediaPlaybackSrc(el, url)
   if (el.src !== safeSrc) {
-    el.src = safeSrc
     el.load()
   }
 }

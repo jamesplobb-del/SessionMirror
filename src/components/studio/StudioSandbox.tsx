@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { applyBulletproofVideoElement, iosBulletproofVideoProps } from '../../utils/mobileVideo'
-import { resolveMediaPlaybackSrc } from '../../utils/mediaPlayback'
+import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
 import { useMultiTrackStudio, type StudioCountInPrefs, type StudioTrack } from './useMultiTrackStudio'
 import { attachLiveStreamPreview, isLiveMediaStream } from './studioLivePreview'
 
@@ -76,10 +76,9 @@ function TrackBox({
 
     if (track.recordedUrl) {
       if (el.srcObject) el.srcObject = null
-      const safeSrc = resolveMediaPlaybackSrc(track.recordedUrl)
       applyBulletproofVideoElement(el)
+      const safeSrc = assignMediaPlaybackSrc(el, track.recordedUrl)
       if (el.src !== safeSrc) {
-        el.src = safeSrc
         el.load()
       }
       if (track.status !== 'PLAYING' && !el.paused) {

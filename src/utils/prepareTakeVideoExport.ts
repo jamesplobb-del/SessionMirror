@@ -9,7 +9,7 @@ import {
   type RecordingOrientation,
 } from './takeVideoTransform'
 import { estimateVideoBitrate, getRecorderMimeType, applyBulletproofVideoElement } from './mobileVideo'
-import { resolveMediaPlaybackSrc } from './mediaPlayback'
+import { assignMediaPlaybackSrc } from './mediaPlayback'
 import { persistUploadedVideo, resolveNativeVideoPlaybackSrc, type PersistedTakeVideo } from './takeStorage'
 import type { Take } from '../types'
 
@@ -71,7 +71,7 @@ function loadVideoMetadata(
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
     applyBulletproofVideoElement(video)
-    video.src = resolveMediaPlaybackSrc(url)
+    assignMediaPlaybackSrc(video, url)
 
     const cleanup = () => {
       video.pause()

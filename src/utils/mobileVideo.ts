@@ -173,5 +173,9 @@ export function withWebKitThumbnailHint(src: string): string {
   if (!src || src.includes('#t=')) {
     return src
   }
+  // Media fragments break Capacitor file URLs on iOS WKWebView.
+  if (src.startsWith('capacitor://') || src.includes('_capacitor_file_')) {
+    return src
+  }
   return `${src}#t=0.1`
 }

@@ -383,8 +383,14 @@ export default function ReviewModeOverlay({
     if (!video) return
 
     if (video.paused) {
-      playTakeMedia(video).then((started) => {
-        if (!started) revealPlayOverlay(false)
+      playTakeMedia(video, {
+        onFailure: () => {
+          setIsPlaying(false)
+          revealPlayOverlay(false)
+        },
+      }).then((started) => {
+        if (started) setIsPlaying(true)
+        else revealPlayOverlay(false)
       })
     } else {
       video.pause()
@@ -542,7 +548,12 @@ export default function ReviewModeOverlay({
       syncDurationFromVideo(video)
 
       if (wasPlayingBeforeScrubRef.current) {
-        playTakeMedia(video).then((started) => {
+        playTakeMedia(video, {
+          onFailure: () => {
+            setIsPlaying(false)
+            revealPlayOverlay(false)
+          },
+        }).then((started) => {
           if (started) setIsPlaying(true)
           else revealPlayOverlay(false)
         })
