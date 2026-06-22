@@ -143,7 +143,7 @@ export default function TakeVideoPlayer({
           className="sr-only"
           src={mediaSrc}
           {...audioRest}
-          muted
+          {...(audible ? {} : { muted: true })}
           autoPlay={false}
           playsInline
           preload="auto"
@@ -199,7 +199,7 @@ export default function TakeVideoPlayer({
         onLoadedMetadata?.(event)
       }}
       {...videoRest}
-      muted
+      {...(audible ? {} : { muted: true })}
       autoPlay={false}
       {...iosBulletproofVideoProps}
     />

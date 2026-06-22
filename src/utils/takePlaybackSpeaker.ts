@@ -212,15 +212,37 @@ export function hasTakePlaybackSpeakerRoute(el: HTMLMediaElement): boolean {
   return speakerNodesByElement.has(el)
 }
 
+export interface RouteTakePlaybackOptions {
+  /**
+   * Allow plain single-track playback to skip Web Audio and rely on the native
+   * speaker route. Web Audio routing of a muted element is starved by iOS after
+   * ~1s when nothing actively pulls from the graph, which cuts audio out.
+   */
+  allowNativeDirect?: boolean
+}
+
 /** Wire a media element into the shared speaker bus (once per element lifetime). */
 export function routeTakePlaybackToSpeaker(
   el: HTMLMediaElement,
   volume = 1,
   muted = false,
+  options: RouteTakePlaybackOptions = {},
 ): void {
+  const existingNodes = speakerNodesByElement.get(el)
+
+  // Native-direct path: no enhancer and the element was never wired into Web
+  // Audio. Play the element itself, unmuted, and let the native AVAudioSession
+  // (forced to .speaker in AppDelegate) drive the loud main speaker. This avoids
+  // the iOS render-starvation cutout and the quieter Web Audio element route.
+  if (options.allowNativeDirect && !existingNodes && !enhancerEnabled) {
+    el.muted = muted
+    el.volume = muted ? 0 : Math.min(volume, 1)
+    return
+  }
+
   const ctx = primePlaybackAudioContextSync()
 
-  let nodes = speakerNodesByElement.get(el)
+  let nodes = existingNodes
   if (!nodes) {
     try {
       const source = ctx.createMediaElementSource(el)

@@ -1,12 +1,14 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import {
-  ensureMediaMuted,
   prepareInlineMediaElement,
   safePlayMutedMedia,
   type PlaybackAttemptOptions,
 } from './mediaPlayback'
-import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from './playbackAudioContext'
-import { routeTakePlaybackToSpeaker } from './takePlaybackSpeaker'
+import { resumePlaybackAudioContext } from './playbackAudioContext'
+import {
+  hasTakePlaybackSpeakerRoute,
+  routeTakePlaybackToSpeaker,
+} from './takePlaybackSpeaker'
 
 let autoPlaybackHoldCheck: (() => boolean) | null = null
 
@@ -25,21 +27,43 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
 }
 
-/** Synchronous Web Audio prep — must finish before .play() in the same call stack. */
+/**
+ * Synchronous playback prep — must finish before .play() in the same call stack.
+ *
+ * Single-track playback uses the native speaker route (no Web Audio) so iOS does
+ * not starve and cut the audio after ~1s. Simultaneous tracks (batch) must mix
+ * through Web Audio, so native-direct is disabled for them.
+ */
+function primeTakePlayback(
+  media: Array<HTMLMediaElement | null | undefined>,
+  allowNativeDirect: boolean,
+): void {
+  const elements = media.filter(
+    (element): element is HTMLMediaElement => !!element,
+  )
+  if (elements.length === 0) return
+
+  for (const element of elements) {
+    prepareInlineMediaElement(element)
+    routeTakePlaybackToSpeaker(element, element.volume || 1, false, {
+      allowNativeDirect,
+    })
+  }
+
+  resumePitchGraphsForMedia(...elements)
+
+  // Only spin up / resume the shared context when something actually routes
+  // through Web Audio (enhancer, pitch analysis, or simultaneous mixing).
+  if (elements.some((element) => hasTakePlaybackSpeakerRoute(element))) {
+    void resumePlaybackAudioContext()
+  }
+}
+
 export function primeTakePlaybackForUserGesture(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  primePlaybackAudioContextSync()
-
-  for (const element of media) {
-    if (!element) continue
-    prepareInlineMediaElement(element)
-    ensureMediaMuted(element)
-    routeTakePlaybackToSpeaker(element, element.volume, false)
-  }
-
-  resumePitchGraphsForMedia(...media)
-  void resumePlaybackAudioContext()
+  const count = media.filter(Boolean).length
+  primeTakePlayback(media, count === 1)
 }
 
 /** Prepare playback — async path for programmatic / muted autoplay only. */
@@ -90,7 +114,9 @@ export function playTakeMediaBatchFromUserGesture(
   callbacks: UserGesturePlaybackCallbacks = {},
 ): void {
   if (media.length === 0) return
-  primeTakePlaybackForUserGesture(...media)
+  // Simultaneous tracks must mix through Web Audio; native output only plays the
+  // last element audibly on iOS.
+  primeTakePlayback(media, false)
   for (const element of media) {
     element.play().catch((error: unknown) => {
       console.log(error)
@@ -129,7 +155,7 @@ export async function playTakeMediaMuted(
 
 export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {
   if (media.length === 0) return []
-  primeTakePlaybackForUserGesture(...media)
+  primeTakePlayback(media, false)
   await resumePlaybackAudioContext()
   return Promise.all(media.map((element) => safePlayMutedMedia(element)))
 }
