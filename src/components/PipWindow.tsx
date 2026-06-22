@@ -4,8 +4,8 @@ import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { safePlayMedia, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
-import { primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
+import { playTakeMedia, primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 
@@ -128,15 +128,12 @@ function PipWindow({
 
     video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
 
-    // Unmute and release mic before .play() — iOS routes muted playback to the earpiece.
-    await primeTakePlaybackAudio(video)
-
     if (Capacitor.isNativePlatform()) {
       await new Promise((resolve) => window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS))
     }
 
     setIsPlaying(true)
-    const started = await safePlayMedia(video)
+    const started = await playTakeMedia(video)
     if (!started) {
       setIsPlaying(false)
       void releaseTakePlaybackAudio()

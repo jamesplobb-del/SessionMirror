@@ -1,10 +1,10 @@
 /** Inline playback attributes required by iOS WebKit. */
 export function prepareInlineMediaElement(media: HTMLMediaElement): void {
-  media.muted = false
-  media.defaultMuted = false
   media.volume = 1
   media.setAttribute('playsinline', 'true')
   media.setAttribute('webkit-playsinline', 'true')
+  // Muted state is owned by the Web Audio speaker bus — never unmute here or iOS
+  // briefly routes through the quiet earpiece receiver.
 }
 
 /** Play with promise catch so iOS blocks never stall the main thread. */

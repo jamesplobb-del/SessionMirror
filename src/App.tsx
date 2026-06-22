@@ -27,11 +27,10 @@ import {
   registerAutoPlaybackHold,
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
-  primeTakePlaybackAudio,
+  playTakeMedia,
 } from './utils/takePlaybackAudio'
 import {
   prepareInlineMediaElement,
-  safePlayMedia,
   waitForMediaReadyWithRetry,
 } from './utils/mediaPlayback'
 import {
@@ -322,8 +321,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       audio.load()
 
       void (async () => {
-        await primeTakePlaybackAudio(audio)
-
         if (Capacitor.isNativePlatform()) {
           await new Promise((resolve) =>
             window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS),
@@ -340,7 +337,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         audio.onended = () => finishAutoPlayback()
         audio.onerror = () => finishAutoPlayback()
 
-        const started = await safePlayMedia(audio)
+        const started = await playTakeMedia(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
 
         if (started) {

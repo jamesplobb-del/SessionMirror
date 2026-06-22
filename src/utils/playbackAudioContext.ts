@@ -1,3 +1,5 @@
+import { routeNativeOutputToSpeaker } from '../plugins/audioSession'
+
 let playbackContext: AudioContext | null = null
 let playbackContextWatchAttached = false
 
@@ -7,13 +9,19 @@ function attachPlaybackContextWatch(ctx: AudioContext): void {
 
   ctx.addEventListener('statechange', () => {
     if (ctx.state === 'suspended') {
-      void ctx.resume().catch(() => {})
+      void ctx
+        .resume()
+        .then(() => routeNativeOutputToSpeaker())
+        .catch(() => {})
     }
   })
 
   const resumeOnVisible = () => {
     if (document.visibilityState === 'visible') {
-      void ctx.resume().catch(() => {})
+      void ctx
+        .resume()
+        .then(() => routeNativeOutputToSpeaker())
+        .catch(() => {})
     }
   }
   document.addEventListener('visibilitychange', resumeOnVisible)

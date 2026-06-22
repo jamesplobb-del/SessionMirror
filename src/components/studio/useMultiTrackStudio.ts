@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { safePlayMedia, waitForMediaReady } from '../../utils/mediaPlayback'
+import { waitForMediaReady } from '../../utils/mediaPlayback'
 import {
+  playTakeMedia,
   playTakeMediaBatch,
-  primeTakePlaybackAudio,
   releaseTakePlaybackAudio,
 } from '../../utils/takePlaybackAudio'
 import {
@@ -183,8 +183,7 @@ export function useMultiTrackStudio() {
       resumeMixContext()
 
       if (fromStart) seekVideoTo(el, 0)
-      await primeTakePlaybackAudio(el)
-      return safePlayMedia(el)
+      return playTakeMedia(el)
     },
     [getVideoForTrack, wireMixForTrack],
   )
