@@ -90,10 +90,17 @@ function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string 
   }
 
   if (!filePath && videoUrl) {
-    return videoUrl
+    return resolveMediaPlaybackSrc(videoUrl)
   }
 
-  return readCachedPlaybackSrc(filePath, videoUrl)
+  const cached = readCachedPlaybackSrc(filePath, videoUrl)
+  if (cached) return cached
+
+  if (videoUrl) {
+    return resolveMediaPlaybackSrc(videoUrl)
+  }
+
+  return null
 }
 
 /** Stable pitch source — same object reference when signature unchanged. */

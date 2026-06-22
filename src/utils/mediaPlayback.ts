@@ -1,4 +1,4 @@
-import { applyStrictPlaybackSrc } from './takeStorage'
+import { Capacitor } from '@capacitor/core'
 import { applyBulletproofVideoElement } from './mobileVideo'
 
 /** Inline playback attributes required by iOS WebKit. */
@@ -14,13 +14,29 @@ export function prepareInlineMediaElement(media: HTMLMediaElement): void {
   // briefly routes through the quiet earpiece receiver.
 }
 
+function isWebSafePlaybackUrl(url: string): boolean {
+  return (
+    url.startsWith('blob:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('capacitor://') ||
+    url.includes('_capacitor_file_')
+  )
+}
+
 /**
  * Wrap local file URIs with Capacitor.convertFileSrc before assigning to media src.
  * Skips blob:, http(s):, and already-converted capacitor playback URLs.
  */
 export function resolveMediaPlaybackSrc(url: string): string {
   if (!url) return url
-  return applyStrictPlaybackSrc(url)
+  if (!Capacitor.isNativePlatform()) return url
+  if (isWebSafePlaybackUrl(url)) return url
+  const converted = Capacitor.convertFileSrc(url)
+  if (converted.startsWith('file://')) {
+    return Capacitor.convertFileSrc(converted)
+  }
+  return converted
 }
 
 /** Play with promise catch so iOS blocks never stall the main thread. */

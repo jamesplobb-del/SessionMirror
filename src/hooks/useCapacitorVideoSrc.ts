@@ -17,7 +17,9 @@ export function useCapacitorVideoSrc(
 ): string | null {
   const [src, setSrc] = useState<string | null>(() => {
     const cached = readCachedPlaybackSrc(filePath, fallbackUrl)
-    return cached ? resolveMediaPlaybackSrc(cached) : null
+    if (cached) return resolveMediaPlaybackSrc(cached)
+    if (fallbackUrl) return resolveMediaPlaybackSrc(fallbackUrl)
+    return null
   })
 
   useEffect(() => {
@@ -33,7 +35,11 @@ export function useCapacitorVideoSrc(
 
     void resolveNativeVideoPlaybackSrc(filePath, fallbackUrl).then((resolved) => {
       if (cancelled) return
-      const safe = resolved ? resolveMediaPlaybackSrc(resolved) : null
+      const safe = resolved
+        ? resolveMediaPlaybackSrc(resolved)
+        : fallbackUrl
+          ? resolveMediaPlaybackSrc(fallbackUrl)
+          : null
       setSrc((current) => (current === safe ? current : safe))
     })
 

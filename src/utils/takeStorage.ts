@@ -470,7 +470,10 @@ export async function resolveTakePlaybackUrl(
     return fallbackUrl
   }
 
-  return (await resolveNativeVideoPlaybackSrc(filePath, fallbackUrl)) ?? fallbackUrl
+  const resolved = await resolveNativeVideoPlaybackSrc(filePath, fallbackUrl)
+  if (resolved) return resolved
+
+  return applyStrictPlaybackSrc(fallbackUrl)
 }
 
 const deleteTakeFileInFlight = new Map<string, Promise<void>>()

@@ -1,10 +1,5 @@
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
-import { routeNativeOutputToSpeaker } from '../plugins/audioSession'
 import { prepareInlineMediaElement, safePlayMedia } from './mediaPlayback'
-import {
-  registerPlaybackKeepAlive,
-  unregisterPlaybackKeepAlive,
-} from './playbackKeepAlive'
 import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from './playbackAudioContext'
 import { routeTakePlaybackToSpeaker } from './takePlaybackSpeaker'
 
@@ -30,7 +25,6 @@ export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
   primePlaybackAudioContextSync()
-  await routeNativeOutputToSpeaker()
 
   for (const element of media) {
     if (!element) continue
@@ -49,30 +43,16 @@ export function primeTakePlaybackAudioSync(
 }
 
 export async function releaseTakePlaybackAudio(): Promise<void> {
-  unregisterPlaybackKeepAlive()
+  // Speaker routing is handled in AppDelegate — nothing to release here.
 }
 
 export async function playTakeMedia(media: HTMLMediaElement): Promise<boolean> {
   await primeTakePlaybackAudio(media)
-  registerPlaybackKeepAlive(media)
-  const started = await safePlayMedia(media)
-  if (!started) {
-    unregisterPlaybackKeepAlive(media)
-  }
-  return started
+  return safePlayMedia(media)
 }
 
 export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {
   if (media.length === 0) return []
   await primeTakePlaybackAudio(...media)
-  for (const element of media) {
-    registerPlaybackKeepAlive(element)
-  }
-  const results = await Promise.all(media.map((element) => safePlayMedia(element)))
-  media.forEach((element, index) => {
-    if (!results[index]) {
-      unregisterPlaybackKeepAlive(element)
-    }
-  })
-  return results
+  return Promise.all(media.map((element) => safePlayMedia(element)))
 }
