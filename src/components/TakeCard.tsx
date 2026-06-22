@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronUp, Clapperboard, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
+import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
 import type { Take, TakeUpdate } from '../types'
 import { pinButtonBubbleProps } from '../utils/eventBubbling'
 
@@ -110,9 +111,11 @@ function TakeCard({
 
     event.stopPropagation()
     if (selectionMode) {
+      triggerLightHaptic()
       onToggleSelect?.()
       return
     }
+    triggerLightHaptic()
     onOpenTake?.()
   }
 
@@ -122,9 +125,11 @@ function TakeCard({
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       if (selectionMode) {
+        triggerLightHaptic()
         onToggleSelect?.()
         return
       }
+      triggerLightHaptic()
       onOpenTake?.()
     }
   }
@@ -157,7 +162,7 @@ function TakeCard({
 
   return (
     <div
-      className={`group flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${cardRingClass}`}
+      className={`group interactive-native flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${cardRingClass}`}
     >
       <div className="relative aspect-video bg-stone-900">
         {thumbnailVideo ? (
@@ -226,11 +231,12 @@ function TakeCard({
             onTouchEnd={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
+              triggerMediumHaptic()
               if (window.confirm(`Delete "${take.name}"? This cannot be undone.`)) {
                 onDelete()
               }
             }}
-            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+            className={`interactive-native absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500`}
             aria-label={`Delete ${take.name}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -323,9 +329,10 @@ function TakeCard({
                 onTouchEnd={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation()
+                  triggerLightHaptic()
                   onPinBenchmark()
                 }}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
+                className={`interactive-native flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
                   isBenchmark
                     ? 'border-amber-300 bg-amber-100 text-amber-800'
                     : 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100'
@@ -341,9 +348,10 @@ function TakeCard({
                 onTouchEnd={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation()
+                  triggerLightHaptic()
                   onPinChallenger()
                 }}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
+                className={`interactive-native flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
                   isChallenger
                     ? 'border-sky-300 bg-sky-100 text-sky-800'
                     : 'border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100'
@@ -359,9 +367,10 @@ function TakeCard({
                   {...pinButtonBubbleProps()}
                   onClick={(e) => {
                     e.stopPropagation()
+                    triggerMediumHaptic()
                     onExport()
                   }}
-                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
+                  className="interactive-native flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
                   aria-label={`Save ${take.name} to Photos`}
                 >
                   <Download className="h-3.5 w-3.5" />

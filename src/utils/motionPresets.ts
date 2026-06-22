@@ -72,8 +72,13 @@ export const iosSheetPremium = {
 export const iosSheetPremiumDurationMs = Math.round(iosSheetPremium.duration * 1000)
 
 export const iosSheetBackdrop = {
-  duration: 0.28,
-  ease: [0.32, 0.72, 0, 1] as [number, number, number, number],
+  duration: 0.3,
+  ease: 'easeOut' as const,
+}
+
+export const nativeGlideEase = {
+  duration: 0.3,
+  ease: 'easeOut' as const,
 }
 
 export const motionTap = { scale: 0.96 }

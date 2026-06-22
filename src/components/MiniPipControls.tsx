@@ -1,4 +1,6 @@
 import { stopEventBubble } from '../utils/eventBubbling'
+import { triggerLightHaptic } from '../utils/haptics'
+import { NATIVE_SQUISH } from '../utils/interactiveUx'
 import { Pause, Play, Volume2 } from 'lucide-react'
 import type { PointerEvent } from 'react'
 
@@ -22,8 +24,11 @@ export default function MiniPipControls({
         onPointerDown={stopEventBubble}
         onTouchStart={stopEventBubble}
         onTouchEnd={stopEventBubble}
-        onPointerUp={onPlayPauseClick}
-        className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white"
+        onPointerUp={(event) => {
+          triggerLightHaptic()
+          onPlayPauseClick(event)
+        }}
+        className={`flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white ${NATIVE_SQUISH}`}
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >
         {isPlaying ? (

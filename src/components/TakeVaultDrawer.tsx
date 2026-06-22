@@ -245,6 +245,7 @@ export default function TakeVaultDrawer({
                   type="button"
                   intensity="soft"
                   onClick={() => setSelectionMode(true)}
+                  haptic="light"
                   className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
                 >
                   Select
@@ -253,6 +254,7 @@ export default function TakeVaultDrawer({
                   type="button"
                   intensity="soft"
                   onClick={handleClearAll}
+                  haptic="medium"
                   className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
                   Clear All
@@ -264,6 +266,7 @@ export default function TakeVaultDrawer({
                 type="button"
                 intensity="soft"
                 onClick={exitSelectionMode}
+                haptic="light"
                 className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100"
               >
                 Cancel
@@ -273,6 +276,7 @@ export default function TakeVaultDrawer({
               type="button"
               intensity="icon"
               onClick={onClose}
+              haptic="light"
               className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
               aria-label="Close vault"
             >
@@ -325,6 +329,7 @@ export default function TakeVaultDrawer({
                         type="button"
                         intensity="soft"
                         onClick={toggleSelectAllFiltered}
+                        haptic="light"
                         className="shrink-0 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
                       >
                         {allFilteredSelected ? 'Deselect All' : 'Select All'}
@@ -402,6 +407,7 @@ export default function TakeVaultDrawer({
               intensity="soft"
               disabled={bulkSaving}
               onClick={handleBulkSave}
+              haptic="medium"
               className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-800 hover:bg-stone-100 disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
@@ -411,6 +417,7 @@ export default function TakeVaultDrawer({
               type="button"
               intensity="soft"
               onClick={handleBulkDelete}
+              haptic="medium"
               className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-100"
             >
               <Trash2 className="h-3.5 w-3.5" />

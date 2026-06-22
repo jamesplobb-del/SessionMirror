@@ -7,7 +7,9 @@ import {
   iosSheetPremium,
   iosSpringSheet,
   motionGpuLayer,
+  nativeGlideEase,
 } from '../../utils/motionPresets'
+import { nativeGlideIn, nativeGlideShown } from '../../utils/interactiveUx'
 import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
 
 function readSlideDistance(): number {
@@ -105,19 +107,24 @@ export default function AnimatedBottomSheet({
             aria-modal="true"
             aria-label={ariaLabel}
             style={{ ...motionGpuLayer, paddingBottom: 'env(safe-area-inset-bottom)' }}
-            initial={useScale ? { y: slideDistance, scale: 0.975 } : { y: slideDistance }}
-            animate={useScale ? { y: 0, scale: 1 } : { y: 0 }}
-            exit={useScale ? { y: slideDistance, scale: 0.985 } : { y: slideDistance }}
+            initial={useScale ? { opacity: 0, y: slideDistance, scale: 0.975 } : { opacity: 0, y: slideDistance }}
+            animate={useScale ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0 }}
+            exit={useScale ? { opacity: 0, y: slideDistance, scale: 0.985 } : { opacity: 0, y: slideDistance }}
             transition={sheetTransition}
             onAnimationComplete={handleSheetAnimationComplete}
           >
-            <div className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden">
+            <motion.div
+              className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden"
+              initial={nativeGlideIn}
+              animate={nativeGlideShown}
+              transition={nativeGlideEase}
+            >
               <div
                 className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-stone-300/90"
                 aria-hidden
               />
               {children}
-            </div>
+            </motion.div>
           </motion.div>
         </>
       )}

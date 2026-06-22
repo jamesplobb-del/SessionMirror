@@ -4,7 +4,9 @@ import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'r
 import { createPortal } from 'react-dom'
 import MetronomeIcon from './icons/MetronomeIcon'
 import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
-import { motionGpuLayer } from '../utils/motionPresets'
+import { motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
+import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
+import { triggerLightHaptic } from '../utils/haptics'
 
 interface SettingsBranchWheelProps {
   open: boolean
@@ -30,10 +32,7 @@ interface BranchItem {
   onSelect: () => void
 }
 
-const BRANCH_MOTION = {
-  duration: 0.2,
-  ease: [0.32, 0.72, 0, 1] as [number, number, number, number],
-}
+const BRANCH_MOTION = nativeGlideEase
 
 export default function SettingsBranchWheel({
   open,
@@ -215,18 +214,20 @@ export default function SettingsBranchWheel({
                     <motion.button
                       type="button"
                       role="menuitem"
-                      className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${
+                      className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${NATIVE_SQUISH} ${
                         item.active ? 'settings-branch-wheel__item--active' : ''
                       }`}
-                      initial={{ opacity: 0, scale: 0.85 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.85 }}
+                      initial={nativeGlideIn}
+                      animate={nativeGlideShown}
+                      exit={nativeGlideIn}
                       transition={{ ...BRANCH_MOTION, delay: index * 0.04 }}
                       style={motionGpuLayer}
                       aria-label={item.label}
                       aria-pressed={item.active}
-                      onClick={item.onSelect}
-                      whileTap={{ scale: 0.94 }}
+                      onClick={() => {
+                        triggerLightHaptic()
+                        item.onSelect()
+                      }}
                     >
                       <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
                         <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">

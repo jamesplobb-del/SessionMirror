@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { Camera, Mic, Square, AudioWaveform } from 'lucide-react'
+import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
 import type { RecordingMode } from '../types'
 
 const SWIPE_THRESHOLD_PX = 36
@@ -60,7 +61,7 @@ function ModeSlot({
       aria-label={ariaLabel}
       aria-pressed={isCenter}
       onClick={onActivate}
-      className={`record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
+      className={`interactive-native record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
         isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
       } ${isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
         isCenter && isRecording ? 'record-carousel-slot--recording' : ''
@@ -97,10 +98,12 @@ export default function RecordingModeCarousel({
   const handleSlotActivate = useCallback(
     (mode: RecordingMode) => {
       if (mode === value) {
+        triggerMediumHaptic()
         onToggleRecord()
         return
       }
       if (modeSwitchLocked) return
+      triggerLightHaptic()
       onChange(mode)
     },
     [modeSwitchLocked, onChange, onToggleRecord, value],
@@ -137,14 +140,17 @@ export default function RecordingModeCarousel({
       {value === 'audio' && !isRecording && onAutoSoundRecordingChange && (
         <button
           type="button"
-          className={`record-carousel-auto-btn pointer-events-auto ${autoSoundRecording ? 'record-carousel-auto-btn--active' : ''}`}
+          className={`interactive-native record-carousel-auto-btn pointer-events-auto ${autoSoundRecording ? 'record-carousel-auto-btn--active' : ''}`}
           aria-label={
             autoSoundRecording
               ? 'Turn off auto sound recording'
               : 'Turn on auto sound recording'
           }
           aria-pressed={autoSoundRecording}
-          onClick={() => onAutoSoundRecordingChange(!autoSoundRecording)}
+          onClick={() => {
+            triggerLightHaptic()
+            onAutoSoundRecordingChange(!autoSoundRecording)
+          }}
         >
           <AudioWaveform className="h-4 w-4" strokeWidth={2.25} />
         </button>

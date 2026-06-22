@@ -141,6 +141,8 @@ export default function ControlDeck({
           type="button"
           intensity="icon"
           onClick={onOpenVault}
+          haptic="light"
+          hapticFeedback={hapticFeedback}
           className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
@@ -157,7 +159,7 @@ export default function ControlDeck({
         <button
           type="button"
           ref={settingsButtonRef}
-          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors ${
+          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors interactive-native ${
             branchActive
               ? 'bg-white/25 text-white ring-1 ring-white/35'
               : 'bg-black/40 text-white/90 hover:bg-black/55'

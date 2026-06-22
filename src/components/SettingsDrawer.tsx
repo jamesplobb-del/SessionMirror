@@ -37,12 +37,14 @@ function SettingToggle({
   checked,
   onChange,
   disabled = false,
+  hapticFeedback = true,
 }: {
   label: string
   description: string
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
+  hapticFeedback?: boolean
 }) {
   return (
     <motion.label
@@ -61,6 +63,7 @@ function SettingToggle({
         disabled={disabled}
         onChange={onChange}
         ariaLabel={label}
+        hapticFeedback={hapticFeedback}
       />
     </motion.label>
   )
@@ -201,6 +204,7 @@ export default function SettingsDrawer({
           type="button"
           intensity="icon"
           onClick={onClose}
+          haptic="light"
           className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
           aria-label="Close settings"
         >

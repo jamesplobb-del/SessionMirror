@@ -49,6 +49,7 @@ export default function IOSSegmentedControl<T extends string>({
             aria-selected={active}
             intensity="soft"
             onClick={() => onChange(segment.id)}
+            haptic="light"
             className={`relative z-10 flex-1 ${buttonClass} ${
               active ? 'text-stone-900' : 'text-stone-500'
             }`}

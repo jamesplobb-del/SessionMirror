@@ -1,46 +1,41 @@
 import { Capacitor } from '@capacitor/core'
 
-/** Light tap — uses Capacitor Haptics on native, vibrate API on web. */
-export async function triggerSelectionHaptic(): Promise<void> {
+function runImpact(style: 'light' | 'medium'): void {
   if (Capacitor.isNativePlatform()) {
-    try {
-      const { Haptics, ImpactStyle } = await import('@capacitor/haptics')
-      await Haptics.impact({ style: ImpactStyle.Light })
-    } catch {
-      /* haptics unavailable */
-    }
+    void import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) =>
+      Haptics.impact({
+        style: style === 'medium' ? ImpactStyle.Medium : ImpactStyle.Light,
+      }),
+    )
     return
   }
 
-  navigator.vibrate?.(12)
+  navigator.vibrate?.(style === 'medium' ? 22 : 12)
+}
+
+/** Light tap — toggles, play, tabs, opening menus. */
+export function triggerLightHaptic(enabled = true): void {
+  if (!enabled) return
+  runImpact('light')
+}
+
+/** Medium pulse — record, delete, save, heavy commits. */
+export function triggerMediumHaptic(enabled = true): void {
+  if (!enabled) return
+  runImpact('medium')
+}
+
+/** @deprecated Use triggerLightHaptic */
+export async function triggerSelectionHaptic(): Promise<void> {
+  triggerLightHaptic()
 }
 
 /** Medium pulse when a long-press action fires (e.g. quick settings). */
 export async function triggerLongPressHaptic(): Promise<void> {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { Haptics, ImpactStyle } = await import('@capacitor/haptics')
-      await Haptics.impact({ style: ImpactStyle.Medium })
-    } catch {
-      /* haptics unavailable */
-    }
-    return
-  }
-
-  navigator.vibrate?.(22)
+  triggerMediumHaptic()
 }
 
 /** Slightly stronger pulse when drag begins. */
 export async function triggerDragStartHaptic(): Promise<void> {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { Haptics, ImpactStyle } = await import('@capacitor/haptics')
-      await Haptics.impact({ style: ImpactStyle.Medium })
-    } catch {
-      /* haptics unavailable */
-    }
-    return
-  }
-
-  navigator.vibrate?.(18)
+  triggerMediumHaptic()
 }

@@ -24,6 +24,7 @@ export default function StarRating({
             type="button"
             intensity="icon"
             onClick={() => onChange(value === rating ? 0 : value)}
+            haptic="light"
             className="rounded p-0.5 text-amber-400 hover:text-amber-500"
             aria-label={`${value} star${value === 1 ? '' : 's'}`}
             aria-pressed={filled}

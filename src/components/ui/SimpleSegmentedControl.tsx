@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { triggerLightHaptic } from '../../utils/haptics'
 
 export interface SimpleSegment<T extends string> {
   id: T
@@ -12,6 +13,7 @@ interface SimpleSegmentedControlProps<T extends string> {
   className?: string
   size?: 'sm' | 'md'
   ariaLabel?: string
+  hapticFeedback?: boolean
 }
 
 /** Lightweight segmented control — CSS only, no layout animations. */
@@ -22,6 +24,7 @@ export default function SimpleSegmentedControl<T extends string>({
   className = '',
   size = 'md',
   ariaLabel,
+  hapticFeedback = true,
 }: SimpleSegmentedControlProps<T>) {
   const padding = size === 'sm' ? 'p-0.5' : 'p-1'
   const buttonClass =
@@ -43,8 +46,11 @@ export default function SimpleSegmentedControl<T extends string>({
             type="button"
             role="tab"
             aria-selected={active}
-            onClick={() => onChange(segment.id)}
-            className={`flex-1 ${buttonClass} transition-colors duration-150 active:scale-[0.98] ${
+            onClick={() => {
+              triggerLightHaptic(hapticFeedback)
+              onChange(segment.id)
+            }}
+            className={`interactive-native flex-1 ${buttonClass} transition-colors duration-150 ${
               active
                 ? 'bg-white text-stone-900 shadow-sm ring-1 ring-stone-200/80'
                 : 'text-stone-500 hover:text-stone-700'

@@ -12,6 +12,7 @@ import {
   type RefObject,
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
+import { triggerLightHaptic } from '../utils/haptics'
 import { usePinchResize } from '../hooks/usePinchResize'
 import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
 import {
@@ -58,9 +59,10 @@ function MetronomeControlButton({
       onPointerUp={(event) => {
         event.stopPropagation()
         if (event.button !== 0) return
+        triggerLightHaptic()
         onPress()
       }}
-      className={`metronome-widget__btn pointer-events-auto ${active ? 'metronome-widget__btn--active' : ''} ${className}`}
+      className={`metronome-widget__btn pointer-events-auto interactive-native ${active ? 'metronome-widget__btn--active' : ''} ${className}`}
     >
       {children}
     </button>

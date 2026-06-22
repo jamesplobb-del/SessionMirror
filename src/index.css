@@ -78,6 +78,22 @@ select {
   pointer-events: none;
 }
 
+/* Native tactile press — use on raw buttons outside Pressable. */
+.interactive-native {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: all 200ms ease-out;
+}
+
+.interactive-native:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+button.interactive-native:disabled,
+.interactive-native:disabled {
+  transform: none;
+}
+
 .review-overlay video {
   -webkit-touch-callout: default;
 }
