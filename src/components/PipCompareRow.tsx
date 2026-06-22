@@ -62,10 +62,10 @@ function PipDragGhost({
       aria-hidden
     >
       <div
-        className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-xl border bg-stone-900 shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
+        className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-2xl border bg-black/40 shadow-[0_8px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl ring-2 ${
           overDelete
             ? 'border-red-400/70 ring-red-400/50'
-            : 'border-sky-400/60 ring-sky-400/40'
+            : 'border-amber-500/50 ring-amber-500/30'
         }`}
       >
         {poster ? (
@@ -79,8 +79,8 @@ function PipDragGhost({
           <div className="h-full w-full bg-stone-800" />
         )}
         <span
-          className={`absolute bottom-1 left-1 rounded px-1 py-px text-[7px] font-semibold uppercase tracking-wide text-white ${
-            overDelete ? 'bg-red-500/90' : 'bg-sky-500/90'
+          className={`absolute bottom-1 left-1 rounded-full px-1.5 py-px text-[7px] font-bold uppercase tracking-widest text-gray-100 ${
+            overDelete ? 'bg-red-500/90' : 'bg-amber-500/90'
           }`}
         >
           {overDelete ? 'Delete' : 'Pin'}

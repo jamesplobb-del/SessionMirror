@@ -14,7 +14,7 @@ export default function GallerySortStrip({
 }: GallerySortStripProps) {
   return (
     <div className="mb-4 flex items-center justify-between">
-      <p className="text-xs text-stone-500">{takeCount} take{takeCount === 1 ? '' : 's'}</p>
+      <p className="text-xs text-gray-500">{takeCount} take{takeCount === 1 ? '' : 's'}</p>
       <SimpleSegmentedControl
         size="sm"
         ariaLabel="Sort takes"

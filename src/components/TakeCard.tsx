@@ -145,19 +145,19 @@ function TakeCard({
 
   const cardRingClass = selectionMode
     ? selected
-      ? 'border-sky-500 ring-2 ring-sky-400'
-      : 'border-stone-200'
+      ? 'border-amber-500 ring-2 ring-amber-500/40'
+      : 'border-white/10'
     : isBenchmark
-      ? 'border-amber-300 ring-1 ring-amber-200'
+      ? 'border-amber-500/50 ring-1 ring-amber-500/30'
       : isChallenger
-        ? 'border-sky-300 ring-1 ring-sky-200'
-        : 'border-stone-200'
+        ? 'border-white/15 ring-1 ring-white/10'
+        : 'border-white/10'
 
   const showThumbnailImage = Boolean(take.thumbnailUrl) && !thumbnailBroken
 
   return (
     <div
-      className={`group flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${cardRingClass}`}
+      className={`group flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-[#121212] transition hover:border-white/15 ${cardRingClass}`}
     >
       <div className="relative aspect-video bg-stone-900">
         {thumbnailVideo ? (
@@ -196,8 +196,8 @@ function TakeCard({
           <div
             className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 shadow-sm ${
               selected
-                ? 'border-sky-500 bg-sky-500 text-white'
-                : 'border-white/90 bg-black/35 text-transparent'
+                ? 'border-amber-500 bg-amber-500/90 text-gray-100'
+                : 'border-white/20 bg-black/40 text-transparent'
             }`}
             aria-hidden
           >
@@ -207,12 +207,12 @@ function TakeCard({
         {!selectionMode && (isBenchmark || isChallenger) && (
           <div className="absolute left-2 top-2 flex gap-1">
             {isBenchmark && (
-              <span className="rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-gray-100">
                 Best Take
               </span>
             )}
             {isChallenger && (
-              <span className="rounded-md bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="rounded-full border border-white/15 bg-black/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-gray-200 backdrop-blur-md">
                 {take.name}
               </span>
             )}
@@ -230,7 +230,7 @@ function TakeCard({
                 onDelete()
               }
             }}
-            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/50 text-gray-500 backdrop-blur-md transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
             aria-label={`Delete ${take.name}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -238,7 +238,7 @@ function TakeCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-3 p-4">
+      <div className="flex flex-col gap-4 p-6">
         <div>
           {isEditingName ? (
             <input
@@ -254,19 +254,19 @@ function TakeCard({
                   setIsEditingName(false)
                 }
               }}
-              className="w-full rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-sm font-medium text-stone-900 outline-none ring-sky-400 focus:ring-2"
+              className="w-full rounded-xl border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm font-medium text-gray-100 outline-none ring-amber-500/40 focus:ring-2"
             />
           ) : (
             <button
               type="button"
               onClick={() => setIsEditingName(true)}
-              className="w-full truncate text-left text-sm font-semibold text-stone-900 transition hover:text-sky-600"
+              className="w-full truncate text-left text-sm font-semibold text-gray-100 transition hover:text-amber-400"
               title="Click to rename"
             >
               {take.name}
             </button>
           )}
-          <p className="mt-0.5 text-[11px] text-stone-400">
+          <p className="mt-0.5 text-[11px] text-gray-500">
             {new Date(take.timestamp).toLocaleString([], {
               month: 'short',
               day: 'numeric',
@@ -282,7 +282,7 @@ function TakeCard({
           <button
             type="button"
             onClick={() => setNotesExpanded((prev) => !prev)}
-            className="flex w-full items-center gap-1.5 text-xs font-medium text-stone-500 transition hover:text-stone-700"
+            className="flex w-full items-center gap-1.5 text-xs font-medium text-gray-500 transition hover:text-gray-300"
           >
             <StickyNote className="h-3.5 w-3.5" />
             Notes
@@ -308,7 +308,7 @@ function TakeCard({
               }}
               placeholder="Equipment, register feel, adjustments..."
               rows={3}
-              className="mt-2 w-full resize-none rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-700 outline-none ring-sky-400 placeholder:text-stone-400 focus:ring-2"
+              className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-[#1a1a1a] px-4 py-3 text-xs leading-relaxed text-gray-300 outline-none ring-amber-500/40 placeholder:text-gray-600 focus:ring-2"
             />
           )}
         </div>
@@ -325,10 +325,10 @@ function TakeCard({
                   e.stopPropagation()
                   onPinBenchmark()
                 }}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition ${
                   isBenchmark
-                    ? 'border-amber-300 bg-amber-100 text-amber-800'
-                    : 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100'
+                    ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
+                    : 'border-amber-500/25 bg-amber-500/10 text-amber-400 hover:border-amber-500/40 hover:bg-amber-500/15'
                 }`}
               >
                 <Pin className="h-3.5 w-3.5" />
@@ -343,10 +343,10 @@ function TakeCard({
                   e.stopPropagation()
                   onPinChallenger()
                 }}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition ${
                   isChallenger
-                    ? 'border-sky-300 bg-sky-100 text-sky-800'
-                    : 'border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100'
+                    ? 'border-white/20 bg-white/10 text-gray-100'
+                    : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20 hover:bg-white/10'
                 }`}
               >
                 <Pin className="h-3.5 w-3.5" />
@@ -361,7 +361,7 @@ function TakeCard({
                     e.stopPropagation()
                     onExport()
                   }}
-                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
+                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-full border border-white/10 bg-[#1a1a1a] px-3 py-2.5 text-xs font-medium text-gray-400 transition hover:border-white/15 hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
                   aria-label={`Save ${take.name} to Photos`}
                 >
                   <Download className="h-3.5 w-3.5" />

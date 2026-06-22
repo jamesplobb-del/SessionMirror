@@ -46,12 +46,12 @@ export default function ProjectSessionBar({
   return (
     <div className="mb-4 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sessions</p>
+        <p className="pro-studio-section-header">Sessions</p>
         <Pressable
           type="button"
           intensity="soft"
           onClick={openNamingForm}
-          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:border-stone-300 hover:bg-stone-50"
+          className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#1a1a1a] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:border-amber-500/30 hover:bg-white/5"
         >
           <FolderPlus className="h-3.5 w-3.5" />
           New Session
@@ -60,13 +60,13 @@ export default function ProjectSessionBar({
 
       <AnimatedExpand open={isNamingSession}>
         <form
-          className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3"
+          className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#1a1a1a] p-4"
           onSubmit={(event) => {
             event.preventDefault()
             submitNaming()
           }}
         >
-          <label className="text-xs font-medium text-stone-600" htmlFor="new-session-name">
+          <label className="text-xs font-medium text-gray-500" htmlFor="new-session-name">
             Session name
           </label>
           <input
@@ -75,7 +75,7 @@ export default function ProjectSessionBar({
             type="text"
             value={sessionNameDraft}
             onChange={(event) => setSessionNameDraft(event.target.value)}
-            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none ring-sky-400 focus:ring-2"
+            className="rounded-xl border border-white/10 bg-[#121212] px-3 py-2 text-sm text-gray-100 outline-none ring-amber-500/40 focus:ring-2"
             maxLength={48}
           />
           <div className="flex justify-end gap-2">
@@ -83,14 +83,14 @@ export default function ProjectSessionBar({
               type="button"
               intensity="soft"
               onClick={cancelNaming}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100"
+              className="rounded-full px-3 py-1.5 text-xs font-medium text-gray-500 transition hover:bg-white/5"
             >
               Cancel
             </Pressable>
             <Pressable
               type="submit"
               intensity="soft"
-              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+              className="rounded-full bg-amber-500/90 px-3 py-1.5 text-xs font-medium text-gray-100 transition hover:bg-amber-500 active:scale-[0.98]"
             >
               Create
             </Pressable>
@@ -107,10 +107,10 @@ export default function ProjectSessionBar({
               type="button"
               intensity="soft"
               onClick={() => onSelectProject(project.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                 active
-                  ? 'border-sky-300 bg-sky-50 text-sky-800'
-                  : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-stone-100'
+                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+                  : 'border-white/10 bg-[#1a1a1a] text-gray-500 hover:border-white/15 hover:bg-white/5'
               }`}
             >
               {project.name}

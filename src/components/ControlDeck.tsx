@@ -141,13 +141,13 @@ export default function ControlDeck({
           type="button"
           intensity="icon"
           onClick={onOpenVault}
-          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/55"
+          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-gray-100 backdrop-blur-xl transition hover:border-amber-500/30 hover:bg-black/50 active:scale-95"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
           <span className="relative flex h-full w-full items-center justify-center">
             <FolderOpen className="h-5 w-5" />
             {takeCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[9px] font-semibold text-stone-900">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-gray-100">
                 {takeCount > 99 ? '99+' : takeCount}
               </span>
             )}
@@ -157,10 +157,10 @@ export default function ControlDeck({
         <button
           type="button"
           ref={settingsButtonRef}
-          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors ${
+          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur-xl transition active:scale-95 ${
             branchActive
-              ? 'bg-white/25 text-white ring-1 ring-white/35'
-              : 'bg-black/40 text-white/90 hover:bg-black/55'
+              ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+              : 'border-white/10 bg-black/40 text-gray-100 hover:border-amber-500/30 hover:bg-black/50'
           }`}
           aria-label={
             branchActive ? 'Close quick settings' : 'Open settings. Long press for quick settings.'
@@ -239,26 +239,26 @@ export default function ControlDeck({
           </div>
 
           {autoSoundListening && !isRecording && !showDeleteDrop && (
-            <p className="auto-sound-hint auto-sound-hint--listening max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-sky-200/95">
+            <p className="auto-sound-hint auto-sound-hint--listening max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-amber-200/90">
               Listening for your playing — a take starts automatically when you begin
             </p>
           )}
 
           {handsFreeRecording && isRecording && !showDeleteDrop && (
-            <p className="auto-sound-hint auto-sound-hint--recording max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/88">
+            <p className="auto-sound-hint auto-sound-hint--recording max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-gray-300">
               Recording hands-free — playback starts when you stop playing
             </p>
           )}
 
           {handsFreePlaybackPending && !isRecording && !showDeleteDrop && (
-            <p className="auto-sound-hint auto-sound-hint--playback max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-emerald-200/90">
+            <p className="auto-sound-hint auto-sound-hint--playback max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-amber-300/90">
               Playing your take back…
             </p>
           )}
 
           {isRecording && !handsFreeRecording && (
             <span
-              className="text-xs font-medium tabular-nums tracking-wide text-white/90"
+              className="text-xs font-medium tabular-nums tracking-wide text-gray-100"
               aria-live="polite"
             >
               {formatElapsed(elapsed)}

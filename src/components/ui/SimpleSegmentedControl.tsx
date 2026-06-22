@@ -26,12 +26,12 @@ export default function SimpleSegmentedControl<T extends string>({
   const padding = size === 'sm' ? 'p-0.5' : 'p-1'
   const buttonClass =
     size === 'sm'
-      ? 'rounded-md px-2.5 py-1 text-xs font-medium'
-      : 'rounded-lg px-3 py-2 text-sm font-medium'
+      ? 'rounded-full px-2.5 py-1 text-xs font-medium'
+      : 'rounded-full px-3 py-2 text-sm font-medium'
 
   return (
     <div
-      className={`flex rounded-xl bg-stone-100 ${padding} ${className}`}
+      className={`flex rounded-full bg-[#1a1a1a] ${padding} ${className}`}
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -46,8 +46,8 @@ export default function SimpleSegmentedControl<T extends string>({
             onClick={() => onChange(segment.id)}
             className={`flex-1 ${buttonClass} transition-colors duration-150 active:scale-[0.98] ${
               active
-                ? 'bg-white text-stone-900 shadow-sm ring-1 ring-stone-200/80'
-                : 'text-stone-500 hover:text-stone-700'
+                ? 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/25'
+                : 'text-gray-500 hover:text-gray-300'
             }`}
           >
             {segment.label}
