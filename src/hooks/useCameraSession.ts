@@ -686,9 +686,6 @@ export function useCameraSession({
       const takeId = crypto.randomUUID()
       const mode = recordingModeRef.current
       recordingOrientationRef.current = readRecordingOrientation()
-      // #region agent log
-      fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'useCameraSession.ts:startRecording',message:'recording orientation captured',data:{recordingOrientation:recordingOrientationRef.current,hasSecondaryPreview:Boolean(secondaryPreviewRef?.current)},timestamp:Date.now(),hypothesisId:'G,I'})}).catch(()=>{});
-      // #endregion
       const mimeType = getRecorderMimeTypeForMode(mode)
       recorderMimeTypeRef.current = mimeType
       chunksRef.current = []

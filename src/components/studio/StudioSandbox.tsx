@@ -37,6 +37,7 @@ function TrackBox({
   onToggleMute,
   onKeepTake,
   onRedoTake,
+  onToggleReviewPlayback,
   onEnded,
 }: {
   track: StudioTrack
@@ -53,6 +54,7 @@ function TrackBox({
   onToggleMute: () => void
   onKeepTake: () => void
   onRedoTake: () => void
+  onToggleReviewPlayback: () => void
   onEnded: () => void
 }) {
   const videoElRef = useRef<HTMLVideoElement | null>(null)
@@ -83,7 +85,7 @@ function TrackBox({
       if (el.src !== safeSrc) {
         el.load()
       }
-      if (track.status !== 'PLAYING') {
+      if (track.status !== 'PLAYING' && !showPostRecordReview) {
         el.pause()
         const showPosterFrame = () => {
           try {
@@ -104,7 +106,7 @@ function TrackBox({
     if (el.srcObject) el.srcObject = null
     el.removeAttribute('src')
     el.load()
-  }, [track.stream, track.recordedUrl, track.status, suppressLivePreview])
+  }, [track.stream, track.recordedUrl, track.status, suppressLivePreview, showPostRecordReview])
 
   useEffect(() => {
     const el = videoElRef.current
@@ -149,7 +151,7 @@ function TrackBox({
     >
       <video
         ref={videoElRef}
-        muted
+        muted={showPostRecordReview ? track.isMuted || track.status !== 'PLAYING' : true}
         {...iosBulletproofVideoProps}
         className={`studio-track-video absolute inset-0 h-full w-full object-cover ${
           isRecording || hasTake ? '-scale-x-100' : ''
@@ -173,19 +175,42 @@ function TrackBox({
       )}
 
       {showPostRecordReview && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Take saved</p>
-          <div className="flex gap-2">
+        <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col gap-2 bg-gradient-to-t from-black/90 via-black/70 to-transparent px-3 pb-3 pt-8">
+          <p className="text-center text-[10px] font-semibold uppercase tracking-wider text-white/60">
+            Review take
+          </p>
+          <div className="flex items-center justify-center gap-2">
             <button
               type="button"
-              onClick={onKeepTake}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleReviewPlayback()
+              }}
+              className={`${CIRCLE_BTN} h-10 w-10`}
+              aria-label={track.status === 'PLAYING' ? 'Pause review' : 'Play review'}
+            >
+              {track.status === 'PLAYING' ? (
+                <Square className="h-4 w-4 fill-white" />
+              ) : (
+                <Play className="h-4 w-4 fill-white" style={{ marginLeft: 1 }} />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onKeepTake()
+              }}
               className="rounded-full bg-emerald-500/90 px-4 py-2 text-xs font-bold text-white active:scale-95"
             >
               Keep
             </button>
             <button
               type="button"
-              onClick={onRedoTake}
+              onClick={(e) => {
+                e.stopPropagation()
+                onRedoTake()
+              }}
               className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-bold text-white active:scale-95"
             >
               Re-record
@@ -503,6 +528,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     setTrackVolume,
     keepRecordedTake,
     redoRecordedTake,
+    togglePostRecordReviewPlayback,
     deselectTrack,
   } = useMultiTrackStudio()
 
@@ -616,6 +642,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
               onToggleMute={() => toggleTrackMute(track.id)}
               onKeepTake={() => keepRecordedTake(track.id)}
               onRedoTake={() => redoRecordedTake(track.id)}
+              onToggleReviewPlayback={() => togglePostRecordReviewPlayback(track.id)}
               onEnded={() => pauseTrack(track.id)}
             />
           ))}

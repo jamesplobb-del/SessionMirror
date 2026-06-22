@@ -830,17 +830,112 @@ export function useMultiTrackStudio() {
   )
 
   const keepRecordedTake = useCallback((id: 1 | 2 | 3 | 4) => {
+    getVideoForTrack(id)?.pause()
+    void releaseTakePlaybackAudio()
+    setTracks((prev) =>
+      prev.map((t) =>
+        t.id === id && t.status === 'PLAYING' ? { ...t, status: 'IDLE' as TrackStatus } : t,
+      ),
+    )
     setPostRecordReviewId((current) => (current === id ? null : current))
-  }, [])
+  }, [getVideoForTrack])
+
+  const togglePostRecordReviewPlayback = useCallback(
+    (id: 1 | 2 | 3 | 4) => {
+      const track = tracksRef.current.find((t) => t.id === id)
+      const el = getVideoForTrack(id)
+      if (!track?.recordedUrl || !el) return
+
+      if (track.status === 'PLAYING') {
+        el.pause()
+        setTracks((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, status: 'IDLE' as TrackStatus } : t)),
+        )
+        return
+      }
+
+      primeRecordedVideo(el, track.recordedUrl)
+      routeTakePlaybackToSpeaker(el, track.volume, track.isMuted, { allowNativeDirect: true })
+      el.muted = track.isMuted
+      seekVideoTo(el, 0)
+      playTakeMediaFromUserGesture(el, {
+        onPlaying: () => {
+          setTracks((prev) =>
+            prev.map((t) => (t.id === id ? { ...t, status: 'PLAYING' as TrackStatus } : t)),
+          )
+        },
+      })
+    },
+    [getVideoForTrack],
+  )
+
+  const startPostRecordReviewPlayback = useCallback(
+    (id: 1 | 2 | 3 | 4) => {
+      const track = tracksRef.current.find((t) => t.id === id)
+      const el = getVideoForTrack(id)
+      if (!track?.recordedUrl || !el) return
+
+      primeRecordedVideo(el, track.recordedUrl)
+      routeTakePlaybackToSpeaker(el, track.volume, track.isMuted, { allowNativeDirect: true })
+
+      const beginPlayback = () => {
+        seekVideoTo(el, 0)
+        void playTakeMediaMuted(el).then((ok) => {
+          if (!ok) return
+          setTracks((prev) =>
+            prev.map((t) => (t.id === id ? { ...t, status: 'PLAYING' as TrackStatus } : t)),
+          )
+        })
+      }
+
+      if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        beginPlayback()
+        return
+      }
+
+      el.addEventListener('loadeddata', beginPlayback, { once: true })
+    },
+    [getVideoForTrack],
+  )
+
+  useEffect(() => {
+    if (postRecordReviewId === null) return
+
+    const trackId = postRecordReviewId
+    let cancelled = false
+    let retryTimer: number | null = null
+
+    const attempt = () => {
+      if (cancelled) return
+      const track = tracksRef.current.find((t) => t.id === trackId)
+      if (!track?.recordedUrl || !getVideoForTrack(trackId)) {
+        retryTimer = window.setTimeout(attempt, 50)
+        return
+      }
+      startPostRecordReviewPlayback(trackId)
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      requestAnimationFrame(attempt)
+    })
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frameId)
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
+    }
+  }, [postRecordReviewId, getVideoForTrack, startPostRecordReviewPlayback])
 
   const redoRecordedTake = useCallback(
     (id: 1 | 2 | 3 | 4) => {
+      getVideoForTrack(id)?.pause()
+      void releaseTakePlaybackAudio()
       setPostRecordReviewId(null)
       clearTrackInternal(id)
       setSelectedTrackId(id)
       void selectTrack(id)
     },
-    [clearTrackInternal, selectTrack],
+    [clearTrackInternal, getVideoForTrack, selectTrack],
   )
 
   const clearTrack = useCallback(
@@ -933,6 +1028,7 @@ export function useMultiTrackStudio() {
     setTrackVolume,
     keepRecordedTake,
     redoRecordedTake,
+    togglePostRecordReviewPlayback,
     deselectTrack,
   }
 }

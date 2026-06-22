@@ -112,12 +112,6 @@ function LiveCameraBackground({
       ? 'camera-background camera-background--visually-suppressed'
       : 'camera-background'
 
-  // #region agent log
-  if (isEmbedded || visuallySuppressed) {
-    fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'LiveCameraBackground.tsx:render',message:'camera preview variant',data:{variant,isEmbedded,visuallySuppressed,isRecording,recordingMode},timestamp:Date.now(),hypothesisId:'H,I'})}).catch(()=>{});
-  }
-  // #endregion
-
   return (
     <div className={shellClass} aria-hidden={!isEmbedded && !visuallySuppressed}>
       <video
