@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { triggerLongPressHaptic } from '../utils/haptics'
 
 interface UseLongPressOptions {
   onClick: () => void
   onLongPress: () => void
   delay?: number
   disabled?: boolean
+  hapticFeedback?: boolean
   targetRef?: RefObject<HTMLElement | null>
 }
 
@@ -17,6 +19,7 @@ export function useLongPress({
   onLongPress,
   delay = 450,
   disabled = false,
+  hapticFeedback = true,
   targetRef,
 }: UseLongPressOptions) {
   const timerRef = useRef<number | null>(null)
@@ -86,10 +89,13 @@ export function useLongPress({
 
         longPressTriggeredRef.current = true
         clearTextSelection()
+        if (hapticFeedback) {
+          void triggerLongPressHaptic()
+        }
         onLongPress()
       }, delay)
     },
-    [clearTimer, delay, disabled, onLongPress],
+    [clearTimer, delay, disabled, hapticFeedback, onLongPress],
   )
 
   const onPointerUp = useCallback(

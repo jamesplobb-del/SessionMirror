@@ -315,6 +315,28 @@ body.settings-branch-open * {
   opacity: 1;
 }
 
+.metronome-widget__drag-handle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  width: 2.75rem;
+  height: 0.625rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  cursor: grab;
+  touch-action: none;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.metronome-widget__drag-handle:active {
+  cursor: grabbing;
+}
+
+.metronome-widget-draggable--playing .metronome-widget {
+  padding-top: 0.875rem;
+}
+
 .metronome-widget__row {
   position: relative;
   z-index: 1;

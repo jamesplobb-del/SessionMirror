@@ -36,6 +36,7 @@ interface ControlDeckProps {
   onAudioEnhancerChange?: (enabled: boolean) => void
   settingsBranchDisabled?: boolean
   onBranchOpenChange?: (open: boolean) => void
+  hapticFeedback?: boolean
 }
 
 function formatElapsed(seconds: number): string {
@@ -73,6 +74,7 @@ export default function ControlDeck({
   onAudioEnhancerChange,
   settingsBranchDisabled = false,
   onBranchOpenChange,
+  hapticFeedback = true,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
@@ -110,6 +112,7 @@ export default function ControlDeck({
     },
     onLongPress: () => openBranch(),
     disabled: settingsBranchDisabled,
+    hapticFeedback,
     targetRef: settingsButtonRef,
   })
 

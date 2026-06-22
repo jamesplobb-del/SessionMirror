@@ -832,9 +832,11 @@ function StandardApp({
 
     const recoverHandsFreeMonitor = () => {
       if (document.visibilityState !== 'visible') return
-      void refreshCameraSession().finally(() => {
-        restartHandsFreeMonitor()
-      })
+      window.setTimeout(() => {
+        void refreshCameraSession().finally(() => {
+          restartHandsFreeMonitor()
+        })
+      }, 800)
     }
 
     if (Capacitor.isNativePlatform()) {
@@ -1011,10 +1013,15 @@ function StandardApp({
     ],
   )
 
+  const pitchTrackerActive =
+    pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled
+
   const handlePitchTrackerSettingChange = useCallback(
     (enabled: boolean) => {
       if (!enabled) {
         setShowPitch(false)
+      } else {
+        pitchUserDismissedRef.current = false
       }
       if (recordingModeRef.current === 'audio') {
         schedulePitchTrackerCommit(enabled)
@@ -1129,24 +1136,44 @@ function StandardApp({
   }, [benchmarkId, challengerId])
 
   useEffect(() => {
+    let debounceTimer: number | null = null
+    let youtubeTimer: number | null = null
+
+    const runRecovery = () => {
+      if (debounceTimer !== null) {
+        window.clearTimeout(debounceTimer)
+      }
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null
+        refreshStaleTakePlaybackUrls()
+        if (youtubeTimer !== null) {
+          window.clearTimeout(youtubeTimer)
+        }
+        youtubeTimer = window.setTimeout(() => {
+          youtubeTimer = null
+          resumeYoutubeReference()
+        }, 700)
+      }, 400)
+    }
+
     if (!Capacitor.isNativePlatform()) {
       const onVisible = () => {
         if (document.visibilityState === 'visible') {
-          refreshStaleTakePlaybackUrls()
-          resumeYoutubeReference()
+          runRecovery()
         }
       }
       document.addEventListener('visibilitychange', onVisible)
-      return () => document.removeEventListener('visibilitychange', onVisible)
+      return () => {
+        document.removeEventListener('visibilitychange', onVisible)
+        if (debounceTimer !== null) window.clearTimeout(debounceTimer)
+        if (youtubeTimer !== null) window.clearTimeout(youtubeTimer)
+      }
     }
 
     let removeListener: (() => void) | undefined
     void import('@capacitor/app').then(({ App }) => {
       void App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) {
-          refreshStaleTakePlaybackUrls()
-          resumeYoutubeReference()
-        }
+        if (isActive) runRecovery()
       }).then((sub) => {
         removeListener = () => {
           void sub.remove()
@@ -1154,24 +1181,17 @@ function StandardApp({
       })
     })
 
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        refreshStaleTakePlaybackUrls()
-        resumeYoutubeReference()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisible)
-
     return () => {
       removeListener?.()
-      document.removeEventListener('visibilitychange', onVisible)
+      if (debounceTimer !== null) window.clearTimeout(debounceTimer)
+      if (youtubeTimer !== null) window.clearTimeout(youtubeTimer)
     }
   }, [refreshStaleTakePlaybackUrls, resumeYoutubeReference])
 
   const mainAudioPitchSource = useMemo(() => {
     let next: MainAudioPitchSource | null = null
 
-    if (settings.pitchTrackerEnabled && recordingMode === 'audio') {
+    if (pitchTrackerActive && recordingMode === 'audio') {
       if (isRecording && ready) {
           next = {
             mediaRef: liveMicPlaceholderRef,
@@ -1256,7 +1276,7 @@ function StandardApp({
     mainAudioPitchSourceCacheRef.current = { signature, value: next }
     return next
   }, [
-    settings.pitchTrackerEnabled,
+    pitchTrackerActive,
     recordingMode,
     autoPlaybackTakeId,
     autoPlaybackTake,
@@ -1270,7 +1290,7 @@ function StandardApp({
   ])
 
   const mainVideoPitchSource = useMemo(() => {
-    if (!settings.pitchTrackerEnabled || recordingMode !== 'video') return null
+    if (!pitchTrackerActive || recordingMode !== 'video') return null
     if (!ready && !isRecording) return null
 
     return {
@@ -1279,7 +1299,7 @@ function StandardApp({
       mediaKey: 'main-video-live',
     }
   }, [
-    settings.pitchTrackerEnabled,
+    pitchTrackerActive,
     recordingMode,
     ready,
     isRecording,
@@ -1324,7 +1344,7 @@ function StandardApp({
   }, [pitchContextKey, recordingMode])
 
   useEffect(() => {
-    if (!settings.pitchTrackerEnabled) {
+    if (!pitchTrackerActive) {
       setShowPitch(false)
       pitchUserDismissedRef.current = false
       return
@@ -1342,7 +1362,7 @@ function StandardApp({
     if (!pitchUserDismissedRef.current) {
       setShowPitch(true)
     }
-  }, [settings.pitchTrackerEnabled, showMainPitchWidget, pitchHudSuspended])
+  }, [pitchTrackerActive, showMainPitchWidget, pitchHudSuspended])
 
   const handleClosePitch = useCallback(() => {
     pitchUserDismissedRef.current = true
@@ -1960,6 +1980,7 @@ function StandardApp({
             onAudioEnhancerChange={handleAudioEnhancerSettingChange}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
             onBranchOpenChange={handleQuickSettingsOpenChange}
+            hapticFeedback={settings.hapticFeedback}
           />
         </div>
       </motion.div>

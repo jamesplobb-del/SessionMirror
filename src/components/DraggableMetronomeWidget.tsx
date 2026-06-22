@@ -1,4 +1,4 @@
-import { motion, useMotionValue } from 'framer-motion'
+import { motion, useDragControls, useMotionValue } from 'framer-motion'
 import { Pause, Play } from 'lucide-react'
 import {
   useCallback,
@@ -13,7 +13,7 @@ import {
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
 import { usePinchResize } from '../hooks/usePinchResize'
-import { getFloatingWidgetTopCenter, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
+import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
 import {
   COMPOUND_METERS,
   MAX_BPM,
@@ -75,10 +75,11 @@ export default function DraggableMetronomeWidget({
 }: DraggableMetronomeWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const bpmInputId = useId()
+  const dragControls = useDragControls()
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
   const positionReadyRef = useRef(false)
-  const { bpm, meter, subdivision, playing, beatIndex, setBpm, setMeter, setSubdivision, togglePlay } =
+  const { bpm, meter, subdivision, playing, beatIndex, setBpm, setMeter, setSubdivision, togglePlay, stop } =
     useMetronome({
     isTakePlaying,
     muteDuringPlayback,
@@ -185,6 +186,26 @@ export default function DraggableMetronomeWidget({
     saveWidgetPosition(positionId, dragX.get(), dragY.get())
   }, [dragX, dragY, positionId])
 
+  const reclampPosition = useCallback(() => {
+    const bounds = boundaryRef.current
+    const el = widgetRef.current
+    if (!bounds || !el) return
+
+    const { x, y } = clampWidgetPosition(
+      bounds.clientWidth,
+      bounds.clientHeight,
+      el.offsetWidth,
+      el.offsetHeight,
+      dragX.get(),
+      dragY.get(),
+    )
+    dragX.set(x)
+    dragY.set(y)
+    if (positionReadyRef.current) {
+      persistPosition()
+    }
+  }, [boundaryRef, dragX, dragY, persistPosition])
+
   const persistSize = useCallback(() => {
     saveWidgetSize(positionId, widgetSize.width, widgetSize.height)
   }, [positionId, widgetSize.height, widgetSize.width])
@@ -197,10 +218,29 @@ export default function DraggableMetronomeWidget({
     wasPinchingRef.current = pinching
   }, [pinching, persistSize])
 
+  useEffect(() => {
+    const onResize = () => {
+      window.requestAnimationFrame(reclampPosition)
+    }
+    window.addEventListener('resize', onResize)
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        window.requestAnimationFrame(reclampPosition)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [reclampPosition])
+
   const handleShellPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       onPinchPointerUp(event)
-      if (pinching || editingBpm) return
+      if (pinching || editingBpm || playing) return
       if (event.button !== 0) return
 
       const now = performance.now()
@@ -212,7 +252,7 @@ export default function DraggableMetronomeWidget({
       }
       lastTapAtRef.current = now
     },
-    [editingBpm, onPinchPointerUp, pinching, positionId, resetSize],
+    [editingBpm, onPinchPointerUp, pinching, playing, positionId, resetSize],
   )
 
   const commitBpmDraft = useCallback(() => {
@@ -241,7 +281,7 @@ export default function DraggableMetronomeWidget({
 
   const onBpmPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (!bpmDragRef.current) return
+      if (!bpmDragRef.current || playing) return
       event.stopPropagation()
       const deltaY = event.clientY - bpmDragRef.current.startY
       if (Math.abs(deltaY) > 3) {
@@ -249,13 +289,16 @@ export default function DraggableMetronomeWidget({
       }
       setBpm(bpmDragRef.current.startBpm - deltaY * BPM_DRAG_SENSITIVITY)
     },
-    [setBpm],
+    [playing, setBpm],
   )
 
   const openBpmEditor = useCallback(() => {
+    if (playing) {
+      stop()
+    }
     setBpmDraft(String(bpm))
     setEditingBpm(true)
-  }, [bpm])
+  }, [bpm, playing, stop])
 
   const onBpmPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -314,10 +357,15 @@ export default function DraggableMetronomeWidget({
     </MetronomeControlButton>
   )
 
+  const canShellDrag = !pinching && !editingBpm
+  const shellDragListener = canShellDrag && !playing
+
   return (
     <motion.div
       ref={widgetRef}
-      drag={!pinching && !editingBpm}
+      drag={canShellDrag}
+      dragControls={dragControls}
+      dragListener={shellDragListener}
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
@@ -326,7 +374,7 @@ export default function DraggableMetronomeWidget({
       onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
       onDragEnd={persistPosition}
-      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[104px] min-w-[200px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''}`}
+      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[104px] min-w-[200px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
@@ -345,6 +393,18 @@ export default function DraggableMetronomeWidget({
         className="ui-orient-spin metronome-widget relative h-full min-h-0 w-full rounded-3xl"
         aria-label="Metronome. Pinch to resize. Double-tap empty space to reset size."
       >
+        {playing && (
+          <div
+            className="metronome-widget__drag-handle"
+            aria-label="Drag metronome"
+            onPointerDown={(event) => {
+              if (pinching || editingBpm) return
+              event.stopPropagation()
+              dragControls.start(event)
+            }}
+          />
+        )}
+
         <div
           className={`metronome-widget__accent ${beatIndex === 0 && playing ? 'metronome-widget__accent--pulse' : ''}`}
           aria-hidden
@@ -390,7 +450,7 @@ export default function DraggableMetronomeWidget({
               <button
                 type="button"
                 className="metronome-widget__bpm pointer-events-auto"
-                aria-label={`${bpm} beats per minute. Drag vertically to adjust, or tap to edit.`}
+                aria-label={`${bpm} beats per minute. ${playing ? 'Tap to edit.' : 'Drag vertically to adjust, or tap to edit.'}`}
                 onPointerDown={onBpmPointerDown}
                 onPointerMove={onBpmPointerMove}
                 onPointerUp={onBpmPointerUp}

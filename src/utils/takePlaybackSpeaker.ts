@@ -30,12 +30,12 @@ let enhancerEnabled = false
 let enhancerSettings: AudioEnhancerSettings | null = null
 
 /** iOS Web Audio element routing is quieter than native — boost on device. */
-const NATIVE_SPEAKER_GAIN = 4
+const NATIVE_SPEAKER_GAIN = 5
 
 function effectiveSpeakerGain(volume: number, muted: boolean): number {
   if (muted) return 0
   const gain = Capacitor.isNativePlatform() ? volume * NATIVE_SPEAKER_GAIN : volume
-  return Math.min(gain, 4)
+  return Math.min(gain, 6)
 }
 
 function resumePlaybackBus(): void {

@@ -8,6 +8,22 @@ export interface WidgetPosition {
 }
 
 /** Default spawn position: horizontally centered, below the HUD header. */
+export function clampWidgetPosition(
+  boundsWidth: number,
+  boundsHeight: number,
+  widgetWidth: number,
+  widgetHeight: number,
+  x: number,
+  y: number,
+): WidgetPosition {
+  const maxX = Math.max(EDGE_INSET, boundsWidth - widgetWidth - EDGE_INSET)
+  const maxY = Math.max(EDGE_INSET, boundsHeight - widgetHeight - EDGE_INSET)
+  return {
+    x: Math.max(EDGE_INSET, Math.min(maxX, x)),
+    y: Math.max(EDGE_INSET, Math.min(maxY, y)),
+  }
+}
+
 export function getFloatingWidgetTopCenter(
   boundsWidth: number,
   boundsHeight: number,
