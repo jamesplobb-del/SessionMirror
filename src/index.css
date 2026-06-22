@@ -738,10 +738,10 @@ html.physical-landscape-right .ui-orient-spin {
 }
 
 .record-carousel-auto-btn--active {
-  border-color: var(--accent-active-border);
-  background: rgba(92, 230, 37, 0.14);
-  color: var(--accent-active);
-  box-shadow: 0 0 16px rgba(92, 230, 37, 0.28);
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(14, 116, 144, 0.42);
+  color: rgb(186, 230, 253);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.28);
 }
 
 .record-delete-drop {
