@@ -942,10 +942,29 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .split-compare-layout__bottom .pip-video-container,
+.split-compare-layout__bottom .pip-window--fill,
 .split-compare-layout__bottom > div {
   height: 100%;
   width: 100%;
   min-height: 0;
+}
+
+.split-compare-layout__bottom .pip-window--fill .take-video-shell,
+.split-compare-layout__bottom .pip-window--fill .take-video-shell__media {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.split-compare-layout__bottom .pip-window--fill .take-video-shell--landscape-fix,
+.split-compare-layout__bottom .pip-window--fill .take-video-shell--landscape-fix .take-video-shell__media {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .split-ratio-slider {

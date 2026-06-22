@@ -74,7 +74,7 @@ function ReviewTakeLayer({
   if (isAudio) {
     return (
       <div
-        className="absolute inset-0 bg-stone-950 transition-all duration-200 ease-out"
+        className="absolute inset-0 h-full w-full bg-stone-950 transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
         <TakeVideoPlayer
@@ -83,7 +83,8 @@ function ReviewTakeLayer({
           videoUrl={videoUrl}
           mimeType={mimeType}
           videoRef={videoRef}
-          className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
+          videoSourceKey={takeKey}
+          className="absolute inset-0 h-full w-full"
           mirror={false}
           audible
           manualPlayOnly
@@ -389,6 +390,7 @@ export default function ReviewModeOverlay({
     if (video.paused) {
       setIsPlaying(true)
       revealPlayOverlay(true)
+      primeTakePlaybackForUserGesture(video)
       playTakeMediaFromUserGesture(video, {
         onFailure: () => {
           setIsPlaying(false)

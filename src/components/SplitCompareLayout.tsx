@@ -108,7 +108,7 @@ export default function SplitCompareLayout({
       />
 
       <div
-        className="split-compare-layout__bottom relative min-h-0 w-full shrink-0 overflow-hidden rounded-xl border border-white/15 bg-stone-900/95 ring-1 ring-sky-400/50"
+        className="split-compare-layout__bottom relative min-h-0 w-full shrink-0 overflow-hidden bg-stone-900/95 ring-1 ring-sky-400/50"
         style={{ height: `${bottomHeight}%` }}
       >
         {showCurrentTake && challengerTake ? (

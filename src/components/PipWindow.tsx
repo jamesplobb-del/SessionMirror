@@ -272,8 +272,24 @@ function PipWindow({
       : 'bg-sky-500/90 text-white'
 
   const shellClass = isFill
-    ? `relative h-full w-full min-h-0 overflow-hidden ${className}`.trim()
+    ? `pip-window--fill relative h-full w-full min-h-0 overflow-hidden ${className}`.trim()
     : `pip-video-container group relative aspect-video ${className}`.trim()
+
+  const innerShellClass = isFill
+    ? `relative z-0 h-full w-full min-h-0 overflow-hidden bg-stone-900/95 ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+        hasMedia ? 'opacity-100' : 'opacity-90'
+      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
+        dragSourceActive ? 'pip-drag-source--active' : ''
+      } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
+        hasMedia ? 'opacity-100' : 'opacity-90'
+      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
+        dragSourceActive ? 'pip-drag-source--active' : ''
+      } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
+
+  const orientWrapperClass = isFill
+    ? 'relative h-full w-full min-h-0'
+    : 'ui-orient-spin relative h-full w-full'
 
   return (
     <div className={shellClass}>
@@ -289,14 +305,8 @@ function PipWindow({
         />
       )}
 
-      <div className="ui-orient-spin relative h-full w-full">
-      <div
-        className={`relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
-          hasMedia ? 'opacity-100' : 'opacity-90'
-        } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
-          dragSourceActive ? 'pip-drag-source--active' : ''
-        } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`}
-      >
+      <div className={orientWrapperClass}>
+      <div className={innerShellClass}>
         <span
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass} ${
             isFill ? 'text-[10px] px-2 py-0.5' : ''
@@ -314,10 +324,11 @@ function PipWindow({
               mimeType={mimeType}
               videoRef={videoRef}
               videoSourceKey={videoSourceKey}
-              className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+              className="absolute inset-0 h-full w-full pointer-events-none"
               loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
               mirror={mirror}
               recordingOrientation={recordingOrientation}
+              fit={isFill ? 'contain' : 'cover'}
               manualPlayOnly
               audible={playbackAudible}
               eagerLoad

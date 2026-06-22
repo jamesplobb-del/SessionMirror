@@ -70,9 +70,11 @@ export default function TakeVideoPlayer({
     const media = mediaRef.current
     if (!media) return
     prepareInlineMediaElement(media)
-    ensureMediaMuted(media)
+    if (!audible) {
+      ensureMediaMuted(media)
+    }
     media.load()
-  }, [mediaSrc, mediaRef])
+  }, [audible, mediaSrc, mediaRef])
 
   useEffect(() => {
     if (!eagerLoad || !mediaSrc) return

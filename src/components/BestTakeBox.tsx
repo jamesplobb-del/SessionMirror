@@ -180,51 +180,13 @@ function BestTakeBox({
     hasReference ? 'opacity-100' : 'opacity-90'
   } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
 
-  const pillLeft = showUploadBadge ? 32 : 8
-  const chromeUsesInlineLayout = isFill || hasYoutube || splitViewActive
+  const pillLeft = showUploadBadge ? 36 : 8
 
   const renderReferenceChrome = () => {
     if (!hasReference) return null
 
-    if (chromeUsesInlineLayout) {
-      return (
-        <div className="absolute top-2 right-2 z-40 flex items-center gap-1.5 pointer-events-auto">
-          <button
-            type="button"
-            onPointerDown={stopEventBubble}
-            onTouchStart={stopEventBubble}
-            onTouchEnd={stopEventBubble}
-            onClick={(e) => {
-              e.stopPropagation()
-              handleClearReference()
-            }}
-            className={INLINE_CHROME_BTN}
-            aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
-          >
-            <X className="h-3 w-3" />
-          </button>
-          {onToggleSplitView && !splitViewActive && (
-            <button
-              type="button"
-              onPointerDown={stopEventBubble}
-              onTouchStart={stopEventBubble}
-              onTouchEnd={stopEventBubble}
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleSplitView()
-              }}
-              className={INLINE_CHROME_BTN}
-              aria-label="Open split view layout"
-            >
-              <Expand className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      )
-    }
-
     return (
-      <>
+      <div className="absolute top-2 right-2 z-40 flex items-center gap-1.5 pointer-events-auto">
         <button
           type="button"
           onPointerDown={stopEventBubble}
@@ -235,12 +197,11 @@ function BestTakeBox({
             handleClearReference()
           }}
           className={INLINE_CHROME_BTN}
-          style={{ top: -12, right: onToggleSplitView ? 28 : -12, position: 'absolute', zIndex: 40 }}
           aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
         >
           <X className="h-3 w-3" />
         </button>
-        {onToggleSplitView && (
+        {onToggleSplitView && !splitViewActive && (
           <button
             type="button"
             onPointerDown={stopEventBubble}
@@ -251,13 +212,12 @@ function BestTakeBox({
               onToggleSplitView()
             }}
             className={INLINE_CHROME_BTN}
-            style={{ top: -12, right: -12, position: 'absolute', zIndex: 40 }}
-            aria-label="Toggle split view layout"
+            aria-label="Open split view layout"
           >
             <Expand className="h-3 w-3" />
           </button>
         )}
-      </>
+      </div>
     )
   }
 
@@ -281,7 +241,7 @@ function BestTakeBox({
             className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap bg-amber-400/90 text-white ${
               isFill ? 'text-[10px] px-2 py-0.5' : ''
             }`}
-            style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
+            style={{ top: isFill ? 8 : 4, left: pillLeft }}
           >
             Best Take
           </span>
@@ -397,22 +357,22 @@ function BestTakeBox({
           )}
 
           {renderReferenceChrome()}
-        </div>
 
-        {showUploadBadge && (
-          <label
-            htmlFor="benchmark-upload"
-            onPointerDown={stopEventBubble}
-            onTouchStart={stopEventBubble}
-            onTouchEnd={stopEventBubble}
-            onClick={stopEventBubble}
-            className={UPLOAD_BADGE_BTN}
-            style={{ top: -12, left: -12 }}
-            aria-label="Upload best take media"
-          >
-            <Upload className="h-3 w-3" />
-          </label>
-        )}
+          {showUploadBadge && (
+            <label
+              htmlFor="benchmark-upload"
+              onPointerDown={stopEventBubble}
+              onTouchStart={stopEventBubble}
+              onTouchEnd={stopEventBubble}
+              onClick={stopEventBubble}
+              className={UPLOAD_BADGE_BTN}
+              style={{ top: isFill ? 8 : 4, left: 8 }}
+              aria-label="Upload best take media"
+            >
+              <Upload className="h-3 w-3" />
+            </label>
+          )}
+        </div>
       </div>
 
       <YoutubeUrlDialog
