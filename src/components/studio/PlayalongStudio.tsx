@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type VideoHTMLAttributes } from 'react'
+import { useCallback, useRef, useState, type ChangeEvent, type VideoHTMLAttributes } from 'react'
 import {
   ArrowLeft,
   Download,
