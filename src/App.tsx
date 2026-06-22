@@ -365,13 +365,13 @@ function StandardApp({
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
-    void syncAppOrientationLock(isSplitView)
+    void syncAppOrientationLock()
 
     let removeListener: (() => void) | undefined
     void import('@capacitor/app').then(({ App }) => {
       void App.addListener('appStateChange', ({ isActive }) => {
         if (isActive) {
-          void syncAppOrientationLock(isSplitViewRef.current)
+          void syncAppOrientationLock()
         }
       }).then((sub) => {
         removeListener = () => {
@@ -383,7 +383,7 @@ function StandardApp({
     return () => {
       removeListener?.()
     }
-  }, [isSplitView])
+  }, [])
 
   useEffect(() => {
     isSplitViewRef.current = isSplitView
