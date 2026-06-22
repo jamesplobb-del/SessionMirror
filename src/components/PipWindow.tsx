@@ -1,4 +1,3 @@
-import { Capacitor } from '@capacitor/core'
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from 'react'
 import { Pause, Play, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
@@ -6,14 +5,12 @@ import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import {
-  playTakeMedia,
+  playTakeMediaFromUserGesture,
   playTakeMediaMuted,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
-
-const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
 
 interface PipWindowProps {
   src: string | null
@@ -125,28 +122,6 @@ function PipWindow({
     setIsPlaying(false)
   }, [suspendPlayback, videoRef, videoSourceKey])
 
-  const startInlinePreview = useCallback(async (): Promise<boolean> => {
-    if (suspendPlayback) return false
-    const video = videoRef.current
-    if (!video) return false
-
-    video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
-
-    if (Capacitor.isNativePlatform()) {
-      await new Promise((resolve) => window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS))
-    }
-
-    const started = await playTakeMedia(video, {
-      onFailure: () => setIsPlaying(false),
-    })
-    if (started) {
-      setIsPlaying(true)
-    } else {
-      void releaseTakePlaybackAudio()
-    }
-    return started
-  }, [suspendPlayback, variant, videoRef])
-
   const handlePlayPauseClick = useCallback(
     (event: PointerEvent<HTMLButtonElement>) => {
       event.stopPropagation()
@@ -156,7 +131,14 @@ function PipWindow({
       if (!video) return
 
       if (video.paused) {
-        void startInlinePreview()
+        video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
+        setIsPlaying(true)
+        playTakeMediaFromUserGesture(video, {
+          onFailure: () => {
+            setIsPlaying(false)
+            void releaseTakePlaybackAudio()
+          },
+        })
       } else {
         video.pause()
         if ('muted' in video) video.muted = true
@@ -164,7 +146,7 @@ function PipWindow({
         setIsPlaying(false)
       }
     },
-    [startInlinePreview, suspendPlayback, videoRef],
+    [suspendPlayback, variant, videoRef],
   )
 
   // Hands-free auto-playback — muted programmatic play (iOS allows muted autoplay).

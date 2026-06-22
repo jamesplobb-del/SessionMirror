@@ -2,7 +2,6 @@ import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import {
   ensureMediaMuted,
   prepareInlineMediaElement,
-  safePlayMedia,
   safePlayMutedMedia,
   type PlaybackAttemptOptions,
 } from './mediaPlayback'
@@ -26,10 +25,10 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
 }
 
-/** Prepare playback — routes audio through Web Audio so iOS uses the main speaker. */
-export async function primeTakePlaybackAudio(
+/** Synchronous Web Audio prep — must finish before .play() in the same call stack. */
+export function primeTakePlaybackForUserGesture(
   ...media: Array<HTMLMediaElement | null | undefined>
-): Promise<void> {
+): void {
   primePlaybackAudioContextSync()
 
   for (const element of media) {
@@ -39,45 +38,98 @@ export async function primeTakePlaybackAudio(
     routeTakePlaybackToSpeaker(element, element.volume, false)
   }
 
-  await resumePlaybackAudioContext()
   resumePitchGraphsForMedia(...media)
+  void resumePlaybackAudioContext()
+}
+
+/** Prepare playback — async path for programmatic / muted autoplay only. */
+export async function primeTakePlaybackAudio(
+  ...media: Array<HTMLMediaElement | null | undefined>
+): Promise<void> {
+  primeTakePlaybackForUserGesture(...media)
+  await resumePlaybackAudioContext()
 }
 
 export function primeTakePlaybackAudioSync(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  void primeTakePlaybackAudio(...media)
+  primeTakePlaybackForUserGesture(...media)
 }
 
 export async function releaseTakePlaybackAudio(): Promise<void> {
   // Speaker routing is handled in AppDelegate — nothing to release here.
 }
 
+export interface UserGesturePlaybackCallbacks {
+  onPlaying?: () => void
+  onFailure?: (error: unknown) => void
+}
+
 /**
- * User-gesture playback — call only from onClick / onPointerUp handlers.
+ * User-gesture playback — call synchronously inside onClick / onPointerUp.
+ * Never await before this; set UI state alongside, not via useEffect.
+ */
+export function playTakeMediaFromUserGesture(
+  media: HTMLMediaElement,
+  callbacks: UserGesturePlaybackCallbacks = {},
+): void {
+  primeTakePlaybackForUserGesture(media)
+  media.play()
+    .then(() => {
+      callbacks.onPlaying?.()
+    })
+    .catch((error: unknown) => {
+      console.log(error)
+      callbacks.onFailure?.(error)
+    })
+}
+
+/** Start multiple tracks synchronously from a single user gesture. */
+export function playTakeMediaBatchFromUserGesture(
+  media: HTMLMediaElement[],
+  callbacks: UserGesturePlaybackCallbacks = {},
+): void {
+  if (media.length === 0) return
+  primeTakePlaybackForUserGesture(...media)
+  for (const element of media) {
+    element.play().catch((error: unknown) => {
+      console.log(error)
+      callbacks.onFailure?.(error)
+    })
+  }
+}
+
+/**
+ * @deprecated Use playTakeMediaFromUserGesture inside click handlers.
  */
 export async function playTakeMedia(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  await primeTakePlaybackAudio(media)
-  return safePlayMedia(media, options)
+  primeTakePlaybackForUserGesture(media)
+  return media
+    .play()
+    .then(() => true)
+    .catch((error: unknown) => {
+      console.log(error)
+      options.onFailure?.(error)
+      return false
+    })
 }
 
-/**
- * Muted programmatic playback — safe after file writes / in useEffect.
- * iOS allows muted autoplay; Web Audio bus provides audible output.
- */
+/** Muted programmatic playback — safe after file writes / in useEffect. */
 export async function playTakeMediaMuted(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  await primeTakePlaybackAudio(media)
+  primeTakePlaybackForUserGesture(media)
+  await resumePlaybackAudioContext()
   return safePlayMutedMedia(media, options)
 }
 
 export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {
   if (media.length === 0) return []
-  await primeTakePlaybackAudio(...media)
+  primeTakePlaybackForUserGesture(...media)
+  await resumePlaybackAudioContext()
   return Promise.all(media.map((element) => safePlayMutedMedia(element)))
 }

@@ -12,7 +12,11 @@ import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
-import { playTakeMedia, primeTakePlaybackAudio, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import {
+  playTakeMediaFromUserGesture,
+  primeTakePlaybackForUserGesture,
+  releaseTakePlaybackAudio,
+} from '../utils/takePlaybackAudio'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
@@ -383,18 +387,18 @@ export default function ReviewModeOverlay({
     if (!video) return
 
     if (video.paused) {
-      playTakeMedia(video, {
+      setIsPlaying(true)
+      revealPlayOverlay(true)
+      playTakeMediaFromUserGesture(video, {
         onFailure: () => {
           setIsPlaying(false)
           revealPlayOverlay(false)
         },
-      }).then((started) => {
-        if (started) setIsPlaying(true)
-        else revealPlayOverlay(false)
       })
     } else {
       video.pause()
       void releaseTakePlaybackAudio()
+      setIsPlaying(false)
       revealPlayOverlay(false)
     }
   }, [getActiveVideo, revealPlayOverlay])
@@ -472,7 +476,7 @@ export default function ReviewModeOverlay({
       }
     }
     const onPlay = () => {
-      void primeTakePlaybackAudio(video)
+      primeTakePlaybackForUserGesture(video)
       setIsPlaying(true)
       revealPlayOverlay(true)
       startProgressLoop()
@@ -548,14 +552,12 @@ export default function ReviewModeOverlay({
       syncDurationFromVideo(video)
 
       if (wasPlayingBeforeScrubRef.current) {
-        playTakeMedia(video, {
+        setIsPlaying(true)
+        playTakeMediaFromUserGesture(video, {
           onFailure: () => {
             setIsPlaying(false)
             revealPlayOverlay(false)
           },
-        }).then((started) => {
-          if (started) setIsPlaying(true)
-          else revealPlayOverlay(false)
         })
       }
     }

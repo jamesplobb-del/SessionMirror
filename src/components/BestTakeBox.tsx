@@ -13,7 +13,10 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import YoutubeUrlDialog from './YoutubeUrlDialog'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { playTakeMedia, releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import {
+  playTakeMediaFromUserGesture,
+  releaseTakePlaybackAudio,
+} from '../utils/takePlaybackAudio'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
@@ -111,22 +114,6 @@ function BestTakeBox({
     setIsPlaying(false)
   }, [hasTake, suspendPlayback, videoRef, videoSourceKey])
 
-  const startInlinePreview = useCallback(async (): Promise<boolean> => {
-    if (suspendPlayback || !hasTake) return false
-    const video = videoRef.current
-    if (!video) return false
-
-    const started = await playTakeMedia(video, {
-      onFailure: () => setIsPlaying(false),
-    })
-    if (started) {
-      setIsPlaying(true)
-    } else {
-      void releaseTakePlaybackAudio()
-    }
-    return started
-  }, [hasTake, suspendPlayback, videoRef])
-
   const handlePlayPauseClick = useCallback(
     (event: PointerEvent<HTMLButtonElement>) => {
       event.stopPropagation()
@@ -136,7 +123,13 @@ function BestTakeBox({
       if (!video) return
 
       if (video.paused) {
-        void startInlinePreview()
+        setIsPlaying(true)
+        playTakeMediaFromUserGesture(video, {
+          onFailure: () => {
+            setIsPlaying(false)
+            void releaseTakePlaybackAudio()
+          },
+        })
       } else {
         video.pause()
         if ('muted' in video) video.muted = true
@@ -144,7 +137,7 @@ function BestTakeBox({
         setIsPlaying(false)
       }
     },
-    [hasTake, startInlinePreview, suspendPlayback, videoRef],
+    [hasTake, suspendPlayback, videoRef],
   )
 
   const handleVolume = useCallback(

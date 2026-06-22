@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { assignMediaPlaybackSrc, waitForMediaReady } from '../../utils/mediaPlayback'
+import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
 import { applyBulletproofVideoElement } from '../../utils/mobileVideo'
 import {
-  playTakeMedia,
   playTakeMediaBatch,
+  playTakeMediaBatchFromUserGesture,
+  playTakeMediaFromUserGesture,
   releaseTakePlaybackAudio,
 } from '../../utils/takePlaybackAudio'
 import {
@@ -176,16 +177,16 @@ export function useMultiTrackStudio() {
   )
 
   const playRecordedTrack = useCallback(
-    async (track: StudioTrack, fromStart = true): Promise<boolean> => {
+    (track: StudioTrack, fromStart = true): void => {
       const el = getVideoForTrack(track.id)
-      if (!el || !track.recordedUrl || track.status === 'RECORDING') return false
+      if (!el || !track.recordedUrl || track.status === 'RECORDING') return
 
       primeRecordedVideo(el, track.recordedUrl)
       wireMixForTrack(track)
       resumeMixContext()
 
       if (fromStart) seekVideoTo(el, 0)
-      return playTakeMedia(el)
+      playTakeMediaFromUserGesture(el)
     },
     [getVideoForTrack, wireMixForTrack],
   )
@@ -357,7 +358,7 @@ export function useMultiTrackStudio() {
     )
   }, [stopDriftLoopInternal])
 
-  const playAll = useCallback(async () => {
+  const playAll = useCallback(() => {
     stopDriftLoopInternal()
     setPostRecordReviewId(null)
 
@@ -388,10 +389,7 @@ export function useMultiTrackStudio() {
 
     if (elements.length === 0) return
 
-    await Promise.all(elements.map((el) => waitForMediaReady(el, 2000)))
-
-    const results = await playTakeMediaBatch(elements)
-    if (!results.some(Boolean)) return
+    playTakeMediaBatchFromUserGesture(elements)
 
     const playingIds = new Set(toPlay.map((t) => t.id))
     setTracks((prev) =>
@@ -736,7 +734,7 @@ export function useMultiTrackStudio() {
   )
 
   const playTrack = useCallback(
-    async (id: 1 | 2 | 3 | 4) => {
+    (id: 1 | 2 | 3 | 4) => {
       const track = tracksRef.current.find((t) => t.id === id)
       if (!track?.recordedUrl) return
 
@@ -753,7 +751,7 @@ export function useMultiTrackStudio() {
         }),
       )
 
-      await playRecordedTrack(track, true)
+      playRecordedTrack(track, true)
     },
     [pauseAllExcept, playRecordedTrack, stopDriftLoopInternal],
   )

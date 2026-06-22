@@ -3,6 +3,7 @@ import { Mic } from 'lucide-react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
+import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
@@ -63,6 +64,15 @@ export default function TakeVideoPlayer({
       ? playbackSrc
       : withWebKitThumbnailHint(playbackSrc)
     : null
+
+  useEffect(() => {
+    if (!mediaSrc) return
+    const media = mediaRef.current
+    if (!media) return
+    prepareInlineMediaElement(media)
+    ensureMediaMuted(media)
+    media.load()
+  }, [mediaSrc, mediaRef])
 
   useEffect(() => {
     if (!eagerLoad || !mediaSrc) return
