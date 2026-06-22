@@ -8,9 +8,12 @@ export interface PlaybackAttemptOptions {
 }
 
 /** Inline playback attributes required by iOS WebKit. */
-export function prepareInlineMediaElement(media: HTMLMediaElement): void {
+export function prepareInlineMediaElement(
+  media: HTMLMediaElement,
+  options: { preload?: 'none' | 'metadata' | 'auto' } = {},
+): void {
   media.volume = 1
-  media.preload = 'auto'
+  media.preload = options.preload ?? 'none'
   media.setAttribute('playsinline', 'true')
   media.setAttribute('webkit-playsinline', 'true')
   if (media instanceof HTMLVideoElement) {

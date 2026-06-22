@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type MouseEvent,
   type PointerEvent,
   type RefObject,
 } from 'react'
@@ -114,7 +115,7 @@ function BestTakeBox({
   }, [hasTake, suspendPlayback, videoRef, videoSourceKey])
 
   const handlePlayPauseClick = useCallback(
-    (event: PointerEvent<HTMLButtonElement>) => {
+    (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback || !hasTake) return
@@ -219,7 +220,11 @@ function BestTakeBox({
           onToggleSplitView()
         }}
         className={UPLOAD_BADGE_BTN}
-        style={{ bottom: chromeInset, right: chromeInset }}
+        style={
+          hasReference
+            ? { bottom: chromeInset, right: chromeInset }
+            : { top: chromeInset, right: chromeInset }
+        }
         aria-label="Open split view layout"
       >
         <Expand className="h-3 w-3" />
@@ -275,7 +280,6 @@ function BestTakeBox({
                 recordingOrientation={take!.recordingOrientation}
                 manualPlayOnly
                 audible={playbackAudible}
-                eagerLoad
               />
 
               {onExpand && (
@@ -294,7 +298,7 @@ function BestTakeBox({
                     onPointerDown={stopEventBubble}
                     onTouchStart={stopEventBubble}
                     onTouchEnd={stopEventBubble}
-                    onPointerUp={handlePlayPauseClick}
+                    onClick={handlePlayPauseClick}
                     className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
                     aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
                   >

@@ -105,7 +105,25 @@ export function playTakeMediaFromUserGesture(
   callbacks: UserGesturePlaybackCallbacks = {},
 ): void {
   primeTakePlaybackForUserGesture(media)
-  media.play()
+
+  if (!hasTakePlaybackSpeakerRoute(media)) {
+    media.muted = false
+    media.volume = Math.max(media.volume, 1)
+  }
+
+  if (
+    media.readyState < HTMLMediaElement.HAVE_METADATA &&
+    (media.src || media.currentSrc)
+  ) {
+    try {
+      media.load()
+    } catch {
+      /* ignore */
+    }
+  }
+
+  void media
+    .play()
     .then(() => {
       callbacks.onPlaying?.()
     })

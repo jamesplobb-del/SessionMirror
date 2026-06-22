@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
 import { Pause, Play, Pin, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
@@ -132,7 +132,7 @@ function PipWindow({
   }, [suspendPlayback, videoRef, videoSourceKey])
 
   const handlePlayPauseClick = useCallback(
-    (event: PointerEvent<HTMLButtonElement>) => {
+    (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback) return
@@ -338,7 +338,6 @@ function PipWindow({
               fit="cover"
               manualPlayOnly
               audible={playbackAudible}
-              eagerLoad
             />
 
             {onExpand && (
@@ -367,7 +366,7 @@ function PipWindow({
                 onPointerDown={stopEventBubble}
                 onTouchStart={stopEventBubble}
                 onTouchEnd={stopEventBubble}
-                onPointerUp={handlePlayPauseClick}
+                onClick={handlePlayPauseClick}
                 className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >

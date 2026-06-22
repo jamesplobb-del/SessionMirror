@@ -47,44 +47,92 @@ export function uiTakesFromVaultRowsFast(rows: VaultTake[]): Take[] {
     .reverse()
 }
 
-export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
+async function hydrateVaultTakeRow(row: VaultTake, index: number): Promise<Take> {
+  let videoUrl = ''
+  let cachedThumbnail: string | null = null
+
+  try {
+    videoUrl = await resolveTakePlaybackUrl(row.filePath, '')
+  } catch {
+    videoUrl = ''
+  }
+
+  if (row.mediaType === 'video') {
+    try {
+      cachedThumbnail = await resolveCachedTakeThumbnail(
+        row.id,
+        row.recordingOrientation ?? 'portrait',
+        {
+          filePath: row.filePath,
+          videoUrl,
+          mediaType: row.mediaType,
+          mirrorPreview: true,
+        },
+      )
+    } catch {
+      cachedThumbnail = null
+    }
+  }
+
+  return vaultTakeToUiTake(row, index, videoUrl, cachedThumbnail ?? '')
+}
+
+function yieldToMainThread(): Promise<void> {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve())
+  })
+}
+
+export interface HydrateVaultTakesOptions {
+  batchSize?: number
+  priorityIds?: string[]
+  onBatch?: (takes: Take[]) => void
+}
+
+/** Resolve playback URLs in small batches so boot does not block the main thread. */
+export async function hydrateVaultTakeRowsProgressive(
+  rows: VaultTake[],
+  options: HydrateVaultTakesOptions = {},
+): Promise<Take[]> {
+  const { batchSize = 3, priorityIds = [], onBatch } = options
   await primeThumbnailCacheIndex()
 
   const chronological = [...rows].reverse()
+  const indexed = chronological.map((row, index) => ({ row, index: index + 1 }))
+  const prioritySet = new Set(priorityIds.filter(Boolean))
 
-  const takes = await Promise.all(
-    chronological.map(async (row, index) => {
-      let videoUrl = ''
-      let cachedThumbnail: string | null = null
+  const ordered = [
+    ...indexed.filter((entry) => prioritySet.has(entry.row.id)),
+    ...indexed.filter((entry) => !prioritySet.has(entry.row.id)),
+  ]
 
-      try {
-        videoUrl = await resolveTakePlaybackUrl(row.filePath, '')
-      } catch {
-        videoUrl = ''
-      }
+  const hydratedById = new Map<string, Take>()
 
-      if (row.mediaType === 'video') {
-        try {
-          cachedThumbnail = await resolveCachedTakeThumbnail(
-            row.id,
-            row.recordingOrientation ?? 'portrait',
-            {
-              filePath: row.filePath,
-              videoUrl,
-              mediaType: row.mediaType,
-              mirrorPreview: true,
-            },
-          )
-        } catch {
-          cachedThumbnail = null
-        }
-      }
+  for (let offset = 0; offset < ordered.length; offset += batchSize) {
+    const batch = ordered.slice(offset, offset + batchSize)
+    const batchTakes = await Promise.all(
+      batch.map(({ row, index }) => hydrateVaultTakeRow(row, index)),
+    )
 
-      return vaultTakeToUiTake(row, index + 1, videoUrl, cachedThumbnail ?? '')
-    }),
-  )
+    for (let i = 0; i < batch.length; i += 1) {
+      hydratedById.set(batch[i].row.id, batchTakes[i])
+    }
 
-  return takes.reverse()
+    const partial = chronological
+      .map((row, index) => hydratedById.get(row.id) ?? vaultTakeToUiTake(row, index + 1, '', ''))
+      .reverse()
+
+    onBatch?.(partial)
+    await yieldToMainThread()
+  }
+
+  return chronological
+    .map((row, index) => hydratedById.get(row.id) ?? vaultTakeToUiTake(row, index + 1, '', ''))
+    .reverse()
+}
+
+export async function uiTakesFromVaultRows(rows: VaultTake[]): Promise<Take[]> {
+  return hydrateVaultTakeRowsProgressive(rows)
 }
 
 export function findBestTakeId(rows: VaultTake[]): string | null {

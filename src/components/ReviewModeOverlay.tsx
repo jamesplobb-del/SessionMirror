@@ -89,7 +89,7 @@ function ReviewTakeLayer({
           mirror={false}
           audible={playbackAudible}
           manualPlayOnly
-          eagerLoad
+          eagerLoad={playbackAudible}
         />
       </div>
     )
@@ -112,7 +112,7 @@ function ReviewTakeLayer({
         fit="contain"
         audible={playbackAudible}
         manualPlayOnly
-        eagerLoad
+        eagerLoad={playbackAudible}
         style={{
           WebkitTouchCallout: 'default',
           userSelect: 'auto',

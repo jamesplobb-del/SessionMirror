@@ -32,6 +32,7 @@ export interface TakeVideoPlayerProps
   audible?: boolean
   mirroredControls?: boolean
   videoSourceKey?: string
+  preload?: 'none' | 'metadata' | 'auto'
 }
 
 export default function TakeVideoPlayer({
@@ -50,6 +51,7 @@ export default function TakeVideoPlayer({
   audible = false,
   mirroredControls: _mirroredControls = false,
   videoSourceKey,
+  preload: preloadProp = 'none',
   style,
   ...rest
 }: TakeVideoPlayerProps) {
@@ -65,36 +67,38 @@ export default function TakeVideoPlayer({
       : withWebKitThumbnailHint(playbackSrc)
     : null
 
+  const effectivePreload = eagerLoad ? 'metadata' : preloadProp
+
   useEffect(() => {
     if (!mediaSrc) return
     const media = mediaRef.current
     if (!media) return
-    prepareInlineMediaElement(media)
-    if (!audible) {
-      ensureMediaMuted(media)
-    }
+    prepareInlineMediaElement(media, { preload: effectivePreload })
+    ensureMediaMuted(media)
     media.load()
-  }, [audible, mediaSrc, mediaRef])
-
-  useEffect(() => {
-    if (!eagerLoad || !mediaSrc) return
-    mediaRef.current?.load()
-  }, [eagerLoad, mediaSrc, mediaRef])
+  }, [effectivePreload, mediaSrc, mediaRef])
 
   useEffect(() => {
     setVideoDimensions({ width: 0, height: 0 })
   }, [mediaSrc, videoSourceKey])
 
   useEffect(() => {
-    if (manualPlayOnly || audible) return
     const media = mediaRef.current
     if (!media || !mediaSrc) return
-    media.pause()
-    media.currentTime = 0
-    if ('muted' in media) {
-      media.muted = true
+
+    if (audible) {
+      media.muted = false
+      if (media.volume <= 0) {
+        media.volume = 1
+      }
+      return
     }
-  }, [audible, mediaSrc, mediaRef, manualPlayOnly])
+
+    ensureMediaMuted(media)
+    if (manualPlayOnly) {
+      media.pause()
+    }
+  }, [audible, manualPlayOnly, mediaSrc, mediaRef])
 
   useEffect(() => {
     if (manualPlayOnly) return
@@ -145,10 +149,10 @@ export default function TakeVideoPlayer({
           className="sr-only"
           src={mediaSrc}
           {...audioRest}
-          {...(audible ? {} : { muted: true })}
+          muted={!audible}
           autoPlay={false}
           playsInline
-          preload="auto"
+          preload={effectivePreload}
           {...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>)}
         />
         <div
@@ -201,9 +205,10 @@ export default function TakeVideoPlayer({
         onLoadedMetadata?.(event)
       }}
       {...videoRest}
-      {...(audible ? {} : { muted: true })}
-      autoPlay={false}
       {...iosBulletproofVideoProps}
+      preload={effectivePreload}
+      muted={!audible}
+      autoPlay={false}
     />
   )
 

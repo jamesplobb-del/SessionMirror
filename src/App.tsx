@@ -17,6 +17,7 @@ import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
+import AppBootOverlay from './components/ui/AppBootOverlay'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
 import { useCameraSession } from './hooks/useCameraSession'
@@ -80,8 +81,8 @@ import {
   listProjects,
   saveTake,
   setProjectBestTake,
-  uiTakesFromVaultRows,
   uiTakesFromVaultRowsFast,
+  hydrateVaultTakeRowsProgressive,
   updateVaultTake,
   type Project,
 } from './db'
@@ -195,6 +196,7 @@ function StandardApp({
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [isSplitView, setIsSplitView] = useState(false)
   const [splitRatio, setSplitRatio] = useState(50)
+  const [appBootReady, setAppBootReady] = useState(false)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
@@ -414,26 +416,36 @@ function StandardApp({
       if (generation !== reloadTakesGenerationRef.current) return
 
       const loadedFast = uiTakesFromVaultRowsFast(rows)
+      const bestId = findBestTakeId(rows)
+      const defaultChallengerId = rows.find((row) => !row.isBestTake)?.id ?? null
 
       setTakes((current) => mergeHydratedTakes(current, loadedFast))
-      setBenchmarkId(findBestTakeId(rows))
+      setBenchmarkId(bestId)
       setChallengerId((current) => {
         if (!showTakeCardsRef.current) return null
         if (current && rows.some((row) => row.id === current)) return current
         if (current && pendingChallengerIdRef.current === current) return current
-        return rows.find((row) => !row.isBestTake)?.id ?? null
+        return defaultChallengerId
       })
 
       scheduleIdle(() => {
         if (generation !== reloadTakesGenerationRef.current) return
 
-        void uiTakesFromVaultRows(rows).then((loaded) => {
+        void hydrateVaultTakeRowsProgressive(rows, {
+          priorityIds: [bestId, defaultChallengerId].filter(
+            (id): id is string => Boolean(id),
+          ),
+          onBatch: (partial) => {
+            if (generation !== reloadTakesGenerationRef.current) return
+            setTakes((current) => mergeHydratedTakes(current, partial))
+          },
+        }).then((loaded) => {
           if (generation !== reloadTakesGenerationRef.current) return
 
           setTakes((current) => mergeHydratedTakes(current, loaded))
           void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
         })
-      }, 150)
+      }, 200)
     },
     [applyTakeThumbnails],
   )
@@ -453,6 +465,9 @@ function StandardApp({
       setActiveProjectId(initialId)
       if (initialId) {
         await reloadProjectTakes(initialId)
+      }
+      if (!cancelled) {
+        setAppBootReady(true)
       }
     })()
 
@@ -879,9 +894,15 @@ function StandardApp({
 
       try {
         const rows = await getTakesByProject(projectId)
-        const loaded = await uiTakesFromVaultRows(rows)
+        const bestId = findBestTakeId(rows)
+        const defaultChallengerId = rows.find((row) => !row.isBestTake)?.id ?? null
+        const loaded = await hydrateVaultTakeRowsProgressive(rows, {
+          priorityIds: [bestId, defaultChallengerId].filter(
+            (id): id is string => Boolean(id),
+          ),
+        })
         setTakes((current) => mergeHydratedTakes(current, loaded))
-        setBenchmarkId(findBestTakeId(rows))
+        setBenchmarkId(bestId)
         void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
       } finally {
         vaultHydrateInFlightRef.current = false
@@ -1085,24 +1106,30 @@ function StandardApp({
   const refreshStaleTakePlaybackUrls = useCallback(() => {
     void (async () => {
       const snapshot = takesRef.current
-      if (!snapshot.some((take) => take.filePath)) return
+      const activeIds = new Set(
+        [benchmarkId, challengerId].filter((id): id is string => Boolean(id)),
+      )
+      const targets = snapshot.filter(
+        (take) => take.filePath && (activeIds.has(take.id) || !take.videoUrl),
+      )
+      if (targets.length === 0) return
 
       const refreshed = await Promise.all(
-        snapshot.map(async (take) => {
-          if (!take.filePath) return take
+        targets.map(async (take) => {
           const resolved = await resolveTakePlaybackUrl(take.filePath, take.videoUrl)
           const safe = resolveMediaPlaybackSrc(resolved)
           return safe && safe !== take.videoUrl ? { ...take, videoUrl: safe } : take
         }),
       )
 
-      if (!refreshed.some((take, index) => take !== snapshot[index])) return
+      if (!refreshed.some((take, index) => take !== targets[index])) return
 
+      const refreshedById = new Map(refreshed.map((take) => [take.id, take]))
       setTakes((current) =>
-        current.map((take) => refreshed.find((entry) => entry.id === take.id) ?? take),
+        current.map((take) => refreshedById.get(take.id) ?? take),
       )
     })()
-  }, [])
+  }, [benchmarkId, challengerId])
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
@@ -1605,23 +1632,23 @@ function StandardApp({
     [challengerTake, handleOpenCompareReview],
   )
 
+  const prevBenchmarkIdRef = useRef<string | null>(null)
+  const prevChallengerIdRef = useRef<string | null>(null)
+
   useLayoutEffect(() => {
-    resetVideoPlayback(benchmarkPipVideoRef.current)
+    const benchmarkChanged = benchmarkId !== prevBenchmarkIdRef.current
+    const challengerChanged = challengerId !== prevChallengerIdRef.current
+    prevBenchmarkIdRef.current = benchmarkId
+    prevChallengerIdRef.current = challengerId
 
-    const skipChallengerReset = autoPlaybackTakeId !== null
+    if (benchmarkChanged) {
+      resetVideoPlayback(benchmarkPipVideoRef.current)
+    }
 
-    if (!skipChallengerReset) {
+    if (challengerChanged && autoPlaybackTakeId === null) {
       resetVideoPlayback(challengerPipVideoRef.current)
     }
-  }, [
-    autoPlaybackTakeId,
-    challengerId,
-    benchmarkId,
-    benchmarkTake?.videoUrl,
-    benchmarkTake?.filePath,
-    challengerTake?.videoUrl,
-    challengerTake?.filePath,
-  ])
+  }, [autoPlaybackTakeId, benchmarkId, challengerId])
 
   const handleChallengerAutoPlayComplete = useCallback(() => {
     finishAutoPlayback()
@@ -1688,10 +1715,12 @@ function StandardApp({
 
   return (
     <div ref={appShellRef} className="app-shell">
+      {!appBootReady && <AppBootOverlay />}
+
       <audio
         ref={autoPlaybackAudioRef}
         className="sr-only"
-        preload="auto"
+        preload="none"
         muted
         playsInline
         {...({ 'webkit-playsinline': 'true' } as React.AudioHTMLAttributes<HTMLAudioElement>)}
@@ -1824,7 +1853,7 @@ function StandardApp({
           className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
         />
 
-        {!quickSettingsOpen && settings.showTakeCards && isSplitView && (
+        {!quickSettingsOpen && appBootReady && settings.showTakeCards && isSplitView && (
           <div className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2">
             <SplitCompareLayout
               splitRatio={splitRatio}
@@ -1865,7 +1894,7 @@ function StandardApp({
         )}
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && (
+          {!quickSettingsOpen && appBootReady && settings.showTakeCards && !isSplitView && (
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"
