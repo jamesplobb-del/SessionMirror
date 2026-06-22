@@ -23,10 +23,10 @@ import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const UPLOAD_BADGE_BTN =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/40 text-gray-100 backdrop-blur-xl transition hover:border-amber-500/30 hover:bg-black/50 active:scale-95'
+  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
 
 const emptyActionClass =
-  'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-[9px] font-medium text-gray-400 transition hover:border-amber-500/25 hover:bg-amber-500/10 hover:text-amber-300'
+  'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition hover:bg-white/10'
 
 export interface BestTakeBoxProps {
   layout: 'pip' | 'fill'
@@ -180,9 +180,9 @@ function BestTakeBox({
     ? 'relative h-full w-full min-h-0 overflow-hidden'
     : 'pip-video-container group relative aspect-video'
 
-  const innerClass = `relative z-0 h-full w-full overflow-hidden rounded-2xl border bg-black/40 shadow-lg backdrop-blur-xl ring-1 ring-amber-500/30 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+  const innerClass = `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
     hasReference ? 'opacity-100' : 'opacity-90'
-  } ${dropHighlight ? 'pip-drop-target--active border-amber-500/60' : 'border-white/10'}`
+  } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
 
   const pillLeft = showUploadBadge ? 36 : 8
 
@@ -253,7 +253,7 @@ function BestTakeBox({
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
           <span
-            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest whitespace-nowrap bg-amber-500/90 text-gray-100 ${
+            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap bg-amber-400/90 text-white ${
               isFill ? 'text-[10px] px-2 py-0.5' : ''
             }`}
             style={{ top: isFill ? 8 : 4, left: pillLeft }}

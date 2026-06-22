@@ -46,15 +46,15 @@ function SettingToggle({
 }) {
   return (
     <motion.label
-      className={`flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-[#121212] p-6 ${
+      className={`flex items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-3.5 ${
         disabled ? 'opacity-50' : 'cursor-pointer'
       }`}
       whileTap={disabled ? undefined : { scale: 0.995 }}
       transition={iosSpringSnappy}
     >
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-gray-100">{label}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{description}</p>
+        <p className="text-sm font-semibold text-stone-900">{label}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-stone-500">{description}</p>
       </div>
       <IOSSwitch
         checked={checked}
@@ -76,9 +76,9 @@ function SettingInstrumentPicker({
   const activeProfile = getTunerProfile(value)
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#121212] p-6">
-      <p className="text-sm font-semibold text-gray-100">Source Instrument</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
+      <p className="text-sm font-semibold text-stone-900">Source Instrument</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
         Adjusts how aggressively pitch is detected and how smooth the tuner trace looks.
       </p>
 
@@ -94,7 +94,7 @@ function SettingInstrumentPicker({
         }))}
       />
 
-      <p className="mt-2.5 text-[11px] leading-relaxed text-gray-500">{activeProfile.description}</p>
+      <p className="mt-2.5 text-[11px] leading-relaxed text-stone-400">{activeProfile.description}</p>
     </div>
   )
 }
@@ -123,11 +123,11 @@ function SettingSlider({
   const display = formatValue ? formatValue(value) : `${value}${unit}`
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#121212] p-6">
+    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-gray-100">{label}</p>
-          <p className="mt-0.5 text-xs text-gray-500">{description}</p>
+          <p className="text-sm font-semibold text-stone-900">{label}</p>
+          <p className="mt-0.5 text-xs text-stone-500">{description}</p>
         </div>
         <motion.span
           key={display}
@@ -135,7 +135,7 @@ function SettingSlider({
           animate={{ scale: 1, opacity: 1 }}
           transition={iosSpringSnappy}
           style={motionGpuLayer}
-          className="shrink-0 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold tabular-nums text-amber-400"
+          className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-stone-700"
         >
           {display}
         </motion.span>
@@ -147,7 +147,7 @@ function SettingSlider({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="pro-studio-slider h-2 w-full cursor-pointer"
+        className="h-2 w-full cursor-pointer accent-sky-500"
       />
     </div>
   )
@@ -192,16 +192,16 @@ export default function SettingsDrawer({
       motionPreset="premium"
       onEnterComplete={handleSheetEnterComplete}
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-6 py-5">
+      <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
         <div>
-          <h2 className="text-base font-semibold text-gray-100">Settings</h2>
-          <p className="text-xs text-gray-500">Recording, pitch tools, and on-screen controls</p>
+          <h2 className="text-base font-semibold text-stone-900">Settings</h2>
+          <p className="text-xs text-stone-500">Recording, pitch tools, and on-screen controls</p>
         </div>
         <Pressable
           type="button"
           intensity="icon"
           onClick={onClose}
-          className="rounded-full p-2 text-gray-500 transition hover:bg-white/5 hover:text-gray-100"
+          className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
           aria-label="Close settings"
         >
           <X className="h-5 w-5" />
@@ -215,24 +215,24 @@ export default function SettingsDrawer({
         <div className="space-y-6 pb-2">
           {(onEnterStudio || onEnterPlayalong) && (
             <section className="space-y-3">
-              <h3 className="pro-studio-section-header">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
                 Studio
               </h3>
 
               {onEnterPlayalong && (
                 <motion.div
-                  className="rounded-2xl border border-white/10 bg-[#121212] p-6"
+                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
                   transition={iosSpringSnappy}
                 >
-                  <p className="text-sm font-semibold text-gray-100">Playalong Studio</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                  <p className="text-sm font-semibold text-stone-900">Playalong Studio</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
                     Record over a local MP3 or YouTube backing track with a split-screen camera
                     view, mix slider, and camera-roll export for MP3 sessions.
                   </p>
                   <Pressable
                     type="button"
                     intensity="soft"
-                    className="mt-3 w-full rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/15 active:scale-[0.98]"
+                    className="mt-3 w-full rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-900 hover:bg-violet-100"
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
@@ -247,18 +247,18 @@ export default function SettingsDrawer({
 
               {onEnterStudio && (
                 <motion.div
-                  className="rounded-2xl border border-white/10 bg-[#121212] p-6"
+                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
                   transition={iosSpringSnappy}
                 >
-                  <p className="text-sm font-semibold text-gray-100">Studio Sandbox</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                  <p className="text-sm font-semibold text-stone-900">Studio Sandbox</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
                     Open an isolated multi-track overdub workspace. Standard camera and recording
                     logic stay off until you return.
                   </p>
                   <Pressable
                     type="button"
                     intensity="soft"
-                    className="mt-3 w-full rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/15 active:scale-[0.98]"
+                    className="mt-3 w-full rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-100"
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
@@ -275,7 +275,7 @@ export default function SettingsDrawer({
           )}
 
           <section className="space-y-3">
-            <h3 className="pro-studio-section-header">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Audio Recording
             </h3>
 
@@ -292,7 +292,7 @@ export default function SettingsDrawer({
                   <motion.p
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+                    className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"
                   >
                     Switch to Audio on the record carousel for hands-free recording to run.
                   </motion.p>
@@ -328,7 +328,7 @@ export default function SettingsDrawer({
           </section>
 
           <section className="space-y-3">
-            <h3 className="pro-studio-section-header">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Pitch & Tuning
             </h3>
 
@@ -356,7 +356,7 @@ export default function SettingsDrawer({
           </section>
 
           <section className="space-y-3">
-            <h3 className="pro-studio-section-header">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Playback
             </h3>
 
@@ -379,7 +379,7 @@ export default function SettingsDrawer({
           </section>
 
           <section className="space-y-3">
-            <h3 className="pro-studio-section-header">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               On-Screen Tools
             </h3>
 
@@ -412,8 +412,8 @@ export default function SettingsDrawer({
               <div className="space-y-2 pt-3">
                 <label className="block space-y-2">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-gray-100">Take Card Size</span>
-                    <span className="text-xs tabular-nums text-gray-500">{settings.takeCardScale}%</span>
+                    <span className="text-sm font-medium text-stone-800">Take Card Size</span>
+                    <span className="text-xs tabular-nums text-stone-500">{settings.takeCardScale}%</span>
                   </div>
                   <input
                     type="range"
@@ -422,7 +422,7 @@ export default function SettingsDrawer({
                     step={5}
                     value={settings.takeCardScale}
                     onChange={(e) => onUpdate({ takeCardScale: Number(e.target.value) })}
-                    className="pro-studio-slider w-full"
+                    className="w-full accent-stone-700"
                     aria-label="Take card size"
                   />
                 </label>
@@ -441,7 +441,7 @@ export default function SettingsDrawer({
             type="button"
             intensity="soft"
             onClick={onReset}
-            className="flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-[#1a1a1a] py-3 text-xs font-semibold text-gray-400 transition hover:bg-white/5 hover:text-gray-200"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-600 hover:bg-stone-100"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset to Defaults

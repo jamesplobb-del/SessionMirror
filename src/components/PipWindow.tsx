@@ -49,7 +49,7 @@ interface PipWindowProps {
 }
 
 const FLOAT_BADGE =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/40 text-gray-100 backdrop-blur-xl transition hover:border-amber-500/30 hover:bg-black/50 active:scale-95'
+  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
 
 function PipWindow({
   layout = 'pip',
@@ -268,11 +268,11 @@ function PipWindow({
     'flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70'
 
   const accentRing =
-    variant === 'benchmark' ? 'ring-amber-500/40' : 'ring-white/15'
+    variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
   const badgeClass =
     variant === 'benchmark'
       ? 'bg-amber-400/90 text-white'
-      : 'bg-black/50 text-gray-200 backdrop-blur-md'
+      : 'bg-sky-500/90 text-white'
 
   const chromeInset = isFill ? 8 : 4
 
@@ -281,12 +281,12 @@ function PipWindow({
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-black/40 backdrop-blur-xl ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-stone-900/95 ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
-    : `relative z-0 h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-lg backdrop-blur-xl ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
         dragSourceActive ? 'pip-drag-source--active' : ''

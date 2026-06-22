@@ -227,10 +227,10 @@ export default function TakeVaultDrawer({
       motionPreset="premium"
       onEnterComplete={handleSheetEnterComplete}
     >
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-6 py-5">
+        <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
-            <h2 className="text-base font-semibold text-gray-100">Take Vault</h2>
-            <p className="text-xs text-gray-500">
+            <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
+            <p className="text-xs text-stone-500">
               {selectionMode
                 ? `${selectedCount} selected`
                 : activeProject
@@ -245,7 +245,7 @@ export default function TakeVaultDrawer({
                   type="button"
                   intensity="soft"
                   onClick={() => setSelectionMode(true)}
-                  className="rounded-full px-3 py-1.5 text-xs font-medium text-gray-400 transition hover:bg-white/5 hover:text-gray-100"
+                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
                 >
                   Select
                 </Pressable>
@@ -253,7 +253,7 @@ export default function TakeVaultDrawer({
                   type="button"
                   intensity="soft"
                   onClick={handleClearAll}
-                  className="rounded-full px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/10"
+                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
                   Clear All
                 </Pressable>
@@ -264,7 +264,7 @@ export default function TakeVaultDrawer({
                 type="button"
                 intensity="soft"
                 onClick={exitSelectionMode}
-                className="rounded-full px-3 py-1.5 text-xs font-medium text-gray-400 transition hover:bg-white/5"
+                className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100"
               >
                 Cancel
               </Pressable>
@@ -273,7 +273,7 @@ export default function TakeVaultDrawer({
               type="button"
               intensity="icon"
               onClick={onClose}
-              className="rounded-full p-2 text-gray-500 transition hover:bg-white/5 hover:text-gray-100"
+              className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
               aria-label="Close vault"
             >
               <X className="h-5 w-5" />
@@ -293,8 +293,8 @@ export default function TakeVaultDrawer({
             onCreateProject={onCreateProject}
           />
           {takes.length === 0 ? (
-            <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#1a1a1a]">
-              <p className="text-sm text-gray-500">
+            <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
+              <p className="text-sm text-stone-400">
                 No takes yet. Hit Record to start your session.
               </p>
             </div>
@@ -307,8 +307,8 @@ export default function TakeVaultDrawer({
                 audioCount={audioCount}
               />
               {filteredTakes.length === 0 ? (
-                <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#1a1a1a]">
-                  <p className="text-sm text-gray-500">
+                <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
+                  <p className="text-sm text-stone-400">
                     No {vaultMediaTab} takes yet.
                   </p>
                 </div>
@@ -325,7 +325,7 @@ export default function TakeVaultDrawer({
                         type="button"
                         intensity="soft"
                         onClick={toggleSelectAllFiltered}
-                        className="shrink-0 rounded-full border border-white/10 bg-[#1a1a1a] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/5"
+                        className="shrink-0 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
                       >
                         {allFilteredSelected ? 'Deselect All' : 'Select All'}
                       </Pressable>
@@ -394,7 +394,7 @@ export default function TakeVaultDrawer({
 
         {contentReady && selectionMode && selectedCount > 0 && (
           <div
-            className="vault-bulk-bar flex shrink-0 gap-2 border-t border-white/10 bg-[#121212] px-6 py-4"
+            className="vault-bulk-bar flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
             <Pressable
@@ -402,7 +402,7 @@ export default function TakeVaultDrawer({
               intensity="soft"
               disabled={bulkSaving}
               onClick={handleBulkSave}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-[#1a1a1a] py-3 text-xs font-semibold text-gray-300 transition hover:bg-white/5 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-800 hover:bg-stone-100 disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
               {bulkSaving ? 'Saving…' : `Save (${selectedCount})`}
@@ -421,7 +421,7 @@ export default function TakeVaultDrawer({
 
         {contentReady && selectionMode && selectedCount === 0 && (
           <div
-            className="vault-bulk-bar flex shrink-0 items-center justify-center gap-2 border-t border-white/10 bg-[#121212] px-6 py-4 text-xs text-gray-500"
+            className="vault-bulk-bar flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
             <CheckSquare className="h-3.5 w-3.5" />

@@ -3,6 +3,7 @@ import { AudioLines, LayoutGrid, Sparkles } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import MetronomeIcon from './icons/MetronomeIcon'
+import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
 import { motionGpuLayer } from '../utils/motionPresets'
 
 interface SettingsBranchWheelProps {
@@ -158,6 +159,8 @@ export default function SettingsBranchWheel({
     showTakeCards,
   ])
 
+  const positions = anchor ? layoutBranchItems(branchItems.length, anchor.rect) : []
+
   if (typeof document === 'undefined') return null
 
   return createPortal(
@@ -166,7 +169,7 @@ export default function SettingsBranchWheel({
         <>
           <motion.button
             type="button"
-            className="settings-branch-backdrop fixed inset-0 z-[200] cursor-default touch-none bg-black/55"
+            className="settings-branch-backdrop fixed inset-0 z-[200] cursor-default touch-none bg-black/45"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -182,49 +185,69 @@ export default function SettingsBranchWheel({
             style={{
               left: anchor.x,
               top: anchor.y,
-              transform: 'translate(-50%, -100%) translateY(-0.75rem)',
+              transform: 'translate(-50%, -50%)',
             }}
           >
             <motion.div
-              className="settings-branch-dock pointer-events-auto"
+              className="settings-branch-wheel relative"
               role="menu"
               aria-label="Quick settings"
-              initial={{ opacity: 0, y: 8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={BRANCH_MOTION}
               style={motionGpuLayer}
             >
-              {branchItems.map((item, index) => (
-                <motion.button
-                  key={item.id}
-                  type="button"
-                  role="menuitem"
-                  className={`settings-branch-dock__btn ${
-                    item.active ? 'settings-branch-dock__btn--active' : ''
-                  }`}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.85 }}
-                  transition={{ ...BRANCH_MOTION, delay: index * 0.03 }}
-                  aria-label={item.label}
-                  aria-pressed={item.active}
-                  onClick={item.onSelect}
-                  whileTap={{ scale: 0.92 }}
-                >
-                  <span className="ui-orient-spin flex items-center justify-center">
-                    {item.icon === 'pitch' ? (
-                      <AudioLines className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                    ) : item.icon === 'take-cards' ? (
-                      <LayoutGrid className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                    ) : item.icon === 'enhancer' ? (
-                      <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                    ) : (
-                      <MetronomeIcon className="h-[18px] w-[18px]" />
-                    )}
-                  </span>
-                </motion.button>
-              ))}
+              {branchItems.map((item, index) => {
+                const { x, y } = positions[index] ?? { x: 0, y: -88 }
+
+                return (
+                  <div
+                    key={item.id}
+                    className="settings-branch-wheel__slot pointer-events-none absolute"
+                    style={{
+                      left: x,
+                      top: y,
+                      width: BRANCH_ITEM_WIDTH,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <motion.button
+                      type="button"
+                      role="menuitem"
+                      className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${
+                        item.active ? 'settings-branch-wheel__item--active' : ''
+                      }`}
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.85 }}
+                      transition={{ ...BRANCH_MOTION, delay: index * 0.04 }}
+                      style={motionGpuLayer}
+                      aria-label={item.label}
+                      aria-pressed={item.active}
+                      onClick={item.onSelect}
+                      whileTap={{ scale: 0.94 }}
+                    >
+                      <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
+                        <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
+                          {item.icon === 'pitch' ? (
+                            <AudioLines className="h-5 w-5" strokeWidth={2.1} />
+                          ) : item.icon === 'take-cards' ? (
+                            <LayoutGrid className="h-5 w-5" strokeWidth={2.1} />
+                          ) : item.icon === 'enhancer' ? (
+                            <Sparkles className="h-5 w-5" strokeWidth={2.1} />
+                          ) : (
+                            <MetronomeIcon className="h-5 w-5" />
+                          )}
+                        </span>
+                        <span className="settings-branch-wheel__label block max-w-[5.5rem] text-center text-[10px] font-semibold leading-snug tracking-wide">
+                          {item.label}
+                        </span>
+                      </span>
+                    </motion.button>
+                  </div>
+                )
+              })}
             </motion.div>
           </div>
         </>

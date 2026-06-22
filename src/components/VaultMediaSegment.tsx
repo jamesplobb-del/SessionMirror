@@ -16,7 +16,7 @@ export default function VaultMediaSegment({
 }: VaultMediaSegmentProps) {
   return (
     <SimpleSegmentedControl
-      className="mb-4"
+      className="mb-4 bg-stone-200/80"
       ariaLabel="Filter takes by media type"
       value={value}
       onChange={onChange}
@@ -27,7 +27,7 @@ export default function VaultMediaSegment({
             <>
               Video
               {videoCount > 0 && (
-                <span className="ml-1.5 text-xs text-gray-600">({videoCount})</span>
+                <span className="ml-1.5 text-xs text-stone-400">({videoCount})</span>
               )}
             </>
           ),
@@ -38,7 +38,7 @@ export default function VaultMediaSegment({
             <>
               Audio
               {audioCount > 0 && (
-                <span className="ml-1.5 text-xs text-gray-600">({audioCount})</span>
+                <span className="ml-1.5 text-xs text-stone-400">({audioCount})</span>
               )}
             </>
           ),

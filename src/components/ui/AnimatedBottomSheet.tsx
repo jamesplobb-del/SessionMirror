@@ -100,7 +100,7 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             ref={sheetRef}
-            className={`fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#121212] shadow-2xl transform-gpu`}
+            className={`fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transform-gpu`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
@@ -113,7 +113,7 @@ export default function AnimatedBottomSheet({
           >
             <div className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden">
               <div
-                className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/15"
+                className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-stone-300/90"
                 aria-hidden
               />
               {children}

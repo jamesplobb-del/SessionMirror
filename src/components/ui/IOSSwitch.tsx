@@ -26,13 +26,13 @@ export default function IOSSwitch({
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
       }`}
       animate={{
-        backgroundColor: checked ? '#d97706' : '#3f3f46',
+        backgroundColor: checked ? '#0ea5e9' : '#d6d3d1',
       }}
       transition={iosSpringSnappy}
       whileTap={disabled ? undefined : { scale: 0.96 }}
     >
       <motion.span
-        className="block h-6 w-6 rounded-full bg-gray-100 shadow-[0_1px_4px_rgba(0,0,0,0.35)]"
+        className="block h-6 w-6 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
         animate={{ x: checked ? 22 : 0 }}
         transition={iosSpringSnappy}
       />
