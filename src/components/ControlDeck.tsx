@@ -143,7 +143,7 @@ export default function ControlDeck({
           onClick={onOpenVault}
           haptic="light"
           hapticFeedback={hapticFeedback}
-          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/55"
+          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 backdrop-blur-2xl hover:bg-slate-900/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
           <span className="relative flex h-full w-full items-center justify-center">
@@ -159,10 +159,10 @@ export default function ControlDeck({
         <button
           type="button"
           ref={settingsButtonRef}
-          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors interactive-native ${
+          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/10 backdrop-blur-2xl transition-colors interactive-native ${
             branchActive
-              ? 'bg-white/25 text-white ring-1 ring-white/35'
-              : 'bg-black/40 text-white/90 hover:bg-black/55'
+              ? 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-400/30 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+              : 'bg-slate-950/40 text-slate-50 hover:bg-slate-900/55'
           }`}
           aria-label={
             branchActive ? 'Close quick settings' : 'Open settings. Long press for quick settings.'

@@ -36,7 +36,7 @@ interface PipCompareRowProps {
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
 }
 
-function PipDragGhost({
+export function PipDragGhost({
   take,
   x,
   y,
@@ -62,10 +62,10 @@ function PipDragGhost({
       aria-hidden
     >
       <div
-        className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-xl border bg-stone-900 shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
+        className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-xl border bg-slate-900 shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
           overDelete
             ? 'border-red-400/70 ring-red-400/50'
-            : 'border-sky-400/60 ring-sky-400/40'
+            : 'border-cyan-400/60 ring-cyan-400/40'
         }`}
       >
         {poster ? (
@@ -76,7 +76,7 @@ function PipDragGhost({
             draggable={false}
           />
         ) : (
-          <div className="h-full w-full bg-stone-800" />
+          <div className="h-full w-full bg-slate-800" />
         )}
         <span
           className={`absolute bottom-1 left-1 rounded px-1 py-px text-[7px] font-semibold uppercase tracking-wide text-white ${

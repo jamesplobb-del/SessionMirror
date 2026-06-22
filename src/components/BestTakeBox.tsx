@@ -23,13 +23,13 @@ import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const UPLOAD_BADGE_BTN =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
+  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-slate-900/60'
 
 const SPLIT_CHROME_BTN =
-  'pointer-events-auto absolute z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white shadow-lg backdrop-blur-xl transition-all duration-200 ease-out active:scale-95 [-webkit-tap-highlight-color:transparent]'
+  'pointer-events-auto absolute z-30 flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 shadow-lg backdrop-blur-2xl transition-all duration-200 ease-out active:scale-95 [-webkit-tap-highlight-color:transparent]'
 
 const SPLIT_PANEL_BADGE =
-  'pointer-events-none absolute z-20 max-w-[calc(100%-5rem)] truncate whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400 backdrop-blur-md'
+  'pointer-events-none absolute z-20 max-w-[calc(100%-5rem)] truncate whitespace-nowrap rounded-md border border-sky-200/10 bg-slate-950/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400 backdrop-blur-2xl shadow-[0_0_15px_rgba(251,191,36,0.3)]'
 
 const emptyActionClass =
   'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition hover:bg-white/10'
@@ -187,10 +187,10 @@ function BestTakeBox({
     : 'pip-video-container group relative aspect-video'
 
   const innerClass = isFill
-    ? `relative z-0 h-full w-full overflow-hidden bg-stone-950/90 ${
+    ? `relative z-0 h-full w-full overflow-hidden bg-[#111827] ${
         hasReference ? 'opacity-100' : 'opacity-95'
       }`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-slate-900/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
         hasReference ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
 
@@ -297,7 +297,7 @@ function BestTakeBox({
                 videoRef={videoRef}
                 videoSourceKey={videoSourceKey}
                 className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
+                loadingClassName="absolute inset-0 h-full w-full bg-[#111827]"
                 mirror={take!.mirrorPlayback !== false}
                 recordingOrientation={take!.recordingOrientation}
                 manualPlayOnly
@@ -351,7 +351,7 @@ function BestTakeBox({
               )}
             </>
           ) : (
-            <div className="absolute inset-0 flex flex-col bg-stone-800/90">
+            <div className="absolute inset-0 flex flex-col bg-slate-900/95">
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 pb-2 pt-7">
                 <p className={`text-center leading-snug text-white/50 ${isFill ? 'text-xs' : 'text-[8px]'}`}>
                   Drag Current Take here or upload.

@@ -49,7 +49,7 @@ interface PipWindowProps {
 }
 
 const FLOAT_BADGE =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
+  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-slate-900/60'
 
 function PipWindow({
   layout = 'pip',
@@ -272,10 +272,10 @@ function PipWindow({
   const badgeClass =
     variant === 'benchmark'
       ? isFill
-        ? 'border border-white/10 bg-black/40 text-amber-400 backdrop-blur-md'
-        : 'bg-amber-400/90 text-white'
+        ? 'border border-sky-200/10 bg-slate-950/40 text-amber-400 backdrop-blur-2xl shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+        : 'bg-amber-500/90 text-white'
       : isFill
-        ? 'border border-white/10 bg-black/40 text-sky-300 backdrop-blur-md'
+        ? 'border border-sky-200/10 bg-slate-950/40 text-cyan-400 backdrop-blur-2xl'
         : 'bg-sky-500/90 text-white'
 
   const chromeInset = isFill ? 8 : 4
@@ -285,12 +285,12 @@ function PipWindow({
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-stone-950/90 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-[#111827] transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
         hasMedia ? 'opacity-100' : 'opacity-95'
       } ${dropHighlight ? 'pip-drop-target--active' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-slate-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
@@ -341,7 +341,7 @@ function PipWindow({
               videoRef={videoRef}
               videoSourceKey={videoSourceKey}
               className="absolute inset-0 h-full w-full pointer-events-none"
-              loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
+              loadingClassName="absolute inset-0 h-full w-full bg-[#111827]"
               mirror={mirror}
               recordingOrientation={recordingOrientation}
               fit="cover"

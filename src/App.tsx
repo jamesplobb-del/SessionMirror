@@ -242,7 +242,7 @@ export default function App() {
 
   if (bootError || !bootSnapshot) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#050505] p-6 text-center font-sans text-gray-100">
+      <div className="fixed inset-0 flex items-center justify-center bg-[#0A0F1C] p-6 text-center font-sans text-slate-50">
         <p>{bootError ?? 'BestTake could not start.'}</p>
       </div>
     )
@@ -250,7 +250,7 @@ export default function App() {
 
   if (appMode === 'studio') {
     return (
-      <Suspense fallback={<div className="fixed inset-0 bg-black" aria-hidden />}>
+      <Suspense fallback={<div className="fixed inset-0 bg-[#0A0F1C]" aria-hidden />}>
         <StudioSandbox key="studio-sandbox" onExit={() => setAppMode('standard')} />
       </Suspense>
     )
@@ -258,7 +258,7 @@ export default function App() {
 
   if (appMode === 'playalong') {
     return (
-      <Suspense fallback={<div className="fixed inset-0 bg-black" aria-hidden />}>
+      <Suspense fallback={<div className="fixed inset-0 bg-[#0A0F1C]" aria-hidden />}>
         <PlayalongStudio key="playalong-studio" onExit={() => setAppMode('standard')} />
       </Suspense>
     )
@@ -2000,6 +2000,11 @@ function StandardApp({
               showPinCurrentAsBest={showPinCurrentAsBest}
               onPinCurrentAsBest={handlePinCurrentAsBest}
               onYoutubeHostChange={handleYoutubeHostChange}
+              deleteDropRef={recordDeleteDropRef}
+              onPinBenchmark={handlePinBenchmark}
+              onDeleteTake={handleDragDeleteTake}
+              onDragStateChange={handlePipDragStateChange}
+              hapticFeedback={settings.hapticFeedback}
             />
           </div>
         )}

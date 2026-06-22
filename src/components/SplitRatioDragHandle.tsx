@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState, type PointerEvent, type RefObject } from 'react'
+import { ChevronsUpDown } from 'lucide-react'
 import { stopEventBubble } from '../utils/eventBubbling'
+import { triggerDragStartHaptic, triggerLightHaptic } from '../utils/haptics'
 
 const MIN_RATIO = 20
 const MAX_RATIO = 80
@@ -10,6 +12,7 @@ interface SplitRatioDragHandleProps {
   ratio: number
   onChange: (ratio: number) => void
   layoutRef: RefObject<HTMLElement | null>
+  hapticFeedback?: boolean
 }
 
 function clampRatio(value: number): number {
@@ -20,6 +23,7 @@ export default function SplitRatioDragHandle({
   ratio,
   onChange,
   layoutRef,
+  hapticFeedback = true,
 }: SplitRatioDragHandleProps) {
   const [active, setActive] = useState(false)
   const [arming, setArming] = useState(false)
@@ -29,6 +33,7 @@ export default function SplitRatioDragHandle({
     startRatio: number
     armed: boolean
     holdTimer: number | null
+    dragHapticFired: boolean
   } | null>(null)
 
   const clearHoldTimer = useCallback(() => {
@@ -39,6 +44,13 @@ export default function SplitRatioDragHandle({
       drag.holdTimer = null
     }
   }, [])
+
+  const fireDragHaptic = useCallback(() => {
+    const drag = dragRef.current
+    if (!drag || drag.dragHapticFired || !hapticFeedback) return
+    drag.dragHapticFired = true
+    void triggerDragStartHaptic()
+  }, [hapticFeedback])
 
   const finishDrag = useCallback(
     (target: HTMLElement, pointerId: number) => {
@@ -77,6 +89,8 @@ export default function SplitRatioDragHandle({
       stopEventBubble(event)
       event.preventDefault()
 
+      triggerLightHaptic(hapticFeedback)
+
       const target = event.currentTarget
       clearHoldTimer()
 
@@ -92,17 +106,19 @@ export default function SplitRatioDragHandle({
           drag.holdTimer = null
           setArming(false)
           setActive(true)
+          fireDragHaptic()
           try {
             target.setPointerCapture(event.pointerId)
           } catch {
             /* ignore */
           }
         }, HOLD_MS),
+        dragHapticFired: false,
       }
 
       setArming(true)
     },
-    [clearHoldTimer, ratio],
+    [clearHoldTimer, fireDragHaptic, hapticFeedback, ratio],
   )
 
   const handlePointerMove = useCallback(
@@ -118,6 +134,7 @@ export default function SplitRatioDragHandle({
         drag.armed = true
         setArming(false)
         setActive(true)
+        fireDragHaptic()
         try {
           event.currentTarget.setPointerCapture(event.pointerId)
         } catch {
@@ -129,7 +146,7 @@ export default function SplitRatioDragHandle({
       event.preventDefault()
       applyDrag(event.clientY)
     },
-    [applyDrag, clearHoldTimer],
+    [applyDrag, clearHoldTimer, fireDragHaptic],
   )
 
   const handlePointerUp = useCallback(
@@ -166,7 +183,9 @@ export default function SplitRatioDragHandle({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
     >
-      <div className="split-ratio-handle__grip" aria-hidden />
+      <div className="split-ratio-handle__grip" aria-hidden>
+        <ChevronsUpDown className="h-4 w-4 stroke-[1.75]" />
+      </div>
     </div>
   )
 }
