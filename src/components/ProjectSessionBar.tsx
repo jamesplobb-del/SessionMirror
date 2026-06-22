@@ -44,8 +44,8 @@ export default function ProjectSessionBar({
   }
 
   return (
-    <div className="mb-4 flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className="mb-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sessions</p>
         <Pressable
           type="button"
@@ -98,7 +98,7 @@ export default function ProjectSessionBar({
         </form>
       </AnimatedExpand>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-2">
         {projects.map((project) => {
           const active = project.id === activeProjectId
           return (

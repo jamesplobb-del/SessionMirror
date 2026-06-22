@@ -6,6 +6,7 @@ interface VaultMediaSegmentProps {
   onChange: (value: MediaType) => void
   videoCount: number
   audioCount: number
+  compact?: boolean
 }
 
 export default function VaultMediaSegment({
@@ -13,10 +14,12 @@ export default function VaultMediaSegment({
   onChange,
   videoCount,
   audioCount,
+  compact = false,
 }: VaultMediaSegmentProps) {
   return (
     <SimpleSegmentedControl
-      className="mb-4 bg-stone-200/80"
+      className={compact ? 'shrink-0 bg-stone-200/80' : 'mb-4 bg-stone-200/80'}
+      size={compact ? 'xs' : 'md'}
       ariaLabel="Filter takes by media type"
       value={value}
       onChange={onChange}

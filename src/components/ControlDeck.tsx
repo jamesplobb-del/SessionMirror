@@ -161,7 +161,7 @@ export default function ControlDeck({
           ref={settingsButtonRef}
           className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full border-[0.5px] border-white/10 backdrop-blur-2xl transition-colors interactive-native ${
             branchActive
-              ? 'bg-[#5ce625]/10 text-[#5ce625] ring-1 ring-[#5ce625]/30 shadow-[0_0_15px_rgba(92,230,37,0.3)]'
+              ? 'bg-sky-500/10 text-sky-400 ring-1 ring-sky-400/30 shadow-[0_0_15px_rgba(56,189,248,0.3)]'
               : 'bg-black/40 text-white hover:bg-black/55'
           }`}
           aria-label={

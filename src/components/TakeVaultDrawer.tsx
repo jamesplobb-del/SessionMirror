@@ -230,23 +230,24 @@ export default function TakeVaultDrawer({
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
-            <p className="text-xs text-stone-500">
-              {selectionMode
-                ? `${selectedCount} selected`
-                : activeProject
-                  ? `Session: ${activeProject.name}`
-                  : 'Set your Best Take and load a take to the HUD'}
-            </p>
+            {selectionMode && (
+              <p className="text-xs text-stone-500">{selectedCount} selected</p>
+            )}
+            {!selectionMode && !activeProject && (
+              <p className="text-xs text-stone-500">
+                Set your Best Take and load a take to the HUD
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {contentReady && takes.length > 0 && !selectionMode && (
-              <>
+              <div className="mr-1 flex items-center gap-2">
                 <Pressable
                   type="button"
                   intensity="soft"
                   onClick={() => setSelectionMode(true)}
                   haptic="light"
-                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+                  className="rounded-full px-2 py-1 text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
                 >
                   Select
                 </Pressable>
@@ -255,11 +256,11 @@ export default function TakeVaultDrawer({
                   intensity="soft"
                   onClick={handleClearAll}
                   haptic="medium"
-                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  className="rounded-full px-2 py-1 text-sm font-medium text-red-600 hover:bg-red-50"
                 >
                   Clear All
                 </Pressable>
-              </>
+              </div>
             )}
             {selectionMode && (
               <Pressable
@@ -304,39 +305,46 @@ export default function TakeVaultDrawer({
             </div>
           ) : (
             <>
-              <VaultMediaSegment
-                value={vaultMediaTab}
-                onChange={setVaultMediaTab}
-                videoCount={videoCount}
-                audioCount={audioCount}
-              />
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <VaultMediaSegment
+                  compact
+                  value={vaultMediaTab}
+                  onChange={setVaultMediaTab}
+                  videoCount={videoCount}
+                  audioCount={audioCount}
+                />
+                <div className="flex shrink-0 items-center gap-2">
+                  <GallerySortStrip
+                    compact
+                    sortMode={sortMode}
+                    onSortChange={onSortChange}
+                    takeCount={filteredTakes.length}
+                  />
+                  {selectionMode && (
+                    <Pressable
+                      type="button"
+                      intensity="soft"
+                      onClick={toggleSelectAllFiltered}
+                      haptic="light"
+                      className="shrink-0 rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                    >
+                      {allFilteredSelected ? 'Deselect All' : 'Select All'}
+                    </Pressable>
+                  )}
+                </div>
+              </div>
               {filteredTakes.length === 0 ? (
-                <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
+                <div className="mt-4 flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
                   <p className="text-sm text-stone-400">
                     No {vaultMediaTab} takes yet.
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <GallerySortStrip
-                      sortMode={sortMode}
-                      onSortChange={onSortChange}
-                      takeCount={filteredTakes.length}
-                    />
-                    {selectionMode && (
-                      <Pressable
-                        type="button"
-                        intensity="soft"
-                        onClick={toggleSelectAllFiltered}
-                        haptic="light"
-                        className="shrink-0 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
-                      >
-                        {allFilteredSelected ? 'Deselect All' : 'Select All'}
-                      </Pressable>
-                    )}
-                  </div>
-                  <div className="vault-card-strip flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
+                  <p className="mt-2 text-xs text-stone-500">
+                    {filteredTakes.length} take{filteredTakes.length === 1 ? '' : 's'}
+                  </p>
+                  <div className="vault-card-strip mt-4 flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
                     {filteredTakes.map((take) => (
                       <TakeCard
                         key={take.id}

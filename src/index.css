@@ -1982,13 +1982,13 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .settings-branch-wheel__item--active .settings-branch-wheel__icon {
-  background: var(--accent-active-soft);
-  border-color: var(--accent-active-border);
-  color: var(--accent-active);
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(125, 211, 252, 0.42);
+  color: rgb(224, 242, 254);
 }
 
 .settings-branch-wheel__item--active .settings-branch-wheel__label {
-  color: var(--accent-active);
+  color: rgb(125, 211, 252);
 }
 
 .settings-branch-wheel__item:active .settings-branch-wheel__icon {
