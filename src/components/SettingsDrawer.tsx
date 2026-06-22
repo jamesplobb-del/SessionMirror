@@ -28,6 +28,7 @@ interface SettingsDrawerProps {
   onReset: () => void
   recordingMode: 'video' | 'audio'
   onEnterStudio?: () => void
+  onEnterPlayalong?: () => void
 }
 
 function SettingToggle({
@@ -165,6 +166,7 @@ export default function SettingsDrawer({
   onReset,
   recordingMode,
   onEnterStudio,
+  onEnterPlayalong,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
 
@@ -211,36 +213,64 @@ export default function SettingsDrawer({
           <SettingsDrawerSkeleton />
         ) : (
         <div className="space-y-6 pb-2">
-          {onEnterStudio && (
+          {(onEnterStudio || onEnterPlayalong) && (
             <section className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
                 Studio
               </h3>
 
-              <motion.div
-                className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
-                transition={iosSpringSnappy}
-              >
-                <p className="text-sm font-semibold text-stone-900">Studio Sandbox</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                  Open an isolated multi-track overdub workspace. Standard camera and recording
-                  logic stay off until you return.
-                </p>
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  className="mt-3 w-full rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-100"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onClose()
-                    // Defer mount so the Enter tap does not ghost-click the studio grid.
-                    requestAnimationFrame(() => onEnterStudio())
-                  }}
+              {onEnterPlayalong && (
+                <motion.div
+                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
+                  transition={iosSpringSnappy}
                 >
-                  Enter Studio Mode
-                </Pressable>
-              </motion.div>
+                  <p className="text-sm font-semibold text-stone-900">Playalong Studio</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                    Record over a local MP3 or YouTube backing track with a split-screen camera
+                    view, mix slider, and camera-roll export for MP3 sessions.
+                  </p>
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    className="mt-3 w-full rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-900 hover:bg-violet-100"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onClose()
+                      requestAnimationFrame(() => onEnterPlayalong())
+                    }}
+                  >
+                    Enter Playalong Studio
+                  </Pressable>
+                </motion.div>
+              )}
+
+              {onEnterStudio && (
+                <motion.div
+                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
+                  transition={iosSpringSnappy}
+                >
+                  <p className="text-sm font-semibold text-stone-900">Studio Sandbox</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                    Open an isolated multi-track overdub workspace. Standard camera and recording
+                    logic stay off until you return.
+                  </p>
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    className="mt-3 w-full rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-100"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onClose()
+                      // Defer mount so the Enter tap does not ghost-click the studio grid.
+                      requestAnimationFrame(() => onEnterStudio())
+                    }}
+                  >
+                    Enter Studio Mode
+                  </Pressable>
+                </motion.div>
+              )}
             </section>
           )}
 

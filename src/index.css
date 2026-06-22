@@ -2025,6 +2025,23 @@ html.physical-landscape-right .control-deck__vault-btn {
   pointer-events: none;
 }
 
+.playalong-studio__top,
+.playalong-studio__bottom {
+  min-height: 0;
+}
+
+.playalong-studio__top {
+  flex: 1 1 50%;
+}
+
+.playalong-studio__bottom {
+  flex: 1 1 50%;
+}
+
+.playalong-studio .camera-preview {
+  transform: scaleX(-1);
+}
+
 .studio-track-cell--recording {
   animation: studio-rec-pulse 1.4s ease-in-out infinite;
 }

@@ -120,25 +120,47 @@ const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetron
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const StudioSandbox = lazy(() => import('./components/studio/StudioSandbox'))
+const PlayalongStudio = lazy(() => import('./components/studio/PlayalongStudio'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
 
-export default function App() {
-  const [studioMode, setStudioMode] = useState(false)
+type AppShellMode = 'standard' | 'studio' | 'playalong'
 
-  if (studioMode) {
+export default function App() {
+  const [appMode, setAppMode] = useState<AppShellMode>('standard')
+
+  if (appMode === 'studio') {
     return (
       <Suspense fallback={<div className="fixed inset-0 bg-black" aria-hidden />}>
-        <StudioSandbox key="studio-sandbox" onExit={() => setStudioMode(false)} />
+        <StudioSandbox key="studio-sandbox" onExit={() => setAppMode('standard')} />
       </Suspense>
     )
   }
 
-  return <StandardApp onEnterStudio={() => setStudioMode(true)} />
+  if (appMode === 'playalong') {
+    return (
+      <Suspense fallback={<div className="fixed inset-0 bg-black" aria-hidden />}>
+        <PlayalongStudio key="playalong-studio" onExit={() => setAppMode('standard')} />
+      </Suspense>
+    )
+  }
+
+  return (
+    <StandardApp
+      onEnterStudio={() => setAppMode('studio')}
+      onEnterPlayalong={() => setAppMode('playalong')}
+    />
+  )
 }
 
-function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
+function StandardApp({
+  onEnterStudio,
+  onEnterPlayalong,
+}: {
+  onEnterStudio: () => void
+  onEnterPlayalong: () => void
+}) {
   usePhysicalOrientation()
   const [takes, setTakes] = useState<Take[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -1835,6 +1857,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         onReset={handleResetSettings}
         recordingMode={recordingMode}
         onEnterStudio={onEnterStudio}
+        onEnterPlayalong={onEnterPlayalong}
       />
       </Suspense>
       </div>
