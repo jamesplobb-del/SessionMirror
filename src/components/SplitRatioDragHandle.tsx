@@ -166,11 +166,7 @@ export default function SplitRatioDragHandle({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
     >
-      <div className="split-ratio-handle__grip" aria-hidden>
-        <span />
-        <span />
-        <span />
-      </div>
+      <div className="split-ratio-handle__grip" aria-hidden />
     </div>
   )
 }

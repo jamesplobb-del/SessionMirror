@@ -61,7 +61,7 @@ function ModeSlot({
       aria-label={ariaLabel}
       aria-pressed={isCenter}
       onClick={onActivate}
-      className={`interactive-native record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
+      className={`record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
         isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
       } ${isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
         isCenter && isRecording ? 'record-carousel-slot--recording' : ''

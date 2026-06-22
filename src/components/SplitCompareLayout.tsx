@@ -143,7 +143,7 @@ export default function SplitCompareLayout({
           </div>
         ) : (
           <>
-            <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-sky-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+            <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-sky-300 backdrop-blur-md">
               {isRecording
                 ? 'Recording…'
                 : recordingMode === 'audio'

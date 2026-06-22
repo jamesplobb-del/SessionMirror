@@ -271,8 +271,12 @@ function PipWindow({
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
   const badgeClass =
     variant === 'benchmark'
-      ? 'bg-amber-400/90 text-white'
-      : 'bg-sky-500/90 text-white'
+      ? isFill
+        ? 'border border-white/10 bg-black/40 text-amber-400 backdrop-blur-md'
+        : 'bg-amber-400/90 text-white'
+      : isFill
+        ? 'border border-white/10 bg-black/40 text-sky-300 backdrop-blur-md'
+        : 'bg-sky-500/90 text-white'
 
   const chromeInset = isFill ? 8 : 4
 
@@ -317,9 +321,11 @@ function PipWindow({
       <div className={orientWrapperClass}>
       <div className={innerShellClass}>
         <span
-          className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass} ${
-            isFill ? 'text-[10px] px-2 py-0.5' : ''
-          }`}
+          className={
+            isFill
+              ? `pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${badgeClass}`
+              : `pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass}`
+          }
           style={{ top: chromeInset, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
         >
           {label}

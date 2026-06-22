@@ -11,6 +11,7 @@ import {
   type RefObject,
 } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { SplashScreen } from '@capacitor/splash-screen'
 import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
@@ -76,7 +77,6 @@ import {
   findBestTakeId,
   getTakesByProject,
   initVaultDatabase,
-  isVaultDatabaseReady,
   listProjects,
   saveTake,
   setProjectBestTake,
@@ -87,6 +87,11 @@ import {
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
+import { initAppFilesystem } from './utils/filesystemInit'
+import { bootstrapViewport } from './utils/viewportSync'
+import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
+import { loadAppSettingsForSessionStart } from './utils/appSettings'
+import AppBootGate from './components/ui/AppBootGate'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
@@ -132,8 +137,116 @@ const PITCH_ENGINE_COMMIT_DELAY_MS = 300
 
 type AppShellMode = 'standard' | 'studio' | 'playalong'
 
+interface AppBootSnapshot {
+  projects: Project[]
+  activeProjectId: string | null
+  takes: Take[]
+  benchmarkId: string | null
+  challengerId: string | null
+}
+
+const BOOT_REVEAL_DELAY_MS = 500
+
+async function performAppBoot(): Promise<AppBootSnapshot> {
+  await Promise.all([initVaultDatabase(), initAppFilesystem()])
+
+  const settings = loadAppSettingsForSessionStart()
+  const projectList = await listProjects()
+  const initialId = projectList[0]?.id ?? null
+  let takes: Take[] = []
+  let benchmarkId: string | null = null
+  let challengerId: string | null = null
+
+  if (initialId) {
+    const rows = await getTakesByProject(initialId)
+    const loadedFast = uiTakesFromVaultRowsFast(rows)
+    benchmarkId = findBestTakeId(rows)
+    const defaultChallengerId = rows.find((row) => !row.isBestTake)?.id ?? null
+    challengerId = settings.showTakeCards ? defaultChallengerId : null
+
+    const hydrated = await hydrateVaultTakeRowsProgressive(rows, {
+      priorityIds: [benchmarkId, defaultChallengerId].filter(
+        (id): id is string => Boolean(id),
+      ),
+    })
+    takes = mergeHydratedTakes(loadedFast, hydrated)
+  }
+
+  return {
+    projects: projectList,
+    activeProjectId: initialId,
+    takes,
+    benchmarkId,
+    challengerId,
+  }
+}
+
 export default function App() {
+  const [isBooting, setIsBooting] = useState(true)
+  const [bootSnapshot, setBootSnapshot] = useState<AppBootSnapshot | null>(null)
+  const [bootError, setBootError] = useState<string | null>(null)
   const [appMode, setAppMode] = useState<AppShellMode>('standard')
+
+  useEffect(() => {
+    let cancelled = false
+
+    bootstrapViewport()
+    void lockPortraitOrientation()
+
+    void (async () => {
+      try {
+        const snapshot = await performAppBoot()
+        if (cancelled) return
+
+        if (Capacitor.isNativePlatform()) {
+          await SplashScreen.hide()
+        }
+
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, BOOT_REVEAL_DELAY_MS)
+        })
+        if (cancelled) return
+
+        setBootSnapshot(snapshot)
+        scheduleIdle(() => {
+          void resumePlaybackAudioContext()
+        }, 400)
+        setIsBooting(false)
+      } catch (error) {
+        console.error('Failed to initialize app', error)
+        if (cancelled) return
+
+        if (Capacitor.isNativePlatform()) {
+          try {
+            await SplashScreen.hide()
+          } catch {
+            // Splash may already be hidden on web or after a partial init.
+          }
+        }
+
+        setBootError(
+          'BestTake could not open its vault database. Restart the app or reinstall if this continues.',
+        )
+        setIsBooting(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (isBooting) {
+    return <AppBootGate />
+  }
+
+  if (bootError || !bootSnapshot) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[#050505] p-6 text-center font-sans text-gray-100">
+        <p>{bootError ?? 'BestTake could not start.'}</p>
+      </div>
+    )
+  }
 
   if (appMode === 'studio') {
     return (
@@ -153,6 +266,7 @@ export default function App() {
 
   return (
     <StandardApp
+      bootSnapshot={bootSnapshot}
       onEnterStudio={() => setAppMode('studio')}
       onEnterPlayalong={() => setAppMode('playalong')}
     />
@@ -160,18 +274,20 @@ export default function App() {
 }
 
 function StandardApp({
+  bootSnapshot,
   onEnterStudio,
   onEnterPlayalong,
 }: {
+  bootSnapshot: AppBootSnapshot
   onEnterStudio: () => void
   onEnterPlayalong: () => void
 }) {
   usePhysicalOrientation()
-  const [takes, setTakes] = useState<Take[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
-  const [benchmarkId, setBenchmarkId] = useState<string | null>(null)
-  const [challengerId, setChallengerId] = useState<string | null>(null)
+  const [takes, setTakes] = useState<Take[]>(bootSnapshot.takes)
+  const [projects, setProjects] = useState<Project[]>(bootSnapshot.projects)
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(bootSnapshot.activeProjectId)
+  const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
+  const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
@@ -449,29 +565,9 @@ function StandardApp({
   )
 
   useEffect(() => {
-    let cancelled = false
-
-    void (async () => {
-      if (!isVaultDatabaseReady()) {
-        await initVaultDatabase()
-      }
-      if (cancelled) return
-
-      const projectList = await listProjects()
-      if (cancelled) return
-
-      setProjects(projectList)
-      const initialId = projectList[0]?.id ?? null
-      setActiveProjectId(initialId)
-      if (initialId) {
-        void reloadProjectTakes(initialId)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [reloadProjectTakes])
+    if (bootSnapshot.takes.length === 0) return
+    void hydrateTakeThumbnailsInBackground(bootSnapshot.takes, applyTakeThumbnails)
+  }, [applyTakeThumbnails, bootSnapshot.takes])
 
   const handleSelectProject = useCallback(
     async (projectId: string) => {

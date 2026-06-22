@@ -253,9 +253,11 @@ function BestTakeBox({
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
           <span
-            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap bg-amber-400/90 text-white ${
-              isFill ? 'text-[10px] px-2 py-0.5' : ''
-            }`}
+            className={
+              isFill
+                ? 'pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400 backdrop-blur-md'
+                : 'pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white'
+            }
             style={{ top: isFill ? 8 : 4, left: pillLeft }}
           >
             Best Take

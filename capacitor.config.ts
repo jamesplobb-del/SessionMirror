@@ -10,6 +10,12 @@ const config: CapacitorConfig = {
     backgroundColor: '#000000',
     scrollEnabled: false,
   },
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      launchShowDuration: 0,
+    },
+  },
 }
 
 export default config
