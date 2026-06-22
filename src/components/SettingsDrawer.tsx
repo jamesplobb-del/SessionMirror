@@ -1,7 +1,8 @@
-import { startTransition, useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
+import type { HudQuickSettings } from '../utils/hudQuickSettings'
 import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import AnimatedExpand from './ui/AnimatedExpand'
@@ -17,11 +18,13 @@ interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
   settings: AppSettings
-  /** Reflects pending pitch commits while the drawer is closed in Audio mode. */
-  pitchDisplayEnabled: boolean
+  /** Shared quick-settings values — must match the long-press branch wheel. */
+  hudQuickSettings: HudQuickSettings
   onUpdate: (patch: Partial<AppSettings>) => void
-  /** Commits pitch engine after drawer close in Audio mode. */
   onPitchTrackerChange: (enabled: boolean) => void
+  onShowTakeCardsChange: (show: boolean) => void
+  onShowMetronomeChange: (show: boolean) => void
+  onAudioEnhancerChange: (enabled: boolean) => void
   onReset: () => void
   recordingMode: 'video' | 'audio'
   onEnterStudio?: () => void
@@ -153,23 +156,17 @@ export default function SettingsDrawer({
   isOpen,
   onClose,
   settings,
-  pitchDisplayEnabled,
+  hudQuickSettings,
   onUpdate,
   onPitchTrackerChange,
+  onShowTakeCardsChange,
+  onShowMetronomeChange,
+  onAudioEnhancerChange,
   onReset,
   recordingMode,
   onEnterStudio,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
-  const [localPitchEnabled, setLocalPitchEnabled] = useState(pitchDisplayEnabled)
-  const pitchUiEnabled =
-    recordingMode === 'audio' && isOpen ? localPitchEnabled : pitchDisplayEnabled
-
-  useEffect(() => {
-    if (isOpen) {
-      setLocalPitchEnabled(pitchDisplayEnabled)
-    }
-  }, [isOpen, pitchDisplayEnabled])
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -178,15 +175,11 @@ export default function SettingsDrawer({
   const handlePitchTrackerToggle = useCallback(
     (checked: boolean) => {
       if (recordingMode === 'audio') {
-        setLocalPitchEnabled(checked)
         onClose()
-        onPitchTrackerChange(checked)
-        return
       }
-
-      onUpdate({ pitchTrackerEnabled: checked })
+      onPitchTrackerChange(checked)
     },
-    [onClose, onPitchTrackerChange, onUpdate, recordingMode],
+    [onClose, onPitchTrackerChange, recordingMode],
   )
 
   return (
@@ -312,11 +305,11 @@ export default function SettingsDrawer({
             <SettingToggle
               label="Pitch Analysis"
               description="Shows a live pitch graph and tuner during playback. With hands-free recording, analysis appears on the main screen while each take plays back."
-              checked={pitchUiEnabled}
+              checked={hudQuickSettings.pitchTrackerEnabled}
               onChange={handlePitchTrackerToggle}
             />
 
-            <AnimatedExpand open={pitchUiEnabled}>
+            <AnimatedExpand open={hudQuickSettings.pitchTrackerEnabled}>
               <div className="space-y-3 pt-3">
                 <SettingToggle
                   label="Idle Mic Tuner"
@@ -340,11 +333,11 @@ export default function SettingsDrawer({
             <SettingToggle
               label="Audio Enhancer"
               description="Applies smart EQ, compression, and reverb presets during take playback. Off keeps the original flat mix."
-              checked={settings.audioEnhancerEnabled}
-              onChange={(checked) => onUpdate({ audioEnhancerEnabled: checked })}
+              checked={hudQuickSettings.audioEnhancerEnabled}
+              onChange={onAudioEnhancerChange}
             />
 
-            <AnimatedExpand open={settings.audioEnhancerEnabled}>
+            <AnimatedExpand open={hudQuickSettings.audioEnhancerEnabled}>
               <div className="pt-3">
                 <AudioEnhancer
                   variant="inline"
@@ -363,15 +356,11 @@ export default function SettingsDrawer({
             <SettingToggle
               label="Metronome Widget"
               description="Shows a draggable metronome on the main screen. Pinch to resize; double-tap the widget to reset its size. Metronome audio is not recorded into takes."
-              checked={settings.showMetronome}
-              onChange={(checked) => {
-                startTransition(() => {
-                  onUpdate({ showMetronome: checked })
-                })
-              }}
+              checked={hudQuickSettings.showMetronome}
+              onChange={onShowMetronomeChange}
             />
 
-            <AnimatedExpand open={settings.showMetronome}>
+            <AnimatedExpand open={hudQuickSettings.showMetronome}>
               <div className="pt-3">
                 <SettingToggle
                   label="Mute During Take Playback"
@@ -385,11 +374,11 @@ export default function SettingsDrawer({
             <SettingToggle
               label="Take Comparison Cards"
               description="Shows Best Take and Latest Take cards above the record button. Turn off to keep new recordings in the vault only."
-              checked={settings.showTakeCards}
-              onChange={(checked) => onUpdate({ showTakeCards: checked })}
+              checked={hudQuickSettings.showTakeCards}
+              onChange={onShowTakeCardsChange}
             />
 
-            <AnimatedExpand open={settings.showTakeCards}>
+            <AnimatedExpand open={hudQuickSettings.showTakeCards}>
               <div className="space-y-2 pt-3">
                 <label className="block space-y-2">
                   <div className="flex items-center justify-between gap-3">

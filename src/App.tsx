@@ -81,6 +81,7 @@ import {
   type Project,
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
+import { pickHudQuickSettings } from './utils/hudQuickSettings'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
@@ -901,24 +902,22 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
     [updateSettings],
   )
 
-  const handleQuickPitchTrackerChange = useCallback(
-    (enabled: boolean) => {
-      if (pitchCommitTimerRef.current !== null) {
-        window.clearTimeout(pitchCommitTimerRef.current)
-        pitchCommitTimerRef.current = null
-      }
-      setPendingPitchTrackerEnabled(null)
-      if (!enabled) {
-        setShowPitch(false)
-      }
-      startTransition(() => {
-        updateSettings({ pitchTrackerEnabled: enabled })
-      })
-    },
-    [updateSettings],
+  const hudQuickSettings = useMemo(
+    () => ({
+      ...pickHudQuickSettings(settings),
+      pitchTrackerEnabled:
+        pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled,
+    }),
+    [
+      pendingPitchTrackerEnabled,
+      settings.audioEnhancerEnabled,
+      settings.pitchTrackerEnabled,
+      settings.showMetronome,
+      settings.showTakeCards,
+    ],
   )
 
-  const handlePitchTrackerChange = useCallback(
+  const handlePitchTrackerSettingChange = useCallback(
     (enabled: boolean) => {
       if (!enabled) {
         setShowPitch(false)
@@ -927,10 +926,50 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         schedulePitchTrackerCommit(enabled)
         return
       }
+      if (pitchCommitTimerRef.current !== null) {
+        window.clearTimeout(pitchCommitTimerRef.current)
+        pitchCommitTimerRef.current = null
+      }
+      setPendingPitchTrackerEnabled(null)
       updateSettings({ pitchTrackerEnabled: enabled })
     },
     [schedulePitchTrackerCommit, updateSettings],
   )
+
+  const handleShowTakeCardsSettingChange = useCallback(
+    (show: boolean) => {
+      updateSettings({ showTakeCards: show })
+    },
+    [updateSettings],
+  )
+
+  const handleShowMetronomeSettingChange = useCallback(
+    (show: boolean) => {
+      startTransition(() => {
+        updateSettings({ showMetronome: show })
+      })
+    },
+    [updateSettings],
+  )
+
+  const handleAudioEnhancerSettingChange = useCallback(
+    (enabled: boolean) => {
+      startTransition(() => {
+        updateSettings({ audioEnhancerEnabled: enabled })
+      })
+    },
+    [updateSettings],
+  )
+
+  const handleResetSettings = useCallback(() => {
+    if (pitchCommitTimerRef.current !== null) {
+      window.clearTimeout(pitchCommitTimerRef.current)
+      pitchCommitTimerRef.current = null
+    }
+    setPendingPitchTrackerEnabled(null)
+    setShowPitch(false)
+    resetSettings()
+  }, [resetSettings])
 
   useEffect(() => {
     return () => {
@@ -945,24 +984,6 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
       setQuickSettingsOpen(open)
     })
   }, [])
-
-  const handleShowMetronomeChange = useCallback(
-    (show: boolean) => {
-      startTransition(() => {
-        updateSettings({ showMetronome: show })
-      })
-    },
-    [updateSettings],
-  )
-
-  const handleQuickAudioEnhancerChange = useCallback(
-    (enabled: boolean) => {
-      startTransition(() => {
-        updateSettings({ audioEnhancerEnabled: enabled })
-      })
-    },
-    [updateSettings],
-  )
 
   const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
 
@@ -1715,15 +1736,15 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
             recordDropRef={recordDeleteDropRef}
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
-            pitchTrackerEnabled={pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled}
+            pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
             pitchToggleVisible
-            showTakeCards={settings.showTakeCards}
-            onPitchTrackerChange={handleQuickPitchTrackerChange}
-            onShowTakeCardsChange={(show) => updateSettings({ showTakeCards: show })}
-            showMetronome={settings.showMetronome}
-            onShowMetronomeChange={handleShowMetronomeChange}
-            audioEnhancerEnabled={settings.audioEnhancerEnabled}
-            onAudioEnhancerChange={handleQuickAudioEnhancerChange}
+            showTakeCards={hudQuickSettings.showTakeCards}
+            onPitchTrackerChange={handlePitchTrackerSettingChange}
+            onShowTakeCardsChange={handleShowTakeCardsSettingChange}
+            showMetronome={hudQuickSettings.showMetronome}
+            onShowMetronomeChange={handleShowMetronomeSettingChange}
+            audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
+            onAudioEnhancerChange={handleAudioEnhancerSettingChange}
             settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
             onBranchOpenChange={handleQuickSettingsOpenChange}
           />
@@ -1805,10 +1826,13 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
         isOpen={isSettingsOpen}
         onClose={handleCloseSettings}
         settings={settings}
-        pitchDisplayEnabled={pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled}
+        hudQuickSettings={hudQuickSettings}
         onUpdate={updateSettings}
-        onPitchTrackerChange={handlePitchTrackerChange}
-        onReset={resetSettings}
+        onPitchTrackerChange={handlePitchTrackerSettingChange}
+        onShowTakeCardsChange={handleShowTakeCardsSettingChange}
+        onShowMetronomeChange={handleShowMetronomeSettingChange}
+        onAudioEnhancerChange={handleAudioEnhancerSettingChange}
+        onReset={handleResetSettings}
         recordingMode={recordingMode}
         onEnterStudio={onEnterStudio}
       />

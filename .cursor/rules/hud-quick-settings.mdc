@@ -1,0 +1,22 @@
+---
+description: Keep long-press quick settings and Settings drawer toggles in sync
+globs: src/App.tsx,src/components/SettingsBranchWheel.tsx,src/components/SettingsDrawer.tsx,src/components/ControlDeck.tsx,src/utils/hudQuickSettings.ts
+alwaysApply: false
+---
+
+# HUD quick settings sync
+
+The long-press **Settings branch wheel** and the tap **Settings drawer** must share one source of truth for:
+
+- `pitchTrackerEnabled`
+- `showTakeCards`
+- `showMetronome`
+- `audioEnhancerEnabled`
+
+## Rules
+
+1. Read display values from `HudQuickSettings` / `settings` — never from widget visibility (`showPitch`) or separate local toggle state.
+2. Use the **same change handlers** in `App.tsx` for both UIs; do not fork quick vs drawer update paths.
+3. Branch wheel `active` / highlighted state must equal the Settings drawer toggle `checked` state for each setting.
+4. When a setting is off in Settings, the branch icon must **not** be highlighted.
+5. Toggling in either UI must call `updateSettings` (pitch may defer commit in audio mode via `pendingPitchTrackerEnabled`, but both UIs must read the same pending overlay).

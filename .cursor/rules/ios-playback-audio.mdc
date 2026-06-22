@@ -1,0 +1,22 @@
+---
+description: iOS take playback audio — native-direct path prevents 1s cutout
+globs: src/utils/takePlayback*.ts,src/utils/playbackAudioContext.ts,src/components/TakeVideoPlayer.tsx
+alwaysApply: false
+---
+
+# iOS take playback audio
+
+Single-track take playback on native iOS must **not** route through Web Audio (`MediaElementAudioSourceNode` + `el.muted = true`) unless required (audio enhancer, pitch analysis graph, or simultaneous multi-track mixing).
+
+## Why
+
+Routing a muted element through Web Audio with nothing actively pulling the graph (no analyser loop) causes iOS WKWebView to **starve audio after ~1 second** and play at **low volume** from the wrong speaker.
+
+## Required pattern
+
+1. **Native-direct for single playback**: `routeTakePlaybackToSpeaker(el, volume, muted, { allowNativeDirect: true })` when no enhancer and the element is not already wired — play the element **unmuted** and rely on `AVAudioSession` in `AppDelegate.swift` (`overrideOutputAudioPort(.speaker)`).
+2. **Web Audio only when needed**: batch/simultaneous tracks, enhancer enabled, or pitch analysis already registered a speaker route.
+3. **User-gesture `.play()`**: call synchronously inside `onClick` / `onPointerUp`; never await before `.play()`.
+4. **Capacitor URIs**: never assign raw `file://` to `media.src`; use `resolveMediaPlaybackSrc` / `assignMediaPlaybackSrc`.
+
+Do not re-introduce mic suspension during playback, `AudioSessionPlugin`, or `playbackKeepAlive` timers — they caused regressions.
