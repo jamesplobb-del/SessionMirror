@@ -317,11 +317,9 @@ function BestTakeBox({
                 loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
                 mirror={take!.mirrorPlayback !== false}
                 recordingOrientation={take!.recordingOrientation}
-                controls={false}
                 manualPlayOnly
                 audible={playbackAudible}
                 eagerLoad
-                preload="auto"
               />
 
               {onExpand && (

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
 import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
-import { mobileVideoProps } from '../../utils/mobileVideo'
+import { applyBulletproofVideoElement, iosBulletproofVideoProps } from '../../utils/mobileVideo'
+import { resolveMediaPlaybackSrc } from '../../utils/mediaPlayback'
 import { useMultiTrackStudio, type StudioCountInPrefs, type StudioTrack } from './useMultiTrackStudio'
 import { attachLiveStreamPreview, isLiveMediaStream } from './studioLivePreview'
 
@@ -75,8 +76,10 @@ function TrackBox({
 
     if (track.recordedUrl) {
       if (el.srcObject) el.srcObject = null
-      if (el.src !== track.recordedUrl) {
-        el.src = track.recordedUrl
+      const safeSrc = resolveMediaPlaybackSrc(track.recordedUrl)
+      applyBulletproofVideoElement(el)
+      if (el.src !== safeSrc) {
+        el.src = safeSrc
         el.load()
       }
       if (track.status !== 'PLAYING' && !el.paused) {
@@ -133,10 +136,8 @@ function TrackBox({
     >
       <video
         ref={videoElRef}
-        playsInline
         muted
-        preload="auto"
-        {...mobileVideoProps}
+        {...iosBulletproofVideoProps}
         className={`studio-track-video absolute inset-0 h-full w-full object-cover ${
           isRecording || hasTake ? '-scale-x-100' : ''
         }`}
@@ -306,9 +307,9 @@ function FullscreenTrackLayer({
     <div className="fixed inset-0 z-[250] flex flex-col bg-black">
       <video
         ref={previewRef}
-        playsInline
+        autoPlay
         muted
-        {...mobileVideoProps}
+        {...iosBulletproofVideoProps}
         className={`studio-immersive-preview absolute inset-0 h-full w-full object-cover camera-preview camera-preview--mirror ${
           showCamera ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}

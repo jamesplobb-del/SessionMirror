@@ -31,6 +31,7 @@ import {
 } from './utils/takePlaybackAudio'
 import {
   prepareInlineMediaElement,
+  resolveMediaPlaybackSrc,
   waitForMediaReadyWithRetry,
 } from './utils/mediaPlayback'
 import {
@@ -317,7 +318,7 @@ function StandardApp({ onEnterStudio }: { onEnterStudio: () => void }) {
 
       prepareInlineMediaElement(audio)
       audio.preload = 'auto'
-      audio.src = playbackUrl
+      audio.src = resolveMediaPlaybackSrc(playbackUrl)
       audio.load()
 
       void (async () => {

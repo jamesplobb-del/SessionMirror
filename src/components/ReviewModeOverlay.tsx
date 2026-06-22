@@ -84,8 +84,6 @@ function ReviewTakeLayer({
           audible
           manualPlayOnly
           eagerLoad
-          preload="auto"
-          controls={false}
         />
       </div>
     )
@@ -109,12 +107,10 @@ function ReviewTakeLayer({
         audible
         manualPlayOnly
         eagerLoad
-        preload="auto"
         style={{
           WebkitTouchCallout: 'default',
           userSelect: 'auto',
         }}
-        controls={false}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

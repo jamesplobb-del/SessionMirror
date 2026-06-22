@@ -315,11 +315,9 @@ function PipWindow({
               loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
               mirror={mirror}
               recordingOrientation={recordingOrientation}
-              controls={false}
               manualPlayOnly
               audible={playbackAudible}
               eagerLoad
-              preload="auto"
             />
 
             {onExpand && (

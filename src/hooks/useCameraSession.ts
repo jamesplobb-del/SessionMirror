@@ -120,7 +120,7 @@ function attachPreviewStream(
     video.srcObject = stream
   }
   video.muted = true
-  void video.play().catch(() => {})
+  void video.play().catch((err) => console.warn('Playback intercepted:', err))
 }
 
 function attachPreviewTargets(

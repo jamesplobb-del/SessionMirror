@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEventHandl
 import { Mic } from 'lucide-react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
+import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
@@ -12,7 +12,10 @@ import {
 } from '../utils/takeVideoPlayback'
 
 export interface TakeVideoPlayerProps
-  extends Omit<VideoHTMLAttributes<HTMLVideoElement>, 'src'> {
+  extends Omit<
+    VideoHTMLAttributes<HTMLVideoElement>,
+    'src' | 'controls' | 'preload' | 'playsInline'
+  > {
   filePath: string
   videoUrl: string
   mimeType?: string
@@ -28,7 +31,6 @@ export interface TakeVideoPlayerProps
   audible?: boolean
   mirroredControls?: boolean
   videoSourceKey?: string
-  preload?: 'auto' | 'metadata' | 'none'
 }
 
 export default function TakeVideoPlayer({
@@ -38,7 +40,6 @@ export default function TakeVideoPlayer({
   videoRef: externalVideoRef,
   className,
   loadingClassName = 'h-full w-full animate-pulse bg-stone-900',
-  controls = true,
   mirror = false,
   recordingOrientation,
   fit = 'cover',
@@ -46,9 +47,8 @@ export default function TakeVideoPlayer({
   thumbnailPreview = false,
   manualPlayOnly = false,
   audible = false,
-  mirroredControls = false,
+  mirroredControls: _mirroredControls = false,
   videoSourceKey,
-  preload = 'metadata',
   style,
   ...rest
 }: TakeVideoPlayerProps) {
@@ -132,11 +132,11 @@ export default function TakeVideoPlayer({
           ref={mediaRef as RefObject<HTMLAudioElement>}
           className="sr-only"
           src={mediaSrc}
-          preload={preload}
           {...audioRest}
           muted
           autoPlay={false}
           playsInline
+          preload="auto"
           {...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>)}
         />
         <div
@@ -173,12 +173,6 @@ export default function TakeVideoPlayer({
 
   const { onLoadedMetadata, ...videoRest } = rest
 
-  const replayElementProps = {
-    playsInline: true,
-    disablePictureInPicture: true,
-    ...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>),
-  }
-
   const videoElement = (
     <video
       key={videoSourceKey ?? mediaSrc ?? 'empty'}
@@ -195,13 +189,9 @@ export default function TakeVideoPlayer({
         onLoadedMetadata?.(event)
       }}
       {...videoRest}
-      {...replayElementProps}
       muted
       autoPlay={false}
-      controls={
-        thumbnailPreview ? false : mirror && !mirroredControls ? false : controls
-      }
-      preload={preload}
+      {...iosBulletproofVideoProps}
     />
   )
 

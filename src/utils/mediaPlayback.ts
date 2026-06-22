@@ -1,10 +1,26 @@
+import { applyStrictPlaybackSrc } from './takeStorage'
+import { applyBulletproofVideoElement } from './mobileVideo'
+
 /** Inline playback attributes required by iOS WebKit. */
 export function prepareInlineMediaElement(media: HTMLMediaElement): void {
   media.volume = 1
+  media.preload = 'auto'
   media.setAttribute('playsinline', 'true')
   media.setAttribute('webkit-playsinline', 'true')
+  if (media instanceof HTMLVideoElement) {
+    applyBulletproofVideoElement(media)
+  }
   // Muted state is owned by the Web Audio speaker bus — never unmute here or iOS
   // briefly routes through the quiet earpiece receiver.
+}
+
+/**
+ * Wrap local file URIs with Capacitor.convertFileSrc before assigning to media src.
+ * Skips blob:, http(s):, and already-converted capacitor playback URLs.
+ */
+export function resolveMediaPlaybackSrc(url: string): string {
+  if (!url) return url
+  return applyStrictPlaybackSrc(url)
 }
 
 /** Play with promise catch so iOS blocks never stall the main thread. */
@@ -13,7 +29,7 @@ export function safePlayMedia(media: HTMLMediaElement): Promise<boolean> {
     .play()
     .then(() => true)
     .catch((error: unknown) => {
-      console.warn('iOS Playback blocked:', error)
+      console.warn('Playback intercepted:', error)
       return false
     })
 }

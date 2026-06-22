@@ -8,6 +8,8 @@ import {
   drawTakeVideoFrame,
   type RecordingOrientation,
 } from './takeVideoTransform'
+import { resolveMediaPlaybackSrc } from './mediaPlayback'
+import { applyBulletproofVideoElement } from './mobileVideo'
 import type { Take } from '../types'
 
 const THUMBNAIL_SEEK_SECONDS = 0.1
@@ -130,12 +132,8 @@ export async function regenerateTakeThumbnailFromVideo(
 
 function configureThumbnailVideoElement(video: HTMLVideoElement): void {
   video.muted = true
-  video.playsInline = true
-  video.setAttribute('playsinline', 'true')
-  video.setAttribute('webkit-playsinline', 'true')
-  video.disablePictureInPicture = true
-  video.preload = 'metadata'
   video.crossOrigin = 'anonymous'
+  applyBulletproofVideoElement(video)
 }
 
 function captureThumbnailFromVideoUrl(
@@ -255,7 +253,7 @@ function captureThumbnailFromVideoUrl(
       { once: true },
     )
 
-    video.src = url
+    video.src = resolveMediaPlaybackSrc(url)
     video.load()
   })
 }

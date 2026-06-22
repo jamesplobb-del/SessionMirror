@@ -8,7 +8,8 @@ import {
   outputDimensionsForTransform,
   type RecordingOrientation,
 } from './takeVideoTransform'
-import { estimateVideoBitrate, getRecorderMimeType } from './mobileVideo'
+import { estimateVideoBitrate, getRecorderMimeType, applyBulletproofVideoElement } from './mobileVideo'
+import { resolveMediaPlaybackSrc } from './mediaPlayback'
 import { persistUploadedVideo, resolveNativeVideoPlaybackSrc, type PersistedTakeVideo } from './takeStorage'
 import type { Take } from '../types'
 
@@ -69,10 +70,8 @@ function loadVideoMetadata(
 ): Promise<{ video: HTMLVideoElement; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
-    video.playsInline = true
-    video.setAttribute('webkit-playsinline', 'true')
-    video.preload = 'auto'
-    video.src = url
+    applyBulletproofVideoElement(video)
+    video.src = resolveMediaPlaybackSrc(url)
 
     const cleanup = () => {
       video.pause()
@@ -224,7 +223,10 @@ async function transcodeTakeVideoForExport(
     void (async () => {
       try {
         video.muted = false
-        await video.play()
+        await video.play().catch((err) => {
+          console.warn('Playback intercepted:', err)
+          throw err
+        })
 
         const captureStream = (
           video as HTMLVideoElement & { captureStream?: () => MediaStream }

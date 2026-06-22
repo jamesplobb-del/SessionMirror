@@ -10,6 +10,21 @@ import { getVideoCaptureConstraintsForOrientation } from './videoCapture'
 /** Shared inline-playback attributes for iOS / mobile Safari (live camera). */
 export const mobileVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
   playsInline: true,
+  preload: 'auto',
+  controls: false,
+  disablePictureInPicture: true,
+  ...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>),
+}
+
+/**
+ * Required attrs for every `<video>` on iOS WKWebView — prevents fullscreen hijack
+ * and RBS media-playback assertion termination.
+ */
+export const iosBulletproofVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
+  playsInline: true,
+  preload: 'auto',
+  controls: false,
+  disablePictureInPicture: true,
   ...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>),
 }
 
@@ -18,17 +33,23 @@ export const mobileVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
  * Muted prevents audio-session lock / main-thread freezes on init.
  */
 export const iosTakeVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
-  playsInline: true,
+  ...iosBulletproofVideoProps,
   muted: true,
-  disablePictureInPicture: true,
-  preload: 'metadata',
-  ...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>),
 }
 
-/** @deprecated Use iosTakeVideoProps */
+/** @deprecated Use iosBulletproofVideoProps */
 export const iosReplayVideoProps: VideoHTMLAttributes<HTMLVideoElement> = {
   ...iosTakeVideoProps,
-  controls: true,
+}
+
+/** Apply bulletproof inline attrs directly on a DOM video element. */
+export function applyBulletproofVideoElement(video: HTMLVideoElement): void {
+  video.playsInline = true
+  video.preload = 'auto'
+  video.controls = false
+  video.disablePictureInPicture = true
+  video.setAttribute('playsinline', 'true')
+  video.setAttribute('webkit-playsinline', 'true')
 }
 
 export function getRecorderMimeType(): string {

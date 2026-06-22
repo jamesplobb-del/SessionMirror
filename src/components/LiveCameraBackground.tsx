@@ -1,7 +1,7 @@
-import { memo, useEffect, type RefObject, type VideoHTMLAttributes } from 'react'
+import { memo, useEffect, type RefObject } from 'react'
 import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
-import { mobileVideoProps } from '../utils/mobileVideo'
+import { iosBulletproofVideoProps } from '../utils/mobileVideo'
 
 interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
@@ -53,9 +53,9 @@ function LiveCameraBackground({
 
     if (video.srcObject !== stream) {
       video.srcObject = stream
-      void video.play().catch(() => {})
+      void video.play().catch((err) => console.warn('Playback intercepted:', err))
     } else if (video.paused) {
-      void video.play().catch(() => {})
+      void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
   }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode])
 
@@ -76,7 +76,7 @@ function LiveCameraBackground({
         video.srcObject = stream
       }
       if (video.paused) {
-        void video.play().catch(() => {})
+        void video.play().catch((err) => console.warn('Playback intercepted:', err))
       }
     }
 
@@ -103,7 +103,7 @@ function LiveCameraBackground({
     if (video.srcObject !== stream) {
       video.srcObject = stream
     }
-    void video.play().catch(() => {})
+    void video.play().catch((err) => console.warn('Playback intercepted:', err))
   }, [isAudioMode, previewRef, streamRef, streamGeneration, visuallySuppressed])
 
   const shellClass = isEmbedded
@@ -118,12 +118,7 @@ function LiveCameraBackground({
         ref={previewRef}
         autoPlay
         muted
-        playsInline
-        disablePictureInPicture
-        {...mobileVideoProps}
-        {...({
-          'webkit-playsinline': 'true',
-        } as VideoHTMLAttributes<HTMLVideoElement>)}
+        {...iosBulletproofVideoProps}
         className={`${
           isEmbedded ? 'camera-preview--embedded' : 'camera-preview'
         } camera-preview--mirror camera-preview--live ${

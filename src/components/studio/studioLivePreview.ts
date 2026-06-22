@@ -1,5 +1,7 @@
 /** Attach a live camera stream and start inline preview (iOS-safe). */
 
+import { applyBulletproofVideoElement } from '../../utils/mobileVideo'
+
 const PREVIEW_PLAY_RETRIES = 4
 const PREVIEW_RETRY_MS = 120
 
@@ -26,15 +28,14 @@ export async function attachLiveStreamPreview(
   }
   el.muted = true
   el.defaultMuted = true
-  el.playsInline = true
-  el.setAttribute('playsinline', 'true')
-  el.setAttribute('webkit-playsinline', 'true')
+  applyBulletproofVideoElement(el)
 
   const tryPlay = async (): Promise<boolean> => {
     try {
       await el.play()
       return !el.paused
-    } catch {
+    } catch (err) {
+      console.warn('Playback intercepted:', err)
       return false
     }
   }
