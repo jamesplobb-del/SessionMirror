@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { assignMediaPlaybackSrc, prepareInlineMediaElement } from '../../utils/mediaPlayback'
-import { applyBulletproofVideoElement } from '../../utils/mobileVideo'
+import { assignMediaPlaybackSrc, prepareInlineMediaElement, resolveMediaPlaybackSrc } from '../../utils/mediaPlayback'
+import {
+  applyBulletproofVideoElement,
+  createMediaRecorder,
+  getRecorderMimeType,
+  withWebKitThumbnailHint,
+} from '../../utils/mobileVideo'
+import {
+  deleteTakeFile,
+  persistUploadedVideo,
+} from '../../utils/takeStorage'
 import {
   playTakeMediaBatchFromUserGesture,
   playTakeMediaFromUserGesture,
@@ -35,6 +44,8 @@ export interface StudioTrack {
   id: 1 | 2 | 3 | 4
   stream: MediaStream | null
   recordedUrl: string | null
+  recordedFilePath: string | null
+  recordedMimeType: string | null
   status: TrackStatus
   isMuted: boolean
   volume: number
@@ -68,6 +79,8 @@ function makeInitialTracks(): StudioTrack[] {
     id,
     stream: null,
     recordedUrl: null,
+    recordedFilePath: null,
+    recordedMimeType: null,
     status: 'IDLE' as TrackStatus,
     isMuted: false,
     volume: 1,
@@ -78,22 +91,16 @@ function trackIndex(id: 1 | 2 | 3 | 4): number {
   return id - 1
 }
 
-function getBestMimeType(): string {
-  const candidates = [
-    'video/webm;codecs=vp9,opus',
-    'video/webm;codecs=vp8,opus',
-    'video/webm',
-    'video/mp4',
-  ]
-  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
+function studioPlaybackSrc(url: string): string {
+  return withWebKitThumbnailHint(resolveMediaPlaybackSrc(url))
 }
 
 function primeRecordedVideo(el: HTMLVideoElement, url: string): void {
   if (el.srcObject) el.srcObject = null
-  prepareInlineMediaElement(el, { preload: 'metadata' })
+  prepareInlineMediaElement(el, { preload: 'auto' })
   applyBulletproofVideoElement(el)
-  const safeSrc = assignMediaPlaybackSrc(el, url)
-  if (el.src !== safeSrc) {
+  const safeSrc = assignMediaPlaybackSrc(el, studioPlaybackSrc(url))
+  if (el.src !== safeSrc && el.currentSrc !== safeSrc) {
     el.load()
   }
 }
@@ -127,6 +134,7 @@ export function useMultiTrackStudio() {
   const [countdownTrackId, setCountdownTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [armingTrackId, setArmingTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [postRecordReviewId, setPostRecordReviewId] = useState<1 | 2 | 3 | 4 | null>(null)
+  const [persistingTrackId, setPersistingTrackId] = useState<1 | 2 | 3 | 4 | null>(null)
   const [recordingElapsed, setRecordingElapsed] = useState(0)
   const [isArmingCamera, setIsArmingCamera] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -428,12 +436,19 @@ export function useMultiTrackStudio() {
 
       setTracks((prev) => {
         const target = prev.find((t) => t.id === id)
-        if (target?.recordedUrl) URL.revokeObjectURL(target.recordedUrl)
+        if (target?.recordedUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(target.recordedUrl)
+        }
+        if (target?.recordedFilePath) {
+          void deleteTakeFile(target.recordedFilePath)
+        }
         return prev.map((t) =>
           t.id === id
             ? {
                 ...t,
                 recordedUrl: null,
+                recordedFilePath: null,
+                recordedMimeType: null,
                 stream: null,
                 status: 'IDLE' as TrackStatus,
                 isMuted: false,
@@ -457,10 +472,8 @@ export function useMultiTrackStudio() {
       chunksRef.current = []
       recordingIdRef.current = id
 
-      const mimeType = getBestMimeType()
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream)
+      const mimeType = getRecorderMimeType()
+      const recorder = createMediaRecorder(stream, mimeType)
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
@@ -477,24 +490,21 @@ export function useMultiTrackStudio() {
         pauseOverdubPlayback(trackId)
         stopRecordTimer()
 
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' })
-        const url = URL.createObjectURL(blob)
+        const resolvedMime = recorder.mimeType || mimeType
+        const blob = new Blob(chunksRef.current, { type: resolvedMime })
         chunksRef.current = []
         recordingIdRef.current = null
         recorderRef.current = null
 
-        setTracks((prev) => {
-          const old = prev.find((t) => t.id === trackId)?.recordedUrl
-          if (old) URL.revokeObjectURL(old)
-          return prev.map((t) =>
+        setTracks((prev) =>
+          prev.map((t) =>
             t.id === trackId
-              ? { ...t, stream: null, recordedUrl: url, status: 'IDLE' as TrackStatus }
+              ? { ...t, stream: null, status: 'IDLE' as TrackStatus }
               : t,
-          )
-        })
+          ),
+        )
 
         setArmingTrackId(null)
-        setPostRecordReviewId(trackId)
 
         for (let slot = 0; slot < TRACK_IDS.length; slot++) {
           const trackIdAtSlot = TRACK_IDS[slot]!
@@ -508,6 +518,73 @@ export function useMultiTrackStudio() {
             /* metadata may not be ready */
           }
         }
+
+        if (blob.size === 0) {
+          setCameraError('Recording was empty — try again.')
+          return
+        }
+
+        const persistId = `studio-${trackId}-${crypto.randomUUID()}`
+        setPersistingTrackId(trackId)
+
+        void (async () => {
+          try {
+            const { filePath, videoUrl } = await persistUploadedVideo(
+              blob,
+              persistId,
+              resolvedMime,
+            )
+            // #region agent log
+            fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'useMultiTrackStudio.ts:onstop',message:'take persisted',data:{trackId,blobSize:blob.size,mimeType:resolvedMime,hasFilePath:Boolean(filePath),urlPrefix:videoUrl.slice(0,24)},timestamp:Date.now(),hypothesisId:'A,B'})}).catch(()=>{});
+            // #endregion
+            setTracks((prev) => {
+              const old = prev.find((t) => t.id === trackId)
+              if (old?.recordedUrl?.startsWith('blob:')) {
+                URL.revokeObjectURL(old.recordedUrl)
+              }
+              if (old?.recordedFilePath && old.recordedFilePath !== filePath) {
+                void deleteTakeFile(old.recordedFilePath)
+              }
+              return prev.map((t) =>
+                t.id === trackId
+                  ? {
+                      ...t,
+                      stream: null,
+                      recordedUrl: videoUrl,
+                      recordedFilePath: filePath || null,
+                      recordedMimeType: resolvedMime,
+                      status: 'IDLE' as TrackStatus,
+                    }
+                  : t,
+              )
+            })
+            setPostRecordReviewId(trackId)
+          } catch (err) {
+            console.error('studio take persist failed', err)
+            const fallbackUrl = URL.createObjectURL(blob)
+            setTracks((prev) => {
+              const old = prev.find((t) => t.id === trackId)
+              if (old?.recordedUrl?.startsWith('blob:')) {
+                URL.revokeObjectURL(old.recordedUrl)
+              }
+              return prev.map((t) =>
+                t.id === trackId
+                  ? {
+                      ...t,
+                      stream: null,
+                      recordedUrl: fallbackUrl,
+                      recordedFilePath: null,
+                      recordedMimeType: resolvedMime,
+                      status: 'IDLE' as TrackStatus,
+                    }
+                  : t,
+              )
+            })
+            setPostRecordReviewId(trackId)
+          } finally {
+            setPersistingTrackId(null)
+          }
+        })()
       }
 
       recorder.start()
@@ -881,6 +958,9 @@ export function useMultiTrackStudio() {
       const beginPlayback = () => {
         seekVideoTo(el, 0)
         void playTakeMediaMuted(el).then((ok) => {
+          // #region agent log
+          fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'useMultiTrackStudio.ts:reviewPlayback',message:'review play attempt',data:{trackId:id,ok,readyState:el.readyState,videoW:el.videoWidth,videoH:el.videoHeight,srcPrefix:(el.currentSrc||el.src||'').slice(0,32)},timestamp:Date.now(),hypothesisId:'C,D'})}).catch(()=>{});
+          // #endregion
           if (!ok) return
           setTracks((prev) =>
             prev.map((t) => (t.id === id ? { ...t, status: 'PLAYING' as TrackStatus } : t)),
@@ -971,7 +1051,8 @@ export function useMultiTrackStudio() {
       liveStreamRef.current?.getTracks().forEach((t) => t.stop())
       recorderRef.current?.stop()
       tracksRef.current.forEach((t) => {
-        if (t.recordedUrl) URL.revokeObjectURL(t.recordedUrl)
+        if (t.recordedUrl?.startsWith('blob:')) URL.revokeObjectURL(t.recordedUrl)
+        if (t.recordedFilePath) void deleteTakeFile(t.recordedFilePath)
       })
       closeStudioMetronomeAudio()
       void resumePlaybackAudioContext()
@@ -1011,6 +1092,7 @@ export function useMultiTrackStudio() {
     selectedTrackId,
     countInPrefs,
     postRecordReviewId,
+    persistingTrackId,
     recordingElapsed,
     isArmingCamera,
     cameraError,

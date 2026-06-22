@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
 import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
-import { applyBulletproofVideoElement, iosBulletproofVideoProps } from '../../utils/mobileVideo'
-import { assignMediaPlaybackSrc, prepareInlineMediaElement } from '../../utils/mediaPlayback'
+import { applyBulletproofVideoElement, iosBulletproofVideoProps, withWebKitThumbnailHint } from '../../utils/mobileVideo'
+import { assignMediaPlaybackSrc, prepareInlineMediaElement, resolveMediaPlaybackSrc } from '../../utils/mediaPlayback'
 import { useMultiTrackStudio, type StudioCountInPrefs, type StudioTrack } from './useMultiTrackStudio'
 import StudioMetronomeBar from './StudioMetronomeBar'
 import { attachLiveStreamPreview, isLiveMediaStream } from './studioLivePreview'
@@ -27,6 +27,7 @@ function TrackBox({
   slotIndex,
   videoRefs,
   showPostRecordReview,
+  isPersisting,
   suppressLivePreview,
   acceptGridInput,
   isSelected,
@@ -44,6 +45,7 @@ function TrackBox({
   slotIndex: number
   videoRefs: MutableRefObject<(HTMLVideoElement | null)[]>
   showPostRecordReview: boolean
+  isPersisting: boolean
   suppressLivePreview: boolean
   acceptGridInput: boolean
   isSelected: boolean
@@ -79,10 +81,13 @@ function TrackBox({
 
     if (track.recordedUrl) {
       if (el.srcObject) el.srcObject = null
-      prepareInlineMediaElement(el, { preload: 'metadata' })
+      prepareInlineMediaElement(el, { preload: 'auto' })
       applyBulletproofVideoElement(el)
-      const safeSrc = assignMediaPlaybackSrc(el, track.recordedUrl)
-      if (el.src !== safeSrc) {
+      const safeSrc = assignMediaPlaybackSrc(
+        el,
+        withWebKitThumbnailHint(resolveMediaPlaybackSrc(track.recordedUrl)),
+      )
+      if (el.src !== safeSrc && el.currentSrc !== safeSrc) {
         el.load()
       }
       if (track.status !== 'PLAYING' && !showPostRecordReview) {
@@ -112,8 +117,17 @@ function TrackBox({
     const el = videoElRef.current
     if (!el) return
     el.addEventListener('ended', onEnded)
-    return () => el.removeEventListener('ended', onEnded)
-  }, [onEnded])
+    const onError = () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'StudioSandbox.tsx:TrackBox',message:'video error',data:{slotIndex,readyState:el.readyState,networkState:el.networkState,srcPrefix:(el.currentSrc||el.src||'').slice(0,32)},timestamp:Date.now(),hypothesisId:'A,C'})}).catch(()=>{});
+      // #endregion
+    }
+    el.addEventListener('error', onError)
+    return () => {
+      el.removeEventListener('ended', onEnded)
+      el.removeEventListener('error', onError)
+    }
+  }, [onEnded, slotIndex])
 
   const showStop = track.status === 'RECORDING' || track.status === 'PLAYING'
   const showPlay = track.status === 'IDLE' && !!track.recordedUrl && !showPostRecordReview
@@ -170,6 +184,14 @@ function TrackBox({
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
           <span className="rounded-full border border-amber-400/40 bg-black/50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-amber-200/90">
             {isRecording ? 'Count-in · REC' : 'Count-in…'}
+          </span>
+        </div>
+      )}
+
+      {isPersisting && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/50">
+          <span className="rounded-full border border-white/20 bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white/70">
+            Saving take…
           </span>
         </div>
       )}
@@ -511,6 +533,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
     selectedTrackId,
     countInPrefs,
     postRecordReviewId,
+    persistingTrackId,
     recordingElapsed,
     isArmingCamera,
     cameraError,
@@ -632,6 +655,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
               slotIndex={track.id - 1}
               videoRefs={videoRefs}
               showPostRecordReview={postRecordReviewId === track.id}
+              isPersisting={persistingTrackId === track.id}
               suppressLivePreview={isImmersive}
               acceptGridInput={acceptGridInput}
               isSelected={selectedTrackId === track.id}

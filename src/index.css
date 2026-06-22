@@ -2240,7 +2240,6 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 /* Recorded take playback — lightweight (no global camera-preview fixed positioning) */
 .studio-track-video {
-  contain: strict;
   transform: translateZ(0);
 }
 
