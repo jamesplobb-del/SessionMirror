@@ -8,11 +8,19 @@ import {
   releaseTakePlaybackAudio,
 } from '../../utils/takePlaybackAudio'
 import {
-  beatIntervalMs,
   closeStudioMetronomeAudio,
   playMetronomeClick,
   primeStudioMetronomeAudioSync,
 } from './studioMetronome'
+import {
+  DEFAULT_METER,
+  DEFAULT_SUBDIVISION,
+  resolveStudioClickAccent,
+  studioTickIntervalMs,
+  studioTicksPerBar,
+  type MetronomeMeter,
+  type MetronomeSubdivision,
+} from '../../utils/metronomeConfig'
 import { isLiveMediaStream } from './studioLivePreview'
 import {
   closeMixContext,
@@ -41,19 +49,20 @@ const DRIFT_THRESHOLD_SEC = 0.2
 const DRIFT_SYNC_INTERVAL_MS = 500
 
 export type StudioCountInBeats = 8 | 16
-export type StudioBeatsPerBar = 2 | 3 | 4
 
 export interface StudioCountInPrefs {
   bpm: number
   countInBeats: StudioCountInBeats
-  beatsPerBar: StudioBeatsPerBar
+  meter: MetronomeMeter
+  subdivision: MetronomeSubdivision
   metronomeDuringRep: boolean
 }
 
 const DEFAULT_STUDIO_PREFS: StudioCountInPrefs = {
   bpm: 120,
   countInBeats: 8,
-  beatsPerBar: 4,
+  meter: DEFAULT_METER,
+  subdivision: DEFAULT_SUBDIVISION,
   metronomeDuringRep: false,
 }
 
@@ -523,46 +532,66 @@ export function useMultiTrackStudio() {
     [pauseOverdubPlayback, startOverdubPlayback, startRecordTimer, stopMetronome, stopRecordTimer],
   )
 
-  const startRepMetronome = useCallback((bpm: number, beatsPerBar: StudioBeatsPerBar) => {
-    if (repMetronomeRef.current) {
-      clearInterval(repMetronomeRef.current)
-      repMetronomeRef.current = null
-    }
-    const beatMs = beatIntervalMs(bpm)
-    let repBeat = 0
-    repMetronomeRef.current = setInterval(() => {
-      void playMetronomeClick(repBeat % beatsPerBar === 0)
-      repBeat++
-    }, beatMs)
-  }, [])
+  const startRepMetronome = useCallback(
+    (bpm: number, meter: MetronomeMeter, subdivision: MetronomeSubdivision, initialTick = 0) => {
+      if (repMetronomeRef.current) {
+        clearInterval(repMetronomeRef.current)
+        repMetronomeRef.current = null
+      }
+
+      const tickMs = studioTickIntervalMs(bpm, meter, subdivision)
+      const ticksPerBar = studioTicksPerBar(meter, subdivision)
+      let tickIndex = initialTick % ticksPerBar
+
+      void playMetronomeClick(
+        resolveStudioClickAccent(meter, tickIndex, subdivision),
+      )
+      tickIndex = (tickIndex + 1) % ticksPerBar
+
+      repMetronomeRef.current = setInterval(() => {
+        void playMetronomeClick(
+          resolveStudioClickAccent(meter, tickIndex, subdivision),
+        )
+        tickIndex = (tickIndex + 1) % ticksPerBar
+      }, tickMs)
+    },
+    [],
+  )
 
   const startMetronomeCountIn = useCallback(
     (id: 1 | 2 | 3 | 4) => {
       const prefs = studioPrefsRef.current
-      const beatMs = beatIntervalMs(prefs.bpm)
-      const beatsPerBar = prefs.beatsPerBar
-      let beatsPlayed = 0
+      const tickMs = studioTickIntervalMs(prefs.bpm, prefs.meter, prefs.subdivision)
+      const ticksPerBar = studioTicksPerBar(prefs.meter, prefs.subdivision)
+      let ticksPlayed = 0
 
       primeStudioMetronomeAudioSync()
       setCountdownTrackId(id)
 
-      const playNextBeat = () => {
-        if (beatsPlayed >= prefs.countInBeats) {
+      const playNextTick = () => {
+        if (ticksPlayed >= prefs.countInBeats) {
           countTimeoutRef.current = null
           setCountdownTrackId(null)
           beginRecording(id)
           if (prefs.metronomeDuringRep) {
-            startRepMetronome(prefs.bpm, beatsPerBar)
+            startRepMetronome(
+              prefs.bpm,
+              prefs.meter,
+              prefs.subdivision,
+              ticksPlayed % ticksPerBar,
+            )
           }
           return
         }
 
-        void playMetronomeClick(beatsPlayed % beatsPerBar === 0)
-        beatsPlayed++
-        countTimeoutRef.current = setTimeout(playNextBeat, beatMs)
+        void playMetronomeClick(
+          resolveStudioClickAccent(prefs.meter, ticksPlayed % ticksPerBar, prefs.subdivision),
+        )
+        ticksPlayed++
+        countTimeoutRef.current = setTimeout(playNextTick, tickMs)
       }
 
-      playNextBeat()
+      playNextTick()
     },
     [beginRecording, startRepMetronome],
   )

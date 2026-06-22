@@ -9,7 +9,7 @@ import {
   type PointerEvent,
   type RefObject,
 } from 'react'
-import { Layout, Maximize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
+import { Maximize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import YoutubeUrlDialog from './YoutubeUrlDialog'
@@ -23,13 +23,7 @@ import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const UPLOAD_BADGE_BTN =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-slate-900/60'
-
-const SPLIT_CHROME_BTN =
-  'pointer-events-auto absolute z-30 flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 shadow-lg backdrop-blur-2xl transition-all duration-200 ease-out active:scale-95 [-webkit-tap-highlight-color:transparent]'
-
-const SPLIT_PANEL_BADGE =
-  'pointer-events-none absolute z-20 max-w-[calc(100%-5rem)] truncate whitespace-nowrap rounded-md border border-sky-200/10 bg-slate-950/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400 backdrop-blur-2xl shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-black/60'
 
 const emptyActionClass =
   'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition hover:bg-white/10'
@@ -187,12 +181,12 @@ function BestTakeBox({
     : 'pip-video-container group relative aspect-video'
 
   const innerClass = isFill
-    ? `relative z-0 h-full w-full overflow-hidden bg-[#111827] ${
-        hasReference ? 'opacity-100' : 'opacity-95'
-      }`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-slate-900/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    ? `relative z-0 h-full w-full overflow-hidden bg-black/95 ring-1 ring-amber-400/50 ${
         hasReference ? 'opacity-100' : 'opacity-90'
-      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
+      }`
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+        hasReference ? 'opacity-100' : 'opacity-90'
+      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'}`
 
   const pillLeft = showUploadBadge ? 36 : 8
 
@@ -220,18 +214,8 @@ function BestTakeBox({
     )
   }
 
-  const renderSplitToggleButton = () => {
-    if (!onToggleSplitView) return null
-
-    const exitingSplit = splitViewActive
-    const Icon = exitingSplit ? Layout : Maximize2
-    const ariaLabel = exitingSplit ? 'Return to normal view' : 'Open split view layout'
-
-    const style = exitingSplit
-      ? { bottom: chromeInset, right: chromeInset }
-      : hasReference
-        ? { bottom: chromeInset, right: chromeInset }
-        : { top: chromeInset, right: chromeInset }
+  const renderExpandButton = () => {
+    if (!onToggleSplitView || splitViewActive) return null
 
     return (
       <button
@@ -243,11 +227,11 @@ function BestTakeBox({
           e.stopPropagation()
           onToggleSplitView()
         }}
-        className={SPLIT_CHROME_BTN}
-        style={style}
-        aria-label={ariaLabel}
+        className={UPLOAD_BADGE_BTN}
+        style={{ top: chromeInset, right: chromeInset }}
+        aria-label="Open split view layout"
       >
-        <Icon className="h-[18px] w-[18px] stroke-[1.5]" aria-hidden />
+        <Maximize2 className="h-3 w-3 stroke-[2]" aria-hidden />
       </button>
     )
   }
@@ -269,12 +253,10 @@ function BestTakeBox({
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
           <span
-            className={
-              isFill
-                ? SPLIT_PANEL_BADGE
-                : 'pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white'
-            }
-            style={{ top: isFill ? 10 : 4, left: isFill ? 10 : pillLeft }}
+            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
+              isFill ? 'px-2 py-0.5 text-[10px]' : ''
+            }`}
+            style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
           >
             Best Take
           </span>
@@ -297,7 +279,7 @@ function BestTakeBox({
                 videoRef={videoRef}
                 videoSourceKey={videoSourceKey}
                 className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                loadingClassName="absolute inset-0 h-full w-full bg-[#111827]"
+                loadingClassName="absolute inset-0 h-full w-full bg-black"
                 mirror={take!.mirrorPlayback !== false}
                 recordingOrientation={take!.recordingOrientation}
                 manualPlayOnly
@@ -351,7 +333,7 @@ function BestTakeBox({
               )}
             </>
           ) : (
-            <div className="absolute inset-0 flex flex-col bg-slate-900/95">
+            <div className="absolute inset-0 flex flex-col bg-black/95">
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 pb-2 pt-7">
                 <p className={`text-center leading-snug text-white/50 ${isFill ? 'text-xs' : 'text-[8px]'}`}>
                   Drag Current Take here or upload.
@@ -384,7 +366,7 @@ function BestTakeBox({
           )}
 
           {renderClearButton()}
-          {renderSplitToggleButton()}
+          {renderExpandButton()}
 
           {showUploadBadge && (
             <label

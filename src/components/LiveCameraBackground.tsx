@@ -162,7 +162,7 @@ function LiveCameraBackground({
       )}
 
       {error && (
-        <div className={`${overlayClass} flex items-center justify-center bg-stone-900`}>
+        <div className={`${overlayClass} flex items-center justify-center bg-black`}>
           <p className="max-w-sm px-6 text-center text-sm text-white/70">{error}</p>
         </div>
       )}

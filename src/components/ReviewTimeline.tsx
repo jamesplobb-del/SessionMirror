@@ -105,7 +105,7 @@ export default function ReviewTimeline({
             }}
             className={`flex h-7 items-center gap-1 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wide ${
               pitchToggleActive
-                ? 'border-sky-400/40 bg-sky-500/25 text-sky-100'
+                ? 'border-[#5ce625]/40 bg-[#5ce625]/20 text-[#5ce625]'
                 : 'border-white/15 bg-white/10 text-white/65 hover:bg-white/15 hover:text-white/85'
             }`}
             aria-label={pitchToggleActive ? 'Hide pitch tuner' : 'Show pitch tuner'}

@@ -49,7 +49,7 @@ interface PipWindowProps {
 }
 
 const FLOAT_BADGE =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-slate-900/60'
+  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-black/60'
 
 function PipWindow({
   layout = 'pip',
@@ -271,12 +271,8 @@ function PipWindow({
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
   const badgeClass =
     variant === 'benchmark'
-      ? isFill
-        ? 'border border-sky-200/10 bg-slate-950/40 text-amber-400 backdrop-blur-2xl shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-        : 'bg-amber-500/90 text-white'
-      : isFill
-        ? 'border border-sky-200/10 bg-slate-950/40 text-cyan-400 backdrop-blur-2xl'
-        : 'bg-sky-500/90 text-white'
+      ? 'bg-amber-400/90 text-white'
+      : 'bg-sky-500/90 text-white'
 
   const chromeInset = isFill ? 8 : 4
 
@@ -285,14 +281,14 @@ function PipWindow({
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-[#111827] transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
-        hasMedia ? 'opacity-100' : 'opacity-95'
-      } ${dropHighlight ? 'pip-drop-target--active' : ''} ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-black/95 ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+        hasMedia ? 'opacity-100' : 'opacity-90'
+      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-slate-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
         hasMedia ? 'opacity-100' : 'opacity-90'
-      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
+      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
 
@@ -321,12 +317,10 @@ function PipWindow({
       <div className={orientWrapperClass}>
       <div className={innerShellClass}>
         <span
-          className={
-            isFill
-              ? `pointer-events-none absolute z-20 max-w-[calc(100%-5rem)] truncate whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${badgeClass}`
-              : `pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass}`
-          }
-          style={{ top: isFill ? 10 : chromeInset, left: isFill ? 10 : pillLeft + (showPinAsBest ? 4 : 0) }}
+          className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass} ${
+            isFill ? 'px-2 py-0.5 text-[10px]' : ''
+          }`}
+          style={{ top: chromeInset, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
         >
           {label}
         </span>
@@ -341,7 +335,7 @@ function PipWindow({
               videoRef={videoRef}
               videoSourceKey={videoSourceKey}
               className="absolute inset-0 h-full w-full pointer-events-none"
-              loadingClassName="absolute inset-0 h-full w-full bg-[#111827]"
+              loadingClassName="absolute inset-0 h-full w-full bg-black"
               mirror={mirror}
               recordingOrientation={recordingOrientation}
               fit="cover"

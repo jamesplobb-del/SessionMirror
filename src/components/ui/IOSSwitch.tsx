@@ -33,7 +33,7 @@ export default function IOSSwitch({
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
       }`}
       animate={{
-        backgroundColor: checked ? '#0ea5e9' : '#d6d3d1',
+        backgroundColor: checked ? '#5ce625' : '#d6d3d1',
       }}
       transition={iosSpringSnappy}
     >

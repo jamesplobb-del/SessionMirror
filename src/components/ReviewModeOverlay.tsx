@@ -73,7 +73,7 @@ function ReviewTakeLayer({
   if (isAudio) {
     return (
       <div
-        className="absolute inset-0 h-full w-full bg-stone-950 transition-all duration-200 ease-out"
+        className="absolute inset-0 h-full w-full bg-black transition-all duration-200 ease-out"
         style={swipeLayerStyle}
       >
         <TakeVideoPlayer

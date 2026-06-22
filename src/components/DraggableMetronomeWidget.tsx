@@ -30,6 +30,7 @@ interface DraggableMetronomeWidgetProps {
   positionId?: string
   isTakePlaying?: boolean
   muteDuringPlayback?: boolean
+  onClose?: () => void
 }
 
 const DEFAULT_WIDGET_SIZE = { width: 268, height: 128 }
@@ -74,6 +75,7 @@ export default function DraggableMetronomeWidget({
   positionId = 'main-metronome',
   isTakePlaying = false,
   muteDuringPlayback = true,
+  onClose,
 }: DraggableMetronomeWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const bpmInputId = useId()
@@ -411,6 +413,29 @@ export default function DraggableMetronomeWidget({
           className={`metronome-widget__accent ${beatIndex === 0 && playing ? 'metronome-widget__accent--pulse' : ''}`}
           aria-hidden
         />
+
+        {onClose && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              stop()
+              onClose()
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="pitch-widget-close absolute right-3 top-3 z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full transition hover:bg-white/20 active:scale-95"
+            aria-label="Close metronome"
+          >
+            <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden className="text-white/90">
+              <path
+                d="M2.5 2.5l7 7M9.5 2.5l-7 7"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        )}
 
         <div className="metronome-widget__row metronome-widget__row--main pointer-events-auto">
           <MetronomeControlButton

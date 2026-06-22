@@ -9,9 +9,6 @@ import type { RecordingMode, Take } from '../types'
 import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
-const SPLIT_CAMERA_BADGE =
-  'pointer-events-none absolute left-2.5 top-2.5 z-20 rounded-md border border-sky-200/10 bg-slate-950/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400 backdrop-blur-2xl'
-
 interface SplitCompareLayoutProps {
   splitRatio: number
   onSplitRatioChange: (ratio: number) => void
@@ -143,7 +140,7 @@ export default function SplitCompareLayout({
         />
 
         <div
-          className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-sky-200/10 bg-[#111827]"
+          className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden bg-black/95 ring-1 ring-sky-400/50"
           style={{ height: `${bottomHeight}%` }}
         >
           {showCurrentTake && challengerTake ? (
@@ -180,7 +177,7 @@ export default function SplitCompareLayout({
             </div>
           ) : (
             <>
-              <span className={SPLIT_CAMERA_BADGE}>
+              <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-sky-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
                 {isRecording
                   ? 'Recording…'
                   : recordingMode === 'audio'

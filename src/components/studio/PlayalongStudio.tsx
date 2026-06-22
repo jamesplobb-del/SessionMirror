@@ -160,7 +160,7 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
     showYoutubeIframe && (phase === 'review' || (phase === 'record' && topTab === 'youtube'))
 
   return (
-    <div className="playalong-studio fixed inset-0 z-[300] flex flex-col bg-stone-950 text-white">
+    <div className="playalong-studio fixed inset-0 z-[300] flex flex-col bg-black text-white">
       <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
         <Pressable
           type="button"
@@ -270,7 +270,7 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
           {phase === 'record' && topTab === 'mp3' && (
             <div className="relative z-[1] flex h-full flex-col gap-2 overflow-y-auto px-4 pb-4">
               {backingTrackMode === 'mp3' && backingTrackLabel && (
-                <div className="shrink-0 rounded-2xl border border-sky-400/30 bg-gradient-to-br from-sky-500/20 to-stone-900 px-4 py-5 text-center">
+                <div className="shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-[#5ce625]/10 to-black px-4 py-5 text-center">
                   <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-sky-300/30 bg-sky-400/10">
                     <Music2 className="h-7 w-7 text-sky-100" />
                   </div>
@@ -333,7 +333,7 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
           )}
 
           {phase === 'review' && backingTrackMode === 'mp3' && (
-            <div className="relative z-[1] flex h-full flex-col items-center justify-center gap-4 bg-gradient-to-b from-stone-900 to-black px-6">
+            <div className="relative z-[1] flex h-full flex-col items-center justify-center gap-4 bg-gradient-to-b from-black to-black px-6">
               <div className="flex h-16 w-16 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/10">
                 <Music2 className="h-8 w-8 text-sky-200" />
               </div>

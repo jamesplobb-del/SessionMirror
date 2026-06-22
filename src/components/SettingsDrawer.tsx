@@ -254,7 +254,7 @@ export default function SettingsDrawer({
                   className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
                   transition={iosSpringSnappy}
                 >
-                  <p className="text-sm font-semibold text-stone-900">Studio Sandbox</p>
+                  <p className="text-sm font-semibold text-stone-900">Multitrack Mode</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
                     Open an isolated multi-track overdub workspace. Standard camera and recording
                     logic stay off until you return.
@@ -271,7 +271,7 @@ export default function SettingsDrawer({
                       requestAnimationFrame(() => onEnterStudio())
                     }}
                   >
-                    Enter Studio Mode
+                    Enter Multitrack Mode
                   </Pressable>
                 </motion.div>
               )}

@@ -569,7 +569,7 @@ export default function LivePitchTuner({
 
   if (isStage) {
     return (
-      <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-stone-950">
+      <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-black">
         <div className="shrink-0 border-b border-white/8 px-5 py-4">
           <div className="flex items-end justify-between gap-4">
             <div className="min-w-0">
@@ -621,7 +621,7 @@ export default function LivePitchTuner({
   }
 
   return (
-    <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-stone-950/95">
+    <div className="pitch-tuner flex h-full w-full flex-col overflow-hidden bg-black/95">
       <div className="shrink-0 border-b border-white/8 px-4 py-3">
         <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">

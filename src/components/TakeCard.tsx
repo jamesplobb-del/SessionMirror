@@ -164,7 +164,7 @@ function TakeCard({
     <div
       className={`group interactive-native flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${cardRingClass}`}
     >
-      <div className="relative aspect-video bg-stone-900">
+      <div className="relative aspect-video bg-black">
         {thumbnailVideo ? (
           <div
             {...thumbActivateProps}

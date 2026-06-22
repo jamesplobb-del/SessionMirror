@@ -139,7 +139,7 @@ export default function AudioEnhancer({
                 active
                   ? inline
                     ? 'bg-stone-800 text-white'
-                    : 'bg-sky-500 text-white shadow-[0_0_16px_rgba(56,189,248,0.35)]'
+                    : 'bg-[#5ce625] text-black shadow-[0_0_16px_rgba(92,230,37,0.35)]'
                   : inline
                     ? 'border border-stone-200 bg-stone-50 text-stone-600'
                     : 'border border-white/15 bg-white/8 text-white/70'

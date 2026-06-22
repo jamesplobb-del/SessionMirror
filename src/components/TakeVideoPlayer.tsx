@@ -41,7 +41,7 @@ export default function TakeVideoPlayer({
   mimeType: mimeTypeProp = NATIVE_VIDEO_MIME,
   videoRef: externalVideoRef,
   className,
-  loadingClassName = 'h-full w-full animate-pulse bg-stone-900',
+  loadingClassName = 'h-full w-full animate-pulse bg-black',
   mirror = false,
   recordingOrientation,
   fit = 'cover',
@@ -158,7 +158,7 @@ export default function TakeVideoPlayer({
     const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, ...audioRest } = rest
     return (
       <div
-        className={`relative h-full w-full bg-stone-950 ${className ?? ''}`.trim()}
+        className={`relative h-full w-full bg-black ${className ?? ''}`.trim()}
         onPointerDown={onPointerDown as PointerEventHandler<HTMLDivElement> | undefined}
         onPointerMove={onPointerMove as PointerEventHandler<HTMLDivElement> | undefined}
         onPointerUp={onPointerUp as PointerEventHandler<HTMLDivElement> | undefined}

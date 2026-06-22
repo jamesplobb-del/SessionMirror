@@ -143,7 +143,7 @@ export default function ControlDeck({
           onClick={onOpenVault}
           haptic="light"
           hapticFeedback={hapticFeedback}
-          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/10 bg-slate-950/40 text-slate-50 backdrop-blur-2xl hover:bg-slate-900/55"
+          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white backdrop-blur-2xl hover:bg-black/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
           <span className="relative flex h-full w-full items-center justify-center">
@@ -159,10 +159,10 @@ export default function ControlDeck({
         <button
           type="button"
           ref={settingsButtonRef}
-          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full border border-sky-200/10 backdrop-blur-2xl transition-colors interactive-native ${
+          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full border-[0.5px] border-white/10 backdrop-blur-2xl transition-colors interactive-native ${
             branchActive
-              ? 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-400/30 shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-              : 'bg-slate-950/40 text-slate-50 hover:bg-slate-900/55'
+              ? 'bg-[#5ce625]/10 text-[#5ce625] ring-1 ring-[#5ce625]/30 shadow-[0_0_15px_rgba(92,230,37,0.3)]'
+              : 'bg-black/40 text-white hover:bg-black/55'
           }`}
           aria-label={
             branchActive ? 'Close quick settings' : 'Open settings. Long press for quick settings.'
@@ -241,7 +241,7 @@ export default function ControlDeck({
           </div>
 
           {autoSoundListening && !isRecording && !showDeleteDrop && (
-            <p className="auto-sound-hint auto-sound-hint--listening max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-sky-200/95">
+            <p className="auto-sound-hint auto-sound-hint--listening max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/90">
               Listening for your playing — a take starts automatically when you begin
             </p>
           )}

@@ -4,6 +4,7 @@ import Pressable from '../ui/Pressable'
 import { applyBulletproofVideoElement, iosBulletproofVideoProps } from '../../utils/mobileVideo'
 import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
 import { useMultiTrackStudio, type StudioCountInPrefs, type StudioTrack } from './useMultiTrackStudio'
+import StudioMetronomeBar from './StudioMetronomeBar'
 import { attachLiveStreamPreview, isLiveMediaStream } from './studioLivePreview'
 
 interface StudioSandboxProps {
@@ -111,7 +112,7 @@ function TrackBox({
 
   return (
     <div
-      className={`studio-track-cell relative min-h-0 min-w-0 flex-1 overflow-hidden border-2 bg-stone-900 transition-colors ${
+      className={`studio-track-cell relative min-h-0 min-w-0 flex-1 overflow-hidden border-2 bg-black transition-colors ${
         isRecording
           ? 'border-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.25)]'
           : isSelected
@@ -440,69 +441,13 @@ function MixerDrawer({
 function StudioCountInControls({
   prefs,
   onChange,
+  disabled = false,
 }: {
   prefs: StudioCountInPrefs
   onChange: (next: StudioCountInPrefs) => void
+  disabled?: boolean
 }) {
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-2 px-2 py-1.5 text-[10px] text-white/70">
-      <label className="flex items-center gap-1.5">
-        <span className="uppercase tracking-wide text-white/45">BPM</span>
-        <input
-          type="number"
-          min={40}
-          max={240}
-          value={prefs.bpm}
-          onChange={(e) =>
-            onChange({ ...prefs, bpm: Math.max(40, Math.min(240, Number(e.target.value) || 120)) })
-          }
-          className="w-14 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-center text-white"
-        />
-      </label>
-      <label className="flex items-center gap-1.5">
-        <span className="uppercase tracking-wide text-white/45">Count</span>
-        <select
-          value={prefs.countInBeats}
-          onChange={(e) =>
-            onChange({
-              ...prefs,
-              countInBeats: Number(e.target.value) === 16 ? 16 : 8,
-            })
-          }
-          className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-white"
-        >
-          <option value={8}>8</option>
-          <option value={16}>16</option>
-        </select>
-      </label>
-      <label className="flex items-center gap-1.5">
-        <span className="uppercase tracking-wide text-white/45">Meter</span>
-        <select
-          value={prefs.beatsPerBar}
-          onChange={(e) =>
-            onChange({
-              ...prefs,
-              beatsPerBar: Number(e.target.value) as StudioCountInPrefs['beatsPerBar'],
-            })
-          }
-          className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-white"
-        >
-          <option value={2}>2/4</option>
-          <option value={3}>3/4</option>
-          <option value={4}>4/4</option>
-        </select>
-      </label>
-      <label className="flex items-center gap-1.5">
-        <input
-          type="checkbox"
-          checked={prefs.metronomeDuringRep}
-          onChange={(e) => onChange({ ...prefs, metronomeDuringRep: e.target.checked })}
-          className="rounded border-white/20"
-        />
-        <span>Metronome through take</span>
-      </label>
-    </div>
-  )
+  return <StudioMetronomeBar prefs={prefs} onChange={onChange} disabled={disabled} />
 }
 
 export default function StudioSandbox({ onExit }: StudioSandboxProps) {
@@ -603,7 +548,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
           </Pressable>
 
           <div className="flex flex-col items-center">
-            <span className="text-xs font-bold tracking-tight">Acapella Studio</span>
+            <span className="text-xs font-bold tracking-tight">Multitrack Mode</span>
             <span className="text-[9px] text-white/35">Use headphones when recording</span>
           </div>
 
@@ -611,7 +556,7 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
             type="button"
             onClick={() => setMixerOpen((o) => !o)}
             className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold active:scale-95 ${
-              mixerOpen ? 'border-sky-400/50 bg-sky-500/15 text-sky-300' : 'border-white/15 bg-white/8 text-white/70'
+              mixerOpen ? 'border-[#5ce625]/50 bg-[#5ce625]/15 text-[#5ce625]' : 'border-white/15 bg-white/8 text-white/70'
             }`}
             aria-label="Open mixer"
           >
@@ -623,7 +568,11 @@ export default function StudioSandbox({ onExit }: StudioSandboxProps) {
 
       <div className="relative flex min-h-0 flex-1 flex-col p-2 pb-1">
         {!isImmersive && (
-          <StudioCountInControls prefs={countInPrefs} onChange={setCountInPrefs} />
+          <StudioCountInControls
+            prefs={countInPrefs}
+            onChange={setCountInPrefs}
+            disabled={isCountingDown || isArmingCamera}
+          />
         )}
 
         {cameraError && !isImmersive && (
