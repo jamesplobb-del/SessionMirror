@@ -9,7 +9,7 @@ import {
   type PointerEvent,
   type RefObject,
 } from 'react'
-import { Expand, Play, Pause, Upload, X, Youtube } from 'lucide-react'
+import { Layout, Maximize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import YoutubeUrlDialog from './YoutubeUrlDialog'
@@ -24,6 +24,12 @@ import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const UPLOAD_BADGE_BTN =
   'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
+
+const SPLIT_CHROME_BTN =
+  'pointer-events-auto absolute z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white shadow-lg backdrop-blur-xl transition-all duration-200 ease-out active:scale-95 [-webkit-tap-highlight-color:transparent]'
+
+const SPLIT_PANEL_BADGE =
+  'pointer-events-none absolute z-20 max-w-[calc(100%-5rem)] truncate whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400 backdrop-blur-md'
 
 const emptyActionClass =
   'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition hover:bg-white/10'
@@ -180,9 +186,13 @@ function BestTakeBox({
     ? 'relative h-full w-full min-h-0 overflow-hidden'
     : 'pip-video-container group relative aspect-video'
 
-  const innerClass = `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
-    hasReference ? 'opacity-100' : 'opacity-90'
-  } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
+  const innerClass = isFill
+    ? `relative z-0 h-full w-full overflow-hidden bg-stone-950/90 ${
+        hasReference ? 'opacity-100' : 'opacity-95'
+      }`
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+        hasReference ? 'opacity-100' : 'opacity-90'
+      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'}`
 
   const pillLeft = showUploadBadge ? 36 : 8
 
@@ -210,8 +220,18 @@ function BestTakeBox({
     )
   }
 
-  const renderExpandButton = () => {
-    if (!onToggleSplitView || splitViewActive) return null
+  const renderSplitToggleButton = () => {
+    if (!onToggleSplitView) return null
+
+    const exitingSplit = splitViewActive
+    const Icon = exitingSplit ? Layout : Maximize2
+    const ariaLabel = exitingSplit ? 'Return to normal view' : 'Open split view layout'
+
+    const style = exitingSplit
+      ? { bottom: chromeInset, right: chromeInset }
+      : hasReference
+        ? { bottom: chromeInset, right: chromeInset }
+        : { top: chromeInset, right: chromeInset }
 
     return (
       <button
@@ -223,15 +243,11 @@ function BestTakeBox({
           e.stopPropagation()
           onToggleSplitView()
         }}
-        className={UPLOAD_BADGE_BTN}
-        style={
-          hasReference
-            ? { bottom: chromeInset, right: chromeInset }
-            : { top: chromeInset, right: chromeInset }
-        }
-        aria-label="Open split view layout"
+        className={SPLIT_CHROME_BTN}
+        style={style}
+        aria-label={ariaLabel}
       >
-        <Expand className="h-3 w-3" />
+        <Icon className="h-[18px] w-[18px] stroke-[1.5]" aria-hidden />
       </button>
     )
   }
@@ -255,10 +271,10 @@ function BestTakeBox({
           <span
             className={
               isFill
-                ? 'pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400 backdrop-blur-md'
+                ? SPLIT_PANEL_BADGE
                 : 'pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white'
             }
-            style={{ top: isFill ? 8 : 4, left: pillLeft }}
+            style={{ top: isFill ? 10 : 4, left: isFill ? 10 : pillLeft }}
           >
             Best Take
           </span>
@@ -368,7 +384,7 @@ function BestTakeBox({
           )}
 
           {renderClearButton()}
-          {renderExpandButton()}
+          {renderSplitToggleButton()}
 
           {showUploadBadge && (
             <label

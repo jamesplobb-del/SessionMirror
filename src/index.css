@@ -975,6 +975,23 @@ video.camera-preview--embedded.camera-preview--mirror {
   overflow: visible;
 }
 
+.split-compare-layout {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.split-compare-layout__top {
+  border-radius: 0.75rem 0.75rem 0 0;
+  overflow: hidden;
+}
+
+.split-compare-layout__bottom {
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
 .split-compare-layout__top,
 .split-compare-layout__bottom {
   contain: layout style;

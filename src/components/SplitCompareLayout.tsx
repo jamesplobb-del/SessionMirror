@@ -109,7 +109,7 @@ export default function SplitCompareLayout({
       />
 
       <div
-        className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col bg-stone-900/95 ring-1 ring-sky-400/50"
+        className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-white/5 bg-stone-950/90"
         style={{ height: `${bottomHeight}%` }}
       >
         {showCurrentTake && challengerTake ? (
@@ -143,7 +143,7 @@ export default function SplitCompareLayout({
           </div>
         ) : (
           <>
-            <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-sky-300 backdrop-blur-md">
+            <span className="pointer-events-none absolute left-2.5 top-2.5 z-20 rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-sky-300 backdrop-blur-md">
               {isRecording
                 ? 'Recording…'
                 : recordingMode === 'audio'

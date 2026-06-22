@@ -285,9 +285,9 @@ function PipWindow({
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-stone-900/95 ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
-        hasMedia ? 'opacity-100' : 'opacity-90'
-      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-stone-950/90 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+        hasMedia ? 'opacity-100' : 'opacity-95'
+      } ${dropHighlight ? 'pip-drop-target--active' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
     : `relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
@@ -323,10 +323,10 @@ function PipWindow({
         <span
           className={
             isFill
-              ? `pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${badgeClass}`
+              ? `pointer-events-none absolute z-20 max-w-[calc(100%-5rem)] truncate whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${badgeClass}`
               : `pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass}`
           }
-          style={{ top: chromeInset, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
+          style={{ top: isFill ? 10 : chromeInset, left: isFill ? 10 : pillLeft + (showPinAsBest ? 4 : 0) }}
         >
           {label}
         </span>
