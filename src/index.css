@@ -29,6 +29,67 @@
   );
 }
 
+.app-boot-gate__ambient {
+  background:
+    radial-gradient(ellipse 52% 42% at 44% 46%, rgba(251, 146, 60, 0.07) 0%, transparent 72%),
+    radial-gradient(ellipse 52% 42% at 56% 46%, rgba(56, 189, 248, 0.07) 0%, transparent 72%);
+}
+
+.app-boot-gate__brand {
+  animation: app-boot-brand-in 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-boot-gate__logo-shell {
+  animation: app-boot-logo-in 0.82s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-boot-gate__logo {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.1),
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    0 0 56px rgba(251, 146, 60, 0.1),
+    0 0 56px rgba(56, 189, 248, 0.08);
+}
+
+.app-boot-gate__title {
+  animation: app-boot-title-in 0.72s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+  text-shadow: 0 1px 24px rgba(255, 255, 255, 0.08);
+}
+
+@keyframes app-boot-logo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes app-boot-title-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-boot-brand-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 html,
 body,
 #root {

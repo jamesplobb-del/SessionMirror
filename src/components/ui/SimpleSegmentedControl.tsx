@@ -11,7 +11,7 @@ interface SimpleSegmentedControlProps<T extends string> {
   onChange: (value: T) => void
   segments: SimpleSegment<T>[]
   className?: string
-  size?: 'xs' | 'sm' | 'md'
+  size?: 'sm' | 'md'
   ariaLabel?: string
   hapticFeedback?: boolean
 }
@@ -26,19 +26,15 @@ export default function SimpleSegmentedControl<T extends string>({
   ariaLabel,
   hapticFeedback = true,
 }: SimpleSegmentedControlProps<T>) {
-  const padding =
-    size === 'xs' ? 'p-0.5' : size === 'sm' ? 'p-0.5' : 'p-1'
+  const padding = size === 'sm' ? 'p-0.5' : 'p-1'
   const buttonClass =
-    size === 'xs'
-      ? 'rounded-md px-2 py-0.5 text-xs font-medium'
-      : size === 'sm'
-        ? 'rounded-md px-2.5 py-1 text-xs font-medium'
-        : 'rounded-lg px-3 py-2 text-sm font-medium'
-  const shellRadius = size === 'xs' ? 'rounded-lg' : 'rounded-xl'
+    size === 'sm'
+      ? 'rounded-md px-2.5 py-1 text-xs font-medium'
+      : 'rounded-lg px-3 py-2 text-sm font-medium'
 
   return (
     <div
-      className={`flex ${shellRadius} bg-stone-100 ${padding} ${className}`}
+      className={`flex rounded-xl bg-stone-100 ${padding} ${className}`}
       role="tablist"
       aria-label={ariaLabel}
     >

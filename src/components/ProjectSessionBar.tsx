@@ -44,19 +44,8 @@ export default function ProjectSessionBar({
   }
 
   return (
-    <div className="mb-3 flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sessions</p>
-        <Pressable
-          type="button"
-          intensity="soft"
-          onClick={openNamingForm}
-          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:border-stone-300 hover:bg-stone-50"
-        >
-          <FolderPlus className="h-3.5 w-3.5" />
-          New Session
-        </Pressable>
-      </div>
+    <div className="mb-4 flex flex-col gap-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sessions</p>
 
       <AnimatedExpand open={isNamingSession}>
         <form
@@ -98,7 +87,16 @@ export default function ProjectSessionBar({
         </form>
       </AnimatedExpand>
 
-      <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-2">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <Pressable
+          type="button"
+          intensity="soft"
+          onClick={openNamingForm}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-stone-400 hover:bg-stone-50"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+          New Session
+        </Pressable>
         {projects.map((project) => {
           const active = project.id === activeProjectId
           return (
