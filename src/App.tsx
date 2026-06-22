@@ -16,6 +16,7 @@ import LiveCameraBackground from './components/LiveCameraBackground'
 import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
+import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
 import { useCameraSession } from './hooks/useCameraSession'
@@ -45,6 +46,10 @@ import {
   normalizeLandscapeTakeInPlace,
 } from './utils/prepareTakeVideoExport'
 import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from './utils/takes'
+import {
+  pauseYoutubeProxy,
+  playYoutubeProxy,
+} from './utils/playalong/youtubeBridge'
 import {
   deleteTakeFile,
   NATIVE_AUDIO_MIME,
@@ -215,6 +220,9 @@ function StandardApp({
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
   const splitPreviewRef = useRef<HTMLVideoElement>(null)
+  const youtubeIframeRef = useRef<HTMLIFrameElement>(null)
+  const youtubeUrlRef = useRef<string | null>(null)
+  const [youtubeHostEl, setYoutubeHostEl] = useState<HTMLElement | null>(null)
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
@@ -642,6 +650,21 @@ function StandardApp({
     })()
   }, [])
 
+  youtubeUrlRef.current = youtubeUrl
+
+  const handleYoutubeHostChange = useCallback((el: HTMLDivElement | null) => {
+    setYoutubeHostEl(el)
+  }, [])
+
+  const pauseYoutubeReference = useCallback(() => {
+    pauseYoutubeProxy(youtubeIframeRef.current)
+  }, [])
+
+  const resumeYoutubeReference = useCallback(() => {
+    if (!youtubeUrlRef.current) return
+    playYoutubeProxy(youtubeIframeRef.current)
+  }, [])
+
   const {
     previewRef,
     streamRef,
@@ -663,15 +686,24 @@ function StandardApp({
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     secondaryPreviewRef: splitPreviewRef,
+    onBeforeForegroundRestart: pauseYoutubeReference,
+    onAfterForegroundRestart: resumeYoutubeReference,
   })
 
   useEffect(() => {
     if (recordingMode !== 'video') return
+    const delayMs = youtubeUrl ? 200 : 0
+    let timer: number | null = null
     const frameId = window.requestAnimationFrame(() => {
-      void refreshCameraSession()
+      timer = window.setTimeout(() => {
+        void refreshCameraSession()
+      }, delayMs)
     })
-    return () => window.cancelAnimationFrame(frameId)
-  }, [isSplitView, recordingMode, refreshCameraSession])
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [isSplitView, recordingMode, refreshCameraSession, youtubeUrl])
 
   recordingModeRef.current = recordingMode
 
@@ -1077,6 +1109,7 @@ function StandardApp({
       const onVisible = () => {
         if (document.visibilityState === 'visible') {
           refreshStaleTakePlaybackUrls()
+          resumeYoutubeReference()
         }
       }
       document.addEventListener('visibilitychange', onVisible)
@@ -1086,7 +1119,10 @@ function StandardApp({
     let removeListener: (() => void) | undefined
     void import('@capacitor/app').then(({ App }) => {
       void App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) refreshStaleTakePlaybackUrls()
+        if (isActive) {
+          refreshStaleTakePlaybackUrls()
+          resumeYoutubeReference()
+        }
       }).then((sub) => {
         removeListener = () => {
           void sub.remove()
@@ -1097,6 +1133,7 @@ function StandardApp({
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         refreshStaleTakePlaybackUrls()
+        resumeYoutubeReference()
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -1105,7 +1142,7 @@ function StandardApp({
       removeListener?.()
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [refreshStaleTakePlaybackUrls])
+  }, [refreshStaleTakePlaybackUrls, resumeYoutubeReference])
 
   const mainAudioPitchSource = useMemo(() => {
     let next: MainAudioPitchSource | null = null
@@ -1604,14 +1641,25 @@ function StandardApp({
 
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     setYoutubeUrl(embedUrl)
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => playYoutubeProxy(youtubeIframeRef.current), 400)
+    })
   }, [])
 
   const handleClearYoutube = useCallback(() => {
+    pauseYoutubeProxy(youtubeIframeRef.current)
     setYoutubeUrl(null)
+    setYoutubeHostEl(null)
   }, [])
 
   const handleToggleSplitView = useCallback(() => {
-    setIsSplitView((current) => !current)
+    setIsSplitView((current) => {
+      const next = !current
+      if (next && youtubeUrlRef.current) {
+        window.requestAnimationFrame(() => playYoutubeProxy(youtubeIframeRef.current))
+      }
+      return next
+    })
   }, [])
 
   const handleExitSplitView = useCallback(() => {
@@ -1648,6 +1696,14 @@ function StandardApp({
         playsInline
         {...({ 'webkit-playsinline': 'true' } as React.AudioHTMLAttributes<HTMLAudioElement>)}
       />
+
+      {youtubeUrl && (
+        <YoutubeBenchmarkPlayer
+          embedUrl={youtubeUrl}
+          hostEl={youtubeHostEl}
+          iframeRef={youtubeIframeRef}
+        />
+      )}
 
       <LiveCameraBackground
         previewRef={previewRef}
@@ -1803,6 +1859,7 @@ function StandardApp({
               onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
               showPinCurrentAsBest={showPinCurrentAsBest}
               onPinCurrentAsBest={handlePinCurrentAsBest}
+              onYoutubeHostChange={handleYoutubeHostChange}
             />
           </div>
         )}
@@ -1842,6 +1899,7 @@ function StandardApp({
                   onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                   showPinCurrentAsBest={showPinCurrentAsBest}
                   onPinCurrentAsBest={handlePinCurrentAsBest}
+                  onYoutubeHostChange={handleYoutubeHostChange}
                   hapticFeedback={settings.hapticFeedback}
                 />
               </motion.div>

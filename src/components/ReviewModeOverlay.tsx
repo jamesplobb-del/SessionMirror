@@ -14,7 +14,6 @@ import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
 import {
   playTakeMediaFromUserGesture,
-  primeTakePlaybackForUserGesture,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
@@ -31,6 +30,7 @@ interface ReviewTakeLayerProps {
   mirror: boolean
   recordingOrientation?: Take['recordingOrientation']
   videoRef: RefObject<HTMLMediaElement | null>
+  playbackAudible: boolean
   swipeLayerStyle?: React.CSSProperties
   onPointerDown?: React.PointerEventHandler<HTMLVideoElement>
   onPointerMove?: React.PointerEventHandler<HTMLVideoElement>
@@ -47,6 +47,7 @@ function ReviewTakeLayer({
   mirror,
   recordingOrientation,
   videoRef,
+  playbackAudible,
   swipeLayerStyle,
   onPointerDown,
   onPointerMove,
@@ -86,7 +87,7 @@ function ReviewTakeLayer({
           videoSourceKey={takeKey}
           className="absolute inset-0 h-full w-full"
           mirror={false}
-          audible
+          audible={playbackAudible}
           manualPlayOnly
           eagerLoad
         />
@@ -109,7 +110,7 @@ function ReviewTakeLayer({
         mirror={mirror}
         recordingOrientation={recordingOrientation}
         fit="contain"
-        audible
+        audible={playbackAudible}
         manualPlayOnly
         eagerLoad
         style={{
@@ -390,7 +391,6 @@ export default function ReviewModeOverlay({
     if (video.paused) {
       setIsPlaying(true)
       revealPlayOverlay(true)
-      primeTakePlaybackForUserGesture(video)
       playTakeMediaFromUserGesture(video, {
         onFailure: () => {
           setIsPlaying(false)
@@ -399,6 +399,7 @@ export default function ReviewModeOverlay({
       })
     } else {
       video.pause()
+      if ('muted' in video) video.muted = true
       void releaseTakePlaybackAudio()
       setIsPlaying(false)
       revealPlayOverlay(false)
@@ -478,7 +479,6 @@ export default function ReviewModeOverlay({
       }
     }
     const onPlay = () => {
-      primeTakePlaybackForUserGesture(video)
       setIsPlaying(true)
       revealPlayOverlay(true)
       startProgressLoop()
@@ -750,6 +750,7 @@ export default function ReviewModeOverlay({
             mirror={vaultTake.mirrorPlayback !== false}
             recordingOrientation={vaultTake.recordingOrientation}
             videoRef={vaultVideoRef}
+            playbackAudible={isPlaying}
             swipeLayerStyle={swipeLayerStyle}
             onPointerDown={handleVideoPointerDown}
             onPointerMove={handleVideoPointerMove}
@@ -775,6 +776,7 @@ export default function ReviewModeOverlay({
                   mirror={benchmarkMirror}
                   recordingOrientation={benchmarkRecordingOrientation}
                   videoRef={benchmarkVideoRef}
+                  playbackAudible={isPlaying && activeSlot === 'benchmark'}
                   swipeLayerStyle={
                     activeSlot === 'benchmark' ? swipeLayerStyle : undefined
                   }
@@ -811,6 +813,7 @@ export default function ReviewModeOverlay({
                   mirror={challengerMirror}
                   recordingOrientation={challengerRecordingOrientation}
                   videoRef={challengerVideoRef}
+                  playbackAudible={isPlaying && activeSlot === 'challenger'}
                   swipeLayerStyle={
                     activeSlot === 'challenger' ? swipeLayerStyle : undefined
                   }

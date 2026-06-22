@@ -25,7 +25,7 @@ export default function HudHeader({
           type="button"
           intensity="soft"
           onClick={onExitSplitView}
-          className="pointer-events-auto absolute right-4 top-2 z-10 rounded-md border-2 border-white/70 bg-black/75 px-2.5 py-1 text-[10px] font-semibold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.25),0_2px_12px_rgba(0,0,0,0.45)] ring-1 ring-sky-400/50 backdrop-blur-md hover:border-white hover:bg-black/90"
+          className="pointer-events-auto absolute right-4 top-2 z-10 rounded-md border-2 border-red-500 bg-black/75 px-2.5 py-1 text-[10px] font-semibold text-white shadow-[0_0_0_1px_rgba(239,68,68,0.35),0_2px_12px_rgba(0,0,0,0.45)] ring-1 ring-red-400/60 backdrop-blur-md hover:border-red-400 hover:bg-black/90"
           aria-label="Return to normal view"
         >
           Normal View

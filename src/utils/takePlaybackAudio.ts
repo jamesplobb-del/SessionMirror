@@ -50,7 +50,14 @@ function primeTakePlayback(
     })
   }
 
-  resumePitchGraphsForMedia(...elements)
+  const onNativeDirectSingle =
+    allowNativeDirect &&
+    elements.length === 1 &&
+    !hasTakePlaybackSpeakerRoute(elements[0]!)
+
+  if (!onNativeDirectSingle) {
+    resumePitchGraphsForMedia(...elements)
+  }
 
   // Only spin up / resume the shared context when something actually routes
   // through Web Audio (enhancer, pitch analysis, or simultaneous mixing).

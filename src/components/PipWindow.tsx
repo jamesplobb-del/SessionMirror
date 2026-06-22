@@ -271,12 +271,14 @@ function PipWindow({
       ? 'bg-amber-400/90 text-white'
       : 'bg-sky-500/90 text-white'
 
+  const chromeInset = isFill ? 8 : 4
+
   const shellClass = isFill
-    ? `pip-window--fill relative h-full w-full min-h-0 overflow-hidden ${className}`.trim()
+    ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-hidden ${className}`.trim()
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative z-0 h-full w-full min-h-0 overflow-hidden bg-stone-900/95 ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-stone-900/95 ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
@@ -288,8 +290,12 @@ function PipWindow({
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
 
   const orientWrapperClass = isFill
-    ? 'relative h-full w-full min-h-0'
+    ? 'relative flex min-h-0 flex-1 w-full flex-col overflow-visible'
     : 'ui-orient-spin relative h-full w-full'
+
+  const mediaStageClass = isFill
+    ? 'relative min-h-0 flex-1 w-full'
+    : 'relative h-full w-full'
 
   return (
     <div className={shellClass}>
@@ -311,11 +317,12 @@ function PipWindow({
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass} ${
             isFill ? 'text-[10px] px-2 py-0.5' : ''
           }`}
-          style={{ top: isFill ? 8 : 4, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
+          style={{ top: chromeInset, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
         >
           {label}
         </span>
 
+        <div className={mediaStageClass}>
         {hasMedia ? (
           <>
             <TakeVideoPlayer
@@ -328,7 +335,7 @@ function PipWindow({
               loadingClassName="absolute inset-0 h-full w-full bg-stone-900"
               mirror={mirror}
               recordingOrientation={recordingOrientation}
-              fit={isFill ? 'contain' : 'cover'}
+              fit="cover"
               manualPlayOnly
               audible={playbackAudible}
               eagerLoad
@@ -405,7 +412,82 @@ function PipWindow({
             </div>
           </div>
         )}
+        </div>
+
+        {showPinAsBest && onPinAsBest && !isFill && (
+          <button
+            type="button"
+            onPointerDown={stopEventBubble}
+            onTouchStart={stopEventBubble}
+            onTouchEnd={stopEventBubble}
+            onClick={(e) => {
+              e.stopPropagation()
+              onPinAsBest()
+            }}
+            className={`${FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
+            style={{ top: chromeInset, left: chromeInset }}
+            aria-label="Pin current take as Best Take"
+            title="Pin as Best Take"
+          >
+            <Pin className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {hasMedia && !isFill && (
+          <button
+            type="button"
+            onPointerDown={stopEventBubble}
+            onTouchStart={stopEventBubble}
+            onTouchEnd={stopEventBubble}
+            onClick={(e) => {
+              e.stopPropagation()
+              onUnpin()
+            }}
+            className={FLOAT_BADGE}
+            style={{ top: chromeInset, right: chromeInset }}
+            aria-label={`Unload ${label}`}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
       </div>
+
+      {isFill && showPinAsBest && onPinAsBest && (
+        <button
+          type="button"
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={(e) => {
+            e.stopPropagation()
+            onPinAsBest()
+          }}
+          className={`${FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
+          style={{ top: -10, left: -10 }}
+          aria-label="Pin current take as Best Take"
+          title="Pin as Best Take"
+        >
+          <Pin className="h-3.5 w-3.5" />
+        </button>
+      )}
+
+      {isFill && hasMedia && (
+        <button
+          type="button"
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={(e) => {
+            e.stopPropagation()
+            onUnpin()
+          }}
+          className={FLOAT_BADGE}
+          style={{ top: -10, right: -10 }}
+          aria-label={`Unload ${label}`}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
 
       {showUploadBadge && (
         <label
@@ -420,43 +502,6 @@ function PipWindow({
         >
           <Upload className="h-3 w-3" />
         </label>
-      )}
-
-      {showPinAsBest && onPinAsBest && (
-        <button
-          type="button"
-          onPointerDown={stopEventBubble}
-          onTouchStart={stopEventBubble}
-          onTouchEnd={stopEventBubble}
-          onClick={(e) => {
-            e.stopPropagation()
-            onPinAsBest()
-          }}
-          className={`${FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
-          style={{ top: isFill ? 8 : -12, left: isFill ? 8 : -12 }}
-          aria-label="Pin current take as Best Take"
-          title="Pin as Best Take"
-        >
-          <Pin className="h-3.5 w-3.5" />
-        </button>
-      )}
-
-      {hasMedia && (
-        <button
-          type="button"
-          onPointerDown={stopEventBubble}
-          onTouchStart={stopEventBubble}
-          onTouchEnd={stopEventBubble}
-          onClick={(e) => {
-            e.stopPropagation()
-            onUnpin()
-          }}
-          className={FLOAT_BADGE}
-          style={{ top: isFill ? 8 : -12, right: isFill ? 8 : -12 }}
-          aria-label={`Unload ${label}`}
-        >
-          <X className="h-3 w-3" />
-        </button>
       )}
       </div>
     </div>

@@ -33,6 +33,7 @@ interface PipCompareRowProps {
   hapticFeedback?: boolean
   showPinCurrentAsBest?: boolean
   onPinCurrentAsBest?: () => void
+  onYoutubeHostChange?: (el: HTMLDivElement | null) => void
 }
 
 function PipDragGhost({
@@ -115,6 +116,7 @@ export default function PipCompareRow({
   hapticFeedback = true,
   showPinCurrentAsBest = false,
   onPinCurrentAsBest,
+  onYoutubeHostChange,
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
 
@@ -148,6 +150,7 @@ export default function PipCompareRow({
             onToggleSplitView={onToggleSplitView}
             onExpand={takeHasPlaybackMedia(benchmarkTake) ? onExpandBenchmark : undefined}
             onPlaybackChange={onBenchmarkPlaybackChange}
+            onYoutubeHostChange={onYoutubeHostChange}
           />
         </div>
 

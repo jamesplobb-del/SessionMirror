@@ -21,9 +21,6 @@ import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
-const INLINE_CHROME_BTN =
-  'pointer-events-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
-
 const UPLOAD_BADGE_BTN =
   'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
 
@@ -45,6 +42,7 @@ export interface BestTakeBoxProps {
   splitViewActive?: boolean
   onExpand?: () => void
   onPlaybackChange?: (playing: boolean) => void
+  onYoutubeHostChange?: (el: HTMLDivElement | null) => void
 }
 
 function BestTakeBox({
@@ -62,6 +60,7 @@ function BestTakeBox({
   splitViewActive = false,
   onExpand,
   onPlaybackChange,
+  onYoutubeHostChange,
 }: BestTakeBoxProps) {
   const src = take?.videoUrl ?? null
   const videoSourceKey = src || take?.filePath || youtubeEmbedUrl || 'empty'
@@ -182,42 +181,49 @@ function BestTakeBox({
 
   const pillLeft = showUploadBadge ? 36 : 8
 
-  const renderReferenceChrome = () => {
+  const chromeInset = isFill ? 8 : 4
+
+  const renderClearButton = () => {
     if (!hasReference) return null
 
     return (
-      <div className="absolute top-2 right-2 z-40 flex items-center gap-1.5 pointer-events-auto">
-        <button
-          type="button"
-          onPointerDown={stopEventBubble}
-          onTouchStart={stopEventBubble}
-          onTouchEnd={stopEventBubble}
-          onClick={(e) => {
-            e.stopPropagation()
-            handleClearReference()
-          }}
-          className={INLINE_CHROME_BTN}
-          aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
-        >
-          <X className="h-3 w-3" />
-        </button>
-        {onToggleSplitView && !splitViewActive && (
-          <button
-            type="button"
-            onPointerDown={stopEventBubble}
-            onTouchStart={stopEventBubble}
-            onTouchEnd={stopEventBubble}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleSplitView()
-            }}
-            className={INLINE_CHROME_BTN}
-            aria-label="Open split view layout"
-          >
-            <Expand className="h-3 w-3" />
-          </button>
-        )}
-      </div>
+      <button
+        type="button"
+        onPointerDown={stopEventBubble}
+        onTouchStart={stopEventBubble}
+        onTouchEnd={stopEventBubble}
+        onClick={(e) => {
+          e.stopPropagation()
+          handleClearReference()
+        }}
+        className={UPLOAD_BADGE_BTN}
+        style={{ top: chromeInset, right: chromeInset }}
+        aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
+      >
+        <X className="h-3 w-3" />
+      </button>
+    )
+  }
+
+  const renderExpandButton = () => {
+    if (!onToggleSplitView || splitViewActive) return null
+
+    return (
+      <button
+        type="button"
+        onPointerDown={stopEventBubble}
+        onTouchStart={stopEventBubble}
+        onTouchEnd={stopEventBubble}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSplitView()
+        }}
+        className={UPLOAD_BADGE_BTN}
+        style={{ bottom: chromeInset, right: chromeInset }}
+        aria-label="Open split view layout"
+      >
+        <Expand className="h-3 w-3" />
+      </button>
     )
   }
 
@@ -247,16 +253,11 @@ function BestTakeBox({
           </span>
 
           {hasYoutube ? (
-            <>
-              <iframe
-                src={youtubeEmbedUrl || undefined}
-                className="absolute inset-0 h-full w-full border-0"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                title="YouTube reference"
-              />
-            </>
+            <div
+              ref={onYoutubeHostChange}
+              className="absolute inset-0"
+              aria-label="YouTube reference"
+            />
           ) : hasTake ? (
             <>
               <TakeVideoPlayer
@@ -356,7 +357,8 @@ function BestTakeBox({
             </div>
           )}
 
-          {renderReferenceChrome()}
+          {renderClearButton()}
+          {renderExpandButton()}
 
           {showUploadBadge && (
             <label
@@ -366,7 +368,7 @@ function BestTakeBox({
               onTouchEnd={stopEventBubble}
               onClick={stopEventBubble}
               className={UPLOAD_BADGE_BTN}
-              style={{ top: isFill ? 8 : 4, left: 8 }}
+              style={{ top: chromeInset, left: chromeInset }}
               aria-label="Upload best take media"
             >
               <Upload className="h-3 w-3" />

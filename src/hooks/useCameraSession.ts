@@ -28,6 +28,8 @@ import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
   secondaryPreviewRef?: RefObject<HTMLVideoElement | null>
+  onBeforeForegroundRestart?: () => void
+  onAfterForegroundRestart?: () => void
 }
 
 const CAMERA_INIT_MAX_ATTEMPTS = 3
@@ -38,6 +40,7 @@ const IOS_CAMERA_RELEASE_DELAY_MS = 250
 const IOS_AUDIO_TO_VIDEO_DELAY_MS = 200
 const IOS_VIDEO_TO_AUDIO_DELAY_MS = 280
 const BACKGROUND_SUSPEND_DELAY_MS = 500
+const RESUME_IN_FLIGHT_TIMEOUT_MS = 15000
 
 function detachPreviewStream(video: HTMLVideoElement | null) {
   if (!video) return
@@ -144,6 +147,8 @@ function detachPreviewTargets(
 export function useCameraSession({
   onRecordingComplete,
   secondaryPreviewRef,
+  onBeforeForegroundRestart,
+  onAfterForegroundRestart,
 }: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -164,6 +169,8 @@ export function useCameraSession({
   const releaseTimerRef = useRef<number | null>(null)
   const elapsedRef = useRef(0)
   const onCompleteRef = useRef(onRecordingComplete)
+  const onBeforeForegroundRestartRef = useRef(onBeforeForegroundRestart)
+  const onAfterForegroundRestartRef = useRef(onAfterForegroundRestart)
   const armedAutoAudioRef = useRef<{
     recorder: MediaRecorder
     writer: StreamingTakeWriter
@@ -175,6 +182,8 @@ export function useCameraSession({
   const recordingOrientationRef = useRef<'portrait' | 'landscape'>('portrait')
   const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
   onCompleteRef.current = onRecordingComplete
+  onBeforeForegroundRestartRef.current = onBeforeForegroundRestart
+  onAfterForegroundRestartRef.current = onAfterForegroundRestart
 
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
@@ -832,6 +841,14 @@ export function useCameraSession({
     resumeInFlightRef.current = true
     cancelScheduledRelease()
 
+    const resumeTimeoutId = window.setTimeout(() => {
+      if (restartToken === foregroundRestartTokenRef.current) {
+        resumeInFlightRef.current = false
+      }
+    }, RESUME_IN_FLIGHT_TIMEOUT_MS)
+
+    onBeforeForegroundRestartRef.current?.()
+
     try {
       applyViewportCssVarsOnResume()
 
@@ -855,11 +872,13 @@ export function useCameraSession({
     } catch {
       setError('Camera interrupted. Close and reopen the app if the preview looks wrong.')
     } finally {
+      window.clearTimeout(resumeTimeoutId)
       if (restartToken === foregroundRestartTokenRef.current) {
         resumeInFlightRef.current = false
       }
+      onAfterForegroundRestartRef.current?.()
     }
-  }, [acquireStream, cancelScheduledRelease, releaseLiveStream])
+  }, [acquireStream, cancelScheduledRelease, releaseLiveStream, syncPreviewTargets])
 
   const scheduleForegroundRecovery = useCallback(() => {
     if (backgroundSuspendTimerRef.current !== null) {

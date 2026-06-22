@@ -934,11 +934,21 @@ video.camera-preview--embedded.camera-preview--mirror {
 .split-compare-host {
   min-height: 0;
   flex: 1 1 auto;
+  overflow: visible;
 }
 
 .split-compare-layout__top,
 .split-compare-layout__bottom {
-  contain: strict;
+  contain: layout style;
+}
+
+.split-compare-layout__bottom-inner {
+  min-height: 0;
+  overflow: visible;
+}
+
+.split-compare-layout__bottom-inner .pip-window--fill {
+  overflow: visible;
 }
 
 .split-compare-layout__bottom .pip-video-container,
@@ -947,8 +957,20 @@ video.camera-preview--embedded.camera-preview--mirror {
   height: 100%;
   width: 100%;
   min-height: 0;
+  min-width: 0;
 }
 
+.pip-window--fill {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.pip-window--fill .take-video-shell,
+.pip-window--fill .take-video-shell__media,
 .split-compare-layout__bottom .pip-window--fill .take-video-shell,
 .split-compare-layout__bottom .pip-window--fill .take-video-shell__media {
   width: 100%;
@@ -965,6 +987,71 @@ video.camera-preview--embedded.camera-preview--mirror {
   min-height: 0;
   max-width: 100%;
   max-height: 100%;
+}
+
+.split-ratio-handle {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  margin: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  cursor: ns-resize;
+  touch-action: none;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.split-ratio-handle--arming {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.split-ratio-handle--active {
+  background: rgba(56, 189, 248, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(56, 189, 248, 0.45),
+    0 0 0 1px rgba(56, 189, 248, 0.2);
+}
+
+.split-ratio-handle__grip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 44px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.split-ratio-handle__grip span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.split-ratio-handle--active .split-ratio-handle__grip {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.split-ratio-handle--active .split-ratio-handle__grip span {
+  background: rgba(186, 230, 253, 0.95);
 }
 
 .split-ratio-slider {

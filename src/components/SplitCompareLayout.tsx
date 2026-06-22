@@ -1,7 +1,8 @@
-import type { RefObject } from 'react'
+import { useRef, type RefObject } from 'react'
 import BestTakeBox from './BestTakeBox'
 import LiveCameraBackground from './LiveCameraBackground'
 import PipWindow from './PipWindow'
+import SplitRatioDragHandle from './SplitRatioDragHandle'
 import type { RecordingMode, Take } from '../types'
 import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
@@ -37,6 +38,7 @@ interface SplitCompareLayoutProps {
   onChallengerAutoPlayComplete?: () => void
   showPinCurrentAsBest?: boolean
   onPinCurrentAsBest?: () => void
+  onYoutubeHostChange?: (el: HTMLDivElement | null) => void
 }
 
 export default function SplitCompareLayout({
@@ -70,12 +72,14 @@ export default function SplitCompareLayout({
   onChallengerAutoPlayComplete,
   showPinCurrentAsBest = false,
   onPinCurrentAsBest,
+  onYoutubeHostChange,
 }: SplitCompareLayoutProps) {
+  const layoutRef = useRef<HTMLDivElement>(null)
   const bottomHeight = 100 - splitRatio
   const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
 
   return (
-    <div className="split-compare-layout flex h-full w-full min-h-0 flex-col">
+    <div ref={layoutRef} className="split-compare-layout flex h-full w-full min-h-0 flex-col">
       <div
         className="split-compare-layout__top relative min-h-0 w-full shrink-0 overflow-hidden"
         style={{ height: `${splitRatio}%` }}
@@ -94,26 +98,25 @@ export default function SplitCompareLayout({
           splitViewActive
           onExpand={onExpandBenchmark}
           onPlaybackChange={onBenchmarkPlaybackChange}
+          onYoutubeHostChange={onYoutubeHostChange}
         />
       </div>
 
-      <input
-        type="range"
-        min={20}
-        max={80}
-        value={splitRatio}
-        onChange={(e) => onSplitRatioChange(Number(e.target.value))}
-        className="split-ratio-slider pointer-events-auto w-full shrink-0"
-        aria-label="Adjust split view ratio"
+      <SplitRatioDragHandle
+        ratio={splitRatio}
+        onChange={onSplitRatioChange}
+        layoutRef={layoutRef}
       />
 
       <div
-        className="split-compare-layout__bottom relative min-h-0 w-full shrink-0 overflow-hidden bg-stone-900/95 ring-1 ring-sky-400/50"
+        className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col bg-stone-900/95 ring-1 ring-sky-400/50"
         style={{ height: `${bottomHeight}%` }}
       >
         {showCurrentTake && challengerTake ? (
-          <PipWindow
-            layout="fill"
+          <div className="split-compare-layout__bottom-inner relative flex h-full w-full min-h-0 flex-1 flex-col">
+            <PipWindow
+              layout="fill"
+              className="h-full w-full min-h-0 flex-1"
             src={challengerTake.videoUrl}
             filePath={challengerTake.filePath}
             mimeType={
@@ -135,8 +138,9 @@ export default function SplitCompareLayout({
             takeId={challengerTake.id}
             onAutoPlayComplete={onChallengerAutoPlayComplete}
             showPinAsBest={showPinCurrentAsBest}
-            onPinAsBest={onPinCurrentAsBest}
-          />
+              onPinAsBest={onPinCurrentAsBest}
+            />
+          </div>
         ) : (
           <>
             <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-sky-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
@@ -146,7 +150,7 @@ export default function SplitCompareLayout({
                   ? 'Audio Recording'
                   : 'Current Camera'}
             </span>
-            <div className="relative h-full w-full overflow-hidden">
+            <div className="relative h-full w-full min-h-0 overflow-hidden">
               <LiveCameraBackground
                 variant="embedded"
                 previewRef={splitPreviewRef}
