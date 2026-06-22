@@ -50,6 +50,7 @@ import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from 
 import {
   pauseYoutubeProxy,
   playYoutubeProxy,
+  setYoutubeProxyVolumeFromUi,
 } from './utils/playalong/youtubeBridge'
 import {
   deleteTakeFile,
@@ -65,7 +66,7 @@ import { resetVideoPlayback } from './utils/videoPlayback'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
 import { scheduleViewportSync } from './utils/viewportSync'
-import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
+import { lockPortraitOrientation, syncAppOrientationLock } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
@@ -310,6 +311,7 @@ function StandardApp({
   )
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [isSplitView, setIsSplitView] = useState(false)
+  const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(50)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
@@ -363,13 +365,13 @@ function StandardApp({
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
-    void lockPortraitOrientation()
+    void syncAppOrientationLock(isSplitView)
 
     let removeListener: (() => void) | undefined
     void import('@capacitor/app').then(({ App }) => {
       void App.addListener('appStateChange', ({ isActive }) => {
         if (isActive) {
-          void lockPortraitOrientation()
+          void syncAppOrientationLock(isSplitViewRef.current)
         }
       }).then((sub) => {
         removeListener = () => {
@@ -381,7 +383,11 @@ function StandardApp({
     return () => {
       removeListener?.()
     }
-  }, [])
+  }, [isSplitView])
+
+  useEffect(() => {
+    isSplitViewRef.current = isSplitView
+  }, [isSplitView])
 
   const pausePipVideos = useCallback(() => {
     resetVideoPlayback(benchmarkPipVideoRef.current)
@@ -771,6 +777,7 @@ function StandardApp({
   const resumeYoutubeReference = useCallback(() => {
     if (!youtubeUrlRef.current) return
     playYoutubeProxy(youtubeIframeRef.current)
+    setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, 1)
   }, [])
 
   const {
@@ -1785,7 +1792,10 @@ function StandardApp({
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     setYoutubeUrl(embedUrl)
     window.requestAnimationFrame(() => {
-      window.setTimeout(() => playYoutubeProxy(youtubeIframeRef.current), 400)
+      window.setTimeout(() => {
+        playYoutubeProxy(youtubeIframeRef.current)
+        setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, 1)
+      }, 400)
     })
   }, [])
 
@@ -1799,7 +1809,10 @@ function StandardApp({
     setIsSplitView((current) => {
       const next = !current
       if (next && youtubeUrlRef.current) {
-        window.requestAnimationFrame(() => playYoutubeProxy(youtubeIframeRef.current))
+        window.requestAnimationFrame(() => {
+          playYoutubeProxy(youtubeIframeRef.current)
+          setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, 1)
+        })
       }
       return next
     })
@@ -2005,6 +2018,7 @@ function StandardApp({
               showPinCurrentAsBest={showPinCurrentAsBest}
               onPinCurrentAsBest={handlePinCurrentAsBest}
               onYoutubeHostChange={handleYoutubeHostChange}
+              youtubeIframeRef={youtubeIframeRef}
               deleteDropRef={recordDeleteDropRef}
               onPinBenchmark={handlePinBenchmark}
               onDeleteTake={handleDragDeleteTake}
@@ -2050,6 +2064,7 @@ function StandardApp({
                   showPinCurrentAsBest={showPinCurrentAsBest}
                   onPinCurrentAsBest={handlePinCurrentAsBest}
                   onYoutubeHostChange={handleYoutubeHostChange}
+                  youtubeIframeRef={youtubeIframeRef}
                   hapticFeedback={settings.hapticFeedback}
                 />
               </motion.div>

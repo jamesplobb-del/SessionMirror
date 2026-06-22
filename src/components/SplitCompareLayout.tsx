@@ -41,6 +41,7 @@ interface SplitCompareLayoutProps {
   showPinCurrentAsBest?: boolean
   onPinCurrentAsBest?: () => void
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
+  youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
   deleteDropRef?: RefObject<HTMLElement | null>
   onPinBenchmark?: (takeId: string) => void
   onDeleteTake?: (takeId: string) => void
@@ -80,6 +81,7 @@ export default function SplitCompareLayout({
   showPinCurrentAsBest = false,
   onPinCurrentAsBest,
   onYoutubeHostChange,
+  youtubeIframeRef,
   deleteDropRef,
   onPinBenchmark,
   onDeleteTake,
@@ -128,6 +130,7 @@ export default function SplitCompareLayout({
               onExpand={onExpandBenchmark}
               onPlaybackChange={onBenchmarkPlaybackChange}
               onYoutubeHostChange={onYoutubeHostChange}
+              youtubeIframeRef={youtubeIframeRef}
             />
           </div>
         </div>

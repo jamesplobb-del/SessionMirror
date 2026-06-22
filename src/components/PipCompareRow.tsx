@@ -34,6 +34,7 @@ interface PipCompareRowProps {
   showPinCurrentAsBest?: boolean
   onPinCurrentAsBest?: () => void
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
+  youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
 }
 
 export function PipDragGhost({
@@ -117,6 +118,7 @@ export default function PipCompareRow({
   showPinCurrentAsBest = false,
   onPinCurrentAsBest,
   onYoutubeHostChange,
+  youtubeIframeRef,
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
 
@@ -151,6 +153,7 @@ export default function PipCompareRow({
             onExpand={takeHasPlaybackMedia(benchmarkTake) ? onExpandBenchmark : undefined}
             onPlaybackChange={onBenchmarkPlaybackChange}
             onYoutubeHostChange={onYoutubeHostChange}
+            youtubeIframeRef={youtubeIframeRef}
           />
         </div>
 

@@ -262,6 +262,9 @@ function PipWindow({
   const emptyUploadClass =
     'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
 
+  const playbackFit =
+    layout === 'fill' && recordingOrientation === 'landscape' ? 'contain' : 'cover'
+
   const pipTouchTargetClass =
     'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
   const pipTouchIconClass =
@@ -338,7 +341,7 @@ function PipWindow({
               loadingClassName="absolute inset-0 h-full w-full bg-black"
               mirror={mirror}
               recordingOrientation={recordingOrientation}
-              fit="cover"
+              fit={playbackFit}
               manualPlayOnly
               audible={playbackAudible}
             />

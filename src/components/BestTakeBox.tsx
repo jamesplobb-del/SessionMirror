@@ -17,6 +17,11 @@ import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import {
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
+import {
+  pauseYoutubeProxy,
+  playYoutubeProxy,
+  setYoutubeProxyVolumeFromUi,
+} from '../utils/playalong/youtubeBridge'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
@@ -44,6 +49,7 @@ export interface BestTakeBoxProps {
   onExpand?: () => void
   onPlaybackChange?: (playing: boolean) => void
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
+  youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
 }
 
 function BestTakeBox({
@@ -62,12 +68,14 @@ function BestTakeBox({
   onExpand,
   onPlaybackChange,
   onYoutubeHostChange,
+  youtubeIframeRef,
 }: BestTakeBoxProps) {
   const src = take?.videoUrl ?? null
   const videoSourceKey = src || take?.filePath || youtubeEmbedUrl || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isYoutubePlaying, setIsYoutubePlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
 
@@ -80,7 +88,13 @@ function BestTakeBox({
 
   useEffect(() => {
     setIsPlaying(false)
+    setIsYoutubePlaying(false)
   }, [videoSourceKey, suspendPlayback])
+
+  useEffect(() => {
+    if (!hasYoutube || !youtubeIframeRef?.current) return
+    setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, volume)
+  }, [hasYoutube, volume, youtubeEmbedUrl, youtubeIframeRef])
 
   useEffect(() => {
     const media = videoRef.current
@@ -146,13 +160,38 @@ function BestTakeBox({
 
   const handleVolume = useCallback(
     (value: number) => {
+      setVolume(value)
+      if (hasYoutube) {
+        setYoutubeProxyVolumeFromUi(youtubeIframeRef?.current, value)
+        return
+      }
       const video = videoRef.current
       if (!video) return
       video.volume = value
       updateTakePlaybackSpeakerGain(video, value, false)
-      setVolume(value)
     },
-    [videoRef],
+    [hasYoutube, videoRef, youtubeIframeRef],
+  )
+
+  const handleYoutubePlayPause = useCallback(
+    (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      stopEventBubble(event)
+      if (suspendPlayback || !hasYoutube) return
+      const iframe = youtubeIframeRef?.current
+      if (!iframe) return
+
+      if (isYoutubePlaying) {
+        pauseYoutubeProxy(iframe)
+        setIsYoutubePlaying(false)
+        return
+      }
+
+      playYoutubeProxy(iframe)
+      setYoutubeProxyVolumeFromUi(iframe, volume)
+      setIsYoutubePlaying(true)
+    },
+    [hasYoutube, isYoutubePlaying, suspendPlayback, volume, youtubeIframeRef],
   )
 
   const handleFileChange = useCallback(
@@ -174,6 +213,9 @@ function BestTakeBox({
   const pipTouchIconClass =
     'flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70'
 
+  const playbackFit =
+    isFill && take?.recordingOrientation === 'landscape' ? 'contain' : 'cover'
+
   const playbackAudible = isPlaying && !suspendPlayback && hasTake
 
   const shellClass = isFill
@@ -181,10 +223,10 @@ function BestTakeBox({
     : 'pip-video-container group relative aspect-video'
 
   const innerClass = isFill
-    ? `relative z-0 h-full w-full overflow-hidden bg-black/95 ring-1 ring-amber-400/50 ${
+    ? `group relative z-0 h-full w-full overflow-hidden bg-black/95 ring-1 ring-amber-400/50 ${
         hasReference ? 'opacity-100' : 'opacity-90'
       }`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    : `group relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
         hasReference ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'}`
 
@@ -262,11 +304,50 @@ function BestTakeBox({
           </span>
 
           {hasYoutube ? (
-            <div
-              ref={onYoutubeHostChange}
-              className="absolute inset-0"
-              aria-label="YouTube reference"
-            />
+            <>
+              <div
+                ref={onYoutubeHostChange}
+                className="absolute inset-0"
+                aria-label="YouTube reference"
+              />
+
+              <div className="absolute inset-0 z-[5] pointer-events-none">
+                {!suspendPlayback && (
+                  <button
+                    type="button"
+                    onPointerDown={stopEventBubble}
+                    onTouchStart={stopEventBubble}
+                    onTouchEnd={stopEventBubble}
+                    onClick={handleYoutubePlayPause}
+                    className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+                    aria-label={isYoutubePlaying ? 'Pause YouTube reference' : 'Play YouTube reference'}
+                  >
+                    <span className={pipTouchIconClass}>
+                      {isYoutubePlaying ? (
+                        <Pause className="h-3 w-3 fill-white" />
+                      ) : (
+                        <Play className="h-3 w-3 fill-white" />
+                      )}
+                    </span>
+                  </button>
+                )}
+              </div>
+
+              {!suspendPlayback && (
+                <div
+                  className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
+                  onClick={(e) => e.stopPropagation()}
+                  {...touchBubbleBlockProps()}
+                >
+                  <MiniPipControls
+                    isPlaying={isYoutubePlaying}
+                    volume={volume}
+                    onPlayPauseClick={handleYoutubePlayPause}
+                    onVolumeChange={handleVolume}
+                  />
+                </div>
+              )}
+            </>
           ) : hasTake ? (
             <>
               <TakeVideoPlayer
@@ -282,6 +363,7 @@ function BestTakeBox({
                 loadingClassName="absolute inset-0 h-full w-full bg-black"
                 mirror={take!.mirrorPlayback !== false}
                 recordingOrientation={take!.recordingOrientation}
+                fit={playbackFit}
                 manualPlayOnly
                 audible={playbackAudible}
               />

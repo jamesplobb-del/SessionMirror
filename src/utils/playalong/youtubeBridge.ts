@@ -1,3 +1,5 @@
+import { youtubeVolumeFromUiSlider } from '../playbackVolume'
+
 const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 
 function postToYoutubeIframe(
@@ -21,13 +23,21 @@ export function pauseYoutubeProxy(iframe: HTMLIFrameElement | null | undefined):
   postToYoutubeIframe(iframe, 'pauseVideo')
 }
 
-/** Volume 0–100 for the YouTube IFrame API. */
+/** Volume from a 0–1 UI slider, boosted for audible reference playback. */
+export function setYoutubeProxyVolumeFromUi(
+  iframe: HTMLIFrameElement | null | undefined,
+  uiVolume: number,
+): void {
+  const clamped = youtubeVolumeFromUiSlider(uiVolume)
+  postToYoutubeIframe(iframe, 'setVolume', [clamped])
+}
+
+/** @deprecated Prefer setYoutubeProxyVolumeFromUi — accepts 0–1 UI slider values. */
 export function setYoutubeProxyVolume(
   iframe: HTMLIFrameElement | null | undefined,
   volumePercent: number,
 ): void {
-  const clamped = Math.round(Math.min(100, Math.max(0, volumePercent)))
-  postToYoutubeIframe(iframe, 'setVolume', [clamped])
+  setYoutubeProxyVolumeFromUi(iframe, volumePercent / 100)
 }
 
 export function seekYoutubeProxy(

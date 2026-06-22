@@ -1,5 +1,5 @@
 import type { BackingTrackMode } from './types'
-import { setYoutubeProxyVolume } from './youtubeBridge'
+import { setYoutubeProxyVolumeFromUi } from './youtubeBridge'
 
 /** Crossfade recorded take vs backing track (mixRatio 0 = all backing, 100 = all take). */
 export function applyPlayalongMix(
@@ -21,6 +21,6 @@ export function applyPlayalongMix(
   }
 
   if (backingTrackMode === 'youtube' && youtubeIframe) {
-    setYoutubeProxyVolume(youtubeIframe, backingVolume * 100)
+    setYoutubeProxyVolumeFromUi(youtubeIframe, backingVolume)
   }
 }

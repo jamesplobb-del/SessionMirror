@@ -3,7 +3,6 @@
  * instead of the quiet earpiece (PlayAndRecord + muted element output).
  */
 
-import { Capacitor } from '@capacitor/core'
 import {
   createAudioEnhancerChain,
   disposeAudioEnhancerChain,
@@ -15,6 +14,7 @@ import {
   primePlaybackAudioContextSync,
   resumePlaybackAudioContext,
 } from './playbackAudioContext'
+import { effectiveSpeakerGain } from './playbackVolume'
 
 export interface TakeSpeakerNodes {
   source: MediaElementAudioSourceNode
@@ -28,15 +28,6 @@ const routedSpeakerElements = new Set<HTMLMediaElement>()
 
 let enhancerEnabled = false
 let enhancerSettings: AudioEnhancerSettings | null = null
-
-/** iOS Web Audio element routing is quieter than native — boost on device. */
-const NATIVE_SPEAKER_GAIN = 5
-
-function effectiveSpeakerGain(volume: number, muted: boolean): number {
-  if (muted) return 0
-  const gain = Capacitor.isNativePlatform() ? volume * NATIVE_SPEAKER_GAIN : volume
-  return Math.min(gain, 6)
-}
 
 function resumePlaybackBus(): void {
   void resumePlaybackAudioContext()

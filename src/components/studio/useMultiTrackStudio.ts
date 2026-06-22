@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
+import { assignMediaPlaybackSrc, prepareInlineMediaElement } from '../../utils/mediaPlayback'
 import { applyBulletproofVideoElement } from '../../utils/mobileVideo'
 import {
-  playTakeMediaBatch,
   playTakeMediaBatchFromUserGesture,
   playTakeMediaFromUserGesture,
+  playTakeMediaMuted,
+  primeTakePlaybackAudioSync,
   releaseTakePlaybackAudio,
 } from '../../utils/takePlaybackAudio'
+import {
+  routeTakePlaybackToSpeaker,
+  updateTakePlaybackSpeakerGain,
+} from '../../utils/takePlaybackSpeaker'
+import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
 import {
   closeStudioMetronomeAudio,
   playMetronomeClick,
@@ -22,15 +28,6 @@ import {
   type MetronomeSubdivision,
 } from '../../utils/metronomeConfig'
 import { isLiveMediaStream } from './studioLivePreview'
-import {
-  closeMixContext,
-  connectVideoToMix,
-  keepMixContextAlive,
-  resumeMixContext,
-  suspendMixContext,
-  updateMixGain,
-} from './studioPlaybackMix'
-import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
 
 export type TrackStatus = 'IDLE' | 'RECORDING' | 'PLAYING'
 
@@ -93,6 +90,7 @@ function getBestMimeType(): string {
 
 function primeRecordedVideo(el: HTMLVideoElement, url: string): void {
   if (el.srcObject) el.srcObject = null
+  prepareInlineMediaElement(el, { preload: 'metadata' })
   applyBulletproofVideoElement(el)
   const safeSrc = assignMediaPlaybackSrc(el, url)
   if (el.src !== safeSrc) {
@@ -176,11 +174,13 @@ export function useMultiTrackStudio() {
     return videoRefs.current[trackIndex(id)] ?? null
   }, [])
 
-  const wireMixForTrack = useCallback(
-    (track: StudioTrack) => {
+  const wireSpeakerForTrack = useCallback(
+    (track: StudioTrack, forSimultaneousMix: boolean) => {
       const el = getVideoForTrack(track.id)
       if (!el || !track.recordedUrl) return
-      connectVideoToMix(el, track.volume, track.isMuted)
+      routeTakePlaybackToSpeaker(el, track.volume, track.isMuted, {
+        allowNativeDirect: !forSimultaneousMix,
+      })
     },
     [getVideoForTrack],
   )
@@ -191,18 +191,15 @@ export function useMultiTrackStudio() {
       if (!el || !track.recordedUrl || track.status === 'RECORDING') return
 
       primeRecordedVideo(el, track.recordedUrl)
-      wireMixForTrack(track)
-      resumeMixContext()
-
       if (fromStart) seekVideoTo(el, 0)
       playTakeMediaFromUserGesture(el)
     },
-    [getVideoForTrack, wireMixForTrack],
+    [getVideoForTrack],
   )
 
   const startOverdubPlayback = useCallback(
-    async (recordingId: 1 | 2 | 3 | 4) => {
-      resumeMixContext()
+    (recordingId: 1 | 2 | 3 | 4) => {
+      void resumePlaybackAudioContext()
       const current = tracksRef.current
       const backing = TRACK_IDS.filter((id) => id !== recordingId)
         .map((trackId) => current.find((t) => t.id === trackId))
@@ -215,15 +212,18 @@ export function useMultiTrackStudio() {
         const el = getVideoForTrack(track.id)
         if (!el || !track.recordedUrl) continue
         primeRecordedVideo(el, track.recordedUrl)
-        wireMixForTrack(track)
+        wireSpeakerForTrack(track, true)
         seekVideoTo(el, 0)
         elements.push(el)
       }
 
       if (elements.length === 0) return
-      await playTakeMediaBatch(elements)
+      primeTakePlaybackAudioSync(...elements)
+      for (const el of elements) {
+        void playTakeMediaMuted(el)
+      }
     },
-    [getVideoForTrack, wireMixForTrack],
+    [getVideoForTrack, wireSpeakerForTrack],
   )
 
   const pauseOverdubPlayback = useCallback((_recordingId: 1 | 2 | 3 | 4) => {
@@ -275,7 +275,7 @@ export function useMultiTrackStudio() {
         return
       }
 
-      keepMixContextAlive()
+      void resumePlaybackAudioContext()
 
       const masterTime = masterEl.currentTime
       for (let slot = 0; slot < TRACK_IDS.length; slot++) {
@@ -384,14 +384,14 @@ export function useMultiTrackStudio() {
     if (toPlay.length === 0) return
 
     pauseAllExcept(null)
-    resumeMixContext()
+    void resumePlaybackAudioContext()
 
     const elements: HTMLVideoElement[] = []
     for (const track of toPlay) {
       const el = getVideoForTrack(track.id)
       if (!el || !track.recordedUrl) continue
       primeRecordedVideo(el, track.recordedUrl)
-      wireMixForTrack(track)
+      wireSpeakerForTrack(track, true)
       seekVideoTo(el, 0)
       elements.push(el)
     }
@@ -414,7 +414,7 @@ export function useMultiTrackStudio() {
     startDriftLoop()
     isGlobalPlayingRef.current = true
     setIsGlobalPlaying(true)
-  }, [getVideoForTrack, pauseAllExcept, startDriftLoop, stopDriftLoopInternal, wireMixForTrack])
+  }, [getVideoForTrack, pauseAllExcept, startDriftLoop, stopDriftLoopInternal, wireSpeakerForTrack])
 
   const clearTrackInternal = useCallback(
     (id: 1 | 2 | 3 | 4) => {
@@ -454,7 +454,6 @@ export function useMultiTrackStudio() {
         return
       }
 
-      suspendMixContext()
       chunksRef.current = []
       recordingIdRef.current = id
 
@@ -558,7 +557,7 @@ export function useMultiTrackStudio() {
     [],
   )
 
-  const startMetronomeCountIn = useCallback(
+  const beginRecordingWithCountIn = useCallback(
     (id: 1 | 2 | 3 | 4) => {
       const prefs = studioPrefsRef.current
       const tickMs = studioTickIntervalMs(prefs.bpm, prefs.meter, prefs.subdivision)
@@ -567,12 +566,12 @@ export function useMultiTrackStudio() {
 
       primeStudioMetronomeAudioSync()
       setCountdownTrackId(id)
+      beginRecording(id)
 
-      const playNextTick = () => {
+      const playCountInTick = () => {
         if (ticksPlayed >= prefs.countInBeats) {
           countTimeoutRef.current = null
           setCountdownTrackId(null)
-          beginRecording(id)
           if (prefs.metronomeDuringRep) {
             startRepMetronome(
               prefs.bpm,
@@ -588,10 +587,10 @@ export function useMultiTrackStudio() {
           resolveStudioClickAccent(prefs.meter, ticksPlayed % ticksPerBar, prefs.subdivision),
         )
         ticksPlayed++
-        countTimeoutRef.current = setTimeout(playNextTick, tickMs)
+        countTimeoutRef.current = setTimeout(playCountInTick, tickMs)
       }
 
-      playNextTick()
+      playCountInTick()
     },
     [beginRecording, startRepMetronome],
   )
@@ -712,7 +711,21 @@ export function useMultiTrackStudio() {
     }
 
     primeStudioMetronomeAudioSync()
-    resumeMixContext()
+
+    const current = tracksRef.current
+    const backingEls: HTMLVideoElement[] = []
+    for (const trackId of TRACK_IDS) {
+      if (trackId === id) continue
+      const track = current.find((t) => t.id === trackId)
+      if (!track?.recordedUrl) continue
+      const el = getVideoForTrack(trackId)
+      if (!el) continue
+      primeRecordedVideo(el, track.recordedUrl)
+      backingEls.push(el)
+    }
+    if (backingEls.length > 0) {
+      primeTakePlaybackAudioSync(...backingEls)
+    }
 
     setPostRecordReviewId(null)
     stopAll()
@@ -725,15 +738,16 @@ export function useMultiTrackStudio() {
       return
     }
 
-    startMetronomeCountIn(id)
+    beginRecordingWithCountIn(id)
   }, [
     armingTrackId,
+    beginRecordingWithCountIn,
     cancelCountdown,
     countdownTrackId,
     ensureLiveCamera,
+    getVideoForTrack,
     isArmingCamera,
     pauseAllExcept,
-    startMetronomeCountIn,
     stopAll,
   ])
 
@@ -792,7 +806,7 @@ export function useMultiTrackStudio() {
           if (t.id !== id) return t
           const next = { ...t, isMuted: !t.isMuted }
           const el = getVideoForTrack(id)
-          if (el) updateMixGain(el, next.volume, next.isMuted)
+          if (el) updateTakePlaybackSpeakerGain(el, next.volume, next.isMuted)
           return next
         }),
       )
@@ -807,7 +821,7 @@ export function useMultiTrackStudio() {
           if (t.id !== id) return t
           const next = { ...t, volume }
           const el = getVideoForTrack(id)
-          if (el) updateMixGain(el, volume, next.isMuted)
+          if (el) updateTakePlaybackSpeakerGain(el, volume, next.isMuted)
           return next
         }),
       )
@@ -865,8 +879,6 @@ export function useMultiTrackStudio() {
         if (t.recordedUrl) URL.revokeObjectURL(t.recordedUrl)
       })
       closeStudioMetronomeAudio()
-      closeMixContext()
-      resumeMixContext()
       void resumePlaybackAudioContext()
     }
   }, [stopDriftLoopInternal])

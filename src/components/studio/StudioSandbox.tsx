@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { ArrowLeft, Layers, Play, Square, Volume2, VolumeX, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { applyBulletproofVideoElement, iosBulletproofVideoProps } from '../../utils/mobileVideo'
-import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
+import { assignMediaPlaybackSrc, prepareInlineMediaElement } from '../../utils/mediaPlayback'
 import { useMultiTrackStudio, type StudioCountInPrefs, type StudioTrack } from './useMultiTrackStudio'
 import StudioMetronomeBar from './StudioMetronomeBar'
 import { attachLiveStreamPreview, isLiveMediaStream } from './studioLivePreview'
@@ -77,13 +77,26 @@ function TrackBox({
 
     if (track.recordedUrl) {
       if (el.srcObject) el.srcObject = null
+      prepareInlineMediaElement(el, { preload: 'metadata' })
       applyBulletproofVideoElement(el)
       const safeSrc = assignMediaPlaybackSrc(el, track.recordedUrl)
       if (el.src !== safeSrc) {
         el.load()
       }
-      if (track.status !== 'PLAYING' && !el.paused) {
+      if (track.status !== 'PLAYING') {
         el.pause()
+        const showPosterFrame = () => {
+          try {
+            el.currentTime = 0
+          } catch {
+            /* metadata may not be ready */
+          }
+        }
+        if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          showPosterFrame()
+        } else {
+          el.addEventListener('loadeddata', showPosterFrame, { once: true })
+        }
       }
       return
     }
@@ -151,10 +164,10 @@ function TrackBox({
         </div>
       )}
 
-      {isCountingDown && !isRecording && (
+      {isCountingDown && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25">
           <span className="rounded-full border border-amber-400/40 bg-black/50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-amber-200/90">
-            Count-in…
+            {isRecording ? 'Count-in · REC' : 'Count-in…'}
           </span>
         </div>
       )}
@@ -324,10 +337,10 @@ function FullscreenTrackLayer({
         </div>
       )}
 
-      {isCountingDown && !isRecording && (
+      {isCountingDown && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/30">
           <span className="rounded-full border border-amber-400/40 bg-black/55 px-4 py-2 text-sm font-semibold uppercase tracking-widest text-amber-200/90">
-            Count-in…
+            {isRecording ? 'Count-in · REC' : 'Count-in…'}
           </span>
         </div>
       )}
