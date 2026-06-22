@@ -19,7 +19,7 @@ import type {
   PlayalongTopTab,
 } from '../utils/playalong/types'
 import { assignMediaPlaybackSrc, prepareInlineMediaElement } from '../utils/mediaPlayback'
-import { iosBulletproofVideoProps } from '../utils/mobileVideo'
+import { applyBulletproofVideoElement } from '../utils/mobileVideo'
 import type { RecordingCompletePayload } from '../utils/takeStorage'
 
 export interface UsePlayalongStudioResult {
@@ -52,6 +52,8 @@ export interface UsePlayalongStudioResult {
   handleReviewEnded: () => void
   handleRedo: () => void
   handleExport: () => Promise<void>
+  stopRecording: () => void
+  pauseBackingSync: () => void
 }
 
 export function usePlayalongStudio(): UsePlayalongStudioResult {
@@ -115,6 +117,8 @@ export function usePlayalongStudio(): UsePlayalongStudioResult {
 
   const {
     previewRef,
+    streamRef,
+    streamGeneration,
     error: cameraError,
     ready: cameraReady,
     isRecording,
@@ -127,6 +131,22 @@ export function usePlayalongStudio(): UsePlayalongStudioResult {
   useEffect(() => {
     changeRecordingMode('video')
   }, [changeRecordingMode])
+
+  // Keep preview stream attached when the contained video element mounts.
+  useEffect(() => {
+    const video = previewRef.current
+    const stream = streamRef.current
+    if (!video || !stream) return
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+    }
+    applyBulletproofVideoElement(video)
+    video.muted = true
+    if (video.paused) {
+      video.play().catch((err: unknown) => console.warn('Playback intercepted:', err))
+    }
+  }, [previewRef, streamRef, streamGeneration, cameraReady])
 
   useEffect(() => {
     let cancelled = false
@@ -156,6 +176,7 @@ export function usePlayalongStudio(): UsePlayalongStudioResult {
     const video = recordedVideoRef.current
     if (!video) return
     prepareInlineMediaElement(video)
+    video.muted = false
     assignMediaPlaybackSrc(video, recordedTake.videoUrl)
     video.load()
   }, [phase, recordedTake])
@@ -337,8 +358,7 @@ export function usePlayalongStudio(): UsePlayalongStudioResult {
     handleReviewEnded,
     handleRedo,
     handleExport,
+    stopRecording,
+    pauseBackingSync,
   }
 }
-
-/** Shared video attrs for playalong camera / review elements. */
-export const playalongVideoProps = iosBulletproofVideoProps

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type VideoHTMLAttributes } from 'react'
 import {
   ArrowLeft,
   Download,
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import YoutubeUrlDialog from '../YoutubeUrlDialog'
 import Pressable from '../ui/Pressable'
-import { usePlayalongStudio, playalongVideoProps } from '../../hooks/usePlayalongStudio'
+import { usePlayalongStudio } from '../../hooks/usePlayalongStudio'
 import type { Mp3VaultTrack, PlayalongTopTab } from '../../utils/playalong/types'
 
 interface PlayalongStudioProps {
@@ -116,7 +116,19 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
     handleReviewEnded,
     handleRedo,
     handleExport,
+    stopRecording,
+    pauseBackingSync,
   } = studio
+
+  const handleSafeExit = useCallback(() => {
+    if (isRecording) {
+      stopRecording()
+      pauseBackingSync()
+      return
+    }
+    pauseBackingSync()
+    onExit()
+  }, [isRecording, onExit, pauseBackingSync, stopRecording])
 
   const handleImportChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -142,9 +154,10 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
   )
 
   const exportDisabled = backingTrackMode === 'youtube' || !recordedTake
-  const showBackingTop =
-    phase === 'record' ||
-    (phase === 'review' && backingTrackMode !== 'none' && Boolean(backingTrackSource))
+  const showYoutubeIframe =
+    backingTrackMode === 'youtube' && Boolean(backingTrackSource)
+  const showYoutubeInTop =
+    showYoutubeIframe && (phase === 'review' || (phase === 'record' && topTab === 'youtube'))
 
   return (
     <div className="playalong-studio fixed inset-0 z-[300] flex flex-col bg-stone-950 text-white">
@@ -152,7 +165,7 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
         <Pressable
           type="button"
           intensity="icon"
-          onClick={onExit}
+          onClick={handleSafeExit}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white"
           aria-label="Exit Playalong Studio"
         >
@@ -236,8 +249,26 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
         )}
 
         <div className="relative min-h-0 flex-1 overflow-hidden">
+          {/* Single persistent YouTube iframe — avoids ref loss across record/review */}
+          {showYoutubeIframe && (
+            <div
+              className={`absolute inset-0 z-0 ${showYoutubeInTop ? '' : 'pointer-events-none invisible'}`}
+              aria-hidden={!showYoutubeInTop}
+            >
+              <iframe
+                ref={youtubeIframeRef}
+                src={backingTrackSource}
+                className="h-full w-full border-0"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                title="YouTube backing track"
+              />
+            </div>
+          )}
+
           {phase === 'record' && topTab === 'mp3' && (
-            <div className="flex h-full flex-col gap-2 overflow-y-auto px-4 pb-4">
+            <div className="relative z-[1] flex h-full flex-col gap-2 overflow-y-auto px-4 pb-4">
               {backingTrackMode === 'mp3' && backingTrackLabel && (
                 <div className="shrink-0 rounded-2xl border border-sky-400/30 bg-gradient-to-br from-sky-500/20 to-stone-900 px-4 py-5 text-center">
                   <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-sky-300/30 bg-sky-400/10">
@@ -278,76 +309,43 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
                 ))
               )}
 
-              {backingTrackMode === 'mp3' && backingTrackLabel && (
-                <div className="mt-auto rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
-                  Selected: <span className="font-semibold">{backingTrackLabel}</span>
-                </div>
-              )}
             </div>
           )}
 
-          {phase === 'record' && topTab === 'youtube' && (
-            <div className="flex h-full flex-col">
-              {backingTrackMode === 'youtube' && backingTrackSource ? (
-                <iframe
-                  ref={youtubeIframeRef}
-                  src={backingTrackSource}
-                  className="h-full w-full border-0"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  title="YouTube backing track"
-                />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-white/55">
-                  <Youtube className="h-10 w-10 text-red-400/80" />
-                  <p className="max-w-sm text-sm leading-relaxed">
-                    Load a YouTube reference through the Netlify proxy for practice playback.
-                    Export stays locked until you switch to a local MP3.
-                  </p>
-                  <Pressable
-                    type="button"
-                    intensity="soft"
-                    onClick={() => setYoutubeDialogOpen(true)}
-                    className="rounded-full border border-red-500/40 bg-red-500/15 px-4 py-2 text-xs font-semibold text-red-100"
-                  >
-                    Paste YouTube URL
-                  </Pressable>
-                </div>
-              )}
+          {phase === 'record' && topTab === 'youtube' && !showYoutubeIframe && (
+            <div className="relative z-[1] flex h-full flex-col">
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-white/55">
+                <Youtube className="h-10 w-10 text-red-400/80" />
+                <p className="max-w-sm text-sm leading-relaxed">
+                  Load a YouTube reference through the Netlify proxy for practice playback.
+                  Export stays locked until you switch to a local MP3.
+                </p>
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={() => setYoutubeDialogOpen(true)}
+                  className="rounded-full border border-red-500/40 bg-red-500/15 px-4 py-2 text-xs font-semibold text-red-100"
+                >
+                  Paste YouTube URL
+                </Pressable>
+              </div>
             </div>
           )}
 
-          {phase === 'review' && showBackingTop && (
-            <>
-              {backingTrackMode === 'youtube' && backingTrackSource && (
-                <iframe
-                  ref={youtubeIframeRef}
-                  src={backingTrackSource}
-                  className="h-full w-full border-0"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  title="YouTube backing track"
-                />
-              )}
-
-              {backingTrackMode === 'mp3' && (
-                <div className="flex h-full flex-col items-center justify-center gap-4 bg-gradient-to-b from-stone-900 to-black px-6">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/10">
-                    <Music2 className="h-8 w-8 text-sky-200" />
-                  </div>
-                  <p className="text-center text-sm font-semibold text-white/90">
-                    {backingTrackLabel || 'MP3 Backing Track'}
-                  </p>
-                  <p className="text-center text-xs text-white/45">Audio routed through hidden player</p>
-                </div>
-              )}
-            </>
+          {phase === 'review' && backingTrackMode === 'mp3' && (
+            <div className="relative z-[1] flex h-full flex-col items-center justify-center gap-4 bg-gradient-to-b from-stone-900 to-black px-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/10">
+                <Music2 className="h-8 w-8 text-sky-200" />
+              </div>
+              <p className="text-center text-sm font-semibold text-white/90">
+                {backingTrackLabel || 'MP3 Backing Track'}
+              </p>
+              <p className="text-center text-xs text-white/45">Audio routed through hidden player</p>
+            </div>
           )}
 
-          {phase === 'review' && !showBackingTop && (
-            <div className="flex h-full items-center justify-center px-6 text-sm text-white/45">
+          {phase === 'review' && backingTrackMode === 'none' && (
+            <div className="relative z-[1] flex h-full items-center justify-center px-6 text-sm text-white/45">
               No backing track selected for this take.
             </div>
           )}
@@ -358,14 +356,16 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
       <section className="playalong-studio__bottom relative flex min-h-0 flex-1 flex-col">
         {phase === 'record' ? (
           <>
-            <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
+            <div className="playalong-studio__camera-shell relative min-h-0 flex-1 overflow-hidden bg-black">
               <video
                 ref={previewRef}
-                className="camera-preview h-full w-full object-cover"
+                className="playalong-camera-preview"
                 muted
                 autoPlay
                 playsInline
-                {...playalongVideoProps}
+                preload="auto"
+                disablePictureInPicture
+                {...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>)}
               />
               {cameraError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/80 px-6 text-center text-sm text-red-200">
@@ -385,7 +385,7 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
               )}
             </div>
 
-            <div className="flex shrink-0 items-center justify-center py-4">
+            <div className="playalong-studio__controls flex shrink-0 items-center justify-center py-4">
               <button
                 type="button"
                 onPointerUp={handleRecordToggle}
@@ -411,16 +411,17 @@ export default function PlayalongStudio({ onExit }: PlayalongStudioProps) {
               {recordedTake && (
                 <video
                   ref={recordedVideoRef}
-                  className="h-full w-full object-contain"
+                  className="playalong-review-video"
                   playsInline
                   preload="auto"
-                  {...playalongVideoProps}
+                  disablePictureInPicture
+                  {...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>)}
                   onEnded={handleReviewEnded}
                 />
               )}
             </div>
 
-            <div className="shrink-0 space-y-3 border-t border-white/10 px-4 py-4">
+            <div className="playalong-studio__controls shrink-0 space-y-3 border-t border-white/10 px-4 py-4">
               <div className="flex items-center justify-center gap-3">
                 <button
                   type="button"

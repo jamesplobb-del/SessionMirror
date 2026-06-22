@@ -2025,9 +2025,23 @@ html.physical-landscape-right .control-deck__vault-btn {
   pointer-events: none;
 }
 
+.playalong-studio > header {
+  position: relative;
+  z-index: 2;
+}
+
+.playalong-studio {
+  height: 100dvh;
+  height: var(--app-height, 100dvh);
+  overflow: hidden;
+  isolation: isolate;
+}
+
 .playalong-studio__top,
 .playalong-studio__bottom {
   min-height: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .playalong-studio__top {
@@ -2038,8 +2052,44 @@ html.physical-landscape-right .control-deck__vault-btn {
   flex: 1 1 50%;
 }
 
-.playalong-studio .camera-preview {
-  transform: scaleX(-1);
+/* Contained camera — never use global video.camera-preview (fixed fullscreen). */
+.playalong-studio__camera-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+video.playalong-camera-preview {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  transform: scaleX(-1) !important;
+  transform-origin: center center !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+video.playalong-review-video {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+  z-index: 0 !important;
+}
+
+.playalong-studio__controls {
+  position: relative;
+  z-index: 2;
 }
 
 .studio-track-cell--recording {
