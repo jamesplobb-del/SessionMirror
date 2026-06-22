@@ -4,6 +4,7 @@ import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
+import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 interface PipCompareRowProps {
@@ -30,6 +31,8 @@ interface PipCompareRowProps {
   challengerAutoPlayRequestId?: string | null
   onChallengerAutoPlayComplete?: () => void
   hapticFeedback?: boolean
+  showPinCurrentAsBest?: boolean
+  onPinCurrentAsBest?: () => void
 }
 
 function PipDragGhost({
@@ -110,6 +113,8 @@ export default function PipCompareRow({
   challengerAutoPlayRequestId = null,
   onChallengerAutoPlayComplete,
   hapticFeedback = true,
+  showPinCurrentAsBest = false,
+  onPinCurrentAsBest,
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
 
@@ -121,7 +126,7 @@ export default function PipCompareRow({
     onDelete: onDeleteTake,
     onTap: onExpandChallenger,
     onDragStateChange,
-    enabled: Boolean(challengerTake?.videoUrl),
+    enabled: takeHasPlaybackMedia(challengerTake),
     hapticFeedback,
   })
 
@@ -141,7 +146,7 @@ export default function PipCompareRow({
             onSubmitYoutube={onSubmitYoutube}
             onUpload={onUploadBenchmark}
             onToggleSplitView={onToggleSplitView}
-            onExpand={benchmarkTake?.videoUrl ? onExpandBenchmark : undefined}
+            onExpand={takeHasPlaybackMedia(benchmarkTake) ? onExpandBenchmark : undefined}
             onPlaybackChange={onBenchmarkPlaybackChange}
           />
         </div>
@@ -163,16 +168,18 @@ export default function PipCompareRow({
           suspendPlayback={suspendPipPlayback}
           videoRef={challengerPipVideoRef}
           onUnpin={onUnpinChallenger}
-          onExpand={challengerTake?.videoUrl ? onExpandChallenger : undefined}
+          onExpand={takeHasPlaybackMedia(challengerTake) ? onExpandChallenger : undefined}
           dragSourceActive={isDragging}
           dragSourceArming={isArming}
           dragSourceProps={
-            challengerTake?.videoUrl ? dragSourceProps : undefined
+            takeHasPlaybackMedia(challengerTake) ? dragSourceProps : undefined
           }
           onPlaybackChange={onChallengerPlaybackChange}
           autoPlayRequestId={challengerAutoPlayRequestId}
           takeId={challengerTake?.id ?? null}
           onAutoPlayComplete={onChallengerAutoPlayComplete}
+          showPinAsBest={showPinCurrentAsBest}
+          onPinAsBest={onPinCurrentAsBest}
         />
       </div>
 

@@ -44,7 +44,7 @@ import {
   normalizeLandscapeRecordingBlob,
   normalizeLandscapeTakeInPlace,
 } from './utils/prepareTakeVideoExport'
-import { createTake, sortTakes } from './utils/takes'
+import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from './utils/takes'
 import {
   deleteTakeFile,
   NATIVE_AUDIO_MIME,
@@ -194,6 +194,9 @@ function StandardApp({
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
+  const pendingChallengerIdRef = useRef<string | null>(null)
+  const reloadTakesGenerationRef = useRef(0)
+  const takesRef = useRef<Take[]>([])
   const pendingAutoPlaybackRef = useRef(false)
   const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
@@ -398,20 +401,28 @@ function StandardApp({
 
   const reloadProjectTakes = useCallback(
     async (projectId: string) => {
+      const generation = ++reloadTakesGenerationRef.current
       const rows = await getTakesByProject(projectId)
+      if (generation !== reloadTakesGenerationRef.current) return
+
       const loadedFast = uiTakesFromVaultRowsFast(rows)
 
-      setTakes(loadedFast)
+      setTakes((current) => mergeHydratedTakes(current, loadedFast))
       setBenchmarkId(findBestTakeId(rows))
       setChallengerId((current) => {
         if (!showTakeCardsRef.current) return null
         if (current && rows.some((row) => row.id === current)) return current
+        if (current && pendingChallengerIdRef.current === current) return current
         return rows.find((row) => !row.isBestTake)?.id ?? null
       })
 
       scheduleIdle(() => {
+        if (generation !== reloadTakesGenerationRef.current) return
+
         void uiTakesFromVaultRows(rows).then((loaded) => {
-          setTakes(loaded)
+          if (generation !== reloadTakesGenerationRef.current) return
+
+          setTakes((current) => mergeHydratedTakes(current, loaded))
           void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
         })
       }, 150)
@@ -484,48 +495,58 @@ function StandardApp({
       pendingAutoPlaybackRef.current &&
       recordingModeRef.current === 'audio'
 
-    void (async () => {
+    const optimisticUrl =
+      resolveTakePlaybackUrlFast(filePath, videoUrl) ??
+      (videoUrl ? resolveMediaPlaybackSrc(videoUrl) : '')
+    const projectId = activeProjectIdRef.current
 
-      const immediateUrl = resolveTakePlaybackUrlFast(filePath, videoUrl)
-      const safeVideoUrl = resolveMediaPlaybackSrc(
-        immediateUrl ?? (await resolveTakePlaybackUrl(filePath, videoUrl)),
+    if (showTakeCardsRef.current || shouldAutoPlay) {
+      pendingChallengerIdRef.current = takeId
+      setChallengerId(takeId)
+    }
+
+    setTakes((prev) => {
+      const index = prev.length + 1
+      const savedTake: Take = {
+        ...createTake(takeId, index, optimisticUrl, filePath, mimeType, mediaType),
+        recordingOrientation: recordingOrientation ?? 'portrait',
+      }
+      return [...prev, savedTake]
+    })
+
+    if (shouldAutoPlay && optimisticUrl) {
+      pendingAutoPlaybackRef.current = false
+      playAutoTakeAudioRef.current(optimisticUrl, takeId)
+    } else if (shouldAutoPlay) {
+      pendingAutoPlaybackRef.current = false
+      setHandsFreePlaybackPending(false)
+      releaseAutoRecordSuppress(0)
+    }
+
+    if (mediaType === 'audio') {
+      setTakes((current) =>
+        current.map((take) =>
+          take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take,
+        ),
       )
-      const projectId = activeProjectIdRef.current
+    }
 
-      if (showTakeCardsRef.current || shouldAutoPlay) {
-        setChallengerId(takeId)
-      }
+    void (async () => {
+      const safeVideoUrl = resolveMediaPlaybackSrc(
+        optimisticUrl || (await resolveTakePlaybackUrl(filePath, videoUrl)),
+      )
 
-      setTakes((prev) => {
-        const index = prev.length + 1
-        const savedTake: Take = {
-          ...createTake(takeId, index, safeVideoUrl, filePath, mimeType, mediaType),
-          recordingOrientation: recordingOrientation ?? 'portrait',
-        }
-        return [...prev, savedTake]
-      })
-
-      if (shouldAutoPlay && safeVideoUrl) {
-        pendingAutoPlaybackRef.current = false
-        playAutoTakeAudioRef.current(safeVideoUrl, takeId)
-      } else if (shouldAutoPlay) {
-        pendingAutoPlaybackRef.current = false
-        setHandsFreePlaybackPending(false)
-        releaseAutoRecordSuppress(0)
-      }
-
-      if (mediaType === 'audio') {
+      if (safeVideoUrl && safeVideoUrl !== optimisticUrl) {
         setTakes((current) =>
           current.map((take) =>
-            take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take,
+            take.id === takeId ? { ...take, videoUrl: safeVideoUrl } : take,
           ),
         )
       }
 
-      void (async () => {
-        let resolvedFilePath = filePath
-        let playbackUrl = safeVideoUrl
-        let normalizedBlob = blob
+      let resolvedFilePath = filePath
+      let playbackUrl = safeVideoUrl || optimisticUrl
+      let normalizedBlob = blob
 
         if (mediaType === 'video' && recordingOrientation === 'landscape') {
           if (blob) {
@@ -557,7 +578,7 @@ function StandardApp({
             }
           }
 
-          if (playbackUrl !== safeVideoUrl || resolvedFilePath !== filePath) {
+          if (playbackUrl !== optimisticUrl || resolvedFilePath !== filePath) {
             setTakes((current) =>
               current.map((take) =>
                 take.id === takeId
@@ -582,6 +603,8 @@ function StandardApp({
             name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
           })
         }
+
+        pendingChallengerIdRef.current = null
 
         if (mediaType !== 'video') return
 
@@ -616,7 +639,6 @@ function StandardApp({
           .catch(() => {
             /* vault falls back to placeholder until thumbnail is ready */
           })
-      })()
     })()
   }, [])
 
@@ -826,7 +848,7 @@ function StandardApp({
       try {
         const rows = await getTakesByProject(projectId)
         const loaded = await uiTakesFromVaultRows(rows)
-        setTakes(loaded)
+        setTakes((current) => mergeHydratedTakes(current, loaded))
         setBenchmarkId(findBestTakeId(rows))
         void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
       } finally {
@@ -1026,6 +1048,64 @@ function StandardApp({
     () => takes.find((t) => t.id === challengerId) ?? null,
     [takes, challengerId],
   )
+  takesRef.current = takes
+
+  const refreshStaleTakePlaybackUrls = useCallback(() => {
+    void (async () => {
+      const snapshot = takesRef.current
+      if (!snapshot.some((take) => take.filePath)) return
+
+      const refreshed = await Promise.all(
+        snapshot.map(async (take) => {
+          if (!take.filePath) return take
+          const resolved = await resolveTakePlaybackUrl(take.filePath, take.videoUrl)
+          const safe = resolveMediaPlaybackSrc(resolved)
+          return safe && safe !== take.videoUrl ? { ...take, videoUrl: safe } : take
+        }),
+      )
+
+      if (!refreshed.some((take, index) => take !== snapshot[index])) return
+
+      setTakes((current) =>
+        current.map((take) => refreshed.find((entry) => entry.id === take.id) ?? take),
+      )
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      const onVisible = () => {
+        if (document.visibilityState === 'visible') {
+          refreshStaleTakePlaybackUrls()
+        }
+      }
+      document.addEventListener('visibilitychange', onVisible)
+      return () => document.removeEventListener('visibilitychange', onVisible)
+    }
+
+    let removeListener: (() => void) | undefined
+    void import('@capacitor/app').then(({ App }) => {
+      void App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) refreshStaleTakePlaybackUrls()
+      }).then((sub) => {
+        removeListener = () => {
+          void sub.remove()
+        }
+      })
+    })
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshStaleTakePlaybackUrls()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      removeListener?.()
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refreshStaleTakePlaybackUrls])
 
   const mainAudioPitchSource = useMemo(() => {
     let next: MainAudioPitchSource | null = null
@@ -1218,6 +1298,7 @@ function StandardApp({
 
     setChallengerId((current) => {
       if (current && takes.some((take) => take.id === current)) return current
+      if (current && pendingChallengerIdRef.current === current) return current
       const candidate = takes.find((take) => take.id !== benchmarkId)
       return candidate?.id ?? null
     })
@@ -1472,13 +1553,19 @@ function StandardApp({
   }, [])
 
   const handleExpandBenchmark = useMemo(
-    () => (benchmarkTake?.videoUrl ? () => handleOpenCompareReview('benchmark') : undefined),
-    [benchmarkTake?.videoUrl, handleOpenCompareReview],
+    () =>
+      takeHasPlaybackMedia(benchmarkTake)
+        ? () => handleOpenCompareReview('benchmark')
+        : undefined,
+    [benchmarkTake, handleOpenCompareReview],
   )
 
   const handleExpandChallenger = useMemo(
-    () => (challengerTake?.videoUrl ? () => handleOpenCompareReview('challenger') : undefined),
-    [challengerTake?.videoUrl, handleOpenCompareReview],
+    () =>
+      takeHasPlaybackMedia(challengerTake)
+        ? () => handleOpenCompareReview('challenger')
+        : undefined,
+    [challengerTake, handleOpenCompareReview],
   )
 
   useLayoutEffect(() => {
@@ -1530,6 +1617,22 @@ function StandardApp({
   const handleExitSplitView = useCallback(() => {
     setIsSplitView(false)
   }, [])
+
+  const hasBestTakeReference =
+    Boolean(youtubeUrl) || takeHasPlaybackMedia(benchmarkTake)
+
+  const showPinCurrentAsBest = Boolean(
+    hasBestTakeReference &&
+      takeHasPlaybackMedia(challengerTake) &&
+      challengerId &&
+      challengerId !== benchmarkId,
+  )
+
+  const handlePinCurrentAsBest = useCallback(() => {
+    if (!challengerId) return
+    setYoutubeUrl(null)
+    handlePinBenchmark(challengerId)
+  }, [challengerId, handlePinBenchmark])
 
   const pipScaleStyle = {
     '--pip-scale': settings.takeCardScale / 100,
@@ -1696,7 +1799,10 @@ function StandardApp({
               onExpandChallenger={handleExpandChallenger}
               onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
               onChallengerPlaybackChange={handleChallengerPlaybackChange}
+              challengerAutoPlayRequestId={autoPlaybackTakeId}
               onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
+              showPinCurrentAsBest={showPinCurrentAsBest}
+              onPinCurrentAsBest={handlePinCurrentAsBest}
             />
           </div>
         )}
@@ -1732,7 +1838,10 @@ function StandardApp({
                   onDragStateChange={handlePipDragStateChange}
                   onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
                   onChallengerPlaybackChange={handleChallengerPlaybackChange}
+                  challengerAutoPlayRequestId={autoPlaybackTakeId}
                   onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
+                  showPinCurrentAsBest={showPinCurrentAsBest}
+                  onPinCurrentAsBest={handlePinCurrentAsBest}
                   hapticFeedback={settings.hapticFeedback}
                 />
               </motion.div>

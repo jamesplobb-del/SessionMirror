@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from 'react'
-import { Pause, Play, Upload, X } from 'lucide-react'
+import { Pause, Play, Pin, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
@@ -13,6 +13,7 @@ import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 
 interface PipWindowProps {
+  layout?: 'pip' | 'fill'
   src: string | null
   filePath?: string
   mimeType?: string
@@ -27,6 +28,9 @@ interface PipWindowProps {
   onUnpin: () => void
   onExpand?: () => void
   onUpload?: (file: File) => void
+  /** Amber pin — promote current take to Best Take in the vault. */
+  showPinAsBest?: boolean
+  onPinAsBest?: () => void
   className?: string
   dropHighlight?: boolean
   dragSourceActive?: boolean
@@ -48,6 +52,7 @@ const FLOAT_BADGE =
   'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-md transition hover:bg-black/90'
 
 function PipWindow({
+  layout = 'pip',
   src,
   filePath = '',
   mimeType = 'video/mp4',
@@ -62,6 +67,8 @@ function PipWindow({
   onUnpin,
   onExpand,
   onUpload,
+  showPinAsBest = false,
+  onPinAsBest,
   className = '',
   dropHighlight = false,
   dragSourceActive = false,
@@ -79,8 +86,10 @@ function PipWindow({
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
 
-  const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && Boolean(src)
-  const pillLeft = showUploadBadge ? 32 : 8
+  const hasMedia = Boolean(src || filePath)
+  const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && hasMedia
+  const isFill = layout === 'fill'
+  const pillLeft = showUploadBadge || showPinAsBest ? 32 : 8
   const isAutoPlayArmed = Boolean(
     autoPlayRequestId && takeId && autoPlayRequestId === takeId,
   )
@@ -262,10 +271,12 @@ function PipWindow({
       ? 'bg-amber-400/90 text-white'
       : 'bg-sky-500/90 text-white'
 
+  const shellClass = isFill
+    ? `relative h-full w-full min-h-0 overflow-hidden ${className}`.trim()
+    : `pip-video-container group relative aspect-video ${className}`.trim()
+
   return (
-    <div
-      className={`pip-video-container group relative aspect-video ${className}`}
-    >
+    <div className={shellClass}>
       {variant === 'benchmark' && onUpload && (
         <input
           type="file"
@@ -281,23 +292,25 @@ function PipWindow({
       <div className="ui-orient-spin relative h-full w-full">
       <div
         className={`relative z-0 h-full w-full overflow-hidden rounded-xl border bg-stone-900/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
-          src ? 'opacity-100' : 'opacity-90'
+          hasMedia ? 'opacity-100' : 'opacity-90'
         } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/15'} ${
           dragSourceActive ? 'pip-drag-source--active' : ''
         } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`}
       >
         <span
-          className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass}`}
-          style={{ top: 4, left: pillLeft }}
+          className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider whitespace-nowrap ${badgeClass} ${
+            isFill ? 'text-[10px] px-2 py-0.5' : ''
+          }`}
+          style={{ top: isFill ? 8 : 4, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
         >
           {label}
         </span>
 
-        {src ? (
+        {hasMedia ? (
           <>
             <TakeVideoPlayer
               filePath={filePath}
-              videoUrl={src}
+              videoUrl={src ?? ''}
               mimeType={mimeType}
               videoRef={videoRef}
               videoSourceKey={videoSourceKey}
@@ -398,7 +411,26 @@ function PipWindow({
         </label>
       )}
 
-      {src && (
+      {showPinAsBest && onPinAsBest && (
+        <button
+          type="button"
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={(e) => {
+            e.stopPropagation()
+            onPinAsBest()
+          }}
+          className={`${FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
+          style={{ top: isFill ? 8 : -12, left: isFill ? 8 : -12 }}
+          aria-label="Pin current take as Best Take"
+          title="Pin as Best Take"
+        >
+          <Pin className="h-3.5 w-3.5" />
+        </button>
+      )}
+
+      {hasMedia && (
         <button
           type="button"
           onPointerDown={stopEventBubble}
@@ -409,7 +441,7 @@ function PipWindow({
             onUnpin()
           }}
           className={FLOAT_BADGE}
-          style={{ top: -12, right: -12 }}
+          style={{ top: isFill ? 8 : -12, right: isFill ? 8 : -12 }}
           aria-label={`Unload ${label}`}
         >
           <X className="h-3 w-3" />

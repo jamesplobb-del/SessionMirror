@@ -23,6 +23,35 @@ export function createTake(
   }
 }
 
+/** True when a take can be shown in PiP / review (URL and/or on-disk path). */
+export function takeHasPlaybackMedia(
+  take: Pick<Take, 'videoUrl' | 'filePath'> | null | undefined,
+): boolean {
+  return Boolean(take?.videoUrl || take?.filePath)
+}
+
+/**
+ * Merge vault hydration with in-memory takes — keeps local-only recordings and
+ * preserves playback URLs when hydration rows are still metadata-only.
+ */
+export function mergeHydratedTakes(local: Take[], hydrated: Take[]): Take[] {
+  const hydratedById = new Map(hydrated.map((take) => [take.id, take]))
+  const localOnly = local.filter((take) => !hydratedById.has(take.id))
+
+  const merged = hydrated.map((remote) => {
+    const prior = local.find((take) => take.id === remote.id)
+    if (!prior) return remote
+
+    return {
+      ...remote,
+      videoUrl: remote.videoUrl || prior.videoUrl,
+      thumbnailUrl: remote.thumbnailUrl || prior.thumbnailUrl,
+    }
+  })
+
+  return localOnly.length > 0 ? [...merged, ...localOnly] : merged
+}
+
 export function sortTakes(takes: Take[], mode: SortMode): Take[] {
   const sorted = [...takes]
   if (mode === 'newest') {

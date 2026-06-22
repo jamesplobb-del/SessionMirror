@@ -3,6 +3,7 @@ import BestTakeBox from './BestTakeBox'
 import LiveCameraBackground from './LiveCameraBackground'
 import PipWindow from './PipWindow'
 import type { RecordingMode, Take } from '../types'
+import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 interface SplitCompareLayoutProps {
@@ -34,6 +35,8 @@ interface SplitCompareLayoutProps {
   onChallengerPlaybackChange?: (playing: boolean) => void
   challengerAutoPlayRequestId?: string | null
   onChallengerAutoPlayComplete?: () => void
+  showPinCurrentAsBest?: boolean
+  onPinCurrentAsBest?: () => void
 }
 
 export default function SplitCompareLayout({
@@ -65,9 +68,11 @@ export default function SplitCompareLayout({
   onChallengerPlaybackChange,
   challengerAutoPlayRequestId = null,
   onChallengerAutoPlayComplete,
+  showPinCurrentAsBest = false,
+  onPinCurrentAsBest,
 }: SplitCompareLayoutProps) {
   const bottomHeight = 100 - splitRatio
-  const showCurrentTake = Boolean(challengerTake?.videoUrl) && !isRecording
+  const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
 
   return (
     <div className="split-compare-layout flex h-full w-full min-h-0 flex-col">
@@ -107,31 +112,31 @@ export default function SplitCompareLayout({
         style={{ height: `${bottomHeight}%` }}
       >
         {showCurrentTake && challengerTake ? (
-          <div className="h-full w-full p-0">
-            <PipWindow
-              className="!aspect-auto h-full w-full"
-              src={challengerTake.videoUrl}
-              filePath={challengerTake.filePath}
-              mimeType={
-                challengerTake.videoMimeType ??
-                (challengerTake.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-              }
-              takeName={challengerTake.name}
-              label="Current Take"
-              variant="challenger"
-              emptyMessage="Record a take to compare."
-              mirror={challengerTake.mirrorPlayback !== false}
-              recordingOrientation={challengerTake.recordingOrientation}
-              suspendPlayback={suspendPipPlayback}
-              videoRef={challengerPipVideoRef}
-              onUnpin={onUnpinChallenger}
-              onExpand={onExpandChallenger}
-              onPlaybackChange={onChallengerPlaybackChange}
-              autoPlayRequestId={challengerAutoPlayRequestId}
-              takeId={challengerTake.id}
-              onAutoPlayComplete={onChallengerAutoPlayComplete}
-            />
-          </div>
+          <PipWindow
+            layout="fill"
+            src={challengerTake.videoUrl}
+            filePath={challengerTake.filePath}
+            mimeType={
+              challengerTake.videoMimeType ??
+              (challengerTake.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+            }
+            takeName={challengerTake.name}
+            label="Current Take"
+            variant="challenger"
+            emptyMessage="Record a take to compare."
+            mirror={challengerTake.mirrorPlayback !== false}
+            recordingOrientation={challengerTake.recordingOrientation}
+            suspendPlayback={suspendPipPlayback}
+            videoRef={challengerPipVideoRef}
+            onUnpin={onUnpinChallenger}
+            onExpand={onExpandChallenger}
+            onPlaybackChange={onChallengerPlaybackChange}
+            autoPlayRequestId={challengerAutoPlayRequestId}
+            takeId={challengerTake.id}
+            onAutoPlayComplete={onChallengerAutoPlayComplete}
+            showPinAsBest={showPinCurrentAsBest}
+            onPinAsBest={onPinCurrentAsBest}
+          />
         ) : (
           <>
             <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-sky-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">

@@ -71,7 +71,7 @@ function BestTakeBox({
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
 
-  const hasTake = Boolean(src)
+  const hasTake = Boolean(src || take?.filePath)
   const hasYoutube = Boolean(youtubeEmbedUrl)
   const hasReference = hasTake || hasYoutube
   const isFill = layout === 'fill'
@@ -301,7 +301,7 @@ function BestTakeBox({
             <>
               <TakeVideoPlayer
                 filePath={take!.filePath}
-                videoUrl={src!}
+                videoUrl={src ?? ''}
                 mimeType={
                   take!.videoMimeType ??
                   (take!.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)

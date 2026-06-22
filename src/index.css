@@ -941,6 +941,13 @@ video.camera-preview--embedded.camera-preview--mirror {
   contain: strict;
 }
 
+.split-compare-layout__bottom .pip-video-container,
+.split-compare-layout__bottom > div {
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
 .split-ratio-slider {
   -webkit-appearance: none;
   appearance: none;
