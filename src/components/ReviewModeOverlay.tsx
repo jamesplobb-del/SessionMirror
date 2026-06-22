@@ -12,10 +12,8 @@ import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
-import {
-  playTakeMediaFromUserGesture,
-  releaseTakePlaybackAudio,
-} from '../utils/takePlaybackAudio'
+import { releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const SWIPE_THRESHOLD = 60
@@ -89,7 +87,6 @@ function ReviewTakeLayer({
           mirror={false}
           audible={playbackAudible}
           manualPlayOnly
-          eagerLoad={playbackAudible}
         />
       </div>
     )
@@ -112,7 +109,6 @@ function ReviewTakeLayer({
         fit="contain"
         audible={playbackAudible}
         manualPlayOnly
-        eagerLoad={playbackAudible}
         style={{
           WebkitTouchCallout: 'default',
           userSelect: 'auto',
@@ -388,21 +384,29 @@ export default function ReviewModeOverlay({
     const video = getActiveVideo()
     if (!video) return
 
-    if (video.paused) {
-      setIsPlaying(true)
+    if (video.paused || video.ended) {
       revealPlayOverlay(true)
-      playTakeMediaFromUserGesture(video, {
+      const started = toggleInlineTakePlayback(video, {
+        onPlaying: () => {
+          setIsPlaying(true)
+          revealPlayOverlay(true)
+        },
         onFailure: () => {
+          setIsPlaying(false)
+          revealPlayOverlay(true)
+        },
+      })
+      if (!started) {
+        setIsPlaying(false)
+        revealPlayOverlay(true)
+      }
+    } else {
+      toggleInlineTakePlayback(video, {
+        onPaused: () => {
           setIsPlaying(false)
           revealPlayOverlay(false)
         },
       })
-    } else {
-      video.pause()
-      if ('muted' in video) video.muted = true
-      void releaseTakePlaybackAudio()
-      setIsPlaying(false)
-      revealPlayOverlay(false)
     }
   }, [getActiveVideo, revealPlayOverlay])
 
@@ -457,7 +461,9 @@ export default function ReviewModeOverlay({
     setDuration(0)
     setIsPlaying(false)
     setShowPlayOverlay(true)
-    video.load()
+    video.pause()
+    video.currentTime = 0
+    if ('muted' in video) video.muted = true
   }, [
     activeSlot,
     getActiveVideo,
@@ -555,7 +561,8 @@ export default function ReviewModeOverlay({
 
       if (wasPlayingBeforeScrubRef.current) {
         setIsPlaying(true)
-        playTakeMediaFromUserGesture(video, {
+        toggleInlineTakePlayback(video, {
+          onPlaying: () => setIsPlaying(true),
           onFailure: () => {
             setIsPlaying(false)
             revealPlayOverlay(false)
@@ -843,7 +850,7 @@ export default function ReviewModeOverlay({
                 type="button"
                 intensity="icon"
                 data-play-overlay
-                onPointerUp={(e) => {
+                onClick={(e) => {
                   e.stopPropagation()
                   togglePlayPause()
                 }}

@@ -60,7 +60,9 @@ export default function TakeVideoPlayer({
   const playbackSrc = useCapacitorVideoSrc(filePath, videoUrl)
   const isAudio = isAudioMimeType(mimeTypeProp)
   const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 })
+  const loadedSrcRef = useRef<string | null>(null)
 
+  const hasPlaybackTarget = Boolean(filePath || videoUrl)
   const mediaSrc = playbackSrc
     ? isAudio
       ? playbackSrc
@@ -73,10 +75,28 @@ export default function TakeVideoPlayer({
     if (!mediaSrc) return
     const media = mediaRef.current
     if (!media) return
+
+    if (loadedSrcRef.current === mediaSrc) {
+      media.preload = effectivePreload
+      return
+    }
+
+    loadedSrcRef.current = mediaSrc
     prepareInlineMediaElement(media, { preload: effectivePreload })
     ensureMediaMuted(media)
     media.load()
+  }, [mediaSrc, mediaRef])
+
+  useEffect(() => {
+    const media = mediaRef.current
+    if (!media || !mediaSrc) return
+    media.preload = effectivePreload
   }, [effectivePreload, mediaSrc, mediaRef])
+
+  useEffect(() => {
+    if (mediaSrc) return
+    loadedSrcRef.current = null
+  }, [mediaSrc])
 
   useEffect(() => {
     setVideoDimensions({ width: 0, height: 0 })
@@ -84,9 +104,9 @@ export default function TakeVideoPlayer({
 
   useEffect(() => {
     const media = mediaRef.current
-    if (!media || !mediaSrc) return
+    if (!media) return
 
-    if (audible) {
+    if (audible && mediaSrc) {
       media.muted = false
       if (media.volume <= 0) {
         media.volume = 1
@@ -94,6 +114,7 @@ export default function TakeVideoPlayer({
       return
     }
 
+    if (!mediaSrc) return
     ensureMediaMuted(media)
     if (manualPlayOnly) {
       media.pause()
@@ -129,7 +150,7 @@ export default function TakeVideoPlayer({
     }
   }, [thumbnailPreview, mediaSrc, mediaRef])
 
-  if (!mediaSrc) {
+  if (!mediaSrc && !hasPlaybackTarget) {
     return <div className={loadingClassName} aria-hidden />
   }
 
@@ -144,10 +165,10 @@ export default function TakeVideoPlayer({
         onPointerCancel={onPointerCancel as PointerEventHandler<HTMLDivElement> | undefined}
       >
         <audio
-          key={videoSourceKey ?? mediaSrc ?? 'empty-audio'}
+          key={videoSourceKey ?? mediaSrc ?? filePath ?? 'empty-audio'}
           ref={mediaRef as RefObject<HTMLAudioElement>}
           className="sr-only"
-          src={mediaSrc}
+          src={mediaSrc ?? undefined}
           {...audioRest}
           muted={!audible}
           autoPlay={false}
@@ -155,6 +176,9 @@ export default function TakeVideoPlayer({
           preload={effectivePreload}
           {...({ 'webkit-playsinline': 'true' } as VideoHTMLAttributes<HTMLVideoElement>)}
         />
+        {!mediaSrc && (
+          <div className={`pointer-events-none absolute inset-0 ${loadingClassName}`} aria-hidden />
+        )}
         <div
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
           aria-hidden
@@ -191,10 +215,10 @@ export default function TakeVideoPlayer({
 
   const videoElement = (
     <video
-      key={videoSourceKey ?? mediaSrc ?? 'empty'}
+      key={videoSourceKey ?? mediaSrc ?? filePath ?? 'empty'}
       ref={mediaRef as RefObject<HTMLVideoElement>}
-      className={`take-video-shell__media media-display-enhance ${className ?? ''} transition-opacity duration-200 ease-in`.trim()}
-      src={mediaSrc}
+      className={`take-video-shell__media media-display-enhance ${className ?? ''} ${!mediaSrc ? loadingClassName : ''} transition-opacity duration-200 ease-in`.trim()}
+      src={mediaSrc ?? undefined}
       style={videoStyle}
       onLoadedMetadata={(event) => {
         const media = event.currentTarget

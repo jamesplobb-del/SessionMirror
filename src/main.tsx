@@ -6,6 +6,7 @@ import { initVaultDatabase } from './db'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
+import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
 
 function showVaultBootError(): void {
   const root = document.getElementById('root')
@@ -27,7 +28,16 @@ function bootstrap() {
     </StrictMode>,
   )
 
-  void Promise.all([initVaultDatabase(), initAppFilesystem()]).catch((error) => {
+  void Promise.all([initVaultDatabase(), initAppFilesystem()]).then(() => {
+    const warmRuntime = () => {
+      void resumePlaybackAudioContext()
+    }
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(warmRuntime, { timeout: 2500 })
+    } else {
+      window.setTimeout(warmRuntime, 400)
+    }
+  }).catch((error) => {
     console.error('Failed to initialize vault database', error)
     showVaultBootError()
   })

@@ -30,7 +30,7 @@ let enhancerEnabled = false
 let enhancerSettings: AudioEnhancerSettings | null = null
 
 /** iOS Web Audio element routing is quieter than native — boost on device. */
-const NATIVE_SPEAKER_GAIN = 2
+const NATIVE_SPEAKER_GAIN = 4
 
 function effectiveSpeakerGain(volume: number, muted: boolean): number {
   if (muted) return 0
@@ -236,7 +236,7 @@ export function routeTakePlaybackToSpeaker(
   // the iOS render-starvation cutout and the quieter Web Audio element route.
   if (options.allowNativeDirect && !existingNodes && !enhancerEnabled) {
     el.muted = muted
-    el.volume = muted ? 0 : Math.min(volume, 1)
+    el.volume = muted ? 0 : 1
     return
   }
 

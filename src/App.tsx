@@ -17,7 +17,6 @@ import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
-import AppBootOverlay from './components/ui/AppBootOverlay'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
 import { useCameraSession } from './hooks/useCameraSession'
@@ -68,7 +67,6 @@ import { scheduleViewportSync } from './utils/viewportSync'
 import { lockPortraitOrientation } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
-import { initAppFilesystem } from './utils/filesystemInit'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -78,6 +76,7 @@ import {
   findBestTakeId,
   getTakesByProject,
   initVaultDatabase,
+  isVaultDatabaseReady,
   listProjects,
   saveTake,
   setProjectBestTake,
@@ -196,7 +195,6 @@ function StandardApp({
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [isSplitView, setIsSplitView] = useState(false)
   const [splitRatio, setSplitRatio] = useState(50)
-  const [appBootReady, setAppBootReady] = useState(false)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
@@ -445,7 +443,7 @@ function StandardApp({
           setTakes((current) => mergeHydratedTakes(current, loaded))
           void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
         })
-      }, 200)
+      }, 500)
     },
     [applyTakeThumbnails],
   )
@@ -454,7 +452,9 @@ function StandardApp({
     let cancelled = false
 
     void (async () => {
-      await Promise.all([initVaultDatabase(), initAppFilesystem()])
+      if (!isVaultDatabaseReady()) {
+        await initVaultDatabase()
+      }
       if (cancelled) return
 
       const projectList = await listProjects()
@@ -464,10 +464,7 @@ function StandardApp({
       const initialId = projectList[0]?.id ?? null
       setActiveProjectId(initialId)
       if (initialId) {
-        await reloadProjectTakes(initialId)
-      }
-      if (!cancelled) {
-        setAppBootReady(true)
+        void reloadProjectTakes(initialId)
       }
     })()
 
@@ -1715,8 +1712,6 @@ function StandardApp({
 
   return (
     <div ref={appShellRef} className="app-shell">
-      {!appBootReady && <AppBootOverlay />}
-
       <audio
         ref={autoPlaybackAudioRef}
         className="sr-only"
@@ -1853,7 +1848,7 @@ function StandardApp({
           className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
         />
 
-        {!quickSettingsOpen && appBootReady && settings.showTakeCards && isSplitView && (
+        {!quickSettingsOpen && settings.showTakeCards && isSplitView && (
           <div className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2">
             <SplitCompareLayout
               splitRatio={splitRatio}
@@ -1894,7 +1889,7 @@ function StandardApp({
         )}
 
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {!quickSettingsOpen && appBootReady && settings.showTakeCards && !isSplitView && (
+          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && (
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"

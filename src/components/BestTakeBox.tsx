@@ -15,9 +15,9 @@ import MiniPipControls from './MiniPipControls'
 import YoutubeUrlDialog from './YoutubeUrlDialog'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import {
-  playTakeMediaFromUserGesture,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
+import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
@@ -124,17 +124,21 @@ function BestTakeBox({
 
       if (video.paused) {
         setIsPlaying(true)
-        playTakeMediaFromUserGesture(video, {
+        toggleInlineTakePlayback(video, {
+          onPlaying: () => setIsPlaying(true),
           onFailure: () => {
             setIsPlaying(false)
             void releaseTakePlaybackAudio()
           },
+          onPaused: () => setIsPlaying(false),
         })
       } else {
-        video.pause()
-        if ('muted' in video) video.muted = true
-        void releaseTakePlaybackAudio()
-        setIsPlaying(false)
+        toggleInlineTakePlayback(video, {
+          onPaused: () => {
+            setIsPlaying(false)
+            void releaseTakePlaybackAudio()
+          },
+        })
       }
     },
     [hasTake, suspendPlayback, videoRef],

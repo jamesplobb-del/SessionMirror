@@ -47,7 +47,12 @@ export function uiTakesFromVaultRowsFast(rows: VaultTake[]): Take[] {
     .reverse()
 }
 
-async function hydrateVaultTakeRow(row: VaultTake, index: number): Promise<Take> {
+async function hydrateVaultTakeRow(
+  row: VaultTake,
+  index: number,
+  options: { resolveThumbnail?: boolean } = {},
+): Promise<Take> {
+  const { resolveThumbnail = true } = options
   let videoUrl = ''
   let cachedThumbnail: string | null = null
 
@@ -57,7 +62,7 @@ async function hydrateVaultTakeRow(row: VaultTake, index: number): Promise<Take>
     videoUrl = ''
   }
 
-  if (row.mediaType === 'video') {
+  if (resolveThumbnail && row.mediaType === 'video') {
     try {
       cachedThumbnail = await resolveCachedTakeThumbnail(
         row.id,
@@ -111,7 +116,9 @@ export async function hydrateVaultTakeRowsProgressive(
   for (let offset = 0; offset < ordered.length; offset += batchSize) {
     const batch = ordered.slice(offset, offset + batchSize)
     const batchTakes = await Promise.all(
-      batch.map(({ row, index }) => hydrateVaultTakeRow(row, index)),
+      batch.map(({ row, index }) =>
+        hydrateVaultTakeRow(row, index, { resolveThumbnail: false }),
+      ),
     )
 
     for (let i = 0; i < batch.length; i += 1) {

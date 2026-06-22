@@ -5,10 +5,10 @@ import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import {
-  playTakeMediaFromUserGesture,
   playTakeMediaMuted,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
+import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { Take } from '../types'
 
@@ -142,17 +142,20 @@ function PipWindow({
       if (video.paused) {
         video.setAttribute('data-debug-playback-tag', `pip-${variant}`)
         setIsPlaying(true)
-        playTakeMediaFromUserGesture(video, {
+        toggleInlineTakePlayback(video, {
+          onPlaying: () => setIsPlaying(true),
           onFailure: () => {
             setIsPlaying(false)
             void releaseTakePlaybackAudio()
           },
         })
       } else {
-        video.pause()
-        if ('muted' in video) video.muted = true
-        void releaseTakePlaybackAudio()
-        setIsPlaying(false)
+        toggleInlineTakePlayback(video, {
+          onPaused: () => {
+            setIsPlaying(false)
+            void releaseTakePlaybackAudio()
+          },
+        })
       }
     },
     [suspendPlayback, variant, videoRef],
