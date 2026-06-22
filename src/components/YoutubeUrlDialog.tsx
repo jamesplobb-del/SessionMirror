@@ -88,7 +88,11 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
   }, [open, releaseInputFocus])
 
   const handleSubmit = useCallback(() => {
+    const t0 = performance.now()
     const embedUrl = parseYoutubeEmbedUrl(value)
+    // #region agent log
+    fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'YoutubeUrlDialog.tsx:handleSubmit',message:'youtube submit',data:{hasEmbedUrl:Boolean(embedUrl),valueLen:value.length,parseMs:Math.round(performance.now()-t0)},timestamp:Date.now(),hypothesisId:'A,C'})}).catch(()=>{});
+    // #endregion
     if (!embedUrl) {
       setError('Paste a valid YouTube link or video ID.')
       return

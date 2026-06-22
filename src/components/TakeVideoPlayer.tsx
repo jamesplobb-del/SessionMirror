@@ -195,6 +195,12 @@ export default function TakeVideoPlayer({
     videoDimensions.height,
   )
 
+  // #region agent log
+  if (fit === 'contain' || needsLandscapeFix) {
+    fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'TakeVideoPlayer.tsx:render',message:'playback orientation state',data:{needsLandscapeFix,mirror,fit,recordingOrientation,videoW:videoDimensions.width,videoH:videoDimensions.height},timestamp:Date.now(),hypothesisId:'G,H'})}).catch(()=>{});
+  }
+  // #endregion
+
   const shellClassName = takeVideoShellClassName({
     needsLandscapeFix,
     mirror,

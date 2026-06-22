@@ -808,9 +808,15 @@ function StandardApp({
   useEffect(() => {
     if (recordingMode !== 'video') return
     const delayMs = youtubeUrl ? 200 : 0
+    // #region agent log
+    fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'App.tsx:cameraRefreshEffect',message:'scheduling camera refresh',data:{isSplitView,youtubeUrl:Boolean(youtubeUrl),delayMs,recordingMode},timestamp:Date.now(),hypothesisId:'B,E'})}).catch(()=>{});
+    // #endregion
     let timer: number | null = null
     const frameId = window.requestAnimationFrame(() => {
       timer = window.setTimeout(() => {
+        // #region agent log
+        fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'App.tsx:cameraRefreshEffect',message:'running refreshCameraSession',data:{isSplitView:isSplitViewRef.current,youtubeUrl:Boolean(youtubeUrlRef.current)},timestamp:Date.now(),hypothesisId:'B,E'})}).catch(()=>{});
+        // #endregion
         void refreshCameraSession()
       }, delayMs)
     })
@@ -1790,6 +1796,9 @@ function StandardApp({
   )
 
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fba730'},body:JSON.stringify({sessionId:'fba730',location:'App.tsx:handleSubmitYoutube',message:'youtube url set',data:{isSplitView:isSplitViewRef.current,embedUrlLen:embedUrl.length,hasHost:Boolean(youtubeHostEl)},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
+    // #endregion
     setYoutubeUrl(embedUrl)
     window.requestAnimationFrame(() => {
       window.setTimeout(() => {
