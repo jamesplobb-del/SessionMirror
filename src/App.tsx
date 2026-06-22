@@ -130,13 +130,9 @@ const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidge
 const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
-const StudioSandbox = lazy(() => import('./components/studio/StudioSandbox'))
-const PlayalongStudio = lazy(() => import('./components/studio/PlayalongStudio'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
-
-type AppShellMode = 'standard' | 'studio' | 'playalong'
 
 interface AppBootSnapshot {
   projects: Project[]
@@ -186,7 +182,6 @@ export default function App() {
   const [isBooting, setIsBooting] = useState(true)
   const [bootSnapshot, setBootSnapshot] = useState<AppBootSnapshot | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
-  const [appMode, setAppMode] = useState<AppShellMode>('standard')
 
   useEffect(() => {
     let cancelled = false
@@ -249,39 +244,13 @@ export default function App() {
     )
   }
 
-  if (appMode === 'studio') {
-    return (
-      <Suspense fallback={<div className="fixed inset-0 bg-black" aria-hidden />}>
-        <StudioSandbox key="studio-sandbox" onExit={() => setAppMode('standard')} />
-      </Suspense>
-    )
-  }
-
-  if (appMode === 'playalong') {
-    return (
-      <Suspense fallback={<div className="fixed inset-0 bg-black" aria-hidden />}>
-        <PlayalongStudio key="playalong-studio" onExit={() => setAppMode('standard')} />
-      </Suspense>
-    )
-  }
-
-  return (
-    <StandardApp
-      bootSnapshot={bootSnapshot}
-      onEnterStudio={() => setAppMode('studio')}
-      onEnterPlayalong={() => setAppMode('playalong')}
-    />
-  )
+  return <StandardApp bootSnapshot={bootSnapshot} />
 }
 
 function StandardApp({
   bootSnapshot,
-  onEnterStudio,
-  onEnterPlayalong,
 }: {
   bootSnapshot: AppBootSnapshot
-  onEnterStudio: () => void
-  onEnterPlayalong: () => void
 }) {
   usePhysicalOrientation()
   const [takes, setTakes] = useState<Take[]>(bootSnapshot.takes)
@@ -2189,8 +2158,6 @@ function StandardApp({
         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
         onReset={handleResetSettings}
         recordingMode={recordingMode}
-        onEnterStudio={onEnterStudio}
-        onEnterPlayalong={onEnterPlayalong}
       />
       </Suspense>
       </div>
