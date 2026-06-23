@@ -131,7 +131,13 @@ export default function RecordingModeCarousel({
   )
 
   return (
-    <div className="record-carousel-cluster pointer-events-auto">
+    <div
+      className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+      role="group"
+      aria-label="Recording mode"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {value === 'audio' && !isRecording && onAutoSoundRecordingChange && (
         <button
           type="button"
@@ -154,31 +160,23 @@ export default function RecordingModeCarousel({
           <AudioWaveform className="h-4 w-4" strokeWidth={2.25} />
         </button>
       )}
-      <div
-        className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
-        role="group"
-        aria-label="Recording mode"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div className="record-carousel-track">
-          <ModeSlot
-            mode="video"
-            position={slotPosition('video', value)}
-            isRecording={isRecording && value === 'video'}
-            ready={ready}
-            modeSwitchLocked={modeSwitchLocked}
-            onActivate={() => handleSlotActivate('video')}
-          />
-          <ModeSlot
-            mode="audio"
-            position={slotPosition('audio', value)}
-            isRecording={isRecording && value === 'audio'}
-            ready={ready}
-            modeSwitchLocked={modeSwitchLocked}
-            onActivate={() => handleSlotActivate('audio')}
-          />
-        </div>
+      <div className="record-carousel-track">
+        <ModeSlot
+          mode="video"
+          position={slotPosition('video', value)}
+          isRecording={isRecording && value === 'video'}
+          ready={ready}
+          modeSwitchLocked={modeSwitchLocked}
+          onActivate={() => handleSlotActivate('video')}
+        />
+        <ModeSlot
+          mode="audio"
+          position={slotPosition('audio', value)}
+          isRecording={isRecording && value === 'audio'}
+          ready={ready}
+          modeSwitchLocked={modeSwitchLocked}
+          onActivate={() => handleSlotActivate('audio')}
+        />
       </div>
     </div>
   )
