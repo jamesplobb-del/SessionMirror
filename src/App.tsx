@@ -90,9 +90,10 @@ import {
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 import {
-  enableRecordingAudioRoute,
-  enableStereoPlaybackRoute,
+  registerAudioSessionLifecycle,
+  setAudioSessionStereoBlocked,
 } from './utils/audioSessionRoute'
+import { useMediaAudioSessionRouting } from './hooks/useMediaAudioSessionRouting'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -852,6 +853,9 @@ function StandardApp({
     onAfterForegroundRestart: resumeYoutubeReference,
   })
 
+  const isRecordingRef = useRef(isRecording)
+  isRecordingRef.current = isRecording
+
   useEffect(() => {
     if (recordingMode !== 'video') return
     const delayMs = youtubeUrl ? 200 : 0
@@ -1094,8 +1098,6 @@ function StandardApp({
     }
     wasReviewOpenRef.current = isReviewOpen
   }, [isReviewOpen, refreshCameraSession])
-
-  const wasStereoRouteRef = useRef(false)
 
   useEffect(() => {
     if (!isSplitView || recordingMode !== 'video' || isRecording) return
@@ -1508,42 +1510,24 @@ function StandardApp({
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
 
-  // Engage the iPhone's STEREO speakers (bottom + earpiece) for focused playback
-  // by switching the audio session to `.playback`. iOS can't do stereo while a
-  // capture is live, so we release the camera/mic, then restore the recording
-  // route + re-acquire the camera when playback stops. Excluded:
-  //   - recording (capture must stay on the recording route)
-  //   - split/expand (the live camera is shown in the bottom pane)
-  //   - the hands-free audio auto-loop (releasing the mic would break re-arming)
-  const wantsStereoPlaybackRoute =
-    isReviewOpen ||
-    (takePlaybackActive &&
-      !isRecording &&
-      !isSplitView &&
-      !handsFreePlaybackPending)
+  useEffect(() => {
+    registerAudioSessionLifecycle({
+      onBeforeStereo: () => {
+        if (!isRecordingRef.current) {
+          suspendCameraForBackground()
+        }
+      },
+      onAfterStereo: () => {
+        void refreshCameraSession()
+      },
+    })
+  }, [refreshCameraSession, suspendCameraForBackground])
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return
+    setAudioSessionStereoBlocked(isRecording)
+  }, [isRecording])
 
-    if (wantsStereoPlaybackRoute) {
-      wasStereoRouteRef.current = true
-      suspendCameraForBackground()
-      const timer = window.setTimeout(() => {
-        void enableStereoPlaybackRoute()
-      }, 200)
-      return () => window.clearTimeout(timer)
-    }
-
-    // Only restore (and re-acquire the camera) if we actually went stereo, and
-    // debounce so a quick pause/play doesn't churn the camera.
-    if (!wasStereoRouteRef.current) return
-    const timer = window.setTimeout(() => {
-      wasStereoRouteRef.current = false
-      void enableRecordingAudioRoute()
-      void refreshCameraSession()
-    }, 400)
-    return () => window.clearTimeout(timer)
-  }, [wantsStereoPlaybackRoute, refreshCameraSession, suspendCameraForBackground])
+  useMediaAudioSessionRouting(autoPlaybackAudioRef, true, 'auto-playback')
 
   useEffect(() => {
     setTakePlaybackEnhancerState(
