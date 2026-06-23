@@ -6,6 +6,23 @@ function attachPlaybackContextWatch(ctx: AudioContext): void {
   playbackContextWatchAttached = true
 
   ctx.addEventListener('statechange', () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'fba730',
+      },
+      body: JSON.stringify({
+        sessionId: 'fba730',
+        location: 'playbackAudioContext.ts:statechange',
+        message: 'ctx-state-change',
+        data: { state: ctx.state },
+        timestamp: Date.now(),
+        hypothesisId: 'D',
+      }),
+    }).catch(() => {})
+    // #endregion
     if (ctx.state === 'suspended') {
       void ctx.resume().catch(() => {})
     }

@@ -9,6 +9,7 @@ import {
   hasTakePlaybackSpeakerRoute,
   routeTakePlaybackToSpeaker,
 } from './takePlaybackSpeaker'
+import { debugPlaybackSnapshot } from './debugPlaybackLog'
 
 let autoPlaybackHoldCheck: (() => boolean) | null = null
 
@@ -125,6 +126,21 @@ export function playTakeMediaFromUserGesture(
   void media
     .play()
     .then(() => {
+      // #region agent log
+      debugPlaybackSnapshot('takePlaybackAudio.ts:play', media, 'play-started', 'E')
+      for (const delayMs of [500, 1000, 1500, 2500]) {
+        window.setTimeout(() => {
+          if (!media.paused && !media.ended) {
+            debugPlaybackSnapshot(
+              'takePlaybackAudio.ts:play',
+              media,
+              `play-t+${delayMs}ms`,
+              delayMs <= 1000 ? 'A' : 'B',
+            )
+          }
+        }, delayMs)
+      }
+      // #endregion
       callbacks.onPlaying?.()
     })
     .catch((error: unknown) => {

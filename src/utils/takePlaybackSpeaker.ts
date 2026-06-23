@@ -15,6 +15,7 @@ import {
   resumePlaybackAudioContext,
 } from './playbackAudioContext'
 import { effectiveSpeakerGain } from './playbackVolume'
+import { debugPlaybackLog } from './debugPlaybackLog'
 
 export interface TakeSpeakerPassthrough {
   input: GainNode
@@ -267,6 +268,14 @@ export function routeTakePlaybackToSpeaker(
   if (options.allowNativeDirect && !existingNodes && !enhancerEnabled) {
     el.muted = muted
     el.volume = muted ? 0 : 1
+    // #region agent log
+    debugPlaybackLog(
+      'takePlaybackSpeaker.ts:route',
+      'route-native-direct',
+      { enhancerEnabled, elMuted: el.muted, elVolume: el.volume, volume, muted },
+      'C',
+    )
+    // #endregion
     return
   }
 
@@ -312,6 +321,25 @@ export function routeTakePlaybackToSpeaker(
   }
 
   resumePlaybackBus()
+
+  // #region agent log
+  debugPlaybackLog(
+    'takePlaybackSpeaker.ts:route',
+    'route-web-audio',
+    {
+      enhancerEnabled,
+      hadExistingNodes: Boolean(existingNodes),
+      allowNativeDirect: options.allowNativeDirect ?? false,
+      busGain: nodes.gain.gain.value,
+      hasEnhancerChain: Boolean(nodes.enhancer),
+      hasPassthrough: Boolean(nodes.passthrough),
+      elMuted: el.muted,
+      elVolume: el.volume,
+      ctxState: (nodes.source.context as AudioContext).state,
+    },
+    'A',
+  )
+  // #endregion
 }
 
 export function updateTakePlaybackSpeakerGain(
