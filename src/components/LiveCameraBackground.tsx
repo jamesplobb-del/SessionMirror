@@ -1,5 +1,5 @@
 import { memo, useEffect, type RefObject } from 'react'
-import { Camera, Mic } from 'lucide-react'
+import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
 import { iosBulletproofVideoProps } from '../utils/mobileVideo'
 
@@ -7,8 +7,6 @@ interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
-  needsPermission?: boolean
-  onRequestPermission?: () => void
   recordingMode: RecordingMode
   isRecording: boolean
   /** Brief overlay while switching between camera and audio capture. */
@@ -25,8 +23,6 @@ function LiveCameraBackground({
   previewRef,
   streamRef,
   streamGeneration,
-  needsPermission = false,
-  onRequestPermission,
   recordingMode,
   isRecording,
   modePreparing = false,
@@ -114,8 +110,6 @@ function LiveCameraBackground({
       ? 'camera-background camera-background--visually-suppressed'
       : 'camera-background'
 
-  const PermissionIcon = isAudioMode ? Mic : Camera
-
   return (
     <div className={shellClass} aria-hidden={!isEmbedded && !visuallySuppressed}>
       <video
@@ -165,26 +159,6 @@ function LiveCameraBackground({
         </div>
       )}
 
-      {needsPermission && (
-        <div className={`${overlayClass} flex flex-col items-center justify-center gap-5 bg-black`}>
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
-            <PermissionIcon className="h-7 w-7 text-white/80" />
-          </div>
-          <p className="max-w-xs px-6 text-center text-sm text-white/70">
-            {isAudioMode
-              ? 'Microphone access is required to record audio takes.'
-              : 'Camera and microphone access are required to record takes.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => onRequestPermission?.()}
-            className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black shadow-lg active:scale-[0.98]"
-          >
-            Tap to Enable Camera/Microphone
-          </button>
-        </div>
-      )}
-
       <div
         className={`${overlayClass} pointer-events-none bg-gradient-to-b from-black/10 via-transparent to-black/25 ${
           showAudioIdle ? 'opacity-40' : isAudioMode ? 'opacity-0' : 'opacity-100'
@@ -207,8 +181,6 @@ export default memo(
     prev.previewRef === next.previewRef &&
     prev.streamRef === next.streamRef &&
     prev.streamGeneration === next.streamGeneration &&
-    prev.needsPermission === next.needsPermission &&
-    prev.onRequestPermission === next.onRequestPermission &&
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
     prev.modePreparing === next.modePreparing &&

@@ -14,6 +14,7 @@ import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
+import CameraPermissionPrompt from './components/CameraPermissionPrompt'
 import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
@@ -828,6 +829,7 @@ function StandardApp({
     streamRef,
     streamGeneration,
     needsPermission: cameraNeedsPermission,
+    permissionRequestInFlight: cameraPermissionRequestInFlight,
     requestCameraAccess,
     ready,
     isRecording,
@@ -2001,10 +2003,6 @@ function StandardApp({
         previewRef={previewRef}
         streamRef={streamRef}
         streamGeneration={streamGeneration}
-        needsPermission={cameraNeedsPermission}
-        onRequestPermission={() => {
-          void requestCameraAccess()
-        }}
         recordingMode={recordingMode}
         isRecording={isRecording}
         modePreparing={!ready && !isRecording && !cameraNeedsPermission}
@@ -2013,6 +2011,14 @@ function StandardApp({
         }
         visuallySuppressed={isSplitView}
       />
+
+      {cameraNeedsPermission && (
+        <CameraPermissionPrompt
+          recordingMode={recordingMode}
+          requesting={cameraPermissionRequestInFlight}
+          onRequestPermission={requestCameraAccess}
+        />
+      )}
 
       <div
         className={`pitch-display-layer${pitchHudSuspended ? ' floating-widget-layer--inert' : ''}`}
@@ -2136,7 +2142,6 @@ function StandardApp({
               streamRef={streamRef}
               streamGeneration={streamGeneration}
               cameraNeedsPermission={cameraNeedsPermission}
-              onRequestCameraAccess={requestCameraAccess}
               recordingMode={recordingMode}
               isRecording={isRecording}
               cameraReady={ready}

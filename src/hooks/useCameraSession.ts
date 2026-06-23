@@ -142,6 +142,15 @@ function detachPreviewTargets(
   detachPreviewStream(secondary)
 }
 
+function getMediaConstraints(mode: RecordingMode): MediaStreamConstraints {
+  return mode === 'audio'
+    ? { audio: getAudioCaptureConstraints(), video: false }
+    : {
+        audio: getAudioCaptureConstraints(),
+        video: getVideoCaptureConstraints(),
+      }
+}
+
 export function useCameraSession({
   onRecordingComplete,
   secondaryPreviewRef,
@@ -185,6 +194,8 @@ export function useCameraSession({
 
   const [error, setError] = useState<string | null>(null)
   const [needsPermission, setNeedsPermission] = useState(false)
+  const [permissionRequestInFlight, setPermissionRequestInFlight] = useState(false)
+  const permissionRequestInFlightRef = useRef(false)
   const [ready, setReady] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -306,13 +317,7 @@ export function useCameraSession({
       streamRef.current = null
       detachAllPreviewTargets()
 
-      const constraints: MediaStreamConstraints =
-        mode === 'audio'
-          ? { audio: getAudioCaptureConstraints(), video: false }
-          : {
-              audio: getAudioCaptureConstraints(),
-              video: getVideoCaptureConstraints(),
-            }
+      const constraints = getMediaConstraints(mode)
 
       try {
         const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
@@ -346,12 +351,55 @@ export function useCameraSession({
     [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets],
   )
 
-  const requestCameraAccess = useCallback(async () => {
-    if (isRecordingRef.current) return
-    setNeedsPermission(false)
+  const requestCameraAccess = useCallback(() => {
+    if (isRecordingRef.current || permissionRequestInFlightRef.current) return
+
+    const mode = recordingModeRef.current
+    const existing = streamRef.current
+    if (existing && isStreamRecordable(existing, mode)) {
+      syncPreviewTargets(existing, mode)
+      setNeedsPermission(false)
+      setReady(true)
+      return
+    }
+
+    const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
+    if (!getUserMedia) {
+      console.warn('navigator.mediaDevices.getUserMedia is unavailable')
+      setNeedsPermission(true)
+      setReady(false)
+      return
+    }
+
+    stopStreamTracks(streamRef.current)
+    streamRef.current = null
+    detachAllPreviewTargets()
+
+    const constraints = getMediaConstraints(mode)
+    permissionRequestInFlightRef.current = true
+    setPermissionRequestInFlight(true)
     setError(null)
-    await acquireStream(recordingModeRef.current)
-  }, [acquireStream])
+
+    // iOS requires getUserMedia to start synchronously inside the tap handler.
+    getUserMedia(constraints)
+      .then(async (mediaStream) => {
+        await tuneMusicRecordingStream(mediaStream)
+        streamRef.current = mediaStream
+        syncPreviewTargets(mediaStream, mode)
+        setStreamGeneration((generation) => generation + 1)
+        setNeedsPermission(false)
+        setReady(true)
+      })
+      .catch((err) => {
+        console.warn('Failed to acquire camera/microphone stream', err)
+        setNeedsPermission(true)
+        setReady(false)
+      })
+      .finally(() => {
+        permissionRequestInFlightRef.current = false
+        setPermissionRequestInFlight(false)
+      })
+  }, [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets])
 
   const ensureRecordableStream = useCallback(async (): Promise<MediaStream | null> => {
     const mode = recordingModeRef.current
@@ -1045,6 +1093,7 @@ export function useCameraSession({
     streamGeneration,
     error,
     needsPermission,
+    permissionRequestInFlight,
     requestCameraAccess,
     ready,
     isRecording,
