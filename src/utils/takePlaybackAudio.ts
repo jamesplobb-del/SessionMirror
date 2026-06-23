@@ -92,10 +92,9 @@ export function playTakeMediaFromUserGesture(
 ): void {
   primeTakePlaybackForUserGesture(media)
 
-  if (!hasTakePlaybackSpeakerRoute(media)) {
-    media.muted = false
-    media.volume = 1
-  }
+  // Output is via the Web Audio bus; element stays unmuted so iOS keeps decoding.
+  media.muted = false
+  media.volume = 1
 
   if (
     media.readyState < HTMLMediaElement.HAVE_METADATA &&
@@ -161,21 +160,30 @@ export async function playTakeMediaAudible(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  primeTakePlayback([media], true)
-  if (!hasTakePlaybackSpeakerRoute(media)) {
-    media.muted = false
-    media.volume = 1
-  } else {
-    await resumePlaybackAudioContext()
-  }
-  return media
-    .play()
-    .then(() => true)
-    .catch((error: unknown) => {
+  primeTakePlayback([media], false)
+  await resumePlaybackAudioContext()
+
+  media.muted = false
+  media.volume = 1
+
+  try {
+    await media.play()
+    return true
+  } catch {
+    // iOS can reject unmuted programmatic autoplay — start muted to pass the
+    // gate, then unmute immediately so the element keeps decoding (no cutout).
+    try {
+      media.muted = true
+      await media.play()
+      media.muted = false
+      media.volume = 1
+      return true
+    } catch (error) {
       console.log(error)
       options.onFailure?.(error)
       return false
-    })
+    }
+  }
 }
 
 export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {

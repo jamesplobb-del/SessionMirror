@@ -47,6 +47,20 @@ function resumePlaybackBus(): void {
   void resumePlaybackAudioContext()
 }
 
+/**
+ * Output flows through the Web Audio graph, so the element must stay UNMUTED.
+ * iOS WKWebView throttles/stops decoding muted media elements after ~1s, which
+ * starves the MediaElementSource and cuts audio out. createMediaElementSource
+ * reroutes the element's output into the graph, so an unmuted element does not
+ * double-play — the GainNode (and optional enhancer) control what we hear.
+ */
+function applyGraphOutputElementState(el: HTMLMediaElement): void {
+  el.muted = false
+  if (el.volume <= 0) {
+    el.volume = 1
+  }
+}
+
 export function setTakePlaybackEnhancerState(
   enabled: boolean,
   settings?: AudioEnhancerSettings,
@@ -61,10 +75,12 @@ export function setTakePlaybackEnhancerState(
       continue
     }
 
+    applyGraphOutputElementState(el)
+
     if (!enhancerEnabled || !enhancerSettings) {
       disconnectEnhancer(nodes)
       ensurePassthroughChain(nodes)
-      nodes.gain.gain.value = effectiveSpeakerGain(el.volume || 1, false, true)
+      nodes.gain.gain.value = effectiveSpeakerGain(1, false, true)
       armPlaybackGraphKeepAlive(el, nodes)
       continue
     }
@@ -72,7 +88,7 @@ export function setTakePlaybackEnhancerState(
     if (nodes.enhancer) {
       updateAudioEnhancerChain(nodes.enhancer, enhancerSettings)
     }
-    nodes.gain.gain.value = effectiveSpeakerGain(el.volume || 1, false, true)
+    nodes.gain.gain.value = effectiveSpeakerGain(1, false, true)
     armPlaybackGraphKeepAlive(el, nodes)
   }
 
@@ -212,15 +228,20 @@ export function registerTakePlaybackSpeakerRoute(
   if (existing) {
     if (existing.source === source && existing.gain === gain) {
       repairSpeakerBus(el, existing)
-      el.muted = true
+      applyGraphOutputElementState(el)
+      existing.gain.gain.value = effectiveSpeakerGain(1, false, true)
+      armPlaybackGraphKeepAlive(el, existing)
     }
     return
   }
 
-  speakerNodesByElement.set(el, { source, gain })
+  const nodes: TakeSpeakerNodes = { source, gain }
+  speakerNodesByElement.set(el, nodes)
   routedSpeakerElements.add(el)
-  el.muted = true
-  repairSpeakerBus(el, { source, gain })
+  applyGraphOutputElementState(el)
+  repairSpeakerBus(el, nodes)
+  gain.gain.value = effectiveSpeakerGain(1, false, true)
+  armPlaybackGraphKeepAlive(el, nodes)
 }
 
 export function hasTakePlaybackSpeakerRoute(el: HTMLMediaElement): boolean {
@@ -228,24 +249,23 @@ export function hasTakePlaybackSpeakerRoute(el: HTMLMediaElement): boolean {
 }
 
 export interface RouteTakePlaybackOptions {
+  /** @deprecated Retained for call-site compatibility — all playback now uses the Web Audio bus. */
   allowNativeDirect?: boolean
 }
 
+/**
+ * Wire a media element into the shared Web Audio speaker bus. A single output
+ * path (bus + optional enhancer) is used for every take so that volume and
+ * routing stay consistent whether the enhancer is on or off. The element is
+ * never muted (see applyGraphOutputElementState).
+ */
 export function routeTakePlaybackToSpeaker(
   el: HTMLMediaElement,
   volume = 1,
   muted = false,
-  options: RouteTakePlaybackOptions = {},
+  _options: RouteTakePlaybackOptions = {},
 ): void {
   const existingNodes = speakerNodesByElement.get(el)
-
-  if (options.allowNativeDirect && !existingNodes && !enhancerEnabled) {
-    disarmPlaybackGraphKeepAlive(el)
-    el.muted = muted
-    el.volume = muted ? 0 : 1
-    return
-  }
-
   const ctx = primePlaybackAudioContextSync()
 
   let nodes = existingNodes
@@ -260,10 +280,12 @@ export function routeTakePlaybackToSpeaker(
     } catch {
       nodes = speakerNodesByElement.get(el)
       if (!nodes) {
+        // Element could not be captured by Web Audio — play it natively, unmuted,
+        // and rely on AVAudioSession (.speaker) for loud, uninterrupted output.
         resumePlaybackBus()
         disarmPlaybackGraphKeepAlive(el)
         el.muted = muted
-        el.volume = muted ? 0 : volume
+        el.volume = muted ? 0 : 1
         return
       }
       repairSpeakerBus(el, nodes)
@@ -272,7 +294,7 @@ export function routeTakePlaybackToSpeaker(
     repairSpeakerBus(el, nodes)
   }
 
-  el.muted = true
+  applyGraphOutputElementState(el)
   nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, true)
 
   if (enhancerEnabled && enhancerSettings) {

@@ -1,22 +1,49 @@
 ---
-description: iOS take playback audio — native-direct path prevents 1s cutout
-globs: src/utils/takePlayback*.ts,src/utils/playbackAudioContext.ts,src/components/TakeVideoPlayer.tsx
+description: iOS take playback audio — single Web Audio bus, never mute routed elements
+globs: src/utils/takePlayback*.ts,src/utils/playbackAudioContext.ts,src/utils/playbackGraphKeepAlive.ts,src/components/TakeVideoPlayer.tsx,src/hooks/useLivePitchTracker.ts
 alwaysApply: false
 ---
 
 # iOS take playback audio
 
-Single-track take playback on native iOS must **not** route through Web Audio (`MediaElementAudioSourceNode` + `el.muted = true`) unless required (audio enhancer, pitch analysis graph, or simultaneous multi-track mixing).
+All take playback (PiP, review, BestTake, hands-free auto-playback) flows through
+ONE output path: the shared Web Audio speaker bus in `takePlaybackSpeaker.ts`
+(`source → gain → [enhancer | passthrough] → destination`). The enhancer being
+on or off only changes the middle of the chain, never the path.
 
-## Why
+## The two recurring bugs and their causes
 
-Routing a muted element through Web Audio with nothing actively pulling the graph (no analyser loop) causes iOS WKWebView to **starve audio after ~1 second** and play at **low volume** from the wrong speaker.
+1. **Audio plays ~1s then cuts out** — the routed media element was set
+   `el.muted = true`. iOS WKWebView throttles/stops decoding muted media
+   elements after ~1s, which starves the `MediaElementAudioSourceNode` at the
+   SOURCE. No downstream keep-alive can fix this.
+2. **Audio is very quiet the whole time** — playback fell back to "native-direct"
+   (element playing on its own), which routes to the quiet earpiece, or the
+   pitch tracker left the shared bus gain at unity (`1`) instead of the boosted
+   speaker gain.
 
-## Required pattern
+## Required pattern (do NOT regress)
 
-1. **Native-direct for single playback**: `routeTakePlaybackToSpeaker(el, volume, muted, { allowNativeDirect: true })` when no enhancer and the element is not already wired — play the element **unmuted** and rely on `AVAudioSession` in `AppDelegate.swift` (`overrideOutputAudioPort(.speaker)`).
-2. **Web Audio only when needed**: batch/simultaneous tracks, enhancer enabled, or pitch analysis already registered a speaker route.
-3. **User-gesture `.play()`**: call synchronously inside `onClick` / `onPointerUp`; never await before `.play()`.
-4. **Capacitor URIs**: never assign raw `file://` to `media.src`; use `resolveMediaPlaybackSrc` / `assignMediaPlaybackSrc`.
+1. **Never mute a routed element.** Once `createMediaElementSource(el)` captures
+   an element, its output is rerouted into the graph, so leaving it unmuted does
+   NOT double-play — but it DOES keep iOS decoding. Use
+   `applyGraphOutputElementState` (muted=false, volume=1); the `GainNode`
+   controls level. This applies in `routeTakePlaybackToSpeaker`,
+   `registerTakePlaybackSpeakerRoute`, `TakeVideoPlayer`, the pitch tracker, and
+   every `playTakeMedia*` entry point.
+2. **One path, always Web Audio.** Do not reintroduce a "native-direct" branch
+   for single playback — it brought back the quiet-earpiece path. Native element
+   output is only a last-resort fallback when `createMediaElementSource` throws.
+3. **Boosted gain everywhere.** Output uses `effectiveSpeakerGain(...)`
+   (`PLAYBACK_GAIN_NATIVE` ≈ 20× on device). The pitch tracker must NOT reset the
+   shared bus gain to `1`; use `applyPitchOutputGain` which defers to the speaker
+   module when tapping the shared bus.
+4. **Programmatic (non-gesture) audible play**: try unmuted first; if iOS rejects
+   it, retry muted then unmute immediately (see `playTakeMediaAudible`).
+5. **Capacitor URIs**: never assign raw `file://` to `media.src`; use
+   `resolveMediaPlaybackSrc` / `assignMediaPlaybackSrc`.
+6. **AVAudioSession** (`AppDelegate.swift`) forces `.speaker` on launch, on
+   activate, and on every `routeChangeNotification`. Keep that observer.
 
-Do not re-introduce mic suspension during playback, `AudioSessionPlugin`, or `playbackKeepAlive` timers — they caused regressions.
+Do not re-introduce mic suspension during playback, `AudioSessionPlugin`, or
+`playbackKeepAlive` timers — they caused regressions.

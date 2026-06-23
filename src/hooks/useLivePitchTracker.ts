@@ -37,7 +37,7 @@ import {
   getTakePlaybackSpeakerNodes,
   registerTakePlaybackSpeakerRoute,
   routeTakePlaybackToSpeaker,
-  isTakePlaybackEnhancerEnabled,
+  updateTakePlaybackSpeakerGain,
 } from '../utils/takePlaybackSpeaker'
 const HISTORY_LENGTH = 140
 
@@ -185,6 +185,24 @@ type PitchGraphMode = 'stream' | 'element'
 
 /** Speaker passthrough when Web Audio routes playback (element is already full scale). */
 const MEDIA_PLAYBACK_GAIN = 1
+
+/**
+ * When the pitch graph taps the shared speaker bus, the speaker module owns the
+ * (boosted) output gain — leave it alone. Only standalone stream passthroughs
+ * use the unity analysis gain.
+ */
+function applyPitchOutputGain(
+  media: HTMLMediaElement,
+  passthrough: GainNode | null,
+): void {
+  if (!passthrough) return
+  const speakerNodes = getTakePlaybackSpeakerNodes(media)
+  if (speakerNodes && speakerNodes.gain === passthrough) {
+    updateTakePlaybackSpeakerGain(media, 1, false)
+  } else {
+    passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+  }
+}
 
 interface PitchGraph {
   context: AudioContext
@@ -459,9 +477,7 @@ async function createPitchGraph(
     if (existing.analyser.fftSize === profile.frameSize) {
       existing.detector.clarityThreshold = profile.clarityMin
       existing.detector.minVolumeDecibels = profile.rmsGateDbMedia
-      if (existing.passthrough) {
-        existing.passthrough.gain.value = MEDIA_PLAYBACK_GAIN
-      }
+      applyPitchOutputGain(media, existing.passthrough)
       resumePlaybackAudioContext()
       return existing
     }
@@ -493,7 +509,7 @@ async function createPitchGraph(
     elementSource.connect(passthrough)
     passthrough.connect(context.destination)
     registerTakePlaybackSpeakerRoute(media, elementSource, passthrough)
-    media.muted = true
+    applyPitchOutputGain(media, passthrough)
     source = elementSource
     mode = 'element'
   } catch {
@@ -505,7 +521,7 @@ async function createPitchGraph(
         /* analyser may already be connected */
       }
       passthrough = speakerNodes.gain
-      passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+      applyPitchOutputGain(media, passthrough)
       source = speakerNodes.source
       mode = 'element'
     } else {
@@ -1774,20 +1790,10 @@ export function resumePitchGraphsForMedia(
     const graph = elementGraphs.get(element)
     if (!graph) continue
 
-    if (graph.passthrough) {
-      const speakerNodes = getTakePlaybackSpeakerNodes(element)
-      const onSharedSpeakerBus = Boolean(
-        speakerNodes && speakerNodes.gain === graph.passthrough,
-      )
-      if (!onSharedSpeakerBus) {
-        graph.passthrough.gain.value = MEDIA_PLAYBACK_GAIN
-      }
-    }
+    applyPitchOutputGain(element, graph.passthrough)
 
     if (graph.mode === 'element' && getTakePlaybackSpeakerNodes(element)) {
-      routeTakePlaybackToSpeaker(element, element.volume, false, {
-        allowNativeDirect: !isTakePlaybackEnhancerEnabled(),
-      })
+      routeTakePlaybackToSpeaker(element, element.volume || 1, false)
     } else if (graph.mode === 'stream' && graph.context.state !== 'closed') {
       refreshMediaPitchStreamSource(graph)
     }
