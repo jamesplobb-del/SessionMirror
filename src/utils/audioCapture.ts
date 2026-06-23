@@ -47,3 +47,37 @@ export async function tuneMusicRecordingStream(stream: MediaStream): Promise<voi
     stream.getAudioTracks().map((track) => tuneMusicRecordingAudioTrack(track)),
   )
 }
+
+/** Reduce speaker bleed from reference playback into the mic while recording. */
+export async function tunePlaybackIsolationAudioTrack(track: MediaStreamTrack): Promise<void> {
+  const attempts: MediaTrackConstraints[] = [
+    {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: false,
+    },
+    {
+      echoCancellation: { ideal: true },
+      noiseSuppression: { ideal: true },
+      autoGainControl: { ideal: false },
+    },
+  ]
+
+  for (const constraints of attempts) {
+    try {
+      await track.applyConstraints(constraints)
+      const settings = track.getSettings()
+      if (settings.echoCancellation === true || settings.noiseSuppression === true) {
+        return
+      }
+    } catch {
+      /* try next constraint shape */
+    }
+  }
+}
+
+export async function tunePlaybackIsolationStream(stream: MediaStream): Promise<void> {
+  await Promise.all(
+    stream.getAudioTracks().map((track) => tunePlaybackIsolationAudioTrack(track)),
+  )
+}

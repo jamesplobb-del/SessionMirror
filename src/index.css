@@ -340,7 +340,8 @@ body.settings-branch-open * {
 }
 
 .metronome-display-layer .metronome-widget-draggable,
-.metronome-display-layer .pointer-events-auto {
+.metronome-display-layer .pointer-events-auto,
+.metronome-display-layer .pitch-widget-close {
   pointer-events: auto !important;
 }
 
@@ -455,9 +456,9 @@ body.settings-branch-open * {
 }
 
 .metronome-widget__btn--active {
-  background: var(--accent-active-soft);
-  border-color: var(--accent-active-border);
-  color: var(--accent-active);
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(125, 211, 252, 0.42);
+  color: rgb(224, 242, 254);
 }
 
 .metronome-widget__play {

@@ -32,6 +32,8 @@ export interface AppSettings {
   audioEnhancerEnabled: boolean
   /** Persisted enhancer preset and slider values. */
   audioEnhancerSettings: AudioEnhancerSettings
+  /** Pause YouTube and enable mic echo cancellation while recording to reduce bleed. */
+  excludeYoutubeFromRecording: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -48,6 +50,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   takeCardScale: 100,
   audioEnhancerEnabled: false,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
+  excludeYoutubeFromRecording: false,
 }
 
 /** Floating widgets — forced off on each cold app start. */
@@ -125,6 +128,10 @@ export function loadAppSettings(): AppSettings {
       audioEnhancerSettings: parseAudioEnhancerSettings(
         parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),
+      excludeYoutubeFromRecording:
+        parsed.excludeYoutubeFromRecording !== undefined
+          ? Boolean(parsed.excludeYoutubeFromRecording)
+          : DEFAULT_APP_SETTINGS.excludeYoutubeFromRecording,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

@@ -376,6 +376,19 @@ export default function SettingsDrawer({
             />
           </section>
 
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Play Along
+            </h3>
+
+            <SettingToggle
+              label="Keep YouTube Out of Recordings"
+              description="While recording, pauses YouTube reference playback and turns on mic echo cancellation to reduce bleed. Resume playback manually when you are done."
+              checked={settings.excludeYoutubeFromRecording}
+              onChange={(checked) => onUpdate({ excludeYoutubeFromRecording: checked })}
+            />
+          </section>
+
           <Pressable
             type="button"
             intensity="soft"

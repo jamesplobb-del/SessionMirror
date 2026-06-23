@@ -50,8 +50,7 @@ import {
 import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from './utils/takes'
 import {
   pauseYoutubeProxy,
-  playYoutubeProxy,
-  setYoutubeProxyVolumeFromUi,
+  startYoutubeProxyPlayback,
 } from './utils/playalong/youtubeBridge'
 import {
   deleteTakeFile,
@@ -96,6 +95,10 @@ import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
+import {
+  tuneMusicRecordingStream,
+  tunePlaybackIsolationStream,
+} from './utils/audioCapture'
 import AppBootGate from './components/ui/AppBootGate'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
@@ -820,8 +823,7 @@ function StandardApp({
 
   const resumeYoutubeReference = useCallback(() => {
     if (!youtubeUrlRef.current) return
-    playYoutubeProxy(youtubeIframeRef.current)
-    setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, 1)
+    startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
   }, [])
 
   const {
@@ -953,6 +955,29 @@ function StandardApp({
     if (!isRecording) return
     teardownActiveAutoPlayback()
   }, [isRecording, teardownActiveAutoPlayback])
+
+  useEffect(() => {
+    const stream = streamRef.current
+    if (!isRecording) {
+      if (settings.excludeYoutubeFromRecording && stream) {
+        void tuneMusicRecordingStream(stream)
+      }
+      return
+    }
+
+    if (!settings.excludeYoutubeFromRecording) return
+
+    pauseYoutubeReference()
+
+    if (stream) {
+      void tunePlaybackIsolationStream(stream)
+    }
+  }, [
+    isRecording,
+    pauseYoutubeReference,
+    settings.excludeYoutubeFromRecording,
+    streamGeneration,
+  ])
 
   useEffect(() => {
     return () => {
@@ -1591,17 +1616,31 @@ function StandardApp({
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(0)
       pausePipVideos()
-      setBenchmarkId(id)
+      setYoutubeUrl(null)
+      setBenchmarkId((prevBenchmark) => {
+        setChallengerId((current) => {
+          if (current === id) {
+            if (prevBenchmark && prevBenchmark !== id) {
+              return prevBenchmark
+            }
+            const sorted = sortTakes(takes, sortMode)
+            const pinnedIndex = sorted.findIndex((take) => take.id === id)
+            if (pinnedIndex >= 0 && pinnedIndex < sorted.length - 1) {
+              return sorted[pinnedIndex + 1].id
+            }
+            return null
+          }
+          if (current && current !== id) return current
+          const other = takes.find((take) => take.id !== id)
+          return other?.id ?? null
+        })
+        return id
+      })
       if (activeProjectIdRef.current) {
         void setProjectBestTake(activeProjectIdRef.current, id)
       }
-      setChallengerId((current) => {
-        if (current && current !== id) return current
-        const other = takes.find((t) => t.id !== id)
-        return other?.id ?? null
-      })
     },
-    [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio, takes],
+    [pausePipVideos, releaseAutoRecordSuppress, sortMode, stopAutoPlaybackAudio, takes],
   )
 
   const handlePinChallenger = useCallback(
@@ -1932,8 +1971,7 @@ function StandardApp({
     setYoutubeUrl(embedUrl)
     window.requestAnimationFrame(() => {
       window.setTimeout(() => {
-        playYoutubeProxy(youtubeIframeRef.current)
-        setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, 1)
+        startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
       }, 400)
     })
   }, [])
@@ -1949,8 +1987,7 @@ function StandardApp({
       const next = !current
       if (next && youtubeUrlRef.current) {
         window.requestAnimationFrame(() => {
-          playYoutubeProxy(youtubeIframeRef.current)
-          setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, 1)
+          startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
         })
       }
       if (!next) {
@@ -1981,7 +2018,6 @@ function StandardApp({
 
   const handlePinCurrentAsBest = useCallback(() => {
     if (!challengerId) return
-    setYoutubeUrl(null)
     handlePinBenchmark(challengerId)
   }, [challengerId, handlePinBenchmark])
 

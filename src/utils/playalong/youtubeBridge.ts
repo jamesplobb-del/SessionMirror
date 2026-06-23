@@ -1,4 +1,6 @@
+import { Capacitor } from '@capacitor/core'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
+import AudioSessionPlugin from '../audioSessionRoute'
 
 const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 
@@ -21,6 +23,33 @@ export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): 
 
 export function pauseYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
   postToYoutubeIframe(iframe, 'pauseVideo')
+}
+
+export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
+  postToYoutubeIframe(iframe, 'unMute')
+}
+
+/** Play reference audio as loud as the proxy allows — re-applies volume after the embed wakes. */
+export function startYoutubeProxyPlayback(
+  iframe: HTMLIFrameElement | null | undefined,
+  uiVolume = 1,
+): void {
+  playYoutubeProxy(iframe)
+  unmuteYoutubeProxy(iframe)
+  setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+
+  if (Capacitor.isNativePlatform()) {
+    void AudioSessionPlugin.enableStereoPlayback()
+  }
+
+  window.setTimeout(() => {
+    unmuteYoutubeProxy(iframe)
+    setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+  }, 120)
+
+  window.setTimeout(() => {
+    setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+  }, 450)
 }
 
 /** Volume from a 0–1 UI slider, boosted for audible reference playback. */

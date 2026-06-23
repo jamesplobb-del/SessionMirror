@@ -19,8 +19,8 @@ import {
 } from '../utils/takePlaybackAudio'
 import {
   pauseYoutubeProxy,
-  playYoutubeProxy,
   setYoutubeProxyVolumeFromUi,
+  startYoutubeProxyPlayback,
 } from '../utils/playalong/youtubeBridge'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
@@ -186,8 +186,7 @@ function BestTakeBox({
         return
       }
 
-      playYoutubeProxy(iframe)
-      setYoutubeProxyVolumeFromUi(iframe, volume)
+      startYoutubeProxyPlayback(iframe, volume)
       setIsYoutubePlaying(true)
     },
     [hasYoutube, isYoutubePlaying, suspendPlayback, volume, youtubeIframeRef],
@@ -258,6 +257,10 @@ function BestTakeBox({
   const renderExpandButton = () => {
     if (!onToggleSplitView || splitViewActive) return null
 
+    const expandPosition = hasReference
+      ? { bottom: chromeInset, right: chromeInset }
+      : { top: chromeInset, right: chromeInset }
+
     return (
       <button
         type="button"
@@ -269,7 +272,7 @@ function BestTakeBox({
           onToggleSplitView()
         }}
         className={UPLOAD_BADGE_BTN}
-        style={{ top: chromeInset, right: chromeInset }}
+        style={expandPosition}
         aria-label="Open split view layout"
       >
         <Maximize2 className="h-3 w-3 stroke-[2]" aria-hidden />
