@@ -28,8 +28,6 @@ import {
   getMusicRecordingAudioConstraints,
   tuneMusicRecordingStream,
 } from '../utils/audioCapture'
-import { getUserMediaCompat } from '../utils/getUserMedia'
-import { prepareForMediaCapture } from '../utils/audioSessionRoute'
 import {
   getPlaybackAudioContext,
   isSharedPlaybackContext,
@@ -282,11 +280,21 @@ async function createMicPitchGraph(
       throw new Error('Shared mic stream not ready')
     }
 
-    await prepareForMediaCapture()
-    stream = await getUserMediaCompat({
-      audio: getMusicRecordingAudioConstraints(),
-      video: false,
-    })
+    try {
+      const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
+      if (!getUserMedia) {
+        console.warn('navigator.mediaDevices.getUserMedia is unavailable for pitch tracking')
+        throw new Error('Microphone unavailable')
+      }
+
+      stream = await getUserMedia({
+        audio: getMusicRecordingAudioConstraints(),
+        video: false,
+      })
+    } catch (err) {
+      console.warn('Failed to acquire microphone for pitch tracking', err)
+      throw err
+    }
     await tuneMusicRecordingStream(stream)
     ownsStream = true
   } else {

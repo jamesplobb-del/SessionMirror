@@ -827,7 +827,8 @@ function StandardApp({
     previewRef,
     streamRef,
     streamGeneration,
-    error: cameraError,
+    needsPermission: cameraNeedsPermission,
+    requestCameraAccess,
     ready,
     isRecording,
     elapsed,
@@ -2000,10 +2001,13 @@ function StandardApp({
         previewRef={previewRef}
         streamRef={streamRef}
         streamGeneration={streamGeneration}
-        error={cameraError}
+        needsPermission={cameraNeedsPermission}
+        onRequestPermission={() => {
+          void requestCameraAccess()
+        }}
         recordingMode={recordingMode}
         isRecording={isRecording}
-        modePreparing={!ready && !isRecording}
+        modePreparing={!ready && !isRecording && !cameraNeedsPermission}
         pitchStageActive={
           showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
         }
@@ -2131,7 +2135,8 @@ function StandardApp({
               splitPreviewRef={splitPreviewRef}
               streamRef={streamRef}
               streamGeneration={streamGeneration}
-              cameraError={cameraError}
+              cameraNeedsPermission={cameraNeedsPermission}
+              onRequestCameraAccess={requestCameraAccess}
               recordingMode={recordingMode}
               isRecording={isRecording}
               cameraReady={ready}

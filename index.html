@@ -25,29 +25,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      ;(function () {
-        if (typeof navigator === 'undefined') return
-        var nav = navigator
-        if (!nav.mediaDevices) {
-          try {
-            Object.defineProperty(nav, 'mediaDevices', { value: {}, writable: true, configurable: true })
-          } catch (e) {
-            nav.mediaDevices = {}
-          }
-        }
-        if (!nav.mediaDevices.getUserMedia) {
-          var legacy = nav.getUserMedia || nav.webkitGetUserMedia || nav.mozGetUserMedia
-          if (legacy) {
-            nav.mediaDevices.getUserMedia = function (constraints) {
-              return new Promise(function (resolve, reject) {
-                legacy.call(nav, constraints, resolve, reject)
-              })
-            }
-          }
-        }
-      })()
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

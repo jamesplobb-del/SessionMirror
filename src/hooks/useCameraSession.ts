@@ -17,8 +17,6 @@ import {
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream } from '../utils/audioCapture'
-import { prepareForMediaCapture } from '../utils/audioSessionRoute'
-import { getUserMediaCompat } from '../utils/getUserMedia'
 import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
@@ -34,8 +32,6 @@ interface UseCameraSessionOptions {
   onAfterForegroundRestart?: () => void
 }
 
-const CAMERA_INIT_MAX_ATTEMPTS = 3
-const CAMERA_INIT_RETRY_MS = 450
 const CAMERA_RELEASE_DELAY_MS = 700
 const FOREGROUND_RESTART_DELAY_MS = 250
 const IOS_CAMERA_RELEASE_DELAY_MS = 250
@@ -188,6 +184,7 @@ export function useCameraSession({
   onAfterForegroundRestartRef.current = onAfterForegroundRestart
 
   const [error, setError] = useState<string | null>(null)
+  const [needsPermission, setNeedsPermission] = useState(false)
   const [ready, setReady] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -300,6 +297,7 @@ export function useCameraSession({
       const existing = streamRef.current
       if (existing && isStreamRecordable(existing, mode)) {
         syncPreviewTargets(existing, mode)
+        setNeedsPermission(false)
         setReady(true)
         return existing
       }
@@ -316,25 +314,44 @@ export function useCameraSession({
               video: getVideoCaptureConstraints(),
             }
 
-      if (Capacitor.isNativePlatform()) {
-        await prepareForMediaCapture()
-        if (cancelled?.()) return null
-      }
+      try {
+        const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
+        if (!getUserMedia) {
+          console.warn('navigator.mediaDevices.getUserMedia is unavailable')
+          setNeedsPermission(true)
+          setReady(false)
+          return null
+        }
 
-      const mediaStream = await getUserMediaCompat(constraints)
-      if (cancelled?.()) {
-        mediaStream.getTracks().forEach((track) => track.stop())
+        const mediaStream = await getUserMedia(constraints)
+        if (cancelled?.()) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          return null
+        }
+
+        await tuneMusicRecordingStream(mediaStream)
+        streamRef.current = mediaStream
+        syncPreviewTargets(mediaStream, mode)
+        setStreamGeneration((generation) => generation + 1)
+        setNeedsPermission(false)
+        setReady(true)
+        return mediaStream
+      } catch (err) {
+        console.warn('Failed to acquire camera/microphone stream', err)
+        setNeedsPermission(true)
+        setReady(false)
         return null
       }
-      await tuneMusicRecordingStream(mediaStream)
-      streamRef.current = mediaStream
-      syncPreviewTargets(mediaStream, mode)
-      setStreamGeneration((generation) => generation + 1)
-      setReady(true)
-      return mediaStream
     },
     [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets],
   )
+
+  const requestCameraAccess = useCallback(async () => {
+    if (isRecordingRef.current) return
+    setNeedsPermission(false)
+    setError(null)
+    await acquireStream(recordingModeRef.current)
+  }, [acquireStream])
 
   const ensureRecordableStream = useCallback(async (): Promise<MediaStream | null> => {
     const mode = recordingModeRef.current
@@ -356,10 +373,9 @@ export function useCameraSession({
 
   useEffect(() => {
     let cancelled = false
-    let retryTimer: number | null = null
     let activeStream: MediaStream | null = null
 
-    const startWithRecovery = async (attempt = 0) => {
+    const startWithRecovery = async () => {
       cancelScheduledRelease()
 
       const mode = recordingMode
@@ -422,23 +438,8 @@ export function useCameraSession({
         activeStream = mediaStream
       } catch (err) {
         if (cancelled) return
-
-        if (attempt + 1 < CAMERA_INIT_MAX_ATTEMPTS) {
-          retryTimer = window.setTimeout(() => {
-            void startWithRecovery(attempt + 1).catch(() => {
-              /* retried inside startWithRecovery */
-            })
-          }, CAMERA_INIT_RETRY_MS)
-          return
-        }
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : recordingMode === 'audio'
-              ? 'Unable to access microphone.'
-              : 'Unable to access camera and microphone.',
-        )
+        console.warn('Camera session initialization failed', err)
+        setNeedsPermission(true)
         setReady(false)
       }
     }
@@ -450,9 +451,6 @@ export function useCameraSession({
     return () => {
       cancelled = true
       cancelScheduledRelease()
-      if (retryTimer !== null) {
-        window.clearTimeout(retryTimer)
-      }
       void abortActiveWriter().catch(() => {})
 
       stopStreamTracks(activeStream)
@@ -876,8 +874,10 @@ export function useCameraSession({
 
       await acquireStream(recordingModeRef.current)
       if (restartToken !== foregroundRestartTokenRef.current) return
-    } catch {
-      setError('Camera interrupted. Close and reopen the app if the preview looks wrong.')
+    } catch (err) {
+      console.warn('Camera interrupted during foreground restart', err)
+      setNeedsPermission(true)
+      setReady(false)
     } finally {
       window.clearTimeout(resumeTimeoutId)
       if (restartToken === foregroundRestartTokenRef.current) {
@@ -1044,6 +1044,8 @@ export function useCameraSession({
     streamRef,
     streamGeneration,
     error,
+    needsPermission,
+    requestCameraAccess,
     ready,
     isRecording,
     elapsed,

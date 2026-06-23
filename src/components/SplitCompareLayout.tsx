@@ -21,7 +21,8 @@ interface SplitCompareLayoutProps {
   splitPreviewRef: RefObject<HTMLVideoElement | null>
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
-  cameraError: string | null
+  cameraNeedsPermission: boolean
+  onRequestCameraAccess: () => void
   recordingMode: RecordingMode
   isRecording: boolean
   cameraReady: boolean
@@ -61,7 +62,8 @@ export default function SplitCompareLayout({
   splitPreviewRef,
   streamRef,
   streamGeneration,
-  cameraError,
+  cameraNeedsPermission,
+  onRequestCameraAccess,
   recordingMode,
   isRecording,
   cameraReady,
@@ -193,10 +195,11 @@ export default function SplitCompareLayout({
                   previewRef={splitPreviewRef}
                   streamRef={streamRef}
                   streamGeneration={streamGeneration}
-                  error={cameraError}
+                  needsPermission={cameraNeedsPermission}
+                  onRequestPermission={onRequestCameraAccess}
                   recordingMode={recordingMode}
                   isRecording={isRecording}
-                  modePreparing={!cameraReady && !isRecording}
+                  modePreparing={!cameraReady && !isRecording && !cameraNeedsPermission}
                   pitchStageActive={pitchStageActive}
                 />
               </div>
