@@ -13,8 +13,8 @@ interface AudioSessionPlugin {
   enableRecordingRoute(): Promise<void>
 }
 
-/** Capacitor jsName is `AudioSession` (see AudioSessionPlugin.swift). */
-export const CustomAudioSession = registerPlugin<AudioSessionPlugin>('AudioSession')
+/** Capacitor jsName is `AudioSessionPlugin` (see AudioSessionPlugin.m). */
+export const CustomAudioSession = registerPlugin<AudioSessionPlugin>('AudioSessionPlugin')
 
 const isNative = Capacitor.isNativePlatform()
 
