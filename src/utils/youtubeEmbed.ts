@@ -2,15 +2,7 @@ const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 
 /** Build the Capacitor-safe proxy iframe URL for a YouTube video ID. */
 export function buildYoutubeProxyUrl(videoId: string): string {
-  const params = new URLSearchParams({
-    v: videoId,
-    controls: '0',
-    modestbranding: '1',
-    rel: '0',
-    playsinline: '1',
-    iv_load_policy: '3',
-  })
-  return `${YOUTUBE_PROXY_ORIGIN}/?${params.toString()}`
+  return `${YOUTUBE_PROXY_ORIGIN}/?v=${videoId}`
 }
 
 /** Extract a YouTube video ID from a pasted URL or raw ID. */

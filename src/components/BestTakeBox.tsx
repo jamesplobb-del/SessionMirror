@@ -309,13 +309,35 @@ function BestTakeBox({
             <>
               <div
                 ref={onYoutubeHostChange}
-                className="absolute inset-0 z-[1] overflow-hidden"
+                className="absolute inset-0"
                 aria-label="YouTube reference"
               />
 
+              <div className="absolute inset-0 z-[5] pointer-events-none">
+                {!suspendPlayback && (
+                  <button
+                    type="button"
+                    onPointerDown={stopEventBubble}
+                    onTouchStart={stopEventBubble}
+                    onTouchEnd={stopEventBubble}
+                    onClick={handleYoutubePlayPause}
+                    className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+                    aria-label={isYoutubePlaying ? 'Pause YouTube reference' : 'Play YouTube reference'}
+                  >
+                    <span className={pipTouchIconClass}>
+                      {isYoutubePlaying ? (
+                        <Pause className="h-3 w-3 fill-white" />
+                      ) : (
+                        <Play className="h-3 w-3 fill-white" />
+                      )}
+                    </span>
+                  </button>
+                )}
+              </div>
+
               {!suspendPlayback && (
                 <div
-                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 bg-black/75 px-2 py-1 backdrop-blur-md"
+                  className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
                   onClick={(e) => e.stopPropagation()}
                   {...touchBubbleBlockProps()}
                 >
