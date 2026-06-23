@@ -467,7 +467,7 @@ function PipWindow({
             onPinAsBest()
           }}
           className={`${FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
-          style={{ top: 8, left: -10 }}
+          style={{ top: -10, left: -10 }}
           aria-label="Pin current take as Best Take"
           title="Pin as Best Take"
         >
@@ -486,7 +486,7 @@ function PipWindow({
             onUnpin()
           }}
           className={FLOAT_BADGE}
-          style={{ top: 8, right: -10 }}
+          style={{ top: -10, right: -10 }}
           aria-label={`Unload ${label}`}
         >
           <X className="h-3 w-3" />

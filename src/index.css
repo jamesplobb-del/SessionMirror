@@ -255,6 +255,17 @@ body.settings-branch-open * {
   }
 }
 
+/* Crop YouTube iframe progress/chrome bleeding through the bottom edge */
+.youtube-embed-host iframe {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  width: 100%;
+  height: calc(100% + 3.5rem);
+  border: 0;
+  pointer-events: none;
+}
+
 .review-timeline-overlay {
   bottom: 0;
 }

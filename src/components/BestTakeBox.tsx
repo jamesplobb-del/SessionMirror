@@ -18,6 +18,7 @@ import {
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
 import {
+  maintainYoutubeProxyLoudness,
   pauseYoutubeProxy,
   setYoutubeProxyVolumeFromUi,
   startYoutubeProxyPlayback,
@@ -95,6 +96,17 @@ function BestTakeBox({
     if (!hasYoutube || !youtubeIframeRef?.current) return
     setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, volume)
   }, [hasYoutube, volume, youtubeEmbedUrl, youtubeIframeRef])
+
+  useEffect(() => {
+    if (!hasYoutube || !isYoutubePlaying || !youtubeIframeRef?.current) return
+
+    maintainYoutubeProxyLoudness(youtubeIframeRef.current, volume)
+    const interval = window.setInterval(() => {
+      maintainYoutubeProxyLoudness(youtubeIframeRef.current, volume)
+    }, 700)
+
+    return () => window.clearInterval(interval)
+  }, [hasYoutube, isYoutubePlaying, volume, youtubeEmbedUrl, youtubeIframeRef])
 
   useEffect(() => {
     const media = videoRef.current
@@ -296,26 +308,45 @@ function BestTakeBox({
 
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
-          <span
-            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
-              isFill ? 'px-2 py-0.5 text-[10px]' : ''
+          <div
+            className={`pointer-events-none absolute z-10 flex max-w-[calc(100%-3rem)] items-center gap-1.5 ${
+              isFill ? 'left-2 top-2' : ''
             }`}
-            style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
+            style={isFill ? undefined : { top: 4, left: pillLeft }}
           >
-            Best Take
-          </span>
+            <span
+              className={`truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
+                isFill ? 'px-2 py-0.5 text-[10px]' : ''
+              }`}
+            >
+              Best Take
+            </span>
+            {isFill && onUpload && (
+              <label
+                htmlFor="benchmark-upload"
+                onPointerDown={stopEventBubble}
+                onTouchStart={stopEventBubble}
+                onTouchEnd={stopEventBubble}
+                onClick={stopEventBubble}
+                className="pointer-events-auto flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/50 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-black/70"
+                aria-label="Upload best take media"
+              >
+                <Upload className="h-3 w-3" />
+              </label>
+            )}
+          </div>
 
           {hasYoutube ? (
             <>
               <div
                 ref={onYoutubeHostChange}
-                className="absolute inset-0 z-[1] overflow-hidden"
+                className="youtube-embed-host absolute inset-0 z-[1] overflow-hidden"
                 aria-label="YouTube reference"
               />
 
               {!suspendPlayback && (
                 <div
-                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 bg-black/75 px-2 py-1 backdrop-blur-md"
+                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
                   onClick={(e) => e.stopPropagation()}
                   {...touchBubbleBlockProps()}
                 >
@@ -430,7 +461,7 @@ function BestTakeBox({
           {renderClearButton()}
           {renderExpandButton()}
 
-          {showUploadBadge && (
+          {showUploadBadge && !isFill && (
             <label
               htmlFor="benchmark-upload"
               onPointerDown={stopEventBubble}

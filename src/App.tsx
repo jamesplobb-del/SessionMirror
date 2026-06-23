@@ -103,7 +103,6 @@ import {
 import AppBootGate from './components/ui/AppBootGate'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
-const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
   if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
@@ -434,9 +433,6 @@ function StandardApp({
     void releaseTakePlaybackAudio().finally(() => {
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
-      if (Capacitor.isNativePlatform()) {
-        void AudioSessionPlugin.enableRecordingRoute()
-      }
     })
   }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
@@ -480,13 +476,6 @@ function StandardApp({
       audio.load()
 
       void (async () => {
-        if (Capacitor.isNativePlatform()) {
-          void AudioSessionPlugin.enableStereoPlayback()
-          await new Promise((resolve) =>
-            window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS),
-          )
-        }
-
         const ready = await waitForMediaReadyWithRetry(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
         if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
