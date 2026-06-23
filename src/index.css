@@ -189,7 +189,6 @@ video.media-display-enhance:not(.camera-preview) {
   overflow: visible;
   width: calc(9.5rem * var(--pip-scale, 1));
   min-width: calc(9.5rem * var(--pip-scale, 1));
-  max-width: min(calc(9.5rem * var(--pip-scale, 1)), calc((100vw - 3.5rem) / 2));
   min-height: calc(9.5rem * 9 / 16 * var(--pip-scale, 1));
   -webkit-user-select: none;
   user-select: none;
@@ -253,17 +252,6 @@ body.settings-branch-open * {
     min-width: 10rem;
     min-height: calc(10rem * 9 / 16);
   }
-}
-
-/* Crop YouTube iframe progress/chrome bleeding through the bottom edge */
-.youtube-embed-host iframe {
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  width: 100%;
-  height: calc(100% + 3.5rem);
-  border: 0;
-  pointer-events: none;
 }
 
 .review-timeline-overlay {
@@ -556,68 +544,6 @@ body.settings-branch-open * {
   font-size: clamp(0.48rem, 11cqh, 0.58rem);
   font-weight: 700;
   letter-spacing: 0.01em;
-}
-
-.metronome-widget__sound-select-wrap {
-  flex: 0 0 auto;
-  min-width: 0;
-}
-
-.metronome-widget__sound-select {
-  height: clamp(1.2rem, 16cqh, 1.45rem);
-  max-width: 4.75rem;
-  border-radius: 999px;
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
-  padding: 0 1.4rem 0 0.45rem;
-  font-size: clamp(0.48rem, 11cqh, 0.58rem);
-  font-weight: 700;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(255,255,255,0.7)' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.4rem center;
-}
-
-.settings-range-input {
-  -webkit-appearance: none;
-  appearance: none;
-  touch-action: manipulation;
-  height: 2rem;
-  padding: 0.625rem 0;
-  background: transparent;
-}
-
-.settings-range-input::-webkit-slider-runnable-track {
-  height: 0.5rem;
-  border-radius: 999px;
-  background: #e7e5e4;
-}
-
-.settings-range-input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-top: -0.375rem;
-  border-radius: 999px;
-  background: #ffffff;
-  border: 1px solid #d6d3d1;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-}
-
-.settings-range-input::-moz-range-track {
-  height: 0.5rem;
-  border-radius: 999px;
-  background: #e7e5e4;
-}
-
-.settings-range-input::-moz-range-thumb {
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 999px;
-  background: #ffffff;
-  border: 1px solid #d6d3d1;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 
 .metronome-widget__meter-divider {

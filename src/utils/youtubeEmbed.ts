@@ -9,8 +9,6 @@ export function buildYoutubeProxyUrl(videoId: string): string {
     rel: '0',
     playsinline: '1',
     iv_load_policy: '3',
-    disablekb: '1',
-    fs: '0',
   })
   return `${YOUTUBE_PROXY_ORIGIN}/?${params.toString()}`
 }

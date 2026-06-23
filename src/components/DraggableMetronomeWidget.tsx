@@ -19,7 +19,6 @@ import {
   COMPOUND_METERS,
   MAX_BPM,
   METRONOME_SUBDIVISIONS,
-  METRONOME_SOUND_TYPES,
   MIN_BPM,
   SIMPLE_METERS,
   type MetronomeMeter,
@@ -84,7 +83,7 @@ export default function DraggableMetronomeWidget({
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
   const positionReadyRef = useRef(false)
-  const { bpm, meter, subdivision, soundType, playing, beatIndex, setBpm, setMeter, setSubdivision, setSoundType, togglePlay, stop } =
+  const { bpm, meter, subdivision, playing, beatIndex, setBpm, setMeter, setSubdivision, togglePlay, stop } =
     useMetronome({
     isTakePlaying,
     muteDuringPlayback,
@@ -502,25 +501,6 @@ export default function DraggableMetronomeWidget({
         </div>
 
         <div className="metronome-widget__row metronome-widget__row--subdivisions pointer-events-auto">
-          <label className="metronome-widget__sound-select-wrap pointer-events-auto">
-            <span className="sr-only">Metronome sound</span>
-            <select
-              value={soundType}
-              onPointerDown={(event) => event.stopPropagation()}
-              onChange={(event) => {
-                triggerLightHaptic()
-                setSoundType(event.target.value as typeof soundType)
-              }}
-              className="metronome-widget__sound-select pointer-events-auto"
-              aria-label="Metronome sound"
-            >
-              {METRONOME_SOUND_TYPES.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
           {METRONOME_SUBDIVISIONS.map(({ value, label }) => renderSubdivisionButton(value, label))}
         </div>
       </div>

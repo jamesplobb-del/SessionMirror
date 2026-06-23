@@ -25,28 +25,23 @@ export default function IOSSwitch({
       aria-checked={checked}
       aria-label={ariaLabel}
       disabled={disabled}
-      onClick={(event) => {
-        event.stopPropagation()
+      onClick={() => {
         triggerLightHaptic(hapticFeedback)
         onChange(!checked)
       }}
-      className={`relative mt-0.5 flex min-h-[44px] min-w-[52px] shrink-0 items-center justify-center rounded-full p-2 ${NATIVE_SQUISH} ${
+      className={`relative mt-1 h-7 w-[3.25rem] shrink-0 rounded-full p-0.5 ${NATIVE_SQUISH} ${
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
       }`}
+      animate={{
+        backgroundColor: checked ? '#0ea5e9' : '#d6d3d1',
+      }}
+      transition={iosSpringSnappy}
     >
       <motion.span
-        className="relative flex h-7 w-[3.25rem] items-center rounded-full p-0.5"
-        animate={{
-          backgroundColor: checked ? '#0ea5e9' : '#d6d3d1',
-        }}
+        className="block h-6 w-6 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
+        animate={{ x: checked ? 22 : 0 }}
         transition={iosSpringSnappy}
-      >
-        <motion.span
-          className="block h-6 w-6 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
-          animate={{ x: checked ? 22 : 0 }}
-          transition={iosSpringSnappy}
-        />
-      </motion.span>
+      />
     </motion.button>
   )
 }

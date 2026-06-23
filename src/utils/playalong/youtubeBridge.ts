@@ -1,4 +1,6 @@
+import { Capacitor } from '@capacitor/core'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
+import AudioSessionPlugin from '../audioSessionRoute'
 
 const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 
@@ -27,42 +29,27 @@ export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined)
   postToYoutubeIframe(iframe, 'unMute')
 }
 
-const YOUTUBE_BOOST_DELAYS_MS = [
-  0, 30, 60, 100, 160, 250, 400, 650, 1000, 1500, 2200, 3200, 4500,
-]
-
-function boostYoutubeProxyAudio(
-  iframe: HTMLIFrameElement | null | undefined,
-  uiVolume: number,
-): void {
-  unmuteYoutubeProxy(iframe)
-  postToYoutubeIframe(iframe, 'unMute')
-  setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-  postToYoutubeIframe(iframe, 'setVolume', [100])
-  postToYoutubeIframe(iframe, 'setVolume', [100])
-}
-
 /** Play reference audio as loud as the proxy allows — re-applies volume after the embed wakes. */
 export function startYoutubeProxyPlayback(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
   playYoutubeProxy(iframe)
-  boostYoutubeProxyAudio(iframe, uiVolume)
+  unmuteYoutubeProxy(iframe)
+  setYoutubeProxyVolumeFromUi(iframe, uiVolume)
 
-  for (const delay of YOUTUBE_BOOST_DELAYS_MS) {
-    window.setTimeout(() => {
-      boostYoutubeProxyAudio(iframe, uiVolume)
-    }, delay)
+  if (Capacitor.isNativePlatform()) {
+    void AudioSessionPlugin.enableStereoPlayback()
   }
-}
 
-/** Re-assert max proxy volume — call while YouTube is playing on iOS. */
-export function maintainYoutubeProxyLoudness(
-  iframe: HTMLIFrameElement | null | undefined,
-  uiVolume = 1,
-): void {
-  boostYoutubeProxyAudio(iframe, uiVolume)
+  window.setTimeout(() => {
+    unmuteYoutubeProxy(iframe)
+    setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+  }, 120)
+
+  window.setTimeout(() => {
+    setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+  }, 450)
 }
 
 /** Volume from a 0–1 UI slider, boosted for audible reference playback. */

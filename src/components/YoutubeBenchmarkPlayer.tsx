@@ -22,7 +22,7 @@ export default function YoutubeBenchmarkPlayer({
     <iframe
       ref={iframeRef}
       src={embedUrl}
-      className="absolute inset-x-0 top-0 h-[calc(100%+3.5rem)] w-full border-0"
+      className="absolute inset-0 h-full w-full border-0"
       referrerPolicy="strict-origin-when-cross-origin"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
       allowFullScreen

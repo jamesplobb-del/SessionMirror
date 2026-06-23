@@ -12,7 +12,6 @@ import {
   subdivisionsPerBeat,
   type MetronomeClickTier,
   type MetronomeMeter,
-  type MetronomeSoundType,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
 
@@ -23,47 +22,33 @@ const LOOKAHEAD_MS = 25
 
 const CLICK_ATTACK_SEC = 0.0015
 
-const TIER_PEAK: Record<MetronomeClickTier, number> = {
-  downbeat: 1.0,
-  macro: 0.6,
-  subdivision: 0.2,
+const TIER_AUDIO: Record<
+  MetronomeClickTier,
+  { hz: number; peak: number; decaySec: number }
+> = {
+  downbeat: { hz: 1000, peak: 1.0, decaySec: 0.045 },
+  macro: { hz: 800, peak: 0.6, decaySec: 0.045 },
+  subdivision: { hz: 600, peak: 0.2, decaySec: 0.028 },
 }
 
-const TIER_SINE: Record<MetronomeClickTier, { hz: number; decaySec: number }> = {
-  downbeat: { hz: 1400, decaySec: 0.04 },
-  macro: { hz: 1100, decaySec: 0.038 },
-  subdivision: { hz: 850, decaySec: 0.026 },
-}
-
-const TIER_DIGITAL: Record<MetronomeClickTier, { hz: number; decaySec: number }> = {
-  downbeat: { hz: 1800, decaySec: 0.032 },
-  macro: { hz: 1350, decaySec: 0.028 },
-  subdivision: { hz: 1000, decaySec: 0.02 },
-}
-
-const TIER_MARCH: Record<MetronomeClickTier, { tickHz: number; decaySec: number }> = {
-  downbeat: { tickHz: 3400, decaySec: 0.03 },
-  macro: { tickHz: 2900, decaySec: 0.026 },
-  subdivision: { tickHz: 2500, decaySec: 0.02 },
-}
-
-function scheduleSineClick(
+function scheduleTieredClick(
   ctx: AudioContext,
   when: number,
   tier: MetronomeClickTier,
   outputNode: AudioNode,
   muted: boolean,
 ): void {
-  const { hz, decaySec } = TIER_SINE[tier]
-  const peak = muted ? 0.0001 : TIER_PEAK[tier]
+  const { hz, peak, decaySec } = TIER_AUDIO[tier]
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
 
   osc.type = 'sine'
   osc.frequency.value = hz
 
+  const effectivePeak = muted ? 0.0001 : Math.max(peak, 0.0002)
+
   gain.gain.setValueAtTime(0.0001, when)
-  gain.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), when + CLICK_ATTACK_SEC)
+  gain.gain.exponentialRampToValueAtTime(effectivePeak, when + CLICK_ATTACK_SEC)
   gain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec)
 
   osc.connect(gain)
@@ -71,102 +56,6 @@ function scheduleSineClick(
 
   osc.start(when)
   osc.stop(when + decaySec + 0.01)
-}
-
-function scheduleDigitalClick(
-  ctx: AudioContext,
-  when: number,
-  tier: MetronomeClickTier,
-  outputNode: AudioNode,
-  muted: boolean,
-): void {
-  const { hz, decaySec } = TIER_DIGITAL[tier]
-  const peak = muted ? 0.0001 : TIER_PEAK[tier] * 1.15
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-
-  osc.type = 'square'
-  osc.frequency.value = hz
-
-  gain.gain.setValueAtTime(0.0001, when)
-  gain.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), when + CLICK_ATTACK_SEC)
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec * 0.85)
-
-  osc.connect(gain)
-  gain.connect(outputNode)
-
-  osc.start(when)
-  osc.stop(when + decaySec + 0.01)
-}
-
-function scheduleWoodClick(
-  ctx: AudioContext,
-  when: number,
-  tier: MetronomeClickTier,
-  outputNode: AudioNode,
-  muted: boolean,
-): void {
-  const { tickHz, decaySec } = TIER_MARCH[tier]
-  const peak = muted ? 0.0001 : TIER_PEAK[tier] * 1.15
-
-  const bufferSize = Math.max(1, Math.ceil(ctx.sampleRate * decaySec))
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-  const data = buffer.getChannelData(0)
-  for (let i = 0; i < bufferSize; i++) {
-    const env = Math.exp(-i / (bufferSize * 0.07))
-    data[i] = (Math.random() * 2 - 1) * env
-  }
-
-  const noise = ctx.createBufferSource()
-  noise.buffer = buffer
-
-  const bandpass = ctx.createBiquadFilter()
-  bandpass.type = 'bandpass'
-  bandpass.frequency.value = tickHz
-  bandpass.Q.value = 10
-
-  const noiseGain = ctx.createGain()
-  noiseGain.gain.setValueAtTime(Math.max(peak * 0.75, 0.0002), when)
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec)
-
-  noise.connect(bandpass)
-  bandpass.connect(noiseGain)
-  noiseGain.connect(outputNode)
-  noise.start(when)
-  noise.stop(when + decaySec + 0.01)
-
-  const tick = ctx.createOscillator()
-  const tickGain = ctx.createGain()
-  tick.type = 'triangle'
-  tick.frequency.value = tickHz * 1.35
-  tickGain.gain.setValueAtTime(0.0001, when)
-  tickGain.gain.exponentialRampToValueAtTime(Math.max(peak * 0.55, 0.0002), when + CLICK_ATTACK_SEC)
-  tickGain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec * 0.6)
-
-  tick.connect(tickGain)
-  tickGain.connect(outputNode)
-  tick.start(when)
-  tick.stop(when + decaySec + 0.01)
-}
-
-function scheduleTieredClick(
-  ctx: AudioContext,
-  when: number,
-  tier: MetronomeClickTier,
-  soundType: MetronomeSoundType,
-  outputNode: AudioNode,
-  muted: boolean,
-): void {
-  switch (soundType) {
-    case 'wood':
-      scheduleWoodClick(ctx, when, tier, outputNode, muted)
-      break
-    case 'digital':
-      scheduleDigitalClick(ctx, when, tier, outputNode, muted)
-      break
-    default:
-      scheduleSineClick(ctx, when, tier, outputNode, muted)
-  }
 }
 
 function secondsPerSchedulerTick(
@@ -231,13 +120,11 @@ export interface UseMetronomeResult {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
-  soundType: MetronomeSoundType
   playing: boolean
   beatIndex: number
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
-  setSoundType: (soundType: MetronomeSoundType) => void
   togglePlay: () => void
   stop: () => void
 }
@@ -247,7 +134,6 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   const [bpm, setBpmState] = useState(initial.bpm)
   const [meter, setMeterState] = useState<MetronomeMeter>(initial.meter)
   const [subdivision, setSubdivisionState] = useState<MetronomeSubdivision>(initial.subdivision)
-  const [soundType, setSoundTypeState] = useState<MetronomeSoundType>(initial.soundType)
   const [playing, setPlaying] = useState(false)
   const [beatIndex, setBeatIndex] = useState(0)
 
@@ -262,7 +148,6 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   const bpmRef = useRef(bpm)
   const meterRef = useRef(meter)
   const subdivisionRef = useRef(subdivision)
-  const soundTypeRef = useRef(soundType)
   const playingRef = useRef(false)
   const isTakePlayingRef = useRef(isTakePlaying)
   const muteDuringPlaybackRef = useRef(muteDuringPlayback)
@@ -270,7 +155,6 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   bpmRef.current = bpm
   meterRef.current = meter
   subdivisionRef.current = subdivision
-  soundTypeRef.current = soundType
   playingRef.current = playing
   isTakePlayingRef.current = isTakePlaying
   muteDuringPlaybackRef.current = muteDuringPlayback
@@ -300,18 +184,8 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   }, [isTakePlaying, muteDuringPlayback, shouldMuteOutput])
 
   const persistPrefs = useCallback(
-    (
-      nextBpm: number,
-      nextMeter: MetronomeMeter,
-      nextSubdivision: MetronomeSubdivision,
-      nextSoundType: MetronomeSoundType,
-    ) => {
-      saveMetronomePrefs({
-        bpm: nextBpm,
-        meter: nextMeter,
-        subdivision: nextSubdivision,
-        soundType: nextSoundType,
-      })
+    (nextBpm: number, nextMeter: MetronomeMeter, nextSubdivision: MetronomeSubdivision) => {
+      saveMetronomePrefs({ bpm: nextBpm, meter: nextMeter, subdivision: nextSubdivision })
     },
     [],
   )
@@ -320,7 +194,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     (value: number) => {
       const next = clampBpm(value)
       setBpmState(next)
-      persistPrefs(next, meterRef.current, subdivisionRef.current, soundTypeRef.current)
+      persistPrefs(next, meterRef.current, subdivisionRef.current)
     },
     [persistPrefs],
   )
@@ -330,7 +204,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       setMeterState(nextMeter)
       tickCounterRef.current = 0
       setBeatIndex(0)
-      persistPrefs(bpmRef.current, nextMeter, subdivisionRef.current, soundTypeRef.current)
+      persistPrefs(bpmRef.current, nextMeter, subdivisionRef.current)
     },
     [persistPrefs],
   )
@@ -340,15 +214,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       setSubdivisionState(nextSubdivision)
       tickCounterRef.current = 0
       setBeatIndex(0)
-      persistPrefs(bpmRef.current, meterRef.current, nextSubdivision, soundTypeRef.current)
-    },
-    [persistPrefs],
-  )
-
-  const setSoundType = useCallback(
-    (nextSoundType: MetronomeSoundType) => {
-      setSoundTypeState(nextSoundType)
-      persistPrefs(bpmRef.current, meterRef.current, subdivisionRef.current, nextSoundType)
+      persistPrefs(bpmRef.current, meterRef.current, nextSubdivision)
     },
     [persistPrefs],
   )
@@ -443,14 +309,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       while (nextBeatTimeRef.current < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
         const tickInBar = tickCounterRef.current % barTicks
         const tier = resolveClickTier(meter, tickInBar, subdivision)
-        scheduleTieredClick(
-          activeCtx,
-          nextBeatTimeRef.current,
-          tier,
-          soundTypeRef.current,
-          outputNode,
-          muted,
-        )
+        scheduleTieredClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted)
 
         if (nextBeatTimeRef.current - activeCtx.currentTime <= LOOKAHEAD_MS / 1000) {
           uiBeat = resolveUiBeatIndex(meter, tickInBar, subdivision)
@@ -506,13 +365,11 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     bpm,
     meter,
     subdivision,
-    soundType,
     playing,
     beatIndex,
     setBpm,
     setMeter,
     setSubdivision,
-    setSoundType,
     togglePlay,
     stop,
   }

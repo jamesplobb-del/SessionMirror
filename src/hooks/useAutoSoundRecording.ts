@@ -12,7 +12,7 @@ const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
 const HEALTH_CHECK_MS = 2500
 const STALL_RECOVERY_MS = 2200
-const START_FAILURE_CLEAR_MS = 1200
+const START_FAILURE_CLEAR_MS = 450
 const QUIET_EMA_ALPHA = 0.03
 
 interface UseAutoSoundRecordingOptions {
@@ -198,8 +198,6 @@ export function useAutoSoundRecording({
   }
 
   const teardownMonitor = () => {
-    if (isRecordingRef.current) return
-
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
@@ -247,7 +245,6 @@ export function useAutoSoundRecording({
 
   useLayoutEffect(() => {
     if (shouldMonitor) return
-    if (isRecordingRef.current) return
     teardownMonitor()
   }, [shouldMonitor])
 
@@ -311,8 +308,6 @@ export function useAutoSoundRecording({
     const setupEpoch = monitorEpoch
 
     const setup = async () => {
-      if (isRecordingRef.current) return
-
       teardownMonitor()
 
       const streamAtSetup = streamRef.current

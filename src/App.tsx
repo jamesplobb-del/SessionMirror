@@ -89,7 +89,6 @@ import {
   type Project,
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
-import { takeCardScaleToMultiplier } from './utils/takeCardScale'
 import AudioSessionPlugin from './utils/audioSessionRoute'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
@@ -103,6 +102,7 @@ import {
 import AppBootGate from './components/ui/AppBootGate'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
+const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
   if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
@@ -265,7 +265,6 @@ function StandardApp({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(bootSnapshot.activeProjectId)
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
-  const challengerIdRef = useRef<string | null>(bootSnapshot.challengerId)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
@@ -321,7 +320,6 @@ function StandardApp({
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
-  challengerIdRef.current = challengerId
 
   const pitchUserDismissedRef = useRef(false)
   const mainAudioPitchSourceCacheRef = useRef<{
@@ -413,7 +411,6 @@ function StandardApp({
       audio.load()
     }
     setAutoPlaybackPlaying(false)
-    setChallengerPipPlaying(false)
   }, [])
 
   const teardownActiveAutoPlayback = useCallback(() => {
@@ -476,6 +473,12 @@ function StandardApp({
       audio.load()
 
       void (async () => {
+        if (Capacitor.isNativePlatform()) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS),
+          )
+        }
+
         const ready = await waitForMediaReadyWithRetry(audio)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
         if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
@@ -494,9 +497,6 @@ function StandardApp({
         if (started) {
           setHandsFreePlaybackPending(false)
           setAutoPlaybackPlaying(true)
-          if (challengerIdRef.current === takeId) {
-            setChallengerPipPlaying(true)
-          }
         } else {
           finishAutoPlayback()
         }
@@ -899,11 +899,7 @@ function StandardApp({
     if (!audio) return
 
     const syncPlaying = () => {
-      const playing = !audio.paused && !audio.ended
-      setAutoPlaybackPlaying(playing)
-      if (autoPlaybackTakeId && challengerIdRef.current === autoPlaybackTakeId) {
-        setChallengerPipPlaying(playing)
-      }
+      setAutoPlaybackPlaying(!audio.paused && !audio.ended)
     }
 
     audio.addEventListener('play', syncPlaying)
@@ -915,7 +911,7 @@ function StandardApp({
       audio.removeEventListener('pause', syncPlaying)
       audio.removeEventListener('ended', syncPlaying)
     }
-  }, [autoPlaybackTakeId])
+  }, [])
 
   const autoMonitoringAllowed =
     !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
@@ -925,11 +921,10 @@ function StandardApp({
     monitoringAllowed: autoMonitoringAllowed,
     suppressStart: autoRecordStartSuppressed,
     monitoringPaused:
-      !isRecording &&
-      (handsFreePlaybackPending ||
-        autoPlaybackPlaying ||
-        benchmarkPipPlaying ||
-        challengerPipPlaying),
+      handsFreePlaybackPending ||
+      autoPlaybackPlaying ||
+      benchmarkPipPlaying ||
+      challengerPipPlaying,
     recordingMode,
     ready,
     isRecording,
@@ -1956,9 +1951,21 @@ function StandardApp({
     }
   }, [autoPlaybackTakeId, benchmarkId, challengerId])
 
-  const handleChallengerPlaybackChange = useCallback((playing: boolean) => {
-    setChallengerPipPlaying(playing)
-  }, [])
+  const handleChallengerAutoPlayComplete = useCallback(() => {
+    finishAutoPlayback()
+  }, [finishAutoPlayback])
+
+  const handleChallengerPlaybackChange = useCallback(
+    (playing: boolean) => {
+      setChallengerPipPlaying(playing)
+      if (playing && autoPlaybackTakeId) {
+        pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        setAutoPlaybackPlaying(true)
+      }
+    },
+    [autoPlaybackTakeId],
+  )
 
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     setYoutubeUrl(embedUrl)
@@ -2015,7 +2022,7 @@ function StandardApp({
   }, [challengerId, handlePinBenchmark])
 
   const pipScaleStyle = {
-    '--pip-scale': takeCardScaleToMultiplier(settings.takeCardScale),
+    '--pip-scale': settings.takeCardScale / 100,
   } as React.CSSProperties
 
   return (
@@ -2195,6 +2202,8 @@ function StandardApp({
               onExpandChallenger={handleExpandChallenger}
               onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
               onChallengerPlaybackChange={handleChallengerPlaybackChange}
+              challengerAutoPlayRequestId={autoPlaybackTakeId}
+              onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
               showPinCurrentAsBest={showPinCurrentAsBest}
               onPinCurrentAsBest={handlePinCurrentAsBest}
               onYoutubeHostChange={handleYoutubeHostChange}
@@ -2239,6 +2248,8 @@ function StandardApp({
                   onDragStateChange={handlePipDragStateChange}
                   onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
                   onChallengerPlaybackChange={handleChallengerPlaybackChange}
+                  challengerAutoPlayRequestId={autoPlaybackTakeId}
+                  onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                   showPinCurrentAsBest={showPinCurrentAsBest}
                   onPinCurrentAsBest={handlePinCurrentAsBest}
                   onYoutubeHostChange={handleYoutubeHostChange}

@@ -279,7 +279,7 @@ function PipWindow({
   const chromeInset = isFill ? 8 : 4
 
   const shellClass = isFill
-    ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-visible ${className}`.trim()
+    ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-hidden ${className}`.trim()
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
@@ -322,7 +322,7 @@ function PipWindow({
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass} ${
             isFill ? 'px-2 py-0.5 text-[10px]' : ''
           }`}
-          style={{ top: chromeInset, left: isFill ? 8 : pillLeft }}
+          style={{ top: chromeInset, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
         >
           {label}
         </span>
