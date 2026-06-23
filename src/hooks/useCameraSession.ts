@@ -17,6 +17,7 @@ import {
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream } from '../utils/audioCapture'
+import { getUserMediaCompat } from '../utils/getUserMedia'
 import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
@@ -314,7 +315,7 @@ export function useCameraSession({
               video: getVideoCaptureConstraints(),
             }
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
+      const mediaStream = await getUserMediaCompat(constraints)
       if (cancelled?.()) {
         mediaStream.getTracks().forEach((track) => track.stop())
         return null

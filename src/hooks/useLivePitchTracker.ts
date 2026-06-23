@@ -28,6 +28,7 @@ import {
   getMusicRecordingAudioConstraints,
   tuneMusicRecordingStream,
 } from '../utils/audioCapture'
+import { getUserMediaCompat } from '../utils/getUserMedia'
 import {
   getPlaybackAudioContext,
   isSharedPlaybackContext,
@@ -280,7 +281,7 @@ async function createMicPitchGraph(
       throw new Error('Shared mic stream not ready')
     }
 
-    stream = await navigator.mediaDevices.getUserMedia({
+    stream = await getUserMediaCompat({
       audio: getMusicRecordingAudioConstraints(),
       video: false,
     })
