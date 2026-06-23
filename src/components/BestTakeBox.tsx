@@ -124,7 +124,6 @@ function BestTakeBox({
     const media = videoRef.current
     if (!media) return
     media.pause()
-    if ('muted' in media) media.muted = true
     setIsPlaying(false)
   }, [hasTake, suspendPlayback, videoRef, videoSourceKey])
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FolderPlus } from 'lucide-react'
+import { FolderPlus, Trash2 } from 'lucide-react'
 import type { Project } from '../db/types'
 import AnimatedExpand from './ui/AnimatedExpand'
 import Pressable from './ui/Pressable'
@@ -9,6 +9,7 @@ interface ProjectSessionBarProps {
   activeProjectId: string | null
   onSelectProject: (projectId: string) => void
   onCreateProject: (name: string) => void | Promise<void>
+  onDeleteProject?: (projectId: string) => void | Promise<void>
 }
 
 export default function ProjectSessionBar({
@@ -16,6 +17,7 @@ export default function ProjectSessionBar({
   activeProjectId,
   onSelectProject,
   onCreateProject,
+  onDeleteProject,
 }: ProjectSessionBarProps) {
   const [isNamingSession, setIsNamingSession] = useState(false)
   const [sessionNameDraft, setSessionNameDraft] = useState('New Session')
@@ -41,6 +43,18 @@ export default function ProjectSessionBar({
     if (!trimmed) return
     setIsNamingSession(false)
     void onCreateProject(trimmed)
+  }
+
+  const handleDeleteSession = (project: Project) => {
+    if (!onDeleteProject) return
+    if (
+      !window.confirm(
+        `Delete session "${project.name}" and all takes inside it? This cannot be undone.`,
+      )
+    ) {
+      return
+    }
+    void onDeleteProject(project.id)
   }
 
   return (
@@ -100,19 +114,36 @@ export default function ProjectSessionBar({
         {projects.map((project) => {
           const active = project.id === activeProjectId
           return (
-            <Pressable
+            <div
               key={project.id}
-              type="button"
-              intensity="soft"
-              onClick={() => onSelectProject(project.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${
+              className={`flex shrink-0 items-center rounded-full border ${
                 active
-                  ? 'border-sky-300 bg-sky-50 text-sky-800'
-                  : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-stone-100'
+                  ? 'border-sky-300 bg-sky-50'
+                  : 'border-stone-200 bg-stone-50'
               }`}
             >
-              {project.name}
-            </Pressable>
+              <Pressable
+                type="button"
+                intensity="soft"
+                onClick={() => onSelectProject(project.id)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                  active ? 'text-sky-800' : 'text-stone-600 hover:text-stone-800'
+                }`}
+              >
+                {project.name}
+              </Pressable>
+              {onDeleteProject && (
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={() => handleDeleteSession(project)}
+                  className="rounded-full px-2 py-1.5 text-stone-400 hover:bg-stone-100 hover:text-red-600"
+                  aria-label={`Delete session ${project.name}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Pressable>
+              )}
+            </div>
           )
         })}
       </div>

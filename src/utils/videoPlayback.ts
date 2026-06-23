@@ -1,11 +1,8 @@
-/** Stop playback and reset a media element (e.g. when pausing a still-mounted PiP). */
+/** Stop playback and reset position. Never mute — routed elements must stay unmuted for iOS Web Audio. */
 export function resetVideoPlayback(media: HTMLMediaElement | null | undefined): void {
   if (!media) return
   media.pause()
   media.currentTime = 0
-  if ('muted' in media) {
-    media.muted = true
-  }
 }
 
 /** Safe unmount / teardown — pause only; never mutate src (React owns the attribute). */

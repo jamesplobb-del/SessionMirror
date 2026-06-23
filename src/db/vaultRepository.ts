@@ -64,6 +64,12 @@ export async function listProjects(): Promise<Project[]> {
   return (result.values ?? []).map((row) => mapProjectRow(row as SqlRow))
 }
 
+export async function deleteProject(projectId: string): Promise<void> {
+  const db = getVaultDatabase()
+  await db.run('DELETE FROM projects WHERE id = ?', [projectId])
+  await persistWebStore()
+}
+
 export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
   const db = getVaultDatabase()
   const trimmedPath = input.filePath.trim()

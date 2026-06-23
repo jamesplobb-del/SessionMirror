@@ -4,6 +4,7 @@ export type { Project, SaveTakeInput, VaultTake, VaultTakeUpdate } from './types
 export { findBestTakeId, hydrateVaultTakeRowsProgressive, loadUiTakesForProject, uiTakesFromVaultRows, uiTakesFromVaultRowsFast, vaultTakeToUiTake } from './takeBridge'
 export {
   createProject,
+  deleteProject,
   deleteVaultTake,
   deleteTakesByProject,
   getTakesByProject,

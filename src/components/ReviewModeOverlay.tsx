@@ -142,7 +142,6 @@ interface ReviewModeOverlayProps {
   challengerMirror?: boolean
   benchmarkRecordingOrientation?: Take['recordingOrientation']
   challengerRecordingOrientation?: Take['recordingOrientation']
-  pitchTrackerEnabled?: boolean
   liveMicTunerEnabled?: boolean
   tunerInstrument?: TunerInstrument
   micStreamRef?: RefObject<MediaStream | null>
@@ -171,7 +170,6 @@ export default function ReviewModeOverlay({
   challengerMirror = true,
   benchmarkRecordingOrientation,
   challengerRecordingOrientation,
-  pitchTrackerEnabled = false,
   liveMicTunerEnabled = true,
   tunerInstrument = 'voice',
   micStreamRef,
@@ -415,7 +413,6 @@ export default function ReviewModeOverlay({
   const hasMedia = isVault ? vaultTakes.length > 0 : hasBenchmark || hasChallenger
 
   const showPitchPanel =
-    pitchTrackerEnabled &&
     isOpen &&
     (isVault
       ? Boolean(vaultTake)
@@ -463,7 +460,6 @@ export default function ReviewModeOverlay({
     setShowPlayOverlay(true)
     video.pause()
     video.currentTime = 0
-    if ('muted' in video) video.muted = true
   }, [
     activeSlot,
     getActiveVideo,
@@ -878,7 +874,7 @@ export default function ReviewModeOverlay({
                 boundaryRef={reviewBoundsRef}
                 positionId="review-pitch"
                 mediaRef={activePitchMediaRef}
-                enabled={pitchTrackerEnabled}
+                enabled={showPitch}
                 isPlaying={isPlaying}
                 mediaKey={activePitchMediaKey}
                 takeName={activeName}

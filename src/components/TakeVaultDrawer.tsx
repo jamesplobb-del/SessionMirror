@@ -22,6 +22,7 @@ interface TakeVaultDrawerProps {
   activeProject: Project | null
   onSelectProject: (projectId: string) => void
   onCreateProject: (name: string) => void | Promise<void>
+  onDeleteProject?: (projectId: string) => void | Promise<void>
   takes: Take[]
   sortedTakes: Take[]
   sortMode: SortMode
@@ -48,6 +49,7 @@ export default function TakeVaultDrawer({
   activeProject,
   onSelectProject,
   onCreateProject,
+  onDeleteProject,
   takes,
   sortedTakes,
   sortMode,
@@ -295,6 +297,7 @@ export default function TakeVaultDrawer({
             activeProjectId={activeProject?.id ?? null}
             onSelectProject={onSelectProject}
             onCreateProject={onCreateProject}
+            onDeleteProject={onDeleteProject}
           />
           {takes.length === 0 ? (
             <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">

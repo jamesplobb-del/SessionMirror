@@ -73,6 +73,8 @@ import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
   createProject,
+  DEFAULT_PROJECT_NAME,
+  deleteProject,
   deleteVaultTake,
   deleteTakesByProject,
   findBestTakeId,
@@ -358,10 +360,21 @@ function StandardApp({
     isSplitViewRef.current = isSplitView
   }, [isSplitView])
 
-  const pausePipVideos = useCallback(() => {
-    resetVideoPlayback(benchmarkPipVideoRef.current)
-    resetVideoPlayback(challengerPipVideoRef.current)
+  const teardownPipMedia = useCallback((media: HTMLMediaElement | null | undefined) => {
+    if (!media) return
+    pausePitchGraphsForMedia(media)
+    resetVideoPlayback(media)
   }, [])
+
+  const pausePipVideos = useCallback(() => {
+    const benchmark = benchmarkPipVideoRef.current
+    const challenger = challengerPipVideoRef.current
+    teardownPipMedia(benchmark)
+    teardownPipMedia(challenger)
+    void releaseTakePlaybackAudio()
+    setBenchmarkPipPlaying(false)
+    setChallengerPipPlaying(false)
+  }, [teardownPipMedia])
 
   const releaseAutoRecordSuppress = useCallback((delayMs = 350) => {
     if (autoPlaybackReleaseTimerRef.current !== null) {
@@ -568,6 +581,66 @@ function StandardApp({
     setBenchmarkId(null)
     setChallengerId(null)
   }, [])
+
+  const handleDeleteProject = useCallback(
+    async (projectId: string) => {
+      stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
+      pausePipVideos()
+
+      const rows =
+        projectId === activeProjectIdRef.current
+          ? takes.map((take) => ({
+              id: take.id,
+              filePath: take.filePath,
+            }))
+          : (await getTakesByProject(projectId)).map((row) => ({
+              id: row.id,
+              filePath: row.filePath,
+            }))
+
+      await deleteProject(projectId)
+
+      for (const row of rows) {
+        await deleteCachedTakeThumbnail(row.id)
+        if (row.filePath) {
+          await deleteTakeFile(row.filePath)
+        }
+      }
+
+      const remaining = projects.filter((project) => project.id !== projectId)
+      const deletingActive = activeProjectIdRef.current === projectId
+
+      if (remaining.length === 0) {
+        const created = await createProject(DEFAULT_PROJECT_NAME)
+        setProjects([created])
+        setActiveProjectId(created.id)
+        setTakes([])
+        setBenchmarkId(null)
+        setChallengerId(null)
+        return
+      }
+
+      setProjects(remaining)
+
+      if (!deletingActive) return
+
+      const next = remaining[0]
+      setActiveProjectId(next.id)
+      setTakes([])
+      setBenchmarkId(null)
+      setChallengerId(null)
+      await reloadProjectTakes(next.id)
+    },
+    [
+      pausePipVideos,
+      projects,
+      releaseAutoRecordSuppress,
+      reloadProjectTakes,
+      stopAutoPlaybackAudio,
+      takes,
+    ],
+  )
 
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
     const {
@@ -992,6 +1065,40 @@ function StandardApp({
     }
     wasVaultOpenRef.current = isVaultOpen
   }, [isVaultOpen, refreshCameraSession])
+
+  const wasSettingsOpenRef = useRef(false)
+  useEffect(() => {
+    if (wasSettingsOpenRef.current && !isSettingsOpen) {
+      const timer = window.setTimeout(() => {
+        void refreshCameraSession()
+      }, 350)
+      wasSettingsOpenRef.current = isSettingsOpen
+      return () => window.clearTimeout(timer)
+    }
+    wasSettingsOpenRef.current = isSettingsOpen
+  }, [isSettingsOpen, refreshCameraSession])
+
+  const wasReviewOpenRef = useRef(false)
+  useEffect(() => {
+    if (wasReviewOpenRef.current && !isReviewOpen) {
+      const timer = window.setTimeout(() => {
+        void refreshCameraSession()
+      }, 350)
+      wasReviewOpenRef.current = isReviewOpen
+      return () => window.clearTimeout(timer)
+    }
+    wasReviewOpenRef.current = isReviewOpen
+  }, [isReviewOpen, refreshCameraSession])
+
+  useEffect(() => {
+    if (!isSplitView || recordingMode !== 'video' || isRecording) return
+    if (challengerId !== null) return
+
+    const timer = window.setTimeout(() => {
+      void refreshCameraSession()
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [challengerId, isRecording, isSplitView, recordingMode, refreshCameraSession])
 
   const deferHudMediaPause = useCallback(() => {
     scheduleAfterPaint(() => {
@@ -1534,7 +1641,15 @@ function StandardApp({
     pausePipVideos()
     stopAutoPlaybackAudio()
     releaseAutoRecordSuppress(0)
-  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+    window.setTimeout(() => {
+      void refreshCameraSession()
+    }, 350)
+  }, [
+    pausePipVideos,
+    refreshCameraSession,
+    releaseAutoRecordSuppress,
+    stopAutoPlaybackAudio,
+  ])
 
   const handleUploadBenchmark = useCallback(
     (file: File) => {
@@ -1627,6 +1742,10 @@ function StandardApp({
         releaseAutoRecordSuppress(0)
       }
 
+      if (ids.some((id) => id === benchmarkId || id === challengerId)) {
+        pausePipVideos()
+      }
+
       const removed = takes.filter((take) => idSet.has(take.id))
 
       setTakes((prev) => prev.filter((take) => !idSet.has(take.id)))
@@ -1638,7 +1757,16 @@ function StandardApp({
         removeTakeResources(take)
       }
     },
-    [autoPlaybackTakeId, releaseAutoRecordSuppress, removeTakeResources, stopAutoPlaybackAudio, takes],
+    [
+      autoPlaybackTakeId,
+      benchmarkId,
+      challengerId,
+      pausePipVideos,
+      releaseAutoRecordSuppress,
+      removeTakeResources,
+      stopAutoPlaybackAudio,
+      takes,
+    ],
   )
 
   const handleDragDeleteTake = useCallback(
@@ -1688,8 +1816,29 @@ function StandardApp({
     [projects, activeProjectId],
   )
 
-  const handleUnpinBenchmark = useCallback(() => setBenchmarkId(null), [])
-  const handleUnpinChallenger = useCallback(() => setChallengerId(null), [])
+  const handleUnpinBenchmark = useCallback(() => {
+    teardownPipMedia(benchmarkPipVideoRef.current)
+    void releaseTakePlaybackAudio()
+    setBenchmarkPipPlaying(false)
+    setBenchmarkId(null)
+  }, [teardownPipMedia])
+
+  const handleUnpinChallenger = useCallback(() => {
+    if (challengerId && autoPlaybackTakeId === challengerId) {
+      stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
+    }
+    teardownPipMedia(challengerPipVideoRef.current)
+    void releaseTakePlaybackAudio()
+    setChallengerPipPlaying(false)
+    setChallengerId(null)
+  }, [
+    autoPlaybackTakeId,
+    challengerId,
+    releaseAutoRecordSuppress,
+    stopAutoPlaybackAudio,
+    teardownPipMedia,
+  ])
   const handleReviewSlotChange = useCallback((slot: ReviewSlot) => {
     setReviewContext('compare')
     setReviewSlot(slot)
@@ -1730,14 +1879,21 @@ function StandardApp({
   useLayoutEffect(() => {
     const benchmarkChanged = benchmarkId !== prevBenchmarkIdRef.current
     const challengerChanged = challengerId !== prevChallengerIdRef.current
+    const prevBenchmark = prevBenchmarkIdRef.current
+    const prevChallenger = prevChallengerIdRef.current
     prevBenchmarkIdRef.current = benchmarkId
     prevChallengerIdRef.current = challengerId
 
-    if (benchmarkChanged) {
+    if (benchmarkChanged && prevBenchmark !== null && benchmarkId !== null) {
       resetVideoPlayback(benchmarkPipVideoRef.current)
     }
 
-    if (challengerChanged && autoPlaybackTakeId === null) {
+    if (
+      challengerChanged &&
+      prevChallenger !== null &&
+      challengerId !== null &&
+      autoPlaybackTakeId === null
+    ) {
       resetVideoPlayback(challengerPipVideoRef.current)
     }
   }, [autoPlaybackTakeId, benchmarkId, challengerId])
@@ -1783,13 +1939,21 @@ function StandardApp({
           setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, 1)
         })
       }
+      if (!next) {
+        window.requestAnimationFrame(() => {
+          void refreshCameraSession()
+        })
+      }
       return next
     })
-  }, [])
+  }, [refreshCameraSession])
 
   const handleExitSplitView = useCallback(() => {
     setIsSplitView(false)
-  }, [])
+    window.requestAnimationFrame(() => {
+      void refreshCameraSession()
+    })
+  }, [refreshCameraSession])
 
   const hasBestTakeReference =
     Boolean(youtubeUrl) || takeHasPlaybackMedia(benchmarkTake)
@@ -2104,7 +2268,6 @@ function StandardApp({
           challengerMirror={challengerTake?.mirrorPlayback !== false}
           benchmarkRecordingOrientation={benchmarkTake?.recordingOrientation}
           challengerRecordingOrientation={challengerTake?.recordingOrientation}
-          pitchTrackerEnabled={settings.pitchTrackerEnabled}
           liveMicTunerEnabled={settings.liveMicTunerEnabled}
           tunerInstrument={settings.tunerInstrument}
           micStreamRef={streamRef}
@@ -2124,6 +2287,7 @@ function StandardApp({
         activeProject={activeProject}
         onSelectProject={handleSelectProject}
         onCreateProject={handleCreateProject}
+        onDeleteProject={handleDeleteProject}
         takes={takes}
         sortedTakes={sortedTakes}
         sortMode={sortMode}

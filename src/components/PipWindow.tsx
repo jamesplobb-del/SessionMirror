@@ -127,7 +127,6 @@ function PipWindow({
     const media = videoRef.current
     if (!media) return
     media.pause()
-    if ('muted' in media) media.muted = true
     setIsPlaying(false)
   }, [suspendPlayback, videoRef, videoSourceKey])
 
