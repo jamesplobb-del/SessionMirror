@@ -1049,6 +1049,7 @@ export function useCameraSession({
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
     refreshCameraSession,
+    suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
   }
