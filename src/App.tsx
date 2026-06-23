@@ -29,7 +29,7 @@ import {
   registerAutoPlaybackHold,
   registerTakePlaybackMicHandlers,
   releaseTakePlaybackAudio,
-  playTakeMediaMuted,
+  playTakeMediaAudible,
 } from './utils/takePlaybackAudio'
 import {
   prepareInlineMediaElement,
@@ -471,7 +471,7 @@ function StandardApp({
         audio.onended = () => finishAutoPlayback()
         audio.onerror = () => finishAutoPlayback()
 
-        const started = await playTakeMediaMuted(audio, {
+        const started = await playTakeMediaAudible(audio, {
           onFailure: () => setAutoPlaybackPlaying(false),
         })
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return

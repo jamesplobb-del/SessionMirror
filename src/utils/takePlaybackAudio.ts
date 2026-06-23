@@ -168,14 +168,38 @@ export async function playTakeMedia(
     })
 }
 
-/** Muted programmatic playback — safe after file writes / in useEffect. */
+/** Muted programmatic playback — Web Audio gain only (never native-direct + re-mute). */
 export async function playTakeMediaMuted(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  primeTakePlaybackForUserGesture(media)
+  primeTakePlayback([media], false)
   await resumePlaybackAudioContext()
   return safePlayMutedMedia(media, options)
+}
+
+/**
+ * Audible programmatic playback (hands-free auto-playback, PiP auto-preview).
+ * Prefers native speaker output at full element volume when enhancer is off.
+ */
+export async function playTakeMediaAudible(
+  media: HTMLMediaElement,
+  options: PlaybackAttemptOptions = {},
+): Promise<boolean> {
+  primeTakePlayback([media], true)
+  if (!hasTakePlaybackSpeakerRoute(media)) {
+    media.muted = false
+    media.volume = 1
+  }
+  await resumePlaybackAudioContext()
+  return media
+    .play()
+    .then(() => true)
+    .catch((error: unknown) => {
+      console.log(error)
+      options.onFailure?.(error)
+      return false
+    })
 }
 
 export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {

@@ -1,12 +1,12 @@
 import { Capacitor } from '@capacitor/core'
 
 /** Web Audio speaker-bus multiplier — iOS element routing is much quieter than native. */
-export const PLAYBACK_GAIN_NATIVE = 8
-export const PLAYBACK_GAIN_WEB = 2.75
-export const PLAYBACK_GAIN_MAX = 12
+export const PLAYBACK_GAIN_NATIVE = 20
+export const PLAYBACK_GAIN_WEB = 6
+export const PLAYBACK_GAIN_MAX = 24
 
 /** YouTube IFrame API volume is 0–100; proxy audio needs extra headroom. */
-export const YOUTUBE_VOLUME_BOOST = 2.85
+export const YOUTUBE_VOLUME_BOOST = 4
 
 export function effectiveSpeakerGain(volume: number, muted: boolean): number {
   if (muted) return 0

@@ -5,7 +5,7 @@ import MiniPipControls from './MiniPipControls'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import {
-  playTakeMediaMuted,
+  playTakeMediaAudible,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
@@ -202,7 +202,7 @@ function PipWindow({
 
       media.addEventListener('ended', onEnded, { once: true })
 
-      const started = await playTakeMediaMuted(media, {
+      const started = await playTakeMediaAudible(media, {
         onFailure: () => setIsPlaying(false),
       })
       if (cancelled || !autoPlaySessionRef.current) {

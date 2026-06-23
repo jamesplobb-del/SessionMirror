@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { Camera, Mic, Square, AudioWaveform } from 'lucide-react'
 import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
+import { stopEventBubble } from '../utils/eventBubbling'
 import type { RecordingMode } from '../types'
 
 const SWIPE_THRESHOLD_PX = 36
@@ -130,24 +131,22 @@ export default function RecordingModeCarousel({
   )
 
   return (
-    <div
-      className={`record-carousel-viewport pointer-events-auto ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
-      role="group"
-      aria-label="Recording mode"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="record-carousel-cluster pointer-events-auto">
       {value === 'audio' && !isRecording && onAutoSoundRecordingChange && (
         <button
           type="button"
-          className={`interactive-native record-carousel-auto-btn pointer-events-auto ${autoSoundRecording ? 'record-carousel-auto-btn--active' : ''}`}
+          className={`record-carousel-auto-btn ${autoSoundRecording ? 'record-carousel-auto-btn--active' : ''}`}
           aria-label={
             autoSoundRecording
               ? 'Turn off auto sound recording'
               : 'Turn on auto sound recording'
           }
           aria-pressed={autoSoundRecording}
-          onClick={() => {
+          onPointerDown={stopEventBubble}
+          onTouchStart={stopEventBubble}
+          onTouchEnd={stopEventBubble}
+          onClick={(event) => {
+            stopEventBubble(event)
             triggerLightHaptic()
             onAutoSoundRecordingChange(!autoSoundRecording)
           }}
@@ -155,23 +154,31 @@ export default function RecordingModeCarousel({
           <AudioWaveform className="h-4 w-4" strokeWidth={2.25} />
         </button>
       )}
-      <div className="record-carousel-track">
-        <ModeSlot
-          mode="video"
-          position={slotPosition('video', value)}
-          isRecording={isRecording && value === 'video'}
-          ready={ready}
-          modeSwitchLocked={modeSwitchLocked}
-          onActivate={() => handleSlotActivate('video')}
-        />
-        <ModeSlot
-          mode="audio"
-          position={slotPosition('audio', value)}
-          isRecording={isRecording && value === 'audio'}
-          ready={ready}
-          modeSwitchLocked={modeSwitchLocked}
-          onActivate={() => handleSlotActivate('audio')}
-        />
+      <div
+        className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+        role="group"
+        aria-label="Recording mode"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="record-carousel-track">
+          <ModeSlot
+            mode="video"
+            position={slotPosition('video', value)}
+            isRecording={isRecording && value === 'video'}
+            ready={ready}
+            modeSwitchLocked={modeSwitchLocked}
+            onActivate={() => handleSlotActivate('video')}
+          />
+          <ModeSlot
+            mode="audio"
+            position={slotPosition('audio', value)}
+            isRecording={isRecording && value === 'audio'}
+            ready={ready}
+            modeSwitchLocked={modeSwitchLocked}
+            onActivate={() => handleSlotActivate('audio')}
+          />
+        </div>
       </div>
     </div>
   )
