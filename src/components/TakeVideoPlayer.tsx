@@ -4,6 +4,10 @@ import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
+import {
+  hasTakePlaybackSpeakerRoute,
+  isTakePlaybackEnhancerEnabled,
+} from '../utils/takePlaybackSpeaker'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
@@ -107,9 +111,13 @@ export default function TakeVideoPlayer({
     if (!media) return
 
     if (audible && mediaSrc) {
-      media.muted = false
-      if (media.volume <= 0) {
-        media.volume = 1
+      if (!hasTakePlaybackSpeakerRoute(media)) {
+        media.muted = false
+        if (media.volume <= 0) {
+          media.volume = 1
+        }
+      } else if (isTakePlaybackEnhancerEnabled()) {
+        ensureMediaMuted(media)
       }
       return
     }
@@ -170,7 +178,6 @@ export default function TakeVideoPlayer({
           className="sr-only"
           src={mediaSrc ?? undefined}
           {...audioRest}
-          muted={!audible}
           autoPlay={false}
           playsInline
           preload={effectivePreload}
@@ -231,7 +238,6 @@ export default function TakeVideoPlayer({
       {...videoRest}
       {...iosBulletproofVideoProps}
       preload={effectivePreload}
-      muted={!audible}
       autoPlay={false}
     />
   )

@@ -1817,7 +1817,6 @@ function StandardApp({
         ref={autoPlaybackAudioRef}
         className="sr-only"
         preload="none"
-        muted
         playsInline
         {...({ 'webkit-playsinline': 'true' } as React.AudioHTMLAttributes<HTMLAudioElement>)}
       />

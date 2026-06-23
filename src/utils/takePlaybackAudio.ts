@@ -187,11 +187,13 @@ export async function playTakeMediaAudible(
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
   primeTakePlayback([media], true)
-  if (!hasTakePlaybackSpeakerRoute(media)) {
+  const nativeDirect = !hasTakePlaybackSpeakerRoute(media)
+  if (nativeDirect) {
     media.muted = false
     media.volume = 1
+  } else {
+    await resumePlaybackAudioContext()
   }
-  await resumePlaybackAudioContext()
   return media
     .play()
     .then(() => true)

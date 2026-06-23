@@ -16,10 +16,21 @@ import {
 } from './playbackAudioContext'
 import { effectiveSpeakerGain } from './playbackVolume'
 
+export interface TakeSpeakerPassthrough {
+  input: GainNode
+  output: GainNode
+}
+
 export interface TakeSpeakerNodes {
   source: MediaElementAudioSourceNode
   gain: GainNode
   enhancer?: AudioEnhancerNodes
+  /** Dry multi-node passthrough — keeps iOS Web Audio alive when enhancer is off. */
+  passthrough?: TakeSpeakerPassthrough
+}
+
+export function isTakePlaybackEnhancerEnabled(): boolean {
+  return enhancerEnabled
 }
 
 const speakerNodesByElement = new WeakMap<HTMLMediaElement, TakeSpeakerNodes>()
@@ -49,6 +60,8 @@ export function setTakePlaybackEnhancerState(
 
     if (!enhancerEnabled || !enhancerSettings) {
       disconnectEnhancer(nodes)
+      ensurePassthroughChain(nodes)
+      nodes.gain.gain.value = effectiveSpeakerGain(1, false, false)
       continue
     }
     ensureEnhancerForElement(el, nodes)
@@ -58,6 +71,70 @@ export function setTakePlaybackEnhancerState(
   }
 
   resumePlaybackBus()
+}
+
+function disconnectPassthrough(nodes: TakeSpeakerNodes): void {
+  if (!nodes.passthrough) return
+
+  const passthrough = nodes.passthrough
+  nodes.passthrough = undefined
+
+  try {
+    nodes.gain.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+
+  try {
+    passthrough.input.disconnect()
+    passthrough.output.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+}
+
+function ensurePassthroughChain(nodes: TakeSpeakerNodes): void {
+  const ctx = nodes.source.context as AudioContext
+
+  if (nodes.passthrough) {
+    try {
+      nodes.gain.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+    try {
+      nodes.gain.connect(nodes.passthrough.input)
+    } catch {
+      /* already connected */
+    }
+    try {
+      nodes.passthrough.output.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+    try {
+      nodes.passthrough.output.connect(ctx.destination)
+    } catch {
+      /* already connected */
+    }
+    return
+  }
+
+  const bridge = ctx.createGain()
+  const output = ctx.createGain()
+  bridge.gain.value = 1
+  output.gain.value = 1
+  bridge.connect(output)
+  output.connect(ctx.destination)
+
+  try {
+    nodes.gain.disconnect()
+  } catch {
+    /* ignore */
+  }
+
+  nodes.gain.connect(bridge)
+  nodes.passthrough = { input: bridge, output }
 }
 
 function disconnectEnhancer(nodes: TakeSpeakerNodes): void {
@@ -95,6 +172,8 @@ function disconnectEnhancer(nodes: TakeSpeakerNodes): void {
 function ensureEnhancerForElement(_el: HTMLMediaElement, nodes: TakeSpeakerNodes): void {
   if (!enhancerEnabled || !enhancerSettings || nodes.enhancer) return
 
+  disconnectPassthrough(nodes)
+
   const ctx = nodes.source.context as AudioContext
   const chain = createAudioEnhancerChain(ctx, enhancerSettings)
 
@@ -107,46 +186,6 @@ function ensureEnhancerForElement(_el: HTMLMediaElement, nodes: TakeSpeakerNodes
   nodes.gain.connect(chain.input)
   chain.output.connect(ctx.destination)
   nodes.enhancer = chain
-}
-
-/** Reconnect source→gain and gain→destination after graph teardown. */
-function ensureGainReachableDestination(nodes: TakeSpeakerNodes): void {
-  const ctx = nodes.source.context as AudioContext
-
-  if (nodes.enhancer) {
-    try {
-      nodes.gain.disconnect()
-    } catch {
-      /* already disconnected */
-    }
-    try {
-      nodes.gain.connect(nodes.enhancer.input)
-    } catch {
-      /* already connected */
-    }
-    try {
-      nodes.enhancer.output.disconnect()
-    } catch {
-      /* already disconnected */
-    }
-    try {
-      nodes.enhancer.output.connect(ctx.destination)
-    } catch {
-      /* already connected */
-    }
-    return
-  }
-
-  try {
-    nodes.gain.disconnect()
-  } catch {
-    /* already disconnected */
-  }
-  try {
-    nodes.gain.connect(ctx.destination)
-  } catch {
-    /* already connected */
-  }
 }
 
 /** Reconnect source→gain after pitch analysis teardown left the bus open. */
@@ -166,7 +205,7 @@ function repairSpeakerBus(el: HTMLMediaElement, nodes: TakeSpeakerNodes): void {
   }
 
   disconnectEnhancer(nodes)
-  ensureGainReachableDestination(nodes)
+  ensurePassthroughChain(nodes)
 }
 
 export function getTakePlaybackSpeakerNodes(
@@ -260,7 +299,7 @@ export function routeTakePlaybackToSpeaker(
   }
 
   el.muted = true
-  nodes.gain.gain.value = effectiveSpeakerGain(volume, muted)
+  nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, enhancerEnabled)
 
   if (enhancerEnabled && enhancerSettings) {
     ensureEnhancerForElement(el, nodes)
@@ -269,7 +308,7 @@ export function routeTakePlaybackToSpeaker(
     }
   } else {
     disconnectEnhancer(nodes)
-    ensureGainReachableDestination(nodes)
+    ensurePassthroughChain(nodes)
   }
 
   resumePlaybackBus()
@@ -282,6 +321,6 @@ export function updateTakePlaybackSpeakerGain(
 ): void {
   const nodes = speakerNodesByElement.get(el)
   if (nodes) {
-    nodes.gain.gain.value = effectiveSpeakerGain(volume, muted)
+    nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, enhancerEnabled)
   }
 }

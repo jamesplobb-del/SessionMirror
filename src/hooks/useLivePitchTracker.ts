@@ -37,6 +37,7 @@ import {
   getTakePlaybackSpeakerNodes,
   registerTakePlaybackSpeakerRoute,
   routeTakePlaybackToSpeaker,
+  isTakePlaybackEnhancerEnabled,
 } from '../utils/takePlaybackSpeaker'
 const HISTORY_LENGTH = 140
 
@@ -1778,7 +1779,9 @@ export function resumePitchGraphsForMedia(
     }
 
     if (graph.mode === 'element' && getTakePlaybackSpeakerNodes(element)) {
-      routeTakePlaybackToSpeaker(element, element.volume, false)
+      routeTakePlaybackToSpeaker(element, element.volume, false, {
+        allowNativeDirect: !isTakePlaybackEnhancerEnabled(),
+      })
     } else if (graph.mode === 'stream' && graph.context.state !== 'closed') {
       refreshMediaPitchStreamSource(graph)
     }
