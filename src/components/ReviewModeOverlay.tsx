@@ -5,6 +5,8 @@ import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import Pressable from './ui/Pressable'
+import { Capacitor } from '@capacitor/core'
+import AudioSessionPlugin from '../utils/audioSessionRoute'
 import { iosEaseOut, iosScreenEnter, iosScreenExit, motionGpuLayer } from '../utils/motionPresets'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
@@ -371,11 +373,14 @@ export default function ReviewModeOverlay({
       )
       void releaseTakePlaybackAudio()
       pauseAllReviewVideosSafe()
+      if (isVault && Capacitor.isNativePlatform()) {
+        void AudioSessionPlugin.enableRecordingRoute()
+      }
       window.requestAnimationFrame(() => {
         onClose()
       })
     },
-    [onClose, pauseAllReviewVideosSafe, stopProgressLoop],
+    [isVault, onClose, pauseAllReviewVideosSafe, stopProgressLoop],
   )
 
   const togglePlayPause = useCallback(() => {
@@ -383,6 +388,9 @@ export default function ReviewModeOverlay({
     if (!video) return
 
     if (video.paused || video.ended) {
+      if (isVault && Capacitor.isNativePlatform()) {
+        void AudioSessionPlugin.enableStereoPlayback()
+      }
       revealPlayOverlay(true)
       const started = toggleInlineTakePlayback(video, {
         onPlaying: () => {
@@ -399,6 +407,9 @@ export default function ReviewModeOverlay({
         revealPlayOverlay(true)
       }
     } else {
+      if (isVault && Capacitor.isNativePlatform()) {
+        void AudioSessionPlugin.enableRecordingRoute()
+      }
       toggleInlineTakePlayback(video, {
         onPaused: () => {
           setIsPlaying(false)
@@ -406,7 +417,7 @@ export default function ReviewModeOverlay({
         },
       })
     }
-  }, [getActiveVideo, revealPlayOverlay])
+  }, [getActiveVideo, isVault, revealPlayOverlay])
 
   const hasBenchmark = Boolean(benchmarkSrc || benchmarkFilePath)
   const hasChallenger = Boolean(challengerSrc || challengerFilePath)

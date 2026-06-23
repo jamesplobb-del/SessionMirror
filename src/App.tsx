@@ -90,7 +90,7 @@ import {
   type Project,
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
-import { enableRecordingRouteForVault, enableStereoPlaybackForVault } from './utils/audioSessionRoute'
+import AudioSessionPlugin from './utils/audioSessionRoute'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -1113,7 +1113,9 @@ function StandardApp({
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleCloseVault = useCallback(() => {
-    void enableRecordingRouteForVault()
+    if (Capacitor.isNativePlatform()) {
+      void AudioSessionPlugin.enableRecordingRoute()
+    }
     startTransition(() => {
       setIsVaultOpen(false)
     })
@@ -1121,7 +1123,6 @@ function StandardApp({
 
   const handleOpenVault = useCallback(() => {
     setShowPitch(false)
-    void enableStereoPlaybackForVault()
     startTransition(() => {
       setIsSettingsOpen(false)
       setIsVaultOpen(true)
@@ -1614,6 +1615,9 @@ function StandardApp({
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
+      if (Capacitor.isNativePlatform()) {
+        void AudioSessionPlugin.enableStereoPlayback()
+      }
       startTransition(() => {
         setVaultReviewIndex(index >= 0 ? index : 0)
         setReviewContext('vault')
@@ -1635,6 +1639,9 @@ function StandardApp({
   )
 
   const handleCloseReview = useCallback(() => {
+    if (reviewContext === 'vault' && Capacitor.isNativePlatform()) {
+      void AudioSessionPlugin.enableRecordingRoute()
+    }
     startTransition(() => {
       setReviewSlot(null)
       setReviewContext((context) => {
@@ -1654,6 +1661,7 @@ function StandardApp({
     pausePipVideos,
     refreshCameraSession,
     releaseAutoRecordSuppress,
+    reviewContext,
     stopAutoPlaybackAudio,
   ])
 
