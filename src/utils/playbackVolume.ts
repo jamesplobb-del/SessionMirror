@@ -1,9 +1,9 @@
 import { Capacitor } from '@capacitor/core'
 
 /** Web Audio speaker-bus multiplier — iOS element routing is much quieter than native. */
-export const PLAYBACK_GAIN_NATIVE = 40
+export const PLAYBACK_GAIN_NATIVE = 46
 export const PLAYBACK_GAIN_WEB = 6
-export const PLAYBACK_GAIN_MAX = 46
+export const PLAYBACK_GAIN_MAX = 52
 
 /** YouTube IFrame API volume is 0–100; peg non-zero slider values to API max. */
 export const YOUTUBE_VOLUME_BOOST = 12
@@ -32,9 +32,9 @@ export function youtubeVolumeFromUiSlider(uiVolume: number): number {
   return Math.round(Math.min(100, Math.max(YOUTUBE_VOLUME_FLOOR, boosted)))
 }
 
-export const METRONOME_GAIN_NATIVE = 56
+export const METRONOME_GAIN_NATIVE = 62
 export const METRONOME_GAIN_WEB = 10
-export const METRONOME_GAIN_MAX = 62
+export const METRONOME_GAIN_MAX = 68
 
 /** Web Audio metronome bus — louder than take playback for audible clicks. */
 export function metronomeSpeakerGain(muted: boolean): number {

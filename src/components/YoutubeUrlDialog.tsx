@@ -18,7 +18,6 @@ interface YoutubeUrlDialogProps {
 export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrlDialogProps) {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [keyboardInset, setKeyboardInset] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const openRef = useRef(open)
 
@@ -26,7 +25,6 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
 
   const releaseInputFocus = useCallback(() => {
     inputRef.current?.blur()
-    setKeyboardInset(0)
   }, [])
 
   useEffect(() => {
@@ -37,31 +35,16 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
 
     setValue('')
     setError(null)
-    setKeyboardInset(0)
   }, [open, releaseInputFocus])
 
   useEffect(() => {
     if (!open) return
-
-    let frameId = 0
-    const updateInset = () => {
-      const vv = window.visualViewport
-      if (!vv) {
-        setKeyboardInset(0)
-        return
-      }
-      const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
-      setKeyboardInset(overlap > 48 ? overlap : 0)
-    }
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         releaseInputFocus()
       }
     }
-
-    frameId = window.requestAnimationFrame(updateInset)
-    window.visualViewport?.addEventListener('resize', updateInset)
 
     document.addEventListener('visibilitychange', onVisibilityChange)
 
@@ -75,8 +58,6 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     }
 
     return () => {
-      window.cancelAnimationFrame(frameId)
-      window.visualViewport?.removeEventListener('resize', updateInset)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       removeAppListener?.()
     }
@@ -105,7 +86,6 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
       {open && (
         <motion.div
           className="fixed inset-0 z-[120] flex items-end justify-center p-4 sm:items-center"
-          style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : undefined }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -171,14 +151,6 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
               value={value}
               onPointerDown={(event) => event.stopPropagation()}
               onTouchStart={(event) => event.stopPropagation()}
-              onFocus={() => {
-                window.requestAnimationFrame(() => {
-                  const vv = window.visualViewport
-                  if (!vv) return
-                  const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
-                  setKeyboardInset(overlap > 48 ? overlap : 0)
-                })
-              }}
               onChange={(event) => {
                 setValue(event.target.value)
                 setError(null)

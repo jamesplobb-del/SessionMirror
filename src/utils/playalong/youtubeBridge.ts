@@ -29,7 +29,7 @@ export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined)
   postToYoutubeIframe(iframe, 'unMute')
 }
 
-const YOUTUBE_BOOST_DELAYS_MS = [0, 60, 120, 240, 450, 750, 1200, 2000]
+const YOUTUBE_BOOST_DELAYS_MS = [0, 40, 80, 120, 200, 320, 480, 750, 1200, 2000, 3200]
 
 function boostYoutubeProxyAudio(
   iframe: HTMLIFrameElement | null | undefined,
@@ -37,6 +37,7 @@ function boostYoutubeProxyAudio(
 ): void {
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+  postToYoutubeIframe(iframe, 'setVolume', [100])
 }
 
 /** Play reference audio as loud as the proxy allows — re-applies volume after the embed wakes. */

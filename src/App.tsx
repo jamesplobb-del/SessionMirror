@@ -89,6 +89,7 @@ import {
   type Project,
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
+import { takeCardScaleToMultiplier } from './utils/takeCardScale'
 import AudioSessionPlugin from './utils/audioSessionRoute'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
@@ -935,10 +936,11 @@ function StandardApp({
     monitoringAllowed: autoMonitoringAllowed,
     suppressStart: autoRecordStartSuppressed,
     monitoringPaused:
-      handsFreePlaybackPending ||
-      autoPlaybackPlaying ||
-      benchmarkPipPlaying ||
-      challengerPipPlaying,
+      !isRecording &&
+      (handsFreePlaybackPending ||
+        autoPlaybackPlaying ||
+        benchmarkPipPlaying ||
+        challengerPipPlaying),
     recordingMode,
     ready,
     isRecording,
@@ -2024,7 +2026,7 @@ function StandardApp({
   }, [challengerId, handlePinBenchmark])
 
   const pipScaleStyle = {
-    '--pip-scale': settings.takeCardScale / 100,
+    '--pip-scale': takeCardScaleToMultiplier(settings.takeCardScale),
   } as React.CSSProperties
 
   return (

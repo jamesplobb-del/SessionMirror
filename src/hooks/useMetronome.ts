@@ -41,11 +41,18 @@ const TIER_DIGITAL: Record<MetronomeClickTier, { hz: number; decaySec: number }>
   subdivision: { hz: 780, decaySec: 0.022 },
 }
 
-const TIER_WOOD: Record<MetronomeClickTier, { thumpHz: number; decaySec: number }> = {
-  downbeat: { thumpHz: 160, decaySec: 0.05 },
-  macro: { thumpHz: 210, decaySec: 0.042 },
-  subdivision: { thumpHz: 280, decaySec: 0.03 },
+const TIER_GLOCK: Record<MetronomeClickTier, { hz: number; decaySec: number }> = {
+  downbeat: { hz: 1568, decaySec: 0.55 },
+  macro: { hz: 1174, decaySec: 0.45 },
+  subdivision: { hz: 880, decaySec: 0.34 },
 }
+
+const GLOCK_PARTIALS: Array<{ ratio: number; gain: number }> = [
+  { ratio: 1, gain: 1 },
+  { ratio: 2.76, gain: 0.58 },
+  { ratio: 5.4, gain: 0.3 },
+  { ratio: 8.15, gain: 0.14 },
+]
 
 function scheduleSineClick(
   ctx: AudioContext,
@@ -106,46 +113,23 @@ function scheduleWoodClick(
   outputNode: AudioNode,
   muted: boolean,
 ): void {
-  const { thumpHz, decaySec } = TIER_WOOD[tier]
+  const { hz, decaySec } = TIER_GLOCK[tier]
   const peak = muted ? 0.0001 : TIER_PEAK[tier]
 
-  const bufferSize = Math.max(1, Math.ceil(ctx.sampleRate * decaySec))
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-  const data = buffer.getChannelData(0)
-  for (let i = 0; i < bufferSize; i++) {
-    const env = Math.exp(-i / (bufferSize * 0.14))
-    data[i] = (Math.random() * 2 - 1) * env
+  for (const partial of GLOCK_PARTIALS) {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = hz * partial.ratio
+    const partialPeak = Math.max(peak * partial.gain * 0.38, 0.0002)
+    gain.gain.setValueAtTime(0.0001, when)
+    gain.gain.exponentialRampToValueAtTime(partialPeak, when + CLICK_ATTACK_SEC)
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec)
+    osc.connect(gain)
+    gain.connect(outputNode)
+    osc.start(when)
+    osc.stop(when + decaySec + 0.01)
   }
-
-  const noise = ctx.createBufferSource()
-  noise.buffer = buffer
-
-  const highpass = ctx.createBiquadFilter()
-  highpass.type = 'highpass'
-  highpass.frequency.value = tier === 'downbeat' ? 900 : tier === 'macro' ? 700 : 500
-
-  const noiseGain = ctx.createGain()
-  noiseGain.gain.setValueAtTime(Math.max(peak * 0.85, 0.0002), when)
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec)
-
-  noise.connect(highpass)
-  highpass.connect(noiseGain)
-  noiseGain.connect(outputNode)
-  noise.start(when)
-  noise.stop(when + decaySec + 0.01)
-
-  const thump = ctx.createOscillator()
-  const thumpGain = ctx.createGain()
-  thump.type = 'sine'
-  thump.frequency.value = thumpHz
-  thumpGain.gain.setValueAtTime(0.0001, when)
-  thumpGain.gain.exponentialRampToValueAtTime(Math.max(peak * 0.55, 0.0002), when + CLICK_ATTACK_SEC)
-  thumpGain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec * 0.7)
-
-  thump.connect(thumpGain)
-  thumpGain.connect(outputNode)
-  thump.start(when)
-  thump.stop(when + decaySec + 0.01)
 }
 
 function scheduleTieredClick(

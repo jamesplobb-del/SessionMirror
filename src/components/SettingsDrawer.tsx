@@ -165,15 +165,17 @@ function SettingSlider({
           {display}
         </motion.span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="settings-range-input h-11 w-full cursor-pointer accent-sky-500"
-      />
+      <div className="px-1 py-2">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="settings-range-input w-full cursor-pointer accent-sky-500"
+        />
+      </div>
     </div>
   )
 }

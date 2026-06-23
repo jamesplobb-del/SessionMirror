@@ -1,6 +1,7 @@
 import type { TunerInstrument } from './pitchConfig'
 import {
   clampTakeCardScale,
+  migrateTakeCardScaleStored,
   TAKE_CARD_SCALE_DEFAULT,
 } from './takeCardScale'
 import {
@@ -121,7 +122,9 @@ export function loadAppSettings(): AppSettings {
           ? Boolean(parsed.muteMetronomeDuringPlayback)
           : DEFAULT_APP_SETTINGS.muteMetronomeDuringPlayback,
       takeCardScale: clampTakeCardScale(
-        Number(parsed.takeCardScale) || DEFAULT_APP_SETTINGS.takeCardScale,
+        migrateTakeCardScaleStored(
+          Number(parsed.takeCardScale) || DEFAULT_APP_SETTINGS.takeCardScale,
+        ),
       ),
       audioEnhancerEnabled:
         parsed.audioEnhancerEnabled !== undefined

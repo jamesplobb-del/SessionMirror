@@ -572,21 +572,22 @@ body.settings-branch-open * {
   -webkit-appearance: none;
   appearance: none;
   touch-action: manipulation;
-  padding: 0.75rem 0;
+  height: 2rem;
+  padding: 0.625rem 0;
   background: transparent;
 }
 
 .settings-range-input::-webkit-slider-runnable-track {
-  height: 0.45rem;
+  height: 0.5rem;
   border-radius: 999px;
   background: #e7e5e4;
 }
 
 .settings-range-input::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 1.75rem;
-  height: 1.75rem;
-  margin-top: -0.65rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: -0.375rem;
   border-radius: 999px;
   background: #ffffff;
   border: 1px solid #d6d3d1;
@@ -594,14 +595,14 @@ body.settings-branch-open * {
 }
 
 .settings-range-input::-moz-range-track {
-  height: 0.45rem;
+  height: 0.5rem;
   border-radius: 999px;
   background: #e7e5e4;
 }
 
 .settings-range-input::-moz-range-thumb {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 999px;
   background: #ffffff;
   border: 1px solid #d6d3d1;
