@@ -6,23 +6,6 @@ function attachPlaybackContextWatch(ctx: AudioContext): void {
   playbackContextWatchAttached = true
 
   ctx.addEventListener('statechange', () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7760/ingest/cf1144c0-2f47-446c-a070-41f2b49db454', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'fba730',
-      },
-      body: JSON.stringify({
-        sessionId: 'fba730',
-        location: 'playbackAudioContext.ts:statechange',
-        message: 'ctx-state-change',
-        data: { state: ctx.state },
-        timestamp: Date.now(),
-        hypothesisId: 'D',
-      }),
-    }).catch(() => {})
-    // #endregion
     if (ctx.state === 'suspended') {
       void ctx.resume().catch(() => {})
     }
@@ -47,7 +30,6 @@ function createPlaybackContext(): AudioContext {
   return new Ctor({ latencyHint: 'playback' })
 }
 
-/** Shared output context for take playback — one context avoids iOS ducking between graphs. */
 export async function getPlaybackAudioContext(): Promise<AudioContext> {
   if (!playbackContext || playbackContext.state === 'closed') {
     playbackContext = createPlaybackContext()
@@ -63,12 +45,10 @@ export async function getPlaybackAudioContext(): Promise<AudioContext> {
   return playbackContext
 }
 
-/** Await a running shared playback context — use before audible .play(). */
 export async function resumePlaybackAudioContext(): Promise<void> {
   await getPlaybackAudioContext()
 }
 
-/** Create or resume the shared playback context — call synchronously inside a user gesture. */
 export function primePlaybackAudioContextSync(): AudioContext {
   if (!playbackContext || playbackContext.state === 'closed') {
     playbackContext = createPlaybackContext()

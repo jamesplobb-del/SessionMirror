@@ -9,7 +9,6 @@ import {
   hasTakePlaybackSpeakerRoute,
   routeTakePlaybackToSpeaker,
 } from './takePlaybackSpeaker'
-import { debugPlaybackSnapshot } from './debugPlaybackLog'
 
 let autoPlaybackHoldCheck: (() => boolean) | null = null
 
@@ -28,13 +27,6 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
 }
 
-/**
- * Synchronous playback prep — must finish before .play() in the same call stack.
- *
- * Single-track playback uses the native speaker route (no Web Audio) so iOS does
- * not starve and cut the audio after ~1s. Simultaneous tracks (batch) must mix
- * through Web Audio, so native-direct is disabled for them.
- */
 function primeTakePlayback(
   media: Array<HTMLMediaElement | null | undefined>,
   allowNativeDirect: boolean,
@@ -60,8 +52,6 @@ function primeTakePlayback(
     resumePitchGraphsForMedia(...elements)
   }
 
-  // Only spin up / resume the shared context when something actually routes
-  // through Web Audio (enhancer, pitch analysis, or simultaneous mixing).
   if (elements.some((element) => hasTakePlaybackSpeakerRoute(element))) {
     void resumePlaybackAudioContext()
   }
@@ -74,7 +64,6 @@ export function primeTakePlaybackForUserGesture(
   primeTakePlayback(media, count === 1)
 }
 
-/** Prepare playback — async path for programmatic / muted autoplay only. */
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
@@ -97,10 +86,6 @@ export interface UserGesturePlaybackCallbacks {
   onFailure?: (error: unknown) => void
 }
 
-/**
- * User-gesture playback — call synchronously inside onClick / onPointerUp.
- * Never await before this; set UI state alongside, not via useEffect.
- */
 export function playTakeMediaFromUserGesture(
   media: HTMLMediaElement,
   callbacks: UserGesturePlaybackCallbacks = {},
@@ -109,7 +94,7 @@ export function playTakeMediaFromUserGesture(
 
   if (!hasTakePlaybackSpeakerRoute(media)) {
     media.muted = false
-    media.volume = Math.max(media.volume, 1)
+    media.volume = 1
   }
 
   if (
@@ -126,21 +111,6 @@ export function playTakeMediaFromUserGesture(
   void media
     .play()
     .then(() => {
-      // #region agent log
-      debugPlaybackSnapshot('takePlaybackAudio.ts:play', media, 'play-started', 'E')
-      for (const delayMs of [500, 1000, 1500, 2500]) {
-        window.setTimeout(() => {
-          if (!media.paused && !media.ended) {
-            debugPlaybackSnapshot(
-              'takePlaybackAudio.ts:play',
-              media,
-              `play-t+${delayMs}ms`,
-              delayMs <= 1000 ? 'A' : 'B',
-            )
-          }
-        }, delayMs)
-      }
-      // #endregion
       callbacks.onPlaying?.()
     })
     .catch((error: unknown) => {
@@ -149,14 +119,11 @@ export function playTakeMediaFromUserGesture(
     })
 }
 
-/** Start multiple tracks synchronously from a single user gesture. */
 export function playTakeMediaBatchFromUserGesture(
   media: HTMLMediaElement[],
   callbacks: UserGesturePlaybackCallbacks = {},
 ): void {
   if (media.length === 0) return
-  // Simultaneous tracks must mix through Web Audio; native output only plays the
-  // last element audibly on iOS.
   primeTakePlayback(media, false)
   for (const element of media) {
     element.play().catch((error: unknown) => {
@@ -166,9 +133,6 @@ export function playTakeMediaBatchFromUserGesture(
   }
 }
 
-/**
- * @deprecated Use playTakeMediaFromUserGesture inside click handlers.
- */
 export async function playTakeMedia(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
@@ -184,7 +148,6 @@ export async function playTakeMedia(
     })
 }
 
-/** Muted programmatic playback — Web Audio gain only (never native-direct + re-mute). */
 export async function playTakeMediaMuted(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
@@ -194,17 +157,12 @@ export async function playTakeMediaMuted(
   return safePlayMutedMedia(media, options)
 }
 
-/**
- * Audible programmatic playback (hands-free auto-playback, PiP auto-preview).
- * Prefers native speaker output at full element volume when enhancer is off.
- */
 export async function playTakeMediaAudible(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
   primeTakePlayback([media], true)
-  const nativeDirect = !hasTakePlaybackSpeakerRoute(media)
-  if (nativeDirect) {
+  if (!hasTakePlaybackSpeakerRoute(media)) {
     media.muted = false
     media.volume = 1
   } else {

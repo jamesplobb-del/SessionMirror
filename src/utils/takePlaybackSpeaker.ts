@@ -11,11 +11,14 @@ import {
   type AudioEnhancerSettings,
 } from './audioEnhancer'
 import {
+  armPlaybackGraphKeepAlive,
+  disarmPlaybackGraphKeepAlive,
+} from './playbackGraphKeepAlive'
+import {
   primePlaybackAudioContextSync,
   resumePlaybackAudioContext,
 } from './playbackAudioContext'
 import { effectiveSpeakerGain } from './playbackVolume'
-import { debugPlaybackLog } from './debugPlaybackLog'
 
 export interface TakeSpeakerPassthrough {
   input: GainNode
@@ -26,8 +29,8 @@ export interface TakeSpeakerNodes {
   source: MediaElementAudioSourceNode
   gain: GainNode
   enhancer?: AudioEnhancerNodes
-  /** Dry multi-node passthrough — keeps iOS Web Audio alive when enhancer is off. */
   passthrough?: TakeSpeakerPassthrough
+  keepAliveAnalyser?: AnalyserNode
 }
 
 export function isTakePlaybackEnhancerEnabled(): boolean {
@@ -35,7 +38,6 @@ export function isTakePlaybackEnhancerEnabled(): boolean {
 }
 
 const speakerNodesByElement = new WeakMap<HTMLMediaElement, TakeSpeakerNodes>()
-/** Tracks routed elements so enhancer state can be applied without WeakMap iteration. */
 const routedSpeakerElements = new Set<HTMLMediaElement>()
 
 let enhancerEnabled = false
@@ -62,13 +64,16 @@ export function setTakePlaybackEnhancerState(
     if (!enhancerEnabled || !enhancerSettings) {
       disconnectEnhancer(nodes)
       ensurePassthroughChain(nodes)
-      nodes.gain.gain.value = effectiveSpeakerGain(1, false, false)
+      nodes.gain.gain.value = effectiveSpeakerGain(el.volume || 1, false, true)
+      armPlaybackGraphKeepAlive(el, nodes)
       continue
     }
     ensureEnhancerForElement(el, nodes)
     if (nodes.enhancer) {
       updateAudioEnhancerChain(nodes.enhancer, enhancerSettings)
     }
+    nodes.gain.gain.value = effectiveSpeakerGain(el.volume || 1, false, true)
+    armPlaybackGraphKeepAlive(el, nodes)
   }
 
   resumePlaybackBus()
@@ -140,16 +145,6 @@ function ensurePassthroughChain(nodes: TakeSpeakerNodes): void {
 
 function disconnectEnhancer(nodes: TakeSpeakerNodes): void {
   if (!nodes.enhancer) {
-    try {
-      nodes.gain.disconnect()
-    } catch {
-      /* already disconnected */
-    }
-    try {
-      nodes.gain.connect(nodes.source.context.destination)
-    } catch {
-      /* already connected */
-    }
     return
   }
 
@@ -161,12 +156,6 @@ function disconnectEnhancer(nodes: TakeSpeakerNodes): void {
     disposeAudioEnhancerChain(enhancer)
   } catch {
     /* already rewired */
-  }
-
-  try {
-    nodes.gain.connect(nodes.source.context.destination)
-  } catch {
-    /* already connected */
   }
 }
 
@@ -189,7 +178,6 @@ function ensureEnhancerForElement(_el: HTMLMediaElement, nodes: TakeSpeakerNodes
   nodes.enhancer = chain
 }
 
-/** Reconnect source→gain after pitch analysis teardown left the bus open. */
 function repairSpeakerBus(el: HTMLMediaElement, nodes: TakeSpeakerNodes): void {
   try {
     nodes.source.connect(nodes.gain)
@@ -215,10 +203,6 @@ export function getTakePlaybackSpeakerNodes(
   return speakerNodesByElement.get(el)
 }
 
-/**
- * Register an existing element→gain route (e.g. from pitch analysis) as the
- * shared speaker bus so enhancer state and repair logic apply consistently.
- */
 export function registerTakePlaybackSpeakerRoute(
   el: HTMLMediaElement,
   source: MediaElementAudioSourceNode,
@@ -244,15 +228,9 @@ export function hasTakePlaybackSpeakerRoute(el: HTMLMediaElement): boolean {
 }
 
 export interface RouteTakePlaybackOptions {
-  /**
-   * Allow plain single-track playback to skip Web Audio and rely on the native
-   * speaker route. Web Audio routing of a muted element is starved by iOS after
-   * ~1s when nothing actively pulls from the graph, which cuts audio out.
-   */
   allowNativeDirect?: boolean
 }
 
-/** Wire a media element into the shared speaker bus (once per element lifetime). */
 export function routeTakePlaybackToSpeaker(
   el: HTMLMediaElement,
   volume = 1,
@@ -261,21 +239,10 @@ export function routeTakePlaybackToSpeaker(
 ): void {
   const existingNodes = speakerNodesByElement.get(el)
 
-  // Native-direct path: no enhancer and the element was never wired into Web
-  // Audio. Play the element itself, unmuted, and let the native AVAudioSession
-  // (forced to .speaker in AppDelegate) drive the loud main speaker. This avoids
-  // the iOS render-starvation cutout and the quieter Web Audio element route.
   if (options.allowNativeDirect && !existingNodes && !enhancerEnabled) {
+    disarmPlaybackGraphKeepAlive(el)
     el.muted = muted
     el.volume = muted ? 0 : 1
-    // #region agent log
-    debugPlaybackLog(
-      'takePlaybackSpeaker.ts:route',
-      'route-native-direct',
-      { enhancerEnabled, elMuted: el.muted, elVolume: el.volume, volume, muted },
-      'C',
-    )
-    // #endregion
     return
   }
 
@@ -287,16 +254,14 @@ export function routeTakePlaybackToSpeaker(
       const source = ctx.createMediaElementSource(el)
       const gain = ctx.createGain()
       source.connect(gain)
-      gain.connect(ctx.destination)
       nodes = { source, gain }
       speakerNodesByElement.set(el, nodes)
       routedSpeakerElements.add(el)
     } catch {
-      // Element may already be wired (e.g. pitch graph registered the bus).
       nodes = speakerNodesByElement.get(el)
       if (!nodes) {
         resumePlaybackBus()
-        // No Web Audio route — fall back to native output (quiet earpiece beats silence).
+        disarmPlaybackGraphKeepAlive(el)
         el.muted = muted
         el.volume = muted ? 0 : volume
         return
@@ -308,7 +273,7 @@ export function routeTakePlaybackToSpeaker(
   }
 
   el.muted = true
-  nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, enhancerEnabled)
+  nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, true)
 
   if (enhancerEnabled && enhancerSettings) {
     ensureEnhancerForElement(el, nodes)
@@ -320,26 +285,8 @@ export function routeTakePlaybackToSpeaker(
     ensurePassthroughChain(nodes)
   }
 
+  armPlaybackGraphKeepAlive(el, nodes)
   resumePlaybackBus()
-
-  // #region agent log
-  debugPlaybackLog(
-    'takePlaybackSpeaker.ts:route',
-    'route-web-audio',
-    {
-      enhancerEnabled,
-      hadExistingNodes: Boolean(existingNodes),
-      allowNativeDirect: options.allowNativeDirect ?? false,
-      busGain: nodes.gain.gain.value,
-      hasEnhancerChain: Boolean(nodes.enhancer),
-      hasPassthrough: Boolean(nodes.passthrough),
-      elMuted: el.muted,
-      elVolume: el.volume,
-      ctxState: (nodes.source.context as AudioContext).state,
-    },
-    'A',
-  )
-  // #endregion
 }
 
 export function updateTakePlaybackSpeakerGain(
@@ -349,6 +296,6 @@ export function updateTakePlaybackSpeakerGain(
 ): void {
   const nodes = speakerNodesByElement.get(el)
   if (nodes) {
-    nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, enhancerEnabled)
+    nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, true)
   }
 }

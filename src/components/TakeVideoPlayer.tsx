@@ -6,7 +6,6 @@ import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } fr
 import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
 import {
   hasTakePlaybackSpeakerRoute,
-  isTakePlaybackEnhancerEnabled,
 } from '../utils/takePlaybackSpeaker'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
@@ -116,7 +115,7 @@ export default function TakeVideoPlayer({
         if (media.volume <= 0) {
           media.volume = 1
         }
-      } else if (isTakePlaybackEnhancerEnabled()) {
+      } else {
         ensureMediaMuted(media)
       }
       return
