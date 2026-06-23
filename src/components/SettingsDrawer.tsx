@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -13,6 +13,12 @@ import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
+import {
+  clampTakeCardScale,
+  getMaxTakeCardScalePercent,
+  TAKE_CARD_SCALE_MIN,
+  TAKE_CARD_SCALE_STEP,
+} from '../utils/takeCardScale'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -44,9 +50,27 @@ function SettingToggle({
   disabled?: boolean
   hapticFeedback?: boolean
 }) {
+  const handleRowActivate = () => {
+    if (disabled) return
+    onChange(!checked)
+  }
+
   return (
-    <motion.label
-      className={`flex items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-3.5 ${
+    <motion.div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest('[role="switch"]')) return
+        handleRowActivate()
+      }}
+      onKeyDown={(event) => {
+        if (disabled) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          handleRowActivate()
+        }
+      }}
+      className={`flex min-h-[4.25rem] items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-4 ${
         disabled ? 'opacity-50' : 'cursor-pointer'
       }`}
       whileTap={disabled ? undefined : { scale: 0.995 }}
@@ -63,7 +87,7 @@ function SettingToggle({
         ariaLabel={label}
         hapticFeedback={hapticFeedback}
       />
-    </motion.label>
+    </motion.div>
   )
 }
 
@@ -148,7 +172,7 @@ function SettingSlider({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="h-2 w-full cursor-pointer accent-sky-500"
+        className="settings-range-input h-11 w-full cursor-pointer accent-sky-500"
       />
     </div>
   )
@@ -168,6 +192,14 @@ export default function SettingsDrawer({
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
+  const [maxTakeCardScale, setMaxTakeCardScale] = useState(() => getMaxTakeCardScalePercent())
+
+  useEffect(() => {
+    const updateMax = () => setMaxTakeCardScale(getMaxTakeCardScalePercent())
+    updateMax()
+    window.addEventListener('resize', updateMax)
+    return () => window.removeEventListener('resize', updateMax)
+  }, [])
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -349,22 +381,17 @@ export default function SettingsDrawer({
 
             <AnimatedExpand open={hudQuickSettings.showTakeCards}>
               <div className="space-y-2 pt-3">
-                <label className="block space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-stone-800">Take Card Size</span>
-                    <span className="text-xs tabular-nums text-stone-500">{settings.takeCardScale}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={85}
-                    max={125}
-                    step={5}
-                    value={settings.takeCardScale}
-                    onChange={(e) => onUpdate({ takeCardScale: Number(e.target.value) })}
-                    className="w-full accent-stone-700"
-                    aria-label="Take card size"
-                  />
-                </label>
+                <SettingSlider
+                  label="Take Card Size"
+                  description="Scales Best Take and Current Take on the main screen. Max size fits your display."
+                  value={clampTakeCardScale(settings.takeCardScale)}
+                  min={TAKE_CARD_SCALE_MIN}
+                  max={maxTakeCardScale}
+                  step={TAKE_CARD_SCALE_STEP}
+                  unit="%"
+                  formatValue={(value) => `${value}%`}
+                  onChange={(value) => onUpdate({ takeCardScale: clampTakeCardScale(value) })}
+                />
               </div>
             </AnimatedExpand>
 

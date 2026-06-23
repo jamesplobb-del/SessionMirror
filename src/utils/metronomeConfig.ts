@@ -28,6 +28,16 @@ export const DEFAULT_SUBDIVISION: MetronomeSubdivision = 'off'
 
 export type MetronomeSubdivision = 'off' | '8ths' | 'triplets' | '16ths'
 
+export type MetronomeSoundType = 'click' | 'wood' | 'digital'
+
+export const METRONOME_SOUND_TYPES: { value: MetronomeSoundType; label: string }[] = [
+  { value: 'click', label: 'Click' },
+  { value: 'wood', label: 'Wood' },
+  { value: 'digital', label: 'Digital' },
+]
+
+export const DEFAULT_SOUND_TYPE: MetronomeSoundType = 'click'
+
 export const METRONOME_SUBDIVISIONS: { value: MetronomeSubdivision; label: string }[] = [
   { value: 'off', label: 'Off' },
   { value: '8ths', label: '8ths' },
@@ -41,6 +51,7 @@ export interface MetronomePrefs {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
+  soundType: MetronomeSoundType
 }
 
 export function clampBpm(value: number): number {
@@ -61,6 +72,13 @@ function parseSubdivision(value: unknown): MetronomeSubdivision {
   return DEFAULT_SUBDIVISION
 }
 
+function parseSoundType(value: unknown): MetronomeSoundType {
+  if (value === 'click' || value === 'wood' || value === 'digital') {
+    return value
+  }
+  return DEFAULT_SOUND_TYPE
+}
+
 export function subdivisionsPerBeat(subdivision: MetronomeSubdivision): number {
   switch (subdivision) {
     case '8ths':
@@ -78,16 +96,27 @@ export function loadMetronomePrefs(): MetronomePrefs {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) {
-      return { bpm: DEFAULT_BPM, meter: DEFAULT_METER, subdivision: DEFAULT_SUBDIVISION }
+      return {
+        bpm: DEFAULT_BPM,
+        meter: DEFAULT_METER,
+        subdivision: DEFAULT_SUBDIVISION,
+        soundType: DEFAULT_SOUND_TYPE,
+      }
     }
     const parsed = JSON.parse(raw) as Partial<MetronomePrefs>
     return {
       bpm: clampBpm(Number(parsed.bpm) || DEFAULT_BPM),
       meter: parseMeter(parsed.meter),
       subdivision: parseSubdivision(parsed.subdivision),
+      soundType: parseSoundType(parsed.soundType),
     }
   } catch {
-    return { bpm: DEFAULT_BPM, meter: DEFAULT_METER, subdivision: DEFAULT_SUBDIVISION }
+    return {
+      bpm: DEFAULT_BPM,
+      meter: DEFAULT_METER,
+      subdivision: DEFAULT_SUBDIVISION,
+      soundType: DEFAULT_SOUND_TYPE,
+    }
   }
 }
 
@@ -99,6 +128,7 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
         bpm: clampBpm(prefs.bpm),
         meter: prefs.meter,
         subdivision: prefs.subdivision,
+        soundType: prefs.soundType,
       }),
     )
   } catch {

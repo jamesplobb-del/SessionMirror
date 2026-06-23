@@ -1,5 +1,9 @@
 import type { TunerInstrument } from './pitchConfig'
 import {
+  clampTakeCardScale,
+  TAKE_CARD_SCALE_DEFAULT,
+} from './takeCardScale'
+import {
   DEFAULT_AUDIO_ENHANCER_SETTINGS,
   parseAudioEnhancerSettings,
   type AudioEnhancerSettings,
@@ -47,7 +51,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showTakeCards: true,
   showMetronome: false,
   muteMetronomeDuringPlayback: true,
-  takeCardScale: 100,
+  takeCardScale: TAKE_CARD_SCALE_DEFAULT,
   audioEnhancerEnabled: false,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
   excludeYoutubeFromRecording: false,
@@ -116,10 +120,8 @@ export function loadAppSettings(): AppSettings {
         parsed.muteMetronomeDuringPlayback !== undefined
           ? Boolean(parsed.muteMetronomeDuringPlayback)
           : DEFAULT_APP_SETTINGS.muteMetronomeDuringPlayback,
-      takeCardScale: clamp(
+      takeCardScale: clampTakeCardScale(
         Number(parsed.takeCardScale) || DEFAULT_APP_SETTINGS.takeCardScale,
-        85,
-        125,
       ),
       audioEnhancerEnabled:
         parsed.audioEnhancerEnabled !== undefined

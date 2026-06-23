@@ -5,10 +5,10 @@ export const PLAYBACK_GAIN_NATIVE = 40
 export const PLAYBACK_GAIN_WEB = 6
 export const PLAYBACK_GAIN_MAX = 46
 
-/** YouTube IFrame API volume is 0–100; shape the low end of the UI slider toward API max. */
-export const YOUTUBE_VOLUME_BOOST = 8
-/** Minimum non-zero YouTube API volume — reference playback stays loud on iOS. */
-export const YOUTUBE_VOLUME_FLOOR = 92
+/** YouTube IFrame API volume is 0–100; peg non-zero slider values to API max. */
+export const YOUTUBE_VOLUME_BOOST = 12
+/** Minimum non-zero YouTube API volume — reference playback stays at API max. */
+export const YOUTUBE_VOLUME_FLOOR = 100
 
 /** Gain for Web Audio speaker bus. Native-direct playback uses element volume instead. */
 export function effectiveSpeakerGain(
@@ -32,7 +32,13 @@ export function youtubeVolumeFromUiSlider(uiVolume: number): number {
   return Math.round(Math.min(100, Math.max(YOUTUBE_VOLUME_FLOOR, boosted)))
 }
 
-/** Web Audio metronome bus — match take playback loudness on native. */
+export const METRONOME_GAIN_NATIVE = 56
+export const METRONOME_GAIN_WEB = 10
+export const METRONOME_GAIN_MAX = 62
+
+/** Web Audio metronome bus — louder than take playback for audible clicks. */
 export function metronomeSpeakerGain(muted: boolean): number {
-  return effectiveSpeakerGain(1, muted)
+  if (muted) return 0
+  const multiplier = Capacitor.isNativePlatform() ? METRONOME_GAIN_NATIVE : METRONOME_GAIN_WEB
+  return Math.min(multiplier, METRONOME_GAIN_MAX)
 }

@@ -29,27 +29,36 @@ export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined)
   postToYoutubeIframe(iframe, 'unMute')
 }
 
+const YOUTUBE_BOOST_DELAYS_MS = [0, 60, 120, 240, 450, 750, 1200, 2000]
+
+function boostYoutubeProxyAudio(
+  iframe: HTMLIFrameElement | null | undefined,
+  uiVolume: number,
+): void {
+  unmuteYoutubeProxy(iframe)
+  setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+}
+
 /** Play reference audio as loud as the proxy allows — re-applies volume after the embed wakes. */
 export function startYoutubeProxyPlayback(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  playYoutubeProxy(iframe)
-  unmuteYoutubeProxy(iframe)
-  setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-
   if (Capacitor.isNativePlatform()) {
     void AudioSessionPlugin.enableStereoPlayback()
   }
 
-  window.setTimeout(() => {
-    unmuteYoutubeProxy(iframe)
-    setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-  }, 120)
+  playYoutubeProxy(iframe)
+  boostYoutubeProxyAudio(iframe, uiVolume)
 
-  window.setTimeout(() => {
-    setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-  }, 450)
+  for (const delay of YOUTUBE_BOOST_DELAYS_MS) {
+    window.setTimeout(() => {
+      if (Capacitor.isNativePlatform()) {
+        void AudioSessionPlugin.enableStereoPlayback()
+      }
+      boostYoutubeProxyAudio(iframe, uiVolume)
+    }, delay)
+  }
 }
 
 /** Volume from a 0–1 UI slider, boosted for audible reference playback. */
