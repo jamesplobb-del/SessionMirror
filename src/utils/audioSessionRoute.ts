@@ -5,8 +5,8 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
  *
  * `.playAndRecord` (camera/mic live) only outputs the single bottom loudspeaker.
  * `.playback` engages the iPhone's STEREO speakers (bottom + earpiece). We switch
- * to stereo when any take media plays, then restore the recording route when all
- * media has stopped. No-op on web.
+ * to stereo when take media plays, then restore the recording route only when the
+ * Take Vault closes (never during camera init — WebRTC owns the first hardware lock).
  */
 interface AudioSessionPlugin {
   enableStereoPlayback(): Promise<void>
@@ -31,14 +31,15 @@ let enterTimer: number | null = null
 let exitTimer: number | null = null
 
 let onBeforeStereo: (() => void) | null = null
-let onAfterStereo: (() => void) | null = null
+let onAfterVaultRestore: (() => void) | null = null
 
 export function registerAudioSessionLifecycle(handlers: {
   onBeforeStereo?: () => void
-  onAfterStereo?: () => void
+  /** Fires after native recording route restore on vault close only. */
+  onAfterVaultRestore?: () => void
 }): void {
   onBeforeStereo = handlers.onBeforeStereo ?? null
-  onAfterStereo = handlers.onAfterStereo ?? null
+  onAfterVaultRestore = handlers.onAfterVaultRestore ?? null
 }
 
 /** Block stereo routing while recording (or other capture-critical states). */
@@ -47,7 +48,7 @@ export function setAudioSessionStereoBlocked(blocked: boolean): void {
   if (blocked && stereoActive) {
     clearStereoTimers()
     playbackCount = 0
-    void restoreRecordingRoute()
+    endStereoPlaybackSession()
   }
 }
 
@@ -62,16 +63,35 @@ async function enableStereoRoute(): Promise<void> {
   }
 }
 
-async function restoreRecordingRoute(): Promise<void> {
-  if (!isNative) return
-  try {
-    await CustomAudioSession.enableRecordingRoute()
-  } catch (error) {
-    console.warn('Failed to restore recording audio route', error)
-  } finally {
-    stereoActive = false
-    onAfterStereo?.()
+/** Clear stereo playback state without touching the native recording route. */
+function endStereoPlaybackSession(): void {
+  clearStereoTimers()
+  stereoActive = false
+}
+
+/**
+ * Restore the native recording route — only call when the Take Vault closes and
+ * the user returns to an already-running camera screen. Never during camera init.
+ */
+export async function restoreRecordingRouteAfterVault(): Promise<void> {
+  if (!isNative) {
+    onAfterVaultRestore?.()
+    return
   }
+
+  const needsNativeRestore = stereoActive || playbackCount > 0
+  endStereoPlaybackSession()
+  playbackCount = 0
+
+  if (needsNativeRestore) {
+    try {
+      await CustomAudioSession.enableRecordingRoute()
+    } catch (error) {
+      console.warn('Failed to restore recording audio route', error)
+    }
+  }
+
+  onAfterVaultRestore?.()
 }
 
 function clearStereoTimers(): void {
@@ -100,7 +120,7 @@ function scheduleStereoExit(): void {
   exitTimer = window.setTimeout(() => {
     exitTimer = null
     if (playbackCount === 0) {
-      void restoreRecordingRoute()
+      endStereoPlaybackSession()
     }
   }, 150)
 }
@@ -126,7 +146,7 @@ function markMediaStopped(media: HTMLMediaElement): void {
 
 /**
  * Attach play / pause / ended routing to a media element.
- * Returns a cleanup that removes listeners and restores the recording route if needed.
+ * Returns a cleanup that removes listeners without restoring the native route.
  */
 export function attachMediaAudioSessionRouting(
   media: HTMLMediaElement,
@@ -174,9 +194,6 @@ export function detachMediaAudioSessionRouting(media: HTMLMediaElement): void {
   }
 
   markMediaStopped(media)
-  if (playbackCount === 0) {
-    void restoreRecordingRoute()
-  }
 }
 
 /** @deprecated Use attachMediaAudioSessionRouting via useMediaAudioSessionRouting. */
@@ -184,7 +201,7 @@ export async function enableStereoPlaybackRoute(): Promise<void> {
   await enableStereoRoute()
 }
 
-/** @deprecated Use detachMediaAudioSessionRouting / media listeners. */
+/** @deprecated Use restoreRecordingRouteAfterVault on vault close only. */
 export async function enableRecordingAudioRoute(): Promise<void> {
-  await restoreRecordingRoute()
+  await restoreRecordingRouteAfterVault()
 }

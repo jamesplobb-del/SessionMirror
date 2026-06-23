@@ -91,6 +91,7 @@ import {
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 import {
   registerAudioSessionLifecycle,
+  restoreRecordingRouteAfterVault,
   setAudioSessionStereoBlocked,
 } from './utils/audioSessionRoute'
 import { useMediaAudioSessionRouting } from './hooks/useMediaAudioSessionRouting'
@@ -1067,13 +1068,13 @@ function StandardApp({
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
       const timer = window.setTimeout(() => {
-        void refreshCameraSession()
+        void restoreRecordingRouteAfterVault()
       }, 350)
       wasVaultOpenRef.current = isVaultOpen
       return () => window.clearTimeout(timer)
     }
     wasVaultOpenRef.current = isVaultOpen
-  }, [isVaultOpen, refreshCameraSession])
+  }, [isVaultOpen])
 
   const wasSettingsOpenRef = useRef(false)
   useEffect(() => {
@@ -1517,7 +1518,7 @@ function StandardApp({
           suspendCameraForBackground()
         }
       },
-      onAfterStereo: () => {
+      onAfterVaultRestore: () => {
         void refreshCameraSession()
       },
     })
