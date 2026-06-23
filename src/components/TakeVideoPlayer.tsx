@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEventHandler, type RefObject, type VideoHTMLAttributes } from 'react'
 import { Mic } from 'lucide-react'
 import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
-import { useMediaAudioSessionRouting } from '../hooks/useMediaAudioSessionRouting'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
@@ -71,13 +70,6 @@ export default function TakeVideoPlayer({
     : null
 
   const effectivePreload = eagerLoad ? 'metadata' : preloadProp
-  const routingKey = videoSourceKey ?? mediaSrc ?? filePath ?? null
-
-  useMediaAudioSessionRouting(
-    mediaRef,
-    Boolean(mediaSrc) && !thumbnailPreview,
-    routingKey,
-  )
 
   useEffect(() => {
     if (!mediaSrc) return

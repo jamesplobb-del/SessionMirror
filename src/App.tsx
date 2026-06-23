@@ -89,12 +89,7 @@ import {
   type Project,
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
-import {
-  registerAudioSessionLifecycle,
-  restoreRecordingRouteAfterVault,
-  setAudioSessionStereoBlocked,
-} from './utils/audioSessionRoute'
-import { useMediaAudioSessionRouting } from './hooks/useMediaAudioSessionRouting'
+import { enableRecordingRouteForVault, enableStereoPlaybackForVault } from './utils/audioSessionRoute'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -844,7 +839,6 @@ function StandardApp({
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
     refreshCameraSession,
-    suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
   } = useCameraSession({
@@ -853,9 +847,6 @@ function StandardApp({
     onBeforeForegroundRestart: pauseYoutubeReference,
     onAfterForegroundRestart: resumeYoutubeReference,
   })
-
-  const isRecordingRef = useRef(isRecording)
-  isRecordingRef.current = isRecording
 
   useEffect(() => {
     if (recordingMode !== 'video') return
@@ -1068,13 +1059,13 @@ function StandardApp({
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
       const timer = window.setTimeout(() => {
-        void restoreRecordingRouteAfterVault()
+        void refreshCameraSession()
       }, 350)
       wasVaultOpenRef.current = isVaultOpen
       return () => window.clearTimeout(timer)
     }
     wasVaultOpenRef.current = isVaultOpen
-  }, [isVaultOpen])
+  }, [isVaultOpen, refreshCameraSession])
 
   const wasSettingsOpenRef = useRef(false)
   useEffect(() => {
@@ -1119,6 +1110,7 @@ function StandardApp({
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleCloseVault = useCallback(() => {
+    void enableRecordingRouteForVault()
     startTransition(() => {
       setIsVaultOpen(false)
     })
@@ -1126,6 +1118,7 @@ function StandardApp({
 
   const handleOpenVault = useCallback(() => {
     setShowPitch(false)
+    void enableStereoPlaybackForVault()
     startTransition(() => {
       setIsSettingsOpen(false)
       setIsVaultOpen(true)
@@ -1510,25 +1503,6 @@ function StandardApp({
 
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
-
-  useEffect(() => {
-    registerAudioSessionLifecycle({
-      onBeforeStereo: () => {
-        if (!isRecordingRef.current) {
-          suspendCameraForBackground()
-        }
-      },
-      onAfterRecordingRouteRestore: () => {
-        void refreshCameraSession()
-      },
-    })
-  }, [refreshCameraSession, suspendCameraForBackground])
-
-  useEffect(() => {
-    setAudioSessionStereoBlocked(isRecording)
-  }, [isRecording])
-
-  useMediaAudioSessionRouting(autoPlaybackAudioRef, true, 'auto-playback')
 
   useEffect(() => {
     setTakePlaybackEnhancerState(
