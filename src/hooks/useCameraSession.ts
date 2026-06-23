@@ -17,6 +17,7 @@ import {
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream } from '../utils/audioCapture'
+import { prepareForMediaCapture } from '../utils/audioSessionRoute'
 import { getUserMediaCompat } from '../utils/getUserMedia'
 import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
 import { releaseRecorderStream } from '../utils/recordingStream'
@@ -314,6 +315,11 @@ export function useCameraSession({
               audio: getAudioCaptureConstraints(),
               video: getVideoCaptureConstraints(),
             }
+
+      if (Capacitor.isNativePlatform()) {
+        await prepareForMediaCapture()
+        if (cancelled?.()) return null
+      }
 
       const mediaStream = await getUserMediaCompat(constraints)
       if (cancelled?.()) {

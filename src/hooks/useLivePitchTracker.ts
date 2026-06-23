@@ -29,6 +29,7 @@ import {
   tuneMusicRecordingStream,
 } from '../utils/audioCapture'
 import { getUserMediaCompat } from '../utils/getUserMedia'
+import { prepareForMediaCapture } from '../utils/audioSessionRoute'
 import {
   getPlaybackAudioContext,
   isSharedPlaybackContext,
@@ -281,6 +282,7 @@ async function createMicPitchGraph(
       throw new Error('Shared mic stream not ready')
     }
 
+    await prepareForMediaCapture()
     stream = await getUserMediaCompat({
       audio: getMusicRecordingAudioConstraints(),
       video: false,
