@@ -1518,7 +1518,7 @@ function StandardApp({
           suspendCameraForBackground()
         }
       },
-      onAfterVaultRestore: () => {
+      onAfterRecordingRouteRestore: () => {
         void refreshCameraSession()
       },
     })

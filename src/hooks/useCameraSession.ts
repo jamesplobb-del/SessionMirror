@@ -17,6 +17,7 @@ import {
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream } from '../utils/audioCapture'
+import { prepareRecordingRoute } from '../utils/audioSessionRoute'
 import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
@@ -680,6 +681,7 @@ export function useCameraSession({
     if (isRecording) return
 
     void (async () => {
+      await prepareRecordingRoute()
       const currentStream = await ensureRecordableStream()
       if (!currentStream || isRecordingRef.current) return
 
@@ -745,34 +747,38 @@ export function useCameraSession({
   const startAutoAudioRecording = useCallback(() => {
     if (isRecordingRef.current) return
 
-    const armed = armedAutoAudioRef.current
-    if (armed?.recorder.state === 'inactive') {
-      armedAutoAudioRef.current = null
-      recorderRef.current = armed.recorder
-      writerRef.current = armed.writer
-      activeTakeIdRef.current = armed.takeId
-      recorderMimeTypeRef.current = armed.mimeType
-      chunksRef.current = []
+    void (async () => {
+      await prepareRecordingRoute()
 
-      try {
-        if (shouldUseRecordingTimeslice(armed.mimeType)) {
-          armed.recorder.start(RECORDING_TIMESLICE_MS)
-        } else {
-          armed.recorder.start()
+      const armed = armedAutoAudioRef.current
+      if (armed?.recorder.state === 'inactive') {
+        armedAutoAudioRef.current = null
+        recorderRef.current = armed.recorder
+        writerRef.current = armed.writer
+        activeTakeIdRef.current = armed.takeId
+        recorderMimeTypeRef.current = armed.mimeType
+        chunksRef.current = []
+
+        try {
+          if (shouldUseRecordingTimeslice(armed.mimeType)) {
+            armed.recorder.start(RECORDING_TIMESLICE_MS)
+          } else {
+            armed.recorder.start()
+          }
+          isRecordingRef.current = true
+          recordStreamRef.current = streamRef.current
+          setIsRecording(true)
+          setElapsed(0)
+          elapsedRef.current = 0
+          return
+        } catch {
+          void disarmAutoAudioRecorder()
+          void warmAutoAudioRecorder()
         }
-        isRecordingRef.current = true
-        recordStreamRef.current = streamRef.current
-        setIsRecording(true)
-        setElapsed(0)
-        elapsedRef.current = 0
-        return
-      } catch {
-        void disarmAutoAudioRecorder()
-        void warmAutoAudioRecorder()
       }
-    }
 
-    startRecording()
+      startRecording()
+    })()
   }, [disarmAutoAudioRecorder, startRecording, warmAutoAudioRecorder])
 
   const stopRecording = useCallback(() => {

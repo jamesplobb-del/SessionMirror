@@ -3,10 +3,9 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 /**
  * Native bridge to the iOS AVAudioSession route.
  *
- * `.playAndRecord` (camera/mic live) only outputs the single bottom loudspeaker.
- * `.playback` engages the iPhone's STEREO speakers (bottom + earpiece). We switch
- * to stereo when take media plays, then restore the recording route only when the
- * Take Vault closes (never during camera init — WebRTC owns the first hardware lock).
+ * Stereo playback switches to `.playback`. Capture requires `.playAndRecord`.
+ * We track when the native playback route is active and restore only then —
+ * never on component mount (WebRTC owns the first hardware lock).
  */
 interface AudioSessionPlugin {
   enableStereoPlayback(): Promise<void>
@@ -26,29 +25,32 @@ const listenerMap = new WeakMap<
 
 let playbackCount = 0
 let stereoActive = false
+/** True after native enableStereoPlayback until enableRecordingRoute succeeds. */
+let playbackRouteActive = false
 let stereoBlocked = false
 let enterTimer: number | null = null
 let exitTimer: number | null = null
 
 let onBeforeStereo: (() => void) | null = null
-let onAfterVaultRestore: (() => void) | null = null
+let onAfterRecordingRouteRestore: (() => void) | null = null
 
 export function registerAudioSessionLifecycle(handlers: {
   onBeforeStereo?: () => void
-  /** Fires after native recording route restore on vault close only. */
-  onAfterVaultRestore?: () => void
+  /** Fires after recording route is restored — refresh the camera stream here. */
+  onAfterRecordingRouteRestore?: () => void
 }): void {
   onBeforeStereo = handlers.onBeforeStereo ?? null
-  onAfterVaultRestore = handlers.onAfterVaultRestore ?? null
+  onAfterRecordingRouteRestore = handlers.onAfterRecordingRouteRestore ?? null
 }
 
-/** Block stereo routing while recording (or other capture-critical states). */
+/** Block stereo routing while recording. */
 export function setAudioSessionStereoBlocked(blocked: boolean): void {
   stereoBlocked = blocked
-  if (blocked && stereoActive) {
+  if (blocked) {
     clearStereoTimers()
     playbackCount = 0
     endStereoPlaybackSession()
+    void restoreNativeRecordingRoute()
   }
 }
 
@@ -57,41 +59,70 @@ async function enableStereoRoute(): Promise<void> {
   try {
     onBeforeStereo?.()
     await CustomAudioSession.enableStereoPlayback()
+    playbackRouteActive = true
     stereoActive = true
   } catch (error) {
     console.warn('Failed to switch to stereo playback route', error)
   }
 }
 
-/** Clear stereo playback state without touching the native recording route. */
 function endStereoPlaybackSession(): void {
   clearStereoTimers()
   stereoActive = false
 }
 
-/**
- * Restore the native recording route — only call when the Take Vault closes and
- * the user returns to an already-running camera screen. Never during camera init.
- */
-export async function restoreRecordingRouteAfterVault(): Promise<void> {
-  if (!isNative) {
-    onAfterVaultRestore?.()
-    return
+async function restoreNativeRecordingRoute(): Promise<boolean> {
+  if (!isNative || !playbackRouteActive) {
+    endStereoPlaybackSession()
+    return false
   }
 
-  const needsNativeRestore = stereoActive || playbackCount > 0
   endStereoPlaybackSession()
   playbackCount = 0
 
-  if (needsNativeRestore) {
-    try {
-      await CustomAudioSession.enableRecordingRoute()
-    } catch (error) {
-      console.warn('Failed to restore recording audio route', error)
-    }
+  try {
+    await CustomAudioSession.enableRecordingRoute()
+    playbackRouteActive = false
+    return true
+  } catch (error) {
+    console.warn('Failed to restore recording audio route', error)
+    return false
+  }
+}
+
+/** Restore capture route after playback ends or vault closes. */
+async function restoreRecordingRouteAfterPlayback(): Promise<void> {
+  const restored = await restoreNativeRecordingRoute()
+  if (restored) {
+    onAfterRecordingRouteRestore?.()
+  }
+}
+
+/**
+ * Call before starting a recording (user gesture). Ensures `.playAndRecord` is
+ * active if we previously switched to stereo playback.
+ */
+export async function prepareRecordingRoute(): Promise<void> {
+  if (!isNative) return
+  clearStereoTimers()
+  playbackCount = 0
+  endStereoPlaybackSession()
+  if (!playbackRouteActive) return
+  await restoreRecordingRouteAfterPlayback()
+}
+
+/** Restore when the Take Vault closes and the user returns to the camera HUD. */
+export async function restoreRecordingRouteAfterVault(): Promise<void> {
+  if (!isNative) {
+    onAfterRecordingRouteRestore?.()
+    return
   }
 
-  onAfterVaultRestore?.()
+  const restored = await restoreNativeRecordingRoute()
+  onAfterRecordingRouteRestore?.()
+  if (!restored && playbackRouteActive) {
+    playbackRouteActive = false
+  }
 }
 
 function clearStereoTimers(): void {
@@ -120,9 +151,9 @@ function scheduleStereoExit(): void {
   exitTimer = window.setTimeout(() => {
     exitTimer = null
     if (playbackCount === 0) {
-      endStereoPlaybackSession()
+      void restoreRecordingRouteAfterPlayback()
     }
-  }, 150)
+  }, 200)
 }
 
 function markMediaPlaying(media: HTMLMediaElement): void {
@@ -144,10 +175,6 @@ function markMediaStopped(media: HTMLMediaElement): void {
   }
 }
 
-/**
- * Attach play / pause / ended routing to a media element.
- * Returns a cleanup that removes listeners without restoring the native route.
- */
 export function attachMediaAudioSessionRouting(
   media: HTMLMediaElement,
 ): () => void {
@@ -196,12 +223,12 @@ export function detachMediaAudioSessionRouting(media: HTMLMediaElement): void {
   markMediaStopped(media)
 }
 
-/** @deprecated Use attachMediaAudioSessionRouting via useMediaAudioSessionRouting. */
+/** @deprecated */
 export async function enableStereoPlaybackRoute(): Promise<void> {
   await enableStereoRoute()
 }
 
-/** @deprecated Use restoreRecordingRouteAfterVault on vault close only. */
+/** @deprecated */
 export async function enableRecordingAudioRoute(): Promise<void> {
   await restoreRecordingRouteAfterVault()
 }
