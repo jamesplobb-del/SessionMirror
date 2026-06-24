@@ -49,10 +49,7 @@ import {
 } from './utils/prepareTakeVideoExport'
 import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from './utils/takes'
 import {
-  ensureYoutubeProxyRouteListener,
   pauseYoutubeProxy,
-  registerYoutubeRouteGuards,
-  releaseYoutubeStereoRoute,
   startYoutubeProxyPlayback,
 } from './utils/playalong/youtubeBridge'
 import {
@@ -154,6 +151,18 @@ interface AppBootSnapshot {
 
 const BOOT_REVEAL_DELAY_MS = 500
 
+function formatBootFailureMessage(error: unknown): string {
+  const detail =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : null
+  const base =
+    'BestTake could not start. Restart the app or reinstall if this continues.'
+  return detail ? `${base}\n\n${detail}` : base
+}
+
 async function performAppBoot(): Promise<AppBootSnapshot> {
   await Promise.all([initVaultDatabase(), initAppFilesystem()])
 
@@ -230,9 +239,7 @@ export default function App() {
           }
         }
 
-        setBootError(
-          'BestTake could not open its vault database. Restart the app or reinstall if this continues.',
-        )
+        setBootError(formatBootFailureMessage(error))
         setIsBooting(false)
       }
     })()
@@ -816,10 +823,6 @@ function StandardApp({
 
   youtubeUrlRef.current = youtubeUrl
 
-  useEffect(() => {
-    ensureYoutubeProxyRouteListener()
-  }, [])
-
   const handleYoutubeHostChange = useCallback((el: HTMLDivElement | null) => {
     setYoutubeHostEl(el)
   }, [])
@@ -859,20 +862,6 @@ function StandardApp({
     onBeforeForegroundRestart: pauseYoutubeReference,
     onAfterForegroundRestart: resumeYoutubeReference,
   })
-
-  useEffect(() => {
-    registerYoutubeRouteGuards(
-      () =>
-        !isRecording &&
-        !autoPlaybackPlaying &&
-        !handsFreePlaybackPending,
-    )
-  }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
-
-  useEffect(() => {
-    if (!isRecording) return
-    releaseYoutubeStereoRoute()
-  }, [isRecording])
 
   useEffect(() => {
     if (recordingMode !== 'video') return
