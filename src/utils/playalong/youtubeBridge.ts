@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { refreshPlaybackOutputProfile } from '../audioOutputProfile'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
 import { YOUTUBE_PROXY_ORIGIN } from '../youtubeEmbed'
 import BestTakeAudioPlugin from '../audioSessionRoute'
@@ -84,28 +85,52 @@ export function registerYoutubeIframe(iframe: HTMLIFrameElement | null | undefin
   }
 }
 
+function postVolumeProfileToIframe(
+  iframe: HTMLIFrameElement | null | undefined,
+  profile: 'speaker' | 'headphones',
+): void {
+  if (!iframe?.contentWindow) return
+  iframe.contentWindow.postMessage(
+    JSON.stringify({ event: 'volume-profile', profile }),
+    YOUTUBE_PROXY_ORIGIN,
+  )
+}
+
 function boostYoutubeProxyAudio(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,
+  profile: 'speaker' | 'headphones',
 ): void {
   if (!iframe) return
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+  postVolumeProfileToIframe(iframe, profile)
+
+  const cap = youtubeVolumeFromUiSlider(uiVolume)
+  if (profile === 'headphones') {
+    postToYoutubeIframe(iframe, 'unMute')
+    postToYoutubeIframe(iframe, 'setVolume', [cap])
+    return
+  }
+
   for (let i = 0; i < 16; i++) {
     postToYoutubeIframe(iframe, 'unMute')
-    postToYoutubeIframe(iframe, 'setVolume', [100])
+    postToYoutubeIframe(iframe, 'setVolume', [cap])
   }
 }
 
 function scheduleYoutubeLoudnessBursts(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,
+  profile: 'speaker' | 'headphones',
 ): void {
+  if (profile === 'headphones') return
+
   const generation = loudnessBurstGeneration
   for (const delay of YOUTUBE_BOOST_DELAYS_MS) {
     window.setTimeout(() => {
       if (generation !== loudnessBurstGeneration) return
-      boostYoutubeProxyAudio(iframe, uiVolume)
+      boostYoutubeProxyAudio(iframe, uiVolume, profile)
     }, delay)
   }
 }
@@ -123,17 +148,19 @@ function handleProxyPlaybackMessage(data: unknown): void {
   const iframe = activeYoutubeIframe
   if (!iframe) return
 
-  if (payload.state === 'ready') {
-    refreshYoutubeStereoRoute(true)
-    boostYoutubeProxyAudio(iframe, 1)
-    return
-  }
+  void refreshPlaybackOutputProfile().then((profile) => {
+    if (payload.state === 'ready') {
+      refreshYoutubeStereoRoute(true)
+      boostYoutubeProxyAudio(iframe, 1, profile)
+      return
+    }
 
-  if (payload.state === 'playing') {
-    refreshYoutubeStereoRoute(true)
-    boostYoutubeProxyAudio(iframe, 1)
-    scheduleYoutubeLoudnessBursts(iframe, 1)
-  }
+    if (payload.state === 'playing') {
+      refreshYoutubeStereoRoute(true)
+      boostYoutubeProxyAudio(iframe, 1, profile)
+      scheduleYoutubeLoudnessBursts(iframe, 1, profile)
+    }
+  })
 }
 
 /** Listen for ready/playing from the Netlify proxy player. */
@@ -157,15 +184,17 @@ export function wakeYoutubeReference(
   registerYoutubeIframe(iframe)
   pendingYoutubeWake = false
 
-  refreshYoutubeStereoRoute(true)
-  boostYoutubeProxyAudio(iframe, uiVolume)
+  void refreshPlaybackOutputProfile().then((profile) => {
+    refreshYoutubeStereoRoute(true)
+    boostYoutubeProxyAudio(iframe, uiVolume, profile)
 
-  if (attemptPlay) {
-    postToYoutubeIframe(iframe, 'playVideo')
-    boostYoutubeProxyAudio(iframe, uiVolume)
-  }
+    if (attemptPlay) {
+      postToYoutubeIframe(iframe, 'playVideo')
+      boostYoutubeProxyAudio(iframe, uiVolume, profile)
+    }
 
-  scheduleYoutubeLoudnessBursts(iframe, uiVolume)
+    scheduleYoutubeLoudnessBursts(iframe, uiVolume, profile)
+  })
 }
 
 /** Retry wake until the proxy player has had time to boot after a paste. */
@@ -206,8 +235,10 @@ export function maintainYoutubeProxyLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  refreshYoutubeStereoRoute(false)
-  boostYoutubeProxyAudio(iframe, uiVolume)
+  void refreshPlaybackOutputProfile().then((profile) => {
+    refreshYoutubeStereoRoute(false)
+    boostYoutubeProxyAudio(iframe, uiVolume, profile)
+  })
 }
 
 export function setYoutubeProxyVolumeFromUi(

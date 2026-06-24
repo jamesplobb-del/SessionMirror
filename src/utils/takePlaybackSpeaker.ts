@@ -18,6 +18,7 @@ import {
   primePlaybackAudioContextSync,
   resumePlaybackAudioContext,
 } from './playbackAudioContext'
+import { subscribePlaybackOutputProfile } from './audioOutputProfile'
 import { effectiveSpeakerGain } from './playbackVolume'
 
 export interface TakeSpeakerPassthrough {
@@ -321,3 +322,15 @@ export function updateTakePlaybackSpeakerGain(
     nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, true)
   }
 }
+
+function refreshAllSpeakerGains(): void {
+  for (const el of routedSpeakerElements) {
+    const nodes = speakerNodesByElement.get(el)
+    if (!nodes) continue
+    nodes.gain.gain.value = effectiveSpeakerGain(1, false, true)
+  }
+}
+
+subscribePlaybackOutputProfile(() => {
+  refreshAllSpeakerGains()
+})

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { metronomeSpeakerGain } from '../utils/playbackVolume'
+import { subscribePlaybackOutputProfile } from '../utils/audioOutputProfile'
 import {
   clampBpm,
   getBeatsPerBar,
@@ -182,6 +183,15 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
 
     master.gain.setValueAtTime(metronomeSpeakerGain(shouldMuteOutput()), ctx.currentTime)
   }, [isTakePlaying, muteDuringPlayback, shouldMuteOutput])
+
+  useEffect(() => {
+    return subscribePlaybackOutputProfile(() => {
+      const ctx = audioCtxRef.current
+      const master = masterGainRef.current
+      if (!ctx || !master || master.context !== ctx) return
+      master.gain.setValueAtTime(metronomeSpeakerGain(shouldMuteOutput()), ctx.currentTime)
+    })
+  }, [shouldMuteOutput])
 
   const persistPrefs = useCallback(
     (nextBpm: number, nextMeter: MetronomeMeter, nextSubdivision: MetronomeSubdivision) => {

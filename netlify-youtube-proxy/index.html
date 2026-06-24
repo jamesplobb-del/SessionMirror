@@ -36,6 +36,8 @@
 
       let ytPlayer = null
       let volumeBoostTimer = null
+      let volumeProfile = 'speaker'
+      let requestedVolume = 100
 
       function notifyParent(state) {
         try {
@@ -48,24 +50,33 @@
         }
       }
 
-      function applyMaxVolume() {
+      function applyVolume() {
         if (!ytPlayer || typeof ytPlayer.unMute !== 'function') return
-        for (let i = 0; i < 8; i++) {
+        const cap = volumeProfile === 'headphones'
+          ? Math.min(100, Math.max(0, requestedVolume))
+          : 100
+        const repeats = volumeProfile === 'headphones' ? 1 : 8
+        for (let i = 0; i < repeats; i++) {
           ytPlayer.unMute()
-          ytPlayer.setVolume(100)
+          ytPlayer.setVolume(cap)
         }
       }
 
       function burstMaxVolume() {
-        applyMaxVolume()
-        window.setTimeout(applyMaxVolume, 60)
-        window.setTimeout(applyMaxVolume, 160)
-        window.setTimeout(applyMaxVolume, 320)
+        if (volumeProfile === 'headphones') {
+          applyVolume()
+          return
+        }
+        applyVolume()
+        window.setTimeout(applyVolume, 60)
+        window.setTimeout(applyVolume, 160)
+        window.setTimeout(applyVolume, 320)
       }
 
       function startVolumeBoostLoop() {
         stopVolumeBoostLoop()
         burstMaxVolume()
+        if (volumeProfile === 'headphones') return
         volumeBoostTimer = window.setInterval(burstMaxVolume, 150)
       }
 
@@ -80,6 +91,9 @@
         if (!ytPlayer) return
         const fn = ytPlayer[func]
         if (typeof fn !== 'function') return
+        if (func === 'setVolume' && Array.isArray(args) && args.length > 0) {
+          requestedVolume = Number(args[0]) || 0
+        }
         fn.apply(ytPlayer, args || [])
         if (func === 'playVideo' || func === 'unMute' || func === 'setVolume') {
           burstMaxVolume()
@@ -95,7 +109,18 @@
             return
           }
         }
-        if (!data || data.event !== 'command' || typeof data.func !== 'string') return
+        if (!data) return
+
+        if (data.event === 'volume-profile') {
+          volumeProfile = data.profile === 'headphones' ? 'headphones' : 'speaker'
+          if (volumeProfile === 'headphones') {
+            stopVolumeBoostLoop()
+          }
+          applyVolume()
+          return
+        }
+
+        if (data.event !== 'command' || typeof data.func !== 'string') return
         invokePlayerCommand(data.func, data.args || [])
       })
 

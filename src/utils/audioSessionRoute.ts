@@ -4,6 +4,7 @@ export interface BestTakeAudioPluginType {
   setHighQualityBluetoothMode(options: { enable: boolean }): Promise<{ success: boolean }>
   enableStereoPlayback(): Promise<void>
   enableRecordingRoute(): Promise<void>
+  getPlaybackOutputProfile(): Promise<{ usesHeadphones: boolean; portType: string }>
 }
 
 const BestTakeAudioPlugin = registerPlugin<BestTakeAudioPluginType>('BestTakeAudioPlugin')

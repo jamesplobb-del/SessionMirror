@@ -93,6 +93,7 @@ import {
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 import BestTakeAudioPlugin, { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
+import { refreshPlaybackOutputProfile } from './utils/audioOutputProfile'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -884,6 +885,7 @@ function StandardApp({
     void (async () => {
       await applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
       if (!Capacitor.isNativePlatform()) return
+      await refreshPlaybackOutputProfile()
       await reacquireStreamForAudioRoute()
     })()
   }, [reacquireStreamForAudioRoute, settings.useIphoneMicForRecording])
