@@ -13,6 +13,7 @@ export function buildYoutubeProxyUrl(videoId: string): string {
     modestbranding: '1',
     rel: '0',
     playsinline: '1',
+    fs: '1',
   })
   return `${YOUTUBE_PROXY_ORIGIN}/?${params.toString()}`
 }

@@ -26,7 +26,7 @@ export default function YoutubeBenchmarkPlayer({
       src={normalizeYoutubeEmbedUrl(embedUrl)}
       className="youtube-embed-iframe h-full w-full border-0"
       referrerPolicy="strict-origin-when-cross-origin"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
       allowFullScreen
       title="YouTube reference"
       onLoad={() => {

@@ -49,7 +49,7 @@ function boostYoutubeProxyAudio(
 ): void {
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) {
     postToYoutubeIframe(iframe, 'unMute')
     postToYoutubeIframe(iframe, 'setVolume', [100])
   }
