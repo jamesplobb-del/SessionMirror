@@ -10,6 +10,12 @@ const config: CapacitorConfig = {
     hostname: 'localhost',
     androidScheme: 'https',
     iosScheme: 'capacitor',
+    allowNavigation: [
+      '*.youtube.com',
+      '*.youtu.be',
+      'stalwart-salamander-9451ab.netlify.app',
+      'singular-manatee-b52df8.netlify.app',
+    ],
   },
   ios: {
     // Edge-to-edge on all iPhones; HUD uses env(safe-area-inset-*) for notch / island / home bar.
