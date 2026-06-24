@@ -6,7 +6,7 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import Pressable from './ui/Pressable'
 import { Capacitor } from '@capacitor/core'
-import AudioSessionPlugin from '../utils/audioSessionRoute'
+import BestTakeAudioPlugin from '../utils/audioSessionRoute'
 import { iosEaseOut, iosScreenEnter, iosScreenExit, motionGpuLayer } from '../utils/motionPresets'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
@@ -374,7 +374,7 @@ export default function ReviewModeOverlay({
       void releaseTakePlaybackAudio()
       pauseAllReviewVideosSafe()
       if (isVault && Capacitor.isNativePlatform()) {
-        void AudioSessionPlugin.enableRecordingRoute()
+        void BestTakeAudioPlugin.enableRecordingRoute()
       }
       window.requestAnimationFrame(() => {
         onClose()
@@ -389,7 +389,7 @@ export default function ReviewModeOverlay({
 
     if (video.paused || video.ended) {
       if (isVault && Capacitor.isNativePlatform()) {
-        void AudioSessionPlugin.enableStereoPlayback()
+        void BestTakeAudioPlugin.enableStereoPlayback()
       }
       revealPlayOverlay(true)
       const started = toggleInlineTakePlayback(video, {
@@ -408,7 +408,7 @@ export default function ReviewModeOverlay({
       }
     } else {
       if (isVault && Capacitor.isNativePlatform()) {
-        void AudioSessionPlugin.enableRecordingRoute()
+        void BestTakeAudioPlugin.enableRecordingRoute()
       }
       toggleInlineTakePlayback(video, {
         onPaused: () => {

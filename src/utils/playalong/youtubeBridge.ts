@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
 import { YOUTUBE_PROXY_ORIGIN } from '../youtubeEmbed'
-import AudioSessionPlugin from '../audioSessionRoute'
+import BestTakeAudioPlugin from '../audioSessionRoute'
 
 const YOUTUBE_BOOST_DELAYS_MS = [
   0, 15, 30, 50, 80, 120, 180, 260, 380, 540, 760, 1100, 1600, 2300, 3200, 4500, 6300, 9000,
@@ -53,7 +53,7 @@ function refreshYoutubeStereoRoute(force = false): void {
   lastStereoRefreshAt = now
 
   youtubeStereoEngaged = true
-  void AudioSessionPlugin.enableStereoPlayback()
+  void BestTakeAudioPlugin.enableStereoPlayback()
 }
 
 export function releaseYoutubeReferenceRoute(): void {
@@ -61,7 +61,7 @@ export function releaseYoutubeReferenceRoute(): void {
   if (!youtubeStereoEngaged) return
   youtubeStereoEngaged = false
   lastStereoRefreshAt = 0
-  void AudioSessionPlugin.enableRecordingRoute()
+  void BestTakeAudioPlugin.enableRecordingRoute()
 }
 
 function cancelScheduledLoudnessWork(): void {

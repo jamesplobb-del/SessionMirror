@@ -92,7 +92,7 @@ import {
   type Project,
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
-import AudioSessionPlugin, { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
+import BestTakeAudioPlugin, { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -1174,7 +1174,7 @@ function StandardApp({
 
   const handleCloseVault = useCallback(() => {
     if (Capacitor.isNativePlatform()) {
-      void AudioSessionPlugin.enableRecordingRoute()
+      void BestTakeAudioPlugin.enableRecordingRoute()
     }
     startTransition(() => {
       setIsVaultOpen(false)
@@ -1690,7 +1690,7 @@ function StandardApp({
     (take: Take) => {
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
       if (Capacitor.isNativePlatform()) {
-        void AudioSessionPlugin.enableStereoPlayback()
+        void BestTakeAudioPlugin.enableStereoPlayback()
       }
       startTransition(() => {
         setVaultReviewIndex(index >= 0 ? index : 0)
@@ -1714,7 +1714,7 @@ function StandardApp({
 
   const handleCloseReview = useCallback(() => {
     if (reviewContext === 'vault' && Capacitor.isNativePlatform()) {
-      void AudioSessionPlugin.enableRecordingRoute()
+      void BestTakeAudioPlugin.enableRecordingRoute()
     }
     startTransition(() => {
       setReviewSlot(null)

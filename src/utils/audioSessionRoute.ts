@@ -1,21 +1,21 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
-export interface AudioSessionPluginType {
-  setUseIphoneMicForRecording(options: { enabled: boolean }): Promise<void>
+export interface BestTakeAudioPluginType {
+  setHighQualityBluetoothMode(options: { enable: boolean }): Promise<{ success: boolean }>
   enableStereoPlayback(): Promise<void>
   enableRecordingRoute(): Promise<void>
 }
 
-const AudioSessionPlugin = registerPlugin<AudioSessionPluginType>('AudioSessionPlugin')
+const BestTakeAudioPlugin = registerPlugin<BestTakeAudioPluginType>('BestTakeAudioPlugin')
 
 /** Route BT headphones for playback while keeping the device built-in mic (A2DP, not HFP). */
 export async function applyUseIphoneMicForRecording(enabled: boolean): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   try {
-    await AudioSessionPlugin.setUseIphoneMicForRecording({ enabled })
+    await BestTakeAudioPlugin.setHighQualityBluetoothMode({ enable: enabled })
   } catch (error) {
-    console.warn('Failed to apply device mic audio route:', error)
+    console.warn('Failed to apply high-quality Bluetooth audio route:', error)
   }
 }
 
-export default AudioSessionPlugin
+export default BestTakeAudioPlugin
