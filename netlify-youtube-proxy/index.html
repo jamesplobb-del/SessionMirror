@@ -37,18 +37,36 @@
       let ytPlayer = null
       let volumeBoostTimer = null
 
+      function notifyParent(state) {
+        try {
+          window.parent.postMessage(
+            JSON.stringify({ event: 'youtube-state', state }),
+            '*',
+          )
+        } catch {
+          // ignore
+        }
+      }
+
       function applyMaxVolume() {
         if (!ytPlayer || typeof ytPlayer.unMute !== 'function') return
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 8; i++) {
           ytPlayer.unMute()
           ytPlayer.setVolume(100)
         }
       }
 
+      function burstMaxVolume() {
+        applyMaxVolume()
+        window.setTimeout(applyMaxVolume, 60)
+        window.setTimeout(applyMaxVolume, 160)
+        window.setTimeout(applyMaxVolume, 320)
+      }
+
       function startVolumeBoostLoop() {
         stopVolumeBoostLoop()
-        applyMaxVolume()
-        volumeBoostTimer = window.setInterval(applyMaxVolume, 300)
+        burstMaxVolume()
+        volumeBoostTimer = window.setInterval(burstMaxVolume, 150)
       }
 
       function stopVolumeBoostLoop() {
@@ -64,7 +82,7 @@
         if (typeof fn !== 'function') return
         fn.apply(ytPlayer, args || [])
         if (func === 'playVideo' || func === 'unMute' || func === 'setVolume') {
-          applyMaxVolume()
+          burstMaxVolume()
         }
       }
 
@@ -99,11 +117,12 @@
           },
           events: {
             onReady() {
-              applyMaxVolume()
+              burstMaxVolume()
             },
             onStateChange(event) {
               const state = event.data
               if (state === YT.PlayerState.PLAYING) {
+                notifyParent('playing')
                 startVolumeBoostLoop()
               } else if (
                 state === YT.PlayerState.PAUSED ||
@@ -112,7 +131,7 @@
               ) {
                 stopVolumeBoostLoop()
                 if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.ENDED) {
-                  applyMaxVolume()
+                  notifyParent('paused')
                 }
               }
             },
