@@ -237,10 +237,10 @@ export default function SettingsDrawer({
             />
 
             <SettingToggle
-              label="Force Headphone Gain (debug)"
-              description="Testing only: apply 6× headphone gain without a confirmed Bluetooth or wired headphone route. Leave off for normal use."
-              checked={settings.forceHeadphoneGain}
-              onChange={(checked) => onUpdate({ forceHeadphoneGain: checked })}
+              label="Bluetooth/Headphone Playback Mode"
+              description="Use the quieter headphone gain path (6×) for Bluetooth or wired headphones. Leave off for normal phone speaker playback (40×). Does not change mic routing."
+              checked={settings.bluetoothHeadphonePlaybackMode}
+              onChange={(checked) => onUpdate({ bluetoothHeadphonePlaybackMode: checked })}
             />
 
             <AnimatedExpand open={settings.autoSoundRecording}>

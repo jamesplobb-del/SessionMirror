@@ -93,7 +93,10 @@ import {
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 import BestTakeAudioPlugin, { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
-import { refreshPlaybackOutputProfile, setForceHeadphoneGainDebug } from './utils/audioOutputProfile'
+import {
+  refreshPlaybackOutputProfile,
+  setBluetoothHeadphonePlaybackMode,
+} from './utils/audioOutputProfile'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -882,8 +885,8 @@ function StandardApp({
   }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
 
   useEffect(() => {
-    setForceHeadphoneGainDebug(settings.forceHeadphoneGain)
-  }, [settings.forceHeadphoneGain])
+    setBluetoothHeadphonePlaybackMode(settings.bluetoothHeadphonePlaybackMode)
+  }, [settings.bluetoothHeadphonePlaybackMode])
 
   useEffect(() => {
     void (async () => {

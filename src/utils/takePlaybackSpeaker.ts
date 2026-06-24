@@ -55,7 +55,9 @@ async function commitSpeakerBusGain(
   muted: boolean,
 ): Promise<void> {
   await ensureFreshPlaybackOutputProfile()
-  gain.gain.value = effectiveSpeakerGain(volume, muted, true)
+  gain.gain.value = effectiveSpeakerGain(volume, muted, true, {
+    enhancerEnabled: enhancerEnabled && Boolean(enhancerSettings),
+  })
 }
 
 /**
@@ -91,7 +93,9 @@ export function setTakePlaybackEnhancerState(
     if (!enhancerEnabled || !enhancerSettings) {
       disconnectEnhancer(nodes)
       ensurePassthroughChain(nodes)
-      nodes.gain.gain.value = effectiveSpeakerGain(1, false, true)
+      nodes.gain.gain.value = effectiveSpeakerGain(1, false, true, {
+        enhancerEnabled: enhancerEnabled && Boolean(enhancerSettings),
+      })
       armPlaybackGraphKeepAlive(el, nodes)
       continue
     }
@@ -99,7 +103,9 @@ export function setTakePlaybackEnhancerState(
     if (nodes.enhancer) {
       updateAudioEnhancerChain(nodes.enhancer, enhancerSettings)
     }
-    nodes.gain.gain.value = effectiveSpeakerGain(1, false, true)
+    nodes.gain.gain.value = effectiveSpeakerGain(1, false, true, {
+      enhancerEnabled: enhancerEnabled && Boolean(enhancerSettings),
+    })
     armPlaybackGraphKeepAlive(el, nodes)
   }
 
@@ -330,7 +336,9 @@ export function updateTakePlaybackSpeakerGain(
 ): void {
   const nodes = speakerNodesByElement.get(el)
   if (nodes) {
-    nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, true)
+    nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, true, {
+      enhancerEnabled: enhancerEnabled && Boolean(enhancerSettings),
+    })
   }
 }
 
@@ -338,7 +346,9 @@ function refreshAllSpeakerGains(): void {
   for (const el of routedSpeakerElements) {
     const nodes = speakerNodesByElement.get(el)
     if (!nodes) continue
-    nodes.gain.gain.value = effectiveSpeakerGain(1, false, true)
+    nodes.gain.gain.value = effectiveSpeakerGain(1, false, true, {
+      enhancerEnabled: enhancerEnabled && Boolean(enhancerSettings),
+    })
   }
 }
 

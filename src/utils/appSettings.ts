@@ -36,8 +36,8 @@ export interface AppSettings {
   excludeYoutubeFromRecording: boolean
   /** Bluetooth headphones for playback, device mic for recording (avoids HFP headset mic). */
   useIphoneMicForRecording: boolean
-  /** Debug: force 6× headphone gain without a confirmed BT/headphone output route. */
-  forceHeadphoneGain: boolean
+  /** User-enabled: use headphone gain tier (6×) for Bluetooth/wired headphone playback. */
+  bluetoothHeadphonePlaybackMode: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -56,7 +56,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
   excludeYoutubeFromRecording: false,
   useIphoneMicForRecording: false,
-  forceHeadphoneGain: false,
+  bluetoothHeadphonePlaybackMode: false,
 }
 
 /** Floating widgets — forced off on each cold app start. */
@@ -142,10 +142,12 @@ export function loadAppSettings(): AppSettings {
         parsed.useIphoneMicForRecording !== undefined
           ? Boolean(parsed.useIphoneMicForRecording)
           : DEFAULT_APP_SETTINGS.useIphoneMicForRecording,
-      forceHeadphoneGain:
-        parsed.forceHeadphoneGain !== undefined
-          ? Boolean(parsed.forceHeadphoneGain)
-          : DEFAULT_APP_SETTINGS.forceHeadphoneGain,
+      bluetoothHeadphonePlaybackMode:
+        parsed.bluetoothHeadphonePlaybackMode !== undefined
+          ? Boolean(parsed.bluetoothHeadphonePlaybackMode)
+          : (parsed as { forceHeadphoneGain?: boolean }).forceHeadphoneGain !== undefined
+            ? Boolean((parsed as { forceHeadphoneGain?: boolean }).forceHeadphoneGain)
+            : DEFAULT_APP_SETTINGS.bluetoothHeadphonePlaybackMode,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

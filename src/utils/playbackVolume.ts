@@ -1,5 +1,8 @@
 import { Capacitor } from '@capacitor/core'
-import { getPlaybackOutputProfile } from './audioOutputProfile'
+import {
+  getPlaybackOutputProfile,
+  isBluetoothHeadphonePlaybackModeEnabled,
+} from './audioOutputProfile'
 
 /** Web Audio speaker-bus multiplier — iOS element routing is much quieter than native. */
 export const PLAYBACK_GAIN_NATIVE_SPEAKER = 40
@@ -7,6 +10,9 @@ export const PLAYBACK_GAIN_NATIVE_HEADPHONES = 6
 export const PLAYBACK_GAIN_WEB = 6
 export const PLAYBACK_GAIN_MAX_SPEAKER = 46
 export const PLAYBACK_GAIN_MAX_HEADPHONES = 10
+
+/** Final-gain cap for explicit Bluetooth/headphone mode when Audio Enhancer is off. */
+const PLAYBACK_GAIN_EXPLICIT_HEADPHONE_SAFE_CAP = 4
 
 /** YouTube IFrame API volume is 0–100; peg non-zero slider values to API max on speaker. */
 export const YOUTUBE_VOLUME_BOOST = 12
@@ -17,11 +23,17 @@ function usesHeadphoneOutput(): boolean {
   return Capacitor.isNativePlatform() && getPlaybackOutputProfile() === 'headphones'
 }
 
+export interface EffectiveSpeakerGainOptions {
+  /** When false/omitted and explicit headphone mode is on, apply conservative safe cap. */
+  enhancerEnabled?: boolean
+}
+
 /** Gain for Web Audio speaker bus. Native-direct playback uses element volume instead. */
 export function effectiveSpeakerGain(
   volume: number,
   muted: boolean,
   forWebAudioBus = true,
+  options: EffectiveSpeakerGainOptions = {},
 ): number {
   if (muted) return 0
   if (!forWebAudioBus) {
@@ -35,7 +47,17 @@ export function effectiveSpeakerGain(
       : PLAYBACK_GAIN_NATIVE_SPEAKER
     : PLAYBACK_GAIN_WEB
   const maxGain = headphones ? PLAYBACK_GAIN_MAX_HEADPHONES : PLAYBACK_GAIN_MAX_SPEAKER
-  return Math.min(Math.max(0, volume) * multiplier, maxGain)
+  let gain = Math.min(Math.max(0, volume) * multiplier, maxGain)
+
+  if (
+    headphones &&
+    isBluetoothHeadphonePlaybackModeEnabled() &&
+    options.enhancerEnabled !== true
+  ) {
+    gain = Math.min(gain, PLAYBACK_GAIN_EXPLICIT_HEADPHONE_SAFE_CAP)
+  }
+
+  return gain
 }
 
 /** Map a 0–1 UI slider to YouTube IFrame API volume (0–100). */
