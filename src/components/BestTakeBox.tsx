@@ -103,7 +103,7 @@ function BestTakeBox({
     maintainYoutubeProxyLoudness(youtubeIframeRef.current, volume)
     const interval = window.setInterval(() => {
       maintainYoutubeProxyLoudness(youtubeIframeRef.current, volume)
-    }, 700)
+    }, 400)
 
     return () => window.clearInterval(interval)
   }, [hasYoutube, isYoutubePlaying, volume, youtubeEmbedUrl, youtubeIframeRef])

@@ -11,6 +11,8 @@ export function buildYoutubeProxyUrl(videoId: string): string {
     iv_load_policy: '3',
     disablekb: '1',
     fs: '0',
+    cc_load_policy: '0',
+    autohide: '1',
   })
   return `${YOUTUBE_PROXY_ORIGIN}/?${params.toString()}`
 }

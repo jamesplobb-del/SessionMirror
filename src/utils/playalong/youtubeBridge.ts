@@ -2,7 +2,9 @@ import { youtubeVolumeFromUiSlider } from '../playbackVolume'
 
 const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 
-const YOUTUBE_BOOST_DELAYS_MS = [0, 60, 120, 240, 450, 750, 1200, 2000, 3200]
+const YOUTUBE_BOOST_DELAYS_MS = [
+  0, 30, 60, 100, 160, 250, 400, 650, 1000, 1500, 2200, 3200, 4500, 6000,
+]
 
 function postToYoutubeIframe(
   iframe: HTMLIFrameElement | null | undefined,
@@ -35,6 +37,8 @@ function boostYoutubeProxyAudio(
 ): void {
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
+  postToYoutubeIframe(iframe, 'unMute')
+  postToYoutubeIframe(iframe, 'setVolume', [100])
   postToYoutubeIframe(iframe, 'setVolume', [100])
 }
 
