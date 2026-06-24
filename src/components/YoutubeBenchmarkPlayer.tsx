@@ -22,7 +22,7 @@ export default function YoutubeBenchmarkPlayer({
     <iframe
       ref={iframeRef}
       src={embedUrl}
-      className="youtube-embed-iframe border-0"
+      className="youtube-embed-iframe h-full w-full border-0"
       referrerPolicy="strict-origin-when-cross-origin"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
       allowFullScreen

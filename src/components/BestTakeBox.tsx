@@ -20,8 +20,6 @@ import {
 import {
   maintainYoutubeProxyLoudness,
   pauseYoutubeProxy,
-  setYoutubeProxyVolumeFromUi,
-  startYoutubeProxyPlayback,
 } from '../utils/playalong/youtubeBridge'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
@@ -76,7 +74,6 @@ function BestTakeBox({
   const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isYoutubePlaying, setIsYoutubePlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
 
@@ -89,24 +86,23 @@ function BestTakeBox({
 
   useEffect(() => {
     setIsPlaying(false)
-    setIsYoutubePlaying(false)
   }, [videoSourceKey, suspendPlayback])
 
   useEffect(() => {
     if (!hasYoutube || !youtubeIframeRef?.current) return
-    setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, volume)
-  }, [hasYoutube, volume, youtubeEmbedUrl, youtubeIframeRef])
 
-  useEffect(() => {
-    if (!hasYoutube || !isYoutubePlaying || !youtubeIframeRef?.current) return
-
-    maintainYoutubeProxyLoudness(youtubeIframeRef.current, volume)
+    maintainYoutubeProxyLoudness(youtubeIframeRef.current, 1)
     const interval = window.setInterval(() => {
-      maintainYoutubeProxyLoudness(youtubeIframeRef.current, volume)
-    }, 400)
+      maintainYoutubeProxyLoudness(youtubeIframeRef.current, 1)
+    }, 300)
 
     return () => window.clearInterval(interval)
-  }, [hasYoutube, isYoutubePlaying, volume, youtubeEmbedUrl, youtubeIframeRef])
+  }, [hasYoutube, youtubeEmbedUrl, youtubeIframeRef])
+
+  useEffect(() => {
+    if (!hasYoutube || !suspendPlayback) return
+    pauseYoutubeProxy(youtubeIframeRef?.current)
+  }, [hasYoutube, suspendPlayback, youtubeEmbedUrl, youtubeIframeRef])
 
   useEffect(() => {
     const media = videoRef.current
@@ -172,36 +168,12 @@ function BestTakeBox({
   const handleVolume = useCallback(
     (value: number) => {
       setVolume(value)
-      if (hasYoutube) {
-        setYoutubeProxyVolumeFromUi(youtubeIframeRef?.current, value)
-        return
-      }
       const video = videoRef.current
       if (!video) return
       video.volume = value
       updateTakePlaybackSpeakerGain(video, value, false)
     },
-    [hasYoutube, videoRef, youtubeIframeRef],
-  )
-
-  const handleYoutubePlayPause = useCallback(
-    (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation()
-      stopEventBubble(event)
-      if (suspendPlayback || !hasYoutube) return
-      const iframe = youtubeIframeRef?.current
-      if (!iframe) return
-
-      if (isYoutubePlaying) {
-        pauseYoutubeProxy(iframe)
-        setIsYoutubePlaying(false)
-        return
-      }
-
-      startYoutubeProxyPlayback(iframe, volume)
-      setIsYoutubePlaying(true)
-    },
-    [hasYoutube, isYoutubePlaying, suspendPlayback, volume, youtubeIframeRef],
+    [videoRef],
   )
 
   const handleFileChange = useCallback(
@@ -318,28 +290,11 @@ function BestTakeBox({
           </span>
 
           {hasYoutube ? (
-            <>
-              <div
-                ref={onYoutubeHostChange}
-                className="youtube-embed-host absolute inset-0 z-[1] overflow-hidden"
-                aria-label="YouTube reference"
-              />
-
-              {!suspendPlayback && (
-                <div
-                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 bg-black/75 px-2 py-1 backdrop-blur-md"
-                  onClick={(e) => e.stopPropagation()}
-                  {...touchBubbleBlockProps()}
-                >
-                  <MiniPipControls
-                    isPlaying={isYoutubePlaying}
-                    volume={volume}
-                    onPlayPauseClick={handleYoutubePlayPause}
-                    onVolumeChange={handleVolume}
-                  />
-                </div>
-              )}
-            </>
+            <div
+              ref={onYoutubeHostChange}
+              className="youtube-embed-host pointer-events-auto absolute inset-0 z-[1] overflow-hidden"
+              aria-label="YouTube reference"
+            />
           ) : hasTake ? (
             <>
               <TakeVideoPlayer

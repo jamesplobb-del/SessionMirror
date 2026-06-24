@@ -3,7 +3,7 @@ import { youtubeVolumeFromUiSlider } from '../playbackVolume'
 const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 
 const YOUTUBE_BOOST_DELAYS_MS = [
-  0, 30, 60, 100, 160, 250, 400, 650, 1000, 1500, 2200, 3200, 4500, 6000,
+  0, 25, 50, 80, 130, 200, 320, 500, 800, 1200, 1800, 2600, 3600, 5000, 7000,
 ]
 
 function postToYoutubeIframe(
@@ -37,9 +37,10 @@ function boostYoutubeProxyAudio(
 ): void {
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-  postToYoutubeIframe(iframe, 'unMute')
-  postToYoutubeIframe(iframe, 'setVolume', [100])
-  postToYoutubeIframe(iframe, 'setVolume', [100])
+  for (let i = 0; i < 4; i++) {
+    postToYoutubeIframe(iframe, 'unMute')
+    postToYoutubeIframe(iframe, 'setVolume', [100])
+  }
 }
 
 /** Play reference audio as loud as the proxy allows — re-applies volume after the embed wakes. */

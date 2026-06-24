@@ -4,15 +4,10 @@ const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
 export function buildYoutubeProxyUrl(videoId: string): string {
   const params = new URLSearchParams({
     v: videoId,
-    controls: '0',
+    controls: '1',
     modestbranding: '1',
     rel: '0',
     playsinline: '1',
-    iv_load_policy: '3',
-    disablekb: '1',
-    fs: '0',
-    cc_load_policy: '0',
-    autohide: '1',
   })
   return `${YOUTUBE_PROXY_ORIGIN}/?${params.toString()}`
 }
