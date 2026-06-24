@@ -1,8 +1,5 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
-import {
-  refreshPlaybackOutputProfile,
-  setPlaybackOutputProfileOverride,
-} from './audioOutputProfile'
+import { refreshPlaybackOutputProfile } from './audioOutputProfile'
 
 export interface AudioRouteSnapshot {
   success?: boolean
@@ -49,10 +46,6 @@ export async function applyUseIphoneMicForRecording(
 ): Promise<AudioRouteSnapshot | null> {
   if (!Capacitor.isNativePlatform()) return null
 
-  if (!enabled) {
-    setPlaybackOutputProfileOverride(null)
-  }
-
   try {
     const snapshot = await BestTakeAudioPlugin.setHighQualityBluetoothMode({ enable: enabled })
     logAudioRoute(enabled ? 'Use device mic ON' : 'Use device mic OFF', snapshot)
@@ -62,21 +55,10 @@ export async function applyUseIphoneMicForRecording(
           `input=${snapshot.inputPort} output=${snapshot.outputPort}`,
       )
     }
-    // Native route is authoritative — use live output profile for gain (40× speaker / 6× BT).
-    setPlaybackOutputProfileOverride(null)
     void refreshPlaybackOutputProfile()
     return snapshot
   } catch (error) {
     console.warn('Failed to apply high-quality Bluetooth audio route:', error)
-    if (enabled) {
-      setPlaybackOutputProfileOverride('headphones')
-      console.info(
-        '[AudioRoute] Native route unavailable, using manual headphones profile override',
-      )
-    } else {
-      setPlaybackOutputProfileOverride(null)
-      void refreshPlaybackOutputProfile()
-    }
     return null
   }
 }

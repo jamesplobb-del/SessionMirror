@@ -236,6 +236,13 @@ export default function SettingsDrawer({
               }}
             />
 
+            <SettingToggle
+              label="Force Headphone Gain (debug)"
+              description="Testing only: apply 6× headphone gain without a confirmed Bluetooth or wired headphone route. Leave off for normal use."
+              checked={settings.forceHeadphoneGain}
+              onChange={(checked) => onUpdate({ forceHeadphoneGain: checked })}
+            />
+
             <AnimatedExpand open={settings.autoSoundRecording}>
               <div className="space-y-3 pl-1 pt-3">
                 {recordingMode !== 'audio' && (

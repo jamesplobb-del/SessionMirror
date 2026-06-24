@@ -1,25 +1,46 @@
 import { Capacitor } from '@capacitor/core'
+import type { AudioRouteSnapshot } from './audioSessionRoute'
 
 export type PlaybackOutputProfile = 'speaker' | 'headphones'
 
 const PROFILE_REFRESH_TIMEOUT_MS = 500
 
+const HEADPHONE_OUTPUT_PORTS = new Set([
+  'BluetoothA2DP',
+  'BluetoothHFP',
+  'BluetoothLE',
+  'Headphones',
+  'HeadsetMic',
+  'AirPlay',
+])
+
 let cachedProfile: PlaybackOutputProfile = 'speaker'
-let manualOutputProfileOverride: PlaybackOutputProfile | null = null
+let forceHeadphoneGainDebug = false
 let refreshInFlight: Promise<PlaybackOutputProfile> | null = null
 let routeListenerInstalled = false
 const listeners = new Set<(profile: PlaybackOutputProfile) => void>()
 
-export function getPlaybackOutputProfile(): PlaybackOutputProfile {
-  return manualOutputProfileOverride ?? cachedProfile
+/** Debug-only: force 6× headphone gain without a confirmed output route. */
+export function setForceHeadphoneGainDebug(enabled: boolean): void {
+  if (forceHeadphoneGainDebug === enabled) return
+  forceHeadphoneGainDebug = enabled
+  notifyProfileChange(getPlaybackOutputProfile())
 }
 
-export function setPlaybackOutputProfileOverride(
-  profile: PlaybackOutputProfile | null,
-): void {
-  if (manualOutputProfileOverride === profile) return
-  manualOutputProfileOverride = profile
-  notifyProfileChange(getPlaybackOutputProfile())
+export function isForceHeadphoneGainDebugEnabled(): boolean {
+  return forceHeadphoneGainDebug
+}
+
+export function isConfirmedHeadphoneOutput(snapshot: AudioRouteSnapshot): boolean {
+  if (snapshot.usesHeadphones) return true
+  if (snapshot.usesA2DPOutput || snapshot.usesBluetoothOutput) return true
+  const outputPort = snapshot.outputPort ?? ''
+  return HEADPHONE_OUTPUT_PORTS.has(outputPort)
+}
+
+export function getPlaybackOutputProfile(): PlaybackOutputProfile {
+  if (forceHeadphoneGainDebug) return 'headphones'
+  return cachedProfile
 }
 
 export function subscribePlaybackOutputProfile(
@@ -47,26 +68,25 @@ function startProfileRefresh(): Promise<PlaybackOutputProfile> {
 /** Read iOS AVAudioSession route and cache speaker vs headphones profile. */
 export async function refreshPlaybackOutputProfile(): Promise<PlaybackOutputProfile> {
   if (!Capacitor.isNativePlatform()) {
-    if (!manualOutputProfileOverride) {
-      cachedProfile = 'speaker'
-    }
+    cachedProfile = 'speaker'
     return getPlaybackOutputProfile()
   }
 
   try {
     const { default: BestTakeAudioPlugin } = await import('./audioSessionRoute')
     const snapshot = await BestTakeAudioPlugin.getPlaybackOutputProfile()
-    const { usesHeadphones } = snapshot
     const previous = cachedProfile
+    const next: PlaybackOutputProfile = isConfirmedHeadphoneOutput(snapshot)
+      ? 'headphones'
+      : 'speaker'
     console.info(
       '[AudioRoute] refresh profile',
       `input=${snapshot.inputPort}`,
       `output=${snapshot.outputPort}`,
       `splitRoute=${snapshot.splitRouteAchieved}`,
-      `usesHeadphones=${usesHeadphones}`,
+      `usesHeadphones=${snapshot.usesHeadphones}`,
       `cachedBefore=${previous}`,
     )
-    const next: PlaybackOutputProfile = usesHeadphones ? 'headphones' : 'speaker'
     if (next !== cachedProfile) {
       cachedProfile = next
       notifyProfileChange(getPlaybackOutputProfile())
