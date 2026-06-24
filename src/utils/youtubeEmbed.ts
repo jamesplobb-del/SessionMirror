@@ -1,4 +1,20 @@
-const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
+const LEGACY_NETLIFY_PROXY = 'https://singular-manatee-b52df8.netlify.app'
+
+/** Bundled page with YouTube IFrame API — volume commands work on the same origin. */
+export const YOUTUBE_PROXY_PATH = '/youtube-proxy/'
+
+export function resolveYoutubeProxyOrigin(
+  iframe: HTMLIFrameElement | null | undefined,
+): string {
+  if (iframe?.src) {
+    try {
+      return new URL(iframe.src, window.location.href).origin
+    } catch {
+      // fall through
+    }
+  }
+  return window.location.origin
+}
 
 /** Build the Capacitor-safe proxy iframe URL for a YouTube video ID. */
 export function buildYoutubeProxyUrl(videoId: string): string {
@@ -9,7 +25,7 @@ export function buildYoutubeProxyUrl(videoId: string): string {
     rel: '0',
     playsinline: '1',
   })
-  return `${YOUTUBE_PROXY_ORIGIN}/?${params.toString()}`
+  return `${YOUTUBE_PROXY_PATH}?${params.toString()}`
 }
 
 /** Extract a YouTube video ID from a pasted URL or raw ID. */
@@ -24,8 +40,13 @@ export function parseYoutubeVideoId(input: string): string | null {
   try {
     const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
     const host = url.hostname.replace(/^www\./, '')
+    const path = url.pathname.replace(/\/+$/, '')
 
-    if (host === 'singular-manatee-b52df8.netlify.app') {
+    if (
+      host === 'singular-manatee-b52df8.netlify.app' ||
+      path === '/youtube-proxy' ||
+      path.endsWith('/youtube-proxy')
+    ) {
       const fromQuery = url.searchParams.get('v')
       return fromQuery && /^[\w-]{11}$/.test(fromQuery) ? fromQuery : null
     }
@@ -63,4 +84,11 @@ export function parseYoutubeVideoId(input: string): string | null {
 export function parseYoutubeEmbedUrl(input: string): string | null {
   const videoId = parseYoutubeVideoId(input)
   return videoId ? buildYoutubeProxyUrl(videoId) : null
+}
+
+/** Upgrade a saved Netlify proxy URL to the bundled proxy page. */
+export function normalizeYoutubeEmbedUrl(embedUrl: string): string {
+  if (!embedUrl.includes(LEGACY_NETLIFY_PROXY)) return embedUrl
+  const videoId = parseYoutubeVideoId(embedUrl)
+  return videoId ? buildYoutubeProxyUrl(videoId) : embedUrl
 }

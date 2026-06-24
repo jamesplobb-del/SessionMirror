@@ -1,10 +1,22 @@
+import { Capacitor } from '@capacitor/core'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
-
-const YOUTUBE_PROXY_ORIGIN = 'https://singular-manatee-b52df8.netlify.app'
+import { resolveYoutubeProxyOrigin } from '../youtubeEmbed'
+import AudioSessionPlugin from '../audioSessionRoute'
 
 const YOUTUBE_BOOST_DELAYS_MS = [
   0, 25, 50, 80, 130, 200, 320, 500, 800, 1200, 1800, 2600, 3600, 5000, 7000,
 ]
+
+let youtubeStereoEngaged = false
+let mayUseYoutubeStereoRoute: () => boolean = () => true
+
+/**
+ * Optional guard — e.g. skip stereo while recording or during hands-free auto-playback.
+ * Call from App once; defaults to allowing stereo.
+ */
+export function registerYoutubeStereoGuard(guard: () => boolean): void {
+  mayUseYoutubeStereoRoute = guard
+}
 
 function postToYoutubeIframe(
   iframe: HTMLIFrameElement | null | undefined,
@@ -14,17 +26,35 @@ function postToYoutubeIframe(
   if (!iframe?.contentWindow) return
   iframe.contentWindow.postMessage(
     JSON.stringify({ event: 'command', func, args }),
-    YOUTUBE_PROXY_ORIGIN,
+    resolveYoutubeProxyOrigin(iframe),
   )
+}
+
+/** One-shot iOS stereo route — only on explicit play, never in the loudness loop. */
+function engageYoutubeStereoOnce(): void {
+  if (!Capacitor.isNativePlatform()) return
+  if (!mayUseYoutubeStereoRoute()) return
+  if (youtubeStereoEngaged) return
+  youtubeStereoEngaged = true
+  void AudioSessionPlugin.enableStereoPlayback()
+}
+
+function releaseYoutubeStereoOnce(): void {
+  if (!Capacitor.isNativePlatform()) return
+  if (!youtubeStereoEngaged) return
+  youtubeStereoEngaged = false
+  void AudioSessionPlugin.enableRecordingRoute()
 }
 
 /** Start proxy playback — call synchronously inside a user gesture when possible. */
 export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
   postToYoutubeIframe(iframe, 'playVideo')
+  engageYoutubeStereoOnce()
 }
 
 export function pauseYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
   postToYoutubeIframe(iframe, 'pauseVideo')
+  releaseYoutubeStereoOnce()
 }
 
 export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
@@ -58,7 +88,7 @@ export function startYoutubeProxyPlayback(
   }
 }
 
-/** Re-assert max proxy volume while YouTube is playing (API-only — no audio session switch). */
+/** Re-assert max proxy volume while YouTube is playing — API only, no audio session switch. */
 export function maintainYoutubeProxyLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,

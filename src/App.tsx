@@ -50,6 +50,7 @@ import {
 import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from './utils/takes'
 import {
   pauseYoutubeProxy,
+  registerYoutubeStereoGuard,
   startYoutubeProxyPlayback,
 } from './utils/playalong/youtubeBridge'
 import {
@@ -862,6 +863,15 @@ function StandardApp({
     onBeforeForegroundRestart: pauseYoutubeReference,
     onAfterForegroundRestart: resumeYoutubeReference,
   })
+
+  useEffect(() => {
+    registerYoutubeStereoGuard(
+      () =>
+        !isRecording &&
+        !autoPlaybackPlaying &&
+        !handsFreePlaybackPending,
+    )
+  }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
 
   useEffect(() => {
     if (recordingMode !== 'video') return
