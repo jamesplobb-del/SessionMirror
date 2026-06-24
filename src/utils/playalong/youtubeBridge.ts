@@ -9,6 +9,8 @@ const YOUTUBE_BOOST_DELAYS_MS = [
 
 const YOUTUBE_WAKE_RETRY_MS = [0, 200, 450, 900, 1600, 2800, 4500]
 
+const STEREO_REFRESH_MIN_MS = 750
+
 let youtubeStereoEngaged = false
 let mayUseYoutubeStereoRoute: () => boolean = () => true
 let playbackListenerInstalled = false
@@ -16,10 +18,17 @@ let activeYoutubeIframe: HTMLIFrameElement | null = null
 let loudnessBurstGeneration = 0
 let wakeRetryGeneration = 0
 let pendingYoutubeWake = false
+let lastStereoRefreshAt = 0
 
 /** Skip stereo while recording or during hands-free auto-playback. */
 export function registerYoutubeStereoGuard(guard: () => boolean): void {
   mayUseYoutubeStereoRoute = guard
+}
+
+export function setYoutubeReferenceActive(active: boolean): void {
+  if (!active) {
+    releaseYoutubeReferenceRoute()
+  }
 }
 
 function postToYoutubeIframe(
@@ -34,23 +43,24 @@ function postToYoutubeIframe(
   )
 }
 
-function engageYoutubeStereoForReference(force = false): void {
+/** Re-apply iOS stereo playback — iOS can silently revert to playAndRecord. */
+function refreshYoutubeStereoRoute(force = false): void {
   if (!Capacitor.isNativePlatform()) return
   if (!mayUseYoutubeStereoRoute()) return
-  if (!force && youtubeStereoEngaged) return
+
+  const now = Date.now()
+  if (!force && now - lastStereoRefreshAt < STEREO_REFRESH_MIN_MS) return
+  lastStereoRefreshAt = now
 
   youtubeStereoEngaged = true
   void AudioSessionPlugin.enableStereoPlayback()
-  window.setTimeout(() => {
-    if (!youtubeStereoEngaged) return
-    void AudioSessionPlugin.enableStereoPlayback()
-  }, 150)
 }
 
 export function releaseYoutubeReferenceRoute(): void {
   if (!Capacitor.isNativePlatform()) return
   if (!youtubeStereoEngaged) return
   youtubeStereoEngaged = false
+  lastStereoRefreshAt = 0
   void AudioSessionPlugin.enableRecordingRoute()
 }
 
@@ -114,13 +124,13 @@ function handleProxyPlaybackMessage(data: unknown): void {
   if (!iframe) return
 
   if (payload.state === 'ready') {
-    engageYoutubeStereoForReference(true)
+    refreshYoutubeStereoRoute(true)
     boostYoutubeProxyAudio(iframe, 1)
     return
   }
 
   if (payload.state === 'playing') {
-    engageYoutubeStereoForReference(true)
+    refreshYoutubeStereoRoute(true)
     boostYoutubeProxyAudio(iframe, 1)
     scheduleYoutubeLoudnessBursts(iframe, 1)
   }
@@ -147,7 +157,7 @@ export function wakeYoutubeReference(
   registerYoutubeIframe(iframe)
   pendingYoutubeWake = false
 
-  engageYoutubeStereoForReference(true)
+  refreshYoutubeStereoRoute(true)
   boostYoutubeProxyAudio(iframe, uiVolume)
 
   if (attemptPlay) {
@@ -169,14 +179,6 @@ export function scheduleYoutubeReferenceWake(
       wakeYoutubeReference(iframe)
     }, delay)
   }
-}
-
-/** @deprecated Use wakeYoutubeReference */
-export function primeYoutubeReferenceLoudness(
-  iframe: HTMLIFrameElement | null | undefined,
-  uiVolume = 1,
-): void {
-  wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume })
 }
 
 export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
@@ -204,7 +206,7 @@ export function maintainYoutubeProxyLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  engageYoutubeStereoForReference(false)
+  refreshYoutubeStereoRoute(false)
   boostYoutubeProxyAudio(iframe, uiVolume)
 }
 

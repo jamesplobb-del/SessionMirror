@@ -52,6 +52,7 @@ import {
   pauseYoutubeProxy,
   prepareNewYoutubeReference,
   registerYoutubeStereoGuard,
+  setYoutubeReferenceActive,
   startYoutubeProxyPlayback,
 } from './utils/playalong/youtubeBridge'
 import {
@@ -824,6 +825,10 @@ function StandardApp({
   }, [])
 
   youtubeUrlRef.current = youtubeUrl
+
+  useEffect(() => {
+    setYoutubeReferenceActive(Boolean(youtubeUrl))
+  }, [youtubeUrl])
 
   const handleYoutubeHostChange = useCallback((el: HTMLDivElement | null) => {
     setYoutubeHostEl(el)
