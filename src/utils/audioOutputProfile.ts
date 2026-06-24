@@ -1,17 +1,25 @@
 import { Capacitor } from '@capacitor/core'
-import BestTakeAudioPlugin from './audioSessionRoute'
 
 export type PlaybackOutputProfile = 'speaker' | 'headphones'
 
 const PROFILE_REFRESH_TIMEOUT_MS = 500
 
 let cachedProfile: PlaybackOutputProfile = 'speaker'
+let manualOutputProfileOverride: PlaybackOutputProfile | null = null
 let refreshInFlight: Promise<PlaybackOutputProfile> | null = null
 let routeListenerInstalled = false
 const listeners = new Set<(profile: PlaybackOutputProfile) => void>()
 
 export function getPlaybackOutputProfile(): PlaybackOutputProfile {
-  return cachedProfile
+  return manualOutputProfileOverride ?? cachedProfile
+}
+
+export function setPlaybackOutputProfileOverride(
+  profile: PlaybackOutputProfile | null,
+): void {
+  if (manualOutputProfileOverride === profile) return
+  manualOutputProfileOverride = profile
+  notifyProfileChange(getPlaybackOutputProfile())
 }
 
 export function subscribePlaybackOutputProfile(
@@ -39,11 +47,14 @@ function startProfileRefresh(): Promise<PlaybackOutputProfile> {
 /** Read iOS AVAudioSession route and cache speaker vs headphones profile. */
 export async function refreshPlaybackOutputProfile(): Promise<PlaybackOutputProfile> {
   if (!Capacitor.isNativePlatform()) {
-    cachedProfile = 'speaker'
-    return cachedProfile
+    if (!manualOutputProfileOverride) {
+      cachedProfile = 'speaker'
+    }
+    return getPlaybackOutputProfile()
   }
 
   try {
+    const { default: BestTakeAudioPlugin } = await import('./audioSessionRoute')
     const snapshot = await BestTakeAudioPlugin.getPlaybackOutputProfile()
     const { usesHeadphones } = snapshot
     const previous = cachedProfile
@@ -58,7 +69,7 @@ export async function refreshPlaybackOutputProfile(): Promise<PlaybackOutputProf
     const next: PlaybackOutputProfile = usesHeadphones ? 'headphones' : 'speaker'
     if (next !== cachedProfile) {
       cachedProfile = next
-      notifyProfileChange(cachedProfile)
+      notifyProfileChange(getPlaybackOutputProfile())
       console.info('[AudioRoute] profile cache updated', `${previous} → ${cachedProfile}`)
     } else {
       console.info('[AudioRoute] profile cache unchanged', cachedProfile)
@@ -67,7 +78,7 @@ export async function refreshPlaybackOutputProfile(): Promise<PlaybackOutputProf
     console.warn('Failed to read playback output profile:', error)
   }
 
-  return cachedProfile
+  return getPlaybackOutputProfile()
 }
 
 /**
@@ -100,8 +111,10 @@ export function installPlaybackOutputProfileRouteListener(): void {
   if (routeListenerInstalled || !Capacitor.isNativePlatform()) return
   routeListenerInstalled = true
 
-  void BestTakeAudioPlugin.addListener('audioRouteChanged', () => {
-    console.info('[AudioRoute] native route change event')
-    void refreshPlaybackOutputProfile()
+  void import('./audioSessionRoute').then(({ default: BestTakeAudioPlugin }) => {
+    void BestTakeAudioPlugin.addListener('audioRouteChanged', () => {
+      console.info('[AudioRoute] native route change event')
+      void refreshPlaybackOutputProfile()
+    })
   })
 }
