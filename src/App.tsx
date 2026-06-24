@@ -49,7 +49,10 @@ import {
 } from './utils/prepareTakeVideoExport'
 import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from './utils/takes'
 import {
+  ensureYoutubeProxyRouteListener,
   pauseYoutubeProxy,
+  registerYoutubeRouteGuards,
+  releaseYoutubeStereoRoute,
   startYoutubeProxyPlayback,
 } from './utils/playalong/youtubeBridge'
 import {
@@ -813,6 +816,10 @@ function StandardApp({
 
   youtubeUrlRef.current = youtubeUrl
 
+  useEffect(() => {
+    ensureYoutubeProxyRouteListener()
+  }, [])
+
   const handleYoutubeHostChange = useCallback((el: HTMLDivElement | null) => {
     setYoutubeHostEl(el)
   }, [])
@@ -852,6 +859,20 @@ function StandardApp({
     onBeforeForegroundRestart: pauseYoutubeReference,
     onAfterForegroundRestart: resumeYoutubeReference,
   })
+
+  useEffect(() => {
+    registerYoutubeRouteGuards(
+      () =>
+        !isRecording &&
+        !autoPlaybackPlaying &&
+        !handsFreePlaybackPending,
+    )
+  }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
+
+  useEffect(() => {
+    if (!isRecording) return
+    releaseYoutubeStereoRoute()
+  }, [isRecording])
 
   useEffect(() => {
     if (recordingMode !== 'video') return

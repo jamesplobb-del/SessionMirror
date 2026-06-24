@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>YouTube Reference</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+      #player {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="player"></div>
+    <script>
+      const params = new URLSearchParams(window.location.search)
+      const videoId = params.get('v')
+      const controls = params.get('controls') === '0' ? 0 : 1
+      const modestbranding = params.get('modestbranding') === '0' ? 0 : 1
+      const rel = params.get('rel') === '1' ? 1 : 0
+      const playsinline = params.get('playsinline') === '0' ? 0 : 1
+
+      let ytPlayer = null
+
+      function notifyParent(state) {
+        try {
+          window.parent.postMessage(
+            JSON.stringify({ event: 'youtube-state', state }),
+            '*',
+          )
+        } catch {
+          // ignore
+        }
+      }
+
+      function applyMaxVolume() {
+        if (!ytPlayer || typeof ytPlayer.unMute !== 'function') return
+        ytPlayer.unMute()
+        ytPlayer.setVolume(100)
+      }
+
+      function invokePlayerCommand(func, args) {
+        if (!ytPlayer) return
+        const fn = ytPlayer[func]
+        if (typeof fn !== 'function') return
+        fn.apply(ytPlayer, args || [])
+        if (func === 'playVideo' || func === 'unMute' || func === 'setVolume') {
+          applyMaxVolume()
+        }
+      }
+
+      window.addEventListener('message', (event) => {
+        let data = event.data
+        if (typeof data === 'string') {
+          try {
+            data = JSON.parse(data)
+          } catch {
+            return
+          }
+        }
+        if (!data || data.event !== 'command' || typeof data.func !== 'string') return
+        invokePlayerCommand(data.func, data.args || [])
+      })
+
+      function onYouTubeIframeAPIReady() {
+        if (!videoId) return
+
+        ytPlayer = new YT.Player('player', {
+          videoId,
+          playerVars: {
+            autoplay: 0,
+            controls,
+            modestbranding,
+            rel,
+            playsinline,
+            enablejsapi: 1,
+            origin: window.location.origin,
+            fs: 0,
+            iv_load_policy: 3,
+          },
+          events: {
+            onReady() {
+              applyMaxVolume()
+            },
+            onStateChange(event) {
+              const state = event.data
+              if (state === YT.PlayerState.PLAYING) {
+                applyMaxVolume()
+                notifyParent('playing')
+              } else if (
+                state === YT.PlayerState.PAUSED ||
+                state === YT.PlayerState.ENDED ||
+                state === YT.PlayerState.CUED
+              ) {
+                notifyParent('paused')
+              }
+            },
+          },
+        })
+      }
+
+      const tag = document.createElement('script')
+      tag.src = 'https://www.youtube.com/iframe_api'
+      document.head.appendChild(tag)
+    </script>
+  </body>
+</html>
