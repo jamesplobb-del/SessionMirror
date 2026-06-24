@@ -31,7 +31,14 @@ export async function refreshPlaybackOutputProfile(): Promise<PlaybackOutputProf
   }
 
   try {
-    const { usesHeadphones } = await BestTakeAudioPlugin.getPlaybackOutputProfile()
+    const snapshot = await BestTakeAudioPlugin.getPlaybackOutputProfile()
+    const { usesHeadphones } = snapshot
+    console.info(
+      '[AudioRoute] refresh profile',
+      `input=${snapshot.inputPort}`,
+      `output=${snapshot.outputPort}`,
+      `splitRoute=${snapshot.splitRouteAchieved}`,
+    )
     const next: PlaybackOutputProfile = usesHeadphones ? 'headphones' : 'speaker'
     if (next !== cachedProfile) {
       cachedProfile = next
