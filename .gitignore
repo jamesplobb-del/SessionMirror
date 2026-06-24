@@ -1,7 +1,11 @@
 node_modules
 dist
-ios
 android
+# iOS — commit native project + custom plugins; ignore cap sync build output
+ios/App/App/public/
+ios/App/Pods/
+ios/capacitor-cordova-ios-plugins/
+ios/**/DerivedData/
 .DS_Store
 *.local
 .env
