@@ -24,7 +24,46 @@ export interface BestTakeAudioPluginType {
   ): Promise<PluginListenerHandle>
 }
 
-const BestTakeAudioPlugin = registerPlugin<BestTakeAudioPluginType>('BestTakeAudioPlugin')
+const PLUGIN_NAME = 'BestTakeAudioPlugin'
+
+function bestTakeNativeBridge() {
+  return Capacitor as typeof Capacitor & {
+    nativePromise: <O, T>(pluginName: string, method: string, opts?: O) => Promise<T>
+    nativeCallback: <O>(
+      pluginName: string,
+      method: string,
+      opts: O,
+      callback: (data: AudioRouteSnapshot) => void,
+    ) => string
+  }
+}
+
+/**
+ * iOS fallback: @capacitor/core throws UNIMPLEMENTED when PluginHeaders lacks this
+ * plugin at registerPlugin() time. nativePromise still reaches the native bridge once
+ * registerPluginInstance() has run in PortraitBridgeViewController.capacitorDidLoad().
+ */
+const iosBestTakeAudioPlugin: BestTakeAudioPluginType = {
+  setHighQualityBluetoothMode: (options) =>
+    bestTakeNativeBridge().nativePromise(PLUGIN_NAME, 'setHighQualityBluetoothMode', options),
+  enableStereoPlayback: () => bestTakeNativeBridge().nativePromise(PLUGIN_NAME, 'enableStereoPlayback'),
+  enableRecordingRoute: () => bestTakeNativeBridge().nativePromise(PLUGIN_NAME, 'enableRecordingRoute'),
+  getPlaybackOutputProfile: () =>
+    bestTakeNativeBridge().nativePromise(PLUGIN_NAME, 'getPlaybackOutputProfile'),
+  addListener: (eventName, listenerFunc) => {
+    const cap = bestTakeNativeBridge()
+    const callbackId = cap.nativeCallback(PLUGIN_NAME, 'addListener', { eventName }, listenerFunc)
+    const handle = Promise.resolve({
+      remove: async () => {
+        await cap.nativePromise(PLUGIN_NAME, 'removeListener', { eventName, callbackId })
+      },
+    })
+    return handle
+  },
+}
+const BestTakeAudioPlugin = registerPlugin<BestTakeAudioPluginType>(PLUGIN_NAME, {
+  ios: iosBestTakeAudioPlugin,
+})
 
 function logAudioRoute(label: string, snapshot: AudioRouteSnapshot): void {
   console.info(
