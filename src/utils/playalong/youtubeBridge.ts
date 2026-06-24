@@ -7,9 +7,15 @@ const YOUTUBE_BOOST_DELAYS_MS = [
   0, 15, 30, 50, 80, 120, 180, 260, 380, 540, 760, 1100, 1600, 2300, 3200, 4500, 6300, 9000,
 ]
 
+const YOUTUBE_WAKE_RETRY_MS = [0, 200, 450, 900, 1600, 2800, 4500]
+
 let youtubeStereoEngaged = false
 let mayUseYoutubeStereoRoute: () => boolean = () => true
 let playbackListenerInstalled = false
+let activeYoutubeIframe: HTMLIFrameElement | null = null
+let loudnessBurstGeneration = 0
+let wakeRetryGeneration = 0
+let pendingYoutubeWake = false
 
 /** Skip stereo while recording or during hands-free auto-playback. */
 export function registerYoutubeStereoGuard(guard: () => boolean): void {
@@ -28,11 +34,11 @@ function postToYoutubeIframe(
   )
 }
 
-/** One-shot iOS stereo — idempotent, never thrashes the session. */
-function engageYoutubeStereoOnce(): void {
+function engageYoutubeStereoForReference(force = false): void {
   if (!Capacitor.isNativePlatform()) return
   if (!mayUseYoutubeStereoRoute()) return
-  if (youtubeStereoEngaged) return
+  if (!force && youtubeStereoEngaged) return
+
   youtubeStereoEngaged = true
   void AudioSessionPlugin.enableStereoPlayback()
   window.setTimeout(() => {
@@ -48,33 +54,31 @@ export function releaseYoutubeReferenceRoute(): void {
   void AudioSessionPlugin.enableRecordingRoute()
 }
 
-function handleProxyPlaybackMessage(data: unknown): void {
-  if (typeof data !== 'string') return
-  let payload: { event?: string; state?: string }
-  try {
-    payload = JSON.parse(data)
-  } catch {
-    return
-  }
-  if (payload.event !== 'youtube-state') return
-  if (payload.state === 'playing') {
-    engageYoutubeStereoOnce()
-  }
+function cancelScheduledLoudnessWork(): void {
+  loudnessBurstGeneration += 1
+  wakeRetryGeneration += 1
 }
 
-/** Engage stereo when the user hits play on native YouTube controls. */
-export function ensureYoutubePlaybackListener(): void {
-  if (playbackListenerInstalled) return
-  playbackListenerInstalled = true
-  window.addEventListener('message', (event) => {
-    handleProxyPlaybackMessage(event.data)
-  })
+/** Reset audio state when swapping or clearing a YouTube reference. */
+export function prepareNewYoutubeReference(): void {
+  cancelScheduledLoudnessWork()
+  releaseYoutubeReferenceRoute()
+  pendingYoutubeWake = true
+  activeYoutubeIframe = null
+}
+
+export function registerYoutubeIframe(iframe: HTMLIFrameElement | null | undefined): void {
+  activeYoutubeIframe = iframe ?? null
+  if (pendingYoutubeWake && iframe) {
+    wakeYoutubeReference(iframe)
+  }
 }
 
 function boostYoutubeProxyAudio(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,
 ): void {
+  if (!iframe) return
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
   for (let i = 0; i < 16; i++) {
@@ -87,29 +91,96 @@ function scheduleYoutubeLoudnessBursts(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,
 ): void {
+  const generation = loudnessBurstGeneration
   for (const delay of YOUTUBE_BOOST_DELAYS_MS) {
     window.setTimeout(() => {
+      if (generation !== loudnessBurstGeneration) return
       boostYoutubeProxyAudio(iframe, uiVolume)
     }, delay)
   }
 }
 
-/** Prime loud reference audio as soon as the proxy iframe is ready. */
+function handleProxyPlaybackMessage(data: unknown): void {
+  if (typeof data !== 'string') return
+  let payload: { event?: string; state?: string }
+  try {
+    payload = JSON.parse(data)
+  } catch {
+    return
+  }
+  if (payload.event !== 'youtube-state') return
+
+  const iframe = activeYoutubeIframe
+  if (!iframe) return
+
+  if (payload.state === 'ready') {
+    engageYoutubeStereoForReference(true)
+    boostYoutubeProxyAudio(iframe, 1)
+    return
+  }
+
+  if (payload.state === 'playing') {
+    engageYoutubeStereoForReference(true)
+    boostYoutubeProxyAudio(iframe, 1)
+    scheduleYoutubeLoudnessBursts(iframe, 1)
+  }
+}
+
+/** Listen for ready/playing from the Netlify proxy player. */
+export function ensureYoutubePlaybackListener(): void {
+  if (playbackListenerInstalled) return
+  playbackListenerInstalled = true
+  window.addEventListener('message', (event) => {
+    handleProxyPlaybackMessage(event.data)
+  })
+}
+
+/** Wake loud reference audio — works for autoplay, paste, and manual play. */
+export function wakeYoutubeReference(
+  iframe: HTMLIFrameElement | null | undefined,
+  options: { attemptPlay?: boolean; uiVolume?: number } = {},
+): void {
+  const { attemptPlay = true, uiVolume = 1 } = options
+  if (!iframe) return
+
+  ensureYoutubePlaybackListener()
+  registerYoutubeIframe(iframe)
+  pendingYoutubeWake = false
+
+  engageYoutubeStereoForReference(true)
+  boostYoutubeProxyAudio(iframe, uiVolume)
+
+  if (attemptPlay) {
+    postToYoutubeIframe(iframe, 'playVideo')
+    boostYoutubeProxyAudio(iframe, uiVolume)
+  }
+
+  scheduleYoutubeLoudnessBursts(iframe, uiVolume)
+}
+
+/** Retry wake until the proxy player has had time to boot after a paste. */
+export function scheduleYoutubeReferenceWake(
+  iframe: HTMLIFrameElement | null | undefined,
+): void {
+  const generation = wakeRetryGeneration
+  for (const delay of YOUTUBE_WAKE_RETRY_MS) {
+    window.setTimeout(() => {
+      if (generation !== wakeRetryGeneration) return
+      wakeYoutubeReference(iframe)
+    }, delay)
+  }
+}
+
+/** @deprecated Use wakeYoutubeReference */
 export function primeYoutubeReferenceLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  ensureYoutubePlaybackListener()
-  engageYoutubeStereoOnce()
-  boostYoutubeProxyAudio(iframe, uiVolume)
-  scheduleYoutubeLoudnessBursts(iframe, uiVolume)
+  wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume })
 }
 
-/** Start proxy playback — call synchronously inside a user gesture when possible. */
 export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
-  engageYoutubeStereoOnce()
-  postToYoutubeIframe(iframe, 'playVideo')
-  boostYoutubeProxyAudio(iframe, 1)
+  wakeYoutubeReference(iframe, { attemptPlay: true })
 }
 
 export function pauseYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
@@ -121,25 +192,22 @@ export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined)
   postToYoutubeIframe(iframe, 'unMute')
 }
 
-/** Play reference audio as loud as possible on native + proxy. */
 export function startYoutubeProxyPlayback(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  primeYoutubeReferenceLoudness(iframe, uiVolume)
-  playYoutubeProxy(iframe)
+  wakeYoutubeReference(iframe, { attemptPlay: true, uiVolume })
+  scheduleYoutubeReferenceWake(iframe)
 }
 
-/** Re-assert max volume while YouTube reference is visible (no session thrash). */
 export function maintainYoutubeProxyLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  engageYoutubeStereoOnce()
+  engageYoutubeStereoForReference(false)
   boostYoutubeProxyAudio(iframe, uiVolume)
 }
 
-/** Volume from a 0–1 UI slider — always API max when non-zero. */
 export function setYoutubeProxyVolumeFromUi(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,

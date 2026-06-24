@@ -1,7 +1,11 @@
 import { useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { normalizeYoutubeEmbedUrl } from '../utils/youtubeEmbed'
-import { primeYoutubeReferenceLoudness } from '../utils/playalong/youtubeBridge'
+import {
+  registerYoutubeIframe,
+  scheduleYoutubeReferenceWake,
+  wakeYoutubeReference,
+} from '../utils/playalong/youtubeBridge'
 
 interface YoutubeBenchmarkPlayerProps {
   embedUrl: string
@@ -19,18 +23,23 @@ export default function YoutubeBenchmarkPlayer({
   const [fallbackEl, setFallbackEl] = useState<HTMLDivElement | null>(null)
 
   const portalTarget = hostEl ?? fallbackEl
+  const normalizedUrl = normalizeYoutubeEmbedUrl(embedUrl)
 
   const iframe = (
     <iframe
+      key={normalizedUrl}
       ref={iframeRef}
-      src={normalizeYoutubeEmbedUrl(embedUrl)}
+      src={normalizedUrl}
       className="youtube-embed-iframe h-full w-full border-0"
       referrerPolicy="strict-origin-when-cross-origin"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
       allowFullScreen
       title="YouTube reference"
       onLoad={() => {
-        primeYoutubeReferenceLoudness(iframeRef.current, 1)
+        const el = iframeRef.current
+        registerYoutubeIframe(el)
+        wakeYoutubeReference(el)
+        scheduleYoutubeReferenceWake(el)
       }}
     />
   )

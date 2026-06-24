@@ -117,6 +117,7 @@
           },
           events: {
             onReady() {
+              notifyParent('ready')
               burstMaxVolume()
             },
             onStateChange(event) {

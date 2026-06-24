@@ -50,6 +50,7 @@ import {
 import { createTake, mergeHydratedTakes, sortTakes, takeHasPlaybackMedia } from './utils/takes'
 import {
   pauseYoutubeProxy,
+  prepareNewYoutubeReference,
   registerYoutubeStereoGuard,
   startYoutubeProxyPlayback,
 } from './utils/playalong/youtubeBridge'
@@ -1988,16 +1989,13 @@ function StandardApp({
   )
 
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
+    prepareNewYoutubeReference()
     setYoutubeUrl(embedUrl)
-    window.requestAnimationFrame(() => {
-      window.setTimeout(() => {
-        startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
-      }, 400)
-    })
   }, [])
 
   const handleClearYoutube = useCallback(() => {
     pauseYoutubeProxy(youtubeIframeRef.current)
+    prepareNewYoutubeReference()
     setYoutubeUrl(null)
     setYoutubeHostEl(null)
   }, [])
