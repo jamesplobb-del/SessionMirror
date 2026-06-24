@@ -11,7 +11,11 @@ const AudioSessionPlugin = registerPlugin<AudioSessionPluginType>('AudioSessionP
 /** Route BT headphones for playback while keeping the device built-in mic (A2DP, not HFP). */
 export async function applyUseIphoneMicForRecording(enabled: boolean): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
-  await AudioSessionPlugin.setUseIphoneMicForRecording({ enabled })
+  try {
+    await AudioSessionPlugin.setUseIphoneMicForRecording({ enabled })
+  } catch (error) {
+    console.warn('Failed to apply device mic audio route:', error)
+  }
 }
 
 export default AudioSessionPlugin

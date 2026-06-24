@@ -979,6 +979,20 @@ export function useCameraSession({
     syncPreviewTargets(stream, mode)
   }, [cancelScheduledRelease, restartCameraAfterForeground, syncPreviewTargets])
 
+  /** Re-open getUserMedia after AVAudioSession route changes (e.g. device mic vs BT HFP). */
+  const reacquireStreamForAudioRoute = useCallback(async () => {
+    if (isRecordingRef.current || resumeInFlightRef.current) return
+
+    cancelScheduledRelease()
+    releaseLiveStream()
+
+    if (Capacitor.isNativePlatform()) {
+      await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
+    }
+
+    await acquireStream(recordingModeRef.current)
+  }, [acquireStream, cancelScheduledRelease, releaseLiveStream])
+
   const suspendMicForPlayback = useCallback(async () => {
     const stream = streamRef.current
     if (!stream) return
@@ -1107,6 +1121,7 @@ export function useCameraSession({
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
     refreshCameraSession,
+    reacquireStreamForAudioRoute,
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,

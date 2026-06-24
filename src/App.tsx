@@ -861,6 +861,7 @@ function StandardApp({
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
     refreshCameraSession,
+    reacquireStreamForAudioRoute,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
   } = useCameraSession({
@@ -880,8 +881,12 @@ function StandardApp({
   }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
 
   useEffect(() => {
-    void applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
-  }, [settings.useIphoneMicForRecording])
+    void (async () => {
+      await applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
+      if (!Capacitor.isNativePlatform()) return
+      await reacquireStreamForAudioRoute()
+    })()
+  }, [reacquireStreamForAudioRoute, settings.useIphoneMicForRecording])
 
   useEffect(() => {
     if (recordingMode !== 'video') return
