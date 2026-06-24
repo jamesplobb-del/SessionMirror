@@ -6,6 +6,7 @@ import {
 } from './mediaPlayback'
 import { logPlaybackStartRouteDiagnostics } from './playbackRouteDiagnostics'
 import { resumePlaybackAudioContext } from './playbackAudioContext'
+import { enableIosRecordingRoute, enableIosStereoPlaybackRoute } from './iosPlaybackRoute'
 import {
   hasTakePlaybackSpeakerRoute,
   routeTakePlaybackToSpeaker,
@@ -36,6 +37,8 @@ async function primeTakePlayback(
     (element): element is HTMLMediaElement => !!element,
   )
   if (elements.length === 0) return
+
+  await enableIosStereoPlaybackRoute()
 
   for (const element of elements) {
     prepareInlineMediaElement(element)
@@ -79,7 +82,7 @@ export function primeTakePlaybackAudioSync(
 }
 
 export async function releaseTakePlaybackAudio(): Promise<void> {
-  // Speaker routing is handled in AppDelegate — nothing to release here.
+  await enableIosRecordingRoute()
 }
 
 export interface UserGesturePlaybackCallbacks {
