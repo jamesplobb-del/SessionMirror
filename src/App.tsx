@@ -97,6 +97,7 @@ import {
   refreshPlaybackOutputProfile,
   setBluetoothHeadphonePlaybackMode,
 } from './utils/audioOutputProfile'
+import { runBluetoothPlaybackActivation } from './utils/bluetoothPlaybackActivation'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -886,6 +887,9 @@ function StandardApp({
 
   useEffect(() => {
     setBluetoothHeadphonePlaybackMode(settings.bluetoothHeadphonePlaybackMode)
+    if (settings.bluetoothHeadphonePlaybackMode) {
+      void runBluetoothPlaybackActivation()
+    }
   }, [settings.bluetoothHeadphonePlaybackMode])
 
   useEffect(() => {
