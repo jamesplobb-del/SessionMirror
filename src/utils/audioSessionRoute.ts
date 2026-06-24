@@ -8,7 +8,7 @@ export interface AudioSessionPluginType {
 
 const AudioSessionPlugin = registerPlugin<AudioSessionPluginType>('AudioSessionPlugin')
 
-/** Route BT headphones for playback while keeping the iPhone built-in mic (A2DP, not HFP). */
+/** Route BT headphones for playback while keeping the device built-in mic (A2DP, not HFP). */
 export async function applyUseIphoneMicForRecording(enabled: boolean): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   await AudioSessionPlugin.setUseIphoneMicForRecording({ enabled })

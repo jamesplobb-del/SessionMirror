@@ -227,8 +227,8 @@ export default function SettingsDrawer({
             />
 
             <SettingToggle
-              label="use iphone mic for recording (so headphones dont use their own mics)"
-              description="Routes backing tracks and playback through Bluetooth headphones (A2DP) while keeping the iPhone built-in microphone for recording — better quality for the Audio Enhancer and hands-free takes."
+              label="Use device mic for recording (prevents Bluetooth quality drop)"
+              description="Routes backing tracks and playback through Bluetooth headphones (A2DP) while keeping the device built-in microphone for recording — better quality for the Audio Enhancer and hands-free takes."
               checked={settings.useIphoneMicForRecording}
               onChange={(checked) => {
                 onUpdate({ useIphoneMicForRecording: checked })

@@ -34,7 +34,7 @@ export interface AppSettings {
   audioEnhancerSettings: AudioEnhancerSettings
   /** Pause YouTube and enable mic echo cancellation while recording to reduce bleed. */
   excludeYoutubeFromRecording: boolean
-  /** Bluetooth headphones for playback, iPhone mic for recording (avoids HFP headset mic). */
+  /** Bluetooth headphones for playback, device mic for recording (avoids HFP headset mic). */
   useIphoneMicForRecording: boolean
 }
 
