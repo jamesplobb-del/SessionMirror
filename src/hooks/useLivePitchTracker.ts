@@ -519,7 +519,7 @@ async function createPitchGraph(
     elementSource.connect(analyser)
     elementSource.connect(passthrough)
     passthrough.connect(context.destination)
-    registerTakePlaybackSpeakerRoute(media, elementSource, passthrough)
+    await registerTakePlaybackSpeakerRoute(media, elementSource, passthrough)
     applyPitchOutputGain(media, passthrough)
     source = elementSource
     mode = 'element'
@@ -1794,21 +1794,23 @@ export function useLivePitchTracker(
 export function resumePitchGraphsForMedia(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  void resumePlaybackAudioContext()
+  void (async () => {
+    await resumePlaybackAudioContext()
 
-  for (const element of media) {
-    if (!element) continue
-    const graph = elementGraphs.get(element)
-    if (!graph) continue
+    for (const element of media) {
+      if (!element) continue
+      const graph = elementGraphs.get(element)
+      if (!graph) continue
 
-    applyPitchOutputGain(element, graph.passthrough)
+      applyPitchOutputGain(element, graph.passthrough)
 
-    if (graph.mode === 'element' && getTakePlaybackSpeakerNodes(element)) {
-      routeTakePlaybackToSpeaker(element, element.volume || 1, false)
-    } else if (graph.mode === 'stream' && graph.context.state !== 'closed') {
-      refreshMediaPitchStreamSource(graph)
+      if (graph.mode === 'element' && getTakePlaybackSpeakerNodes(element)) {
+        await routeTakePlaybackToSpeaker(element, element.volume || 1, false)
+      } else if (graph.mode === 'stream' && graph.context.state !== 'closed') {
+        refreshMediaPitchStreamSource(graph)
+      }
     }
-  }
+  })()
 }
 
 /** Pause pitch graphs for review teardown without blocking the UI thread. */

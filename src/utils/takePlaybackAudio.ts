@@ -4,6 +4,7 @@ import {
   safePlayMutedMedia,
   type PlaybackAttemptOptions,
 } from './mediaPlayback'
+import { logPlaybackStartRouteDiagnostics } from './playbackRouteDiagnostics'
 import { resumePlaybackAudioContext } from './playbackAudioContext'
 import {
   hasTakePlaybackSpeakerRoute,
@@ -27,10 +28,10 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
 }
 
-function primeTakePlayback(
+async function primeTakePlayback(
   media: Array<HTMLMediaElement | null | undefined>,
   allowNativeDirect: boolean,
-): void {
+): Promise<void> {
   const elements = media.filter(
     (element): element is HTMLMediaElement => !!element,
   )
@@ -38,7 +39,7 @@ function primeTakePlayback(
 
   for (const element of elements) {
     prepareInlineMediaElement(element)
-    routeTakePlaybackToSpeaker(element, element.volume || 1, false, {
+    await routeTakePlaybackToSpeaker(element, element.volume || 1, false, {
       allowNativeDirect,
     })
   }
@@ -53,28 +54,28 @@ function primeTakePlayback(
   }
 
   if (elements.some((element) => hasTakePlaybackSpeakerRoute(element))) {
-    void resumePlaybackAudioContext()
+    await resumePlaybackAudioContext()
   }
 }
 
-export function primeTakePlaybackForUserGesture(
+export async function primeTakePlaybackForUserGesture(
   ...media: Array<HTMLMediaElement | null | undefined>
-): void {
+): Promise<void> {
   const count = media.filter(Boolean).length
-  primeTakePlayback(media, count === 1)
+  await primeTakePlayback(media, count === 1)
 }
 
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
-  primeTakePlaybackForUserGesture(...media)
+  await primeTakePlaybackForUserGesture(...media)
   await resumePlaybackAudioContext()
 }
 
 export function primeTakePlaybackAudioSync(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  primeTakePlaybackForUserGesture(...media)
+  void primeTakePlaybackForUserGesture(...media)
 }
 
 export async function releaseTakePlaybackAudio(): Promise<void> {
@@ -90,32 +91,36 @@ export function playTakeMediaFromUserGesture(
   media: HTMLMediaElement,
   callbacks: UserGesturePlaybackCallbacks = {},
 ): void {
-  primeTakePlaybackForUserGesture(media)
+  void (async () => {
+    await primeTakePlaybackForUserGesture(media)
 
-  // Output is via the Web Audio bus; element stays unmuted so iOS keeps decoding.
-  media.muted = false
-  media.volume = 1
-
-  if (
-    media.readyState < HTMLMediaElement.HAVE_METADATA &&
-    (media.src || media.currentSrc)
-  ) {
-    try {
-      media.load()
-    } catch {
-      /* ignore */
-    }
-  }
-
-  void media
-    .play()
-    .then(() => {
-      callbacks.onPlaying?.()
+    // Output is via the Web Audio bus; element stays unmuted so iOS keeps decoding.
+    media.muted = false
+    media.volume = 1
+    logPlaybackStartRouteDiagnostics('playTakeMediaFromUserGesture', {
+      volume: media.volume,
+      muted: media.muted,
     })
-    .catch((error: unknown) => {
+
+    if (
+      media.readyState < HTMLMediaElement.HAVE_METADATA &&
+      (media.src || media.currentSrc)
+    ) {
+      try {
+        media.load()
+      } catch {
+        /* ignore */
+      }
+    }
+
+    try {
+      await media.play()
+      callbacks.onPlaying?.()
+    } catch (error: unknown) {
       console.log(error)
       callbacks.onFailure?.(error)
-    })
+    }
+  })()
 }
 
 export function playTakeMediaBatchFromUserGesture(
@@ -123,20 +128,24 @@ export function playTakeMediaBatchFromUserGesture(
   callbacks: UserGesturePlaybackCallbacks = {},
 ): void {
   if (media.length === 0) return
-  primeTakePlayback(media, false)
-  for (const element of media) {
-    element.play().catch((error: unknown) => {
-      console.log(error)
-      callbacks.onFailure?.(error)
-    })
-  }
+  void (async () => {
+    await primeTakePlayback(media, false)
+    for (const element of media) {
+      try {
+        await element.play()
+      } catch (error: unknown) {
+        console.log(error)
+        callbacks.onFailure?.(error)
+      }
+    }
+  })()
 }
 
 export async function playTakeMedia(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  primeTakePlaybackForUserGesture(media)
+  await primeTakePlaybackForUserGesture(media)
   return media
     .play()
     .then(() => true)
@@ -151,7 +160,7 @@ export async function playTakeMediaMuted(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  primeTakePlayback([media], false)
+  await primeTakePlayback([media], false)
   await resumePlaybackAudioContext()
   return safePlayMutedMedia(media, options)
 }
@@ -160,11 +169,15 @@ export async function playTakeMediaAudible(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  primeTakePlayback([media], false)
+  await primeTakePlayback([media], false)
   await resumePlaybackAudioContext()
 
   media.muted = false
   media.volume = 1
+  logPlaybackStartRouteDiagnostics('playTakeMediaAudible', {
+    volume: media.volume,
+    muted: media.muted,
+  })
 
   try {
     await media.play()
@@ -188,7 +201,7 @@ export async function playTakeMediaAudible(
 
 export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {
   if (media.length === 0) return []
-  primeTakePlayback(media, false)
+  await primeTakePlayback(media, false)
   await resumePlaybackAudioContext()
   return Promise.all(media.map((element) => safePlayMutedMedia(element)))
 }

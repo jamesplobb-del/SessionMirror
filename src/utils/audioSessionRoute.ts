@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from '@capacitor/core'
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
 
 export interface AudioRouteSnapshot {
   success?: boolean
@@ -18,6 +18,10 @@ export interface BestTakeAudioPluginType {
   enableStereoPlayback(): Promise<void>
   enableRecordingRoute(): Promise<void>
   getPlaybackOutputProfile(): Promise<AudioRouteSnapshot>
+  addListener(
+    eventName: 'audioRouteChanged',
+    listenerFunc: (data: AudioRouteSnapshot) => void,
+  ): Promise<PluginListenerHandle>
 }
 
 const BestTakeAudioPlugin = registerPlugin<BestTakeAudioPluginType>('BestTakeAudioPlugin')

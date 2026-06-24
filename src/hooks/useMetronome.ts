@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { logPlaybackStartRouteDiagnostics } from '../utils/playbackRouteDiagnostics'
+import {
+  ensureFreshPlaybackOutputProfile,
+  subscribePlaybackOutputProfile,
+} from '../utils/audioOutputProfile'
 import { metronomeSpeakerGain } from '../utils/playbackVolume'
-import { subscribePlaybackOutputProfile } from '../utils/audioOutputProfile'
 import {
   clampBpm,
   getBeatsPerBar,
@@ -284,59 +288,71 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   useEffect(() => {
     if (!playing) return
 
-    const ctx = audioCtxRef.current
-    if (!ctx || ctx.state === 'closed') {
-      playingRef.current = false
-      setPlaying(false)
-      return
-    }
-
     let cancelled = false
 
-    nextBeatTimeRef.current = Math.max(
-      ctx.currentTime + 0.03,
-      nextBeatTimeRef.current > ctx.currentTime ? nextBeatTimeRef.current : ctx.currentTime + 0.03,
-    )
+    void (async () => {
+      await ensureFreshPlaybackOutputProfile()
+      if (cancelled) return
 
-    const tick = () => {
-      if (cancelled || !playingRef.current) return
+      logPlaybackStartRouteDiagnostics('metronomeStart', {
+        muted: shouldMuteOutput(),
+      })
 
-      const activeCtx = audioCtxRef.current
-      if (!activeCtx || activeCtx.state === 'closed') {
-        stop()
+      const ctx = audioCtxRef.current
+      if (!ctx || ctx.state === 'closed') {
+        playingRef.current = false
+        setPlaying(false)
         return
       }
 
-      const meter = meterRef.current
-      const subdivision = subdivisionRef.current
-      const barTicks = ticksPerBar(meter, subdivision)
-      const secondsPerTick = secondsPerSchedulerTick(meter, bpmRef.current, subdivision)
-      const outputNode = ensureMasterGain(activeCtx)
-      const muted = shouldMuteOutput()
+      const master = ensureMasterGain(ctx)
+      master.gain.setValueAtTime(metronomeSpeakerGain(shouldMuteOutput()), ctx.currentTime)
 
-      let uiBeat = -1
+      nextBeatTimeRef.current = Math.max(
+        ctx.currentTime + 0.03,
+        nextBeatTimeRef.current > ctx.currentTime ? nextBeatTimeRef.current : ctx.currentTime + 0.03,
+      )
 
-      while (nextBeatTimeRef.current < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
-        const tickInBar = tickCounterRef.current % barTicks
-        const tier = resolveClickTier(meter, tickInBar, subdivision)
-        scheduleTieredClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted)
+      const tick = () => {
+        if (cancelled || !playingRef.current) return
 
-        if (nextBeatTimeRef.current - activeCtx.currentTime <= LOOKAHEAD_MS / 1000) {
-          uiBeat = resolveUiBeatIndex(meter, tickInBar, subdivision)
+        const activeCtx = audioCtxRef.current
+        if (!activeCtx || activeCtx.state === 'closed') {
+          stop()
+          return
         }
 
-        nextBeatTimeRef.current += secondsPerTick
-        tickCounterRef.current += 1
+        const meter = meterRef.current
+        const subdivision = subdivisionRef.current
+        const barTicks = ticksPerBar(meter, subdivision)
+        const secondsPerTick = secondsPerSchedulerTick(meter, bpmRef.current, subdivision)
+        const outputNode = ensureMasterGain(activeCtx)
+        const muted = shouldMuteOutput()
+
+        let uiBeat = -1
+
+        while (nextBeatTimeRef.current < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
+          const tickInBar = tickCounterRef.current % barTicks
+          const tier = resolveClickTier(meter, tickInBar, subdivision)
+          scheduleTieredClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted)
+
+          if (nextBeatTimeRef.current - activeCtx.currentTime <= LOOKAHEAD_MS / 1000) {
+            uiBeat = resolveUiBeatIndex(meter, tickInBar, subdivision)
+          }
+
+          nextBeatTimeRef.current += secondsPerTick
+          tickCounterRef.current += 1
+        }
+
+        if (uiBeat >= 0) {
+          setBeatIndex(uiBeat)
+        }
+
+        schedulerTimerRef.current = window.setTimeout(tick, LOOKAHEAD_MS)
       }
 
-      if (uiBeat >= 0) {
-        setBeatIndex(uiBeat)
-      }
-
-      schedulerTimerRef.current = window.setTimeout(tick, LOOKAHEAD_MS)
-    }
-
-    tick()
+      tick()
+    })()
 
     return () => {
       cancelled = true

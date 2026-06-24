@@ -18,7 +18,8 @@ import {
   primePlaybackAudioContextSync,
   resumePlaybackAudioContext,
 } from './playbackAudioContext'
-import { subscribePlaybackOutputProfile } from './audioOutputProfile'
+import { subscribePlaybackOutputProfile, ensureFreshPlaybackOutputProfile } from './audioOutputProfile'
+import { logPlaybackStartRouteDiagnostics } from './playbackRouteDiagnostics'
 import { effectiveSpeakerGain } from './playbackVolume'
 
 export interface TakeSpeakerPassthrough {
@@ -46,6 +47,15 @@ let enhancerSettings: AudioEnhancerSettings | null = null
 
 function resumePlaybackBus(): void {
   void resumePlaybackAudioContext()
+}
+
+async function commitSpeakerBusGain(
+  gain: GainNode,
+  volume: number,
+  muted: boolean,
+): Promise<void> {
+  await ensureFreshPlaybackOutputProfile()
+  gain.gain.value = effectiveSpeakerGain(volume, muted, true)
 }
 
 /**
@@ -220,17 +230,17 @@ export function getTakePlaybackSpeakerNodes(
   return speakerNodesByElement.get(el)
 }
 
-export function registerTakePlaybackSpeakerRoute(
+export async function registerTakePlaybackSpeakerRoute(
   el: HTMLMediaElement,
   source: MediaElementAudioSourceNode,
   gain: GainNode,
-): void {
+): Promise<void> {
   const existing = speakerNodesByElement.get(el)
   if (existing) {
     if (existing.source === source && existing.gain === gain) {
       repairSpeakerBus(el, existing)
       applyGraphOutputElementState(el)
-      existing.gain.gain.value = effectiveSpeakerGain(1, false, true)
+      await commitSpeakerBusGain(existing.gain, 1, false)
       armPlaybackGraphKeepAlive(el, existing)
     }
     return
@@ -241,7 +251,7 @@ export function registerTakePlaybackSpeakerRoute(
   routedSpeakerElements.add(el)
   applyGraphOutputElementState(el)
   repairSpeakerBus(el, nodes)
-  gain.gain.value = effectiveSpeakerGain(1, false, true)
+  await commitSpeakerBusGain(gain, 1, false)
   armPlaybackGraphKeepAlive(el, nodes)
 }
 
@@ -260,12 +270,12 @@ export interface RouteTakePlaybackOptions {
  * routing stay consistent whether the enhancer is on or off. The element is
  * never muted (see applyGraphOutputElementState).
  */
-export function routeTakePlaybackToSpeaker(
+export async function routeTakePlaybackToSpeaker(
   el: HTMLMediaElement,
   volume = 1,
   muted = false,
   _options: RouteTakePlaybackOptions = {},
-): void {
+): Promise<void> {
   const existingNodes = speakerNodesByElement.get(el)
   const ctx = primePlaybackAudioContextSync()
 
@@ -296,7 +306,8 @@ export function routeTakePlaybackToSpeaker(
   }
 
   applyGraphOutputElementState(el)
-  nodes.gain.gain.value = effectiveSpeakerGain(volume, muted, true)
+  logPlaybackStartRouteDiagnostics('routeTakePlaybackToSpeaker', { volume, muted })
+  await commitSpeakerBusGain(nodes.gain, volume, muted)
 
   if (enhancerEnabled && enhancerSettings) {
     ensureEnhancerForElement(el, nodes)
