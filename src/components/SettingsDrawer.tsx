@@ -13,6 +13,7 @@ import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
+import { applyUseIphoneMicForRecording } from '../utils/audioSessionRoute'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -223,6 +224,16 @@ export default function SettingsDrawer({
               description="In Audio mode, starts recording when your playing crosses the trigger level, stops after silence, then immediately plays the take back through the speaker."
               checked={settings.autoSoundRecording}
               onChange={(checked) => onUpdate({ autoSoundRecording: checked })}
+            />
+
+            <SettingToggle
+              label="use iphone mic for recording (so headphones dont use their own mics)"
+              description="Routes backing tracks and playback through Bluetooth headphones (A2DP) while keeping the iPhone built-in microphone for recording — better quality for the Audio Enhancer and hands-free takes."
+              checked={settings.useIphoneMicForRecording}
+              onChange={(checked) => {
+                onUpdate({ useIphoneMicForRecording: checked })
+                void applyUseIphoneMicForRecording(checked)
+              }}
             />
 
             <AnimatedExpand open={settings.autoSoundRecording}>

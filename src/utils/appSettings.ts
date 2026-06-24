@@ -34,6 +34,8 @@ export interface AppSettings {
   audioEnhancerSettings: AudioEnhancerSettings
   /** Pause YouTube and enable mic echo cancellation while recording to reduce bleed. */
   excludeYoutubeFromRecording: boolean
+  /** Bluetooth headphones for playback, iPhone mic for recording (avoids HFP headset mic). */
+  useIphoneMicForRecording: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -51,6 +53,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   audioEnhancerEnabled: false,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
   excludeYoutubeFromRecording: false,
+  useIphoneMicForRecording: false,
 }
 
 /** Floating widgets — forced off on each cold app start. */
@@ -132,6 +135,10 @@ export function loadAppSettings(): AppSettings {
         parsed.excludeYoutubeFromRecording !== undefined
           ? Boolean(parsed.excludeYoutubeFromRecording)
           : DEFAULT_APP_SETTINGS.excludeYoutubeFromRecording,
+      useIphoneMicForRecording:
+        parsed.useIphoneMicForRecording !== undefined
+          ? Boolean(parsed.useIphoneMicForRecording)
+          : DEFAULT_APP_SETTINGS.useIphoneMicForRecording,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

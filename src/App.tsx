@@ -92,7 +92,7 @@ import {
   type Project,
 } from './db'
 import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
-import AudioSessionPlugin from './utils/audioSessionRoute'
+import AudioSessionPlugin, { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport } from './utils/viewportSync'
@@ -878,6 +878,10 @@ function StandardApp({
         !handsFreePlaybackPending,
     )
   }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
+
+  useEffect(() => {
+    void applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
+  }, [settings.useIphoneMicForRecording])
 
   useEffect(() => {
     if (recordingMode !== 'video') return
