@@ -1,5 +1,7 @@
 import { useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import { normalizeYoutubeEmbedUrl } from '../utils/youtubeEmbed'
+import { primeYoutubeReferenceLoudness } from '../utils/playalong/youtubeBridge'
 
 interface YoutubeBenchmarkPlayerProps {
   embedUrl: string
@@ -21,12 +23,15 @@ export default function YoutubeBenchmarkPlayer({
   const iframe = (
     <iframe
       ref={iframeRef}
-      src={embedUrl}
+      src={normalizeYoutubeEmbedUrl(embedUrl)}
       className="youtube-embed-iframe h-full w-full border-0"
       referrerPolicy="strict-origin-when-cross-origin"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
       allowFullScreen
       title="YouTube reference"
+      onLoad={() => {
+        primeYoutubeReferenceLoudness(iframeRef.current, 1)
+      }}
     />
   )
 

@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
-import { resolveYoutubeProxyOrigin } from '../youtubeEmbed'
+import { YOUTUBE_PROXY_ORIGIN } from '../youtubeEmbed'
 import AudioSessionPlugin from '../audioSessionRoute'
 
 const YOUTUBE_BOOST_DELAYS_MS = [
@@ -10,10 +10,7 @@ const YOUTUBE_BOOST_DELAYS_MS = [
 let youtubeStereoEngaged = false
 let mayUseYoutubeStereoRoute: () => boolean = () => true
 
-/**
- * Optional guard — e.g. skip stereo while recording or during hands-free auto-playback.
- * Call from App once; defaults to allowing stereo.
- */
+/** Skip stereo while recording or during hands-free auto-playback. */
 export function registerYoutubeStereoGuard(guard: () => boolean): void {
   mayUseYoutubeStereoRoute = guard
 }
@@ -26,11 +23,11 @@ function postToYoutubeIframe(
   if (!iframe?.contentWindow) return
   iframe.contentWindow.postMessage(
     JSON.stringify({ event: 'command', func, args }),
-    resolveYoutubeProxyOrigin(iframe),
+    YOUTUBE_PROXY_ORIGIN,
   )
 }
 
-/** One-shot iOS stereo route — only on explicit play, never in the loudness loop. */
+/** One-shot iOS stereo — idempotent, never thrashes the session. */
 function engageYoutubeStereoOnce(): void {
   if (!Capacitor.isNativePlatform()) return
   if (!mayUseYoutubeStereoRoute()) return
@@ -39,26 +36,11 @@ function engageYoutubeStereoOnce(): void {
   void AudioSessionPlugin.enableStereoPlayback()
 }
 
-function releaseYoutubeStereoOnce(): void {
+export function releaseYoutubeReferenceRoute(): void {
   if (!Capacitor.isNativePlatform()) return
   if (!youtubeStereoEngaged) return
   youtubeStereoEngaged = false
   void AudioSessionPlugin.enableRecordingRoute()
-}
-
-/** Start proxy playback — call synchronously inside a user gesture when possible. */
-export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
-  postToYoutubeIframe(iframe, 'playVideo')
-  engageYoutubeStereoOnce()
-}
-
-export function pauseYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
-  postToYoutubeIframe(iframe, 'pauseVideo')
-  releaseYoutubeStereoOnce()
-}
-
-export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
-  postToYoutubeIframe(iframe, 'unMute')
 }
 
 function boostYoutubeProxyAudio(
@@ -67,19 +49,42 @@ function boostYoutubeProxyAudio(
 ): void {
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 8; i++) {
     postToYoutubeIframe(iframe, 'unMute')
     postToYoutubeIframe(iframe, 'setVolume', [100])
   }
 }
 
-/** Play reference audio as loud as the proxy allows — re-applies volume after the embed wakes. */
+/** Prime loud reference audio as soon as the proxy iframe is ready. */
+export function primeYoutubeReferenceLoudness(
+  iframe: HTMLIFrameElement | null | undefined,
+  uiVolume = 1,
+): void {
+  engageYoutubeStereoOnce()
+  boostYoutubeProxyAudio(iframe, uiVolume)
+}
+
+/** Start proxy playback — call synchronously inside a user gesture when possible. */
+export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
+  postToYoutubeIframe(iframe, 'playVideo')
+}
+
+export function pauseYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
+  postToYoutubeIframe(iframe, 'pauseVideo')
+  releaseYoutubeReferenceRoute()
+}
+
+export function unmuteYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
+  postToYoutubeIframe(iframe, 'unMute')
+}
+
+/** Play reference audio as loud as possible on native + proxy. */
 export function startYoutubeProxyPlayback(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
+  primeYoutubeReferenceLoudness(iframe, uiVolume)
   playYoutubeProxy(iframe)
-  boostYoutubeProxyAudio(iframe, uiVolume)
 
   for (const delay of YOUTUBE_BOOST_DELAYS_MS) {
     window.setTimeout(() => {
@@ -88,15 +93,16 @@ export function startYoutubeProxyPlayback(
   }
 }
 
-/** Re-assert max proxy volume while YouTube is playing — API only, no audio session switch. */
+/** Re-assert max volume while YouTube reference is visible (no session thrash). */
 export function maintainYoutubeProxyLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
+  engageYoutubeStereoOnce()
   boostYoutubeProxyAudio(iframe, uiVolume)
 }
 
-/** Volume from a 0–1 UI slider, boosted for audible reference playback. */
+/** Volume from a 0–1 UI slider — always API max when non-zero. */
 export function setYoutubeProxyVolumeFromUi(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,
