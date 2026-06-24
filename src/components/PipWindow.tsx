@@ -279,7 +279,7 @@ function PipWindow({
   const chromeInset = isFill ? 8 : 4
 
   const shellClass = isFill
-    ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-hidden ${className}`.trim()
+    ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-visible ${className}`.trim()
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
