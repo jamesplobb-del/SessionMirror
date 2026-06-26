@@ -130,7 +130,6 @@ import AppBootGate from './components/ui/AppBootGate'
 import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTabs'
 import AudioMetronomeTab from './components/audioPractice/AudioMetronomeTab'
 import AudioTunerTab from './components/audioPractice/AudioTunerTab'
-import AudioComboTab from './components/audioPractice/AudioComboTab'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 
@@ -1658,17 +1657,15 @@ function StandardApp({
   const isAudioPracticeMainTab =
     recordingMode !== 'audio' || audioPracticeTab === 'audio'
 
+  const showAudioTakeCardsRow = recordingMode === 'audio'
+
   const isAudioPracticeMetronomeTab =
     recordingMode === 'audio' && audioPracticeTab === 'metronome'
 
   const isAudioPracticeTunerTab =
     recordingMode === 'audio' && audioPracticeTab === 'tuner'
 
-  const isAudioPracticeComboTab =
-    recordingMode === 'audio' && audioPracticeTab === 'combo'
-
-  const isAudioPracticeToolTab =
-    isAudioPracticeMetronomeTab || isAudioPracticeTunerTab || isAudioPracticeComboTab
+  const isAudioPracticeToolTab = isAudioPracticeMetronomeTab || isAudioPracticeTunerTab
 
   const showFloatingMainPitch =
     showPitch &&
@@ -2317,7 +2314,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isVaultOpen || isSettingsOpen ? 'app-ui-overlay--sheet-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${isAudioPracticeComboTab ? 'app-ui-overlay--audio-practice-combo' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isVaultOpen || isSettingsOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2350,7 +2347,7 @@ function StandardApp({
         {recordingMode === 'audio' && audioPracticeTab === 'metronome' && !quickSettingsOpen && (
           <div
             key="audio-practice-metronome-layer"
-            className="audio-practice-metronome-layer pointer-events-auto flex min-h-0 flex-1 flex-col"
+            className={`audio-practice-metronome-layer pointer-events-auto flex min-h-0 flex-1 flex-col ${isReviewOpen || isVaultOpen || isSettingsOpen ? 'pointer-events-none' : ''}`}
           >
             <AudioMetronomeTab key="audio-metronome-tab" />
           </div>
@@ -2359,7 +2356,7 @@ function StandardApp({
         {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && (
           <div
             key="audio-practice-tuner-layer"
-            className="audio-practice-tuner-layer pointer-events-auto flex min-h-0 flex-1 flex-col"
+            className={`audio-practice-tuner-layer pointer-events-auto flex min-h-0 flex-1 flex-col ${isReviewOpen || isVaultOpen || isSettingsOpen ? 'pointer-events-none' : ''}`}
           >
             <AudioTunerTab
               streamRef={streamRef}
@@ -2423,53 +2420,8 @@ function StandardApp({
           </div>
         )}
 
-        {recordingMode === 'audio' && isAudioPracticeComboTab && !quickSettingsOpen && (
-          <div
-            className={`audio-practice-combo-layer flex min-h-0 flex-1 flex-col ${isVaultOpen || isSettingsOpen || isReviewOpen ? 'pointer-events-none' : 'pointer-events-auto'}`}
-          >
-            <AudioComboTab
-              streamRef={streamRef}
-              streamGeneration={streamGeneration}
-              ready={ready}
-              isRecording={isRecording}
-              elapsed={elapsed}
-              tunerInstrument={settings.tunerInstrument}
-              liveMicTunerEnabled={settings.liveMicTunerEnabled}
-              interactionSuspended={isVaultOpen || isSettingsOpen || isReviewOpen}
-              benchmarkTake={benchmarkTake}
-              challengerTake={challengerTake}
-              youtubeEmbedUrl={youtubeUrl}
-              suspendPipPlayback={suspendPipPlayback}
-              benchmarkPipVideoRef={benchmarkPipVideoRef}
-              challengerPipVideoRef={challengerPipVideoRef}
-              deleteDropRef={recordDeleteDropRef}
-              onPinBenchmark={handlePinBenchmark}
-              onDeleteTake={handleDragDeleteTake}
-              onUnpinBenchmark={handleUnpinBenchmark}
-              onUnpinChallenger={handleUnpinChallenger}
-              onUploadBenchmark={handleUploadBenchmark}
-              onSubmitYoutube={handleSubmitYoutube}
-              onClearYoutube={handleClearYoutube}
-              onToggleSplitView={handleToggleSplitView}
-              onExpandBenchmark={handleExpandBenchmark}
-              onExpandChallenger={handleExpandChallenger}
-              onDragStateChange={handlePipDragStateChange}
-              onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
-              onChallengerPlaybackChange={handleChallengerPlaybackChange}
-              challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
-              onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
-              showPinCurrentAsBest={showPinCurrentAsBest}
-              onPinCurrentAsBest={handlePinCurrentAsBest}
-              onYoutubeHostChange={handleYoutubeHostChange}
-              youtubeIframeRef={youtubeIframeRef}
-              hapticFeedback={settings.hapticFeedback}
-            />
-          </div>
-        )}
-
-        {!isAudioPracticeMetronomeTab && (
-        <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && isAudioPracticeMainTab && (
+        <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
+          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && showAudioTakeCardsRow && (
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"
@@ -2518,9 +2470,9 @@ function StandardApp({
             recordingMode={recordingMode}
             onRecordingModeChange={handleRecordingModeChange}
             onToggleRecord={toggleRecording}
-            onOpenVault={isAudioPracticeComboTab ? handleToggleVault : handleOpenVault}
+            onOpenVault={recordingMode === 'audio' ? handleToggleVault : handleOpenVault}
             isVaultOpen={isVaultOpen}
-            vaultToggleEnabled={isAudioPracticeComboTab}
+            vaultToggleEnabled={recordingMode === 'audio'}
             onOpenSettings={handleOpenSettings}
             takeCount={takes.length}
             autoSoundListening={autoSoundListening}
@@ -2547,7 +2499,6 @@ function StandardApp({
             hapticFeedback={settings.hapticFeedback}
           />
         </div>
-        )}
       </motion.div>
 
       <Suspense fallback={null}>
