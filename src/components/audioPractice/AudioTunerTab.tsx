@@ -1,18 +1,43 @@
-import { AudioLines } from 'lucide-react'
+import { useRef, type RefObject } from 'react'
+import LivePitchTuner from '../LivePitchTuner'
+import type { TunerInstrument } from '../../utils/pitchConfig'
 
-/** Phase 1 placeholder — focused tuner view ships in a later phase. */
-export default function AudioTunerTab() {
+export interface AudioTunerTabProps {
+  streamRef: RefObject<MediaStream | null>
+  streamGeneration: number
+  ready: boolean
+  isRecording: boolean
+  tunerInstrument: TunerInstrument
+  liveMicTunerEnabled: boolean
+}
+
+export default function AudioTunerTab({
+  streamRef,
+  streamGeneration,
+  ready,
+  isRecording,
+  tunerInstrument,
+  liveMicTunerEnabled,
+}: AudioTunerTabProps) {
+  const mediaRef = useRef<HTMLMediaElement | null>(null)
+
   return (
-    <section className="audio-practice-placeholder" aria-label="Tuner">
-      <div className="audio-practice-placeholder__icon-wrap">
-        <AudioLines className="h-8 w-8 text-sky-300" aria-hidden />
-      </div>
-      <h2 className="audio-practice-placeholder__title">Tuner</h2>
-      <p className="audio-practice-placeholder__body">
-        Focused pitch analysis view coming soon — reuses the existing live tuner without
-        changing detection logic.
-      </p>
-      <p className="audio-practice-placeholder__todo">TODO: Phase 2 — tuner presentation</p>
+    <section
+      className="audio-practice-tuner-shell flex min-h-0 flex-1 flex-col"
+      aria-label="Tuner"
+    >
+      <LivePitchTuner
+        variant="audio"
+        mediaRef={mediaRef}
+        enabled={ready || isRecording}
+        isPlaying={isRecording}
+        mediaKey={`tuner-tab-${streamGeneration}`}
+        label="Pitch Analysis"
+        liveMicEnabled={liveMicTunerEnabled}
+        micStreamRef={streamRef}
+        liveMicOnly
+        tunerInstrument={tunerInstrument}
+      />
     </section>
   )
 }
