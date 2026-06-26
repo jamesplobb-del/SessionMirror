@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { App } from '@capacitor/app'
 import { metronomeSpeakerGain } from '../utils/playbackVolume'
 import { primePlaybackAudioContextSync } from '../utils/playbackAudioContext'
 import { scheduleMetronomeClick } from '../utils/metronomeClickSounds'
@@ -92,6 +94,8 @@ export interface UseMetronomeOptions {
   muteDuringPlayback?: boolean
   /** Dev-only console prefix, e.g. "MetronomeTab". */
   debugLabel?: string
+  /** Stop and release audio graph when app backgrounds (metronome tab). */
+  pauseOnAppHidden?: boolean
 }
 
 export interface UseMetronomeResult {
@@ -102,6 +106,8 @@ export interface UseMetronomeResult {
   soundId: string
   playing: boolean
   beatIndex: number
+  /** Increments on each visual beat tick (drives pulse animation). */
+  beatPulseId: number
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
@@ -120,10 +126,12 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   const [soundId, setSoundIdState] = useState(initial.soundId)
   const [playing, setPlaying] = useState(false)
   const [beatIndex, setBeatIndex] = useState(0)
+  const [beatPulseId, setBeatPulseId] = useState(0)
 
   const isTakePlaying = options.isTakePlaying ?? false
   const muteDuringPlayback = options.muteDuringPlayback ?? true
   const debugLabel = options.debugLabel
+  const pauseOnAppHidden = options.pauseOnAppHidden ?? false
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const masterGainRef = useRef<GainNode | null>(null)
@@ -167,6 +175,16 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       window.clearTimeout(schedulerTimerRef.current)
       schedulerTimerRef.current = null
     }
+  }, [])
+
+  const releaseAudioGraph = useCallback(() => {
+    try {
+      masterGainRef.current?.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+    masterGainRef.current = null
+    audioCtxRef.current = null
   }, [])
 
   const ensureMasterGain = useCallback((ctx: AudioContext): GainNode => {
@@ -268,6 +286,45 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     clearSchedulerTimer()
   }, [clearSchedulerTimer, debugLog])
 
+  const stopAndRelease = useCallback(() => {
+    debugLog('app hidden - stopping')
+    playingRef.current = false
+    setPlaying(false)
+    setBeatIndex(0)
+    tickCounterRef.current = 0
+    nextBeatTimeRef.current = 0
+    schedulerSessionRef.current += 1
+    clearSchedulerTimer()
+    releaseAudioGraph()
+  }, [clearSchedulerTimer, debugLog, releaseAudioGraph])
+
+  const prepareAudioContextForStart = useCallback(async (): Promise<AudioContext | null> => {
+    const wasReleased = audioCtxRef.current === null
+
+    let ctx = primePlaybackAudioContextSync()
+    if (ctx.state === 'closed') {
+      ctx = primePlaybackAudioContextSync()
+    }
+
+    masterGainRef.current = null
+    audioCtxRef.current = ctx
+
+    if (wasReleased) {
+      debugLog('audio context recreated')
+    }
+
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume()
+        debugLog('audio context resumed')
+      } catch {
+        return null
+      }
+    }
+
+    return ctx
+  }, [debugLog])
+
   const start = useCallback(() => {
     if (typeof window === 'undefined') return
 
@@ -276,18 +333,9 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       clearSchedulerTimer()
     }
 
-    const ctx = primePlaybackAudioContextSync()
-    audioCtxRef.current = ctx
-    if (ctx.state === 'closed') return
-
     const resumeAndPlay = async () => {
-      if (ctx.state === 'suspended') {
-        try {
-          await ctx.resume()
-        } catch {
-          return
-        }
-      }
+      const ctx = await prepareAudioContextForStart()
+      if (!ctx || ctx.state === 'closed') return
 
       if (schedulerTimerRef.current !== null) {
         debugLog('duplicate timer prevented')
@@ -296,6 +344,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
 
       tickCounterRef.current = 0
       setBeatIndex(0)
+      setBeatPulseId(0)
       nextBeatTimeRef.current = ctx.currentTime + START_LEAD_SEC
       schedulerSessionRef.current += 1
       playingRef.current = true
@@ -304,7 +353,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     }
 
     void resumeAndPlay()
-  }, [clearSchedulerTimer, debugLog])
+  }, [clearSchedulerTimer, debugLog, prepareAudioContextForStart])
 
   const togglePlay = useCallback(() => {
     if (playingRef.current) {
@@ -355,15 +404,16 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
 
       while (nextBeatTimeRef.current < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
         const tickInBar = tickCounterRef.current % barTicks
+        const beatTime = nextBeatTimeRef.current
         const tier = applyAccentFirstBeat(
           resolveClickTier(meter, tickInBar, subdivision),
           meter,
           subdivision,
           accentFirstBeatRef.current,
         )
-        scheduleMetronomeClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted, sound)
+        scheduleMetronomeClick(activeCtx, beatTime, tier, outputNode, muted, sound)
 
-        if (nextBeatTimeRef.current - activeCtx.currentTime <= LOOKAHEAD_MS / 1000) {
+        if (beatTime - activeCtx.currentTime <= SCHEDULE_AHEAD_SEC) {
           uiBeat = resolveUiBeatIndex(meter, tickInBar, subdivision)
         }
 
@@ -373,6 +423,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
 
       if (uiBeat >= 0) {
         setBeatIndex(uiBeat)
+        setBeatPulseId((id) => id + 1)
         debugLog(`tick beat=${uiBeat + 1}`)
       }
 
@@ -389,18 +440,63 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   }, [playing, clearSchedulerTimer, ensureMasterGain, shouldMuteOutput, stop, debugLog])
 
   useEffect(() => {
+    if (!pauseOnAppHidden) return
+
+    const onForeground = () => {
+      debugLog('app visible - ready')
+    }
+
+    const onHidden = () => {
+      if (document.visibilityState !== 'hidden') return
+      if (!playingRef.current) {
+        releaseAudioGraph()
+        return
+      }
+      stopAndRelease()
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        onHidden()
+      } else {
+        onForeground()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    let removeAppListener: (() => void) | undefined
+    if (Capacitor.isNativePlatform()) {
+      void App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) {
+          if (!playingRef.current) {
+            releaseAudioGraph()
+            return
+          }
+          stopAndRelease()
+        } else {
+          onForeground()
+        }
+      }).then((handle) => {
+        removeAppListener = () => {
+          void handle.remove()
+        }
+      })
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      removeAppListener?.()
+    }
+  }, [debugLog, pauseOnAppHidden, releaseAudioGraph, stopAndRelease])
+
+  useEffect(() => {
     return () => {
       playingRef.current = false
       clearSchedulerTimer()
-      try {
-        masterGainRef.current?.disconnect()
-      } catch {
-        /* already disconnected */
-      }
-      audioCtxRef.current = null
-      masterGainRef.current = null
+      releaseAudioGraph()
     }
-  }, [clearSchedulerTimer])
+  }, [clearSchedulerTimer, releaseAudioGraph])
 
   return {
     bpm,
@@ -410,6 +506,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     soundId,
     playing,
     beatIndex,
+    beatPulseId,
     setBpm,
     setMeter,
     setSubdivision,

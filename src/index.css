@@ -612,6 +612,7 @@ body.settings-branch-open * {
   display: flex;
   gap: 0.35rem;
   width: 100%;
+  margin-top: 0.5rem;
   padding: 0 0.75rem 0.5rem;
   overflow-x: auto;
   scrollbar-width: none;
@@ -910,6 +911,19 @@ body.settings-branch-open * {
 .audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat
   .audio-practice-metronome__beat-number {
   color: #0f172a;
+}
+
+.metronome-audio-stage__beat-row--playing .audio-practice-metronome__beat--pulse {
+  animation: metronome-beat-pulse 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.metronome-audio-stage__beat-row--playing .audio-practice-metronome__beat--pulse-soft {
+  animation: metronome-beat-pulse-soft 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.metronome-audio-stage__beat-row--reduced-motion .audio-practice-metronome__beat--pulse,
+.metronome-audio-stage__beat-row--reduced-motion .audio-practice-metronome__beat--pulse-soft {
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

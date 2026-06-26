@@ -74,10 +74,10 @@ export function scheduleMetronomeClick(
 
   switch (sound) {
     case 'woodblock':
-      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_WOODBLOCK, 'triangle')
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_SOFT, 'sine')
       return
     case 'soft':
-      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_SOFT, 'sine')
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_WOODBLOCK, 'triangle')
       return
     case 'electronic':
       scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_ELECTRONIC, 'square')
