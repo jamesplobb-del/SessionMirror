@@ -1788,8 +1788,6 @@ function StandardApp({
   const isAudioPracticeMainTab =
     recordingMode !== 'audio' || audioPracticeTab === 'audio'
 
-  const showAudioTakeCardsRow = recordingMode === 'audio'
-
   const showFloatingMainPitch =
     showPitch &&
     mainAudioPitchSource !== null &&
@@ -2646,7 +2644,7 @@ function StandardApp({
         )}
 
         <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
-          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && showAudioTakeCardsRow && (
+          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && (
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"
