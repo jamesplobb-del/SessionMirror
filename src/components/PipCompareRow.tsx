@@ -7,7 +7,7 @@ import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
-interface PipCompareRowProps {
+export interface PipCompareRowProps {
   benchmarkTake: Take | null
   challengerTake: Take | null
   youtubeEmbedUrl: string | null
@@ -35,6 +35,8 @@ interface PipCompareRowProps {
   onPinCurrentAsBest?: () => void
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
   youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
+  /** Compact stacked layout for Audio Tuner + Met bottom panel. */
+  layoutVariant?: 'pip' | 'combo'
 }
 
 export function PipDragGhost({
@@ -119,8 +121,11 @@ export default memo(function PipCompareRow({
   onPinCurrentAsBest,
   onYoutubeHostChange,
   youtubeIframeRef,
+  layoutVariant = 'pip',
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
+  const isCombo = layoutVariant === 'combo'
+  const boxLayout = isCombo ? 'fill' : 'pip'
 
   const { ghost, isDragging, isArming, dragSourceProps } = useDragToPin({
     sourceTakeId: challengerTake?.id ?? null,
@@ -136,10 +141,13 @@ export default memo(function PipCompareRow({
 
   return (
     <>
-      <div className="app-pip-row" data-tutorial="pip-row">
+      <div
+        className={`app-pip-row ${isCombo ? 'app-pip-row--combo' : ''}`}
+        data-tutorial="pip-row"
+      >
         <div ref={benchmarkDropRef} className="app-pip-slot pointer-events-auto">
           <BestTakeBox
-            layout="pip"
+            layout={boxLayout}
             take={benchmarkTake}
             youtubeEmbedUrl={youtubeEmbedUrl}
             suspendPlayback={suspendPipPlayback}
@@ -159,6 +167,7 @@ export default memo(function PipCompareRow({
 
         <div className="app-pip-slot pointer-events-auto" data-tutorial="challenger-card">
           <PipWindow
+            layout={boxLayout}
             src={challengerTake?.videoUrl ?? null}
           filePath={challengerTake?.filePath}
           mimeType={

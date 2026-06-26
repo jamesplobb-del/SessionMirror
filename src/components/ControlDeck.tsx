@@ -18,6 +18,8 @@ interface ControlDeckProps {
   onOpenVault: () => void
   onOpenSettings: () => void
   takeCount: number
+  isVaultOpen?: boolean
+  vaultToggleEnabled?: boolean
   autoSoundListening?: boolean
   handsFreeRecording?: boolean
   handsFreePlaybackPending?: boolean
@@ -56,6 +58,8 @@ function ControlDeck({
   onOpenVault,
   onOpenSettings,
   takeCount,
+  isVaultOpen = false,
+  vaultToggleEnabled = false,
   autoSoundListening = false,
   handsFreeRecording = false,
   handsFreePlaybackPending = false,
@@ -147,7 +151,11 @@ function ControlDeck({
           hapticFeedback={hapticFeedback}
           data-tutorial="vault-button"
           className={`control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full ${HUD_SOLID_BTN}`}
-          aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
+          aria-label={
+            vaultToggleEnabled && isVaultOpen
+              ? 'Close take vault'
+              : `View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`
+          }
         >
           <span className="relative flex h-full w-full items-center justify-center">
             <FolderOpen className="h-5 w-5" />
