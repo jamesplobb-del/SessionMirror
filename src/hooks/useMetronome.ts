@@ -20,6 +20,7 @@ export interface UseMetronomeResult {
   soundId: string
   playing: boolean
   beatIndex: number
+  subTickIndex: number
   beatPulseId: number
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
