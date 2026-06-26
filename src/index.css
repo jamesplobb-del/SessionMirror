@@ -414,10 +414,23 @@ body.settings-branch-open * {
 .app-ui-overlay--sheet-open .audio-practice-metronome,
 .app-ui-overlay--sheet-open .audio-practice-tuner-shell,
 .app-ui-overlay--sheet-open .audio-practice-tuner-shell *,
-.app-ui-overlay--sheet-open .app-pip-row-wrap,
 .app-ui-overlay--sheet-open .app-hud-bottom,
-.app-ui-overlay--sheet-open .control-deck,
+.app-ui-overlay--sheet-open .control-deck {
+  pointer-events: none !important;
+}
+
+.app-ui-overlay--sheet-open .control-deck__vault-btn,
+.app-ui-overlay--sheet-open .control-deck__settings-btn {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 101;
+}
+
 .app-ui-overlay--sheet-open .hud-header {
+  pointer-events: none !important;
+}
+
+.app-ui-overlay--sheet-open .app-pip-row-wrap {
   pointer-events: none !important;
 }
 
@@ -963,11 +976,6 @@ body.settings-branch-open * {
   background: transparent;
 }
 
-.pitch-chart-card--metronome-hold .pitch-chart-shell {
-  opacity: 0.94;
-  filter: saturate(0.88);
-}
-
 .animated-bottom-sheet--elevated,
 .tutorial-sheet-backdrop--elevated {
   pointer-events: auto !important;
@@ -975,18 +983,6 @@ body.settings-branch-open * {
 
 .tutorial-sheet-backdrop--elevated {
   touch-action: manipulation;
-}
-
-.app-ui-overlay--sheet-open .control-deck__vault-btn {
-  pointer-events: auto !important;
-  position: relative;
-  z-index: 56;
-}
-
-.app-ui-overlay--sheet-open .control-deck__settings-btn {
-  pointer-events: auto !important;
-  position: relative;
-  z-index: 56;
 }
 
 .app-ui-rotator .tutorial-sheet-backdrop {

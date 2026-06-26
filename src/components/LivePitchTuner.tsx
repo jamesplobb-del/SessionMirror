@@ -1,7 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMemo, useRef, type RefObject } from 'react'
-import { useGatedPitchReadout } from '../hooks/useGatedPitchReadout'
-import { useMetronomePitchAnalysisHold } from '../hooks/useMetronomePitchAnalysisHold'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
@@ -293,12 +291,10 @@ function LiveAudioTunerPane({
   readout,
   inTuneGlow,
   canvasRef,
-  chartHolding = false,
 }: {
   readout: PitchReadout
   inTuneGlow: number
   canvasRef: RefObject<HTMLCanvasElement | null>
-  chartHolding?: boolean
 }) {
   const active = readout.noteName !== '—'
   const displayCents = active ? readout.cents : 0
@@ -316,9 +312,7 @@ function LiveAudioTunerPane({
       </div>
 
       <div className="pitch-audio-stage__chart min-h-0 flex-1">
-        <div
-          className={`pitch-chart-card${chartHolding ? ' pitch-chart-card--metronome-hold' : ''}`}
-        >
+        <div className="pitch-chart-card">
           <PitchChartCanvas canvasRef={canvasRef} glass fill />
         </div>
       </div>
@@ -352,8 +346,7 @@ function LivePitchTunerAudio({
 
   const showPlayback = isPlaying && !liveMicOnly
   const showLive = liveMicOnly && (isPlaying || liveMicEnabled || enabled)
-  const metronomePitchHold = useMetronomePitchAnalysisHold(showLive)
-  const liveTrackerEnabled = enabled && showLive && !metronomePitchHold
+  const liveTrackerEnabled = enabled && showLive
   const playbackTrackerEnabled = enabled && showPlayback
 
   const liveTrackerOptions = useMemo(
@@ -397,18 +390,6 @@ function LivePitchTunerAudio({
     playbackTrackerOptions,
   )
 
-  const gatedLive = useGatedPitchReadout(liveTracker.readout, liveTracker.inTuneGlow, {
-    enabled: showLive,
-    metronomeGate: true,
-  })
-
-  const gatedPlayback = useGatedPitchReadout(playbackTracker.readout, playbackTracker.inTuneGlow, {
-    enabled: showPlayback,
-    metronomeGate: false,
-  })
-
-  const liveChartHolding = metronomePitchHold || gatedLive.suppressing
-
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
 
   return (
@@ -424,16 +405,15 @@ function LivePitchTunerAudio({
         >
           {showPlayback ? (
             <LiveAudioTunerPane
-              readout={gatedPlayback.readout}
-              inTuneGlow={gatedPlayback.inTuneGlow}
+              readout={playbackTracker.readout}
+              inTuneGlow={playbackTracker.inTuneGlow}
               canvasRef={playbackCanvasRef}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
-              readout={gatedLive.readout}
-              inTuneGlow={gatedLive.inTuneGlow}
+              readout={liveTracker.readout}
+              inTuneGlow={liveTracker.inTuneGlow}
               canvasRef={liveCanvasRef}
-              chartHolding={liveChartHolding}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -491,12 +471,6 @@ export default function LivePitchTuner({
       realtimeMode: isWidget,
     },
   )
-  const { readout, inTuneGlow: _inTuneGlow } = useGatedPitchReadout(tracker.readout, tracker.inTuneGlow, {
-    enabled: trackerActive && liveMicWidget,
-    metronomeGate: liveMicWidget,
-  })
-  void _inTuneGlow
-
   if (isAudio) {
     return (
       <LivePitchTunerAudio
@@ -513,11 +487,11 @@ export default function LivePitchTuner({
     )
   }
 
-  const active = readout.noteName !== '—'
-  const displayCents = active ? readout.cents : 0
+  const active = tracker.readout.noteName !== '—'
+  const displayCents = active ? tracker.readout.cents : 0
   const accent = active ? getIntonationColor(displayCents) : 'rgba(255,255,255,0.55)'
-  const inTune = active && isInTune(readout.cents)
-  const zone = active ? getIntonationZone(readout.cents) : null
+  const inTune = active && isInTune(tracker.readout.cents)
+  const zone = active ? getIntonationZone(tracker.readout.cents) : null
   const spectrogramHeight = isStage
     ? 'min-h-0 flex-1'
     : 'h-[6.5rem]'
@@ -531,10 +505,10 @@ export default function LivePitchTuner({
               className="pitch-widget-note pitch-readout-display text-center text-[clamp(0.875rem,4.5cqw,1rem)] font-bold leading-none tracking-tight"
               style={{ color: accent }}
             >
-              {readout.noteName}
+              {tracker.readout.noteName}
               {active && (
                 <span className="ml-1.5 text-[clamp(0.75rem,3.8cqw,0.875rem)] font-semibold">
-                  {active ? formatDisplayCents(readout.cents) : '—'}
+                  {active ? formatDisplayCents(tracker.readout.cents) : '—'}
                 </span>
               )}
             </p>
@@ -542,7 +516,7 @@ export default function LivePitchTuner({
               className="pitch-widget-hz pitch-readout-display absolute right-3.5 top-3 shrink-0"
               style={{ color: accent }}
             >
-              {formatFrequencyHz(readout.frequencyHz)}
+              {formatFrequencyHz(tracker.readout.frequencyHz)}
             </p>
           </div>
 
@@ -569,10 +543,10 @@ export default function LivePitchTuner({
                 className="pitch-readout-display text-2xl font-bold leading-none tracking-tight"
                 style={{ color: accent }}
               >
-                {readout.noteName}
+                {tracker.readout.noteName}
                 {active && (
                   <span className="ml-2 text-lg font-semibold">
-                    {formatDisplayCents(readout.cents)}
+                    {formatDisplayCents(tracker.readout.cents)}
                   </span>
                 )}
               </p>
@@ -581,7 +555,7 @@ export default function LivePitchTuner({
               className="pitch-readout-display shrink-0 text-sm font-bold"
               style={{ color: accent }}
             >
-              {formatFrequencyHz(readout.frequencyHz)}
+              {formatFrequencyHz(tracker.readout.frequencyHz)}
             </p>
           </div>
 
@@ -609,10 +583,10 @@ export default function LivePitchTuner({
                 className="mt-2 font-mono text-6xl font-bold leading-none tabular-nums sm:text-7xl"
                 style={{ color: accent }}
               >
-                {readout.noteName}
+                {tracker.readout.noteName}
               </p>
               <p className="mt-1.5 font-mono text-xs text-white/35">
-                {formatFrequencyHz(readout.frequencyHz)}
+                {formatFrequencyHz(tracker.readout.frequencyHz)}
               </p>
             </div>
 
@@ -621,7 +595,7 @@ export default function LivePitchTuner({
                 className="font-mono text-3xl font-semibold tabular-nums"
                 style={{ color: accent }}
               >
-                {active ? formatDisplayCents(readout.cents) : '—'}
+                {active ? formatDisplayCents(tracker.readout.cents) : '—'}
               </p>
               <div className="mt-1.5">
                 <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
@@ -630,7 +604,7 @@ export default function LivePitchTuner({
           </div>
 
           <div className="mt-4">
-            <CentsNeedle cents={readout.cents} active={active} />
+            <CentsNeedle cents={tracker.readout.cents} active={active} />
             <div className="mt-1.5 flex justify-between font-mono text-[10px] text-white/25">
               <span>-50</span>
               <span className="text-emerald-400/60">0</span>
@@ -661,10 +635,10 @@ export default function LivePitchTuner({
               className="mt-1 font-mono text-5xl font-bold leading-none tabular-nums"
               style={{ color: accent }}
             >
-              {readout.noteName}
+              {tracker.readout.noteName}
             </p>
             <p className="mt-1 font-mono text-[11px] text-white/35">
-              {formatFrequencyHz(readout.frequencyHz)}
+              {formatFrequencyHz(tracker.readout.frequencyHz)}
             </p>
           </div>
 
@@ -673,7 +647,7 @@ export default function LivePitchTuner({
               className="font-mono text-2xl font-semibold tabular-nums"
               style={{ color: accent }}
             >
-              {active ? formatDisplayCents(readout.cents) : '—'}
+              {active ? formatDisplayCents(tracker.readout.cents) : '—'}
             </p>
             <div className="mt-1">
               <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
@@ -682,7 +656,7 @@ export default function LivePitchTuner({
         </div>
 
         <div className="mt-3">
-          <CentsNeedle cents={readout.cents} active={active} />
+          <CentsNeedle cents={tracker.readout.cents} active={active} />
           <div className="mt-1 flex justify-between font-mono text-[9px] text-white/25">
             <span>-50</span>
             <span className="text-emerald-400/60">0</span>
