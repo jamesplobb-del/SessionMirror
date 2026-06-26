@@ -300,7 +300,7 @@ function LiveAudioTunerPane({
   const displayCents = active ? readout.cents : 0
 
   return (
-    <div className="pitch-audio-stage flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="pitch-audio-stage pitch-audio-stage--polished flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="pitch-audio-stage__hero shrink-0">
         <NoteOrbitReadout
           noteName={readout.noteName}
@@ -312,7 +312,10 @@ function LiveAudioTunerPane({
       </div>
 
       <div className="pitch-audio-stage__chart min-h-0 flex-1">
-        <PitchChartCanvas canvasRef={canvasRef} glass fill />
+        <div className="pitch-chart-card">
+          <div className="pitch-chart-card__grid" aria-hidden />
+          <PitchChartCanvas canvasRef={canvasRef} glass fill />
+        </div>
       </div>
     </div>
   )
@@ -414,7 +417,7 @@ function LivePitchTunerAudio({
               canvasRef={liveCanvasRef}
             />
           ) : (
-            <div className="pitch-audio-idle-pane flex flex-1 flex-col items-center justify-center px-6 text-center">
+            <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
               <p className="pitch-audio-idle-pane__title">Pitch Analysis</p>
               <p className="pitch-audio-idle-pane__copy">
                 Enable Live Mic Tuner in Settings to practice with a live tuner, or press play to
