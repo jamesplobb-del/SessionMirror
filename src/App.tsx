@@ -81,6 +81,7 @@ import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { INTERACTIVE_TUTORIAL_STEPS, isOnboardingComplete, markOnboardingComplete } from './utils/onboardingTutorial'
 import { ActionSheetProvider } from './context/ActionSheetContext'
+import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -2260,6 +2261,10 @@ function StandardApp({
       signals={tutorialSignals}
     >
     <ActionSheetProvider>
+    <MetronomeProvider
+      isTakePlaying={takePlaybackActive}
+      muteDuringPlayback={settings.muteMetronomeDuringPlayback}
+    >
     <div ref={appShellRef} className="app-shell">
       <audio
         ref={autoPlaybackAudioRef}
@@ -2674,6 +2679,7 @@ function StandardApp({
       </Suspense>
     </div>
     </div>
+    </MetronomeProvider>
     </ActionSheetProvider>
     </TutorialProvider>
   )
