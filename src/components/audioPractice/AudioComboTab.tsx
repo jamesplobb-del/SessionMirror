@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useRef, useState, type RefObject } from 'react'
 import LivePitchTuner from '../LivePitchTuner'
+import PipCompareRow, { type PipCompareRowProps } from '../PipCompareRow'
 import SplitRatioDragHandle from '../SplitRatioDragHandle'
-import type { Take } from '../../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import { formatAudioDuration } from '../../utils/formatAudioTakeTime'
 import {
@@ -14,13 +14,10 @@ import {
   normalizeAudioComboSplit,
   saveAudioComboSplitPrefs,
 } from '../../utils/audioComboSplitPrefs'
-import { takeHasPlaybackMedia } from '../../utils/takes'
-import { usePracticeTakePlayback } from '../../hooks/usePracticeTakePlayback'
-import AudioPracticeTakeCard from './AudioPracticeTakeCard'
 import CompactMetronomeCard from './CompactMetronomeCard'
 import LiveRecordingWaveform from './LiveRecordingWaveform'
 
-export interface AudioComboTabProps {
+export interface AudioComboTabProps extends PipCompareRowProps {
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   ready: boolean
@@ -28,14 +25,7 @@ export interface AudioComboTabProps {
   elapsed: number
   tunerInstrument: TunerInstrument
   liveMicTunerEnabled: boolean
-  benchmarkTake: Take | null
-  challengerTake: Take | null
-  benchmarkId: string | null
-  challengerId: string | null
   interactionSuspended?: boolean
-  onPinCurrentAsBest: () => void
-  onDiscardCurrentTake: (takeId: string) => void
-  onOpenVault: () => void
 }
 
 export default function AudioComboTab({
@@ -46,20 +36,12 @@ export default function AudioComboTab({
   elapsed,
   tunerInstrument,
   liveMicTunerEnabled,
-  benchmarkTake,
-  challengerTake,
-  benchmarkId,
-  challengerId,
   interactionSuspended = false,
-  onPinCurrentAsBest,
-  onDiscardCurrentTake,
-  onOpenVault,
+  ...pipProps
 }: AudioComboTabProps) {
   const layoutRef = useRef<HTMLDivElement>(null)
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const [splitPrefs, setSplitPrefs] = useState(loadAudioComboSplitPrefs)
-  const { audioRef, playingTakeId, progress, toggleTakePlayback, stopPlayback } =
-    usePracticeTakePlayback()
 
   const { tunerRatio, takesRatio } = splitPrefs
   const metronomeRatio = Math.max(COMBO_MIDDLE_MIN_RATIO, 100 - tunerRatio - takesRatio)
@@ -96,36 +78,6 @@ export default function AudioComboTab({
     [tunerRatio, updateSplitPrefs],
   )
 
-  const showBest =
-    benchmarkTake != null &&
-    takeHasPlaybackMedia(benchmarkTake) &&
-    benchmarkTake.mediaType !== 'video'
-  const showCurrent =
-    !isRecording &&
-    challengerTake != null &&
-    takeHasPlaybackMedia(challengerTake) &&
-    challengerId != null &&
-    challengerId !== benchmarkId &&
-    challengerTake.mediaType !== 'video'
-
-  const compareActive = Boolean(showBest && showCurrent)
-  const canMakeBest = Boolean(
-    showCurrent && challengerId && challengerId !== benchmarkId,
-  )
-
-  const currentSubtitle =
-    showCurrent && challengerTake
-      ? challengerTake.timestamp > Date.now() - 120_000
-        ? 'Just Recorded'
-        : challengerTake.name
-      : undefined
-
-  useEffect(() => {
-    if (isRecording) {
-      stopPlayback()
-    }
-  }, [isRecording, stopPlayback])
-
   const takesTopRatio = 100 - takesRatio
 
   return (
@@ -133,8 +85,6 @@ export default function AudioComboTab({
       className={`audio-practice-combo-shell ${interactionSuspended ? 'audio-practice-combo-shell--suspended' : ''}`}
       aria-label="Tuner, metronome, and take comparison"
     >
-      <audio ref={audioRef} className="sr-only" preload="none" playsInline />
-
       <div ref={layoutRef} className="audio-combo-split-layout">
         <div
           className="audio-combo-split-layout__tuner min-h-0 overflow-hidden"
@@ -191,16 +141,7 @@ export default function AudioComboTab({
           style={{ flex: `${takesRatio} 1 0%` }}
         >
           <div className="audio-practice-combo__takes audio-practice-combo__takes--docked">
-            <div className="audio-practice-combo__takes-head">
-              <h2 className="audio-practice-combo__takes-title">Take Comparison</h2>
-              <button
-                type="button"
-                className="audio-practice-combo__vault-link"
-                onClick={onOpenVault}
-              >
-                All Takes
-              </button>
-            </div>
+            <h2 className="audio-practice-combo__takes-title">Take Comparison</h2>
 
             {isRecording && (
               <article className="audio-practice-take-card audio-practice-take-card--current audio-practice-take-card--recording">
@@ -226,53 +167,8 @@ export default function AudioComboTab({
               </article>
             )}
 
-            <div className="audio-practice-combo__take-stack">
-              {showBest && benchmarkTake && (
-                <AudioPracticeTakeCard
-                  variant="best"
-                  take={benchmarkTake}
-                  compact
-                  isPlaying={playingTakeId === benchmarkTake.id}
-                  playbackProgress={playingTakeId === benchmarkTake.id ? progress : 0}
-                  compareActive={compareActive}
-                  onPlayToggle={() => {
-                    if (playingTakeId === benchmarkTake.id) {
-                      toggleTakePlayback(benchmarkTake)
-                      return
-                    }
-                    stopPlayback()
-                    toggleTakePlayback(benchmarkTake)
-                  }}
-                />
-              )}
-
-              {showCurrent && challengerTake && (
-                <AudioPracticeTakeCard
-                  variant="current"
-                  take={challengerTake}
-                  compact
-                  subtitle={currentSubtitle}
-                  isPlaying={playingTakeId === challengerTake.id}
-                  playbackProgress={playingTakeId === challengerTake.id ? progress : 0}
-                  canMakeBest={canMakeBest}
-                  onPlayToggle={() => {
-                    if (playingTakeId === challengerTake.id) {
-                      toggleTakePlayback(challengerTake)
-                      return
-                    }
-                    stopPlayback()
-                    toggleTakePlayback(challengerTake)
-                  }}
-                  onMakeBest={onPinCurrentAsBest}
-                  onDiscard={() => onDiscardCurrentTake(challengerTake.id)}
-                />
-              )}
-
-              {!isRecording && !showBest && !showCurrent && (
-                <p className="audio-practice-combo__takes-empty">
-                  Record below to capture a take and compare against your best.
-                </p>
-              )}
+            <div className="audio-combo-take-strip">
+              <PipCompareRow {...pipProps} layoutVariant="combo" />
             </div>
           </div>
         </div>

@@ -1329,6 +1329,14 @@ function StandardApp({
     deferHudMediaPause()
   }, [deferHudMediaPause])
 
+  const handleToggleVault = useCallback(() => {
+    if (isVaultOpen) {
+      handleCloseVault()
+      return
+    }
+    handleOpenVault()
+  }, [handleCloseVault, handleOpenVault, isVaultOpen])
+
   const handleVaultEnterComplete = useCallback(() => {
     if (vaultEnterLoadDoneRef.current) return
     vaultEnterLoadDoneRef.current = true
@@ -2427,14 +2435,34 @@ function StandardApp({
               elapsed={elapsed}
               tunerInstrument={settings.tunerInstrument}
               liveMicTunerEnabled={settings.liveMicTunerEnabled}
+              interactionSuspended={isVaultOpen || isSettingsOpen || isReviewOpen}
               benchmarkTake={benchmarkTake}
               challengerTake={challengerTake}
-              benchmarkId={benchmarkId}
-              challengerId={challengerId}
-              interactionSuspended={isVaultOpen || isSettingsOpen || isReviewOpen}
+              youtubeEmbedUrl={youtubeUrl}
+              suspendPipPlayback={suspendPipPlayback}
+              benchmarkPipVideoRef={benchmarkPipVideoRef}
+              challengerPipVideoRef={challengerPipVideoRef}
+              deleteDropRef={recordDeleteDropRef}
+              onPinBenchmark={handlePinBenchmark}
+              onDeleteTake={handleDragDeleteTake}
+              onUnpinBenchmark={handleUnpinBenchmark}
+              onUnpinChallenger={handleUnpinChallenger}
+              onUploadBenchmark={handleUploadBenchmark}
+              onSubmitYoutube={handleSubmitYoutube}
+              onClearYoutube={handleClearYoutube}
+              onToggleSplitView={handleToggleSplitView}
+              onExpandBenchmark={handleExpandBenchmark}
+              onExpandChallenger={handleExpandChallenger}
+              onDragStateChange={handlePipDragStateChange}
+              onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+              onChallengerPlaybackChange={handleChallengerPlaybackChange}
+              challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
+              onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
+              showPinCurrentAsBest={showPinCurrentAsBest}
               onPinCurrentAsBest={handlePinCurrentAsBest}
-              onDiscardCurrentTake={handleDragDeleteTake}
-              onOpenVault={handleOpenVault}
+              onYoutubeHostChange={handleYoutubeHostChange}
+              youtubeIframeRef={youtubeIframeRef}
+              hapticFeedback={settings.hapticFeedback}
             />
           </div>
         )}
@@ -2490,7 +2518,9 @@ function StandardApp({
             recordingMode={recordingMode}
             onRecordingModeChange={handleRecordingModeChange}
             onToggleRecord={toggleRecording}
-            onOpenVault={handleOpenVault}
+            onOpenVault={isAudioPracticeComboTab ? handleToggleVault : handleOpenVault}
+            isVaultOpen={isVaultOpen}
+            vaultToggleEnabled={isAudioPracticeComboTab}
             onOpenSettings={handleOpenSettings}
             takeCount={takes.length}
             autoSoundListening={autoSoundListening}
