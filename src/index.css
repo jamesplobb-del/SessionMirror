@@ -773,6 +773,7 @@ body.settings-branch-open * {
   max-width: 21rem;
   margin-inline: auto;
   padding-inline: 0.5rem;
+  pointer-events: auto;
 }
 
 .audio-practice-metronome__controls {
@@ -1072,6 +1073,7 @@ body.settings-branch-open * {
   padding-block: 0.125rem;
   padding-inline: 0;
   scrollbar-width: none;
+  pointer-events: auto;
 }
 
 .metronome-h-scroll__track::-webkit-scrollbar {
@@ -1091,7 +1093,8 @@ body.settings-branch-open * {
   border-radius: 999px;
   scroll-snap-align: start;
   scroll-snap-stop: normal;
-  touch-action: pan-x;
+  touch-action: auto;
+  pointer-events: auto;
   -webkit-user-select: none;
   user-select: none;
   cursor: pointer;

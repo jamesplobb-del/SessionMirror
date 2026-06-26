@@ -345,7 +345,7 @@ export default function AudioPracticeMetronomeView() {
           </div>
 
           <section
-            className="audio-practice-metronome__selectors shrink-0"
+            className="audio-practice-metronome__selectors pointer-events-auto shrink-0"
             aria-label="Time signature and rhythm"
           >
             <MetronomeHorizontalScroller label="Time" ariaLabel="Time signature" selectedKey={meter}>
