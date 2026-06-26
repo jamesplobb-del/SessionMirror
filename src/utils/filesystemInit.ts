@@ -3,6 +3,7 @@ import { Directory, Filesystem } from '@capacitor/filesystem'
 
 export const TAKES_DIR = 'takes'
 export const THUMBNAIL_DIR = 'thumbnails'
+export const LIBRARY_DIR = 'library'
 
 let initPromise: Promise<void> | null = null
 let initialized = false
@@ -105,6 +106,7 @@ export async function initAppFilesystem(): Promise<void> {
   initPromise = (async () => {
     await ensureDirectory(TAKES_DIR)
     await ensureDirectory(THUMBNAIL_DIR)
+    await ensureDirectory(LIBRARY_DIR)
     initialized = true
   })()
 

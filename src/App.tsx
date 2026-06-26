@@ -89,19 +89,41 @@ import {
   createProject,
   DEFAULT_PROJECT_NAME,
   deleteProject,
+  deleteLibraryItem,
   deleteVaultTake,
   deleteTakesByProject,
   findBestTakeId,
+  getLibraryItemsByProject,
+  getProjectBenchmarkBinding,
   getTakesByProject,
   initVaultDatabase,
   listProjects,
+  saveLibraryAudioItem,
   saveTake,
+  setProjectBenchmarkBinding,
   setProjectBestTake,
+  setProjectLibraryBenchmark,
   uiTakesFromVaultRowsFast,
   hydrateVaultTakeRowsProgressive,
+  updateLibraryItemName,
   updateVaultTake,
   type Project,
 } from './db'
+import {
+  hasBenchmarkReference,
+  resolveBenchmarkPlayback,
+} from './utils/benchmarkReference'
+import {
+  hydrateLibraryItems,
+  type HydratedLibraryItem,
+} from './utils/libraryBridge'
+import {
+  deleteLibraryFile,
+  normalizeLibraryAudioMime,
+  persistLibraryAudio,
+  probeAudioDurationSeconds,
+} from './utils/libraryStorage'
+import type { BenchmarkBinding } from './types/library'
 import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
 import { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
 import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
@@ -177,6 +199,8 @@ interface AppBootSnapshot {
   takes: Take[]
   benchmarkId: string | null
   challengerId: string | null
+  libraryItems: HydratedLibraryItem[]
+  benchmarkBinding: BenchmarkBinding | null
 }
 
 const BOOT_REVEAL_DELAY_MS = 500
@@ -202,6 +226,8 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
   let takes: Take[] = []
   let benchmarkId: string | null = null
   let challengerId: string | null = null
+  let libraryItems: HydratedLibraryItem[] = []
+  let benchmarkBinding: BenchmarkBinding | null = null
 
   if (initialId) {
     const rows = await getTakesByProject(initialId)
@@ -209,6 +235,21 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
     benchmarkId = findBestTakeId(rows)
     const defaultChallengerId = rows.find((row) => !row.isBestTake)?.id ?? null
     challengerId = settings.showTakeCards ? defaultChallengerId : null
+
+    const libraryRows = await getLibraryItemsByProject(initialId)
+    libraryItems = await hydrateLibraryItems(
+      libraryRows.map((row) => ({
+        id: row.id,
+        projectId: row.projectId,
+        kind: row.kind,
+        name: row.name,
+        createdAt: row.createdAt,
+        filePath: row.filePath,
+        mimeType: row.mimeType,
+        duration: row.duration,
+      })),
+    )
+    benchmarkBinding = await getProjectBenchmarkBinding(initialId)
 
     const hydrated = await hydrateVaultTakeRowsProgressive(rows, {
       priorityIds: [benchmarkId, defaultChallengerId].filter(
@@ -224,6 +265,8 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
     takes,
     benchmarkId,
     challengerId,
+    libraryItems,
+    benchmarkBinding,
   }
 }
 
@@ -306,6 +349,12 @@ function StandardApp({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(bootSnapshot.activeProjectId)
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
+  const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(
+    bootSnapshot.libraryItems,
+  )
+  const [benchmarkBinding, setBenchmarkBinding] = useState<BenchmarkBinding | null>(
+    bootSnapshot.benchmarkBinding,
+  )
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
@@ -596,12 +645,30 @@ function StandardApp({
     async (projectId: string) => {
       const generation = ++reloadTakesGenerationRef.current
       const rows = await getTakesByProject(projectId)
+      const libraryRows = await getLibraryItemsByProject(projectId)
+      const binding = await getProjectBenchmarkBinding(projectId)
       if (generation !== reloadTakesGenerationRef.current) return
 
       const loadedFast = uiTakesFromVaultRowsFast(rows)
       const bestId = findBestTakeId(rows)
       const defaultChallengerId = rows.find((row) => !row.isBestTake)?.id ?? null
 
+      const hydratedLibrary = await hydrateLibraryItems(
+        libraryRows.map((row) => ({
+          id: row.id,
+          projectId: row.projectId,
+          kind: row.kind,
+          name: row.name,
+          createdAt: row.createdAt,
+          filePath: row.filePath,
+          mimeType: row.mimeType,
+          duration: row.duration,
+        })),
+      )
+      if (generation !== reloadTakesGenerationRef.current) return
+
+      setLibraryItems(hydratedLibrary)
+      setBenchmarkBinding(binding)
       setTakes((current) => mergeHydratedTakes(current, loadedFast))
       setBenchmarkId(bestId)
       setChallengerId((current) => {
@@ -649,6 +716,8 @@ function StandardApp({
       setTakes([])
       setBenchmarkId(null)
       setChallengerId(null)
+      setLibraryItems([])
+      setBenchmarkBinding(null)
       await reloadProjectTakes(projectId)
     },
     [pausePipVideos, releaseAutoRecordSuppress, reloadProjectTakes, stopAutoPlaybackAudio],
@@ -669,7 +738,7 @@ function StandardApp({
       releaseAutoRecordSuppress(0)
       pausePipVideos()
 
-      const rows =
+      const takeRows =
         projectId === activeProjectIdRef.current
           ? takes.map((take) => ({
               id: take.id,
@@ -679,13 +748,24 @@ function StandardApp({
               id: row.id,
               filePath: row.filePath,
             }))
+      const libraryFileRows =
+        projectId === activeProjectIdRef.current
+          ? libraryItems.map((item) => ({ filePath: item.filePath }))
+          : (await getLibraryItemsByProject(projectId)).map((row) => ({
+              filePath: row.filePath,
+            }))
 
       await deleteProject(projectId)
 
-      for (const row of rows) {
+      for (const row of takeRows) {
         await deleteCachedTakeThumbnail(row.id)
         if (row.filePath) {
           await deleteTakeFile(row.filePath)
+        }
+      }
+      for (const row of libraryFileRows) {
+        if (row.filePath) {
+          await deleteLibraryFile(row.filePath)
         }
       }
 
@@ -699,6 +779,8 @@ function StandardApp({
         setTakes([])
         setBenchmarkId(null)
         setChallengerId(null)
+        setLibraryItems([])
+        setBenchmarkBinding(null)
         return
       }
 
@@ -711,9 +793,12 @@ function StandardApp({
       setTakes([])
       setBenchmarkId(null)
       setChallengerId(null)
+      setLibraryItems([])
+      setBenchmarkBinding(null)
       await reloadProjectTakes(next.id)
     },
     [
+      libraryItems,
       pausePipVideos,
       projects,
       releaseAutoRecordSuppress,
@@ -1517,10 +1602,13 @@ function StandardApp({
   const challengerHandsFreeAutoPlayRequestId =
     recordingMode === 'audio' ? null : autoPlaybackTakeId
 
-  const benchmarkTake = useMemo(
-    () => takes.find((t) => t.id === benchmarkId) ?? null,
-    [takes, benchmarkId],
+  const resolvedBenchmark = useMemo(
+    () => resolveBenchmarkPlayback(benchmarkBinding, benchmarkId, takes, libraryItems),
+    [benchmarkBinding, benchmarkId, libraryItems, takes],
   )
+
+  const benchmarkTake = resolvedBenchmark.take
+  const libraryBenchmarkPlayback = resolvedBenchmark.libraryPlayback
 
   const challengerTake = useMemo(
     () => takes.find((t) => t.id === challengerId) ?? null,
@@ -1777,6 +1865,7 @@ function StandardApp({
       releaseAutoRecordSuppress(0)
       pausePipVideos()
       setYoutubeUrl(null)
+      setBenchmarkBinding({ source: 'take', refId: id })
       setBenchmarkId((prevBenchmark) => {
         setChallengerId((current) => {
           if (current === id) {
@@ -1801,6 +1890,97 @@ function StandardApp({
       }
     },
     [pausePipVideos, releaseAutoRecordSuppress, sortMode, stopAutoPlaybackAudio, takes],
+  )
+
+  const handleSetLibraryReference = useCallback(
+    (itemId: string) => {
+      stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
+      pausePipVideos()
+      setYoutubeUrl(null)
+      setBenchmarkBinding({ source: 'library', refId: itemId })
+      if (activeProjectIdRef.current) {
+        void setProjectLibraryBenchmark(activeProjectIdRef.current, itemId)
+      }
+    },
+    [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio],
+  )
+
+  const handleClearLibraryReference = useCallback(() => {
+    teardownPipMedia(benchmarkPipVideoRef.current)
+    void releaseTakePlaybackAudio()
+    stabilizeViewportAfterMediaInteraction()
+    setBenchmarkPipPlaying(false)
+    setBenchmarkBinding(null)
+    if (activeProjectIdRef.current) {
+      void setProjectBenchmarkBinding(activeProjectIdRef.current, null)
+    }
+  }, [teardownPipMedia])
+
+  const handleImportLibraryAudio = useCallback(async (file: File) => {
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
+
+    const itemId = crypto.randomUUID()
+    const mimeType = normalizeLibraryAudioMime(file.type)
+    const duration = await probeAudioDurationSeconds(file)
+    const persisted = await persistLibraryAudio(file, itemId, mimeType)
+    const row = await saveLibraryAudioItem({
+      projectId,
+      filePath: persisted.filePath,
+      mimeType,
+      duration,
+      name: file.name.replace(/\.[^.]+$/, ''),
+      itemId,
+    })
+
+    const hydrated = await hydrateLibraryItems([
+      {
+        id: row.id,
+        projectId: row.projectId,
+        kind: row.kind,
+        name: row.name,
+        createdAt: row.createdAt,
+        filePath: row.filePath,
+        mimeType: row.mimeType,
+        duration: row.duration,
+      },
+    ])
+    const item = hydrated[0]
+    if (item && persisted.playbackUrl) {
+      item.playbackUrl = persisted.playbackUrl
+    }
+    if (item) {
+      setLibraryItems((current) => [item, ...current])
+    }
+  }, [])
+
+  const handleRenameLibraryItem = useCallback((itemId: string, name: string) => {
+    void updateLibraryItemName(itemId, name)
+    setLibraryItems((current) =>
+      current.map((item) => (item.id === itemId ? { ...item, name } : item)),
+    )
+  }, [])
+
+  const handleDeleteLibraryItem = useCallback(
+    async (itemId: string) => {
+      const item = libraryItems.find((entry) => entry.id === itemId)
+      if (!item) return
+
+      if (
+        benchmarkBinding?.source === 'library' &&
+        benchmarkBinding.refId === itemId
+      ) {
+        handleClearLibraryReference()
+      }
+
+      await deleteLibraryItem(itemId)
+      if (item.filePath) {
+        await deleteLibraryFile(item.filePath)
+      }
+      setLibraryItems((current) => current.filter((entry) => entry.id !== itemId))
+    },
+    [benchmarkBinding, handleClearLibraryReference, libraryItems],
   )
 
   const handlePinChallenger = useCallback(
@@ -2068,10 +2248,10 @@ function StandardApp({
 
   const handleExpandBenchmark = useMemo(
     () =>
-      takeHasPlaybackMedia(benchmarkTake)
+      libraryBenchmarkPlayback || takeHasPlaybackMedia(benchmarkTake)
         ? () => handleOpenCompareReview('benchmark')
         : undefined,
-    [benchmarkTake, handleOpenCompareReview],
+    [benchmarkTake, handleOpenCompareReview, libraryBenchmarkPlayback],
   )
 
   const handleExpandChallenger = useMemo(
@@ -2160,8 +2340,7 @@ function StandardApp({
     })
   }, [refreshCameraSession])
 
-  const hasBestTakeReference =
-    Boolean(youtubeUrl) || takeHasPlaybackMedia(benchmarkTake)
+  const hasBestTakeReference = hasBenchmarkReference(youtubeUrl, resolvedBenchmark)
 
   const showPinCurrentAsBest = Boolean(
     hasBestTakeReference &&
@@ -2412,6 +2591,7 @@ function StandardApp({
               splitRatio={splitRatio}
               onSplitRatioChange={setSplitRatio}
               benchmarkTake={benchmarkTake}
+              libraryBenchmarkPlayback={libraryBenchmarkPlayback}
               challengerTake={challengerTake}
               youtubeEmbedUrl={youtubeUrl}
               suspendPipPlayback={suspendPipPlayback}
@@ -2430,6 +2610,7 @@ function StandardApp({
               }
               metronomeStageActive={metronomeStageActive}
               onUnpinBenchmark={handleUnpinBenchmark}
+              onClearLibraryReference={handleClearLibraryReference}
               onUnpinChallenger={handleUnpinChallenger}
               onClearYoutube={handleClearYoutube}
               onSubmitYoutube={handleSubmitYoutube}
@@ -2467,6 +2648,7 @@ function StandardApp({
               >
                 <PipCompareRow
                   benchmarkTake={benchmarkTake}
+                  libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                   challengerTake={challengerTake}
                   youtubeEmbedUrl={youtubeUrl}
                   suspendPipPlayback={suspendPipPlayback}
@@ -2476,6 +2658,7 @@ function StandardApp({
                   onPinBenchmark={handlePinBenchmark}
                   onDeleteTake={handleDragDeleteTake}
                   onUnpinBenchmark={handleUnpinBenchmark}
+                  onClearLibraryReference={handleClearLibraryReference}
                   onUnpinChallenger={handleUnpinChallenger}
                   onUploadBenchmark={handleUploadBenchmark}
                   onSubmitYoutube={handleSubmitYoutube}
@@ -2545,13 +2728,14 @@ function StandardApp({
           vaultTakes={sortedTakes}
           vaultIndex={vaultReviewIndex}
           onVaultIndexChange={setVaultReviewIndex}
-          benchmarkSrc={benchmarkTake?.videoUrl ?? null}
+          benchmarkSrc={libraryBenchmarkPlayback?.playbackUrl ?? benchmarkTake?.videoUrl ?? null}
           challengerSrc={challengerTake?.videoUrl ?? null}
-          benchmarkFilePath={benchmarkTake?.filePath}
+          benchmarkFilePath={libraryBenchmarkPlayback?.filePath ?? benchmarkTake?.filePath}
           challengerFilePath={challengerTake?.filePath}
-          benchmarkName={benchmarkTake?.name}
+          benchmarkName={libraryBenchmarkPlayback?.name ?? benchmarkTake?.name}
           challengerName={challengerTake?.name}
           benchmarkMimeType={
+            libraryBenchmarkPlayback?.mimeType ??
             benchmarkTake?.videoMimeType ??
             (benchmarkTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
           }
@@ -2559,9 +2743,9 @@ function StandardApp({
             challengerTake?.videoMimeType ??
             (challengerTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
           }
-          benchmarkMediaType={benchmarkTake?.mediaType}
+          benchmarkMediaType={libraryBenchmarkPlayback ? 'audio' : benchmarkTake?.mediaType}
           challengerMediaType={challengerTake?.mediaType}
-          benchmarkMirror={benchmarkTake?.mirrorPlayback !== false}
+          benchmarkMirror={libraryBenchmarkPlayback ? false : benchmarkTake?.mirrorPlayback !== false}
           challengerMirror={challengerTake?.mirrorPlayback !== false}
           benchmarkRecordingOrientation={benchmarkTake?.recordingOrientation}
           challengerRecordingOrientation={challengerTake?.recordingOrientation}
@@ -2590,7 +2774,17 @@ function StandardApp({
         sortMode={sortMode}
         onSortChange={setSortMode}
         benchmarkId={benchmarkId}
+        benchmarkBinding={benchmarkBinding}
         challengerId={challengerId}
+        libraryItems={libraryItems}
+        onImportLibraryAudio={(file) => {
+          void handleImportLibraryAudio(file)
+        }}
+        onRenameLibraryItem={handleRenameLibraryItem}
+        onDeleteLibraryItem={(itemId) => {
+          void handleDeleteLibraryItem(itemId)
+        }}
+        onSetLibraryReference={handleSetLibraryReference}
         onPinBenchmark={handlePinBenchmark}
         onPinChallenger={handlePinChallenger}
         onBeforePin={pausePipVideos}

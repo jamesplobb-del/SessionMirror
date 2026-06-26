@@ -26,6 +26,7 @@ import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { useTutorialAction } from '../context/TutorialContext'
 import type { Take } from '../types'
+import type { LibraryPlaybackReference } from '../types/library'
 import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
 import { HUD_SOLID_FLOAT_BADGE, HUD_SOLID_PIP_PLAY_ICON } from '../utils/interactiveUx'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
@@ -56,11 +57,13 @@ function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
 export interface BestTakeBoxProps {
   layout: 'pip' | 'fill'
   take: Take | null
+  libraryPlayback?: LibraryPlaybackReference | null
   youtubeEmbedUrl: string | null
   suspendPlayback?: boolean
   videoRef?: RefObject<HTMLMediaElement | null>
   dropHighlight?: boolean
   onUnpinTake: () => void
+  onClearLibraryReference?: () => void
   onClearYoutube: () => void
   onSubmitYoutube: (embedUrl: string) => void
   onUpload?: (file: File) => void
@@ -75,11 +78,13 @@ export interface BestTakeBoxProps {
 function BestTakeBox({
   layout,
   take,
+  libraryPlayback = null,
   youtubeEmbedUrl,
   suspendPlayback = false,
   videoRef: externalVideoRef,
   dropHighlight = false,
   onUnpinTake,
+  onClearLibraryReference,
   onClearYoutube,
   onSubmitYoutube,
   onUpload,
@@ -90,8 +95,14 @@ function BestTakeBox({
   onYoutubeHostChange,
   youtubeIframeRef,
 }: BestTakeBoxProps) {
-  const src = take?.videoUrl ?? null
-  const videoSourceKey = src || take?.filePath || youtubeEmbedUrl || 'empty'
+  const librarySrc = libraryPlayback?.playbackUrl ?? null
+  const src = librarySrc || take?.videoUrl || null
+  const playbackFilePath = libraryPlayback?.filePath || take?.filePath || ''
+  const playbackMimeType =
+    libraryPlayback?.mimeType ??
+    take?.videoMimeType ??
+    (take?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+  const videoSourceKey = src || playbackFilePath || youtubeEmbedUrl || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
   const [isPlaying, setIsPlaying] = useState(false)
@@ -99,12 +110,13 @@ function BestTakeBox({
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
   const notifyTutorial = useTutorialAction()
 
-  const hasTake = Boolean(src || take?.filePath)
+  const hasLibraryPlayback = Boolean(librarySrc || libraryPlayback?.filePath)
+  const hasTake = Boolean(hasLibraryPlayback || take?.videoUrl || take?.filePath)
   const hasYoutube = Boolean(youtubeEmbedUrl)
   const hasReference = hasTake || hasYoutube
   const isFill = layout === 'fill'
 
-  const showUploadBadge = Boolean(onUpload) && hasTake
+  const showUploadBadge = Boolean(onUpload) && hasTake && !hasLibraryPlayback
 
   useEffect(() => {
     if (youtubeDialogOpen) {
@@ -167,7 +179,8 @@ function BestTakeBox({
   }, [hasTake, suspendPlayback, videoRef, videoSourceKey])
 
   const posterUrl =
-    take?.thumbnailUrl ?? (take?.mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : null)
+    take?.thumbnailUrl ??
+    (hasLibraryPlayback || take?.mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : null)
   const { decoderActive, pendingPlayRef, requestDecoderForPlay } = usePipInlineDecoder({
     suspendPlayback,
     isAutoPlayArmed: false,
@@ -262,8 +275,9 @@ function BestTakeBox({
 
   const handleClearReference = useCallback(() => {
     if (hasYoutube) onClearYoutube()
+    else if (hasLibraryPlayback) onClearLibraryReference?.()
     else onUnpinTake()
-  }, [hasYoutube, onClearYoutube, onUnpinTake])
+  }, [hasLibraryPlayback, hasYoutube, onClearLibraryReference, onClearYoutube, onUnpinTake])
 
   const pipTouchTargetClass =
     'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
@@ -308,7 +322,7 @@ function BestTakeBox({
         }}
         className={UPLOAD_BADGE_BTN}
         style={{ top: chromeInset, right: chromeInset }}
-        aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
+        aria-label={hasYoutube ? 'Clear YouTube reference' : hasLibraryPlayback ? 'Clear library reference' : 'Unload Best Take'}
       >
         <X className="h-3 w-3" />
       </Pressable>
@@ -384,18 +398,15 @@ function BestTakeBox({
             <>
               {decoderActive ? (
                 <TakeVideoPlayer
-                  filePath={take!.filePath}
+                  filePath={playbackFilePath}
                   videoUrl={src ?? ''}
-                  mimeType={
-                    take!.videoMimeType ??
-                    (take!.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-                  }
+                  mimeType={playbackMimeType}
                   videoRef={videoRef}
                   videoSourceKey={videoSourceKey}
                   className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                   loadingClassName="absolute inset-0 h-full w-full bg-black"
-                  mirror={take!.mirrorPlayback !== false}
-                  recordingOrientation={take!.recordingOrientation}
+                  mirror={hasLibraryPlayback ? false : take!.mirrorPlayback !== false}
+                  recordingOrientation={take?.recordingOrientation}
                   fit={playbackFit}
                   manualPlayOnly
                   audible={playbackAudible}

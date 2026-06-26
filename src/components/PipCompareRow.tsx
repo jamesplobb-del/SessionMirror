@@ -3,12 +3,14 @@ import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
+import type { LibraryPlaybackReference } from '../types/library'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 export interface PipCompareRowProps {
   benchmarkTake: Take | null
+  libraryBenchmarkPlayback: LibraryPlaybackReference | null
   challengerTake: Take | null
   youtubeEmbedUrl: string | null
   suspendPipPlayback: boolean
@@ -18,6 +20,7 @@ export interface PipCompareRowProps {
   onPinBenchmark: (takeId: string) => void
   onDeleteTake: (takeId: string) => void
   onUnpinBenchmark: () => void
+  onClearLibraryReference?: () => void
   onUnpinChallenger: () => void
   onUploadBenchmark: (file: File) => void
   onSubmitYoutube: (embedUrl: string) => void
@@ -93,6 +96,7 @@ export function PipDragGhost({
 
 export default memo(function PipCompareRow({
   benchmarkTake,
+  libraryBenchmarkPlayback,
   challengerTake,
   youtubeEmbedUrl,
   suspendPipPlayback,
@@ -102,6 +106,7 @@ export default memo(function PipCompareRow({
   onPinBenchmark,
   onDeleteTake,
   onUnpinBenchmark,
+  onClearLibraryReference,
   onUnpinChallenger,
   onUploadBenchmark,
   onSubmitYoutube,
@@ -141,16 +146,22 @@ export default memo(function PipCompareRow({
           <BestTakeBox
             layout="pip"
             take={benchmarkTake}
+            libraryPlayback={libraryBenchmarkPlayback}
             youtubeEmbedUrl={youtubeEmbedUrl}
             suspendPlayback={suspendPipPlayback}
             videoRef={benchmarkPipVideoRef}
             dropHighlight={ghost?.overPin ?? false}
             onUnpinTake={onUnpinBenchmark}
+            onClearLibraryReference={onClearLibraryReference}
             onClearYoutube={onClearYoutube}
             onSubmitYoutube={onSubmitYoutube}
             onUpload={onUploadBenchmark}
             onToggleSplitView={onToggleSplitView}
-            onExpand={takeHasPlaybackMedia(benchmarkTake) ? onExpandBenchmark : undefined}
+            onExpand={
+              libraryBenchmarkPlayback || takeHasPlaybackMedia(benchmarkTake)
+                ? onExpandBenchmark
+                : undefined
+            }
             onPlaybackChange={onBenchmarkPlaybackChange}
             onYoutubeHostChange={onYoutubeHostChange}
             youtubeIframeRef={youtubeIframeRef}

@@ -6,6 +6,7 @@ import { PipDragGhost } from './PipCompareRow'
 import SplitRatioDragHandle from './SplitRatioDragHandle'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { RecordingMode, Take } from '../types'
+import type { LibraryPlaybackReference } from '../types/library'
 import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
@@ -13,6 +14,7 @@ interface SplitCompareLayoutProps {
   splitRatio: number
   onSplitRatioChange: (ratio: number) => void
   benchmarkTake: Take | null
+  libraryBenchmarkPlayback: LibraryPlaybackReference | null
   challengerTake: Take | null
   youtubeEmbedUrl: string | null
   suspendPipPlayback: boolean
@@ -29,6 +31,7 @@ interface SplitCompareLayoutProps {
   pitchStageActive: boolean
   metronomeStageActive: boolean
   onUnpinBenchmark: () => void
+  onClearLibraryReference?: () => void
   onUnpinChallenger: () => void
   onClearYoutube: () => void
   onSubmitYoutube: (embedUrl: string) => void
@@ -55,6 +58,7 @@ export default function SplitCompareLayout({
   splitRatio,
   onSplitRatioChange,
   benchmarkTake,
+  libraryBenchmarkPlayback,
   challengerTake,
   youtubeEmbedUrl,
   suspendPipPlayback,
@@ -71,6 +75,7 @@ export default function SplitCompareLayout({
   pitchStageActive,
   metronomeStageActive,
   onUnpinBenchmark,
+  onClearLibraryReference,
   onUnpinChallenger,
   onClearYoutube,
   onSubmitYoutube,
@@ -121,11 +126,13 @@ export default function SplitCompareLayout({
             <BestTakeBox
               layout="fill"
               take={benchmarkTake}
+              libraryPlayback={libraryBenchmarkPlayback}
               youtubeEmbedUrl={youtubeEmbedUrl}
               suspendPlayback={suspendPipPlayback}
               videoRef={benchmarkPipVideoRef}
               dropHighlight={ghost?.overPin ?? false}
               onUnpinTake={onUnpinBenchmark}
+              onClearLibraryReference={onClearLibraryReference}
               onClearYoutube={onClearYoutube}
               onSubmitYoutube={onSubmitYoutube}
               onUpload={onUploadBenchmark}
