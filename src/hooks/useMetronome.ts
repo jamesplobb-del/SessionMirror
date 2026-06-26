@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { metronomeSpeakerGain } from '../utils/playbackVolume'
 import { primePlaybackAudioContextSync } from '../utils/playbackAudioContext'
+import { scheduleMetronomeClick } from '../utils/metronomeClickSounds'
 import {
   clampBpm,
   getBeatsPerBar,
@@ -20,44 +21,7 @@ import {
 const SCHEDULE_AHEAD_SEC = 0.12
 /** How often the scheduler runs (ms). */
 const LOOKAHEAD_MS = 25
-
-const CLICK_ATTACK_SEC = 0.0015
-
-const TIER_AUDIO: Record<
-  MetronomeClickTier,
-  { hz: number; peak: number; decaySec: number }
-> = {
-  downbeat: { hz: 1000, peak: 1.0, decaySec: 0.045 },
-  macro: { hz: 800, peak: 0.6, decaySec: 0.045 },
-  subdivision: { hz: 600, peak: 0.2, decaySec: 0.028 },
-}
-
-function scheduleTieredClick(
-  ctx: AudioContext,
-  when: number,
-  tier: MetronomeClickTier,
-  outputNode: AudioNode,
-  muted: boolean,
-): void {
-  const { hz, peak, decaySec } = TIER_AUDIO[tier]
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-
-  osc.type = 'sine'
-  osc.frequency.value = hz
-
-  const effectivePeak = muted ? 0.0001 : Math.max(peak, 0.0002)
-
-  gain.gain.setValueAtTime(0.0001, when)
-  gain.gain.exponentialRampToValueAtTime(effectivePeak, when + CLICK_ATTACK_SEC)
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec)
-
-  osc.connect(gain)
-  gain.connect(outputNode)
-
-  osc.start(when)
-  osc.stop(when + decaySec + 0.01)
-}
+const START_LEAD_SEC = 0.05
 
 function secondsPerSchedulerTick(
   meter: MetronomeMeter,
@@ -126,6 +90,8 @@ export interface UseMetronomeOptions {
   isTakePlaying?: boolean
   /** When true with isTakePlaying, metronome output is gated to silence. */
   muteDuringPlayback?: boolean
+  /** Dev-only console prefix, e.g. "MetronomeTab". */
+  debugLabel?: string
 }
 
 export interface UseMetronomeResult {
@@ -133,12 +99,14 @@ export interface UseMetronomeResult {
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
   accentFirstBeat: boolean
+  soundId: string
   playing: boolean
   beatIndex: number
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
   setAccentFirstBeat: (accentFirstBeat: boolean) => void
+  setSoundId: (soundId: string) => void
   togglePlay: () => void
   stop: () => void
 }
@@ -149,22 +117,25 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   const [meter, setMeterState] = useState<MetronomeMeter>(initial.meter)
   const [subdivision, setSubdivisionState] = useState<MetronomeSubdivision>(initial.subdivision)
   const [accentFirstBeat, setAccentFirstBeatState] = useState(initial.accentFirstBeat)
+  const [soundId, setSoundIdState] = useState(initial.soundId)
   const [playing, setPlaying] = useState(false)
   const [beatIndex, setBeatIndex] = useState(0)
 
   const isTakePlaying = options.isTakePlaying ?? false
   const muteDuringPlayback = options.muteDuringPlayback ?? true
+  const debugLabel = options.debugLabel
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const masterGainRef = useRef<GainNode | null>(null)
   const schedulerTimerRef = useRef<number | null>(null)
+  const schedulerSessionRef = useRef(0)
   const nextBeatTimeRef = useRef(0)
   const tickCounterRef = useRef(0)
   const bpmRef = useRef(bpm)
   const meterRef = useRef(meter)
   const subdivisionRef = useRef(subdivision)
   const accentFirstBeatRef = useRef(accentFirstBeat)
-  const soundIdRef = useRef(initial.soundId)
+  const soundIdRef = useRef(soundId)
   const playingRef = useRef(false)
   const isTakePlayingRef = useRef(isTakePlaying)
   const muteDuringPlaybackRef = useRef(muteDuringPlayback)
@@ -173,14 +144,30 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   meterRef.current = meter
   subdivisionRef.current = subdivision
   accentFirstBeatRef.current = accentFirstBeat
+  soundIdRef.current = soundId
   playingRef.current = playing
   isTakePlayingRef.current = isTakePlaying
   muteDuringPlaybackRef.current = muteDuringPlayback
+
+  const debugLog = useCallback(
+    (message: string) => {
+      if (!debugLabel || !import.meta.env.DEV) return
+      console.log(`[${debugLabel}] ${message}`)
+    },
+    [debugLabel],
+  )
 
   const shouldMuteOutput = useCallback(
     () => muteDuringPlaybackRef.current && isTakePlayingRef.current,
     [],
   )
+
+  const clearSchedulerTimer = useCallback(() => {
+    if (schedulerTimerRef.current !== null) {
+      window.clearTimeout(schedulerTimerRef.current)
+      schedulerTimerRef.current = null
+    }
+  }, [])
 
   const ensureMasterGain = useCallback((ctx: AudioContext): GainNode => {
     let master = masterGainRef.current
@@ -207,13 +194,14 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       nextMeter: MetronomeMeter,
       nextSubdivision: MetronomeSubdivision,
       nextAccentFirstBeat: boolean = accentFirstBeatRef.current,
+      nextSoundId: string = soundIdRef.current,
     ) => {
       saveMetronomePrefs({
         bpm: nextBpm,
         meter: nextMeter,
         subdivision: nextSubdivision,
         accentFirstBeat: nextAccentFirstBeat,
-        soundId: soundIdRef.current,
+        soundId: nextSoundId,
       })
     },
     [],
@@ -256,17 +244,37 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
     [persistPrefs],
   )
 
+  const setSoundId = useCallback(
+    (nextSoundId: string) => {
+      soundIdRef.current = nextSoundId
+      setSoundIdState(nextSoundId)
+      persistPrefs(
+        bpmRef.current,
+        meterRef.current,
+        subdivisionRef.current,
+        accentFirstBeatRef.current,
+        nextSoundId,
+      )
+    },
+    [persistPrefs],
+  )
+
   const stop = useCallback(() => {
+    if (playingRef.current) {
+      debugLog('stop')
+    }
     playingRef.current = false
     setPlaying(false)
-    if (schedulerTimerRef.current !== null) {
-      window.clearTimeout(schedulerTimerRef.current)
-      schedulerTimerRef.current = null
-    }
-  }, [])
+    clearSchedulerTimer()
+  }, [clearSchedulerTimer, debugLog])
 
   const start = useCallback(() => {
     if (typeof window === 'undefined') return
+
+    if (schedulerTimerRef.current !== null) {
+      debugLog('duplicate timer prevented')
+      clearSchedulerTimer()
+    }
 
     const ctx = primePlaybackAudioContextSync()
     audioCtxRef.current = ctx
@@ -281,15 +289,22 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
         }
       }
 
+      if (schedulerTimerRef.current !== null) {
+        debugLog('duplicate timer prevented')
+        clearSchedulerTimer()
+      }
+
       tickCounterRef.current = 0
       setBeatIndex(0)
-      nextBeatTimeRef.current = 0
+      nextBeatTimeRef.current = ctx.currentTime + START_LEAD_SEC
+      schedulerSessionRef.current += 1
       playingRef.current = true
       setPlaying(true)
+      debugLog('start')
     }
 
     void resumeAndPlay()
-  }, [])
+  }, [clearSchedulerTimer, debugLog])
 
   const togglePlay = useCallback(() => {
     if (playingRef.current) {
@@ -300,7 +315,10 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
   }, [start, stop])
 
   useEffect(() => {
-    if (!playing) return
+    if (!playing) {
+      clearSchedulerTimer()
+      return
+    }
 
     const ctx = audioCtxRef.current
     if (!ctx || ctx.state === 'closed') {
@@ -309,15 +327,15 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       return
     }
 
+    const sessionId = schedulerSessionRef.current
     let cancelled = false
 
-    nextBeatTimeRef.current = Math.max(
-      ctx.currentTime + 0.03,
-      nextBeatTimeRef.current > ctx.currentTime ? nextBeatTimeRef.current : ctx.currentTime + 0.03,
-    )
+    if (nextBeatTimeRef.current <= 0 || nextBeatTimeRef.current < ctx.currentTime) {
+      nextBeatTimeRef.current = ctx.currentTime + START_LEAD_SEC
+    }
 
     const tick = () => {
-      if (cancelled || !playingRef.current) return
+      if (cancelled || !playingRef.current || sessionId !== schedulerSessionRef.current) return
 
       const activeCtx = audioCtxRef.current
       if (!activeCtx || activeCtx.state === 'closed') {
@@ -331,6 +349,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       const secondsPerTick = secondsPerSchedulerTick(meter, bpmRef.current, subdivision)
       const outputNode = ensureMasterGain(activeCtx)
       const muted = shouldMuteOutput()
+      const sound = soundIdRef.current
 
       let uiBeat = -1
 
@@ -342,7 +361,7 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
           subdivision,
           accentFirstBeatRef.current,
         )
-        scheduleTieredClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted)
+        scheduleMetronomeClick(activeCtx, nextBeatTimeRef.current, tier, outputNode, muted, sound)
 
         if (nextBeatTimeRef.current - activeCtx.currentTime <= LOOKAHEAD_MS / 1000) {
           uiBeat = resolveUiBeatIndex(meter, tickInBar, subdivision)
@@ -354,37 +373,25 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
 
       if (uiBeat >= 0) {
         setBeatIndex(uiBeat)
+        debugLog(`tick beat=${uiBeat + 1}`)
       }
 
       schedulerTimerRef.current = window.setTimeout(tick, LOOKAHEAD_MS)
     }
 
+    clearSchedulerTimer()
     tick()
 
     return () => {
       cancelled = true
-      if (schedulerTimerRef.current !== null) {
-        window.clearTimeout(schedulerTimerRef.current)
-        schedulerTimerRef.current = null
-      }
+      clearSchedulerTimer()
     }
-  }, [playing, bpm, meter, subdivision, ensureMasterGain, shouldMuteOutput, stop])
-
-  useEffect(() => {
-    if (playing) {
-      tickCounterRef.current = 0
-      setBeatIndex(0)
-      nextBeatTimeRef.current = 0
-    }
-  }, [bpm, meter, subdivision, playing])
+  }, [playing, clearSchedulerTimer, ensureMasterGain, shouldMuteOutput, stop, debugLog])
 
   useEffect(() => {
     return () => {
       playingRef.current = false
-      if (schedulerTimerRef.current !== null) {
-        window.clearTimeout(schedulerTimerRef.current)
-        schedulerTimerRef.current = null
-      }
+      clearSchedulerTimer()
       try {
         masterGainRef.current?.disconnect()
       } catch {
@@ -393,19 +400,21 @@ export function useMetronome(options: UseMetronomeOptions = {}): UseMetronomeRes
       audioCtxRef.current = null
       masterGainRef.current = null
     }
-  }, [])
+  }, [clearSchedulerTimer])
 
   return {
     bpm,
     meter,
     subdivision,
     accentFirstBeat,
+    soundId,
     playing,
     beatIndex,
     setBpm,
     setMeter,
     setSubdivision,
     setAccentFirstBeat,
+    setSoundId,
     togglePlay,
     stop,
   }

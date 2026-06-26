@@ -705,6 +705,25 @@ body.settings-branch-open * {
   background: transparent;
 }
 
+.audio-practice-metronome-layer {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  background: linear-gradient(180deg, #0b1220 0%, #0f172a 48%, #020617 100%);
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.app-ui-overlay--audio-practice-metronome {
+  background: transparent;
+}
+
+.audio-practice-metronome-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: linear-gradient(180deg, #0b1220 0%, #0f172a 52%, #020617 100%);
+}
+
 .audio-practice-metronome-shell,
 .audio-practice-metronome {
   flex: 1;
@@ -714,7 +733,21 @@ body.settings-branch-open * {
 
 .audio-practice-metronome {
   padding-inline: 0.75rem;
-  padding-bottom: 0.25rem;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  pointer-events: auto;
+}
+
+.audio-practice-metronome__body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding-top: clamp(1rem, 5vh, 2.5rem);
+  padding-bottom: clamp(0.75rem, 3vh, 1.5rem);
+}
+
+.audio-practice-metronome__controls {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
 }
 
 .audio-practice-metronome__bpm-row {
@@ -766,7 +799,7 @@ body.settings-branch-open * {
   justify-content: center;
   gap: 1.25rem;
   width: 100%;
-  min-height: 8.5rem;
+  min-height: clamp(7.5rem, 24vh, 11rem);
 }
 
 .audio-practice-metronome__pulse {

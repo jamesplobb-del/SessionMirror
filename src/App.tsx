@@ -1742,10 +1742,16 @@ function StandardApp({
     !metronomeHudSuspended
 
   const metronomeStageActive =
-    showMetronomeWidget && recordingMode === 'audio' && !metronomeHudSuspended
+    showMetronomeWidget &&
+    recordingMode === 'audio' &&
+    !metronomeHudSuspended &&
+    audioPracticeTab !== 'metronome'
 
   const isAudioPracticeMainTab =
     recordingMode !== 'audio' || audioPracticeTab === 'audio'
+
+  const isAudioPracticeMetronomeTab =
+    recordingMode === 'audio' && audioPracticeTab === 'metronome'
 
   const pitchContextKey =
     mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
@@ -2271,6 +2277,10 @@ function StandardApp({
         />
       )}
 
+      {isAudioPracticeMetronomeTab && (
+        <div className="audio-practice-metronome-scrim pointer-events-none" aria-hidden />
+      )}
+
       <LiveCameraBackground
         previewRef={previewRef}
         streamRef={streamRef}
@@ -2283,6 +2293,7 @@ function StandardApp({
           showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
         }
         metronomeStageActive={metronomeStageActive}
+        audioPracticeOverlayActive={isAudioPracticeMetronomeTab}
         visuallySuppressed={isSplitView}
       />
 
@@ -2346,7 +2357,7 @@ function StandardApp({
                   onClose={handleCloseMetronome}
                 />
               )}
-              {recordingMode === 'audio' && (
+              {recordingMode === 'audio' && audioPracticeTab !== 'metronome' && (
                 <MetronomeStagePresenter
                   key="main-metronome-audio"
                   isTakePlaying={takePlaybackActive}
@@ -2385,7 +2396,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2413,6 +2424,12 @@ function StandardApp({
             activeTab={audioPracticeTab}
             onTabChange={setAudioPracticeTab}
           />
+        )}
+
+        {isAudioPracticeMetronomeTab && !quickSettingsOpen && (
+          <div className="audio-practice-metronome-layer pointer-events-auto flex min-h-0 flex-1 flex-col">
+            <AudioMetronomeTab />
+          </div>
         )}
 
         {!quickSettingsOpen && settings.showTakeCards && isSplitView && isAudioPracticeMainTab && (
@@ -2466,14 +2483,17 @@ function StandardApp({
           </div>
         )}
 
-        {recordingMode === 'audio' && !quickSettingsOpen && !isAudioPracticeMainTab && (
+        {recordingMode === 'audio' &&
+          !quickSettingsOpen &&
+          !isAudioPracticeMainTab &&
+          audioPracticeTab !== 'metronome' && (
           <div className="audio-practice-tab-panel pointer-events-auto flex min-h-0 flex-1 flex-col px-3 pb-2">
-            {audioPracticeTab === 'metronome' && <AudioMetronomeTab />}
             {audioPracticeTab === 'tuner' && <AudioTunerTab />}
             {audioPracticeTab === 'combo' && <AudioComboTab />}
           </div>
         )}
 
+        {!isAudioPracticeMetronomeTab && (
         <div className="app-hud-bottom pointer-events-none flex flex-col">
           {!quickSettingsOpen && settings.showTakeCards && !isSplitView && isAudioPracticeMainTab && (
               <motion.div
@@ -2551,6 +2571,7 @@ function StandardApp({
             hapticFeedback={settings.hapticFeedback}
           />
         </div>
+        )}
       </motion.div>
 
       <Suspense fallback={null}>
