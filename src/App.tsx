@@ -78,6 +78,7 @@ import { registerRecordingRouteRestoredHandler } from './utils/stereoPlaybackRou
 import { lockPortraitOrientation, syncAppOrientationLock } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
+import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { INTERACTIVE_TUTORIAL_STEPS, isOnboardingComplete, markOnboardingComplete } from './utils/onboardingTutorial'
 import { ActionSheetProvider } from './context/ActionSheetContext'
@@ -164,7 +165,6 @@ interface MainAudioPitchSource {
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
 const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
-const MetronomeStagePresenter = lazy(() => import('./components/MetronomeStagePresenter'))
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
@@ -970,6 +970,7 @@ function StandardApp({
     getAutoPreRollAgeMs,
     restartAutoPreRollCapture,
     refreshCameraSession,
+    requestCameraPreviewResume,
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
@@ -1018,7 +1019,7 @@ function StandardApp({
       window.cancelAnimationFrame(frameId)
       if (timer !== null) window.clearTimeout(timer)
     }
-  }, [isSplitView, recordingMode, refreshCameraSession, youtubeUrl])
+  }, [isSplitView, refreshCameraSession, youtubeUrl])
 
   recordingModeRef.current = recordingMode
   cameraReadyRef.current = ready
@@ -1355,10 +1356,20 @@ function StandardApp({
     (mode: RecordingMode) => {
       if (mode !== recordingModeRef.current) {
         setShowPitch(false)
+        resetToAudioTab()
+        sharedMetronomeEngine.reconcileAfterModeSwitch()
+        if (import.meta.env.DEV) {
+          console.log(mode === 'video' ? '[ModeSwitch] entering camera' : '[ModeSwitch] entering audio')
+        }
       }
       changeRecordingMode(mode)
+      if (mode === 'video') {
+        scheduleAfterPaint(() => {
+          void requestCameraPreviewResume('mode-switch')
+        })
+      }
     },
-    [changeRecordingMode],
+    [changeRecordingMode, requestCameraPreviewResume, resetToAudioTab],
   )
 
   const handleCloseSettings = useCallback(() => {
@@ -1737,16 +1748,12 @@ function StandardApp({
     !pitchHudSuspended
 
   const metronomeAudioHudLock =
-    showMetronomeWidget &&
     recordingMode === 'audio' &&
+    audioPracticeTab === 'metronome' &&
     hudModalState === 'idle' &&
     !metronomeHudSuspended
 
-  const metronomeStageActive =
-    showMetronomeWidget &&
-    recordingMode === 'audio' &&
-    !metronomeHudSuspended &&
-    audioPracticeTab !== 'metronome'
+  const metronomeStageActive = false
 
   const isAudioPracticeMainTab =
     recordingMode !== 'audio' || audioPracticeTab === 'audio'
@@ -2362,13 +2369,6 @@ function StandardApp({
                   onClose={handleCloseMetronome}
                 />
               )}
-              {recordingMode === 'audio' && audioPracticeTab !== 'metronome' && (
-                <MetronomeStagePresenter
-                  key="main-metronome-audio"
-                  isTakePlaying={takePlaybackActive}
-                  muteDuringPlayback={settings.muteMetronomeDuringPlayback}
-                />
-              )}
             </AnimatePresence>
           </Suspense>
         )}
@@ -2431,9 +2431,12 @@ function StandardApp({
           />
         )}
 
-        {isAudioPracticeMetronomeTab && !quickSettingsOpen && (
-          <div className="audio-practice-metronome-layer pointer-events-auto flex min-h-0 flex-1 flex-col">
-            <AudioMetronomeTab />
+        {recordingMode === 'audio' && audioPracticeTab === 'metronome' && !quickSettingsOpen && (
+          <div
+            key="audio-practice-metronome-layer"
+            className="audio-practice-metronome-layer pointer-events-auto flex min-h-0 flex-1 flex-col"
+          >
+            <AudioMetronomeTab key="audio-metronome-tab" />
           </div>
         )}
 

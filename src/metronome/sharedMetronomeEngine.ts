@@ -418,6 +418,28 @@ class SharedMetronomeEngine {
     tick()
   }
 
+  private isSchedulerHealthy(): boolean {
+    return (
+      this.schedulerTimer !== null &&
+      this.audioCtx !== null &&
+      this.audioCtx.state !== 'closed'
+    )
+  }
+
+  private sanityReset(): void {
+    this.debugLog('sanity reset')
+    this.schedulerSession += 1
+    this.clearSchedulerTimer()
+    this.patchState({ playing: false })
+  }
+
+  reconcileAfterModeSwitch(): void {
+    if (!this.snapshot.playing) return
+    if (this.isSchedulerHealthy()) return
+    this.sanityReset()
+    void this.start({ recovered: true, fromStale: true })
+  }
+
   private hardStop(options?: { background?: boolean }): void {
     if (this.snapshot.playing && !options?.background) {
       this.debugLog('stop')
@@ -435,8 +457,18 @@ class SharedMetronomeEngine {
     this.hardStop()
   }
 
-  start = async (options?: { recovered?: boolean }): Promise<void> => {
+  start = async (options?: {
+    recovered?: boolean
+    fromStale?: boolean
+  }): Promise<void> => {
     if (typeof window === 'undefined') return
+
+    if (this.snapshot.playing && !this.isSchedulerHealthy()) {
+      this.debugLog(
+        options?.fromStale ? 'start recovered from stale state' : 'start recovered from stale state',
+      )
+      this.sanityReset()
+    }
 
     this.clearSchedulerTimer()
 
@@ -458,7 +490,11 @@ class SharedMetronomeEngine {
 
   togglePlay = (): void => {
     if (this.snapshot.playing) {
-      this.stop()
+      if (!this.isSchedulerHealthy()) {
+        this.sanityReset()
+      } else {
+        this.stop()
+      }
       return
     }
     void this.start()
