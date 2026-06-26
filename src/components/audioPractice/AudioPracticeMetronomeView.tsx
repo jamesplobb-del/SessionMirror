@@ -56,7 +56,6 @@ export default function AudioPracticeMetronomeView() {
   const didNormalizeBpmRef = useRef(false)
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState('')
-  const [pulseNonce, setPulseNonce] = useState(0)
 
   const {
     bpm,
@@ -66,6 +65,7 @@ export default function AudioPracticeMetronomeView() {
     soundId,
     playing,
     beatIndex,
+    beatPulseId,
     setBpm,
     setMeter,
     setSubdivision,
@@ -77,6 +77,7 @@ export default function AudioPracticeMetronomeView() {
     isTakePlaying: false,
     muteDuringPlayback: false,
     debugLabel: 'MetronomeTab',
+    pauseOnAppHidden: true,
   })
 
   const setPracticeBpm = useCallback(
@@ -109,11 +110,6 @@ export default function AudioPracticeMetronomeView() {
       stop()
     }
   }, [stop])
-
-  useEffect(() => {
-    if (!playing) return
-    setPulseNonce((nonce) => nonce + 1)
-  }, [beatIndex, playing])
 
   const handleTogglePlay = useCallback(() => {
     triggerMediumHaptic()
@@ -265,11 +261,13 @@ export default function AudioPracticeMetronomeView() {
       <div className="metronome-audio-stage__beats min-h-0 flex-1" aria-live="polite" aria-atomic>
         <div className="audio-practice-metronome__visual">
           <div
-            key={pulseNonce}
+            key={beatPulseId}
             className={[
               'audio-practice-metronome__pulse',
               playing ? pulseClass : '',
-              playing && !prefersReducedMotion ? 'audio-practice-metronome__pulse--animate' : '',
+              playing && beatPulseId > 0 && !prefersReducedMotion
+                ? 'audio-practice-metronome__pulse--animate'
+                : '',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -285,13 +283,13 @@ export default function AudioPracticeMetronomeView() {
               const isDownbeat = index === 0 && accentFirstBeat
               return (
                 <span
-                  key={index}
+                  key={`${index}-${isActive ? beatPulseId : 'idle'}`}
                   className={[
                     'audio-practice-metronome__beat',
                     isActive ? 'audio-practice-metronome__beat--active' : '',
                     isDownbeat ? 'audio-practice-metronome__beat--downbeat' : '',
-                    isActive && isDownbeat ? 'metronome-audio-stage__beat-dot--pulse' : '',
-                    isActive && !isDownbeat ? 'metronome-audio-stage__beat-dot--pulse-soft' : '',
+                    isActive && isDownbeat ? 'audio-practice-metronome__beat--pulse' : '',
+                    isActive && !isDownbeat ? 'audio-practice-metronome__beat--pulse-soft' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
