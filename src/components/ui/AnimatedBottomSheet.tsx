@@ -24,6 +24,8 @@ interface AnimatedBottomSheetProps {
   motionPreset?: 'default' | 'light' | 'premium'
   /** Fires once when the enter slide animation finishes (not on exit). */
   onEnterComplete?: () => void
+  /** Portal above floating HUD layers (metronome/pitch display). */
+  elevated?: boolean
 }
 
 export default function AnimatedBottomSheet({
@@ -35,6 +37,7 @@ export default function AnimatedBottomSheet({
   sheetRef,
   motionPreset = 'premium',
   onEnterComplete,
+  elevated = false,
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSheetSlideDistance)
   const enterNotifiedRef = useRef(false)
@@ -86,29 +89,33 @@ export default function AnimatedBottomSheet({
     onEnterComplete?.()
   }
 
+  const portalTarget = elevated
+    ? document.body
+    : (document.getElementById(PHYSICAL_UI_ROOT_ID) ?? document.body)
+
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
           <motion.button
             type="button"
-            className="tutorial-sheet-backdrop fixed inset-0 z-40 cursor-default touch-none bg-black/80"
+            className={`tutorial-sheet-backdrop fixed inset-0 cursor-default touch-none bg-black/80 ${elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: backdropOpacity }}
             exit={{ opacity: 0 }}
             transition={backdropTransition}
-            style={motionGpuLayer}
+            style={{ ...motionGpuLayer, pointerEvents: 'auto' }}
             onClick={onClose}
           />
 
           <motion.div
             ref={sheetRef}
-            className={`animated-bottom-sheet fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transform-gpu`}
+            className={`animated-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transform-gpu ${elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
-            style={{ ...motionGpuLayer, paddingBottom: 'env(safe-area-inset-bottom)' }}
+            style={{ ...motionGpuLayer, paddingBottom: 'env(safe-area-inset-bottom)', pointerEvents: 'auto' }}
             initial={useScale ? { opacity: 0, y: slideDistance, scale: 0.975 } : { opacity: 0, y: slideDistance }}
             animate={useScale ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0 }}
             exit={useScale ? { opacity: 0, y: slideDistance, scale: 0.985 } : { opacity: 0, y: slideDistance }}
@@ -134,6 +141,6 @@ export default function AnimatedBottomSheet({
         </>
       )}
     </AnimatePresence>,
-    document.getElementById(PHYSICAL_UI_ROOT_ID) ?? document.body,
+    portalTarget,
   )
 }

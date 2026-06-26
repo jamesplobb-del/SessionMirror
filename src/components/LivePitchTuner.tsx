@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMemo, useRef, type RefObject } from 'react'
 import { useGatedPitchReadout } from '../hooks/useGatedPitchReadout'
+import { useMetronomePitchAnalysisHold } from '../hooks/useMetronomePitchAnalysisHold'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
@@ -292,10 +293,12 @@ function LiveAudioTunerPane({
   readout,
   inTuneGlow,
   canvasRef,
+  chartHolding = false,
 }: {
   readout: PitchReadout
   inTuneGlow: number
   canvasRef: RefObject<HTMLCanvasElement | null>
+  chartHolding?: boolean
 }) {
   const active = readout.noteName !== '—'
   const displayCents = active ? readout.cents : 0
@@ -313,7 +316,9 @@ function LiveAudioTunerPane({
       </div>
 
       <div className="pitch-audio-stage__chart min-h-0 flex-1">
-        <div className="pitch-chart-card">
+        <div
+          className={`pitch-chart-card${chartHolding ? ' pitch-chart-card--metronome-hold' : ''}`}
+        >
           <PitchChartCanvas canvasRef={canvasRef} glass fill />
         </div>
       </div>
@@ -347,7 +352,8 @@ function LivePitchTunerAudio({
 
   const showPlayback = isPlaying && !liveMicOnly
   const showLive = liveMicOnly && (isPlaying || liveMicEnabled || enabled)
-  const liveTrackerEnabled = enabled && showLive
+  const metronomePitchHold = useMetronomePitchAnalysisHold(showLive)
+  const liveTrackerEnabled = enabled && showLive && !metronomePitchHold
   const playbackTrackerEnabled = enabled && showPlayback
 
   const liveTrackerOptions = useMemo(
@@ -401,6 +407,8 @@ function LivePitchTunerAudio({
     metronomeGate: false,
   })
 
+  const liveChartHolding = metronomePitchHold || gatedLive.suppressing
+
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
 
   return (
@@ -425,6 +433,7 @@ function LivePitchTunerAudio({
               readout={gatedLive.readout}
               inTuneGlow={gatedLive.inTuneGlow}
               canvasRef={liveCanvasRef}
+              chartHolding={liveChartHolding}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">

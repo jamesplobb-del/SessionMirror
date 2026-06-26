@@ -235,6 +235,7 @@ export default function TakeVaultDrawer({
       maxHeightClass="h-[min(75vh,100dvh)]"
       sheetRef={drawerRef}
       motionPreset="premium"
+      elevated
       onEnterComplete={handleSheetEnterComplete}
     >
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">

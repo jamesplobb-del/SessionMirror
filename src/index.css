@@ -963,6 +963,20 @@ body.settings-branch-open * {
   background: transparent;
 }
 
+.pitch-chart-card--metronome-hold .pitch-chart-shell {
+  opacity: 0.94;
+  filter: saturate(0.88);
+}
+
+.animated-bottom-sheet--elevated,
+.tutorial-sheet-backdrop--elevated {
+  pointer-events: auto !important;
+}
+
+.tutorial-sheet-backdrop--elevated {
+  touch-action: manipulation;
+}
+
 .app-ui-overlay--sheet-open .control-deck__vault-btn {
   pointer-events: auto !important;
   position: relative;
