@@ -25,6 +25,7 @@ import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAppShellPolicies } from './hooks/useAppShellPolicies'
+import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
@@ -124,6 +125,10 @@ import {
   tunePlaybackIsolationStream,
 } from './utils/audioCapture'
 import AppBootGate from './components/ui/AppBootGate'
+import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTabs'
+import AudioMetronomeTab from './components/audioPractice/AudioMetronomeTab'
+import AudioTunerTab from './components/audioPractice/AudioTunerTab'
+import AudioComboTab from './components/audioPractice/AudioComboTab'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
 
@@ -329,6 +334,11 @@ function StandardApp({
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
+  const {
+    activeTab: audioPracticeTab,
+    setActiveTab: setAudioPracticeTab,
+    resetToAudioTab,
+  } = useAudioPracticeTab()
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
   const pendingChallengerIdRef = useRef<string | null>(null)
@@ -1063,6 +1073,12 @@ function StandardApp({
   }, [recordingMode, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   useEffect(() => {
+    if (recordingMode !== 'audio') {
+      resetToAudioTab()
+    }
+  }, [recordingMode, resetToAudioTab])
+
+  useEffect(() => {
     const audio = autoPlaybackAudioRef.current
     if (!audio) return
 
@@ -1728,6 +1744,9 @@ function StandardApp({
   const metronomeStageActive =
     showMetronomeWidget && recordingMode === 'audio' && !metronomeHudSuspended
 
+  const isAudioPracticeMainTab =
+    recordingMode !== 'audio' || audioPracticeTab === 'audio'
+
   const pitchContextKey =
     mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
 
@@ -2389,7 +2408,14 @@ function StandardApp({
           className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
         />
 
-        {!quickSettingsOpen && settings.showTakeCards && isSplitView && (
+        {recordingMode === 'audio' && !quickSettingsOpen && (
+          <AudioPracticeTopTabs
+            activeTab={audioPracticeTab}
+            onTabChange={setAudioPracticeTab}
+          />
+        )}
+
+        {!quickSettingsOpen && settings.showTakeCards && isSplitView && isAudioPracticeMainTab && (
           <div
             className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2"
             style={pipScaleStyle}
@@ -2440,8 +2466,16 @@ function StandardApp({
           </div>
         )}
 
+        {recordingMode === 'audio' && !quickSettingsOpen && !isAudioPracticeMainTab && (
+          <div className="audio-practice-tab-panel pointer-events-auto flex min-h-0 flex-1 flex-col px-3 pb-2">
+            {audioPracticeTab === 'metronome' && <AudioMetronomeTab />}
+            {audioPracticeTab === 'tuner' && <AudioTunerTab />}
+            {audioPracticeTab === 'combo' && <AudioComboTab />}
+          </div>
+        )}
+
         <div className="app-hud-bottom pointer-events-none flex flex-col">
-          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && (
+          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && isAudioPracticeMainTab && (
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"
