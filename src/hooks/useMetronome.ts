@@ -16,6 +16,7 @@ export interface UseMetronomeResult {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
+  accentPattern: boolean[]
   accentFirstBeat: boolean
   soundId: string
   playing: boolean
@@ -25,6 +26,8 @@ export interface UseMetronomeResult {
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
+  setAccentPattern: (accentPattern: boolean[]) => void
+  toggleBeatAccent: (beatIndex: number) => void
   setAccentFirstBeat: (accentFirstBeat: boolean) => void
   setSoundId: (soundId: string) => void
   togglePlay: () => void
@@ -33,5 +36,9 @@ export interface UseMetronomeResult {
 
 /** Shared global metronome — same engine for Audio tab, Metronome tab, and Camera widget. */
 export function useMetronome(_options: UseMetronomeOptions = {}): UseMetronomeResult {
-  return useSharedMetronome()
+  const state = useSharedMetronome()
+  return {
+    ...state,
+    accentFirstBeat: state.accentPattern[0] ?? true,
+  }
 }

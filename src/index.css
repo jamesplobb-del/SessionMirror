@@ -912,6 +912,21 @@ body.settings-branch-open * {
     box-shadow 0.12s ease;
 }
 
+.audio-practice-metronome__beat--accented {
+  border-color: rgba(125, 211, 252, 0.62);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.28),
+    inset 0 0 0 1px rgba(125, 211, 252, 0.12);
+}
+
+.audio-practice-metronome__beat-tap {
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  color: inherit;
+  font: inherit;
+}
+
 .audio-practice-metronome__beat--downbeat {
   width: clamp(2.875rem, 13vw, 3.625rem);
   height: clamp(2.875rem, 13vw, 3.625rem);
@@ -1124,6 +1139,12 @@ body.settings-branch-open * {
   justify-content: center;
   width: 100%;
   pointer-events: none;
+}
+
+.metronome-h-scroll__triplet-symbol {
+  width: 1.75rem;
+  height: auto;
+  display: block;
 }
 
 .audio-practice-metronome__selectors .metronome-h-scroll + .metronome-h-scroll {

@@ -12,7 +12,6 @@ import {
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../../utils/metronomeConfig'
-import IOSSwitch from '../ui/IOSSwitch'
 import {
   AUDIO_PRACTICE_CLICK_SOUNDS,
   AUDIO_PRACTICE_MAX_BPM,
@@ -23,6 +22,7 @@ import {
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
 import MetronomeHorizontalScroller, { MetronomeScrollChip } from './MetronomeHorizontalScroller'
+import TripletRhythmSymbol from './TripletRhythmSymbol'
 
 function PracticeControlButton({
   label,
@@ -65,7 +65,7 @@ export default function AudioPracticeMetronomeView() {
     bpm,
     meter,
     subdivision,
-    accentFirstBeat,
+    accentPattern,
     soundId,
     playing,
     beatIndex,
@@ -74,7 +74,7 @@ export default function AudioPracticeMetronomeView() {
     setBpm,
     setMeter,
     setSubdivision,
-    setAccentFirstBeat,
+    toggleBeatAccent,
     setSoundId,
     togglePlay,
     stop,
@@ -131,11 +131,12 @@ export default function AudioPracticeMetronomeView() {
     [setSubdivision, subdivision],
   )
 
-  const handleAccentChange = useCallback(
-    (nextAccent: boolean) => {
-      setAccentFirstBeat(nextAccent)
+  const handleBeatAccentToggle = useCallback(
+    (beat: number) => {
+      triggerLightHaptic()
+      toggleBeatAccent(beat)
     },
-    [setAccentFirstBeat],
+    [toggleBeatAccent],
   )
 
   const handleSoundChange = useCallback(
@@ -169,9 +170,12 @@ export default function AudioPracticeMetronomeView() {
     setEditingBpm(false)
   }, [bpmDraft, setPracticeBpm])
 
-  const isDownbeatPulse = playing && beatIndex === 0 && subTickIndex === 0
-  const pulseClass = isDownbeatPulse && accentFirstBeat
-    ? 'audio-practice-metronome__pulse--accent'
+  const isMainBeatPulse = playing && subTickIndex === 0
+  const isAccentedPulse = isMainBeatPulse && Boolean(accentPattern[beatIndex])
+  const pulseClass = isAccentedPulse
+    ? beatIndex === 0
+      ? 'audio-practice-metronome__pulse--accent'
+      : 'audio-practice-metronome__pulse--beat'
     : 'audio-practice-metronome__pulse--beat'
 
   return (
@@ -289,7 +293,8 @@ export default function AudioPracticeMetronomeView() {
             >
               {Array.from({ length: beatsPerBar }, (_, index) => {
                 const isBeatActive = playing && beatIndex === index
-                const isDownbeat = index === 0 && accentFirstBeat
+                const isAccented = Boolean(accentPattern[index])
+                const isDownbeat = index === 0 && isAccented
                 const isMainTick = isBeatActive && subTickIndex === 0
                 const isSubTick = isBeatActive && subTickIndex > 0
                 return (
@@ -302,22 +307,37 @@ export default function AudioPracticeMetronomeView() {
                       .filter(Boolean)
                       .join(' ')}
                   >
-                    <span
+                    <button
+                      type="button"
                       className={[
                         'audio-practice-metronome__beat',
+                        'audio-practice-metronome__beat-tap',
+                        'pointer-events-auto',
+                        isAccented ? 'audio-practice-metronome__beat--accented' : '',
                         isMainTick ? 'audio-practice-metronome__beat--active' : '',
                         isSubTick ? 'audio-practice-metronome__beat--sub-active' : '',
                         isDownbeat ? 'audio-practice-metronome__beat--downbeat' : '',
-                        isMainTick && isDownbeat ? 'audio-practice-metronome__beat--pulse' : '',
-                        isMainTick && !isDownbeat ? 'audio-practice-metronome__beat--pulse-soft' : '',
+                        isMainTick && isAccented && index === 0
+                          ? 'audio-practice-metronome__beat--pulse'
+                          : '',
+                        isMainTick && isAccented && index > 0
+                          ? 'audio-practice-metronome__beat--pulse-soft'
+                          : '',
+                        isMainTick && !isAccented ? 'audio-practice-metronome__beat--pulse-soft' : '',
                       ]
                         .filter(Boolean)
                         .join(' ')}
+                      aria-label={`Beat ${index + 1}${isAccented ? ', accented' : ''}. Tap to toggle accent.`}
+                      aria-pressed={isAccented}
+                      onPointerUp={(event) => {
+                        if (event.button !== 0) return
+                        handleBeatAccentToggle(index)
+                      }}
                     >
                       <span className="audio-practice-metronome__beat-number" aria-hidden>
                         {index + 1}
                       </span>
-                    </span>
+                    </button>
                     {subNotchCount > 0 && (
                       <div className="audio-practice-metronome__sub-notches" aria-hidden>
                         {Array.from({ length: subNotchCount }, (_, notchIndex) => {
@@ -378,7 +398,11 @@ export default function AudioPracticeMetronomeView() {
                   className="metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
                 >
                   <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
-                    {option.label}
+                    {option.id === 'triplet' ? (
+                      <TripletRhythmSymbol className="metronome-h-scroll__triplet-symbol" />
+                    ) : (
+                      option.label
+                    )}
                   </span>
                 </MetronomeScrollChip>
               ))}
@@ -388,15 +412,6 @@ export default function AudioPracticeMetronomeView() {
       </div>
 
       <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
-        <div className="metronome-audio-stage__toggle-row pointer-events-auto">
-          <span className="metronome-audio-stage__toggle-label">Accent First Beat</span>
-          <IOSSwitch
-            checked={accentFirstBeat}
-            onChange={handleAccentChange}
-            ariaLabel="Accent first beat"
-          />
-        </div>
-
         <div
           className="metronome-audio-stage__control-row metronome-audio-stage__control-row--sounds"
           role="group"
