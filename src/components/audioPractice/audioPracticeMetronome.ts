@@ -11,33 +11,26 @@ export function clampAudioPracticeBpm(value: number): number {
   )
 }
 
-export interface PracticeTimeSignatureGroup {
-  id: string
-  label: string
-  meters: MetronomeMeter[]
-}
+/** Visible by default; extended meters scroll in horizontally. */
+export const PRACTICE_CORE_METERS: MetronomeMeter[] = ['2/4', '4/4', '5/4', '6/8', '9/8', '12/8']
 
-export const PRACTICE_TIME_SIGNATURE_GROUPS: PracticeTimeSignatureGroup[] = [
-  {
-    id: 'simple',
-    label: 'Simple',
-    meters: ['2/4', '3/4', '4/4', '5/4', '6/4', '7/4'],
-  },
-  {
-    id: 'compound',
-    label: 'Compound',
-    meters: ['6/8', '9/8', '12/8'],
-  },
-  {
-    id: 'odd',
-    label: 'Odd',
-    meters: ['5/8', '7/8', '8/8', '10/8', '11/8'],
-  },
-  {
-    id: 'sixteenth',
-    label: '16th-based',
-    meters: ['3/16', '5/16', '7/16', '9/16', '11/16', '13/16', '15/16', '16/16'],
-  },
+export const PRACTICE_EXTENDED_METERS: MetronomeMeter[] = [
+  '3/4',
+  '6/4',
+  '7/4',
+  '5/8',
+  '7/8',
+  '8/8',
+  '10/8',
+  '11/8',
+  '3/16',
+  '5/16',
+  '7/16',
+  '9/16',
+  '11/16',
+  '13/16',
+  '15/16',
+  '16/16',
 ]
 
 export interface PracticeRhythmOption {
@@ -48,12 +41,15 @@ export interface PracticeRhythmOption {
   ticksPerBeat: number
 }
 
-export const PRACTICE_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
+export const PRACTICE_CORE_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
   { id: 'quarter', value: 'off', label: '♩', name: 'Quarter notes', ticksPerBeat: 1 },
   { id: 'eighth', value: '8ths', label: '♪', name: 'Eighth notes', ticksPerBeat: 2 },
-  { id: 'sixteenth', value: '16ths', label: '♬', name: 'Sixteenth notes', ticksPerBeat: 4 },
-  { id: 'dotted', value: 'dotted', label: '♩·', name: 'Dotted quarter', ticksPerBeat: 3 },
   { id: 'triplet', value: 'triplets', label: '♪3', name: 'Triplets', ticksPerBeat: 3 },
+  { id: 'sixteenth', value: '16ths', label: '♬', name: 'Sixteenth notes', ticksPerBeat: 4 },
+]
+
+export const PRACTICE_EXTENDED_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
+  { id: 'dotted', value: 'dotted', label: '♩·', name: 'Dotted quarter', ticksPerBeat: 3 },
   { id: 'quintuplet', value: 'quints', label: '5', name: 'Quintuplets', ticksPerBeat: 5 },
   { id: 'septuplet', value: 'septuplets', label: '7', name: 'Septuplets', ticksPerBeat: 7 },
 ]
