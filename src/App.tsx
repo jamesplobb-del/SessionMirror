@@ -372,10 +372,6 @@ function StandardApp({
   activeProjectIdRef.current = activeProjectId
 
   const pitchUserDismissedRef = useRef(false)
-  const mainAudioPitchSourceCacheRef = useRef<{
-    signature: string
-    value: MainAudioPitchSource | null
-  }>({ signature: '', value: null })
 
   const isReviewOpen = reviewSlot !== null
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
@@ -1485,14 +1481,6 @@ function StandardApp({
 
   const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
 
-  const autoPlaybackTake = useMemo(
-    () =>
-      autoPlaybackTakeId
-        ? takes.find((take) => take.id === autoPlaybackTakeId) ?? null
-        : null,
-    [autoPlaybackTakeId, takes],
-  )
-
   /** Audio-mode hands-free plays through hidden `<audio>` — PiP must not auto-play the same take. */
   const challengerHandsFreeAutoPlayRequestId =
     recordingMode === 'audio' ? null : autoPlaybackTakeId
@@ -1590,106 +1578,10 @@ function StandardApp({
     }
   }, [refreshStaleTakePlaybackUrls, resumeYoutubeReference])
 
-  const mainAudioPitchSource = useMemo(() => {
-    let next: MainAudioPitchSource | null = null
-
-    if (pitchTrackerActive && recordingMode === 'audio') {
-      if (isRecording && ready) {
-          next = {
-            mediaRef: liveMicPlaceholderRef,
-            take: null,
-            isPlaying: true,
-            mediaKey: 'main-recording-audio',
-            liveMicOnly: true,
-          }
-        } else if (
-          autoPlaybackPlaying &&
-          autoPlaybackTake &&
-          autoPlaybackAudioRef.current
-        ) {
-          next = {
-            mediaRef: autoPlaybackAudioRef,
-            take: autoPlaybackTake,
-            isPlaying: true,
-            mediaKey: `main-auto-${autoPlaybackTake.id}`,
-            liveMicOnly: false,
-          }
-        } else if (
-          autoPlaybackTakeId &&
-          autoPlaybackTake &&
-          challengerTake?.id === autoPlaybackTakeId &&
-          (challengerPipPlaying || autoPlaybackPlaying)
-        ) {
-          next = {
-            mediaRef: challengerPipVideoRef,
-            take: autoPlaybackTake,
-            isPlaying: challengerPipPlaying || autoPlaybackPlaying,
-            mediaKey: `main-auto-pip-${autoPlaybackTake.id}`,
-            liveMicOnly: false,
-          }
-        } else if (
-          challengerTake?.mediaType === 'audio' &&
-          challengerTake.videoUrl &&
-          challengerPipPlaying
-        ) {
-          next = {
-            mediaRef: challengerPipVideoRef,
-            take: challengerTake,
-            isPlaying: challengerPipPlaying,
-            mediaKey: `main-pip-ch-${challengerTake.id}-${challengerTake.filePath}`,
-            liveMicOnly: false,
-          }
-        } else if (
-          benchmarkTake?.mediaType === 'audio' &&
-          benchmarkTake.videoUrl &&
-          benchmarkPipPlaying
-        ) {
-          next = {
-            mediaRef: benchmarkPipVideoRef,
-            take: benchmarkTake,
-            isPlaying: benchmarkPipPlaying,
-            mediaKey: `main-pip-bm-${benchmarkTake.id}-${benchmarkTake.filePath}`,
-            liveMicOnly: false,
-          }
-        } else if (ready) {
-          next = {
-            mediaRef: liveMicPlaceholderRef,
-            take: null,
-            isPlaying: false,
-            mediaKey: 'main-live-mic-audio',
-            liveMicOnly: true,
-          }
-        }
-    }
-
-    const signature = next
-      ? `${next.mediaKey}|${next.isPlaying}|${next.liveMicOnly}|${next.take?.id ?? ''}`
-      : 'null'
-
-    if (signature === mainAudioPitchSourceCacheRef.current.signature) {
-      const cached = mainAudioPitchSourceCacheRef.current.value
-      if (cached && next) {
-        cached.isPlaying = next.isPlaying
-        cached.take = next.take
-      }
-      return cached
-    }
-
-    mainAudioPitchSourceCacheRef.current = { signature, value: next }
-    return next
-  }, [
-    pitchTrackerActive,
-    recordingMode,
-    autoPlaybackTakeId,
-    autoPlaybackTake,
-    autoPlaybackPlaying,
-    challengerTake,
-    challengerPipPlaying,
-    benchmarkTake,
-    benchmarkPipPlaying,
-    ready,
-    isRecording,
-  ])
+  const mainAudioPitchSource = useMemo((): MainAudioPitchSource | null => {
+    // Audio mode uses the dedicated Tuner tab — no floating pitch overlay.
+    return null
+  }, [])
 
   const mainVideoPitchSource = useMemo(() => {
     if (!pitchTrackerActive || recordingMode !== 'video') return null
@@ -2313,7 +2205,8 @@ function StandardApp({
         resumeNonce={cameraResumeNonce}
         modePreparing={!ready && !isRecording && !cameraNeedsPermission}
         pitchStageActive={
-          showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
+          isAudioPracticeTunerTab ||
+          (showPitch && mainVideoPitchSource !== null)
         }
         metronomeStageActive={metronomeStageActive}
         audioPracticeOverlayActive={isAudioPracticeToolTab}
@@ -2461,8 +2354,6 @@ function StandardApp({
               streamGeneration={streamGeneration}
               ready={ready}
               isRecording={isRecording}
-              tunerInstrument={settings.tunerInstrument}
-              liveMicTunerEnabled={settings.liveMicTunerEnabled}
             />
           </div>
         )}
@@ -2592,7 +2483,7 @@ function StandardApp({
             dragDeleteActive={pipDragState.isDragging}
             dragOverDelete={pipDragState.overDelete}
             pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
-            pitchToggleVisible
+            pitchToggleVisible={recordingMode === 'video'}
             showTakeCards={hudQuickSettings.showTakeCards}
             onPitchTrackerChange={handlePitchTrackerSettingChange}
             onShowTakeCardsChange={handleShowTakeCardsSettingChange}
