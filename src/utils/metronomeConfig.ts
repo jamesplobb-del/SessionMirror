@@ -1,21 +1,84 @@
-export type MetronomeMeter = '2/4' | '3/4' | '4/4' | '5/4' | '6/8' | '9/8' | '12/8'
+export type MetronomeMeter =
+  | '2/4'
+  | '3/4'
+  | '4/4'
+  | '5/4'
+  | '6/4'
+  | '7/4'
+  | '6/8'
+  | '9/8'
+  | '12/8'
+  | '5/8'
+  | '7/8'
+  | '8/8'
+  | '10/8'
+  | '11/8'
+  | '3/16'
+  | '5/16'
+  | '7/16'
+  | '9/16'
+  | '11/16'
+  | '13/16'
+  | '15/16'
+  | '16/16'
+
+export type MetronomeMeterGroup = 'simple' | 'compound' | 'odd' | 'sixteenth'
 
 export interface MetronomeMeterDef {
   label: string
+  numerator: number
+  denominator: number
+  /** Main beat dots shown in the UI. */
   beatsPerBar: number
-  group: 'simple' | 'compound'
-  /** Eighth-note subdivisions per bar (compound meters only). */
+  group: MetronomeMeterGroup
+  /** Compound 8th-note pulses per bar when subdivision is quarter (off). */
   eighthNotesPerBar?: number
 }
 
 export const METRONOME_METERS: Record<MetronomeMeter, MetronomeMeterDef> = {
-  '2/4': { label: '2/4', beatsPerBar: 2, group: 'simple' },
-  '3/4': { label: '3/4', beatsPerBar: 3, group: 'simple' },
-  '4/4': { label: '4/4', beatsPerBar: 4, group: 'simple' },
-  '5/4': { label: '5/4', beatsPerBar: 5, group: 'simple' },
-  '6/8': { label: '6/8', beatsPerBar: 2, group: 'compound', eighthNotesPerBar: 6 },
-  '9/8': { label: '9/8', beatsPerBar: 3, group: 'compound', eighthNotesPerBar: 9 },
-  '12/8': { label: '12/8', beatsPerBar: 4, group: 'compound', eighthNotesPerBar: 12 },
+  '2/4': { label: '2/4', numerator: 2, denominator: 4, beatsPerBar: 2, group: 'simple' },
+  '3/4': { label: '3/4', numerator: 3, denominator: 4, beatsPerBar: 3, group: 'simple' },
+  '4/4': { label: '4/4', numerator: 4, denominator: 4, beatsPerBar: 4, group: 'simple' },
+  '5/4': { label: '5/4', numerator: 5, denominator: 4, beatsPerBar: 5, group: 'simple' },
+  '6/4': { label: '6/4', numerator: 6, denominator: 4, beatsPerBar: 6, group: 'simple' },
+  '7/4': { label: '7/4', numerator: 7, denominator: 4, beatsPerBar: 7, group: 'simple' },
+  '6/8': {
+    label: '6/8',
+    numerator: 6,
+    denominator: 8,
+    beatsPerBar: 2,
+    group: 'compound',
+    eighthNotesPerBar: 6,
+  },
+  '9/8': {
+    label: '9/8',
+    numerator: 9,
+    denominator: 8,
+    beatsPerBar: 3,
+    group: 'compound',
+    eighthNotesPerBar: 9,
+  },
+  '12/8': {
+    label: '12/8',
+    numerator: 12,
+    denominator: 8,
+    beatsPerBar: 4,
+    group: 'compound',
+    eighthNotesPerBar: 12,
+  },
+  '5/8': { label: '5/8', numerator: 5, denominator: 8, beatsPerBar: 5, group: 'odd' },
+  '7/8': { label: '7/8', numerator: 7, denominator: 8, beatsPerBar: 7, group: 'odd' },
+  '8/8': { label: '8/8', numerator: 8, denominator: 8, beatsPerBar: 8, group: 'odd' },
+  '10/8': { label: '10/8', numerator: 10, denominator: 8, beatsPerBar: 10, group: 'odd' },
+  '11/8': { label: '11/8', numerator: 11, denominator: 8, beatsPerBar: 11, group: 'odd' },
+  '3/16': { label: '3/16', numerator: 3, denominator: 16, beatsPerBar: 3, group: 'sixteenth' },
+  '5/16': { label: '5/16', numerator: 5, denominator: 16, beatsPerBar: 5, group: 'sixteenth' },
+  '7/16': { label: '7/16', numerator: 7, denominator: 16, beatsPerBar: 7, group: 'sixteenth' },
+  '9/16': { label: '9/16', numerator: 9, denominator: 16, beatsPerBar: 9, group: 'sixteenth' },
+  '11/16': { label: '11/16', numerator: 11, denominator: 16, beatsPerBar: 11, group: 'sixteenth' },
+  '13/16': { label: '13/16', numerator: 13, denominator: 16, beatsPerBar: 13, group: 'sixteenth' },
+  '15/16': { label: '15/16', numerator: 15, denominator: 16, beatsPerBar: 15, group: 'sixteenth' },
+  '16/16': { label: '16/16', numerator: 16, denominator: 16, beatsPerBar: 16, group: 'sixteenth' },
 }
 
 export const SIMPLE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4']
@@ -28,7 +91,14 @@ export const DEFAULT_BPM = 120
 export const DEFAULT_METER: MetronomeMeter = '4/4'
 export const DEFAULT_SUBDIVISION: MetronomeSubdivision = 'off'
 
-export type MetronomeSubdivision = 'off' | '8ths' | 'triplets' | '16ths'
+export type MetronomeSubdivision =
+  | 'off'
+  | '8ths'
+  | 'triplets'
+  | '16ths'
+  | 'dotted'
+  | 'quints'
+  | 'septuplets'
 
 export const METRONOME_SUBDIVISIONS: { value: MetronomeSubdivision; label: string }[] = [
   { value: 'off', label: 'Off' },
@@ -58,6 +128,16 @@ export interface MetronomePrefs {
 
 const DEFAULT_SOUND_ID = 'classic'
 
+const VALID_SUBDIVISIONS = new Set<MetronomeSubdivision>([
+  'off',
+  '8ths',
+  'triplets',
+  '16ths',
+  'dotted',
+  'quints',
+  'septuplets',
+])
+
 function defaultMetronomePrefs(): MetronomePrefs {
   return {
     bpm: DEFAULT_BPM,
@@ -80,8 +160,8 @@ function parseMeter(value: unknown): MetronomeMeter {
 }
 
 function parseSubdivision(value: unknown): MetronomeSubdivision {
-  if (value === '8ths' || value === 'triplets' || value === '16ths' || value === 'off') {
-    return value
+  if (typeof value === 'string' && VALID_SUBDIVISIONS.has(value as MetronomeSubdivision)) {
+    return value as MetronomeSubdivision
   }
   return DEFAULT_SUBDIVISION
 }
@@ -91,9 +171,14 @@ export function subdivisionsPerBeat(subdivision: MetronomeSubdivision): number {
     case '8ths':
       return 2
     case 'triplets':
+    case 'dotted':
       return 3
     case '16ths':
       return 4
+    case 'quints':
+      return 5
+    case 'septuplets':
+      return 7
     default:
       return 1
   }
@@ -138,6 +223,10 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
   }
 }
 
+export function getMeterDef(meter: MetronomeMeter): MetronomeMeterDef {
+  return METRONOME_METERS[meter]
+}
+
 export function getBeatsPerBar(meter: MetronomeMeter): number {
   return METRONOME_METERS[meter].beatsPerBar
 }
@@ -149,6 +238,10 @@ export function isCompoundMeter(meter: MetronomeMeter): boolean {
 export function getEighthNotesPerBar(meter: MetronomeMeter): number {
   const def = METRONOME_METERS[meter]
   return def.eighthNotesPerBar ?? def.beatsPerBar
+}
+
+export function getCompoundGroupSize(_meter: MetronomeMeter): number {
+  return 3
 }
 
 export type MetronomeClickTier = 'downbeat' | 'macro' | 'subdivision'

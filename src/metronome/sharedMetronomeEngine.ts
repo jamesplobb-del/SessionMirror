@@ -30,6 +30,7 @@ export interface SharedMetronomeSnapshot {
   soundId: string
   playing: boolean
   beatIndex: number
+  subTickIndex: number
   beatPulseId: number
 }
 
@@ -78,16 +79,23 @@ function applyAccentFirstBeat(
   return 'subdivision'
 }
 
-function resolveUiBeatIndex(
+function resolveUiTick(
   meter: MetronomeMeter,
   tickIndexInBar: number,
   subdivision: MetronomeSubdivision,
-): number {
+): { beatIndex: number; subTickIndex: number } {
   if (isCompoundMeter(meter) && subdivision === 'off') {
-    return Math.floor(tickIndexInBar / 3) % getBeatsPerBar(meter)
+    const beatsPerBar = getBeatsPerBar(meter)
+    const beatIndex = Math.floor(tickIndexInBar / 3) % beatsPerBar
+    const subTickIndex = tickIndexInBar % 3
+    return { beatIndex, subTickIndex }
   }
+
   const ticksPerBeat = subdivisionsPerBeat(subdivision)
-  return Math.floor(tickIndexInBar / ticksPerBeat) % getBeatsPerBar(meter)
+  const beatsPerBar = getBeatsPerBar(meter)
+  const beatIndex = Math.floor(tickIndexInBar / ticksPerBeat) % beatsPerBar
+  const subTickIndex = tickIndexInBar % ticksPerBeat
+  return { beatIndex, subTickIndex }
 }
 
 function ticksPerBar(meter: MetronomeMeter, subdivision: MetronomeSubdivision): number {
@@ -107,6 +115,7 @@ function createInitialSnapshot(): SharedMetronomeSnapshot {
     soundId: prefs.soundId,
     playing: false,
     beatIndex: 0,
+    subTickIndex: 0,
     beatPulseId: 0,
   }
 }
@@ -198,7 +207,7 @@ class SharedMetronomeEngine {
       }
 
       if (this.snapshot.playing) {
-        this.patchState({ playing: false, beatIndex: 0 })
+        this.patchState({ playing: false, beatIndex: 0, subTickIndex: 0 })
       }
     }
 
@@ -257,14 +266,21 @@ class SharedMetronomeEngine {
 
   setMeter = (nextMeter: MetronomeMeter): void => {
     this.tickCounter = 0
-    this.patchState({ meter: nextMeter, beatIndex: 0 })
+    this.patchState({ meter: nextMeter, beatIndex: 0, subTickIndex: 0 })
     this.persistPrefs(this.snapshot.bpm, nextMeter, this.snapshot.subdivision)
+    if (import.meta.env.DEV) {
+      console.log(`[MetronomeTab] timeSignature=${nextMeter}`)
+    }
   }
 
   setSubdivision = (nextSubdivision: MetronomeSubdivision): void => {
     this.tickCounter = 0
-    this.patchState({ subdivision: nextSubdivision, beatIndex: 0 })
+    this.patchState({ subdivision: nextSubdivision, beatIndex: 0, subTickIndex: 0 })
     this.persistPrefs(this.snapshot.bpm, this.snapshot.meter, nextSubdivision)
+    if (import.meta.env.DEV) {
+      console.log(`[MetronomeTab] subdivision=${nextSubdivision}`)
+    }
+    this.debugLog(`ticksPerBeat=${subdivisionsPerBeat(nextSubdivision)}`)
   }
 
   setAccentFirstBeat = (nextAccentFirstBeat: boolean): void => {
@@ -377,6 +393,7 @@ class SharedMetronomeEngine {
       const sound = this.snapshot.soundId
 
       let uiBeat = -1
+      let uiSubTick = 0
 
       while (this.nextBeatTime < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
         const tickInBar = this.tickCounter % barTicks
@@ -390,7 +407,9 @@ class SharedMetronomeEngine {
         scheduleMetronomeClick(activeCtx, beatTime, tier, outputNode, muted, sound)
 
         if (beatTime - activeCtx.currentTime <= SCHEDULE_AHEAD_SEC) {
-          uiBeat = resolveUiBeatIndex(meter, tickInBar, subdivision)
+          const uiTick = resolveUiTick(meter, tickInBar, subdivision)
+          uiBeat = uiTick.beatIndex
+          uiSubTick = uiTick.subTickIndex
         }
 
         this.nextBeatTime += secondsPerTick
@@ -400,9 +419,10 @@ class SharedMetronomeEngine {
       if (uiBeat >= 0) {
         this.patchState({
           beatIndex: uiBeat,
+          subTickIndex: uiSubTick,
           beatPulseId: this.snapshot.beatPulseId + 1,
         })
-        this.debugLog(`tick beat=${uiBeat + 1}`)
+        this.debugLog(`beat=${uiBeat + 1} subTick=${uiSubTick}`)
       }
 
       this.schedulerTimer = window.setTimeout(tick, LOOKAHEAD_MS)
@@ -483,7 +503,7 @@ class SharedMetronomeEngine {
     this.tickCounter = 0
     this.nextBeatTime = ctx.currentTime + START_LEAD_SEC
     this.schedulerSession += 1
-    this.patchState({ playing: true, beatIndex: 0, beatPulseId: 0 })
+    this.patchState({ playing: true, beatIndex: 0, subTickIndex: 0, beatPulseId: 0 })
     this.debugLog(options?.recovered ? 'start (recovered)' : 'start')
     this.runSchedulerLoop()
   }
