@@ -5,7 +5,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -13,8 +12,8 @@ import {
 } from 'react'
 import { triggerLightHaptic } from '../../utils/haptics'
 
-const TAP_MOVE_THRESHOLD_PX = 12
-const TAP_SUPPRESS_MS = 200
+const TAP_MOVE_THRESHOLD_PX = 14
+const TAP_SUPPRESS_MS = 180
 const DEFAULT_VISIBLE_COLUMNS = 5
 
 interface ScrollTapGuard {
@@ -124,11 +123,8 @@ export default function MetronomeHorizontalScroller({
   className = '',
 }: MetronomeHorizontalScrollerProps) {
   const trackRef = useRef<HTMLDivElement>(null)
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressUntilRef = useRef(0)
   const didInitialScrollResetRef = useRef(false)
-  const [fadeLeft, setFadeLeft] = useState(false)
-  const [fadeRight, setFadeRight] = useState(false)
 
   const markScrollGesture = useCallback(() => {
     suppressUntilRef.current = Date.now() + TAP_SUPPRESS_MS
@@ -141,16 +137,6 @@ export default function MetronomeHorizontalScroller({
     [],
   )
 
-  const updateFades = useCallback(() => {
-    const track = trackRef.current
-    if (!track) return
-
-    const { scrollLeft, scrollWidth, clientWidth } = track
-    const overflow = scrollWidth - clientWidth > 2
-    setFadeLeft(overflow && scrollLeft > 4)
-    setFadeRight(overflow && scrollLeft + clientWidth < scrollWidth - 4)
-  }, [])
-
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
@@ -160,55 +146,16 @@ export default function MetronomeHorizontalScroller({
       didInitialScrollResetRef.current = true
     }
 
-    const onPointerDown = (event: globalThis.PointerEvent) => {
-      pointerStartRef.current = { x: event.clientX, y: event.clientY }
-    }
-
-    const onPointerMove = (event: globalThis.PointerEvent) => {
-      const start = pointerStartRef.current
-      if (!start) return
-      const dx = Math.abs(event.clientX - start.x)
-      const dy = Math.abs(event.clientY - start.y)
-      if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) {
-        markScrollGesture()
-      }
-    }
-
-    const onTouchMove = () => {
-      markScrollGesture()
-    }
-
-    const onPointerEnd = () => {
-      pointerStartRef.current = null
-    }
-
     const onScroll = () => {
       markScrollGesture()
-      updateFades()
     }
 
-    track.addEventListener('pointerdown', onPointerDown, { capture: true })
-    track.addEventListener('pointermove', onPointerMove, { capture: true })
-    track.addEventListener('pointerup', onPointerEnd, { capture: true })
-    track.addEventListener('pointercancel', onPointerEnd, { capture: true })
-    track.addEventListener('touchmove', onTouchMove, { passive: true })
     track.addEventListener('scroll', onScroll, { passive: true })
 
-    updateFades()
-
-    const observer = new ResizeObserver(() => updateFades())
-    observer.observe(track)
-
     return () => {
-      track.removeEventListener('pointerdown', onPointerDown, { capture: true })
-      track.removeEventListener('pointermove', onPointerMove, { capture: true })
-      track.removeEventListener('pointerup', onPointerEnd, { capture: true })
-      track.removeEventListener('pointercancel', onPointerEnd, { capture: true })
-      track.removeEventListener('touchmove', onTouchMove)
       track.removeEventListener('scroll', onScroll)
-      observer.disconnect()
     }
-  }, [markScrollGesture, updateFades, children])
+  }, [markScrollGesture, children])
 
   useEffect(() => {
     if (!selectedKey) return
@@ -218,39 +165,27 @@ export default function MetronomeHorizontalScroller({
     const selected = track.querySelector<HTMLElement>(`[data-scroll-key="${selectedKey}"]`)
     if (!selected) return
 
-    if (isChipVisibleInTrack(track, selected)) {
-      window.requestAnimationFrame(updateFades)
-      return
-    }
+    if (isChipVisibleInTrack(track, selected)) return
 
     selected.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
-    window.requestAnimationFrame(updateFades)
-  }, [selectedKey, updateFades])
+  }, [selectedKey])
 
   return (
     <ScrollTapGuardContext.Provider value={scrollGuard}>
       <div
-        className={[
-          'metronome-h-scroll',
-          'metronome-h-scroll--five-wide',
-          fadeLeft ? 'metronome-h-scroll--fade-left' : '',
-          fadeRight ? 'metronome-h-scroll--fade-right' : '',
-          className,
-        ]
+        className={['metronome-h-scroll', 'metronome-h-scroll--five-wide', className]
           .filter(Boolean)
           .join(' ')}
         style={{ '--mhs-columns': visibleColumns } as CSSProperties}
       >
         <div className="metronome-h-scroll__label">{label}</div>
-        <div className="metronome-h-scroll__viewport">
-          <div
-            ref={trackRef}
-            className="metronome-h-scroll__track"
-            role="group"
-            aria-label={ariaLabel}
-          >
-            {children}
-          </div>
+        <div
+          ref={trackRef}
+          className="metronome-h-scroll__track"
+          role="group"
+          aria-label={ariaLabel}
+        >
+          {children}
         </div>
       </div>
     </ScrollTapGuardContext.Provider>
