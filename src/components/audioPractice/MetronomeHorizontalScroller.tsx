@@ -1,30 +1,9 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { triggerLightHaptic } from '../../utils/haptics'
 
-const TAP_MOVE_THRESHOLD_PX = 14
-const TAP_SUPPRESS_MS = 180
+const TAP_MOVE_THRESHOLD_PX = 12
+const SCROLL_DELTA_THRESHOLD_PX = 3
 const DEFAULT_VISIBLE_COLUMNS = 5
-
-interface ScrollTapGuard {
-  shouldSuppressTap: () => boolean
-}
-
-const ScrollTapGuardContext = createContext<ScrollTapGuard | null>(null)
-
-export function useScrollTapGuard(): ScrollTapGuard | null {
-  return useContext(ScrollTapGuardContext)
-}
 
 function isChipVisibleInTrack(track: HTMLElement, chip: HTMLElement): boolean {
   const trackRect = track.getBoundingClientRect()
@@ -49,30 +28,33 @@ export function MetronomeScrollChip({
   children,
   className = '',
 }: MetronomeScrollChipProps) {
-  const scrollGuard = useScrollTapGuard()
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
+  const gestureRef = useRef({ x: 0, y: 0, scrollLeft: 0 })
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
-    pointerStartRef.current = { x: event.clientX, y: event.clientY }
+    const track = event.currentTarget.closest<HTMLElement>('.metronome-h-scroll__track')
+    gestureRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      scrollLeft: track?.scrollLeft ?? 0,
+    }
   }
 
-  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return
-    const start = pointerStartRef.current
-    pointerStartRef.current = null
-    if (!start) return
+  const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const track = event.currentTarget.closest<HTMLElement>('.metronome-h-scroll__track')
+    const { x, y, scrollLeft } = gestureRef.current
+    const dx = Math.abs(event.clientX - x)
+    const dy = Math.abs(event.clientY - y)
+    const scrolled =
+      track !== null && Math.abs(track.scrollLeft - scrollLeft) > SCROLL_DELTA_THRESHOLD_PX
 
-    const dx = Math.abs(event.clientX - start.x)
-    const dy = Math.abs(event.clientY - start.y)
-    if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) return
-    if (scrollGuard?.shouldSuppressTap()) return
+    if (scrolled || dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) return
 
     triggerLightHaptic()
     onPress()
   }
 
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
     onPress()
@@ -86,14 +68,12 @@ export function MetronomeScrollChip({
       aria-pressed={active}
       data-scroll-key={scrollKey}
       onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={() => {
-        pointerStartRef.current = null
-      }}
+      onClick={handleClick}
       onKeyDown={handleKeyDown}
       className={[
         'metronome-h-scroll__chip',
         'metronome-audio-stage__btn',
+        'pointer-events-auto',
         active ? 'metronome-audio-stage__btn--active' : '',
         className,
       ]
@@ -123,39 +103,14 @@ export default function MetronomeHorizontalScroller({
   className = '',
 }: MetronomeHorizontalScrollerProps) {
   const trackRef = useRef<HTMLDivElement>(null)
-  const suppressUntilRef = useRef(0)
   const didInitialScrollResetRef = useRef(false)
-
-  const markScrollGesture = useCallback(() => {
-    suppressUntilRef.current = Date.now() + TAP_SUPPRESS_MS
-  }, [])
-
-  const scrollGuard = useMemo<ScrollTapGuard>(
-    () => ({
-      shouldSuppressTap: () => Date.now() < suppressUntilRef.current,
-    }),
-    [],
-  )
 
   useEffect(() => {
     const track = trackRef.current
-    if (!track) return
-
-    if (!didInitialScrollResetRef.current) {
-      track.scrollLeft = 0
-      didInitialScrollResetRef.current = true
-    }
-
-    const onScroll = () => {
-      markScrollGesture()
-    }
-
-    track.addEventListener('scroll', onScroll, { passive: true })
-
-    return () => {
-      track.removeEventListener('scroll', onScroll)
-    }
-  }, [markScrollGesture, children])
+    if (!track || didInitialScrollResetRef.current) return
+    track.scrollLeft = 0
+    didInitialScrollResetRef.current = true
+  }, [children])
 
   useEffect(() => {
     if (!selectedKey) return
@@ -171,23 +126,21 @@ export default function MetronomeHorizontalScroller({
   }, [selectedKey])
 
   return (
-    <ScrollTapGuardContext.Provider value={scrollGuard}>
+    <div
+      className={['metronome-h-scroll', 'metronome-h-scroll--five-wide', className]
+        .filter(Boolean)
+        .join(' ')}
+      style={{ '--mhs-columns': visibleColumns } as CSSProperties}
+    >
+      <div className="metronome-h-scroll__label">{label}</div>
       <div
-        className={['metronome-h-scroll', 'metronome-h-scroll--five-wide', className]
-          .filter(Boolean)
-          .join(' ')}
-        style={{ '--mhs-columns': visibleColumns } as CSSProperties}
+        ref={trackRef}
+        className="metronome-h-scroll__track pointer-events-auto"
+        role="group"
+        aria-label={ariaLabel}
       >
-        <div className="metronome-h-scroll__label">{label}</div>
-        <div
-          ref={trackRef}
-          className="metronome-h-scroll__track"
-          role="group"
-          aria-label={ariaLabel}
-        >
-          {children}
-        </div>
+        {children}
       </div>
-    </ScrollTapGuardContext.Provider>
+    </div>
   )
 }
