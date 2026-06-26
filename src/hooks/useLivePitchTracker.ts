@@ -624,7 +624,7 @@ function drawColoredTraceSegments(
     if (glow && !isSilenceFloorSample(points[runEnd].cents)) {
       ctx.save()
       ctx.shadowColor = glowColorForCents(points[runEnd].cents)
-      ctx.shadowBlur = 8
+      ctx.shadowBlur = lineWidth >= 6 ? 10 : 8
       ctx.strokeStyle = strokeColor
       ctx.beginPath()
       ctx.moveTo(points[runStart].x, points[runStart].y)
@@ -697,8 +697,8 @@ function drawSmoothPitchTrace(
   if (points.length < 2) return
 
   if (theme === 'glass-legacy' && !responsiveTrace) {
-    drawColoredTraceSegments(ctx, points, 4.5, 0.34, true)
-    drawColoredTraceSegments(ctx, points, 3.1, 0.96)
+    drawColoredTraceSegments(ctx, points, 6.5, 0.26, true)
+    drawColoredTraceSegments(ctx, points, 4.35, 0.98)
     return
   }
 
@@ -750,9 +750,18 @@ function drawTraceEndpointDot(
   const isGreen = Math.abs(point.cents) <= TUNING_GREEN_CENTS
   const glowBoost = isGreen ? Math.max(0, inTuneGlow) : 0
   const isWidgetGlass = theme === 'glass-widget'
-  const isGlassStyle = theme === 'glass-widget' || theme === 'glass-legacy'
-  const radius = isGlassStyle ? 5 + glowBoost * 1.2 : 4.5
-  const glowRadius = isGlassStyle ? 7 + glowBoost * 5 : 6
+  const isLegacyGlass = theme === 'glass-legacy'
+  const isGlassStyle = isWidgetGlass || isLegacyGlass
+  const radius = isLegacyGlass
+    ? 6.25 + glowBoost * 1.5
+    : isGlassStyle
+      ? 5 + glowBoost * 1.2
+      : 4.5
+  const glowRadius = isLegacyGlass
+    ? 10 + glowBoost * 6
+    : isGlassStyle
+      ? 7 + glowBoost * 5
+      : 6
 
   if (glowBoost > 0.08 && !isWidgetGlass) {
     ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + Math.min(1, glowBoost) * 0.5})`
@@ -786,51 +795,94 @@ function getGlassLayoutMetrics(height: number) {
 function drawGlassLegacyGrid(
   ctx: CanvasRenderingContext2D,
   width: number,
+  height: number,
   pitchTop: number,
   pitchBottom: number,
   pitchHeight: number,
   centsToY: (cents: number) => number,
 ): void {
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'
-  ctx.lineWidth = 1
-  ctx.setLineDash([3, 3])
+  const labelPad = 36
 
-  const gridXStep = Math.max(16, Math.floor(width / 14))
-  for (let x = gridXStep; x < width; x += gridXStep) {
+  const bg = ctx.createRadialGradient(
+    width * 0.5,
+    pitchTop + pitchHeight * 0.5,
+    0,
+    width * 0.5,
+    pitchTop + pitchHeight * 0.5,
+    Math.max(width, pitchHeight) * 0.72,
+  )
+  bg.addColorStop(0, 'rgba(22, 28, 42, 0.98)')
+  bg.addColorStop(1, 'rgba(8, 10, 18, 0.99)')
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, width, height)
+
+  const vignette = ctx.createLinearGradient(0, pitchTop, 0, pitchBottom)
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0.12)')
+  vignette.addColorStop(0.45, 'transparent')
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.18)')
+  ctx.fillStyle = vignette
+  ctx.fillRect(0, pitchTop, width, pitchBottom - pitchTop)
+
+  const bandTop = Math.min(centsToY(10), centsToY(-10))
+  const bandBottom = Math.max(centsToY(10), centsToY(-10))
+  ctx.fillStyle = 'rgba(16, 185, 129, 0.07)'
+  ctx.fillRect(labelPad, bandTop, width - labelPad, bandBottom - bandTop)
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.028)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  const vStep = Math.max(28, Math.floor((width - labelPad) / 9))
+  for (let x = labelPad + vStep; x < width - 4; x += vStep) {
     ctx.beginPath()
     ctx.moveTo(x + 0.5, pitchTop)
     ctx.lineTo(x + 0.5, pitchBottom)
     ctx.stroke()
   }
 
-  const gridYStep = pitchHeight / 8
-  for (let i = 1; i < 8; i += 1) {
-    const y = pitchTop + i * gridYStep
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.055)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([3, 7])
+  for (const cents of [50, 25, -25, -50]) {
+    const y = centsToY(cents)
     ctx.beginPath()
-    ctx.moveTo(0, y + 0.5)
+    ctx.moveTo(labelPad, y + 0.5)
     ctx.lineTo(width, y + 0.5)
     ctx.stroke()
   }
-
   ctx.setLineDash([])
 
-  ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
+  const centerY = centsToY(0)
+  const zeroGrad = ctx.createLinearGradient(labelPad, 0, width, 0)
+  zeroGrad.addColorStop(0, 'rgba(52, 211, 153, 0.12)')
+  zeroGrad.addColorStop(0.45, 'rgba(255, 255, 255, 0.2)')
+  zeroGrad.addColorStop(1, 'rgba(52, 211, 153, 0.06)')
+  ctx.strokeStyle = zeroGrad
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(labelPad, centerY + 0.5)
+  ctx.lineTo(width, centerY + 0.5)
+  ctx.stroke()
+
+  const labelX = 7
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText('Sharp', 2, centsToY(50) - 10)
-  ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
-  ctx.fillText('+50', 2, centsToY(50))
-  ctx.fillText('0', 2, centsToY(0))
-  ctx.fillText('-50', 2, centsToY(-50))
+
   ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+  ctx.fillText('Sharp', labelX, centsToY(50) - 11)
+  ctx.fillText('Flat', labelX, centsToY(-50) + 11)
+
+  ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
   ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
-  ctx.fillText('Flat', 2, centsToY(-50) + 10)
+  ctx.fillText('+50', labelX, centsToY(50))
+  ctx.fillText('+25', labelX, centsToY(25))
+  ctx.fillText('0', labelX, centsToY(0))
+  ctx.fillText('-25', labelX, centsToY(-25))
+  ctx.fillText('-50', labelX, centsToY(-50))
 }
 
 /** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 5
+const GLASS_STATIC_GRID_VERSION = 6
 
 type GlassStaticVariant = 'widget' | 'legacy'
 
@@ -887,7 +939,7 @@ function blitGlassStaticLayer(
     } else {
       const { pitchTop, pitchBottom, pitchHeight, centsToY } = getGlassLayoutMetrics(height)
       offCtx.clearRect(0, 0, width, height)
-      drawGlassLegacyGrid(offCtx, width, pitchTop, pitchBottom, pitchHeight, centsToY)
+      drawGlassLegacyGrid(offCtx, width, height, pitchTop, pitchBottom, pitchHeight, centsToY)
     }
     cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, variant, canvas: off }
     glassStaticLayerCache.set(canvas, cache)
@@ -973,16 +1025,15 @@ function drawPitchCanvas(
   }
 
   if (isLegacyGlass) {
-    drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight, false)
-    const centerY = centsToY(0)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
-    ctx.setLineDash([4, 7])
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(0, centerY)
-    ctx.lineTo(width, centerY)
-    ctx.stroke()
-    ctx.setLineDash([])
+    if (inTuneHighlight > 0.01) {
+      const yTop = centsToY(TUNING_GREEN_CENTS)
+      const yBottom = centsToY(-TUNING_GREEN_CENTS)
+      const bandTop = Math.min(yTop, yBottom)
+      const bandHeight = Math.abs(yBottom - yTop)
+      const t = Math.min(1, inTuneHighlight)
+      ctx.fillStyle = `rgba(34, 197, 94, ${0.05 + t * 0.16})`
+      ctx.fillRect(0, bandTop, width, bandHeight)
+    }
   } else if (isWidgetGlass) {
     drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight, true)
   } else {
