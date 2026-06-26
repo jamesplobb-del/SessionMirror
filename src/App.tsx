@@ -2309,7 +2309,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${isAudioPracticeComboTab ? 'app-ui-overlay--audio-practice-combo' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isVaultOpen || isSettingsOpen ? 'app-ui-overlay--sheet-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${isAudioPracticeComboTab ? 'app-ui-overlay--audio-practice-combo' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2416,18 +2416,22 @@ function StandardApp({
         )}
 
         {recordingMode === 'audio' && isAudioPracticeComboTab && !quickSettingsOpen && (
-          <div className="audio-practice-combo-layer pointer-events-auto flex min-h-0 flex-1 flex-col">
+          <div
+            className={`audio-practice-combo-layer flex min-h-0 flex-1 flex-col ${isVaultOpen || isSettingsOpen || isReviewOpen ? 'pointer-events-none' : 'pointer-events-auto'}`}
+          >
             <AudioComboTab
               streamRef={streamRef}
               streamGeneration={streamGeneration}
               ready={ready}
               isRecording={isRecording}
+              elapsed={elapsed}
               tunerInstrument={settings.tunerInstrument}
               liveMicTunerEnabled={settings.liveMicTunerEnabled}
               benchmarkTake={benchmarkTake}
               challengerTake={challengerTake}
               benchmarkId={benchmarkId}
               challengerId={challengerId}
+              interactionSuspended={isVaultOpen || isSettingsOpen || isReviewOpen}
               onPinCurrentAsBest={handlePinCurrentAsBest}
               onDiscardCurrentTake={handleDragDeleteTake}
               onOpenVault={handleOpenVault}

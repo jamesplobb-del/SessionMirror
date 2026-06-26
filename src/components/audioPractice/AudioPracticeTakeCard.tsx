@@ -15,6 +15,7 @@ interface AudioPracticeTakeCardProps {
   compareActive?: boolean
   subtitle?: string
   canMakeBest?: boolean
+  compact?: boolean
   onPlayToggle: () => void
   onMakeBest?: () => void
   onDiscard?: () => void
@@ -88,6 +89,7 @@ export default function AudioPracticeTakeCard({
   compareActive = false,
   subtitle,
   canMakeBest = false,
+  compact = false,
   onPlayToggle,
   onMakeBest,
   onDiscard,
@@ -100,7 +102,7 @@ export default function AudioPracticeTakeCard({
 
   return (
     <article
-      className={`audio-practice-take-card audio-practice-take-card--${variant}`}
+      className={`audio-practice-take-card audio-practice-take-card--${variant} ${compact ? 'audio-practice-take-card--compact' : ''}`}
       aria-label={variant === 'best' ? 'Best take' : 'Current take'}
     >
       <header className="audio-practice-take-card__header">

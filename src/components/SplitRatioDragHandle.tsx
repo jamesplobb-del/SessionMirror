@@ -3,8 +3,8 @@ import { ChevronsUpDown } from 'lucide-react'
 import { stopEventBubble } from '../utils/eventBubbling'
 import { triggerDragStartHaptic, triggerLightHaptic } from '../utils/haptics'
 
-const MIN_RATIO = 20
-const MAX_RATIO = 80
+const DEFAULT_MIN_RATIO = 20
+const DEFAULT_MAX_RATIO = 80
 const HOLD_MS = 120
 const DRAG_THRESHOLD_PX = 4
 
@@ -13,10 +13,13 @@ interface SplitRatioDragHandleProps {
   onChange: (ratio: number) => void
   layoutRef: RefObject<HTMLElement | null>
   hapticFeedback?: boolean
+  minRatio?: number
+  maxRatio?: number
+  ariaLabel?: string
 }
 
-function clampRatio(value: number): number {
-  return Math.min(MAX_RATIO, Math.max(MIN_RATIO, Math.round(value)))
+function clampRatio(value: number, minRatio: number, maxRatio: number): number {
+  return Math.min(maxRatio, Math.max(minRatio, Math.round(value)))
 }
 
 export default function SplitRatioDragHandle({
@@ -24,6 +27,9 @@ export default function SplitRatioDragHandle({
   onChange,
   layoutRef,
   hapticFeedback = true,
+  minRatio = DEFAULT_MIN_RATIO,
+  maxRatio = DEFAULT_MAX_RATIO,
+  ariaLabel = 'Drag up for larger camera, drag down for larger reference',
 }: SplitRatioDragHandleProps) {
   const [active, setActive] = useState(false)
   const [arming, setArming] = useState(false)
@@ -79,9 +85,9 @@ export default function SplitRatioDragHandle({
       if (rect.height <= 0) return
 
       const deltaRatio = ((clientY - drag.startY) / rect.height) * 100
-      onChange(clampRatio(drag.startRatio + deltaRatio))
+      onChange(clampRatio(drag.startRatio + deltaRatio, minRatio, maxRatio))
     },
-    [layoutRef, onChange],
+    [layoutRef, maxRatio, minRatio, onChange],
   )
 
   const handlePointerDown = useCallback(
@@ -175,9 +181,9 @@ export default function SplitRatioDragHandle({
       role="separator"
       aria-orientation="horizontal"
       aria-valuenow={ratio}
-      aria-valuemin={MIN_RATIO}
-      aria-valuemax={MAX_RATIO}
-      aria-label="Drag up for larger camera, drag down for larger reference"
+      aria-valuemin={minRatio}
+      aria-valuemax={maxRatio}
+      aria-label={ariaLabel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
