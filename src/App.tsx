@@ -1761,6 +1761,16 @@ function StandardApp({
   const isAudioPracticeMetronomeTab =
     recordingMode === 'audio' && audioPracticeTab === 'metronome'
 
+  const isAudioPracticeTunerTab =
+    recordingMode === 'audio' && audioPracticeTab === 'tuner'
+
+  const isAudioPracticeToolTab = isAudioPracticeMetronomeTab || isAudioPracticeTunerTab
+
+  const showFloatingMainPitch =
+    showPitch &&
+    mainAudioPitchSource !== null &&
+    !isAudioPracticeTunerTab
+
   const pitchContextKey =
     mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
 
@@ -1790,8 +1800,9 @@ function StandardApp({
   }, [pitchTrackerActive, showMainPitchWidget, pitchHudSuspended])
 
   const handleClosePitch = useCallback(() => {
-    handlePitchTrackerSettingChange(false)
-  }, [handlePitchTrackerSettingChange])
+    pitchUserDismissedRef.current = true
+    setShowPitch(false)
+  }, [])
 
   const handleCloseMetronome = useCallback(() => {
     handleShowMetronomeSettingChange(false)
@@ -2305,7 +2316,7 @@ function StandardApp({
           showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
         }
         metronomeStageActive={metronomeStageActive}
-        audioPracticeOverlayActive={isAudioPracticeMetronomeTab}
+        audioPracticeOverlayActive={isAudioPracticeToolTab}
         visuallySuppressed={isSplitView}
       />
 
@@ -2319,16 +2330,16 @@ function StandardApp({
 
       <div
         className={`pitch-display-layer${pitchHudSuspended ? ' floating-widget-layer--inert' : ''}`}
-        aria-hidden={!showPitch || !mainAudioPitchSource || pitchHudSuspended}
+        aria-hidden={!showFloatingMainPitch || pitchHudSuspended}
       >
         {showMainPitchWidget && (
           <Suspense fallback={null}>
             <AnimatePresence>
-              {showPitch && mainAudioPitchSource && (
+              {showFloatingMainPitch && (
                 <DraggablePitchWidget
                   boundaryRef={appShellRef}
                   mediaRef={mainAudioPitchSource.mediaRef}
-                  enabled={settings.pitchTrackerEnabled && !pitchHudSuspended}
+                  enabled={pitchTrackerActive && !pitchHudSuspended}
                   isPlaying={mainAudioPitchSource.isPlaying}
                   mediaKey={mainAudioPitchSource.mediaKey}
                   takeName={mainAudioPitchSource.take?.name}
@@ -2383,7 +2394,7 @@ function StandardApp({
             <DraggablePitchWidget
               boundaryRef={appShellRef}
               mediaRef={mainVideoPitchSource.mediaRef}
-              enabled={settings.pitchTrackerEnabled && !pitchHudSuspended}
+              enabled={pitchTrackerActive && !pitchHudSuspended}
               isPlaying={mainVideoPitchSource.isPlaying}
               mediaKey={mainVideoPitchSource.mediaKey}
               label="Live Pitch"
@@ -2401,7 +2412,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2437,6 +2448,22 @@ function StandardApp({
             className="audio-practice-metronome-layer pointer-events-auto flex min-h-0 flex-1 flex-col"
           >
             <AudioMetronomeTab key="audio-metronome-tab" />
+          </div>
+        )}
+
+        {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && (
+          <div
+            key="audio-practice-tuner-layer"
+            className="audio-practice-tuner-layer pointer-events-auto flex min-h-0 flex-1 flex-col"
+          >
+            <AudioTunerTab
+              streamRef={streamRef}
+              streamGeneration={streamGeneration}
+              ready={ready}
+              isRecording={isRecording}
+              tunerInstrument={settings.tunerInstrument}
+              liveMicTunerEnabled={settings.liveMicTunerEnabled}
+            />
           </div>
         )}
 
@@ -2494,10 +2521,9 @@ function StandardApp({
         {recordingMode === 'audio' &&
           !quickSettingsOpen &&
           !isAudioPracticeMainTab &&
-          audioPracticeTab !== 'metronome' && (
+          audioPracticeTab === 'combo' && (
           <div className="audio-practice-tab-panel pointer-events-auto flex min-h-0 flex-1 flex-col px-3 pb-2">
-            {audioPracticeTab === 'tuner' && <AudioTunerTab />}
-            {audioPracticeTab === 'combo' && <AudioComboTab />}
+            <AudioComboTab />
           </div>
         )}
 
