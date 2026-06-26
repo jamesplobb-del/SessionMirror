@@ -2354,6 +2354,8 @@ function StandardApp({
               streamGeneration={streamGeneration}
               ready={ready}
               isRecording={isRecording}
+              tunerInstrument={settings.tunerInstrument}
+              liveMicTunerEnabled={settings.liveMicTunerEnabled}
             />
           </div>
         )}
