@@ -132,6 +132,7 @@ export default function RecordingModeCarousel({
 
   return (
     <div
+      data-tutorial="record-controls"
       className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
       role="group"
       aria-label="Recording mode"
@@ -141,6 +142,7 @@ export default function RecordingModeCarousel({
       {value === 'audio' && !isRecording && onAutoSoundRecordingChange && (
         <button
           type="button"
+          data-tutorial="auto-record-toggle"
           className={`record-carousel-auto-btn ${autoSoundRecording ? 'record-carousel-auto-btn--active' : ''}`}
           aria-label={
             autoSoundRecording

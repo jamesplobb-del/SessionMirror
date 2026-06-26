@@ -73,6 +73,12 @@ import { lockPortraitOrientation, syncAppOrientationLock } from './utils/lockPor
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
+import {
+  INTERACTIVE_TUTORIAL_STEPS,
+  isOnboardingComplete,
+  markOnboardingComplete,
+} from './utils/onboardingTutorial'
+import { TutorialProvider } from './context/TutorialContext'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
   createProject,
@@ -145,6 +151,7 @@ const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidge
 const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
+const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -307,6 +314,8 @@ function StandardApp({
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(50)
+  const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const showTakeCardsRef = useRef(settings.showTakeCards)
@@ -354,6 +363,31 @@ function StandardApp({
 
   useLayoutEffect(() => {
     return scheduleViewportSync(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (isOnboardingComplete()) return
+    const timer = window.setTimeout(() => {
+      setShowOnboardingTutorial(true)
+    }, BOOT_REVEAL_DELAY_MS + 240)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const handleCloseOnboardingTutorial = useCallback(() => {
+    setShowOnboardingTutorial(false)
+  }, [])
+
+  const handleTutorialComplete = useCallback(() => {
+    markOnboardingComplete()
+    setShowOnboardingTutorial(false)
+  }, [])
+
+  const handleReplayOnboardingTutorial = useCallback(() => {
+    setIsSettingsOpen(false)
+    setTutorialStepIndex(0)
+    scheduleAfterPaint(() => {
+      setShowOnboardingTutorial(true)
+    })
   }, [])
 
   useEffect(() => {
@@ -2070,7 +2104,39 @@ function StandardApp({
     '--pip-scale': settings.takeCardScale / 100,
   } as React.CSSProperties
 
+  const tutorialSignals = useMemo(
+    () => ({
+      isRecording,
+      isReviewOpen,
+      isVaultOpen,
+      isSplitView,
+      autoSoundRecording: settings.autoSoundRecording,
+    }),
+    [isRecording, isReviewOpen, isSplitView, isVaultOpen, settings.autoSoundRecording],
+  )
+
+  useEffect(() => {
+    if (!showOnboardingTutorial) return
+    const step = INTERACTIVE_TUTORIAL_STEPS[tutorialStepIndex]
+    if (step?.id === 'auto-record' && recordingMode !== 'audio' && !isRecording) {
+      changeRecordingMode('audio')
+    }
+  }, [
+    changeRecordingMode,
+    isRecording,
+    recordingMode,
+    showOnboardingTutorial,
+    tutorialStepIndex,
+  ])
+
   return (
+    <TutorialProvider
+      active={showOnboardingTutorial}
+      stepIndex={tutorialStepIndex}
+      onStepIndexChange={setTutorialStepIndex}
+      onComplete={handleTutorialComplete}
+      signals={tutorialSignals}
+    >
     <div ref={appShellRef} className="app-shell">
       <audio
         ref={autoPlaybackAudioRef}
@@ -2191,7 +2257,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2201,11 +2267,12 @@ function StandardApp({
         style={{
           ...motionGpuLayer,
           ...pipScaleStyle,
-          pointerEvents: pitchAudioHudLock
-            ? 'auto'
-            : hudModalState !== 'idle'
-              ? 'none'
-              : undefined,
+          pointerEvents:
+            pitchAudioHudLock || showOnboardingTutorial
+              ? 'auto'
+              : hudModalState !== 'idle'
+                ? 'none'
+                : undefined,
         }}
       >
         <HudHeader
@@ -2267,6 +2334,7 @@ function StandardApp({
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"
+                data-tutorial="review-mode-button"
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={iosHudDim}
@@ -2422,10 +2490,24 @@ function StandardApp({
         onShowMetronomeChange={handleShowMetronomeSettingChange}
         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
         onReset={handleResetSettings}
+        onReplayTutorial={handleReplayOnboardingTutorial}
         recordingMode={recordingMode}
       />
       </Suspense>
+
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {showOnboardingTutorial && (
+            <OnboardingTutorial
+              key="onboarding-tutorial"
+              onClose={handleCloseOnboardingTutorial}
+              hapticFeedback={settings.hapticFeedback}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
       </div>
     </div>
+    </TutorialProvider>
   )
 }

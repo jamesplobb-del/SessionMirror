@@ -143,6 +143,7 @@ export default function ControlDeck({
           onClick={onOpenVault}
           haptic="light"
           hapticFeedback={hapticFeedback}
+          data-tutorial="vault-button"
           className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white backdrop-blur-2xl hover:bg-black/55"
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
