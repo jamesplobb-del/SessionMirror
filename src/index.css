@@ -1024,10 +1024,16 @@ body.settings-branch-open * {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
+  --mhs-chip-size: 2.5rem;
+  --mhs-gap: 0.3125rem;
+  --mhs-columns: 5;
+  --mhs-row-width: calc(
+    var(--mhs-columns) * var(--mhs-chip-size) + (var(--mhs-columns) - 1) * var(--mhs-gap)
+  );
 }
 
-.metronome-h-scroll--centered {
-  width: min(100%, 17.5rem);
+.metronome-h-scroll--five-wide {
+  width: min(100%, var(--mhs-row-width));
   margin-inline: auto;
   align-items: center;
 }
@@ -1044,7 +1050,9 @@ body.settings-branch-open * {
 
 .metronome-h-scroll__viewport {
   position: relative;
-  width: 100%;
+  width: var(--mhs-row-width);
+  max-width: 100%;
+  margin-inline: auto;
   overflow: hidden;
 }
 
@@ -1054,7 +1062,7 @@ body.settings-branch-open * {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 1rem;
+  width: 0.75rem;
   z-index: 1;
   pointer-events: none;
   opacity: 0;
@@ -1063,12 +1071,12 @@ body.settings-branch-open * {
 
 .metronome-h-scroll__viewport::before {
   left: 0;
-  background: linear-gradient(to right, rgba(15, 23, 42, 0.95), transparent);
+  background: linear-gradient(to right, rgba(15, 23, 42, 0.9), transparent);
 }
 
 .metronome-h-scroll__viewport::after {
   right: 0;
-  background: linear-gradient(to left, rgba(15, 23, 42, 0.95), transparent);
+  background: linear-gradient(to left, rgba(15, 23, 42, 0.9), transparent);
 }
 
 .metronome-h-scroll--fade-left .metronome-h-scroll__viewport::before {
@@ -1083,16 +1091,17 @@ body.settings-branch-open * {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.3125rem;
+  gap: var(--mhs-gap);
+  width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   touch-action: pan-x;
   scroll-snap-type: x mandatory;
-  scroll-padding-inline: calc(50% - 1.125rem);
+  scroll-padding-inline: 0;
   padding-block: 0.0625rem;
-  padding-inline: calc(50% - 1.125rem);
+  padding-inline: 0;
   scrollbar-width: none;
 }
 
@@ -1100,23 +1109,19 @@ body.settings-branch-open * {
   display: none;
 }
 
-.metronome-h-scroll__break {
-  flex-shrink: 0;
-  width: 0.25rem;
-}
-
 .metronome-h-scroll__chip {
-  flex-shrink: 0;
-  scroll-snap-align: center;
-  min-width: 2.125rem;
+  flex: 0 0 var(--mhs-chip-size);
+  width: var(--mhs-chip-size);
+  min-width: var(--mhs-chip-size);
   min-height: 2.125rem;
-  padding-inline: 0.5rem;
+  padding-inline: 0;
   font-size: 0.75rem;
   border-radius: 999px;
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
 }
 
 .metronome-h-scroll__chip--rhythm {
-  min-width: 2.25rem;
   font-size: 0.9375rem;
   line-height: 1;
 }
@@ -1125,7 +1130,7 @@ body.settings-branch-open * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1rem;
+  width: 100%;
 }
 
 .audio-practice-metronome__selectors .metronome-h-scroll + .metronome-h-scroll {
