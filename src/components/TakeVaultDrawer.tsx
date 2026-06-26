@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
@@ -227,6 +227,15 @@ export default function TakeVaultDrawer({
     }
   }, [])
 
+  const handleCloseClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      event.preventDefault()
+      onClose()
+    },
+    [onClose],
+  )
+
   return (
     <AnimatedBottomSheet
       isOpen={isOpen}
@@ -286,7 +295,7 @@ export default function TakeVaultDrawer({
             <Pressable
               type="button"
               intensity="icon"
-              onClick={onClose}
+              onClick={handleCloseClick}
               haptic="light"
               data-tutorial="vault-close"
               className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"

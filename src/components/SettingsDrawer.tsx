@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, type MouseEvent } from 'react'
 import { RotateCcw, X, GraduationCap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -184,6 +184,15 @@ export default function SettingsDrawer({
     [onClose, onPitchTrackerChange, recordingMode],
   )
 
+  const handleCloseClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      event.preventDefault()
+      onClose()
+    },
+    [onClose],
+  )
+
   return (
     <AnimatedBottomSheet
       isOpen={isOpen}
@@ -201,7 +210,7 @@ export default function SettingsDrawer({
         <Pressable
           type="button"
           intensity="icon"
-          onClick={onClose}
+          onClick={handleCloseClick}
           haptic="light"
           className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
           aria-label="Close settings"
