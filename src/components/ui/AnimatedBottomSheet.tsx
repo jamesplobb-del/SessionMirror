@@ -41,6 +41,7 @@ export default function AnimatedBottomSheet({
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSheetSlideDistance)
   const enterNotifiedRef = useRef(false)
+  const [backdropArmed, setBackdropArmed] = useState(false)
 
   const { sheetDragProps, dragHandleProps, backdropOpacity } = useSheetDragDismiss({
     enabled: isOpen,
@@ -52,6 +53,16 @@ export default function AnimatedBottomSheet({
     if (isOpen) {
       enterNotifiedRef.current = false
     }
+  }, [isOpen])
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setBackdropArmed(false)
+      return
+    }
+    setBackdropArmed(false)
+    const timer = window.setTimeout(() => setBackdropArmed(true), 320)
+    return () => window.clearTimeout(timer)
   }, [isOpen])
 
   useLayoutEffect(() => {
@@ -105,8 +116,11 @@ export default function AnimatedBottomSheet({
             animate={{ opacity: backdropOpacity }}
             exit={{ opacity: 0 }}
             transition={backdropTransition}
-            style={{ ...motionGpuLayer, pointerEvents: 'auto' }}
-            onClick={onClose}
+            style={{
+              ...motionGpuLayer,
+              pointerEvents: backdropArmed ? 'auto' : 'none',
+            }}
+            onClick={backdropArmed ? onClose : undefined}
           />
 
           <motion.div
