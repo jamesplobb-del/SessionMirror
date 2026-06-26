@@ -1639,6 +1639,16 @@ function StandardApp({
     setActiveCaptureProfile('natural')
   }, [])
 
+  const audioPracticeSheetOpen = isVaultOpen || isSettingsOpen
+
+  const isAudioPracticeMetronomeTab =
+    recordingMode === 'audio' && audioPracticeTab === 'metronome'
+
+  const isAudioPracticeTunerTab =
+    recordingMode === 'audio' && audioPracticeTab === 'tuner'
+
+  const isAudioPracticeToolTab = isAudioPracticeMetronomeTab || isAudioPracticeTunerTab
+
   const pitchAudioHudLock =
     showPitch &&
     recordingMode === 'audio' &&
@@ -1652,20 +1662,19 @@ function StandardApp({
     hudModalState === 'idle' &&
     !metronomeHudSuspended
 
+  const audioToolHudLock =
+    isAudioPracticeToolTab && hudModalState === 'idle' && !audioPracticeSheetOpen && !isReviewOpen
+
+  const overlayPointerCapture =
+    !audioPracticeSheetOpen &&
+    (pitchAudioHudLock || metronomeAudioHudLock || audioToolHudLock || showOnboardingTutorial)
+
   const metronomeStageActive = false
 
   const isAudioPracticeMainTab =
     recordingMode !== 'audio' || audioPracticeTab === 'audio'
 
   const showAudioTakeCardsRow = recordingMode === 'audio'
-
-  const isAudioPracticeMetronomeTab =
-    recordingMode === 'audio' && audioPracticeTab === 'metronome'
-
-  const isAudioPracticeTunerTab =
-    recordingMode === 'audio' && audioPracticeTab === 'tuner'
-
-  const isAudioPracticeToolTab = isAudioPracticeMetronomeTab || isAudioPracticeTunerTab
 
   const showFloatingMainPitch =
     showPitch &&
@@ -2314,7 +2323,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${isVaultOpen || isSettingsOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2323,8 +2332,9 @@ function StandardApp({
         transition={iosHudDim}
         style={{
           ...motionGpuLayer,
-          pointerEvents:
-            pitchAudioHudLock || metronomeAudioHudLock || showOnboardingTutorial
+          pointerEvents: audioPracticeSheetOpen
+            ? 'none'
+            : overlayPointerCapture
               ? 'auto'
               : hudModalState !== 'idle' && !showOnboardingTutorial
                 ? 'none'
@@ -2347,7 +2357,7 @@ function StandardApp({
         {recordingMode === 'audio' && audioPracticeTab === 'metronome' && !quickSettingsOpen && (
           <div
             key="audio-practice-metronome-layer"
-            className={`audio-practice-metronome-layer pointer-events-auto flex min-h-0 flex-1 flex-col ${isReviewOpen || isVaultOpen || isSettingsOpen ? 'pointer-events-none' : ''}`}
+            className="audio-practice-metronome-layer flex min-h-0 flex-1 flex-col"
           >
             <AudioMetronomeTab key="audio-metronome-tab" />
           </div>
@@ -2356,7 +2366,7 @@ function StandardApp({
         {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && (
           <div
             key="audio-practice-tuner-layer"
-            className={`audio-practice-tuner-layer pointer-events-auto flex min-h-0 flex-1 flex-col ${isReviewOpen || isVaultOpen || isSettingsOpen ? 'pointer-events-none' : ''}`}
+            className="audio-practice-tuner-layer flex min-h-0 flex-1 flex-col"
           >
             <AudioTunerTab
               streamRef={streamRef}

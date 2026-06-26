@@ -360,6 +360,67 @@ body.settings-branch-open * {
   z-index: 41;
 }
 
+.app-ui-overlay--audio-tool-hud-lock {
+  pointer-events: auto !important;
+  z-index: 30;
+}
+
+.app-ui-overlay--audio-tool-hud-lock .hud-header button,
+.app-ui-overlay--audio-tool-hud-lock .hud-header a,
+.app-ui-overlay--audio-tool-hud-lock .hud-header .pointer-events-auto,
+.app-ui-overlay--audio-tool-hud-lock .audio-practice-top-tabs,
+.app-ui-overlay--audio-tool-hud-lock .audio-practice-metronome-layer,
+.app-ui-overlay--audio-tool-hud-lock .audio-practice-tuner-layer,
+.app-ui-overlay--audio-tool-hud-lock .app-pip-row-wrap,
+.app-ui-overlay--audio-tool-hud-lock .app-pip-row,
+.app-ui-overlay--audio-tool-hud-lock .pip-video-container,
+.app-ui-overlay--audio-tool-hud-lock .pip-drag-layer,
+.app-ui-overlay--audio-tool-hud-lock .pip-drag-layer * {
+  pointer-events: auto !important;
+}
+
+.app-ui-overlay--audio-tool-hud-lock .app-pip-row-wrap {
+  position: relative;
+  z-index: 42;
+}
+
+.app-ui-overlay--audio-tool-hud-lock .record-carousel-viewport,
+.app-ui-overlay--audio-tool-hud-lock .record-carousel-track,
+.app-ui-overlay--audio-tool-hud-lock .record-carousel-slot,
+.app-ui-overlay--audio-tool-hud-lock .record-carousel-auto-btn {
+  pointer-events: auto !important;
+  z-index: 40;
+}
+
+.app-ui-overlay--audio-tool-hud-lock .control-deck {
+  z-index: 40;
+  pointer-events: auto !important;
+}
+
+.app-ui-overlay--audio-tool-hud-lock .control-deck__settings-btn,
+.app-ui-overlay--audio-tool-hud-lock .control-deck__vault-btn {
+  pointer-events: auto !important;
+  z-index: 41;
+}
+
+.app-ui-overlay--sheet-open {
+  pointer-events: none !important;
+  z-index: 8;
+}
+
+.app-ui-overlay--sheet-open .audio-practice-metronome-layer,
+.app-ui-overlay--sheet-open .audio-practice-tuner-layer,
+.app-ui-overlay--sheet-open .audio-practice-top-tabs,
+.app-ui-overlay--sheet-open .audio-practice-metronome,
+.app-ui-overlay--sheet-open .audio-practice-tuner-shell,
+.app-ui-overlay--sheet-open .audio-practice-tuner-shell *,
+.app-ui-overlay--sheet-open .app-pip-row-wrap,
+.app-ui-overlay--sheet-open .app-hud-bottom,
+.app-ui-overlay--sheet-open .control-deck,
+.app-ui-overlay--sheet-open .hud-header {
+  pointer-events: none !important;
+}
+
 .pitch-display-layer {
   position: fixed;
   inset: 0;
@@ -848,6 +909,56 @@ body.settings-branch-open * {
   background: transparent;
 }
 
+.app-ui-overlay--audio-practice-tuner .app-hud-bottom {
+  gap: 0.35rem;
+}
+
+.app-ui-overlay--audio-practice-tuner .app-pip-row-wrap {
+  margin-bottom: -0.125rem;
+}
+
+.app-ui-overlay--audio-practice-tuner .app-pip-row {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+
+.app-ui-overlay--audio-practice-tuner .control-deck {
+  padding-top: 0.125rem;
+}
+
+.app-ui-overlay--audio-practice-tuner .audio-practice-tuner-layer {
+  padding-bottom: 0;
+}
+
+.app-ui-overlay--audio-practice-tuner .pitch-audio-stage--polished {
+  gap: 0.2rem;
+  padding: 0.35rem 0.5rem 0.4rem;
+}
+
+.app-ui-overlay--audio-practice-tuner .pitch-audio-stage--polished .pitch-audio-stage__hero {
+  padding-top: 0.15rem;
+  padding-bottom: 0;
+  padding-inline: 0.75rem;
+}
+
+.app-ui-overlay--audio-practice-tuner .pitch-audio-stage--polished .pitch-note-orbit {
+  --orbit-size: min(50vw, 15.5rem);
+}
+
+.app-ui-overlay--audio-practice-tuner .pitch-audio-stage--polished .pitch-note-orbit__note {
+  font-size: clamp(2.75rem, 12vw, 4.25rem);
+}
+
+.app-ui-overlay--audio-practice-tuner .pitch-audio-stage--polished .pitch-audio-stage__chart {
+  min-height: min(28vh, 12.5rem);
+  padding-top: 0.125rem;
+  padding-bottom: 0;
+}
+
+.app-ui-overlay--audio-practice-tuner .audio-practice-tuner-shell {
+  padding: 0.25rem 0.375rem 0.25rem;
+}
+
 .app-ui-overlay--audio-practice-metronome {
   background: transparent;
 }
@@ -856,6 +967,20 @@ body.settings-branch-open * {
   pointer-events: auto !important;
   position: relative;
   z-index: 56;
+}
+
+.app-ui-overlay--sheet-open .control-deck__settings-btn {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 56;
+}
+
+.app-ui-rotator .tutorial-sheet-backdrop {
+  z-index: 45;
+}
+
+.app-ui-rotator .animated-bottom-sheet {
+  z-index: 50;
 }
 
 .audio-practice-metronome-scrim {
