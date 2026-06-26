@@ -22,7 +22,7 @@ import {
   clampAudioPracticeBpm,
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
-import MetronomeHorizontalScroller, { useScrollTapGuard } from './MetronomeHorizontalScroller'
+import MetronomeHorizontalScroller, { MetronomeScrollChip } from './MetronomeHorizontalScroller'
 
 function PracticeControlButton({
   label,
@@ -30,28 +30,20 @@ function PracticeControlButton({
   onPress,
   children,
   className = '',
-  scrollKey,
-  respectScrollGuard = false,
 }: {
   label: string
   active?: boolean
   onPress: () => void
   children?: React.ReactNode
   className?: string
-  scrollKey?: string
-  respectScrollGuard?: boolean
 }) {
-  const scrollGuard = useScrollTapGuard()
-
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
-      data-scroll-key={scrollKey}
       onPointerUp={(event) => {
         if (event.button !== 0) return
-        if (respectScrollGuard && scrollGuard?.shouldSuppressTap()) return
         triggerLightHaptic()
         onPress()
       }}
@@ -358,17 +350,16 @@ export default function AudioPracticeMetronomeView() {
           >
             <MetronomeHorizontalScroller label="Time" ariaLabel="Time signature" selectedKey={meter}>
               {PRACTICE_ALL_METERS.map((value) => (
-                <PracticeControlButton
+                <MetronomeScrollChip
                   key={value}
                   scrollKey={value}
-                  respectScrollGuard
                   label={`${value} time signature`}
                   active={meter === value}
                   onPress={() => handleMeterChange(value)}
-                  className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
+                  className="metronome-audio-stage__meter-btn"
                 >
                   {value}
-                </PracticeControlButton>
+                </MetronomeScrollChip>
               ))}
             </MetronomeHorizontalScroller>
 
@@ -378,19 +369,18 @@ export default function AudioPracticeMetronomeView() {
               selectedKey={subdivision}
             >
               {PRACTICE_ALL_RHYTHM_OPTIONS.map((option) => (
-                <PracticeControlButton
+                <MetronomeScrollChip
                   key={option.id}
                   scrollKey={option.value}
-                  respectScrollGuard
                   label={option.name}
                   active={subdivision === option.value}
                   onPress={() => handleSubdivisionChange(option.value)}
-                  className="metronome-h-scroll__chip metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
+                  className="metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
                 >
                   <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
                     {option.label}
                   </span>
-                </PracticeControlButton>
+                </MetronomeScrollChip>
               ))}
             </MetronomeHorizontalScroller>
           </section>

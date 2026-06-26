@@ -22,7 +22,6 @@ const SCHEDULE_AHEAD_SEC = 0.12
 const LOOKAHEAD_MS = 25
 const START_LEAD_SEC = 0.05
 const FOREGROUND_RECOVERY_DELAY_MS = 200
-const SUSPENDED_SCHEDULER_TICK_LIMIT = 8
 
 export interface SharedMetronomeSnapshot {
   bpm: number
@@ -141,7 +140,6 @@ class SharedMetronomeEngine {
   private foregroundTimer: number | null = null
   private recoveringForeground = false
   private startInFlight = false
-  private suspendedSchedulerTicks = 0
   private playbackWatchCtx: AudioContext | null = null
   private onPlaybackStateChange: (() => void) | null = null
 
@@ -259,7 +257,7 @@ class SharedMetronomeEngine {
 
     const onStateChange = () => {
       if (ctx.state === 'suspended' && this.snapshot.playing) {
-        this.notePlaybackInterrupted('context-suspended')
+        void ctx.resume().catch(() => {})
         return
       }
       if (ctx.state === 'running' && this.resumeOnForeground) {
@@ -270,14 +268,6 @@ class SharedMetronomeEngine {
     this.playbackWatchCtx = ctx
     this.onPlaybackStateChange = onStateChange
     ctx.addEventListener('statechange', onStateChange)
-  }
-
-  private notePlaybackInterrupted(reason: string): void {
-    if (!this.snapshot.playing) return
-    this.resumeOnForeground = true
-    this.isBackgrounded = true
-    this.debugLog(`interrupt (${reason})`)
-    this.hardStop({ background: true })
   }
 
   private reconcileAfterInterrupt(): void {
@@ -338,7 +328,6 @@ class SharedMetronomeEngine {
         const started = await this.start({ recovered: true })
         if (started) {
           this.resumeOnForeground = false
-          this.suspendedSchedulerTicks = 0
           this.debugLog('foreground recovery complete')
           return
         }
@@ -498,17 +487,10 @@ class SharedMetronomeEngine {
       }
 
       if (activeCtx.state === 'suspended') {
-        this.suspendedSchedulerTicks += 1
-        if (this.suspendedSchedulerTicks >= SUSPENDED_SCHEDULER_TICK_LIMIT) {
-          this.notePlaybackInterrupted('scheduler-suspended')
-          return
-        }
         void activeCtx.resume().catch(() => {})
         this.schedulerTimer = window.setTimeout(tick, LOOKAHEAD_MS)
         return
       }
-
-      this.suspendedSchedulerTicks = 0
 
       const meter = this.snapshot.meter
       const subdivision = this.snapshot.subdivision
@@ -656,10 +638,7 @@ class SharedMetronomeEngine {
       }
       return
     }
-    if (this.resumeOnForeground) {
-      this.reconcileAfterInterrupt()
-      return
-    }
+    this.resumeOnForeground = false
     void this.start()
   }
 }

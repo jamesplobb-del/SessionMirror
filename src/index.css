@@ -1119,6 +1119,10 @@ body.settings-branch-open * {
   border-radius: 999px;
   scroll-snap-align: start;
   scroll-snap-stop: normal;
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
 }
 
 .metronome-h-scroll__chip--rhythm {

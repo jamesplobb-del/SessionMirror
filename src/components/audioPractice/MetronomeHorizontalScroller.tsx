@@ -7,11 +7,14 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
+import { triggerLightHaptic } from '../../utils/haptics'
 
-const TAP_MOVE_THRESHOLD_PX = 10
-const TAP_SUPPRESS_MS = 140
+const TAP_MOVE_THRESHOLD_PX = 12
+const TAP_SUPPRESS_MS = 200
 const DEFAULT_VISIBLE_COLUMNS = 5
 
 interface ScrollTapGuard {
@@ -28,6 +31,79 @@ function isChipVisibleInTrack(track: HTMLElement, chip: HTMLElement): boolean {
   const trackRect = track.getBoundingClientRect()
   const chipRect = chip.getBoundingClientRect()
   return chipRect.left >= trackRect.left - 2 && chipRect.right <= trackRect.right + 2
+}
+
+interface MetronomeScrollChipProps {
+  scrollKey: string
+  label: string
+  active?: boolean
+  onPress: () => void
+  children?: ReactNode
+  className?: string
+}
+
+export function MetronomeScrollChip({
+  scrollKey,
+  label,
+  active = false,
+  onPress,
+  children,
+  className = '',
+}: MetronomeScrollChipProps) {
+  const scrollGuard = useScrollTapGuard()
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    pointerStartRef.current = { x: event.clientX, y: event.clientY }
+  }
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    const start = pointerStartRef.current
+    pointerStartRef.current = null
+    if (!start) return
+
+    const dx = Math.abs(event.clientX - start.x)
+    const dy = Math.abs(event.clientY - start.y)
+    if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) return
+    if (scrollGuard?.shouldSuppressTap()) return
+
+    triggerLightHaptic()
+    onPress()
+  }
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onPress()
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      aria-pressed={active}
+      data-scroll-key={scrollKey}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => {
+        pointerStartRef.current = null
+      }}
+      onKeyDown={handleKeyDown}
+      className={[
+        'metronome-h-scroll__chip',
+        'metronome-audio-stage__btn',
+        active ? 'metronome-audio-stage__btn--active' : '',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {children}
+    </div>
+  )
 }
 
 interface MetronomeHorizontalScrollerProps {
@@ -84,11 +160,11 @@ export default function MetronomeHorizontalScroller({
       didInitialScrollResetRef.current = true
     }
 
-    const onPointerDown = (event: PointerEvent) => {
+    const onPointerDown = (event: globalThis.PointerEvent) => {
       pointerStartRef.current = { x: event.clientX, y: event.clientY }
     }
 
-    const onPointerMove = (event: PointerEvent) => {
+    const onPointerMove = (event: globalThis.PointerEvent) => {
       const start = pointerStartRef.current
       if (!start) return
       const dx = Math.abs(event.clientX - start.x)
@@ -96,6 +172,10 @@ export default function MetronomeHorizontalScroller({
       if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) {
         markScrollGesture()
       }
+    }
+
+    const onTouchMove = () => {
+      markScrollGesture()
     }
 
     const onPointerEnd = () => {
@@ -111,6 +191,7 @@ export default function MetronomeHorizontalScroller({
     track.addEventListener('pointermove', onPointerMove, { capture: true })
     track.addEventListener('pointerup', onPointerEnd, { capture: true })
     track.addEventListener('pointercancel', onPointerEnd, { capture: true })
+    track.addEventListener('touchmove', onTouchMove, { passive: true })
     track.addEventListener('scroll', onScroll, { passive: true })
 
     updateFades()
@@ -123,6 +204,7 @@ export default function MetronomeHorizontalScroller({
       track.removeEventListener('pointermove', onPointerMove, { capture: true })
       track.removeEventListener('pointerup', onPointerEnd, { capture: true })
       track.removeEventListener('pointercancel', onPointerEnd, { capture: true })
+      track.removeEventListener('touchmove', onTouchMove)
       track.removeEventListener('scroll', onScroll)
       observer.disconnect()
     }
