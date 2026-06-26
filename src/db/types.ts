@@ -37,4 +37,20 @@ export interface SaveTakeInput {
   recordingOrientation?: 'portrait' | 'landscape'
 }
 
+export interface VaultLibraryItem {
+  id: string
+  projectId: string
+  kind: 'audio'
+  name: string
+  createdAt: number
+  filePath: string
+  mimeType: string
+  duration: number
+}
+
+export interface BenchmarkBindingRow {
+  source: 'take' | 'library' | null
+  refId: string | null
+}
+
 export type VaultTakeUpdate = Partial<Pick<VaultTake, 'name' | 'rating' | 'notes'>>

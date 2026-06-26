@@ -25,4 +25,19 @@ CREATE TABLE IF NOT EXISTS takes (
 
 CREATE INDEX IF NOT EXISTS idx_takes_project_id ON takes(project_id);
 CREATE INDEX IF NOT EXISTS idx_takes_created_at ON takes(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS library_items (
+  id TEXT PRIMARY KEY NOT NULL,
+  project_id TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'audio',
+  name TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  file_path TEXT NOT NULL,
+  mime_type TEXT NOT NULL DEFAULT 'audio/mpeg',
+  duration INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_library_items_project_id ON library_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_library_items_created_at ON library_items(created_at DESC);
 `

@@ -3,6 +3,8 @@ import { CheckSquare, Download, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
+import VaultSectionTabs, { type VaultSection } from './VaultSectionTabs'
+import LibraryTab from './LibraryTab'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import { VaultDrawerSkeleton } from './ui/DrawerSkeletons'
 import Pressable from './ui/Pressable'
@@ -14,7 +16,9 @@ import { useActionSheet } from '../context/ActionSheetContext'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { getTakeMediaType } from '../utils/mediaType'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
+import type { BenchmarkBinding } from '../types/library'
 import type { Project } from '../db/types'
+import type { HydratedLibraryItem } from '../utils/libraryBridge'
 
 interface TakeVaultDrawerProps {
   isOpen: boolean
@@ -29,7 +33,13 @@ interface TakeVaultDrawerProps {
   sortMode: SortMode
   onSortChange: (mode: SortMode) => void
   benchmarkId: string | null
+  benchmarkBinding: BenchmarkBinding | null
   challengerId: string | null
+  libraryItems: HydratedLibraryItem[]
+  onImportLibraryAudio: (file: File) => void
+  onRenameLibraryItem: (itemId: string, name: string) => void
+  onDeleteLibraryItem: (itemId: string) => void
+  onSetLibraryReference: (itemId: string) => void
   onPinBenchmark: (id: string) => void
   onPinChallenger: (id: string) => void
   onBeforePin?: () => void
@@ -56,7 +66,13 @@ export default function TakeVaultDrawer({
   sortMode,
   onSortChange,
   benchmarkId,
+  benchmarkBinding,
   challengerId,
+  libraryItems,
+  onImportLibraryAudio,
+  onRenameLibraryItem,
+  onDeleteLibraryItem,
+  onSetLibraryReference,
   onPinBenchmark,
   onPinChallenger,
   onBeforePin,
@@ -71,6 +87,7 @@ export default function TakeVaultDrawer({
   const drawerRef = useRef<HTMLDivElement>(null)
   const { showAlert, showConfirm } = useActionSheet()
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
+  const [vaultSection, setVaultSection] = useState<VaultSection>('takes')
   const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
@@ -112,6 +129,7 @@ export default function TakeVaultDrawer({
     })
     setSelectionMode(false)
     setSelectedIds(new Set())
+    setVaultSection('takes')
   }, [isOpen])
 
   useEffect(() => {
@@ -236,6 +254,9 @@ export default function TakeVaultDrawer({
     [onClose],
   )
 
+  const vaultBenchmarkTakeId =
+    benchmarkBinding?.source === 'take' ? benchmarkBinding.refId : benchmarkId
+
   return (
     <AnimatedBottomSheet
       isOpen={isOpen}
@@ -318,7 +339,22 @@ export default function TakeVaultDrawer({
             onCreateProject={onCreateProject}
             onDeleteProject={onDeleteProject}
           />
-          {takes.length === 0 ? (
+          <VaultSectionTabs
+            value={vaultSection}
+            onChange={setVaultSection}
+            takesCount={takes.length}
+            libraryCount={libraryItems.length}
+          />
+          {vaultSection === 'library' ? (
+            <LibraryTab
+              items={libraryItems}
+              benchmarkBinding={benchmarkBinding}
+              onImportAudio={onImportLibraryAudio}
+              onRenameItem={onRenameLibraryItem}
+              onDeleteItem={onDeleteLibraryItem}
+              onSetAsReference={onSetLibraryReference}
+            />
+          ) : takes.length === 0 ? (
             <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
               <p className="text-sm text-stone-400">
                 No takes yet. Hit Record to start your session.
@@ -363,7 +399,7 @@ export default function TakeVaultDrawer({
                       <TakeCard
                         key={take.id}
                         take={take}
-                        isBenchmark={take.id === benchmarkId}
+                        isBenchmark={take.id === vaultBenchmarkTakeId}
                         isChallenger={take.id === challengerId}
                         selectionMode={selectionMode}
                         selected={selectedIds.has(take.id)}
@@ -422,7 +458,7 @@ export default function TakeVaultDrawer({
           )}
         </div>
 
-        {contentReady && selectionMode && selectedCount > 0 && (
+        {contentReady && vaultSection === 'takes' && selectionMode && selectedCount > 0 && (
           <div
             className="vault-bulk-bar flex shrink-0 gap-2 border-t border-stone-200/80 bg-white/95 px-6 py-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
@@ -451,7 +487,7 @@ export default function TakeVaultDrawer({
           </div>
         )}
 
-        {contentReady && selectionMode && selectedCount === 0 && (
+        {contentReady && vaultSection === 'takes' && selectionMode && selectedCount === 0 && (
           <div
             className="vault-bulk-bar flex shrink-0 items-center justify-center gap-2 border-t border-stone-200/80 bg-stone-50/95 px-6 py-3 text-xs text-stone-500"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}

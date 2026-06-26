@@ -14,3 +14,14 @@ export {
   toggleBestTake,
   updateVaultTake,
 } from './vaultRepository'
+export {
+  deleteLibraryItem,
+  deleteLibraryItemsByProject,
+  getLibraryItemsByProject,
+  getProjectBenchmarkBinding,
+  saveLibraryAudioItem,
+  setProjectBenchmarkBinding,
+  setProjectLibraryBenchmark,
+  updateLibraryItemName,
+} from './libraryRepository'
+export type { VaultLibraryItem } from './types'

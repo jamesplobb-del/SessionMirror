@@ -186,6 +186,10 @@ export async function setProjectBestTake(projectId: string, takeId: string): Pro
   const db = getVaultDatabase()
   await db.run('UPDATE takes SET is_best_take = 0 WHERE project_id = ?', [projectId])
   await db.run('UPDATE takes SET is_best_take = 1 WHERE id = ?', [takeId])
+  await db.run(
+    'UPDATE projects SET benchmark_source = ?, benchmark_ref_id = ? WHERE id = ?',
+    ['take', takeId, projectId],
+  )
   await persistWebStore()
 }
 
