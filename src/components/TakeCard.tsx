@@ -343,7 +343,6 @@ function TakeCard({
               <Pressable
                 type="button"
                 intensity="soft"
-                haptic="medium"
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => e.stopPropagation()}

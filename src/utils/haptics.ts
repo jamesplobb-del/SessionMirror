@@ -1,16 +1,21 @@
 import { Capacitor } from '@capacitor/core'
 
-function runImpact(style: 'light' | 'medium'): void {
+function runImpact(style: 'light' | 'medium' | 'heavy'): void {
   if (Capacitor.isNativePlatform()) {
     void import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) =>
       Haptics.impact({
-        style: style === 'medium' ? ImpactStyle.Medium : ImpactStyle.Light,
+        style:
+          style === 'heavy'
+            ? ImpactStyle.Heavy
+            : style === 'medium'
+              ? ImpactStyle.Medium
+              : ImpactStyle.Light,
       }),
     )
     return
   }
 
-  navigator.vibrate?.(style === 'medium' ? 22 : 12)
+  navigator.vibrate?.(style === 'heavy' ? 32 : style === 'medium' ? 22 : 12)
 }
 
 function runNotification(type: 'success' | 'warning' | 'error'): void {
@@ -45,10 +50,40 @@ export function triggerMediumHaptic(enabled = true): void {
   runImpact('medium')
 }
 
+/** Heavy pulse — recording stop or similarly weighty commits. */
+export function triggerHeavyHaptic(enabled = true): void {
+  if (!enabled) return
+  runImpact('heavy')
+}
+
 /** Success — save, export, complete. */
 export function triggerSuccessHaptic(enabled = true): void {
   if (!enabled) return
   runNotification('success')
+}
+
+export function triggerRecordStartHaptic(enabled = true): void {
+  triggerMediumHaptic(enabled)
+}
+
+export function triggerRecordStopHaptic(enabled = true): void {
+  triggerHeavyHaptic(enabled)
+}
+
+export function triggerBestTakeHaptic(enabled = true): void {
+  triggerSuccessHaptic(enabled)
+}
+
+export function triggerMetronomeTapHaptic(enabled = true): void {
+  triggerLightHaptic(enabled)
+}
+
+export function triggerMetronomeToggleHaptic(playing: boolean, enabled = true): void {
+  if (playing) {
+    triggerMediumHaptic(enabled)
+    return
+  }
+  triggerLightHaptic(enabled)
 }
 
 /** Warning — destructive confirm. */

@@ -117,6 +117,7 @@ import {
   hydrateLibraryItems,
   type HydratedLibraryItem,
 } from './utils/libraryBridge'
+import { triggerBestTakeHaptic, triggerWarningHaptic } from './utils/haptics'
 import {
   deleteLibraryFile,
   normalizeLibraryAudioMime,
@@ -1861,6 +1862,7 @@ function StandardApp({
 
   const handlePinBenchmark = useCallback(
     (id: string) => {
+      triggerBestTakeHaptic(settings.hapticFeedback)
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(0)
       pausePipVideos()
@@ -1889,7 +1891,14 @@ function StandardApp({
         void setProjectBestTake(activeProjectIdRef.current, id)
       }
     },
-    [pausePipVideos, releaseAutoRecordSuppress, sortMode, stopAutoPlaybackAudio, takes],
+    [
+      pausePipVideos,
+      releaseAutoRecordSuppress,
+      settings.hapticFeedback,
+      sortMode,
+      stopAutoPlaybackAudio,
+      takes,
+    ],
   )
 
   const handleSetLibraryReference = useCallback(
@@ -2158,10 +2167,11 @@ function StandardApp({
 
   const handleDragDeleteTake = useCallback(
     (id: string) => {
+      triggerWarningHaptic(settings.hapticFeedback)
       pausePipVideos()
       handleDeleteTakes([id])
     },
-    [handleDeleteTakes, pausePipVideos],
+    [handleDeleteTakes, pausePipVideos, settings.hapticFeedback],
   )
 
   const handleDeleteTake = useCallback(

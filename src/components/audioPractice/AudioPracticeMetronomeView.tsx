@@ -3,7 +3,11 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useMetronome } from '../../hooks/useMetronome'
 import { useTapTempo } from '../../hooks/useTapTempo'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
-import { triggerLightHaptic, triggerMediumHaptic } from '../../utils/haptics'
+import {
+  triggerLightHaptic,
+  triggerMetronomeTapHaptic,
+  triggerMetronomeToggleHaptic,
+} from '../../utils/haptics'
 import {
   getBeatsPerBar,
   getCompoundGroupSize,
@@ -27,12 +31,14 @@ import TripletRhythmSymbol from './TripletRhythmSymbol'
 function PracticeControlButton({
   label,
   active = false,
+  haptic = 'light',
   onPress,
   children,
   className = '',
 }: {
   label: string
   active?: boolean
+  haptic?: 'light' | false
   onPress: () => void
   children?: React.ReactNode
   className?: string
@@ -44,7 +50,7 @@ function PracticeControlButton({
       aria-pressed={active}
       onPointerUp={(event) => {
         if (event.button !== 0) return
-        triggerLightHaptic()
+        if (haptic === 'light') triggerLightHaptic()
         onPress()
       }}
       className={`metronome-audio-stage__btn pointer-events-auto interactive-native ${active ? 'metronome-audio-stage__btn--active' : ''} ${className}`}
@@ -89,7 +95,6 @@ export default function AudioPracticeMetronomeView() {
 
   const { registerTap } = useTapTempo(
     (nextBpm) => {
-      triggerLightHaptic()
       setPracticeBpm(nextBpm)
     },
     { minBpm: AUDIO_PRACTICE_MIN_BPM, maxBpm: AUDIO_PRACTICE_MAX_BPM },
@@ -111,9 +116,14 @@ export default function AudioPracticeMetronomeView() {
   }, [bpm, setPracticeBpm])
 
   const handleTogglePlay = useCallback(() => {
-    triggerMediumHaptic()
+    triggerMetronomeToggleHaptic(playing)
     togglePlay()
-  }, [togglePlay])
+  }, [playing, togglePlay])
+
+  const handleTapTempo = useCallback(() => {
+    triggerMetronomeTapHaptic()
+    registerTap()
+  }, [registerTap])
 
   const handleMeterChange = useCallback(
     (nextMeter: MetronomeMeter) => {
@@ -241,7 +251,8 @@ export default function AudioPracticeMetronomeView() {
           <div className="audio-practice-metronome__actions">
             <PracticeControlButton
               label="Tap tempo"
-              onPress={registerTap}
+              haptic={false}
+              onPress={handleTapTempo}
               className="metronome-audio-stage__tap-btn audio-practice-metronome__tap-btn"
             >
               Tap Tempo
@@ -249,6 +260,7 @@ export default function AudioPracticeMetronomeView() {
 
             <PracticeControlButton
               label={playing ? 'Stop metronome' : 'Start metronome'}
+              haptic={false}
               onPress={handleTogglePlay}
               className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
             >

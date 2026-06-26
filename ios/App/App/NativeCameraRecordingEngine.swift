@@ -63,7 +63,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         audioSessionProfile: NativeCameraAudioSessionProfile,
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) {
-        requestMediaAccess(for: .video) { [weak self] videoGranted in
+        requestMediaAccess(mediaType: .video) { [weak self] videoGranted in
             guard let self = self else { return }
             guard videoGranted else {
                 completion(.failure(NSError(
@@ -74,7 +74,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 return
             }
 
-            self.requestMediaAccess(for: .audio) { audioGranted in
+            self.requestMediaAccess(mediaType: .audio) { audioGranted in
                 guard audioGranted else {
                     completion(.failure(NSError(
                         domain: "NativeCameraTest",

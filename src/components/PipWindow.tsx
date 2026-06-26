@@ -491,7 +491,6 @@ function PipWindow({
             type="button"
             intensity="icon"
             squish={false}
-            haptic="medium"
             onPointerDown={stopEventBubble}
             onTouchStart={stopEventBubble}
             onTouchEnd={stopEventBubble}
@@ -535,7 +534,6 @@ function PipWindow({
           type="button"
           intensity="icon"
           squish={false}
-          haptic="medium"
           onPointerDown={stopEventBubble}
           onTouchStart={stopEventBubble}
           onTouchEnd={stopEventBubble}

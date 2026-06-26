@@ -12,7 +12,7 @@ import {
   type RefObject,
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
-import { triggerLightHaptic } from '../utils/haptics'
+import { triggerLightHaptic, triggerMetronomeToggleHaptic } from '../utils/haptics'
 import { usePinchResize } from '../hooks/usePinchResize'
 import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
 import {
@@ -41,12 +41,14 @@ const DOUBLE_TAP_MS = 320
 function MetronomeControlButton({
   label,
   active = false,
+  haptic = 'light',
   onPress,
   children,
   className = '',
 }: {
   label: string
   active?: boolean
+  haptic?: 'light' | false
   onPress: () => void
   children?: React.ReactNode
   className?: string
@@ -60,7 +62,7 @@ function MetronomeControlButton({
       onPointerUp={(event) => {
         event.stopPropagation()
         if (event.button !== 0) return
-        triggerLightHaptic()
+        if (haptic === 'light') triggerLightHaptic()
         onPress()
       }}
       className={`metronome-widget__btn pointer-events-auto interactive-native ${active ? 'metronome-widget__btn--active' : ''} ${className}`}
@@ -385,6 +387,11 @@ export default function DraggableMetronomeWidget({
     [onClose, stop],
   )
 
+  const handleTogglePlay = useCallback(() => {
+    triggerMetronomeToggleHaptic(playing)
+    togglePlay()
+  }, [playing, togglePlay])
+
   return (
     <motion.div
       ref={widgetRef}
@@ -456,7 +463,8 @@ export default function DraggableMetronomeWidget({
         <div className="metronome-widget__row metronome-widget__row--main pointer-events-auto">
           <MetronomeControlButton
             label={playing ? 'Pause metronome' : 'Start metronome'}
-            onPress={togglePlay}
+            haptic={false}
+            onPress={handleTogglePlay}
             className="metronome-widget__play"
           >
             {playing ? (

@@ -245,6 +245,7 @@ function ControlDeck({
                 isRecording={isRecording}
                 ready={ready}
                 autoSoundRecording={autoSoundRecording}
+                hapticFeedback={hapticFeedback}
                 onAutoSoundRecordingChange={
                   recordingMode === 'audio' ? onAutoSoundRecordingChange : undefined
                 }

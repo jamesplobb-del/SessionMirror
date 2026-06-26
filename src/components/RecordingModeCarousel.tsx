@@ -1,6 +1,10 @@
 import { useCallback, useRef, memo } from 'react'
 import { Camera, Mic, Square, AudioWaveform } from 'lucide-react'
-import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
+import {
+  triggerLightHaptic,
+  triggerRecordStartHaptic,
+  triggerRecordStopHaptic,
+} from '../utils/haptics'
 import { stopEventBubble } from '../utils/eventBubbling'
 import type { RecordingMode } from '../types'
 
@@ -15,6 +19,7 @@ interface RecordingModeCarouselProps {
   disabled?: boolean
   autoSoundRecording?: boolean
   onAutoSoundRecordingChange?: (enabled: boolean) => void
+  hapticFeedback?: boolean
 }
 
 type SlotPosition = 'center' | 'left' | 'right'
@@ -93,6 +98,7 @@ function RecordingModeCarousel({
   disabled = false,
   autoSoundRecording = false,
   onAutoSoundRecordingChange,
+  hapticFeedback = true,
 }: RecordingModeCarouselProps) {
   const touchStartXRef = useRef(0)
   const modeSwitchLocked = disabled || isRecording
@@ -100,15 +106,19 @@ function RecordingModeCarousel({
   const handleSlotActivate = useCallback(
     (mode: RecordingMode) => {
       if (mode === value) {
-        triggerMediumHaptic()
+        if (isRecording) {
+          triggerRecordStopHaptic(hapticFeedback)
+        } else {
+          triggerRecordStartHaptic(hapticFeedback)
+        }
         onToggleRecord()
         return
       }
       if (modeSwitchLocked) return
-      triggerLightHaptic()
+      triggerLightHaptic(hapticFeedback)
       onChange(mode)
     },
-    [modeSwitchLocked, onChange, onToggleRecord, value],
+    [hapticFeedback, isRecording, modeSwitchLocked, onChange, onToggleRecord, value],
   )
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
@@ -155,7 +165,7 @@ function RecordingModeCarousel({
           onTouchEnd={stopEventBubble}
           onClick={(event) => {
             stopEventBubble(event)
-            triggerLightHaptic()
+            triggerLightHaptic(hapticFeedback)
             onAutoSoundRecordingChange(!autoSoundRecording)
           }}
         >
