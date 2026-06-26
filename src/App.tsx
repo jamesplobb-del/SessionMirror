@@ -1237,6 +1237,23 @@ function StandardApp({
   const wasVaultOpenRef = useRef(false)
   const vaultEnterLoadDoneRef = useRef(false)
   const vaultHydrateInFlightRef = useRef(false)
+  /** Blocks ghost-tap reopen after sheet close (tuner tab has high-frequency pitch updates). */
+  const overlayOpenSuppressUntilRef = useRef(0)
+
+  const canOpenOverlaySheet = useCallback(() => {
+    return performance.now() >= overlayOpenSuppressUntilRef.current
+  }, [])
+
+  const markOverlayClosed = useCallback(() => {
+    overlayOpenSuppressUntilRef.current = performance.now() + 450
+  }, [])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.log(
+      `[OverlayState] vaultOpen=${isVaultOpen} settingsOpen=${isSettingsOpen}`,
+    )
+  }, [isVaultOpen, isSettingsOpen])
 
   useEffect(() => {
     if (!isVaultOpen) {
@@ -1314,19 +1331,23 @@ function StandardApp({
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleCloseVault = useCallback(() => {
-    startTransition(() => {
-      setIsVaultOpen(false)
-    })
-  }, [])
+    if (import.meta.env.DEV) {
+      console.log('[OverlayClose] vault close pressed')
+    }
+    markOverlayClosed()
+    setIsVaultOpen(false)
+    if (import.meta.env.DEV) {
+      console.log('[OverlayState] vaultOpen=false')
+    }
+  }, [markOverlayClosed])
 
   const handleOpenVault = useCallback(() => {
+    if (!canOpenOverlaySheet()) return
     setShowPitch(false)
-    startTransition(() => {
-      setIsSettingsOpen(false)
-      setIsVaultOpen(true)
-    })
+    setIsSettingsOpen(false)
+    setIsVaultOpen(true)
     deferHudMediaPause()
-  }, [deferHudMediaPause])
+  }, [canOpenOverlaySheet, deferHudMediaPause])
 
   const handleToggleVault = useCallback(() => {
     if (isVaultOpen) {
@@ -1347,13 +1368,12 @@ function StandardApp({
   }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
+    if (!canOpenOverlaySheet()) return
     setShowPitch(false)
-    startTransition(() => {
-      setIsVaultOpen(false)
-      setIsSettingsOpen(true)
-    })
+    setIsVaultOpen(false)
+    setIsSettingsOpen(true)
     deferHudMediaPause()
-  }, [deferHudMediaPause])
+  }, [canOpenOverlaySheet, deferHudMediaPause])
 
   const handleRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
@@ -1376,10 +1396,15 @@ function StandardApp({
   )
 
   const handleCloseSettings = useCallback(() => {
-    startTransition(() => {
-      setIsSettingsOpen(false)
-    })
-  }, [])
+    if (import.meta.env.DEV) {
+      console.log('[OverlayClose] settings close pressed')
+    }
+    markOverlayClosed()
+    setIsSettingsOpen(false)
+    if (import.meta.env.DEV) {
+      console.log('[OverlayState] settingsOpen=false')
+    }
+  }, [markOverlayClosed])
 
   const schedulePitchTrackerCommit = useCallback(
     (enabled: boolean) => {
@@ -1789,15 +1814,14 @@ function StandardApp({
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
-      startTransition(() => {
-        setVaultReviewIndex(index >= 0 ? index : 0)
-        setReviewContext('vault')
-        setReviewSlot('benchmark')
-        setIsVaultOpen(false)
-      })
+      markOverlayClosed()
+      setVaultReviewIndex(index >= 0 ? index : 0)
+      setReviewContext('vault')
+      setReviewSlot('benchmark')
+      setIsVaultOpen(false)
       deferHudMediaPause()
     },
-    [deferHudMediaPause, sortedTakes],
+    [deferHudMediaPause, markOverlayClosed, sortedTakes],
   )
 
   const handleOpenCompareReview = useCallback(

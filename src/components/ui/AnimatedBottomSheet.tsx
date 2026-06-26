@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, useCallback, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useSheetDragDismiss, readSheetSlideDistance } from '../../hooks/useSheetDragDismiss'
 import {
@@ -43,10 +43,14 @@ export default function AnimatedBottomSheet({
   const enterNotifiedRef = useRef(false)
   const [backdropArmed, setBackdropArmed] = useState(false)
 
+  const handleDismiss = useCallback(() => {
+    onClose()
+  }, [onClose])
+
   const { sheetDragProps, dragHandleProps, backdropOpacity } = useSheetDragDismiss({
     enabled: isOpen,
     slideDistance,
-    onDismiss: onClose,
+    onDismiss: handleDismiss,
   })
 
   useLayoutEffect(() => {
@@ -120,7 +124,7 @@ export default function AnimatedBottomSheet({
               ...motionGpuLayer,
               pointerEvents: backdropArmed ? 'auto' : 'none',
             }}
-            onClick={backdropArmed ? onClose : undefined}
+            onClick={backdropArmed ? handleDismiss : undefined}
           />
 
           <motion.div
