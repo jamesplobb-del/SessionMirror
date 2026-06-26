@@ -6,14 +6,14 @@ import { scheduleMetronomeClick } from '../utils/metronomeClickSounds'
 import {
   clampBpm,
   getBeatsPerBar,
-  getCompoundClickTier,
+  getDefaultAccentPattern,
   getEighthNotesPerBar,
-  getSimpleClickTier,
   isCompoundMeter,
   loadMetronomePrefs,
+  normalizeAccentPattern,
+  resolveClickTierWithAccents,
   saveMetronomePrefs,
   subdivisionsPerBeat,
-  type MetronomeClickTier,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
@@ -27,7 +27,7 @@ export interface SharedMetronomeSnapshot {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
-  accentFirstBeat: boolean
+  accentPattern: boolean[]
   soundId: string
   playing: boolean
   beatIndex: number
@@ -48,36 +48,6 @@ function secondsPerSchedulerTick(
   }
   const ticksPerBeat = subdivisionsPerBeat(subdivision)
   return macroBeatSec / ticksPerBeat
-}
-
-function resolveClickTier(
-  meter: MetronomeMeter,
-  tickIndexInBar: number,
-  subdivision: MetronomeSubdivision,
-): MetronomeClickTier {
-  if (isCompoundMeter(meter) && subdivision === 'off') {
-    return getCompoundClickTier(tickIndexInBar)
-  }
-
-  const ticksPerBeat = subdivisionsPerBeat(subdivision)
-  const beatIndex = Math.floor(tickIndexInBar / ticksPerBeat)
-  const tickInBeat = tickIndexInBar % ticksPerBeat
-
-  if (tickInBeat === 0) {
-    return getSimpleClickTier(beatIndex)
-  }
-  return 'subdivision'
-}
-
-function applyAccentFirstBeat(
-  tier: MetronomeClickTier,
-  meter: MetronomeMeter,
-  subdivision: MetronomeSubdivision,
-  accentFirstBeat: boolean,
-): MetronomeClickTier {
-  if (accentFirstBeat || tier !== 'downbeat') return tier
-  if (isCompoundMeter(meter) && subdivision === 'off') return 'macro'
-  return 'subdivision'
 }
 
 function resolveUiTick(
@@ -112,7 +82,7 @@ function createInitialSnapshot(): SharedMetronomeSnapshot {
     bpm: prefs.bpm,
     meter: prefs.meter,
     subdivision: prefs.subdivision,
-    accentFirstBeat: prefs.accentFirstBeat,
+    accentPattern: normalizeAccentPattern(prefs.meter, prefs.accentPattern),
     soundId: prefs.soundId,
     playing: false,
     beatIndex: 0,
@@ -343,14 +313,14 @@ class SharedMetronomeEngine {
     nextBpm: number,
     nextMeter: MetronomeMeter,
     nextSubdivision: MetronomeSubdivision,
-    nextAccentFirstBeat: boolean = this.snapshot.accentFirstBeat,
+    nextAccentPattern: boolean[] = this.snapshot.accentPattern,
     nextSoundId: string = this.snapshot.soundId,
   ): void {
     saveMetronomePrefs({
       bpm: nextBpm,
       meter: nextMeter,
       subdivision: nextSubdivision,
-      accentFirstBeat: nextAccentFirstBeat,
+      accentPattern: normalizeAccentPattern(nextMeter, nextAccentPattern),
       soundId: nextSoundId,
     })
   }
@@ -362,9 +332,10 @@ class SharedMetronomeEngine {
   }
 
   setMeter = (nextMeter: MetronomeMeter): void => {
+    const nextAccentPattern = getDefaultAccentPattern(nextMeter)
     this.tickCounter = 0
-    this.patchState({ meter: nextMeter, beatIndex: 0, subTickIndex: 0 })
-    this.persistPrefs(this.snapshot.bpm, nextMeter, this.snapshot.subdivision)
+    this.patchState({ meter: nextMeter, beatIndex: 0, subTickIndex: 0, accentPattern: nextAccentPattern })
+    this.persistPrefs(this.snapshot.bpm, nextMeter, this.snapshot.subdivision, nextAccentPattern)
     if (import.meta.env.DEV) {
       console.log(`[MetronomeTab] timeSignature=${nextMeter}`)
     }
@@ -380,14 +351,32 @@ class SharedMetronomeEngine {
     this.debugLog(`ticksPerBeat=${subdivisionsPerBeat(nextSubdivision)}`)
   }
 
-  setAccentFirstBeat = (nextAccentFirstBeat: boolean): void => {
-    this.patchState({ accentFirstBeat: nextAccentFirstBeat })
+  setAccentPattern = (nextAccentPattern: boolean[]): void => {
+    const pattern = normalizeAccentPattern(this.snapshot.meter, nextAccentPattern)
+    this.patchState({ accentPattern: pattern })
     this.persistPrefs(
       this.snapshot.bpm,
       this.snapshot.meter,
       this.snapshot.subdivision,
-      nextAccentFirstBeat,
+      pattern,
     )
+  }
+
+  toggleBeatAccent = (beatIndex: number): void => {
+    const beats = getBeatsPerBar(this.snapshot.meter)
+    if (beatIndex < 0 || beatIndex >= beats) return
+    const pattern = normalizeAccentPattern(this.snapshot.meter, [...this.snapshot.accentPattern])
+    pattern[beatIndex] = !pattern[beatIndex]
+    this.setAccentPattern(pattern)
+  }
+
+  /** Legacy control for audio stage / camera widget — toggles accent on beat 1 only. */
+  setAccentFirstBeat = (nextAccentFirstBeat: boolean): void => {
+    const pattern = normalizeAccentPattern(this.snapshot.meter, [...this.snapshot.accentPattern])
+    if (pattern.length > 0) {
+      pattern[0] = nextAccentFirstBeat
+    }
+    this.setAccentPattern(pattern)
   }
 
   setSoundId = (nextSoundId: string): void => {
@@ -396,7 +385,7 @@ class SharedMetronomeEngine {
       this.snapshot.bpm,
       this.snapshot.meter,
       this.snapshot.subdivision,
-      this.snapshot.accentFirstBeat,
+      this.snapshot.accentPattern,
       nextSoundId,
     )
   }
@@ -506,11 +495,11 @@ class SharedMetronomeEngine {
       while (this.nextBeatTime < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
         const tickInBar = this.tickCounter % barTicks
         const beatTime = this.nextBeatTime
-        const tier = applyAccentFirstBeat(
-          resolveClickTier(meter, tickInBar, subdivision),
+        const tier = resolveClickTierWithAccents(
           meter,
+          tickInBar,
           subdivision,
-          this.snapshot.accentFirstBeat,
+          this.snapshot.accentPattern,
         )
         scheduleMetronomeClick(activeCtx, beatTime, tier, outputNode, muted, sound)
 

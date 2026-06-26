@@ -122,7 +122,7 @@ export interface MetronomePrefs {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
-  accentFirstBeat: boolean
+  accentPattern: boolean[]
   soundId: string
 }
 
@@ -143,9 +143,35 @@ function defaultMetronomePrefs(): MetronomePrefs {
     bpm: DEFAULT_BPM,
     meter: DEFAULT_METER,
     subdivision: DEFAULT_SUBDIVISION,
-    accentFirstBeat: true,
+    accentPattern: getDefaultAccentPattern(DEFAULT_METER),
     soundId: DEFAULT_SOUND_ID,
   }
+}
+
+export function getDefaultAccentPattern(meter: MetronomeMeter): boolean[] {
+  const beats = getBeatsPerBar(meter)
+  if (meter === '6/8') return [true, true]
+  if (meter === '9/8') return [true, true, true]
+  if (meter === '12/8') return [true, true, true, true]
+  return Array.from({ length: beats }, (_, index) => index === 0)
+}
+
+export function normalizeAccentPattern(meter: MetronomeMeter, pattern: boolean[]): boolean[] {
+  const beats = getBeatsPerBar(meter)
+  const next = Array.from({ length: beats }, (_, index) => Boolean(pattern[index]))
+  if (next.length === 0) return getDefaultAccentPattern(meter)
+  return next
+}
+
+function parseAccentPattern(meter: MetronomeMeter, parsed: Partial<MetronomePrefs> & { accentFirstBeat?: boolean }): boolean[] {
+  if (Array.isArray(parsed.accentPattern)) {
+    return normalizeAccentPattern(meter, parsed.accentPattern)
+  }
+  const defaults = getDefaultAccentPattern(meter)
+  if (typeof parsed.accentFirstBeat === 'boolean' && defaults.length > 0) {
+    defaults[0] = parsed.accentFirstBeat
+  }
+  return defaults
 }
 
 export function clampBpm(value: number): number {
@@ -190,12 +216,13 @@ export function loadMetronomePrefs(): MetronomePrefs {
     if (!raw) {
       return defaultMetronomePrefs()
     }
-    const parsed = JSON.parse(raw) as Partial<MetronomePrefs>
+    const parsed = JSON.parse(raw) as Partial<MetronomePrefs> & { accentFirstBeat?: boolean }
+    const meter = parseMeter(parsed.meter)
     return {
       bpm: clampBpm(Number(parsed.bpm) || DEFAULT_BPM),
-      meter: parseMeter(parsed.meter),
+      meter,
       subdivision: parseSubdivision(parsed.subdivision),
-      accentFirstBeat: parsed.accentFirstBeat !== false,
+      accentPattern: parseAccentPattern(meter, parsed),
       soundId:
         typeof parsed.soundId === 'string' && parsed.soundId.length > 0
           ? parsed.soundId
@@ -214,7 +241,7 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
         bpm: clampBpm(prefs.bpm),
         meter: prefs.meter,
         subdivision: prefs.subdivision,
-        accentFirstBeat: prefs.accentFirstBeat,
+        accentPattern: normalizeAccentPattern(prefs.meter, prefs.accentPattern),
         soundId: prefs.soundId,
       }),
     )
@@ -255,4 +282,35 @@ export function getCompoundClickTier(eighthIndexInBar: number): MetronomeClickTi
 
 export function getSimpleClickTier(beatIndexInBar: number): MetronomeClickTier {
   return beatIndexInBar === 0 ? 'downbeat' : 'subdivision'
+}
+
+export function getAccentedMainBeatTier(
+  beatIndexInBar: number,
+  accentPattern: boolean[],
+): MetronomeClickTier {
+  if (!accentPattern[beatIndexInBar]) return 'subdivision'
+  return beatIndexInBar === 0 ? 'downbeat' : 'macro'
+}
+
+export function resolveClickTierWithAccents(
+  meter: MetronomeMeter,
+  tickIndexInBar: number,
+  subdivision: MetronomeSubdivision,
+  accentPattern: boolean[],
+): MetronomeClickTier {
+  const pattern = normalizeAccentPattern(meter, accentPattern)
+
+  if (isCompoundMeter(meter) && subdivision === 'off') {
+    const macroBeatIndex = Math.floor(tickIndexInBar / 3)
+    const tickInGroup = tickIndexInBar % 3
+    if (tickInGroup !== 0) return 'subdivision'
+    return getAccentedMainBeatTier(macroBeatIndex, pattern)
+  }
+
+  const ticksPerBeat = subdivisionsPerBeat(subdivision)
+  const beatIndex = Math.floor(tickIndexInBar / ticksPerBeat)
+  const tickInBeat = tickIndexInBar % ticksPerBeat
+
+  if (tickInBeat !== 0) return 'subdivision'
+  return getAccentedMainBeatTier(beatIndex, pattern)
 }
