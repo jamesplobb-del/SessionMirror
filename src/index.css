@@ -699,6 +699,196 @@ body.settings-branch-open * {
   color: rgba(125, 211, 252, 0.65);
 }
 
+.audio-practice-tab-panel:has(.audio-practice-metronome-shell) {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.audio-practice-metronome-shell,
+.audio-practice-metronome {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.audio-practice-metronome {
+  padding-inline: 0.75rem;
+  padding-bottom: 0.25rem;
+}
+
+.audio-practice-metronome__bpm-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.audio-practice-metronome__bpm-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.audio-practice-metronome__step-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.audio-practice-metronome__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  margin-top: 0.875rem;
+}
+
+.audio-practice-metronome__tap-btn {
+  min-width: 6.5rem;
+}
+
+.audio-practice-metronome__play-btn {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+
+.audio-practice-metronome__visual {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  width: 100%;
+  min-height: 8.5rem;
+}
+
+.audio-practice-metronome__pulse {
+  position: absolute;
+  width: clamp(5.5rem, 28vw, 8.5rem);
+  height: clamp(5.5rem, 28vw, 8.5rem);
+  border-radius: 999px;
+  border: 2px solid rgba(125, 211, 252, 0.22);
+  background: radial-gradient(
+    circle at center,
+    rgba(56, 189, 248, 0.14) 0%,
+    rgba(56, 189, 248, 0.03) 68%,
+    transparent 100%
+  );
+  opacity: 0.35;
+  transform: scale(0.92);
+  pointer-events: none;
+}
+
+.audio-practice-metronome__pulse--animate.audio-practice-metronome__pulse--accent {
+  animation: audio-practice-metronome-pulse-accent 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.audio-practice-metronome__pulse--animate.audio-practice-metronome__pulse--beat {
+  animation: audio-practice-metronome-pulse-beat 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes audio-practice-metronome-pulse-accent {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.08);
+    border-color: rgba(125, 211, 252, 0.72);
+    box-shadow: 0 0 28px rgba(56, 189, 248, 0.42);
+  }
+  100% {
+    opacity: 0.42;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes audio-practice-metronome-pulse-beat {
+  0% {
+    opacity: 0.28;
+    transform: scale(0.94);
+  }
+  45% {
+    opacity: 0.82;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0.32;
+    transform: scale(0.95);
+  }
+}
+
+.audio-practice-metronome__beat-row {
+  position: relative;
+  z-index: 1;
+}
+
+.audio-practice-metronome__beat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(2rem, 9vw, 2.5rem);
+  height: clamp(2rem, 9vw, 2.5rem);
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background: rgba(15, 23, 42, 0.45);
+  transition:
+    transform 0.12s ease,
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.audio-practice-metronome__beat--downbeat {
+  width: clamp(2.25rem, 10vw, 2.75rem);
+  height: clamp(2.25rem, 10vw, 2.75rem);
+}
+
+.audio-practice-metronome__beat--active {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.9);
+}
+
+.audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat {
+  background: #38bdf8;
+  border-color: #7dd3fc;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.45);
+}
+
+.audio-practice-metronome__beat-number {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.audio-practice-metronome__beat--active .audio-practice-metronome__beat-number {
+  color: rgba(15, 23, 42, 0.92);
+}
+
+.audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat
+  .audio-practice-metronome__beat-number {
+  color: #0f172a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-practice-metronome__pulse--animate {
+    animation: none;
+  }
+
+  .audio-practice-metronome__beat {
+    transition: none;
+  }
+}
+
 .control-deck {
   padding-bottom: 0;
 }
