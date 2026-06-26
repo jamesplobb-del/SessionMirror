@@ -17,8 +17,10 @@ import {
   AUDIO_PRACTICE_CLICK_SOUNDS,
   AUDIO_PRACTICE_MAX_BPM,
   AUDIO_PRACTICE_MIN_BPM,
-  PRACTICE_RHYTHM_OPTIONS,
-  PRACTICE_TIME_SIGNATURE_GROUPS,
+  PRACTICE_CORE_METERS,
+  PRACTICE_CORE_RHYTHM_OPTIONS,
+  PRACTICE_EXTENDED_METERS,
+  PRACTICE_EXTENDED_RHYTHM_OPTIONS,
   clampAudioPracticeBpm,
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
@@ -30,18 +32,21 @@ function PracticeControlButton({
   onPress,
   children,
   className = '',
+  scrollKey,
 }: {
   label: string
   active?: boolean
   onPress: () => void
   children?: React.ReactNode
   className?: string
+  scrollKey?: string
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
+      data-scroll-key={scrollKey}
       onPointerUp={(event) => {
         if (event.button !== 0) return
         triggerLightHaptic()
@@ -345,28 +350,58 @@ export default function AudioPracticeMetronomeView() {
       </div>
 
       <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
-        <MetronomeHorizontalScroller label="Time" ariaLabel="Time signature">
-          {PRACTICE_TIME_SIGNATURE_GROUPS.map((group) => (
-            <div key={group.id} className="metronome-h-scroll__group">
-              {group.meters.map((value) => (
-                <PracticeControlButton
-                  key={value}
-                  label={`${value} time signature`}
-                  active={meter === value}
-                  onPress={() => handleMeterChange(value)}
-                  className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
-                >
-                  {value}
-                </PracticeControlButton>
-              ))}
-            </div>
+        <MetronomeHorizontalScroller label="Time" ariaLabel="Time signature" selectedKey={meter}>
+          {PRACTICE_CORE_METERS.map((value) => (
+            <PracticeControlButton
+              key={value}
+              scrollKey={value}
+              label={`${value} time signature`}
+              active={meter === value}
+              onPress={() => handleMeterChange(value)}
+              className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
+            >
+              {value}
+            </PracticeControlButton>
+          ))}
+          <span className="metronome-h-scroll__break" aria-hidden />
+          {PRACTICE_EXTENDED_METERS.map((value) => (
+            <PracticeControlButton
+              key={value}
+              scrollKey={value}
+              label={`${value} time signature`}
+              active={meter === value}
+              onPress={() => handleMeterChange(value)}
+              className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
+            >
+              {value}
+            </PracticeControlButton>
           ))}
         </MetronomeHorizontalScroller>
 
-        <MetronomeHorizontalScroller label="Rhythm" ariaLabel="Rhythm subdivision">
-          {PRACTICE_RHYTHM_OPTIONS.map((option) => (
+        <MetronomeHorizontalScroller
+          label="Rhythm"
+          ariaLabel="Rhythm subdivision"
+          selectedKey={subdivision}
+        >
+          {PRACTICE_CORE_RHYTHM_OPTIONS.map((option) => (
             <PracticeControlButton
               key={option.id}
+              scrollKey={option.value}
+              label={option.name}
+              active={subdivision === option.value}
+              onPress={() => handleSubdivisionChange(option.value)}
+              className="metronome-h-scroll__chip metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
+            >
+              <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
+                {option.label}
+              </span>
+            </PracticeControlButton>
+          ))}
+          <span className="metronome-h-scroll__break" aria-hidden />
+          {PRACTICE_EXTENDED_RHYTHM_OPTIONS.map((option) => (
+            <PracticeControlButton
+              key={option.id}
+              scrollKey={option.value}
               label={option.name}
               active={subdivision === option.value}
               onPress={() => handleSubdivisionChange(option.value)}

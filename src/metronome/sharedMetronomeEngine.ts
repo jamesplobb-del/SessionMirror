@@ -136,6 +136,9 @@ class SharedMetronomeEngine {
   private resumeOnForeground = false
   private lifecycleAttached = false
   private isBackgrounded = false
+  private foregroundTimer: number | null = null
+  private recoveringForeground = false
+  private startInFlight = false
 
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener)
@@ -182,38 +185,18 @@ class SharedMetronomeEngine {
     this.lifecycleAttached = true
 
     const onForeground = () => {
-      if (!this.isBackgrounded && !this.resumeOnForeground) {
-        return
-      }
-      this.isBackgrounded = false
-
-      this.debugLog('foreground recovery')
-      this.clearSchedulerTimer()
-
-      if (this.masterGain) {
-        try {
-          this.masterGain.disconnect()
-        } catch {
-          /* already disconnected */
-        }
-      }
-      this.masterGain = null
-      this.audioCtx = null
-
-      if (this.resumeOnForeground) {
-        this.resumeOnForeground = false
-        void this.start({ recovered: true })
-        return
-      }
-
-      if (this.snapshot.playing) {
-        this.patchState({ playing: false, beatIndex: 0, subTickIndex: 0 })
-      }
+      if (!this.isBackgrounded && !this.resumeOnForeground) return
+      this.scheduleForegroundRecovery()
     }
 
     const onBackground = () => {
       if (this.isBackgrounded) return
       this.isBackgrounded = true
+
+      if (this.foregroundTimer !== null) {
+        window.clearTimeout(this.foregroundTimer)
+        this.foregroundTimer = null
+      }
 
       if (this.snapshot.playing) {
         this.resumeOnForeground = true
@@ -230,6 +213,13 @@ class SharedMetronomeEngine {
     }
 
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', onForeground)
+
+    const retryOnUserGesture = () => {
+      if (!this.resumeOnForeground || this.snapshot.playing) return
+      this.scheduleForegroundRecovery()
+    }
+    document.addEventListener('pointerdown', retryOnUserGesture, { passive: true, capture: true })
 
     if (Capacitor.isNativePlatform()) {
       void App.addListener('appStateChange', ({ isActive }) => {
@@ -239,6 +229,55 @@ class SharedMetronomeEngine {
           onForeground()
         }
       })
+    }
+  }
+
+  private scheduleForegroundRecovery(): void {
+    if (this.foregroundTimer !== null) {
+      window.clearTimeout(this.foregroundTimer)
+    }
+    this.foregroundTimer = window.setTimeout(() => {
+      this.foregroundTimer = null
+      void this.handleForegroundRecovery()
+    }, 100)
+  }
+
+  private async handleForegroundRecovery(): Promise<void> {
+    if (!this.resumeOnForeground) {
+      this.isBackgrounded = false
+      if (this.snapshot.playing) {
+        this.patchState({ playing: false, beatIndex: 0, subTickIndex: 0 })
+      }
+      return
+    }
+
+    if (this.recoveringForeground) return
+    this.recoveringForeground = true
+    this.isBackgrounded = false
+
+    this.debugLog('foreground recovery')
+    this.clearSchedulerTimer()
+    this.releaseAudioGraph()
+
+    try {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (!this.resumeOnForeground) return
+
+        if (attempt > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, 80 * attempt))
+        }
+
+        const started = await this.start({ recovered: true })
+        if (started) {
+          this.resumeOnForeground = false
+          this.debugLog('foreground recovery complete')
+          return
+        }
+      }
+
+      this.debugLog('foreground recovery failed; keeping resume intent')
+    } finally {
+      this.recoveringForeground = false
     }
   }
 
@@ -348,12 +387,22 @@ class SharedMetronomeEngine {
     }
 
     if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume()
-        this.debugLog('audio context resumed')
-      } catch {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          await ctx.resume()
+        } catch {
+          /* iOS may block until audio session is ready */
+        }
+        if (ctx.state !== 'suspended') break
+        await new Promise((resolve) => window.setTimeout(resolve, 50 * (attempt + 1)))
+      }
+
+      if (ctx.state === 'suspended') {
+        this.debugLog('audio context resume blocked')
         return null
       }
+
+      this.debugLog('audio context resumed')
     }
 
     return ctx
@@ -379,9 +428,9 @@ class SharedMetronomeEngine {
       }
 
       if (activeCtx.state === 'suspended') {
-        void activeCtx.resume().catch(() => {
-          this.hardStop()
-        })
+        void activeCtx.resume().catch(() => {})
+        this.schedulerTimer = window.setTimeout(tick, LOOKAHEAD_MS)
+        return
       }
 
       const meter = this.snapshot.meter
@@ -480,32 +529,42 @@ class SharedMetronomeEngine {
   start = async (options?: {
     recovered?: boolean
     fromStale?: boolean
-  }): Promise<void> => {
-    if (typeof window === 'undefined') return
+  }): Promise<boolean> => {
+    if (typeof window === 'undefined') return false
+    if (this.startInFlight) return false
 
-    if (this.snapshot.playing && !this.isSchedulerHealthy()) {
-      this.debugLog(
-        options?.fromStale ? 'start recovered from stale state' : 'start recovered from stale state',
-      )
-      this.sanityReset()
-    }
+    this.startInFlight = true
 
-    this.clearSchedulerTimer()
+    try {
+      if (this.snapshot.playing && !this.isSchedulerHealthy()) {
+        this.debugLog(
+          options?.fromStale
+            ? 'start recovered from stale state'
+            : 'start recovered from stale state',
+        )
+        this.sanityReset()
+      }
 
-    const ctx = await this.prepareAudioContextForStart()
-    if (!ctx || ctx.state === 'closed') {
-      this.schedulerSession += 1
       this.clearSchedulerTimer()
-      this.patchState({ playing: false })
-      return
-    }
 
-    this.tickCounter = 0
-    this.nextBeatTime = ctx.currentTime + START_LEAD_SEC
-    this.schedulerSession += 1
-    this.patchState({ playing: true, beatIndex: 0, subTickIndex: 0, beatPulseId: 0 })
-    this.debugLog(options?.recovered ? 'start (recovered)' : 'start')
-    this.runSchedulerLoop()
+      const ctx = await this.prepareAudioContextForStart()
+      if (!ctx || ctx.state === 'closed') {
+        this.schedulerSession += 1
+        this.clearSchedulerTimer()
+        this.patchState({ playing: false })
+        return false
+      }
+
+      this.tickCounter = 0
+      this.nextBeatTime = ctx.currentTime + START_LEAD_SEC
+      this.schedulerSession += 1
+      this.patchState({ playing: true, beatIndex: 0, subTickIndex: 0, beatPulseId: 0 })
+      this.debugLog(options?.recovered ? 'start (recovered)' : 'start')
+      this.runSchedulerLoop()
+      return true
+    } finally {
+      this.startInFlight = false
+    }
   }
 
   togglePlay = (): void => {
