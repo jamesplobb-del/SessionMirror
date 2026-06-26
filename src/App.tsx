@@ -2354,7 +2354,7 @@ function StandardApp({
           />
         )}
 
-        {recordingMode === 'audio' && audioPracticeTab === 'metronome' && !quickSettingsOpen && (
+        {recordingMode === 'audio' && audioPracticeTab === 'metronome' && !quickSettingsOpen && !audioPracticeSheetOpen && (
           <div
             key="audio-practice-metronome-layer"
             className="audio-practice-metronome-layer flex min-h-0 flex-1 flex-col"
@@ -2363,7 +2363,7 @@ function StandardApp({
           </div>
         )}
 
-        {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && (
+        {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && !audioPracticeSheetOpen && (
           <div
             key="audio-practice-tuner-layer"
             className="audio-practice-tuner-layer flex min-h-0 flex-1 flex-col"
