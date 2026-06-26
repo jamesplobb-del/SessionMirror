@@ -313,7 +313,6 @@ function LiveAudioTunerPane({
 
       <div className="pitch-audio-stage__chart min-h-0 flex-1">
         <div className="pitch-chart-card">
-          <div className="pitch-chart-card__grid" aria-hidden />
           <PitchChartCanvas canvasRef={canvasRef} glass fill />
         </div>
       </div>
