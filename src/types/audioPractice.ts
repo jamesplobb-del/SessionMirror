@@ -1,0 +1,1 @@
+export type AudioPracticeTab = 'audio' | 'metronome' | 'tuner' | 'combo'
