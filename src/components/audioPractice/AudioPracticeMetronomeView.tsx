@@ -24,7 +24,7 @@ import {
   clampAudioPracticeBpm,
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
-import MetronomeHorizontalScroller from './MetronomeHorizontalScroller'
+import MetronomeHorizontalScroller, { useScrollTapGuard } from './MetronomeHorizontalScroller'
 
 function PracticeControlButton({
   label,
@@ -33,6 +33,7 @@ function PracticeControlButton({
   children,
   className = '',
   scrollKey,
+  respectScrollGuard = false,
 }: {
   label: string
   active?: boolean
@@ -40,7 +41,10 @@ function PracticeControlButton({
   children?: React.ReactNode
   className?: string
   scrollKey?: string
+  respectScrollGuard?: boolean
 }) {
+  const scrollGuard = useScrollTapGuard()
+
   return (
     <button
       type="button"
@@ -49,6 +53,7 @@ function PracticeControlButton({
       data-scroll-key={scrollKey}
       onPointerUp={(event) => {
         if (event.button !== 0) return
+        if (respectScrollGuard && scrollGuard?.shouldSuppressTap()) return
         triggerLightHaptic()
         onPress()
       }}
@@ -262,7 +267,8 @@ export default function AudioPracticeMetronomeView() {
           </div>
         </header>
 
-        <div className="metronome-audio-stage__beats min-h-0 flex-1" aria-live="polite" aria-atomic>
+        <div className="audio-practice-metronome__center-stack min-h-0 flex-1">
+          <div className="metronome-audio-stage__beats min-h-0" aria-live="polite" aria-atomic>
           <div className="audio-practice-metronome__visual">
             <div
               key={beatPulseId}
@@ -346,74 +352,84 @@ export default function AudioPracticeMetronomeView() {
               })}
             </div>
           </div>
+          </div>
+
+          <section
+            className="audio-practice-metronome__selectors shrink-0"
+            aria-label="Time signature and rhythm"
+          >
+            <MetronomeHorizontalScroller label="Time" ariaLabel="Time signature" selectedKey={meter}>
+              {PRACTICE_CORE_METERS.map((value) => (
+                <PracticeControlButton
+                  key={value}
+                  scrollKey={value}
+                  respectScrollGuard
+                  label={`${value} time signature`}
+                  active={meter === value}
+                  onPress={() => handleMeterChange(value)}
+                  className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
+                >
+                  {value}
+                </PracticeControlButton>
+              ))}
+              <span className="metronome-h-scroll__break" aria-hidden />
+              {PRACTICE_EXTENDED_METERS.map((value) => (
+                <PracticeControlButton
+                  key={value}
+                  scrollKey={value}
+                  respectScrollGuard
+                  label={`${value} time signature`}
+                  active={meter === value}
+                  onPress={() => handleMeterChange(value)}
+                  className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
+                >
+                  {value}
+                </PracticeControlButton>
+              ))}
+            </MetronomeHorizontalScroller>
+
+            <MetronomeHorizontalScroller
+              label="Rhythm"
+              ariaLabel="Rhythm subdivision"
+              selectedKey={subdivision}
+            >
+              {PRACTICE_CORE_RHYTHM_OPTIONS.map((option) => (
+                <PracticeControlButton
+                  key={option.id}
+                  scrollKey={option.value}
+                  respectScrollGuard
+                  label={option.name}
+                  active={subdivision === option.value}
+                  onPress={() => handleSubdivisionChange(option.value)}
+                  className="metronome-h-scroll__chip metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
+                >
+                  <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
+                    {option.label}
+                  </span>
+                </PracticeControlButton>
+              ))}
+              <span className="metronome-h-scroll__break" aria-hidden />
+              {PRACTICE_EXTENDED_RHYTHM_OPTIONS.map((option) => (
+                <PracticeControlButton
+                  key={option.id}
+                  scrollKey={option.value}
+                  respectScrollGuard
+                  label={option.name}
+                  active={subdivision === option.value}
+                  onPress={() => handleSubdivisionChange(option.value)}
+                  className="metronome-h-scroll__chip metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
+                >
+                  <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
+                    {option.label}
+                  </span>
+                </PracticeControlButton>
+              ))}
+            </MetronomeHorizontalScroller>
+          </section>
         </div>
       </div>
 
       <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
-        <MetronomeHorizontalScroller label="Time" ariaLabel="Time signature" selectedKey={meter}>
-          {PRACTICE_CORE_METERS.map((value) => (
-            <PracticeControlButton
-              key={value}
-              scrollKey={value}
-              label={`${value} time signature`}
-              active={meter === value}
-              onPress={() => handleMeterChange(value)}
-              className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
-            >
-              {value}
-            </PracticeControlButton>
-          ))}
-          <span className="metronome-h-scroll__break" aria-hidden />
-          {PRACTICE_EXTENDED_METERS.map((value) => (
-            <PracticeControlButton
-              key={value}
-              scrollKey={value}
-              label={`${value} time signature`}
-              active={meter === value}
-              onPress={() => handleMeterChange(value)}
-              className="metronome-h-scroll__chip metronome-audio-stage__meter-btn"
-            >
-              {value}
-            </PracticeControlButton>
-          ))}
-        </MetronomeHorizontalScroller>
-
-        <MetronomeHorizontalScroller
-          label="Rhythm"
-          ariaLabel="Rhythm subdivision"
-          selectedKey={subdivision}
-        >
-          {PRACTICE_CORE_RHYTHM_OPTIONS.map((option) => (
-            <PracticeControlButton
-              key={option.id}
-              scrollKey={option.value}
-              label={option.name}
-              active={subdivision === option.value}
-              onPress={() => handleSubdivisionChange(option.value)}
-              className="metronome-h-scroll__chip metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
-            >
-              <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
-                {option.label}
-              </span>
-            </PracticeControlButton>
-          ))}
-          <span className="metronome-h-scroll__break" aria-hidden />
-          {PRACTICE_EXTENDED_RHYTHM_OPTIONS.map((option) => (
-            <PracticeControlButton
-              key={option.id}
-              scrollKey={option.value}
-              label={option.name}
-              active={subdivision === option.value}
-              onPress={() => handleSubdivisionChange(option.value)}
-              className="metronome-h-scroll__chip metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
-            >
-              <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
-                {option.label}
-              </span>
-            </PracticeControlButton>
-          ))}
-        </MetronomeHorizontalScroller>
-
         <div className="metronome-audio-stage__toggle-row pointer-events-auto">
           <span className="metronome-audio-stage__toggle-label">Accent First Beat</span>
           <IOSSwitch

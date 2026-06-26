@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { App } from '@capacitor/app'
 import { metronomeSpeakerGain } from '../utils/playbackVolume'
-import { primePlaybackAudioContextSync } from '../utils/playbackAudioContext'
+import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import { scheduleMetronomeClick } from '../utils/metronomeClickSounds'
 import {
   clampBpm,
@@ -21,6 +21,8 @@ import {
 const SCHEDULE_AHEAD_SEC = 0.12
 const LOOKAHEAD_MS = 25
 const START_LEAD_SEC = 0.05
+const FOREGROUND_RECOVERY_DELAY_MS = 200
+const SUSPENDED_SCHEDULER_TICK_LIMIT = 8
 
 export interface SharedMetronomeSnapshot {
   bpm: number
@@ -139,6 +141,9 @@ class SharedMetronomeEngine {
   private foregroundTimer: number | null = null
   private recoveringForeground = false
   private startInFlight = false
+  private suspendedSchedulerTicks = 0
+  private playbackWatchCtx: AudioContext | null = null
+  private onPlaybackStateChange: (() => void) | null = null
 
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener)
@@ -184,10 +189,7 @@ class SharedMetronomeEngine {
     if (this.lifecycleAttached || typeof window === 'undefined') return
     this.lifecycleAttached = true
 
-    const onForeground = () => {
-      if (!this.isBackgrounded && !this.resumeOnForeground) return
-      this.scheduleForegroundRecovery()
-    }
+    this.attachPlaybackInterruptWatch()
 
     const onBackground = () => {
       if (this.isBackgrounded) return
@@ -204,6 +206,11 @@ class SharedMetronomeEngine {
       this.hardStop({ background: true })
     }
 
+    const onForeground = () => {
+      this.isBackgrounded = false
+      this.reconcileAfterInterrupt()
+    }
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         onBackground()
@@ -212,12 +219,20 @@ class SharedMetronomeEngine {
       }
     }
 
+    const onPageHide = () => {
+      if (this.snapshot.playing || this.resumeOnForeground) {
+        onBackground()
+      }
+    }
+
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('pageshow', onForeground)
+    window.addEventListener('focus', onForeground)
+    window.addEventListener('pagehide', onPageHide)
 
     const retryOnUserGesture = () => {
       if (!this.resumeOnForeground || this.snapshot.playing) return
-      this.scheduleForegroundRecovery()
+      this.reconcileAfterInterrupt()
     }
     document.addEventListener('pointerdown', retryOnUserGesture, { passive: true, capture: true })
 
@@ -229,6 +244,55 @@ class SharedMetronomeEngine {
           onForeground()
         }
       })
+      void App.addListener('pause', onBackground)
+      void App.addListener('resume', onForeground)
+    }
+  }
+
+  private attachPlaybackInterruptWatch(): void {
+    const ctx = primePlaybackAudioContextSync()
+    if (this.playbackWatchCtx === ctx && this.onPlaybackStateChange) return
+
+    if (this.playbackWatchCtx && this.onPlaybackStateChange) {
+      this.playbackWatchCtx.removeEventListener('statechange', this.onPlaybackStateChange)
+    }
+
+    const onStateChange = () => {
+      if (ctx.state === 'suspended' && this.snapshot.playing) {
+        this.notePlaybackInterrupted('context-suspended')
+        return
+      }
+      if (ctx.state === 'running' && this.resumeOnForeground) {
+        this.reconcileAfterInterrupt()
+      }
+    }
+
+    this.playbackWatchCtx = ctx
+    this.onPlaybackStateChange = onStateChange
+    ctx.addEventListener('statechange', onStateChange)
+  }
+
+  private notePlaybackInterrupted(reason: string): void {
+    if (!this.snapshot.playing) return
+    this.resumeOnForeground = true
+    this.isBackgrounded = true
+    this.debugLog(`interrupt (${reason})`)
+    this.hardStop({ background: true })
+  }
+
+  private reconcileAfterInterrupt(): void {
+    if (this.resumeOnForeground) {
+      this.scheduleForegroundRecovery()
+      return
+    }
+
+    if (!this.snapshot.playing) return
+
+    const ctx = this.audioCtx ?? primePlaybackAudioContextSync()
+    const audioNeedsRecovery = ctx.state === 'suspended' || ctx.state === 'closed'
+    if (!this.isSchedulerHealthy() || audioNeedsRecovery) {
+      this.resumeOnForeground = true
+      this.scheduleForegroundRecovery()
     }
   }
 
@@ -239,7 +303,7 @@ class SharedMetronomeEngine {
     this.foregroundTimer = window.setTimeout(() => {
       this.foregroundTimer = null
       void this.handleForegroundRecovery()
-    }, 100)
+    }, FOREGROUND_RECOVERY_DELAY_MS)
   }
 
   private async handleForegroundRecovery(): Promise<void> {
@@ -260,16 +324,21 @@ class SharedMetronomeEngine {
     this.releaseAudioGraph()
 
     try {
-      for (let attempt = 0; attempt < 4; attempt++) {
+      await resumePlaybackAudioContext()
+      this.attachPlaybackInterruptWatch()
+
+      for (let attempt = 0; attempt < 6; attempt++) {
         if (!this.resumeOnForeground) return
 
         if (attempt > 0) {
-          await new Promise((resolve) => window.setTimeout(resolve, 80 * attempt))
+          await new Promise((resolve) => window.setTimeout(resolve, 100 * attempt))
+          await resumePlaybackAudioContext()
         }
 
         const started = await this.start({ recovered: true })
         if (started) {
           this.resumeOnForeground = false
+          this.suspendedSchedulerTicks = 0
           this.debugLog('foreground recovery complete')
           return
         }
@@ -381,6 +450,7 @@ class SharedMetronomeEngine {
 
     this.masterGain = null
     this.audioCtx = ctx
+    this.attachPlaybackInterruptWatch()
 
     if (wasReleased) {
       this.debugLog('audio context recreated')
@@ -428,10 +498,17 @@ class SharedMetronomeEngine {
       }
 
       if (activeCtx.state === 'suspended') {
+        this.suspendedSchedulerTicks += 1
+        if (this.suspendedSchedulerTicks >= SUSPENDED_SCHEDULER_TICK_LIMIT) {
+          this.notePlaybackInterrupted('scheduler-suspended')
+          return
+        }
         void activeCtx.resume().catch(() => {})
         this.schedulerTimer = window.setTimeout(tick, LOOKAHEAD_MS)
         return
       }
+
+      this.suspendedSchedulerTicks = 0
 
       const meter = this.snapshot.meter
       const subdivision = this.snapshot.subdivision
@@ -491,7 +568,8 @@ class SharedMetronomeEngine {
     return (
       this.schedulerTimer !== null &&
       this.audioCtx !== null &&
-      this.audioCtx.state !== 'closed'
+      this.audioCtx.state !== 'closed' &&
+      this.audioCtx.state !== 'suspended'
     )
   }
 
@@ -570,10 +648,16 @@ class SharedMetronomeEngine {
   togglePlay = (): void => {
     if (this.snapshot.playing) {
       if (!this.isSchedulerHealthy()) {
+        this.resumeOnForeground = false
         this.sanityReset()
+        void this.start()
       } else {
         this.stop()
       }
+      return
+    }
+    if (this.resumeOnForeground) {
+      this.reconcileAfterInterrupt()
       return
     }
     void this.start()

@@ -1,4 +1,26 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+
+const TAP_MOVE_THRESHOLD_PX = 10
+const TAP_SUPPRESS_MS = 140
+
+interface ScrollTapGuard {
+  shouldSuppressTap: () => boolean
+}
+
+const ScrollTapGuardContext = createContext<ScrollTapGuard | null>(null)
+
+export function useScrollTapGuard(): ScrollTapGuard | null {
+  return useContext(ScrollTapGuardContext)
+}
 
 interface MetronomeHorizontalScrollerProps {
   label: string
@@ -16,8 +38,21 @@ export default function MetronomeHorizontalScroller({
   className = '',
 }: MetronomeHorizontalScrollerProps) {
   const trackRef = useRef<HTMLDivElement>(null)
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
+  const suppressUntilRef = useRef(0)
   const [fadeLeft, setFadeLeft] = useState(false)
   const [fadeRight, setFadeRight] = useState(false)
+
+  const markScrollGesture = useCallback(() => {
+    suppressUntilRef.current = Date.now() + TAP_SUPPRESS_MS
+  }, [])
+
+  const scrollGuard = useMemo<ScrollTapGuard>(
+    () => ({
+      shouldSuppressTap: () => Date.now() < suppressUntilRef.current,
+    }),
+    [],
+  )
 
   const updateFades = useCallback(() => {
     const track = trackRef.current
@@ -33,19 +68,49 @@ export default function MetronomeHorizontalScroller({
     const track = trackRef.current
     if (!track) return
 
-    updateFades()
+    const onPointerDown = (event: PointerEvent) => {
+      pointerStartRef.current = { x: event.clientX, y: event.clientY }
+    }
 
-    const onScroll = () => updateFades()
+    const onPointerMove = (event: PointerEvent) => {
+      const start = pointerStartRef.current
+      if (!start) return
+      const dx = Math.abs(event.clientX - start.x)
+      const dy = Math.abs(event.clientY - start.y)
+      if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) {
+        markScrollGesture()
+      }
+    }
+
+    const onPointerEnd = () => {
+      pointerStartRef.current = null
+    }
+
+    const onScroll = () => {
+      markScrollGesture()
+      updateFades()
+    }
+
+    track.addEventListener('pointerdown', onPointerDown, { capture: true })
+    track.addEventListener('pointermove', onPointerMove, { capture: true })
+    track.addEventListener('pointerup', onPointerEnd, { capture: true })
+    track.addEventListener('pointercancel', onPointerEnd, { capture: true })
     track.addEventListener('scroll', onScroll, { passive: true })
+
+    updateFades()
 
     const observer = new ResizeObserver(() => updateFades())
     observer.observe(track)
 
     return () => {
+      track.removeEventListener('pointerdown', onPointerDown, { capture: true })
+      track.removeEventListener('pointermove', onPointerMove, { capture: true })
+      track.removeEventListener('pointerup', onPointerEnd, { capture: true })
+      track.removeEventListener('pointercancel', onPointerEnd, { capture: true })
       track.removeEventListener('scroll', onScroll)
       observer.disconnect()
     }
-  }, [updateFades, children])
+  }, [markScrollGesture, updateFades, children])
 
   useEffect(() => {
     if (!selectedKey) return
@@ -60,27 +125,30 @@ export default function MetronomeHorizontalScroller({
   }, [selectedKey, updateFades])
 
   return (
-    <div
-      className={[
-        'metronome-h-scroll',
-        fadeLeft ? 'metronome-h-scroll--fade-left' : '',
-        fadeRight ? 'metronome-h-scroll--fade-right' : '',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
-    >
-      <div className="metronome-h-scroll__label">{label}</div>
-      <div className="metronome-h-scroll__viewport">
-        <div
-          ref={trackRef}
-          className="metronome-h-scroll__track"
-          role="group"
-          aria-label={ariaLabel}
-        >
-          {children}
+    <ScrollTapGuardContext.Provider value={scrollGuard}>
+      <div
+        className={[
+          'metronome-h-scroll',
+          'metronome-h-scroll--centered',
+          fadeLeft ? 'metronome-h-scroll--fade-left' : '',
+          fadeRight ? 'metronome-h-scroll--fade-right' : '',
+          className,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <div className="metronome-h-scroll__label">{label}</div>
+        <div className="metronome-h-scroll__viewport">
+          <div
+            ref={trackRef}
+            className="metronome-h-scroll__track"
+            role="group"
+            aria-label={ariaLabel}
+          >
+            {children}
+          </div>
         </div>
       </div>
-    </div>
+    </ScrollTapGuardContext.Provider>
   )
 }
