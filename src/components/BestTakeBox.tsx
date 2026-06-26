@@ -12,6 +12,7 @@ import {
 import { Maximize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
+import Pressable from './ui/Pressable'
 import YoutubeUrlDialog from './YoutubeUrlDialog'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import {
@@ -23,6 +24,7 @@ import {
 } from '../utils/playalong/youtubeBridge'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
+import { useTutorialAction } from '../context/TutorialContext'
 import type { Take } from '../types'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
@@ -76,6 +78,7 @@ function BestTakeBox({
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
+  const notifyTutorial = useTutorialAction()
 
   const hasTake = Boolean(src || take?.filePath)
   const hasYoutube = Boolean(youtubeEmbedUrl)
@@ -83,6 +86,12 @@ function BestTakeBox({
   const isFill = layout === 'fill'
 
   const showUploadBadge = Boolean(onUpload) && hasTake
+
+  useEffect(() => {
+    if (youtubeDialogOpen) {
+      notifyTutorial?.('youtube-opened')
+    }
+  }, [notifyTutorial, youtubeDialogOpen])
 
   useEffect(() => {
     setIsPlaying(false)
@@ -246,8 +255,11 @@ function BestTakeBox({
       : { top: chromeInset, right: chromeInset }
 
     return (
-      <button
+      <Pressable
         type="button"
+        intensity="icon"
+        haptic="light"
+        {...(!splitViewActive ? { 'data-tutorial': 'best-take-expand' } : {})}
         onPointerDown={stopEventBubble}
         onTouchStart={stopEventBubble}
         onTouchEnd={stopEventBubble}
@@ -260,7 +272,7 @@ function BestTakeBox({
         aria-label="Open split view layout"
       >
         <Maximize2 className="h-3 w-3 stroke-[2]" aria-hidden />
-      </button>
+      </Pressable>
     )
   }
 
@@ -377,6 +389,7 @@ function BestTakeBox({
                 )}
                 <button
                   type="button"
+                  data-tutorial="best-take-youtube"
                   onPointerDown={stopEventBubble}
                   onTouchStart={stopEventBubble}
                   onTouchEnd={stopEventBubble}

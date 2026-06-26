@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { RotateCcw, X } from 'lucide-react'
+import { RotateCcw, X, GraduationCap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
@@ -27,6 +27,7 @@ interface SettingsDrawerProps {
   onShowMetronomeChange: (show: boolean) => void
   onAudioEnhancerChange: (enabled: boolean) => void
   onReset: () => void
+  onReplayTutorial?: () => void
   recordingMode: 'video' | 'audio'
 }
 
@@ -166,6 +167,7 @@ export default function SettingsDrawer({
   onShowMetronomeChange,
   onAudioEnhancerChange,
   onReset,
+  onReplayTutorial,
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
@@ -406,6 +408,18 @@ export default function SettingsDrawer({
               onChange={(checked) => onUpdate({ excludeYoutubeFromRecording: checked })}
             />
           </section>
+
+          {onReplayTutorial && (
+            <Pressable
+              type="button"
+              intensity="soft"
+              onClick={onReplayTutorial}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+            >
+              <GraduationCap className="h-3.5 w-3.5" />
+              Replay Quick Tour
+            </Pressable>
+          )}
 
           <Pressable
             type="button"

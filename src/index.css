@@ -2194,6 +2194,67 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 
+/* HUD above dim layer; only spotlight targets stay tappable under the coach card. */
+body.tutorial-active .app-ui-overlay,
+body.tutorial-active .app-ui-overlay--tutorial {
+  z-index: 50 !important;
+  pointer-events: none !important;
+}
+
+body.tutorial-active .animated-bottom-sheet {
+  z-index: 52 !important;
+}
+
+body.tutorial-active .tutorial-sheet-backdrop {
+  z-index: 51 !important;
+}
+
+.tutorial-spotlight-target {
+  position: relative;
+  z-index: 53 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.onboarding-tutorial__panel {
+  box-sizing: border-box;
+  pointer-events: auto !important;
+}
+
+.tutorial-panel__title,
+.tutorial-panel__body-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.tutorial-panel__body {
+  -webkit-overflow-scrolling: touch;
+}
+
+@supports (font: -apple-system-body) {
+  .tutorial-panel__title {
+    font: -apple-system-headline;
+    font-size: 1.0625rem;
+  }
+
+  .tutorial-panel__body-text {
+    font: -apple-system-body;
+    font-size: 0.9375rem;
+  }
+}
+
+.tutorial-spotlight-backdrop {
+  pointer-events: none;
+}
+
+.tutorial-spotlight-backdrop .tutorial-spotlight__shade {
+  pointer-events: auto;
+}
+
+.tutorial-spotlight__ring {
+  pointer-events: none;
+}
+
 .app-shell {
   position: relative;
   width: 100%;
