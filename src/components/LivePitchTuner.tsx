@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMemo, useRef, type RefObject } from 'react'
+import { useGatedPitchReadout } from '../hooks/useGatedPitchReadout'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import {
   formatDisplayCents,
@@ -390,6 +391,16 @@ function LivePitchTunerAudio({
     playbackTrackerOptions,
   )
 
+  const gatedLive = useGatedPitchReadout(liveTracker.readout, liveTracker.inTuneGlow, {
+    enabled: showLive,
+    metronomeGate: true,
+  })
+
+  const gatedPlayback = useGatedPitchReadout(playbackTracker.readout, playbackTracker.inTuneGlow, {
+    enabled: showPlayback,
+    metronomeGate: false,
+  })
+
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
 
   return (
@@ -405,14 +416,14 @@ function LivePitchTunerAudio({
         >
           {showPlayback ? (
             <LiveAudioTunerPane
-              readout={playbackTracker.readout}
-              inTuneGlow={playbackTracker.inTuneGlow}
+              readout={gatedPlayback.readout}
+              inTuneGlow={gatedPlayback.inTuneGlow}
               canvasRef={playbackCanvasRef}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
-              readout={liveTracker.readout}
-              inTuneGlow={liveTracker.inTuneGlow}
+              readout={gatedLive.readout}
+              inTuneGlow={gatedLive.inTuneGlow}
               canvasRef={liveCanvasRef}
             />
           ) : (
@@ -455,7 +466,7 @@ export default function LivePitchTuner({
   const liveMicWidget = isWidget && pitchSource === 'microphone'
   const trackerActive = enabled && !isAudio
   const trackerPlaying = liveMicWidget ? trackerActive : isPlaying
-  const { readout, inTuneGlow: _inTuneGlow } = useLivePitchTracker(
+  const tracker = useLivePitchTracker(
     mediaRef,
     trackerActive,
     trackerPlaying,
@@ -471,6 +482,10 @@ export default function LivePitchTuner({
       realtimeMode: isWidget,
     },
   )
+  const { readout, inTuneGlow: _inTuneGlow } = useGatedPitchReadout(tracker.readout, tracker.inTuneGlow, {
+    enabled: trackerActive && liveMicWidget,
+    metronomeGate: liveMicWidget,
+  })
   void _inTuneGlow
 
   if (isAudio) {
