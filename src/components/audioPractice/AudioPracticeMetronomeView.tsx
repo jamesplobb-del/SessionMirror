@@ -73,12 +73,7 @@ export default function AudioPracticeMetronomeView() {
     setSoundId,
     togglePlay,
     stop,
-  } = useMetronome({
-    isTakePlaying: false,
-    muteDuringPlayback: false,
-    debugLabel: 'MetronomeTab',
-    pauseOnAppHidden: true,
-  })
+  } = useMetronome()
 
   const setPracticeBpm = useCallback(
     (value: number) => {
@@ -104,12 +99,6 @@ export default function AudioPracticeMetronomeView() {
       setPracticeBpm(bpm)
     }
   }, [bpm, setPracticeBpm])
-
-  useEffect(() => {
-    return () => {
-      stop()
-    }
-  }, [stop])
 
   const handleTogglePlay = useCallback(() => {
     triggerMediumHaptic()

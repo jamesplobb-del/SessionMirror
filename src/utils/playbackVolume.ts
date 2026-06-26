@@ -94,19 +94,24 @@ export function youtubeVolumeFromUiSlider(uiVolume: number): number {
   return Math.round(Math.min(100, Math.max(YOUTUBE_VOLUME_FLOOR, boosted)))
 }
 
+/** Extra bus gain so metronome clicks are clearly audible on the iPhone speaker. */
+export const METRONOME_MASTER_GAIN = 3.25
+
 /** Web Audio metronome bus — moderate default when mastering on; legacy when Off. */
 export function metronomeSpeakerGain(muted: boolean): number {
   if (muted) return 0
+  let base: number
   if (isHeadphoneOutputActive()) {
-    return effectiveHeadphoneGain(1, false)
+    base = effectiveHeadphoneGain(1, false)
+  } else {
+    const preset = activeSpeakerLoudnessPreset
+    if (preset === 'off') {
+      base = effectiveSpeakerGain(1, false)
+    } else if (preset === 'phone' || preset === 'extreme' || preset === 'insane') {
+      base = getSpeakerDefaultBusGain('loud')
+    } else {
+      base = getSpeakerDefaultBusGain(preset)
+    }
   }
-  const preset = activeSpeakerLoudnessPreset
-  if (preset === 'off') {
-    return effectiveSpeakerGain(1, false)
-  }
-  // Phone / test boosts are for take playback only — keep metronome at musician preset levels.
-  if (preset === 'phone' || preset === 'extreme' || preset === 'insane') {
-    return getSpeakerDefaultBusGain('loud')
-  }
-  return getSpeakerDefaultBusGain(preset)
+  return Math.min(base * METRONOME_MASTER_GAIN, PLAYBACK_GAIN_MAX)
 }
