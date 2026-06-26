@@ -6,11 +6,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react'
 
 const TAP_MOVE_THRESHOLD_PX = 10
 const TAP_SUPPRESS_MS = 140
+const DEFAULT_VISIBLE_COLUMNS = 5
 
 interface ScrollTapGuard {
   shouldSuppressTap: () => boolean
@@ -22,10 +24,17 @@ export function useScrollTapGuard(): ScrollTapGuard | null {
   return useContext(ScrollTapGuardContext)
 }
 
+function isChipVisibleInTrack(track: HTMLElement, chip: HTMLElement): boolean {
+  const trackRect = track.getBoundingClientRect()
+  const chipRect = chip.getBoundingClientRect()
+  return chipRect.left >= trackRect.left - 2 && chipRect.right <= trackRect.right + 2
+}
+
 interface MetronomeHorizontalScrollerProps {
   label: string
   ariaLabel: string
   selectedKey?: string
+  visibleColumns?: number
   children: ReactNode
   className?: string
 }
@@ -34,12 +43,14 @@ export default function MetronomeHorizontalScroller({
   label,
   ariaLabel,
   selectedKey,
+  visibleColumns = DEFAULT_VISIBLE_COLUMNS,
   children,
   className = '',
 }: MetronomeHorizontalScrollerProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
   const suppressUntilRef = useRef(0)
+  const didInitialScrollResetRef = useRef(false)
   const [fadeLeft, setFadeLeft] = useState(false)
   const [fadeRight, setFadeRight] = useState(false)
 
@@ -67,6 +78,11 @@ export default function MetronomeHorizontalScroller({
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
+
+    if (!didInitialScrollResetRef.current) {
+      track.scrollLeft = 0
+      didInitialScrollResetRef.current = true
+    }
 
     const onPointerDown = (event: PointerEvent) => {
       pointerStartRef.current = { x: event.clientX, y: event.clientY }
@@ -120,7 +136,12 @@ export default function MetronomeHorizontalScroller({
     const selected = track.querySelector<HTMLElement>(`[data-scroll-key="${selectedKey}"]`)
     if (!selected) return
 
-    selected.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+    if (isChipVisibleInTrack(track, selected)) {
+      window.requestAnimationFrame(updateFades)
+      return
+    }
+
+    selected.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
     window.requestAnimationFrame(updateFades)
   }, [selectedKey, updateFades])
 
@@ -129,13 +150,14 @@ export default function MetronomeHorizontalScroller({
       <div
         className={[
           'metronome-h-scroll',
-          'metronome-h-scroll--centered',
+          'metronome-h-scroll--five-wide',
           fadeLeft ? 'metronome-h-scroll--fade-left' : '',
           fadeRight ? 'metronome-h-scroll--fade-right' : '',
           className,
         ]
           .filter(Boolean)
           .join(' ')}
+        style={{ '--mhs-columns': visibleColumns } as CSSProperties}
       >
         <div className="metronome-h-scroll__label">{label}</div>
         <div className="metronome-h-scroll__viewport">

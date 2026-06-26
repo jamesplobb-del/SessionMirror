@@ -11,10 +11,11 @@ export function clampAudioPracticeBpm(value: number): number {
   )
 }
 
-/** Visible by default; extended meters scroll in horizontally. */
-export const PRACTICE_CORE_METERS: MetronomeMeter[] = ['2/4', '4/4', '5/4', '6/8', '9/8', '12/8']
+/** First visible window (5 across): 2/4, 4/4, 5/4, 6/8, 9/8 */
+export const PRACTICE_CORE_METERS: MetronomeMeter[] = ['2/4', '4/4', '5/4', '6/8', '9/8']
 
 export const PRACTICE_EXTENDED_METERS: MetronomeMeter[] = [
+  '12/8',
   '3/4',
   '6/4',
   '7/4',
@@ -33,6 +34,11 @@ export const PRACTICE_EXTENDED_METERS: MetronomeMeter[] = [
   '16/16',
 ]
 
+export const PRACTICE_ALL_METERS: MetronomeMeter[] = [
+  ...PRACTICE_CORE_METERS,
+  ...PRACTICE_EXTENDED_METERS,
+]
+
 export interface PracticeRhythmOption {
   id: string
   value: MetronomeSubdivision
@@ -41,17 +47,23 @@ export interface PracticeRhythmOption {
   ticksPerBeat: number
 }
 
+/** First visible window (5 across). */
 export const PRACTICE_CORE_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
   { id: 'quarter', value: 'off', label: '♩', name: 'Quarter notes', ticksPerBeat: 1 },
   { id: 'eighth', value: '8ths', label: '♪', name: 'Eighth notes', ticksPerBeat: 2 },
   { id: 'triplet', value: 'triplets', label: '♪3', name: 'Triplets', ticksPerBeat: 3 },
   { id: 'sixteenth', value: '16ths', label: '♬', name: 'Sixteenth notes', ticksPerBeat: 4 },
+  { id: 'dotted', value: 'dotted', label: '♩·', name: 'Dotted quarter', ticksPerBeat: 3 },
 ]
 
 export const PRACTICE_EXTENDED_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
-  { id: 'dotted', value: 'dotted', label: '♩·', name: 'Dotted quarter', ticksPerBeat: 3 },
   { id: 'quintuplet', value: 'quints', label: '5', name: 'Quintuplets', ticksPerBeat: 5 },
   { id: 'septuplet', value: 'septuplets', label: '7', name: 'Septuplets', ticksPerBeat: 7 },
+]
+
+export const PRACTICE_ALL_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
+  ...PRACTICE_CORE_RHYTHM_OPTIONS,
+  ...PRACTICE_EXTENDED_RHYTHM_OPTIONS,
 ]
 
 /** UI-only until sound engine supports multiple click timbres. */
