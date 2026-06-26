@@ -17,6 +17,8 @@ interface LiveCameraBackgroundProps {
   pitchStageActive?: boolean
   /** Hide the idle audio-mode mic UI while the full-screen metronome stage is showing. */
   metronomeStageActive?: boolean
+  /** Hide idle audio UI while a dedicated Audio Mode practice tab is active. */
+  audioPracticeOverlayActive?: boolean
   /** fullscreen = behind HUD; embedded = inside split-view panel */
   variant?: 'fullscreen' | 'embedded'
   /** Keep the preview element mounted but off-screen (split view uses embedded preview). */
@@ -33,11 +35,13 @@ function LiveCameraBackground({
   modePreparing = false,
   pitchStageActive = false,
   metronomeStageActive = false,
+  audioPracticeOverlayActive = false,
   variant = 'fullscreen',
   visuallySuppressed = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
-  const showAudioIdle = isAudioMode && !pitchStageActive && !metronomeStageActive
+  const showAudioIdle =
+    isAudioMode && !pitchStageActive && !metronomeStageActive && !audioPracticeOverlayActive
   const isEmbedded = variant === 'embedded'
   const overlayClass = isEmbedded
     ? 'camera-background-overlay camera-background-overlay--embedded'
@@ -247,6 +251,7 @@ export default memo(
     prev.modePreparing === next.modePreparing &&
     prev.pitchStageActive === next.pitchStageActive &&
     prev.metronomeStageActive === next.metronomeStageActive &&
+    prev.audioPracticeOverlayActive === next.audioPracticeOverlayActive &&
     prev.variant === next.variant &&
     prev.visuallySuppressed === next.visuallySuppressed,
 )

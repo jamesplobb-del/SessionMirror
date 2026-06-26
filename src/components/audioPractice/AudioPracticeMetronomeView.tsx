@@ -6,8 +6,6 @@ import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { triggerLightHaptic, triggerMediumHaptic } from '../../utils/haptics'
 import {
   getBeatsPerBar,
-  loadMetronomePrefs,
-  saveMetronomePrefs,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../../utils/metronomeConfig'
@@ -56,12 +54,6 @@ export default function AudioPracticeMetronomeView() {
   const bpmInputId = useId()
   const prefersReducedMotion = usePrefersReducedMotion()
   const didNormalizeBpmRef = useRef(false)
-  const [soundId, setSoundId] = useState<AudioPracticeClickSoundId>(() => {
-    const stored = loadMetronomePrefs().soundId
-    return AUDIO_PRACTICE_CLICK_SOUNDS.some((sound) => sound.id === stored)
-      ? (stored as AudioPracticeClickSoundId)
-      : 'classic'
-  })
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState('')
   const [pulseNonce, setPulseNonce] = useState(0)
@@ -71,15 +63,21 @@ export default function AudioPracticeMetronomeView() {
     meter,
     subdivision,
     accentFirstBeat,
+    soundId,
     playing,
     beatIndex,
     setBpm,
     setMeter,
     setSubdivision,
     setAccentFirstBeat,
+    setSoundId,
     togglePlay,
     stop,
-  } = useMetronome({ isTakePlaying: false, muteDuringPlayback: false })
+  } = useMetronome({
+    isTakePlaying: false,
+    muteDuringPlayback: false,
+    debugLabel: 'MetronomeTab',
+  })
 
   const setPracticeBpm = useCallback(
     (value: number) => {
@@ -145,13 +143,13 @@ export default function AudioPracticeMetronomeView() {
     [setAccentFirstBeat],
   )
 
-  const handleSoundChange = useCallback((nextSoundId: AudioPracticeClickSoundId) => {
-    if (nextSoundId === soundId) return
-    setSoundId(nextSoundId)
-    const prefs = loadMetronomePrefs()
-    saveMetronomePrefs({ ...prefs, soundId: nextSoundId })
-    // TODO: Route click timbre through sound engine when multiple sounds are supported.
-  }, [soundId])
+  const handleSoundChange = useCallback(
+    (nextSoundId: AudioPracticeClickSoundId) => {
+      if (nextSoundId === soundId) return
+      setSoundId(nextSoundId)
+    },
+    [setSoundId, soundId],
+  )
 
   const adjustBpm = useCallback(
     (delta: number) => {
@@ -186,7 +184,8 @@ export default function AudioPracticeMetronomeView() {
       className="metronome-audio-stage audio-practice-metronome flex min-h-0 flex-1 flex-col overflow-hidden"
       data-practice-mode="metronome-tab"
     >
-      <header className="metronome-audio-stage__hero shrink-0">
+      <div className="audio-practice-metronome__body min-h-0 flex-1">
+        <header className="metronome-audio-stage__hero shrink-0">
         <div className="audio-practice-metronome__bpm-row">
           <PracticeControlButton
             label="Decrease tempo"
@@ -306,8 +305,9 @@ export default function AudioPracticeMetronomeView() {
           </div>
         </div>
       </div>
+      </div>
 
-      <footer className="metronome-audio-stage__controls shrink-0">
+      <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
         <div className="metronome-audio-stage__control-row" role="group" aria-label="Time signature">
           {AUDIO_PRACTICE_METERS.map((value) => (
             <PracticeControlButton
