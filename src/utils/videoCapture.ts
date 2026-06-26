@@ -1,9 +1,18 @@
 import type { RecordingOrientation } from './takeVideoTransform'
+import { isTabletViewport } from './deviceFormFactor'
 
 /**
- * Full field-of-view front camera — no width/height/aspect locks (those crop/zoom on iOS).
+ * Full field-of-view front camera — no width/height/aspect locks (those crop/zoom on iPhone).
  */
 export function getPortraitVideoCaptureConstraints(): MediaTrackConstraints {
+  if (typeof window !== 'undefined' && isTabletViewport()) {
+    return {
+      facingMode: 'user',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    }
+  }
+
   return {
     facingMode: 'user',
   }
@@ -25,6 +34,29 @@ export function getVideoCaptureConstraintsForOrientation(
   return orientation === 'landscape'
     ? getLandscapeVideoCaptureConstraints()
     : getPortraitVideoCaptureConstraints()
+}
+
+/** Soft resolution boost for iPad preview/record when the initial track is low-res. */
+export async function maybeBoostTabletPreviewResolution(
+  stream: MediaStream,
+): Promise<void> {
+  if (!isTabletViewport()) return
+
+  const track = stream.getVideoTracks()[0]
+  if (!track) return
+
+  const { width = 0 } = track.getSettings()
+  if (width >= 1280) return
+
+  try {
+    await track.applyConstraints({
+      facingMode: 'user',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    })
+  } catch {
+    /* keep full field of view if ideals are rejected */
+  }
 }
 
 /** Only re-tune for landscape recording — never touch portrait (avoids iOS zoom/crop). */

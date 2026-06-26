@@ -1,7 +1,8 @@
 import {
+  finalizeTakePlaybackCleanup,
   playTakeMediaFromUserGesture,
-  releaseTakePlaybackAudio,
 } from './takePlaybackAudio'
+import { stabilizeViewportAfterMediaInteraction } from './viewportSync'
 
 export interface InlineTakePlaybackCallbacks {
   onPlaying?: () => void
@@ -28,8 +29,8 @@ export function toggleInlineTakePlayback(
   }
 
   media.pause()
-  if ('muted' in media) media.muted = true
-  void releaseTakePlaybackAudio()
+  void finalizeTakePlaybackCleanup()
+  stabilizeViewportAfterMediaInteraction()
   callbacks.onPaused?.()
   return true
 }

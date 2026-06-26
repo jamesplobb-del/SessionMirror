@@ -168,6 +168,7 @@ export default function SettingsBranchWheel({
         <>
           <motion.button
             type="button"
+            data-tutorial="branch-backdrop"
             className="settings-branch-backdrop fixed inset-0 z-[200] cursor-default touch-none bg-black/45"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -200,6 +201,13 @@ export default function SettingsBranchWheel({
               {branchItems.map((item, index) => {
                 const { x, y } = positions[index] ?? { x: 0, y: -88 }
 
+                const tutorialTarget =
+                  item.id === 'pitch-analysis'
+                    ? 'branch-pitch'
+                    : item.id === 'metronome'
+                      ? 'branch-metronome'
+                      : undefined
+
                 return (
                   <div
                     key={item.id}
@@ -214,6 +222,7 @@ export default function SettingsBranchWheel({
                     <motion.button
                       type="button"
                       role="menuitem"
+                      {...(tutorialTarget ? { 'data-tutorial': tutorialTarget } : {})}
                       className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${NATIVE_SQUISH} ${
                         item.active ? 'settings-branch-wheel__item--active' : ''
                       }`}
@@ -230,7 +239,7 @@ export default function SettingsBranchWheel({
                       }}
                     >
                       <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
-                        <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md">
+                        <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full bg-black/55">
                           {item.icon === 'pitch' ? (
                             <AudioLines className="h-5 w-5" strokeWidth={2.1} />
                           ) : item.icon === 'take-cards' ? (

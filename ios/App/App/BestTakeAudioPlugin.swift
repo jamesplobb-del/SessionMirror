@@ -1,4 +1,4 @@
-import AVFoundation
+﻿import AVFoundation
 import Capacitor
 
 @objc(BestTakeAudioPlugin)
@@ -7,12 +7,30 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "BestTakeAudioPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "setHighQualityBluetoothMode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setDeviceMicForRecording", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setBluetoothHeadphonePlaybackMode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reapplyHeadphonePlaybackRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "enableStereoPlayback", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "enableRecordingRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPlaybackOutputProfile", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startNativePlaybackTest", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNativePlaybackTest", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "prepareCameraLikePlaybackSession", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setCameraSessionState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getCameraSessionState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setPlaybackRouteActive", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "restoreRecordingRouteAfterPlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startNativeCameraRecording", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNativeCameraRecording", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
     ]
 
+    private let nativeCameraEngine = NativeCameraRecordingEngine.shared
     private var routeObserver: NSObjectProtocol?
+    private var nativeTestPlayer: AVPlayer?
+    private var nativeTestEndObserver: NSObjectProtocol?
+    private var playbackRouteRestorePending = false
 
     override public func load() {
         super.load()
@@ -21,7 +39,6 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             object: AVAudioSession.sharedInstance(),
             queue: .main
         ) { [weak self] _ in
-            AudioRouteConfigurator.maintainHighQualityInputIfNeeded()
             AudioRouteConfigurator.logRoute("route-change event")
             guard let self = self else { return }
             self.notifyListeners("audioRouteChanged", data: AudioRouteConfigurator.routeSnapshot())
@@ -29,6 +46,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     deinit {
+        stopNativePlaybackTestPlayer()
         if let routeObserver = routeObserver {
             NotificationCenter.default.removeObserver(routeObserver)
         }
@@ -36,6 +54,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setHighQualityBluetoothMode(_ call: CAPPluginCall) {
         let enableHQ = call.getBool("enable") ?? false
+
+        if CameraSessionGuard.shouldBlockRouteChanges() {
+            CameraSessionGuard.skipRouteChangeLog()
+            call.resolve(AudioRouteConfigurator.routeSnapshot())
+            return
+        }
 
         do {
             try AudioRouteConfigurator.applyRecordingRoute(enableHQ: enableHQ)
@@ -48,36 +72,107 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func setDeviceMicForRecording(_ call: CAPPluginCall) {
+        let enable = call.getBool("enable") ?? false
+
+        if CameraSessionGuard.shouldBlockDeviceMicChanges() {
+            CameraSessionGuard.skipDeviceMicLog()
+            call.resolve(AudioRouteConfigurator.routeSnapshot())
+            return
+        }
+
+        if CameraSessionGuard.shouldBlockRouteChanges() {
+            CameraSessionGuard.skipRouteChangeLog()
+            call.resolve(AudioRouteConfigurator.routeSnapshot())
+            return
+        }
+
+        do {
+            try AudioRouteConfigurator.setPreferredBuiltInMic(enable)
+            var result = AudioRouteConfigurator.routeSnapshot()
+            result["success"] = true
+            call.resolve(result)
+        } catch {
+            print("BestTake Audio Error: \(error.localizedDescription)")
+            call.reject("Device mic routing failed: \(error.localizedDescription)")
+        }
+    }
+
+    @objc func setBluetoothHeadphonePlaybackMode(_ call: CAPPluginCall) {
+        let enable = call.getBool("enable") ?? false
+        let applyRoute = call.getBool("applyRoute") ?? false
+
+        do {
+            try AudioRouteConfigurator.setHeadphonePlaybackMode(enable, applyRoute: applyRoute)
+            var result = AudioRouteConfigurator.routeSnapshot()
+            result["success"] = true
+            call.resolve(result)
+        } catch {
+            print("BestTake Audio Error: \(error.localizedDescription)")
+            call.reject("Headphone playback mode routing failed: \(error.localizedDescription)")
+        }
+    }
+
+    @objc func reapplyHeadphonePlaybackRoute(_ call: CAPPluginCall) {
+        guard AudioRouteConfigurator.isHeadphonePlaybackModeEnabled() else {
+            call.resolve(AudioRouteConfigurator.routeSnapshot())
+            return
+        }
+
+        do {
+            try AudioRouteConfigurator.applyHeadphonePlaybackRoute()
+            var result = AudioRouteConfigurator.routeSnapshot()
+            result["success"] = true
+            call.resolve(result)
+        } catch {
+            print("BestTake Audio Error: \(error.localizedDescription)")
+            call.reject("Headphone playback route reapply failed: \(error.localizedDescription)")
+        }
+    }
+
     @objc func enableStereoPlayback(_ call: CAPPluginCall) {
-        if AudioRouteConfigurator.isHighQualityModeEnabled() {
-            do {
-                try AudioRouteConfigurator.applyRecordingRoute(enableHQ: true)
-                call.resolve()
-            } catch {
-                call.reject("Failed to maintain HQ recording route", error.localizedDescription)
-            }
+        if CameraSessionGuard.shouldBlockRouteChanges() {
+            CameraSessionGuard.skipRouteChangeLog()
+            call.resolve()
             return
         }
 
         let session = AVAudioSession.sharedInstance()
+        let outputPort = session.currentRoute.outputs.first?.portType ?? .builtInSpeaker
+
+        // Built-in speaker: keep playAndRecord + defaultToSpeaker (Web Audio uses current route).
+        let builtInSpeakerOutputs: Set<AVAudioSession.Port> = [.builtInSpeaker, .builtInReceiver]
+        if builtInSpeakerOutputs.contains(outputPort) {
+            AudioRouteConfigurator.logRoute("stereo playback skipped (built-in speaker)")
+            call.resolve()
+            return
+        }
+
         do {
+            // .allowBluetoothA2DP is invalid with .playback (OSStatus -50). External outputs only.
             try session.setCategory(
                 .playback,
-                mode: .moviePlayback,
-                options: [.allowBluetoothA2DP, .allowAirPlay, .mixWithOthers]
+                mode: .default,
+                options: [.mixWithOthers, .allowAirPlay]
             )
             try session.setActive(true, options: [])
-            AudioRouteConfigurator.logRoute("stereo playback")
+            AudioRouteConfigurator.logRoute("stereo playback (external output)")
             call.resolve()
         } catch {
-            call.reject("Failed to set stereo playback", error.localizedDescription)
+            call.reject("Failed to set stereo playback", nil, error)
         }
     }
 
     @objc func enableRecordingRoute(_ call: CAPPluginCall) {
+        if CameraSessionGuard.shouldBlockRouteChanges() {
+            CameraSessionGuard.skipRouteChangeLog()
+            call.resolve()
+            return
+        }
+
         do {
             try AudioRouteConfigurator.applyRecordingRoute(
-                enableHQ: AudioRouteConfigurator.isHighQualityModeEnabled()
+                enableHQ: AudioRouteConfigurator.shouldUseHighQualityRoute()
             )
             call.resolve()
         } catch {
@@ -100,5 +195,253 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         result["usesHeadphones"] = headphonePorts.contains(outputPort)
         result["portType"] = outputPort
         call.resolve(result)
+    }
+
+    // MARK: - Native playback A/B test (AVPlayer — bypasses WKWebView / Web Audio)
+
+    private func stopNativePlaybackTestPlayer() {
+        if let nativeTestEndObserver = nativeTestEndObserver {
+            NotificationCenter.default.removeObserver(nativeTestEndObserver)
+            self.nativeTestEndObserver = nil
+        }
+        nativeTestPlayer?.pause()
+        nativeTestPlayer = nil
+    }
+
+    private func applyCameraLikePlaybackSessionOrReject(_ call: CAPPluginCall) -> Bool {
+        do {
+            _ = try NativeCameraTestAudio.prepareCameraLikePlaybackSession()
+            return true
+        } catch {
+            if CameraSessionGuard.shouldBlockRouteChanges() {
+                CameraSessionGuard.skipRouteChangeLog()
+            }
+            call.reject("Failed to configure camera-like playback session", nil, error)
+            return false
+        }
+    }
+
+    private func finishPlaybackRouteIfNeeded() {
+        guard playbackRouteRestorePending else { return }
+        playbackRouteRestorePending = false
+        CameraSessionGuard.setPlaybackRouteActive(false)
+
+        print("[PlaybackRoute] playback ended")
+        print("[PlaybackRoute] restoring camera session")
+
+        do {
+            try AudioRouteConfigurator.applyRecordingRoute(
+                enableHQ: AudioRouteConfigurator.shouldUseHighQualityRoute()
+            )
+        } catch {
+            print("[PlaybackRoute] failed to restore recording route: \(error.localizedDescription)")
+        }
+
+        notifyListeners("playbackRouteEnded", data: [:])
+    }
+
+    @objc func setCameraSessionState(_ call: CAPPluginCall) {
+        let previewActive = call.getBool("previewActive") ?? false
+        let recordingActive = call.getBool("recordingActive") ?? false
+
+        if CameraSessionGuard.playbackRouteActive {
+            if previewActive || recordingActive {
+                call.resolve(CameraSessionGuard.snapshot())
+                return
+            }
+            CameraSessionGuard.setPreviewActive(false)
+            CameraSessionGuard.setRecordingActive(false)
+            call.resolve(CameraSessionGuard.snapshot())
+            return
+        }
+
+        CameraSessionGuard.setPreviewActive(previewActive)
+        CameraSessionGuard.setRecordingActive(recordingActive)
+        call.resolve(CameraSessionGuard.snapshot())
+    }
+
+    @objc func getCameraSessionState(_ call: CAPPluginCall) {
+        call.resolve(CameraSessionGuard.snapshot())
+    }
+
+    @objc func setPlaybackRouteActive(_ call: CAPPluginCall) {
+        let active = call.getBool("active") ?? false
+        CameraSessionGuard.setPlaybackRouteActive(active)
+        call.resolve(CameraSessionGuard.snapshot())
+    }
+
+    @objc func restoreRecordingRouteAfterPlayback(_ call: CAPPluginCall) {
+        if playbackRouteRestorePending {
+            finishPlaybackRouteIfNeeded()
+        } else {
+            print("[PlaybackRoute] playback ended")
+            print("[PlaybackRoute] restoring camera session")
+            do {
+                try AudioRouteConfigurator.applyRecordingRoute(
+                    enableHQ: AudioRouteConfigurator.shouldUseHighQualityRoute()
+                )
+            } catch {
+                print("[PlaybackRoute] failed to restore recording route: \(error.localizedDescription)")
+            }
+        }
+        call.resolve(AudioRouteConfigurator.routeSnapshot())
+    }
+
+    @objc func prepareCameraLikePlaybackSession(_ call: CAPPluginCall) {
+        let allowWithActivePreview = call.getBool("allowWithActivePreview") ?? false
+        do {
+            let result = try NativeCameraTestAudio.prepareCameraLikePlaybackSession(
+                allowWithActivePreview: allowWithActivePreview
+            )
+            call.resolve(result)
+        } catch {
+            call.reject("Failed to prepare camera-like playback session", nil, error)
+        }
+    }
+
+    private func resolvePluginFileURL(from call: CAPPluginCall) -> URL? {
+        guard let urlString = call.getString("url"), !urlString.isEmpty else {
+            call.reject("url required")
+            return nil
+        }
+
+        if urlString.hasPrefix("file://") {
+            guard let parsed = URL(string: urlString) else {
+                call.reject("invalid file url")
+                return nil
+            }
+            return parsed
+        }
+
+        return URL(fileURLWithPath: urlString)
+    }
+
+    private func startNativeAVPlayerPlayback(
+        fileURL: URL,
+        call: CAPPluginCall,
+        logLabel: String,
+        postProcess: Bool = false
+    ) {
+        if !CameraSessionGuard.playbackSessionPrepared {
+            guard applyCameraLikePlaybackSessionOrReject(call) else { return }
+        }
+
+        let session = AVAudioSession.sharedInstance()
+        let item = AVPlayerItem(url: fileURL)
+        let player = AVPlayer(playerItem: item)
+        player.volume = 1.0
+
+        let routeSnapshot = AudioRouteConfigurator.routeSnapshot(for: session)
+        let route = routeSnapshot["outputPort"] as? String ?? "unknown"
+        let systemVolume = session.outputVolume
+        let durationSeconds = CMTimeGetSeconds(item.asset.duration)
+        let safeDuration = durationSeconds.isFinite && durationSeconds > 0 ? durationSeconds : 0
+
+        print("[\(logLabel)] started")
+        print("[PlaybackRoute] playback started")
+        print("[\(logLabel)] fileURL = \(fileURL.absoluteString)")
+        print("[\(logLabel)] duration = \(safeDuration)")
+        print("[\(logLabel)] route = \(route)")
+        print("[\(logLabel)] systemVolume = \(systemVolume)")
+        print("[\(logLabel)] playerVolume = \(player.volume)")
+
+        playbackRouteRestorePending = true
+        nativeTestPlayer = player
+        nativeTestEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            print("[\(logLabel)] finished")
+            self.stopNativePlaybackTestPlayer()
+            self.finishPlaybackRouteIfNeeded()
+        }
+
+        player.play()
+
+        var payload: [String: Any] = [
+            "fileURL": fileURL.absoluteString,
+            "duration": safeDuration,
+            "route": route,
+            "systemVolume": systemVolume,
+            "playerVolume": player.volume,
+        ]
+        if postProcess {
+            payload["postProcess"] = true
+        }
+        call.resolve(payload)
+    }
+
+    @objc func startNativePlaybackTest(_ call: CAPPluginCall) {
+        guard let fileURL = resolvePluginFileURL(from: call) else { return }
+        stopNativePlaybackTestPlayer()
+        startNativeAVPlayerPlayback(fileURL: fileURL, call: call, logLabel: "NativePlaybackTest")
+    }
+
+    @objc func stopNativePlaybackTest(_ call: CAPPluginCall) {
+        let wasPlaying = nativeTestPlayer != nil
+        stopNativePlaybackTestPlayer()
+        if wasPlaying {
+            finishPlaybackRouteIfNeeded()
+            print("[NativePlaybackTest] stopped")
+        }
+        call.resolve()
+    }
+
+    // MARK: - Native camera recording A/B test (AVCaptureSession — bypasses WKWebView)
+
+    @objc func startNativeCameraRecording(_ call: CAPPluginCall) {
+        let useFrontCamera = call.getBool("useFrontCamera") ?? true
+        let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
+
+        nativeCameraEngine.start(
+            useFrontCamera: useFrontCamera,
+            audioSessionProfile: profile,
+            completion: { result in
+                switch result {
+                case .success(let payload):
+                    call.resolve(payload)
+                case .failure(let error):
+                    call.reject("Native camera recording failed", nil, error)
+                }
+            }
+        )
+    }
+
+    @objc func stopNativeCameraRecording(_ call: CAPPluginCall) {
+        nativeCameraEngine.stop(completion: { result in
+            switch result {
+            case .success(let payload):
+                call.resolve(payload)
+            case .failure(let error):
+                call.reject("Native camera stop failed", nil, error)
+            }
+        })
+    }
+
+    @objc func playNativeCameraTestPostProcess(_ call: CAPPluginCall) {
+        guard let fileURL = resolvePluginFileURL(from: call) else { return }
+
+        print("[NativeCameraTest] playNativeCameraTestPostProcess")
+        print("[NativeCameraTest] fileURL = \(fileURL.absoluteString)")
+
+        stopNativePlaybackTestPlayer()
+        startNativeAVPlayerPlayback(
+            fileURL: fileURL,
+            call: call,
+            logLabel: "NativeCameraTest",
+            postProcess: true
+        )
+    }
+
+    @objc func stopNativeCameraTestPostProcess(_ call: CAPPluginCall) {
+        let wasPlaying = nativeTestPlayer != nil
+        stopNativePlaybackTestPlayer()
+        if wasPlaying {
+            finishPlaybackRouteIfNeeded()
+            print("[NativeCameraTest] post-process playback stopped")
+        }
+        call.resolve()
     }
 }

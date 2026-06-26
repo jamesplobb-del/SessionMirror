@@ -9,7 +9,7 @@ import {
   type PointerEvent,
   type RefObject,
 } from 'react'
-import { Maximize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
+import { Maximize2, Minimize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import Pressable from './ui/Pressable'
@@ -26,13 +26,32 @@ import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { useTutorialAction } from '../context/TutorialContext'
 import type { Take } from '../types'
+import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
+import { HUD_SOLID_FLOAT_BADGE, HUD_SOLID_PIP_PLAY_ICON } from '../utils/interactiveUx'
+import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
+import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 
-const UPLOAD_BADGE_BTN =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-black/60'
+const UPLOAD_BADGE_BTN = HUD_SOLID_FLOAT_BADGE
 
 const emptyActionClass =
-  'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition hover:bg-white/10'
+  'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition-opacity duration-200 ease-out hover:bg-white/10'
+
+function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
+  return (
+    <div className="absolute inset-0 h-full w-full bg-black" aria-hidden>
+      {posterUrl ? (
+        <img
+          src={posterUrl}
+          alt=""
+          className="pointer-events-none h-full w-full object-cover"
+          draggable={false}
+          decoding="async"
+        />
+      ) : null}
+    </div>
+  )
+}
 
 export interface BestTakeBoxProps {
   layout: 'pip' | 'fill'
@@ -101,11 +120,14 @@ function BestTakeBox({
     if (!hasYoutube || !youtubeIframeRef?.current) return
 
     maintainYoutubeProxyLoudness(youtubeIframeRef.current, 1)
-    const interval = window.setInterval(() => {
-      maintainYoutubeProxyLoudness(youtubeIframeRef.current, 1)
-    }, 150)
 
-    return () => window.clearInterval(interval)
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      maintainYoutubeProxyLoudness(youtubeIframeRef.current, 1)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [hasYoutube, youtubeEmbedUrl, youtubeIframeRef])
 
   useEffect(() => {
@@ -144,11 +166,26 @@ function BestTakeBox({
     setIsPlaying(false)
   }, [hasTake, suspendPlayback, videoRef, videoSourceKey])
 
+  const posterUrl =
+    take?.thumbnailUrl ?? (take?.mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : null)
+  const { decoderActive, pendingPlayRef, requestDecoderForPlay } = usePipInlineDecoder({
+    suspendPlayback,
+    isAutoPlayArmed: false,
+    isPlaying,
+    videoSourceKey,
+  })
+
   const handlePlayPauseClick = useCallback(
     (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback || !hasTake) return
+
+      if (!decoderActive) {
+        requestDecoderForPlay()
+        return
+      }
+
       const video = videoRef.current
       if (!video) return
 
@@ -171,8 +208,37 @@ function BestTakeBox({
         })
       }
     },
-    [hasTake, suspendPlayback, videoRef],
+    [decoderActive, hasTake, requestDecoderForPlay, suspendPlayback, videoRef],
   )
+
+  useEffect(() => {
+    if (!decoderActive || !pendingPlayRef.current || suspendPlayback || !hasTake) return
+
+    let cancelled = false
+    void (async () => {
+      const media = videoRef.current
+      if (!media) return
+
+      const ready = await waitForMediaReadyWithRetry(media)
+      if (cancelled || !pendingPlayRef.current) return
+      pendingPlayRef.current = false
+      if (!ready) return
+
+      setIsPlaying(true)
+      toggleInlineTakePlayback(media, {
+        onPlaying: () => setIsPlaying(true),
+        onFailure: () => {
+          setIsPlaying(false)
+          void releaseTakePlaybackAudio()
+        },
+        onPaused: () => setIsPlaying(false),
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [decoderActive, hasTake, pendingPlayRef, suspendPlayback, videoRef, videoSourceKey])
 
   const handleVolume = useCallback(
     (value: number) => {
@@ -201,8 +267,7 @@ function BestTakeBox({
 
   const pipTouchTargetClass =
     'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
-  const pipTouchIconClass =
-    'flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70'
+  const pipTouchIconClass = HUD_SOLID_PIP_PLAY_ICON
 
   const playbackFit =
     isFill && take?.recordingOrientation === 'landscape' ? 'contain' : 'cover'
@@ -217,7 +282,7 @@ function BestTakeBox({
     ? `group relative z-0 h-full w-full overflow-hidden bg-black/95 ring-1 ring-amber-400/50 ${
         hasReference ? 'opacity-100' : 'opacity-90'
       }`
-    : `group relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    : `group relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-opacity duration-200 ease-in ${
         hasReference ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'}`
 
@@ -229,8 +294,11 @@ function BestTakeBox({
     if (!hasReference) return null
 
     return (
-      <button
+      <Pressable
         type="button"
+        intensity="icon"
+        squish={false}
+        haptic="light"
         onPointerDown={stopEventBubble}
         onTouchStart={stopEventBubble}
         onTouchEnd={stopEventBubble}
@@ -243,14 +311,14 @@ function BestTakeBox({
         aria-label={hasYoutube ? 'Clear YouTube reference' : 'Unload Best Take'}
       >
         <X className="h-3 w-3" />
-      </button>
+      </Pressable>
     )
   }
 
-  const renderExpandButton = () => {
-    if (!onToggleSplitView || splitViewActive) return null
+  const renderSplitViewToggle = () => {
+    if (!onToggleSplitView) return null
 
-    const expandPosition = hasReference
+    const togglePosition = hasReference
       ? { bottom: chromeInset, right: chromeInset }
       : { top: chromeInset, right: chromeInset }
 
@@ -258,6 +326,7 @@ function BestTakeBox({
       <Pressable
         type="button"
         intensity="icon"
+        squish={false}
         haptic="light"
         {...(!splitViewActive ? { 'data-tutorial': 'best-take-expand' } : {})}
         onPointerDown={stopEventBubble}
@@ -268,10 +337,14 @@ function BestTakeBox({
           onToggleSplitView()
         }}
         className={UPLOAD_BADGE_BTN}
-        style={expandPosition}
-        aria-label="Open split view layout"
+        style={togglePosition}
+        aria-label={splitViewActive ? 'Return to normal view' : 'Open split view layout'}
       >
-        <Maximize2 className="h-3 w-3 stroke-[2]" aria-hidden />
+        {splitViewActive ? (
+          <Minimize2 className="h-3 w-3 stroke-[2]" aria-hidden />
+        ) : (
+          <Maximize2 className="h-3 w-3 stroke-[2]" aria-hidden />
+        )}
       </Pressable>
     )
   }
@@ -309,27 +382,34 @@ function BestTakeBox({
             />
           ) : hasTake ? (
             <>
-              <TakeVideoPlayer
-                filePath={take!.filePath}
-                videoUrl={src ?? ''}
-                mimeType={
-                  take!.videoMimeType ??
-                  (take!.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-                }
-                videoRef={videoRef}
-                videoSourceKey={videoSourceKey}
-                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                loadingClassName="absolute inset-0 h-full w-full bg-black"
-                mirror={take!.mirrorPlayback !== false}
-                recordingOrientation={take!.recordingOrientation}
-                fit={playbackFit}
-                manualPlayOnly
-                audible={playbackAudible}
-              />
+              {decoderActive ? (
+                <TakeVideoPlayer
+                  filePath={take!.filePath}
+                  videoUrl={src ?? ''}
+                  mimeType={
+                    take!.videoMimeType ??
+                    (take!.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+                  }
+                  videoRef={videoRef}
+                  videoSourceKey={videoSourceKey}
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                  loadingClassName="absolute inset-0 h-full w-full bg-black"
+                  mirror={take!.mirrorPlayback !== false}
+                  recordingOrientation={take!.recordingOrientation}
+                  fit={playbackFit}
+                  manualPlayOnly
+                  audible={playbackAudible}
+                />
+              ) : (
+                <PipMediaPoster posterUrl={posterUrl} />
+              )}
 
               {onExpand && (
-                <button
+                <Pressable
                   type="button"
+                  intensity="soft"
+                  squish={false}
+                  haptic="light"
                   className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
                   onClick={onExpand}
                   aria-label="Open Best Take in full screen"
@@ -338,8 +418,11 @@ function BestTakeBox({
 
               <div className="absolute inset-0 z-[5] pointer-events-none">
                 {!suspendPlayback && (
-                  <button
+                  <Pressable
                     type="button"
+                    intensity="icon"
+                    squish={false}
+                    haptic="light"
                     onPointerDown={stopEventBubble}
                     onTouchStart={stopEventBubble}
                     onTouchEnd={stopEventBubble}
@@ -354,13 +437,13 @@ function BestTakeBox({
                         <Play className="h-3 w-3 fill-white" />
                       )}
                     </span>
-                  </button>
+                  </Pressable>
                 )}
               </div>
 
               {!suspendPlayback && (
                 <div
-                  className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
+                  className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/70 px-2 py-1 transition-transform duration-200 group-hover:translate-y-0"
                   onClick={(e) => e.stopPropagation()}
                   {...touchBubbleBlockProps()}
                 >
@@ -387,8 +470,10 @@ function BestTakeBox({
                     Upload
                   </label>
                 )}
-                <button
+                <Pressable
                   type="button"
+                  intensity="soft"
+                  haptic="light"
                   data-tutorial="best-take-youtube"
                   onPointerDown={stopEventBubble}
                   onTouchStart={stopEventBubble}
@@ -402,13 +487,13 @@ function BestTakeBox({
                 >
                   <Youtube className="h-3 w-3 text-red-500" />
                   YouTube
-                </button>
+                </Pressable>
               </div>
             </div>
           )}
 
           {renderClearButton()}
-          {renderExpandButton()}
+          {renderSplitViewToggle()}
 
           {showUploadBadge && (
             <label

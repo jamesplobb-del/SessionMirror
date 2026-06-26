@@ -1,9 +1,11 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronUp, Clapperboard, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
 import StarRating from './StarRating'
-import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
+import Pressable from './ui/Pressable'
+import { useActionSheet } from '../context/ActionSheetContext'
+import { triggerLightHaptic } from '../utils/haptics'
 import type { Take, TakeUpdate } from '../types'
-import { pinButtonBubbleProps } from '../utils/eventBubbling'
+import TakeCardThumbnailSkeleton from './ui/TakeCardThumbnailSkeleton'
 
 function TakeCardThumbnailPlaceholder() {
   return (
@@ -46,6 +48,7 @@ function TakeCard({
   onToggleSelect,
   exportBusy = false,
 }: TakeCardProps) {
+  const { showConfirm } = useActionSheet()
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(take.name)
   const [notesExpanded, setNotesExpanded] = useState(false)
@@ -159,6 +162,7 @@ function TakeCard({
         : 'border-stone-200'
 
   const showThumbnailImage = Boolean(take.thumbnailUrl) && !thumbnailBroken
+  const showThumbnailSkeleton = !take.thumbnailUrl && !thumbnailBroken
 
   return (
     <div
@@ -194,7 +198,11 @@ function TakeCard({
             className={`${thumbActivateProps.className} overflow-hidden`}
             aria-label={thumbAriaLabel}
           >
-            <TakeCardThumbnailPlaceholder />
+            {showThumbnailSkeleton ? (
+              <TakeCardThumbnailSkeleton />
+            ) : (
+              <TakeCardThumbnailPlaceholder />
+            )}
           </div>
         )}
         {selectionMode && (
@@ -224,23 +232,29 @@ function TakeCard({
           </div>
         )}
         {!selectionMode && (
-          <button
+          <Pressable
             type="button"
+            intensity="icon"
+            haptic="light"
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchEnd={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
-              triggerMediumHaptic()
-              if (window.confirm(`Delete "${take.name}"? This cannot be undone.`)) {
-                onDelete()
-              }
+              void (async () => {
+                const confirmed = await showConfirm({
+                  message: `Delete "${take.name}"? This cannot be undone.`,
+                  destructive: true,
+                  confirmLabel: 'Delete',
+                })
+                if (confirmed) onDelete()
+              })()
             }}
-            className={`interactive-native absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500`}
+            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 shadow-sm backdrop-blur-sm hover:border-red-200 hover:bg-red-50 hover:text-red-500"
             aria-label={`Delete ${take.name}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Pressable>
         )}
       </div>
 
@@ -263,14 +277,16 @@ function TakeCard({
               className="w-full rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-sm font-medium text-stone-900 outline-none ring-sky-400 focus:ring-2"
             />
           ) : (
-            <button
+            <Pressable
               type="button"
+              intensity="soft"
+              haptic="light"
               onClick={() => setIsEditingName(true)}
-              className="w-full truncate text-left text-sm font-semibold text-stone-900 transition hover:text-sky-600"
+              className="w-full truncate text-left text-sm font-semibold text-stone-900 hover:text-sky-600"
               title="Click to rename"
             >
               {take.name}
-            </button>
+            </Pressable>
           )}
           <p className="mt-0.5 text-[11px] text-stone-400">
             {new Date(take.timestamp).toLocaleString([], {
@@ -285,10 +301,12 @@ function TakeCard({
         <StarRating rating={take.rating} onChange={(rating) => onUpdate({ rating })} />
 
         <div>
-          <button
+          <Pressable
             type="button"
+            intensity="soft"
+            haptic="light"
             onClick={() => setNotesExpanded((prev) => !prev)}
-            className="flex w-full items-center gap-1.5 text-xs font-medium text-stone-500 transition hover:text-stone-700"
+            className="flex w-full items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-stone-700"
           >
             <StickyNote className="h-3.5 w-3.5" />
             Notes
@@ -297,7 +315,7 @@ function TakeCard({
             ) : (
               <ChevronDown className="ml-auto h-3.5 w-3.5" />
             )}
-          </button>
+          </Pressable>
           {notesExpanded && (
             <textarea
               value={notesDraft}
@@ -322,17 +340,18 @@ function TakeCard({
         <div className="flex flex-col gap-2">
           {!selectionMode && (
             <>
-              <button
+              <Pressable
                 type="button"
+                intensity="soft"
+                haptic="medium"
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation()
-                  triggerLightHaptic()
                   onPinBenchmark()
                 }}
-                className={`interactive-native flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium ${
                   isBenchmark
                     ? 'border-amber-300 bg-amber-100 text-amber-800'
                     : 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100'
@@ -340,18 +359,19 @@ function TakeCard({
               >
                 <Pin className="h-3.5 w-3.5" />
                 Set BestTake
-              </button>
-              <button
+              </Pressable>
+              <Pressable
                 type="button"
+                intensity="soft"
+                haptic="medium"
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation()
-                  triggerLightHaptic()
                   onPinChallenger()
                 }}
-                className={`interactive-native flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium ${
                   isChallenger
                     ? 'border-sky-300 bg-sky-100 text-sky-800'
                     : 'border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100'
@@ -359,23 +379,26 @@ function TakeCard({
               >
                 <Pin className="h-3.5 w-3.5" />
                 Load Take
-              </button>
+              </Pressable>
               {onExport && (
-                <button
+                <Pressable
                   type="button"
+                  intensity="soft"
+                  haptic="medium"
                   disabled={exportBusy}
-                  {...pinButtonBubbleProps()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation()
-                    triggerMediumHaptic()
                     onExport()
                   }}
-                  className="interactive-native flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
+                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
                   aria-label={`Save ${take.name} to Photos`}
                 >
                   <Download className="h-3.5 w-3.5" />
                   {exportBusy ? 'Saving…' : 'Save Video'}
-                </button>
+                </Pressable>
               )}
             </>
           )}

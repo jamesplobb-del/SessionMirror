@@ -1,14 +1,18 @@
+import { logPlaybackGainAuditOnStart } from './playbackGainAudit'
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import {
   prepareInlineMediaElement,
   safePlayMutedMedia,
   type PlaybackAttemptOptions,
 } from './mediaPlayback'
-import { logPlaybackStartRouteDiagnostics } from './playbackRouteDiagnostics'
 import { resumePlaybackAudioContext } from './playbackAudioContext'
-import { isBluetoothHeadphonePlaybackModeEnabled } from './audioOutputProfile'
-import { runBluetoothPlaybackActivation } from './bluetoothPlaybackActivation'
-import { enableIosRecordingRoute, enableIosStereoPlaybackRoute } from './iosPlaybackRoute'
+import { engageStereoPlayback, releaseStereoPlayback } from './stereoPlaybackRoute'
+import {
+  attachPlaybackRouteEndedListener,
+  completePlaybackRouteRestore,
+  preparePlaybackRoute,
+} from './playbackRouteCoordinator'
+import { stabilizeViewportAfterMediaInteraction } from './viewportSync'
 import {
   hasTakePlaybackSpeakerRoute,
   routeTakePlaybackToSpeaker,
@@ -31,28 +35,25 @@ export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
 }
 
-async function primeTakePlayback(
+let takePlaybackStereoHeld = false
+
+function primeTakePlayback(
   media: Array<HTMLMediaElement | null | undefined>,
   allowNativeDirect: boolean,
-): Promise<void> {
+): void {
   const elements = media.filter(
     (element): element is HTMLMediaElement => !!element,
   )
   if (elements.length === 0) return
 
-  if (isBluetoothHeadphonePlaybackModeEnabled()) {
-    await runBluetoothPlaybackActivation({
-      media: elements[0],
-      userVolume: elements[0]?.volume || 1,
-      attemptPlay: false,
-    })
-  } else {
-    await enableIosStereoPlaybackRoute()
+  if (!takePlaybackStereoHeld) {
+    takePlaybackStereoHeld = true
+    engageStereoPlayback()
   }
 
   for (const element of elements) {
     prepareInlineMediaElement(element)
-    await routeTakePlaybackToSpeaker(element, element.volume || 1, false, {
+    routeTakePlaybackToSpeaker(element, element.volume || 1, false, {
       allowNativeDirect,
     })
   }
@@ -67,50 +68,41 @@ async function primeTakePlayback(
   }
 
   if (elements.some((element) => hasTakePlaybackSpeakerRoute(element))) {
-    await resumePlaybackAudioContext()
+    void resumePlaybackAudioContext()
   }
 }
 
-async function playMediaWithOptionalBluetoothActivation(
-  media: HTMLMediaElement,
-  userVolume = media.volume || 1,
-): Promise<boolean> {
-  if (isBluetoothHeadphonePlaybackModeEnabled()) {
-    return runBluetoothPlaybackActivation({
-      media,
-      userVolume,
-      attemptPlay: true,
-    })
-  }
-
-  await media.play()
-  return true
-}
-
-export async function primeTakePlaybackForUserGesture(
+export function primeTakePlaybackForUserGesture(
   ...media: Array<HTMLMediaElement | null | undefined>
-): Promise<void> {
+): void {
   const count = media.filter(Boolean).length
-  await primeTakePlayback(media, count === 1)
+  primeTakePlayback(media, count === 1)
 }
 
 export async function primeTakePlaybackAudio(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): Promise<void> {
-  await primeTakePlaybackForUserGesture(...media)
+  primeTakePlaybackForUserGesture(...media)
   await resumePlaybackAudioContext()
 }
 
 export function primeTakePlaybackAudioSync(
   ...media: Array<HTMLMediaElement | null | undefined>
 ): void {
-  void primeTakePlaybackForUserGesture(...media)
+  primeTakePlaybackForUserGesture(...media)
 }
 
 export async function releaseTakePlaybackAudio(): Promise<void> {
-  if (!isBluetoothHeadphonePlaybackModeEnabled()) {
-    await enableIosRecordingRoute()
-  }
+  if (!takePlaybackStereoHeld) return
+  takePlaybackStereoHeld = false
+  await releaseStereoPlayback()
+  stabilizeViewportAfterMediaInteraction()
+}
+
+/** End take playback — restore native route first, then release Web Audio stereo hold. */
+export async function finalizeTakePlaybackCleanup(): Promise<void> {
+  await completePlaybackRouteRestore()
+  await releaseTakePlaybackAudio()
 }
 
 export interface UserGesturePlaybackCallbacks {
@@ -118,28 +110,56 @@ export interface UserGesturePlaybackCallbacks {
   onFailure?: (error: unknown) => void
 }
 
+function prepareMediaForAudiblePlayback(media: HTMLMediaElement): void {
+  prepareInlineMediaElement(media)
+  media.muted = false
+  media.volume = 1
+
+  if (
+    media.readyState < HTMLMediaElement.HAVE_METADATA &&
+    (media.src || media.currentSrc)
+  ) {
+    try {
+      media.load()
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Defer one frame so routing/gain is wired after play() resolves. */
+function reportTakePlaybackStarted(media: HTMLMediaElement): void {
+  window.requestAnimationFrame(() => {
+    logPlaybackGainAuditOnStart(media)
+  })
+}
+
+/** Wire Web Audio gain after playback starts so the user gesture is not blocked. */
+function wireTakePlaybackAfterStart(
+  media: HTMLMediaElement,
+  allowNativeDirect: boolean,
+): void {
+  primeTakePlayback([media], allowNativeDirect)
+}
+
 export function playTakeMediaFromUserGesture(
   media: HTMLMediaElement,
   callbacks: UserGesturePlaybackCallbacks = {},
 ): void {
+  prepareMediaForAudiblePlayback(media)
+
   void (async () => {
-    await primeTakePlaybackForUserGesture(media)
-
-    logPlaybackStartRouteDiagnostics('playTakeMediaFromUserGesture', {
-      volume: media.volume,
-      muted: media.muted,
-    })
-
     try {
-      const started = await playMediaWithOptionalBluetoothActivation(media)
-      if (started) {
-        callbacks.onPlaying?.()
-      } else {
-        callbacks.onFailure?.(new Error('Bluetooth playback activation failed'))
-      }
+      await preparePlaybackRoute({ suspendCamera: false })
+      await media.play()
+      attachPlaybackRouteEndedListener(media)
+      wireTakePlaybackAfterStart(media, true)
+      reportTakePlaybackStarted(media)
+      callbacks.onPlaying?.()
     } catch (error: unknown) {
       console.log(error)
       callbacks.onFailure?.(error)
+      await completePlaybackRouteRestore()
     }
   })()
 }
@@ -149,37 +169,41 @@ export function playTakeMediaBatchFromUserGesture(
   callbacks: UserGesturePlaybackCallbacks = {},
 ): void {
   if (media.length === 0) return
-  void (async () => {
-    await primeTakePlayback(media, false)
-    for (const element of media) {
-      try {
-        if (isBluetoothHeadphonePlaybackModeEnabled()) {
-          const started = await runBluetoothPlaybackActivation({
-            media: element,
-            userVolume: element.volume || 1,
-            attemptPlay: true,
-          })
-          if (!started) {
-            callbacks.onFailure?.(new Error('Bluetooth playback activation failed'))
-          }
-        } else {
-          await element.play()
-        }
-      } catch (error: unknown) {
+
+  for (const element of media) {
+    prepareMediaForAudiblePlayback(element)
+  }
+
+  void Promise.all(
+    media.map((element) =>
+      element.play().catch((error: unknown) => {
         console.log(error)
         callbacks.onFailure?.(error)
+        throw error
+      }),
+    ),
+  )
+    .then(() => {
+      primeTakePlayback(media, false)
+      for (const element of media) {
+        reportTakePlaybackStarted(element)
       }
-    }
-  })()
+    })
+    .catch(() => {
+      /* onFailure already invoked per element */
+    })
 }
 
 export async function playTakeMedia(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  await primeTakePlaybackForUserGesture(media)
+  prepareMediaForAudiblePlayback(media)
   try {
-    return await playMediaWithOptionalBluetoothActivation(media)
+    await media.play()
+    wireTakePlaybackAfterStart(media, true)
+    reportTakePlaybackStarted(media)
+    return true
   } catch (error: unknown) {
     console.log(error)
     options.onFailure?.(error)
@@ -191,50 +215,46 @@ export async function playTakeMediaMuted(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  await primeTakePlayback([media], false)
+  primeTakePlayback([media], false)
   await resumePlaybackAudioContext()
-  return safePlayMutedMedia(media, options)
+  const started = await safePlayMutedMedia(media, options)
+  if (started) reportTakePlaybackStarted(media)
+  return started
 }
 
 export async function playTakeMediaAudible(
   media: HTMLMediaElement,
   options: PlaybackAttemptOptions = {},
 ): Promise<boolean> {
-  await primeTakePlayback([media], false)
-  await resumePlaybackAudioContext()
+  prepareMediaForAudiblePlayback(media)
 
-  logPlaybackStartRouteDiagnostics('playTakeMediaAudible', {
-    volume: media.volume,
-    muted: media.muted,
-  })
-
-  if (isBluetoothHeadphonePlaybackModeEnabled()) {
-    const started = await runBluetoothPlaybackActivation({
-      media,
-      userVolume: media.volume || 1,
-      attemptPlay: true,
-    })
-    if (!started) {
-      options.onFailure?.(new Error('Bluetooth playback activation failed'))
-    }
-    return started
+  try {
+    await preparePlaybackRoute({ suspendCamera: false })
+  } catch {
+    return false
   }
+
+  primeTakePlaybackForUserGesture(media)
+  await resumePlaybackAudioContext()
 
   try {
     await media.play()
+    attachPlaybackRouteEndedListener(media)
+    reportTakePlaybackStarted(media)
     return true
   } catch {
-    // iOS can reject unmuted programmatic autoplay — start muted to pass the
-    // gate, then unmute immediately so the element keeps decoding (no cutout).
     try {
       media.muted = true
       await media.play()
       media.muted = false
       media.volume = 1
+      attachPlaybackRouteEndedListener(media)
+      reportTakePlaybackStarted(media)
       return true
     } catch (error) {
       console.log(error)
       options.onFailure?.(error)
+      await completePlaybackRouteRestore()
       return false
     }
   }
@@ -242,7 +262,19 @@ export async function playTakeMediaAudible(
 
 export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boolean[]> {
   if (media.length === 0) return []
-  await primeTakePlayback(media, false)
+  try {
+    await preparePlaybackRoute({ suspendCamera: false })
+  } catch {
+    return media.map(() => false)
+  }
+
+  primeTakePlayback(media, false)
   await resumePlaybackAudioContext()
-  return Promise.all(media.map((element) => safePlayMutedMedia(element)))
+  return Promise.all(
+    media.map(async (element) => {
+      const started = await safePlayMutedMedia(element)
+      if (started) reportTakePlaybackStarted(element)
+      return started
+    }),
+  )
 }

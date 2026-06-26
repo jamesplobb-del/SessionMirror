@@ -1,0 +1,212 @@
+/**
+ * iPad portrait layout — min-width 744px (iPad mini).
+ * iPhone Pro Max is 430px; nothing below 744px is affected.
+ */
+@media (min-width: 744px) {
+  :root {
+    --ipad-pip-width: clamp(18rem, 24vw, 22rem);
+    --ipad-deck-btn-size: 3.375rem;
+    --ipad-record-size: 4.75rem;
+    --app-split-max-width: min(960px, calc(100% - 2rem));
+    --app-sheet-max-width: min(580px, calc(100% - 2rem));
+    --pitch-tuner-edge-gap: 32px;
+    --pitch-pip-row-block: calc(var(--ipad-pip-width) * 9 / 16 + 1.25rem);
+    --pitch-control-deck-block: calc(var(--ipad-record-size) + 2.5rem);
+  }
+
+  .hud-header {
+    width: 100%;
+    padding-top: 0.625rem;
+  }
+
+  .hud-header__vault {
+    max-width: min(100%, 22rem);
+    padding: 0.5rem 1.125rem;
+    font-size: 0.875rem;
+  }
+
+  .app-hud-bottom {
+    width: 100%;
+    gap: 1.25rem;
+    padding-bottom: 0.375rem;
+  }
+
+  .app-pip-row-wrap {
+    width: min(960px, calc(100% - 2.5rem));
+    margin-inline: auto;
+    padding-bottom: 0.375rem;
+  }
+
+  .app-pip-row {
+    gap: clamp(1.5rem, 4vw, 2.75rem);
+    padding: 0;
+    margin-bottom: 0.25rem;
+    justify-content: center;
+  }
+
+  .app-pip-row > .app-pip-slot {
+    flex: 0 0 var(--ipad-pip-width);
+    width: var(--ipad-pip-width);
+    min-width: 0;
+    max-width: none;
+  }
+
+  .app-pip-row .app-pip-slot > .pip-video-container {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .pip-drag-ghost-inner {
+    width: calc(var(--ipad-pip-width) * 0.72);
+  }
+
+  .pip-video-container .h-7.w-7 {
+    height: 2.125rem;
+    width: 2.125rem;
+  }
+
+  .pip-video-container .h-7.w-7 svg {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+
+  .split-compare-host {
+    width: var(--app-split-max-width);
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+
+  /* Vault left corner · record center · settings right corner */
+  .control-deck.pointer-events-auto {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    column-gap: 1rem;
+    padding-inline: max(1.25rem, env(safe-area-inset-left, 0px))
+      max(1.25rem, env(safe-area-inset-right, 0px));
+  }
+
+  .control-deck__main-row {
+    display: contents;
+  }
+
+  .control-deck__vault-btn {
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    align-self: end;
+    width: var(--ipad-deck-btn-size);
+    height: var(--ipad-deck-btn-size);
+    margin-bottom: 0.125rem;
+  }
+
+  .control-deck__vault-btn svg {
+    height: 1.625rem;
+    width: 1.625rem;
+  }
+
+  .control-deck__vault-btn span.absolute {
+    height: 1.25rem;
+    min-width: 1.25rem;
+    font-size: 0.625rem;
+  }
+
+  .control-deck__settings-btn {
+    position: static;
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    align-self: end;
+    width: var(--ipad-deck-btn-size);
+    height: var(--ipad-deck-btn-size);
+    margin-bottom: 0.125rem;
+  }
+
+  .control-deck__settings-btn svg {
+    height: 1.625rem;
+    width: 1.625rem;
+  }
+
+  .control-deck__main-row > .ui-orient-spin {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: center;
+    align-self: end;
+  }
+
+  .record-carousel-viewport,
+  .record-delete-drop {
+    --record-carousel-viewport-width: 13.5rem;
+    --record-slot-active-size: var(--ipad-record-size);
+    --record-slot-inactive-size: 3.125rem;
+    height: var(--ipad-record-size);
+  }
+
+  .record-carousel-slot--center {
+    border-width: 3.5px;
+  }
+
+  .record-carousel-auto-btn {
+    right: -3.375rem;
+    height: 2.75rem;
+    width: 2.75rem;
+  }
+
+  .record-delete-drop .h-14.w-14 {
+    height: var(--ipad-record-size);
+    width: var(--ipad-record-size);
+  }
+
+  .record-delete-drop .h-6.w-6 {
+    height: 1.75rem;
+    width: 1.75rem;
+  }
+
+  .auto-sound-hint {
+    max-width: 18rem;
+    font-size: 0.8125rem;
+  }
+
+  .control-deck__main-row .text-xs {
+    font-size: 0.875rem;
+  }
+
+  .animated-bottom-sheet {
+    inset-inline: 0;
+    width: var(--app-sheet-max-width);
+    margin-inline: auto;
+    bottom: max(0.875rem, env(safe-area-inset-bottom, 0px));
+    border-radius: 1.5rem;
+  }
+
+  .camera-permission-gate__panel {
+    max-width: 26rem;
+  }
+
+  .pitch-widget-draggable {
+    max-width: min(calc(100vw - 2rem), 28rem);
+  }
+
+  .metronome-widget-draggable {
+    max-width: min(calc(100vw - 2rem), 26rem);
+  }
+
+  .pitch-widget-audio__card {
+    width: min(100%, 34rem);
+  }
+
+  .pitch-note-orbit {
+    --orbit-size: min(34vw, 17rem);
+  }
+
+  .app-ui-overlay--pitch-hud-lock .control-deck__vault-btn,
+  .app-ui-overlay--pitch-hud-lock .control-deck__settings-btn,
+  .app-ui-overlay--metronome-hud-lock .control-deck__vault-btn,
+  .app-ui-overlay--metronome-hud-lock .control-deck__settings-btn {
+    pointer-events: auto !important;
+    z-index: 41;
+  }
+}

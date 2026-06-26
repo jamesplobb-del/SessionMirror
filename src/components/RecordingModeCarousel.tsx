@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, memo } from 'react'
 import { Camera, Mic, Square, AudioWaveform } from 'lucide-react'
 import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
 import { stopEventBubble } from '../utils/eventBubbling'
@@ -61,6 +61,7 @@ function ModeSlot({
       disabled={slotDisabled}
       aria-label={ariaLabel}
       aria-pressed={isCenter}
+      {...(isCenter ? { 'data-tutorial': 'record-controls' } : {})}
       onClick={onActivate}
       className={`record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
         isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
@@ -83,7 +84,7 @@ function ModeSlot({
   )
 }
 
-export default function RecordingModeCarousel({
+function RecordingModeCarousel({
   value,
   onChange,
   onToggleRecord,
@@ -132,7 +133,6 @@ export default function RecordingModeCarousel({
 
   return (
     <div
-      data-tutorial="record-controls"
       className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
       role="group"
       aria-label="Recording mode"
@@ -183,3 +183,5 @@ export default function RecordingModeCarousel({
     </div>
   )
 }
+
+export default memo(RecordingModeCarousel)

@@ -1,4 +1,4 @@
-import UIKit
+﻿import UIKit
 import Capacitor
 import AVFoundation
 
@@ -6,18 +6,16 @@ import AVFoundation
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
-
-    /// Keep the Swift plugin class linked so NSClassFromString can resolve it.
-    private let bestTakeAudioPluginClass = BestTakeAudioPlugin.self
     private var audioRouteObserver: NSObjectProtocol?
 
+    /// Keep the Swift plugin class linked so Capacitor packageClassList can resolve it.
+    private let bestTakeAudioPluginClass = BestTakeAudioPlugin.self
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        _ = bestTakeAudioPluginClass
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
         installAudioRouteObserver()
-        DispatchQueue.main.async { [weak self] in
-            self?.registerBestTakeAudioPlugin()
-        }
         return true
     }
 
@@ -27,16 +25,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             object: AVAudioSession.sharedInstance(),
             queue: .main
         ) { _ in
-            AudioRouteConfigurator.maintainHighQualityInputIfNeeded()
+            AudioRouteConfigurator.logRoute("route-change event (passive)")
         }
-    }
-
-    private func registerBestTakeAudioPlugin() {
-        _ = bestTakeAudioPluginClass
-        guard let bridgeViewController = window?.rootViewController as? CAPBridgeViewController else {
-            return
-        }
-        bridgeViewController.bridge?.registerPluginInstance(BestTakeAudioPlugin())
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
@@ -51,15 +41,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         lockInterfaceToPortrait()
     }
 
-    /// Initial recording route on cold launch only — do not call on every foreground
-    /// resume or it will undo YouTube stereo playback (.playback category).
+    /// Passive launch session — do not force HQ/headphone routes; JS applies on user action.
     private func configurePersistentAudioSession() {
+        let session = AVAudioSession.sharedInstance()
         do {
-            try AudioRouteConfigurator.applyRecordingRoute(
-                enableHQ: AudioRouteConfigurator.isHighQualityModeEnabled()
+            try session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.allowBluetoothA2DP, .allowBluetooth, .defaultToSpeaker]
             )
+            try session.setActive(true, options: [])
+            AudioRouteConfigurator.logRoute("launch passive session")
         } catch {
-            print("Failed to configure persistent audio session: \(error)")
+            print("Failed to configure passive audio session: \(error.localizedDescription)")
         }
     }
 

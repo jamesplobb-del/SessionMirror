@@ -2,6 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import type { RecordingMode } from '../types'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
+import { AUTO_RECORD_MAX_IDLE_PREROLL_MS } from '../utils/autoRecordPlayback'
+import {
+  getPlaybackAudioContext,
+  isSharedPlaybackContext,
+} from '../utils/playbackAudioContext'
 
 const POLL_INTERVAL_MS = 32
 const MIN_RECORDING_MS = 400
@@ -33,6 +38,10 @@ interface UseAutoSoundRecordingOptions {
   stopRecording: () => void
   warmRecorder: () => void
   disarmRecorder: () => void
+  tryMarkAutoPerformance?: () => 'started' | 'pending' | 'unavailable'
+  isAutoPreRollCaptureActive?: () => boolean
+  getAutoPreRollAgeMs?: () => number
+  restartAutoPreRollCapture?: () => void
   onAutoRecordingFinished: () => void
   onMonitorStalled?: () => void
 }
@@ -79,6 +88,10 @@ export function useAutoSoundRecording({
   stopRecording,
   warmRecorder,
   disarmRecorder,
+  tryMarkAutoPerformance,
+  isAutoPreRollCaptureActive,
+  getAutoPreRollAgeMs,
+  restartAutoPreRollCapture,
   onAutoRecordingFinished,
   onMonitorStalled,
 }: UseAutoSoundRecordingOptions) {
@@ -112,6 +125,11 @@ export function useAutoSoundRecording({
   const disarmRecorderRef = useRef(disarmRecorder)
   const onFinishedRef = useRef(onAutoRecordingFinished)
   const onMonitorStalledRef = useRef(onMonitorStalled)
+  const tryMarkAutoPerformanceRef = useRef(tryMarkAutoPerformance)
+  const isAutoPreRollCaptureActiveRef = useRef(isAutoPreRollCaptureActive)
+  const getAutoPreRollAgeMsRef = useRef(getAutoPreRollAgeMs)
+  const restartAutoPreRollCaptureRef = useRef(restartAutoPreRollCapture)
+  const pendingPerformanceGateRef = useRef(false)
   const profileRef = useRef(getAutoRecordProfile(volumeThreshold))
   const silenceMsRef = useRef(silenceMs)
   const wasRecordingRef = useRef(isRecording)
@@ -127,6 +145,10 @@ export function useAutoSoundRecording({
   disarmRecorderRef.current = disarmRecorder
   onFinishedRef.current = onAutoRecordingFinished
   onMonitorStalledRef.current = onMonitorStalled
+  tryMarkAutoPerformanceRef.current = tryMarkAutoPerformance
+  isAutoPreRollCaptureActiveRef.current = isAutoPreRollCaptureActive
+  getAutoPreRollAgeMsRef.current = getAutoPreRollAgeMs
+  restartAutoPreRollCaptureRef.current = restartAutoPreRollCapture
   profileRef.current = getAutoRecordProfile(volumeThreshold)
   silenceMsRef.current = silenceMs
   effectiveGateRef.current = computeEffectiveGate(
@@ -184,6 +206,25 @@ export function useAutoSoundRecording({
       return
     }
 
+    const mark = tryMarkAutoPerformanceRef.current?.()
+    if (mark === 'started') {
+      pendingPerformanceGateRef.current = false
+      autoTriggeredRef.current = true
+      setHandsFreeRecording(true)
+      loudSinceRef.current = null
+      attackSinceRef.current = null
+      armStartLatch()
+      scheduleStartFailureRecovery()
+      return
+    }
+
+    if (mark === 'pending') {
+      pendingPerformanceGateRef.current = true
+      armStartLatch()
+      scheduleStartFailureRecovery()
+      return
+    }
+
     autoTriggeredRef.current = true
     setHandsFreeRecording(true)
     loudSinceRef.current = null
@@ -191,6 +232,17 @@ export function useAutoSoundRecording({
     armStartLatch()
     scheduleStartFailureRecovery()
     startRecordingRef.current()
+  }
+
+  const tryCommitPendingPerformanceStart = (): boolean => {
+    if (!pendingPerformanceGateRef.current) return false
+    const mark = tryMarkAutoPerformanceRef.current?.()
+    if (mark !== 'started') return false
+
+    pendingPerformanceGateRef.current = false
+    autoTriggeredRef.current = true
+    setHandsFreeRecording(true)
+    return true
   }
 
   const bumpMonitorEpoch = () => {
@@ -226,7 +278,7 @@ export function useAutoSoundRecording({
 
     const ctx = audioContextRef.current
     audioContextRef.current = null
-    if (ctx && ctx.state !== 'closed') {
+    if (ctx && !isSharedPlaybackContext(ctx) && ctx.state !== 'closed') {
       void ctx.close().catch(() => {})
     }
 
@@ -236,6 +288,7 @@ export function useAutoSoundRecording({
     recordingStartedAtRef.current = null
     autoTriggeredRef.current = false
     monitorWarmUntilRef.current = 0
+    pendingPerformanceGateRef.current = false
     quietRmsEmaRef.current = 0
     effectiveGateRef.current = profileRef.current.gate
     lastTickAtRef.current = 0
@@ -316,9 +369,8 @@ export function useAutoSoundRecording({
         return
       }
 
-      const audioContext = new AudioContext()
+      const audioContext = await getPlaybackAudioContext()
       if (cancelled || setupEpoch !== monitorEpoch) {
-        await audioContext.close().catch(() => {})
         return
       }
 
@@ -327,7 +379,6 @@ export function useAutoSoundRecording({
       }
 
       if (cancelled || setupEpoch !== monitorEpoch) {
-        await audioContext.close().catch(() => {})
         return
       }
 
@@ -393,6 +444,18 @@ export function useAutoSoundRecording({
         if (!isRecordingRef.current) {
           silenceSinceRef.current = null
           recordingStartedAtRef.current = null
+
+          tryCommitPendingPerformanceStart()
+
+          if (isAutoPreRollCaptureActiveRef.current?.()) {
+            const preRollAge = getAutoPreRollAgeMsRef.current?.() ?? 0
+            if (preRollAge > AUTO_RECORD_MAX_IDLE_PREROLL_MS) {
+              restartAutoPreRollCaptureRef.current?.()
+              loudSinceRef.current = null
+              attackSinceRef.current = null
+              pendingPerformanceGateRef.current = false
+            }
+          }
 
           if (!suppressStartRef.current && metrics.rms < effectiveGateRef.current * 0.9) {
             quietRmsEmaRef.current =

@@ -24,11 +24,13 @@ import ControlDeck from './components/ControlDeck'
 import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
+import { useAppShellPolicies } from './hooks/useAppShellPolicies'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
   registerAutoPlaybackHold,
   registerTakePlaybackMicHandlers,
+  finalizeTakePlaybackCleanup,
   releaseTakePlaybackAudio,
   playTakeMediaAudible,
 } from './utils/takePlaybackAudio'
@@ -63,21 +65,21 @@ import {
   isConvertedPlaybackUrl,
   readCachedPlaybackSrc,
   resolveTakePlaybackUrl,
+  resolveNativeFileUri,
   type RecordingCompletePayload,
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
 import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
 import { scheduleViewportSync } from './utils/viewportSync'
+import { applyDarkHudStatusBar } from './utils/nativeStatusBar'
+import { registerRecordingRouteRestoredHandler } from './utils/stereoPlaybackRoute'
 import { lockPortraitOrientation, syncAppOrientationLock } from './utils/lockPortraitOrientation'
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
-import {
-  INTERACTIVE_TUTORIAL_STEPS,
-  isOnboardingComplete,
-  markOnboardingComplete,
-} from './utils/onboardingTutorial'
+import { INTERACTIVE_TUTORIAL_STEPS, isOnboardingComplete, markOnboardingComplete } from './utils/onboardingTutorial'
+import { ActionSheetProvider } from './context/ActionSheetContext'
 import { TutorialProvider } from './context/TutorialContext'
 import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
 import {
@@ -97,18 +99,26 @@ import {
   updateVaultTake,
   type Project,
 } from './db'
-import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
-import BestTakeAudioPlugin, { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
+import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
+import { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
+import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
+import { setActiveCaptureProfile } from './utils/audioCapture'
 import {
-  refreshPlaybackOutputProfile,
-  setBluetoothHeadphonePlaybackMode,
-} from './utils/audioOutputProfile'
-import { runBluetoothPlaybackActivation } from './utils/bluetoothPlaybackActivation'
+  buildRecordingCaptureDiagnostics,
+  logRecordingCaptureDiagnostics,
+} from './utils/recordingDiagnostics'
+import {
+  installPlaybackRouteEndedListener,
+  preparePlaybackRoute,
+  registerPlaybackCameraHandlers,
+} from './utils/playbackRouteCoordinator'
+import { syncNativeCameraSessionState } from './utils/cameraSessionState'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
-import { bootstrapViewport } from './utils/viewportSync'
+import { bootstrapViewport, stabilizeViewportAfterMediaInteraction } from './utils/viewportSync'
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
+import { applyAutoPlaybackLeadIn } from './utils/autoRecordPlayback'
 import {
   tuneMusicRecordingStream,
   tunePlaybackIsolationStream,
@@ -116,7 +126,6 @@ import {
 import AppBootGate from './components/ui/AppBootGate'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
-const AUTO_PLAYBACK_NATIVE_PRIME_MS = 150
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
   if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
@@ -149,6 +158,7 @@ interface MainAudioPitchSource {
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
 const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
+const MetronomeStagePresenter = lazy(() => import('./components/MetronomeStagePresenter'))
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
@@ -222,6 +232,7 @@ export default function App() {
 
     bootstrapViewport()
     void lockPortraitOrientation()
+    void applyDarkHudStatusBar()
 
     void (async () => {
       try {
@@ -328,6 +339,7 @@ function StandardApp({
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
   const queuedAutoPlayRef = useRef<{ url: string; takeId: string } | null>(null)
   const recordingModeRef = useRef<RecordingMode>('video')
+  const cameraReadyRef = useRef(false)
   const pitchCommitTimerRef = useRef<number | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
   const autoPlaybackGenerationRef = useRef(0)
@@ -429,6 +441,7 @@ function StandardApp({
     teardownPipMedia(benchmark)
     teardownPipMedia(challenger)
     void releaseTakePlaybackAudio()
+    stabilizeViewportAfterMediaInteraction()
     setBenchmarkPipPlaying(false)
     setChallengerPipPlaying(false)
   }, [teardownPipMedia])
@@ -479,7 +492,7 @@ function StandardApp({
   }, [teardownActiveAutoPlayback])
 
   const finishAutoPlayback = useCallback(() => {
-    void releaseTakePlaybackAudio().finally(() => {
+    void finalizeTakePlaybackCleanup().finally(() => {
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
     })
@@ -525,18 +538,23 @@ function StandardApp({
       audio.load()
 
       void (async () => {
-        if (Capacitor.isNativePlatform()) {
-          await new Promise((resolve) =>
-            window.setTimeout(resolve, AUTO_PLAYBACK_NATIVE_PRIME_MS),
-          )
-        }
+        const routePrep = Capacitor.isNativePlatform()
+          ? preparePlaybackRoute({ suspendCamera: false }).catch((error) => {
+              console.warn('[PlaybackRoute] auto-playback prep failed', error)
+            })
+          : Promise.resolve()
 
-        const ready = await waitForMediaReadyWithRetry(audio)
+        const ready = await Promise.all([
+          waitForMediaReadyWithRetry(audio),
+          routePrep,
+        ]).then(([mediaReady]) => mediaReady)
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
         if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
           finishAutoPlayback()
           return
         }
+
+        await applyAutoPlaybackLeadIn(audio)
 
         audio.onended = () => finishAutoPlayback()
         audio.onerror = () => finishAutoPlayback()
@@ -709,6 +727,8 @@ function StandardApp({
       mediaType,
       durationSeconds,
       recordingOrientation,
+      captureProfile,
+      captureTrackSnapshot,
     } = payload
 
     const shouldAutoPlay =
@@ -825,6 +845,34 @@ function StandardApp({
           })
         }
 
+        let audioAnalysisSource: Blob | string | null = normalizedBlob ?? blob ?? null
+        if (!audioAnalysisSource && resolvedFilePath) {
+          const nativeUri = await resolveNativeFileUri(resolvedFilePath)
+          if (nativeUri) audioAnalysisSource = nativeUri
+        } else if (!audioAnalysisSource && playbackUrl) {
+          audioAnalysisSource = playbackUrl
+        }
+
+        const captureDiagnostics = await buildRecordingCaptureDiagnostics(
+          captureProfile ?? 'natural',
+          captureTrackSnapshot ?? null,
+          audioAnalysisSource,
+        )
+        logRecordingCaptureDiagnostics(takeId, captureDiagnostics)
+
+        if (captureDiagnostics.playbackGainMetadata) {
+          setTakes((current) =>
+            current.map((take) =>
+              take.id === takeId
+                ? {
+                    ...take,
+                    playbackGainMetadata: captureDiagnostics.playbackGainMetadata ?? undefined,
+                  }
+                : take,
+            ),
+          )
+        }
+
         pendingChallengerIdRef.current = null
 
         if (mediaType !== 'video') return
@@ -882,6 +930,13 @@ function StandardApp({
     startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
   }, [])
 
+  const [cameraResumeNonce, setCameraResumeNonce] = useState(0)
+
+  const handleBeforeForegroundRestart = useCallback(() => {
+    pauseYoutubeReference()
+    setCameraResumeNonce((nonce) => nonce + 1)
+  }, [pauseYoutubeReference])
+
   const {
     previewRef,
     streamRef,
@@ -899,14 +954,18 @@ function StandardApp({
     stopRecording,
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
+    tryMarkAutoPerformanceStart,
+    isAutoPreRollCaptureActive,
+    getAutoPreRollAgeMs,
+    restartAutoPreRollCapture,
     refreshCameraSession,
-    reacquireStreamForAudioRoute,
+    suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     secondaryPreviewRef: splitPreviewRef,
-    onBeforeForegroundRestart: pauseYoutubeReference,
+    onBeforeForegroundRestart: handleBeforeForegroundRestart,
     onAfterForegroundRestart: resumeYoutubeReference,
   })
 
@@ -919,21 +978,21 @@ function StandardApp({
     )
   }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
 
+  // Re-assert the mic preference whenever the camera (re)starts so it survives
+  // cold launch / foreground / mode changes. Gentle input-only switch — no reacquire.
   useEffect(() => {
-    setBluetoothHeadphonePlaybackMode(settings.bluetoothHeadphonePlaybackMode)
-    if (settings.bluetoothHeadphonePlaybackMode) {
-      void runBluetoothPlaybackActivation()
-    }
-  }, [settings.bluetoothHeadphonePlaybackMode])
+    if (!ready) return
+    if (isPlaybackRouteHoldActive()) return
+    void applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
+  }, [settings.useIphoneMicForRecording, ready])
 
   useEffect(() => {
-    void (async () => {
-      await applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
-      if (!Capacitor.isNativePlatform()) return
-      await refreshPlaybackOutputProfile()
-      await reacquireStreamForAudioRoute()
-    })()
-  }, [reacquireStreamForAudioRoute, settings.useIphoneMicForRecording])
+    if (isPlaybackRouteHoldActive()) return
+    void syncNativeCameraSessionState({
+      previewActive: ready && recordingMode === 'video',
+      recordingActive: isRecording,
+    })
+  }, [ready, isRecording, recordingMode])
 
   useEffect(() => {
     if (recordingMode !== 'video') return
@@ -951,6 +1010,7 @@ function StandardApp({
   }, [isSplitView, recordingMode, refreshCameraSession, youtubeUrl])
 
   recordingModeRef.current = recordingMode
+  cameraReadyRef.current = ready
 
   const autoPlaybackPlayingRef = useRef(autoPlaybackPlaying)
   autoPlaybackPlayingRef.current = autoPlaybackPlaying
@@ -960,13 +1020,39 @@ function StandardApp({
       suspendMic: suspendMicForPlayback,
       resumeMic: resumeMicAfterPlayback,
     })
+    registerPlaybackCameraHandlers({
+      suspend: () => {
+        suspendCameraForBackground()
+      },
+      resume: () => {
+        void refreshCameraSession()
+      },
+      hasLivePreview: () =>
+        cameraReadyRef.current && recordingModeRef.current === 'video',
+    })
+    installPlaybackRouteEndedListener(() => {
+      void refreshCameraSession()
+    })
     registerAutoPlaybackHold(
       () =>
         pendingAutoPlaybackRef.current ||
         autoPlaybackPlayingRef.current ||
         handsFreePlaybackPending,
     )
-  }, [handsFreePlaybackPending, resumeMicAfterPlayback, suspendMicForPlayback])
+    registerRecordingRouteRestoredHandler(() => {
+      if (isPlaybackRouteHoldActive()) return
+      stabilizeViewportAfterMediaInteraction()
+      window.requestAnimationFrame(() => {
+        void refreshCameraSession()
+      })
+    })
+  }, [
+    handsFreePlaybackPending,
+    refreshCameraSession,
+    resumeMicAfterPlayback,
+    suspendCameraForBackground,
+    suspendMicForPlayback,
+  ])
 
   useEffect(() => {
     if (recordingMode === 'audio') return
@@ -1022,6 +1108,10 @@ function StandardApp({
     disarmRecorder: () => {
       void disarmAutoAudioRecorder()
     },
+    tryMarkAutoPerformance: tryMarkAutoPerformanceStart,
+    isAutoPreRollCaptureActive,
+    getAutoPreRollAgeMs,
+    restartAutoPreRollCapture,
     onAutoRecordingFinished: () => {
       pendingAutoPlaybackRef.current = true
       autoRecordStartSuppressedRef.current = true
@@ -1168,6 +1258,7 @@ function StandardApp({
 
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
+      stabilizeViewportAfterMediaInteraction()
       const timer = window.setTimeout(() => {
         void refreshCameraSession()
       }, 350)
@@ -1180,6 +1271,7 @@ function StandardApp({
   const wasSettingsOpenRef = useRef(false)
   useEffect(() => {
     if (wasSettingsOpenRef.current && !isSettingsOpen) {
+      stabilizeViewportAfterMediaInteraction()
       const timer = window.setTimeout(() => {
         void refreshCameraSession()
       }, 350)
@@ -1192,24 +1284,13 @@ function StandardApp({
   const wasReviewOpenRef = useRef(false)
   useEffect(() => {
     if (wasReviewOpenRef.current && !isReviewOpen) {
-      const timer = window.setTimeout(() => {
-        void refreshCameraSession()
-      }, 350)
+      stabilizeViewportAfterMediaInteraction()
+      void finalizeTakePlaybackCleanup()
       wasReviewOpenRef.current = isReviewOpen
-      return () => window.clearTimeout(timer)
+      return
     }
     wasReviewOpenRef.current = isReviewOpen
-  }, [isReviewOpen, refreshCameraSession])
-
-  useEffect(() => {
-    if (!isSplitView || recordingMode !== 'video' || isRecording) return
-    if (challengerId !== null) return
-
-    const timer = window.setTimeout(() => {
-      void refreshCameraSession()
-    }, 150)
-    return () => window.clearTimeout(timer)
-  }, [challengerId, isRecording, isSplitView, recordingMode, refreshCameraSession])
+  }, [isReviewOpen])
 
   const deferHudMediaPause = useCallback(() => {
     scheduleAfterPaint(() => {
@@ -1220,9 +1301,6 @@ function StandardApp({
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const handleCloseVault = useCallback(() => {
-    if (Capacitor.isNativePlatform()) {
-      void BestTakeAudioPlugin.enableRecordingRoute()
-    }
     startTransition(() => {
       setIsVaultOpen(false)
     })
@@ -1339,9 +1417,7 @@ function StandardApp({
 
   const handleShowMetronomeSettingChange = useCallback(
     (show: boolean) => {
-      startTransition(() => {
-        updateSettings({ showMetronome: show })
-      })
+      updateSettings({ showMetronome: show })
     },
     [updateSettings],
   )
@@ -1389,6 +1465,10 @@ function StandardApp({
     [autoPlaybackTakeId, takes],
   )
 
+  /** Audio-mode hands-free plays through hidden `<audio>` — PiP must not auto-play the same take. */
+  const challengerHandsFreeAutoPlayRequestId =
+    recordingMode === 'audio' ? null : autoPlaybackTakeId
+
   const benchmarkTake = useMemo(
     () => takes.find((t) => t.id === benchmarkId) ?? null,
     [takes, benchmarkId],
@@ -1398,6 +1478,7 @@ function StandardApp({
     () => takes.find((t) => t.id === challengerId) ?? null,
     [takes, challengerId],
   )
+
   takesRef.current = takes
 
   const refreshStaleTakePlaybackUrls = useCallback(() => {
@@ -1604,16 +1685,17 @@ function StandardApp({
 
   const showMetronomeWidget = settings.showMetronome
 
-  const metronomeHudSuspended =
-    isVaultOpen ||
-    isSettingsOpen ||
-    isReviewOpen ||
-    (!ready && !isRecording)
+  const metronomeHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen
 
   const metronomeWidgetInteractive = showMetronomeWidget && !metronomeHudSuspended
 
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
+
+  useAppShellPolicies({
+    keepAwake: isRecording || isReviewOpen || takePlaybackActive,
+    hudSurface: hudModalState,
+  })
 
   useEffect(() => {
     setTakePlaybackEnhancerState(
@@ -1622,12 +1704,29 @@ function StandardApp({
     )
   }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings])
 
+  useEffect(() => {
+    setSpeakerLoudnessPreset(settings.speakerLoudnessPreset)
+  }, [settings.speakerLoudnessPreset])
+
+  useEffect(() => {
+    setActiveCaptureProfile('natural')
+  }, [])
+
   const pitchAudioHudLock =
     showPitch &&
     recordingMode === 'audio' &&
     mainAudioPitchSource !== null &&
     hudModalState === 'idle' &&
     !pitchHudSuspended
+
+  const metronomeAudioHudLock =
+    showMetronomeWidget &&
+    recordingMode === 'audio' &&
+    hudModalState === 'idle' &&
+    !metronomeHudSuspended
+
+  const metronomeStageActive =
+    showMetronomeWidget && recordingMode === 'audio' && !metronomeHudSuspended
 
   const pitchContextKey =
     mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
@@ -1736,9 +1835,6 @@ function StandardApp({
   const handleOpenVaultTake = useCallback(
     (take: Take) => {
       const index = sortedTakes.findIndex((entry) => entry.id === take.id)
-      if (Capacitor.isNativePlatform()) {
-        void BestTakeAudioPlugin.enableStereoPlayback()
-      }
       startTransition(() => {
         setVaultReviewIndex(index >= 0 ? index : 0)
         setReviewContext('vault')
@@ -1760,9 +1856,6 @@ function StandardApp({
   )
 
   const handleCloseReview = useCallback(() => {
-    if (reviewContext === 'vault' && Capacitor.isNativePlatform()) {
-      void BestTakeAudioPlugin.enableRecordingRoute()
-    }
     startTransition(() => {
       setReviewSlot(null)
       setReviewContext((context) => {
@@ -1775,6 +1868,7 @@ function StandardApp({
     pausePipVideos()
     stopAutoPlaybackAudio()
     releaseAutoRecordSuppress(0)
+    stabilizeViewportAfterMediaInteraction()
     window.setTimeout(() => {
       void refreshCameraSession()
     }, 350)
@@ -1954,6 +2048,7 @@ function StandardApp({
   const handleUnpinBenchmark = useCallback(() => {
     teardownPipMedia(benchmarkPipVideoRef.current)
     void releaseTakePlaybackAudio()
+    stabilizeViewportAfterMediaInteraction()
     setBenchmarkPipPlaying(false)
     setBenchmarkId(null)
   }, [teardownPipMedia])
@@ -1965,6 +2060,7 @@ function StandardApp({
     }
     teardownPipMedia(challengerPipVideoRef.current)
     void releaseTakePlaybackAudio()
+    stabilizeViewportAfterMediaInteraction()
     setChallengerPipPlaying(false)
     setChallengerId(null)
   }, [
@@ -2059,6 +2155,7 @@ function StandardApp({
     prepareNewYoutubeReference()
     setYoutubeUrl(null)
     setYoutubeHostEl(null)
+    stabilizeViewportAfterMediaInteraction()
   }, [])
 
   const handleToggleSplitView = useCallback(() => {
@@ -2137,6 +2234,7 @@ function StandardApp({
       onComplete={handleTutorialComplete}
       signals={tutorialSignals}
     >
+    <ActionSheetProvider>
     <div ref={appShellRef} className="app-shell">
       <audio
         ref={autoPlaybackAudioRef}
@@ -2160,10 +2258,12 @@ function StandardApp({
         streamGeneration={streamGeneration}
         recordingMode={recordingMode}
         isRecording={isRecording}
+        resumeNonce={cameraResumeNonce}
         modePreparing={!ready && !isRecording && !cameraNeedsPermission}
         pitchStageActive={
           showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
         }
+        metronomeStageActive={metronomeStageActive}
         visuallySuppressed={isSplitView}
       />
 
@@ -2217,14 +2317,23 @@ function StandardApp({
         {showMetronomeWidget && (
           <Suspense fallback={null}>
             <AnimatePresence>
-              <DraggableMetronomeWidget
-                key="main-metronome"
-                boundaryRef={appShellRef}
-                positionId="main-metronome"
-                isTakePlaying={takePlaybackActive}
-                muteDuringPlayback={settings.muteMetronomeDuringPlayback}
-                onClose={handleCloseMetronome}
-              />
+              {recordingMode === 'video' && (
+                <DraggableMetronomeWidget
+                  key="main-metronome"
+                  boundaryRef={appShellRef}
+                  positionId="main-metronome"
+                  isTakePlaying={takePlaybackActive}
+                  muteDuringPlayback={settings.muteMetronomeDuringPlayback}
+                  onClose={handleCloseMetronome}
+                />
+              )}
+              {recordingMode === 'audio' && (
+                <MetronomeStagePresenter
+                  key="main-metronome-audio"
+                  isTakePlaying={takePlaybackActive}
+                  muteDuringPlayback={settings.muteMetronomeDuringPlayback}
+                />
+              )}
             </AnimatePresence>
           </Suspense>
         )}
@@ -2257,7 +2366,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''}`}
+        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2266,11 +2375,10 @@ function StandardApp({
         transition={iosHudDim}
         style={{
           ...motionGpuLayer,
-          ...pipScaleStyle,
           pointerEvents:
-            pitchAudioHudLock || showOnboardingTutorial
+            pitchAudioHudLock || metronomeAudioHudLock || showOnboardingTutorial
               ? 'auto'
-              : hudModalState !== 'idle'
+              : hudModalState !== 'idle' && !showOnboardingTutorial
                 ? 'none'
                 : undefined,
         }}
@@ -2278,13 +2386,14 @@ function StandardApp({
         <HudHeader
           sessionName={activeProject?.name ?? 'BestTake'}
           onOpenVault={handleOpenVault}
-          splitViewActive={isSplitView}
-          onExitSplitView={handleExitSplitView}
           className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
         />
 
         {!quickSettingsOpen && settings.showTakeCards && isSplitView && (
-          <div className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2">
+          <div
+            className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2"
+            style={pipScaleStyle}
+          >
             <SplitCompareLayout
               splitRatio={splitRatio}
               onSplitRatioChange={setSplitRatio}
@@ -2301,9 +2410,11 @@ function StandardApp({
               recordingMode={recordingMode}
               isRecording={isRecording}
               cameraReady={ready}
+              cameraResumeNonce={cameraResumeNonce}
               pitchStageActive={
                 showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
               }
+              metronomeStageActive={metronomeStageActive}
               onUnpinBenchmark={handleUnpinBenchmark}
               onUnpinChallenger={handleUnpinChallenger}
               onClearYoutube={handleClearYoutube}
@@ -2314,7 +2425,7 @@ function StandardApp({
               onExpandChallenger={handleExpandChallenger}
               onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
               onChallengerPlaybackChange={handleChallengerPlaybackChange}
-              challengerAutoPlayRequestId={autoPlaybackTakeId}
+              challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
               onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
               showPinCurrentAsBest={showPinCurrentAsBest}
               onPinCurrentAsBest={handlePinCurrentAsBest}
@@ -2338,7 +2449,7 @@ function StandardApp({
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={iosHudDim}
-                style={motionGpuLayer}
+                style={{ ...motionGpuLayer, ...pipScaleStyle }}
               >
                 <PipCompareRow
                   benchmarkTake={benchmarkTake}
@@ -2361,7 +2472,7 @@ function StandardApp({
                   onDragStateChange={handlePipDragStateChange}
                   onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
                   onChallengerPlaybackChange={handleChallengerPlaybackChange}
-                  challengerAutoPlayRequestId={autoPlaybackTakeId}
+                  challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
                   onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                   showPinCurrentAsBest={showPinCurrentAsBest}
                   onPinCurrentAsBest={handlePinCurrentAsBest}
@@ -2506,8 +2617,9 @@ function StandardApp({
           )}
         </AnimatePresence>
       </Suspense>
-      </div>
     </div>
+    </div>
+    </ActionSheetProvider>
     </TutorialProvider>
   )
 }

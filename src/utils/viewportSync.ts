@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { syncFormFactorClass } from './deviceFormFactor'
 
 export function isIOSNative(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
@@ -32,6 +33,14 @@ function readSafeAreaInsets(): { top: number; bottom: number } {
 }
 
 export function readViewportSize(): { width: number; height: number } {
+  const visualViewport = window.visualViewport
+  if (visualViewport) {
+    return {
+      width: Math.round(visualViewport.width),
+      height: Math.round(visualViewport.height),
+    }
+  }
+
   return {
     width: Math.round(window.innerWidth),
     height: Math.round(window.innerHeight),
@@ -57,6 +66,8 @@ export function applyViewportCssVars(): number {
   root.style.setProperty('--safe-top-js', `${safe.top}px`)
   root.style.setProperty('--safe-bottom-js', `${safe.bottom}px`)
 
+  syncFormFactorClass(width)
+
   return height
 }
 
@@ -76,6 +87,17 @@ export function applyViewportCssVarsOnResume(): number {
   return applyViewportCssVars()
 }
 
+/** Reset scroll + viewport CSS vars after inline video / PiP interaction (iOS zoom glitch). */
+export function stabilizeViewportAfterMediaInteraction(): void {
+  window.scrollTo(0, 0)
+  document.documentElement.scrollTop = 0
+  document.body.scrollTop = 0
+  applyViewportCssVarsOnResume()
+  requestAnimationFrame(() => {
+    applyViewportCssVarsOnResume()
+  })
+}
+
 export function refreshCameraPreviewLayout(_video: HTMLVideoElement | null): void {
   /* Preview layout is CSS-only — never touch srcObject or play() on orientation. */
 }
@@ -88,6 +110,21 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   }
 
   sync()
+
+  let debounceTimer: number | null = null
+  const scheduleSync = () => {
+    const scale = window.visualViewport?.scale ?? 1
+    if (Math.abs(scale - 1) > 0.01) return
+
+    if (debounceTimer !== null) window.clearTimeout(debounceTimer)
+    debounceTimer = window.setTimeout(() => {
+      debounceTimer = null
+      sync()
+    }, 80)
+  }
+
+  window.addEventListener('resize', scheduleSync)
+  window.visualViewport?.addEventListener('resize', scheduleSync)
 
   let capCleanup: (() => void) | undefined
   if (Capacitor.isNativePlatform()) {
@@ -105,6 +142,9 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   }
 
   return () => {
+    if (debounceTimer !== null) window.clearTimeout(debounceTimer)
+    window.removeEventListener('resize', scheduleSync)
+    window.visualViewport?.removeEventListener('resize', scheduleSync)
     capCleanup?.()
     lastAppliedWidth = 0
     lastAppliedHeight = 0

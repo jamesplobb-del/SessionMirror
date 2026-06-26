@@ -10,6 +10,7 @@ import { resetVideosInContainer, teardownVideosInContainer } from '../utils/vide
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
 import ProjectSessionBar from './ProjectSessionBar'
+import { useActionSheet } from '../context/ActionSheetContext'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { getTakeMediaType } from '../utils/mediaType'
 import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
@@ -68,6 +69,7 @@ export default function TakeVaultDrawer({
   onEnterComplete,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
+  const { showAlert, showConfirm } = useActionSheet()
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
   const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
   const [selectionMode, setSelectionMode] = useState(false)
@@ -166,52 +168,58 @@ export default function TakeVaultDrawer({
     silenceAllVaultVideos()
     onBeforeExport?.()
     void shareTakeVideos(selectedTakes)
-      .then((result) => {
+      .then(async (result) => {
         const message = describeBulkSaveResult(result)
         if (message) {
-          window.alert(message)
+          await showAlert({
+            message,
+            tone: result.failed > 0 ? 'error' : 'success',
+          })
         }
       })
       .finally(() => {
         setBulkSaving(false)
       })
-  }, [onBeforeExport, selectedIds, silenceAllVaultVideos, takes])
+  }, [onBeforeExport, selectedIds, showAlert, silenceAllVaultVideos, takes])
 
   const handleBulkDelete = useCallback(() => {
     const ids = [...selectedIds]
     if (ids.length === 0) return
 
-    if (
-      !window.confirm(
-        `Delete ${ids.length} selected take${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
-      )
-    ) {
-      return
-    }
+    void (async () => {
+      const confirmed = await showConfirm({
+        message: `Delete ${ids.length} selected take${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
+        destructive: true,
+        confirmLabel: 'Delete',
+      })
+      if (!confirmed) return
 
-    silenceAllVaultVideos()
-    onDeleteTakes(ids)
-    exitSelectionMode()
-  }, [exitSelectionMode, onDeleteTakes, selectedIds, silenceAllVaultVideos])
+      silenceAllVaultVideos()
+      onDeleteTakes(ids)
+      exitSelectionMode()
+    })()
+  }, [exitSelectionMode, onDeleteTakes, selectedIds, showConfirm, silenceAllVaultVideos])
 
   const handleClearAll = useCallback(() => {
     if (takes.length === 0) return
     const sessionName = activeProject?.name ?? 'this session'
-    if (
-      !window.confirm(
-        `Delete all ${takes.length} takes in "${sessionName}"? This cannot be undone.`,
-      )
-    ) {
-      return
-    }
 
-    onClearAllTakes()
-    exitSelectionMode()
+    void (async () => {
+      const confirmed = await showConfirm({
+        message: `Delete all ${takes.length} takes in "${sessionName}"? This cannot be undone.`,
+        destructive: true,
+        confirmLabel: 'Delete All',
+      })
+      if (!confirmed) return
 
-    window.requestAnimationFrame(() => {
-      teardownVideosInContainer(drawerRef.current)
-    })
-  }, [activeProject?.name, exitSelectionMode, onClearAllTakes, takes.length])
+      onClearAllTakes()
+      exitSelectionMode()
+
+      window.requestAnimationFrame(() => {
+        teardownVideosInContainer(drawerRef.current)
+      })
+    })()
+  }, [activeProject?.name, exitSelectionMode, onClearAllTakes, showConfirm, takes.length])
 
   useEffect(() => {
     return () => {
@@ -256,7 +264,7 @@ export default function TakeVaultDrawer({
                   type="button"
                   intensity="soft"
                   onClick={handleClearAll}
-                  haptic="medium"
+                  haptic="light"
                   className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
                   Clear All
@@ -279,6 +287,7 @@ export default function TakeVaultDrawer({
               intensity="icon"
               onClick={onClose}
               haptic="light"
+              data-tutorial="vault-close"
               className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
               aria-label="Close vault"
             >
@@ -372,10 +381,13 @@ export default function TakeVaultDrawer({
                                 onBeforeExport?.()
                                 setExportingTakeId(take.id)
                                 void shareTakeVideo(take)
-                                  .then((result) => {
+                                  .then(async (result) => {
                                     const message = describeSaveTakeResult(result)
                                     if (message) {
-                                      window.alert(message)
+                                      await showAlert({
+                                        message,
+                                        tone: result.ok ? 'success' : 'error',
+                                      })
                                     }
                                   })
                                   .finally(() => {
@@ -420,7 +432,7 @@ export default function TakeVaultDrawer({
               type="button"
               intensity="soft"
               onClick={handleBulkDelete}
-              haptic="medium"
+              haptic="light"
               className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-100"
             >
               <Trash2 className="h-3.5 w-3.5" />

@@ -2,15 +2,18 @@ import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type 
 import { Pause, Play, Pin, Upload, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
+import Pressable from './ui/Pressable'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import {
+  finalizeTakePlaybackCleanup,
   playTakeMediaAudible,
-  releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
-import type { Take } from '../types'
+import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
+import type { RecordingOrientation } from '../utils/physicalOrientation'
+import { HUD_SOLID_FLOAT_BADGE, HUD_SOLID_PIP_PLAY_ICON } from '../utils/interactiveUx'
 
 interface PipWindowProps {
   layout?: 'pip' | 'fill'
@@ -22,7 +25,7 @@ interface PipWindowProps {
   variant: 'benchmark' | 'challenger'
   emptyMessage: string
   mirror?: boolean
-  recordingOrientation?: Take['recordingOrientation']
+  recordingOrientation?: RecordingOrientation
   suspendPlayback?: boolean
   videoRef?: React.RefObject<HTMLMediaElement | null>
   onUnpin: () => void
@@ -46,10 +49,24 @@ interface PipWindowProps {
   autoPlayRequestId?: string | null
   takeId?: string | null
   onAutoPlayComplete?: () => void
+  posterUrl?: string | null
 }
 
-const FLOAT_BADGE =
-  'pointer-events-auto absolute z-30 flex h-7 w-7 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white shadow-[0_1px_6px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition hover:bg-black/60'
+function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
+  return (
+    <div className="absolute inset-0 h-full w-full bg-black" aria-hidden>
+      {posterUrl ? (
+        <img
+          src={posterUrl}
+          alt=""
+          className="pointer-events-none h-full w-full object-cover"
+          draggable={false}
+          decoding="async"
+        />
+      ) : null}
+    </div>
+  )
+}
 
 function PipWindow({
   layout = 'pip',
@@ -78,6 +95,7 @@ function PipWindow({
   autoPlayRequestId = null,
   takeId = null,
   onAutoPlayComplete,
+  posterUrl = null,
 }: PipWindowProps) {
   const videoSourceKey = src || filePath || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
@@ -93,6 +111,12 @@ function PipWindow({
   const isAutoPlayArmed = Boolean(
     autoPlayRequestId && takeId && autoPlayRequestId === takeId,
   )
+  const { decoderActive, pendingPlayRef, requestDecoderForPlay } = usePipInlineDecoder({
+    suspendPlayback,
+    isAutoPlayArmed,
+    isPlaying,
+    videoSourceKey,
+  })
   const playbackAudible = (isAutoPlayArmed || isPlaying) && !suspendPlayback
 
   useEffect(() => {
@@ -135,6 +159,12 @@ function PipWindow({
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback) return
+
+      if (!decoderActive) {
+        requestDecoderForPlay()
+        return
+      }
+
       const video = videoRef.current
       if (!video) return
 
@@ -145,20 +175,48 @@ function PipWindow({
           onPlaying: () => setIsPlaying(true),
           onFailure: () => {
             setIsPlaying(false)
-            void releaseTakePlaybackAudio()
+            void finalizeTakePlaybackCleanup()
           },
         })
       } else {
         toggleInlineTakePlayback(video, {
           onPaused: () => {
             setIsPlaying(false)
-            void releaseTakePlaybackAudio()
           },
         })
       }
     },
-    [suspendPlayback, variant, videoRef],
+    [decoderActive, requestDecoderForPlay, suspendPlayback, variant, videoRef],
   )
+
+  useEffect(() => {
+    if (!decoderActive || !pendingPlayRef.current || suspendPlayback) return
+
+    let cancelled = false
+    void (async () => {
+      const media = videoRef.current
+      if (!media) return
+
+      const ready = await waitForMediaReadyWithRetry(media)
+      if (cancelled || !pendingPlayRef.current) return
+      pendingPlayRef.current = false
+      if (!ready) return
+
+      media.setAttribute('data-debug-playback-tag', `pip-${variant}`)
+      setIsPlaying(true)
+      toggleInlineTakePlayback(media, {
+        onPlaying: () => setIsPlaying(true),
+        onFailure: () => {
+          setIsPlaying(false)
+          void finalizeTakePlaybackCleanup()
+        },
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [decoderActive, pendingPlayRef, suspendPlayback, variant, videoRef, videoSourceKey])
 
   // Hands-free auto-playback — muted programmatic play (iOS allows muted autoplay).
   useEffect(() => {
@@ -168,7 +226,7 @@ function PipWindow({
       autoPlayRequestId === takeId &&
       Boolean(src)
 
-    if (!wantsAutoPlay || suspendPlayback) {
+    if (!wantsAutoPlay || suspendPlayback || !decoderActive) {
       autoPlaySessionRef.current = false
       return
     }
@@ -230,6 +288,7 @@ function PipWindow({
     takeId,
     videoRef,
     videoSourceKey,
+    decoderActive,
   ])
 
   const handleVolume = useCallback(
@@ -266,8 +325,7 @@ function PipWindow({
 
   const pipTouchTargetClass =
     'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
-  const pipTouchIconClass =
-    'flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70'
+  const pipTouchIconClass = HUD_SOLID_PIP_PLAY_ICON
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -283,12 +341,12 @@ function PipWindow({
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-black/95 ring-1 ${accentRing} transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-black/95 ring-1 ${accentRing} transition-opacity duration-200 ease-in ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 transition-[opacity,box-shadow,transform,border-color] duration-200 ease-in ${accentRing} ${
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 transition-opacity duration-200 ease-in ${accentRing} ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
@@ -330,20 +388,24 @@ function PipWindow({
         <div className={mediaStageClass}>
         {hasMedia ? (
           <>
-            <TakeVideoPlayer
-              filePath={filePath}
-              videoUrl={src ?? ''}
-              mimeType={mimeType}
-              videoRef={videoRef}
-              videoSourceKey={videoSourceKey}
-              className="absolute inset-0 h-full w-full pointer-events-none"
-              loadingClassName="absolute inset-0 h-full w-full bg-black"
-              mirror={mirror}
-              recordingOrientation={recordingOrientation}
-              fit={playbackFit}
-              manualPlayOnly
-              audible={playbackAudible}
-            />
+            {decoderActive ? (
+              <TakeVideoPlayer
+                filePath={filePath}
+                videoUrl={src ?? ''}
+                mimeType={mimeType}
+                videoRef={videoRef}
+                videoSourceKey={videoSourceKey}
+                className="absolute inset-0 h-full w-full pointer-events-none"
+                loadingClassName="absolute inset-0 h-full w-full bg-black"
+                mirror={mirror}
+                recordingOrientation={recordingOrientation}
+                fit={playbackFit}
+                manualPlayOnly
+                audible={playbackAudible}
+              />
+            ) : (
+              <PipMediaPoster posterUrl={posterUrl} />
+            )}
 
             {onExpand && (
               dragSourceProps ? (
@@ -355,8 +417,11 @@ function PipWindow({
                   {...dragSourceProps}
                 />
               ) : (
-                <button
+                <Pressable
                   type="button"
+                  intensity="soft"
+                  squish={false}
+                  haptic="light"
                   className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
                   onClick={handleVideoAreaClick}
                   aria-label={`Open ${label} in full screen`}
@@ -366,8 +431,11 @@ function PipWindow({
 
             <div className="absolute inset-0 z-[5] pointer-events-none">
               {!suspendPlayback && (
-              <button
+              <Pressable
                 type="button"
+                intensity="icon"
+                squish={false}
+                haptic="light"
                 onPointerDown={stopEventBubble}
                 onTouchStart={stopEventBubble}
                 onTouchEnd={stopEventBubble}
@@ -382,13 +450,13 @@ function PipWindow({
                     <Play className="h-3 w-3 fill-white" />
                   )}
                 </span>
-              </button>
+              </Pressable>
               )}
             </div>
 
             {!suspendPlayback && (
             <div
-              className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/60 px-2 py-1 backdrop-blur-md transition-transform duration-200 group-hover:translate-y-0"
+              className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/70 px-2 py-1 transition-transform duration-200 group-hover:translate-y-0"
               onClick={(e) => e.stopPropagation()}
               {...touchBubbleBlockProps()}
             >
@@ -419,8 +487,11 @@ function PipWindow({
         </div>
 
         {showPinAsBest && onPinAsBest && !isFill && (
-          <button
+          <Pressable
             type="button"
+            intensity="icon"
+            squish={false}
+            haptic="medium"
             onPointerDown={stopEventBubble}
             onTouchStart={stopEventBubble}
             onTouchEnd={stopEventBubble}
@@ -428,18 +499,21 @@ function PipWindow({
               e.stopPropagation()
               onPinAsBest()
             }}
-            className={`${FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
+            className={`${HUD_SOLID_FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
             style={{ top: chromeInset, left: chromeInset }}
             aria-label="Pin current take as Best Take"
             title="Pin as Best Take"
           >
             <Pin className="h-3.5 w-3.5" />
-          </button>
+          </Pressable>
         )}
 
         {hasMedia && !isFill && (
-          <button
+          <Pressable
             type="button"
+            intensity="icon"
+            squish={false}
+            haptic="light"
             onPointerDown={stopEventBubble}
             onTouchStart={stopEventBubble}
             onTouchEnd={stopEventBubble}
@@ -447,18 +521,21 @@ function PipWindow({
               e.stopPropagation()
               onUnpin()
             }}
-            className={FLOAT_BADGE}
+            className={HUD_SOLID_FLOAT_BADGE}
             style={{ top: chromeInset, right: chromeInset }}
             aria-label={`Unload ${label}`}
           >
             <X className="h-3 w-3" />
-          </button>
+          </Pressable>
         )}
       </div>
 
       {isFill && showPinAsBest && onPinAsBest && (
-        <button
+        <Pressable
           type="button"
+          intensity="icon"
+          squish={false}
+          haptic="medium"
           onPointerDown={stopEventBubble}
           onTouchStart={stopEventBubble}
           onTouchEnd={stopEventBubble}
@@ -466,18 +543,20 @@ function PipWindow({
             e.stopPropagation()
             onPinAsBest()
           }}
-          className={`${FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
+          className={`${HUD_SOLID_FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
           style={{ top: -10, left: -10 }}
           aria-label="Pin current take as Best Take"
           title="Pin as Best Take"
         >
           <Pin className="h-3.5 w-3.5" />
-        </button>
+        </Pressable>
       )}
 
       {isFill && hasMedia && (
-        <button
+        <Pressable
           type="button"
+          intensity="icon"
+          haptic="light"
           onPointerDown={stopEventBubble}
           onTouchStart={stopEventBubble}
           onTouchEnd={stopEventBubble}
@@ -485,12 +564,12 @@ function PipWindow({
             e.stopPropagation()
             onUnpin()
           }}
-          className={FLOAT_BADGE}
+          className={HUD_SOLID_FLOAT_BADGE}
           style={{ top: -10, right: -10 }}
           aria-label={`Unload ${label}`}
         >
           <X className="h-3 w-3" />
-        </button>
+        </Pressable>
       )}
 
       {showUploadBadge && (
@@ -500,7 +579,7 @@ function PipWindow({
           onTouchStart={stopEventBubble}
           onTouchEnd={stopEventBubble}
           onClick={stopEventBubble}
-          className={FLOAT_BADGE}
+          className={HUD_SOLID_FLOAT_BADGE}
           style={{ top: -12, left: -12 }}
           aria-label="Upload best take media"
         >

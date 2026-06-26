@@ -332,6 +332,7 @@ export default function OnboardingTutorial({
             <Pressable
               type="button"
               intensity="soft"
+              squish={false}
               haptic="light"
               hapticFeedback={hapticFeedback}
               onClick={handleSkip}
@@ -364,6 +365,7 @@ export default function OnboardingTutorial({
             <Pressable
               type="button"
               intensity="soft"
+              squish={false}
               haptic="light"
               hapticFeedback={hapticFeedback}
               onClick={handlePrimary}

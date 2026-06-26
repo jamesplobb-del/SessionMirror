@@ -25,7 +25,9 @@ interface SplitCompareLayoutProps {
   recordingMode: RecordingMode
   isRecording: boolean
   cameraReady: boolean
+  cameraResumeNonce?: number
   pitchStageActive: boolean
+  metronomeStageActive: boolean
   onUnpinBenchmark: () => void
   onUnpinChallenger: () => void
   onClearYoutube: () => void
@@ -65,7 +67,9 @@ export default function SplitCompareLayout({
   recordingMode,
   isRecording,
   cameraReady,
+  cameraResumeNonce = 0,
   pitchStageActive,
+  metronomeStageActive,
   onUnpinBenchmark,
   onUnpinChallenger,
   onClearYoutube,
@@ -195,8 +199,10 @@ export default function SplitCompareLayout({
                   streamGeneration={streamGeneration}
                   recordingMode={recordingMode}
                   isRecording={isRecording}
+                  resumeNonce={cameraResumeNonce}
                   modePreparing={!cameraReady && !isRecording && !cameraNeedsPermission}
                   pitchStageActive={pitchStageActive}
+                  metronomeStageActive={metronomeStageActive}
                 />
               </div>
             </>

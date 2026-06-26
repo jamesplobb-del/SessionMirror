@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react'
+import { useRef, memo, type RefObject } from 'react'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
@@ -91,7 +91,7 @@ export function PipDragGhost({
   )
 }
 
-export default function PipCompareRow({
+export default memo(function PipCompareRow({
   benchmarkTake,
   challengerTake,
   youtubeEmbedUrl,
@@ -136,8 +136,8 @@ export default function PipCompareRow({
 
   return (
     <>
-      <div className="app-pip-row">
-        <div ref={benchmarkDropRef} className="pointer-events-auto shrink-0">
+      <div className="app-pip-row" data-tutorial="pip-row">
+        <div ref={benchmarkDropRef} className="app-pip-slot pointer-events-auto">
           <BestTakeBox
             layout="pip"
             take={benchmarkTake}
@@ -157,9 +157,9 @@ export default function PipCompareRow({
           />
         </div>
 
-        <PipWindow
-          className="pointer-events-auto shrink-0"
-          src={challengerTake?.videoUrl ?? null}
+        <div className="app-pip-slot pointer-events-auto" data-tutorial="challenger-card">
+          <PipWindow
+            src={challengerTake?.videoUrl ?? null}
           filePath={challengerTake?.filePath}
           mimeType={
             challengerTake?.videoMimeType ??
@@ -186,7 +186,12 @@ export default function PipCompareRow({
           onAutoPlayComplete={onChallengerAutoPlayComplete}
           showPinAsBest={showPinCurrentAsBest}
           onPinAsBest={onPinCurrentAsBest}
-        />
+          posterUrl={
+            challengerTake?.thumbnailUrl ??
+            (challengerTake?.mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : null)
+          }
+          />
+        </div>
       </div>
 
       {ghost && challengerTake && (
@@ -199,4 +204,4 @@ export default function PipCompareRow({
       )}
     </>
   )
-}
+})
