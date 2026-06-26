@@ -203,6 +203,8 @@ export function useCameraSession({
   const isRecordingRef = useRef(false)
   const readyRef = useRef(false)
   const resumeInFlightRef = useRef(false)
+  const streamAcquireInFlightRef = useRef(false)
+  const previewHealthyRef = useRef(false)
   const foregroundRestartTokenRef = useRef(0)
   const foregroundRestartTimerRef = useRef<number | null>(null)
   const backgroundSuspendTimerRef = useRef<number | null>(null)
@@ -258,28 +260,36 @@ export function useCameraSession({
 
   const ensureCameraPreviewActive = useCallback((): boolean => {
     const mode = recordingModeRef.current
+    if (mode !== 'video') {
+      previewHealthyRef.current = false
+      return false
+    }
+
     const stream = streamRef.current
-    if (!isStreamRecordable(stream, mode)) return false
+    if (!isStreamRecordable(stream, mode)) {
+      previewHealthyRef.current = false
+      return false
+    }
 
     syncPreviewTargets(stream, mode)
 
-    if (mode === 'video') {
-      const videos = [previewRef.current, secondaryPreviewRef?.current ?? null]
-      for (const video of videos) {
-        if (!video || !stream) continue
-        if (video.srcObject !== stream) {
-          video.srcObject = stream
-        }
-        video.muted = true
-        if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-          void video.play().catch((err) => console.warn('Playback intercepted:', err))
-        }
+    const videos = [previewRef.current, secondaryPreviewRef?.current ?? null]
+    for (const video of videos) {
+      if (!video || !stream) continue
+      if (video.srcObject !== stream) {
+        video.srcObject = stream
+      }
+      video.muted = true
+      if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        void video.play().catch((err) => console.warn('Playback intercepted:', err))
       }
     }
 
     setNeedsPermission(false)
     setReady(true)
-    return isVideoPreviewRecoverable(previewRef.current, stream, mode)
+    const healthy = isVideoPreviewHealthy(previewRef.current, stream, mode)
+    previewHealthyRef.current = healthy
+    return healthy
   }, [secondaryPreviewRef, syncPreviewTargets])
 
   const retuneCaptureAudio = useCallback(async () => {
@@ -388,6 +398,7 @@ export function useCameraSession({
       detachAllPreviewTargets()
 
       const constraints = getMediaConstraints(mode)
+      streamAcquireInFlightRef.current = true
 
       try {
         const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
@@ -419,6 +430,8 @@ export function useCameraSession({
         setNeedsPermission(true)
         setReady(false)
         return null
+      } finally {
+        streamAcquireInFlightRef.current = false
       }
     },
     [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets],
@@ -521,6 +534,13 @@ export function useCameraSession({
         syncPreviewTargets(streamRef.current, mode)
         setReady(true)
         activeStream = streamRef.current
+        if (mode === 'video') {
+          previewHealthyRef.current = isVideoPreviewHealthy(
+            previewRef.current,
+            streamRef.current,
+            'video',
+          )
+        }
         return
       }
 
@@ -595,6 +615,7 @@ export function useCameraSession({
         streamRef.current = null
       }
       syncPreviewTargets(null, recordingMode)
+      previewHealthyRef.current = false
       setReady(false)
     }
   }, [
@@ -1114,7 +1135,12 @@ export function useCameraSession({
   }, [cancelScheduledRelease, releaseLiveStream])
 
   const restartCameraAfterForeground = useCallback(async () => {
-    if (isRecordingRef.current || resumeInFlightRef.current) return
+    if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
+      if (import.meta.env.DEV) {
+        console.log('[CameraPreview] resume skipped: already starting')
+      }
+      return
+    }
 
     const restartToken = ++foregroundRestartTokenRef.current
     resumeInFlightRef.current = true
@@ -1135,6 +1161,9 @@ export function useCameraSession({
       const stream = streamRef.current
       if (isStreamRecordable(stream, mode)) {
         if (ensureCameraPreviewActive()) {
+          if (import.meta.env.DEV) {
+            console.log('[CameraPreview] resume skipped: already active')
+          }
           return
         }
       }
@@ -1188,8 +1217,58 @@ export function useCameraSession({
     }, BACKGROUND_SUSPEND_DELAY_MS)
   }, [suspendCameraForBackground])
 
+  const logCameraPreview = useCallback((message: string) => {
+    if (!import.meta.env.DEV) return
+    console.log(`[CameraPreview] ${message}`)
+  }, [])
+
+  const requestCameraPreviewResume = useCallback(
+    async (reason = 'unknown') => {
+      if (recordingModeRef.current !== 'video') return
+
+      if (streamAcquireInFlightRef.current || resumeInFlightRef.current) {
+        logCameraPreview('resume skipped: already starting')
+        return
+      }
+
+      if (
+        previewHealthyRef.current &&
+        isVideoPreviewHealthy(previewRef.current, streamRef.current, 'video')
+      ) {
+        logCameraPreview('resume skipped: already active')
+        return
+      }
+
+      if (ensureCameraPreviewActive()) {
+        logCameraPreview('resume skipped: already active')
+        return
+      }
+
+      logCameraPreview('resume requested')
+
+      try {
+        await restartCameraAfterForeground()
+
+        if (ensureCameraPreviewActive()) {
+          logCameraPreview('live preview restored')
+        } else {
+          console.warn(`[CameraPreview] resume failed (${reason})`)
+        }
+      } catch (err) {
+        console.warn(`[CameraPreview] resume failed (${reason})`, err)
+      }
+    },
+    [
+      ensureCameraPreviewActive,
+      logCameraPreview,
+      restartCameraAfterForeground,
+    ],
+  )
+
   const refreshCameraSession = useCallback(async () => {
-    if (isRecordingRef.current || resumeInFlightRef.current) return
+    if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
+      return
+    }
 
     cancelScheduledRelease()
     applyViewportCssVarsOnResume()
@@ -1351,6 +1430,7 @@ export function useCameraSession({
         : 0,
     restartAutoPreRollCapture,
     refreshCameraSession,
+    requestCameraPreviewResume,
     reacquireStreamForAudioRoute,
     retuneCaptureAudio,
     reacquireCaptureStream,
