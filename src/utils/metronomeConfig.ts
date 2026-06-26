@@ -1,4 +1,4 @@
-export type MetronomeMeter = '2/4' | '3/4' | '4/4' | '6/8' | '9/8' | '12/8'
+export type MetronomeMeter = '2/4' | '3/4' | '4/4' | '5/4' | '6/8' | '9/8' | '12/8'
 
 export interface MetronomeMeterDef {
   label: string
@@ -12,6 +12,7 @@ export const METRONOME_METERS: Record<MetronomeMeter, MetronomeMeterDef> = {
   '2/4': { label: '2/4', beatsPerBar: 2, group: 'simple' },
   '3/4': { label: '3/4', beatsPerBar: 3, group: 'simple' },
   '4/4': { label: '4/4', beatsPerBar: 4, group: 'simple' },
+  '5/4': { label: '5/4', beatsPerBar: 5, group: 'simple' },
   '6/8': { label: '6/8', beatsPerBar: 2, group: 'compound', eighthNotesPerBar: 6 },
   '9/8': { label: '9/8', beatsPerBar: 3, group: 'compound', eighthNotesPerBar: 9 },
   '12/8': { label: '12/8', beatsPerBar: 4, group: 'compound', eighthNotesPerBar: 12 },
@@ -19,6 +20,7 @@ export const METRONOME_METERS: Record<MetronomeMeter, MetronomeMeterDef> = {
 
 export const SIMPLE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4']
 export const COMPOUND_METERS: MetronomeMeter[] = ['6/8', '9/8', '12/8']
+export const AUDIO_STAGE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4', '5/4', '6/8']
 
 export const MIN_BPM = 1
 export const MAX_BPM = 400
@@ -35,12 +37,35 @@ export const METRONOME_SUBDIVISIONS: { value: MetronomeSubdivision; label: strin
   { value: '16ths', label: '16ths' },
 ]
 
+export const STAGE_SUBDIVISIONS: { value: MetronomeSubdivision; label: string }[] = [
+  { value: 'off', label: 'Quarter Notes' },
+  { value: '8ths', label: 'Eighth Notes' },
+  { value: 'triplets', label: 'Triplets' },
+  { value: '16ths', label: 'Sixteenth Notes' },
+]
+
+export const AUDIO_STAGE_METRONOME_SOUNDS = [{ id: 'classic', label: 'Classic' }] as const
+
 const STORAGE_KEY = 'sessionmirror:metronome-prefs'
 
 export interface MetronomePrefs {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
+  accentFirstBeat: boolean
+  soundId: string
+}
+
+const DEFAULT_SOUND_ID = 'classic'
+
+function defaultMetronomePrefs(): MetronomePrefs {
+  return {
+    bpm: DEFAULT_BPM,
+    meter: DEFAULT_METER,
+    subdivision: DEFAULT_SUBDIVISION,
+    accentFirstBeat: true,
+    soundId: DEFAULT_SOUND_ID,
+  }
 }
 
 export function clampBpm(value: number): number {
@@ -78,16 +103,21 @@ export function loadMetronomePrefs(): MetronomePrefs {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) {
-      return { bpm: DEFAULT_BPM, meter: DEFAULT_METER, subdivision: DEFAULT_SUBDIVISION }
+      return defaultMetronomePrefs()
     }
     const parsed = JSON.parse(raw) as Partial<MetronomePrefs>
     return {
       bpm: clampBpm(Number(parsed.bpm) || DEFAULT_BPM),
       meter: parseMeter(parsed.meter),
       subdivision: parseSubdivision(parsed.subdivision),
+      accentFirstBeat: parsed.accentFirstBeat !== false,
+      soundId:
+        typeof parsed.soundId === 'string' && parsed.soundId.length > 0
+          ? parsed.soundId
+          : DEFAULT_SOUND_ID,
     }
   } catch {
-    return { bpm: DEFAULT_BPM, meter: DEFAULT_METER, subdivision: DEFAULT_SUBDIVISION }
+    return defaultMetronomePrefs()
   }
 }
 
@@ -99,6 +129,8 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
         bpm: clampBpm(prefs.bpm),
         meter: prefs.meter,
         subdivision: prefs.subdivision,
+        accentFirstBeat: prefs.accentFirstBeat,
+        soundId: prefs.soundId,
       }),
     )
   } catch {

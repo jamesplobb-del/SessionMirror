@@ -4,6 +4,11 @@ import {
   parseAudioEnhancerSettings,
   type AudioEnhancerSettings,
 } from './audioEnhancer'
+import {
+  parseSpeakerLoudnessPreset,
+  type SpeakerLoudnessPreset,
+} from './speakerLoudnessMastering'
+import { parseCaptureProfile, type CaptureProfile } from './audioCapture'
 
 export interface AppSettings {
   /** Audio mode: auto-start/stop recording from mic levels. */
@@ -32,12 +37,14 @@ export interface AppSettings {
   audioEnhancerEnabled: boolean
   /** Persisted enhancer preset and slider values. */
   audioEnhancerSettings: AudioEnhancerSettings
+  /** Speaker-only loudness mastering preset for built-in iPhone speakers. */
+  speakerLoudnessPreset: SpeakerLoudnessPreset
   /** Pause YouTube and enable mic echo cancellation while recording to reduce bleed. */
   excludeYoutubeFromRecording: boolean
   /** Bluetooth headphones for playback, device mic for recording (avoids HFP headset mic). */
   useIphoneMicForRecording: boolean
-  /** User-enabled: use headphone gain tier (6×) for Bluetooth/wired headphone playback. */
-  bluetoothHeadphonePlaybackMode: boolean
+  /** Mic capture profile — Natural preserves prior behavior; Loud Camera-like enables AGC. */
+  captureProfile: CaptureProfile
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -54,9 +61,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   takeCardScale: 100,
   audioEnhancerEnabled: false,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
+  speakerLoudnessPreset: 'loud',
   excludeYoutubeFromRecording: false,
   useIphoneMicForRecording: false,
-  bluetoothHeadphonePlaybackMode: false,
+  captureProfile: 'natural',
 }
 
 /** Floating widgets — forced off on each cold app start. */
@@ -134,6 +142,9 @@ export function loadAppSettings(): AppSettings {
       audioEnhancerSettings: parseAudioEnhancerSettings(
         parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),
+      speakerLoudnessPreset: parseSpeakerLoudnessPreset(
+        parsed.speakerLoudnessPreset ?? DEFAULT_APP_SETTINGS.speakerLoudnessPreset,
+      ),
       excludeYoutubeFromRecording:
         parsed.excludeYoutubeFromRecording !== undefined
           ? Boolean(parsed.excludeYoutubeFromRecording)
@@ -142,12 +153,9 @@ export function loadAppSettings(): AppSettings {
         parsed.useIphoneMicForRecording !== undefined
           ? Boolean(parsed.useIphoneMicForRecording)
           : DEFAULT_APP_SETTINGS.useIphoneMicForRecording,
-      bluetoothHeadphonePlaybackMode:
-        parsed.bluetoothHeadphonePlaybackMode !== undefined
-          ? Boolean(parsed.bluetoothHeadphonePlaybackMode)
-          : (parsed as { forceHeadphoneGain?: boolean }).forceHeadphoneGain !== undefined
-            ? Boolean((parsed as { forceHeadphoneGain?: boolean }).forceHeadphoneGain)
-            : DEFAULT_APP_SETTINGS.bluetoothHeadphonePlaybackMode,
+      captureProfile: parseCaptureProfile(
+        parsed.captureProfile ?? DEFAULT_APP_SETTINGS.captureProfile,
+      ),
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

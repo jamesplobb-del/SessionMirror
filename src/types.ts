@@ -1,3 +1,5 @@
+import type { PlaybackGainMetadata } from './utils/recordingDiagnostics'
+
 export type MediaType = 'video' | 'audio'
 
 export type RecordingMode = 'video' | 'audio'
@@ -29,6 +31,8 @@ export interface Take {
   recordingOrientation?: 'portrait' | 'landscape'
   /** Optional pitch contour from offline or live analysis */
   pitchSeries?: PitchSample[]
+  /** Non-destructive loudness metadata — does not alter the saved file. */
+  playbackGainMetadata?: PlaybackGainMetadata
 }
 
 export type SortMode = 'newest' | 'highest-rated'

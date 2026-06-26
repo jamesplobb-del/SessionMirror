@@ -1,6 +1,7 @@
 import { memo, useEffect, type RefObject } from 'react'
 import { Mic } from 'lucide-react'
 import type { RecordingMode } from '../types'
+import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
 import { iosBulletproofVideoProps } from '../utils/mobileVideo'
 
 interface LiveCameraBackgroundProps {
@@ -9,10 +10,13 @@ interface LiveCameraBackgroundProps {
   streamGeneration: number
   recordingMode: RecordingMode
   isRecording: boolean
+  resumeNonce?: number
   /** Brief overlay while switching between camera and audio capture. */
   modePreparing?: boolean
   /** Hide the idle audio-mode mic UI while main-screen pitch analysis is showing. */
   pitchStageActive?: boolean
+  /** Hide the idle audio-mode mic UI while the full-screen metronome stage is showing. */
+  metronomeStageActive?: boolean
   /** fullscreen = behind HUD; embedded = inside split-view panel */
   variant?: 'fullscreen' | 'embedded'
   /** Keep the preview element mounted but off-screen (split view uses embedded preview). */
@@ -25,17 +29,28 @@ function LiveCameraBackground({
   streamGeneration,
   recordingMode,
   isRecording,
+  resumeNonce = 0,
   modePreparing = false,
   pitchStageActive = false,
+  metronomeStageActive = false,
   variant = 'fullscreen',
   visuallySuppressed = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
-  const showAudioIdle = isAudioMode && !pitchStageActive
+  const showAudioIdle = isAudioMode && !pitchStageActive && !metronomeStageActive
   const isEmbedded = variant === 'embedded'
   const overlayClass = isEmbedded
     ? 'camera-background-overlay camera-background-overlay--embedded'
     : 'camera-background-overlay'
+
+  const { resumingPreview, placeholderUrl, placeholderFading, showSlowIndicator } =
+    useCameraPreviewResume({
+      previewRef,
+      streamRef,
+      streamGeneration,
+      recordingMode,
+      resumeNonce,
+    })
 
   useEffect(() => {
     const video = previewRef.current
@@ -51,14 +66,16 @@ function LiveCameraBackground({
 
     if (video.srcObject !== stream) {
       video.srcObject = stream
-      void video.play().catch((err) => console.warn('Playback intercepted:', err))
-    } else if (video.paused) {
+    }
+    if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
   }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode])
 
   useEffect(() => {
-    if (isAudioMode) return
+    if (isAudioMode || modePreparing || resumingPreview) return
+
+    let reviveTimer: number | null = null
 
     const revivePreview = () => {
       const video = previewRef.current
@@ -73,36 +90,45 @@ function LiveCameraBackground({
       if (video.srcObject !== stream) {
         video.srcObject = stream
       }
-      if (video.paused) {
+      if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
         void video.play().catch((err) => console.warn('Playback intercepted:', err))
       }
     }
 
+    const scheduleRevive = () => {
+      if (reviveTimer !== null) return
+      reviveTimer = window.setTimeout(() => {
+        reviveTimer = null
+        revivePreview()
+      }, 400)
+    }
+
     revivePreview()
-    const intervalId = window.setInterval(revivePreview, 350)
     const video = previewRef.current
-    video?.addEventListener('pause', revivePreview)
-    video?.addEventListener('stalled', revivePreview)
-    video?.addEventListener('suspend', revivePreview)
+    video?.addEventListener('pause', scheduleRevive)
+    video?.addEventListener('stalled', scheduleRevive)
+    video?.addEventListener('suspend', scheduleRevive)
 
     return () => {
-      window.clearInterval(intervalId)
-      video?.removeEventListener('pause', revivePreview)
-      video?.removeEventListener('stalled', revivePreview)
-      video?.removeEventListener('suspend', revivePreview)
+      if (reviveTimer !== null) window.clearTimeout(reviveTimer)
+      video?.removeEventListener('pause', scheduleRevive)
+      video?.removeEventListener('stalled', scheduleRevive)
+      video?.removeEventListener('suspend', scheduleRevive)
     }
-  }, [isAudioMode, previewRef, streamRef, streamGeneration, visuallySuppressed])
+  }, [isAudioMode, modePreparing, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
 
   useEffect(() => {
-    if (visuallySuppressed || isAudioMode) return
+    if (visuallySuppressed || isAudioMode || modePreparing) return
     const video = previewRef.current
     const stream = streamRef.current
     if (!video || !stream) return
     if (video.srcObject !== stream) {
       video.srcObject = stream
     }
-    void video.play().catch((err) => console.warn('Playback intercepted:', err))
-  }, [isAudioMode, previewRef, streamRef, streamGeneration, visuallySuppressed])
+    if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      void video.play().catch((err) => console.warn('Playback intercepted:', err))
+    }
+  }, [isAudioMode, modePreparing, previewRef, streamRef, streamGeneration, visuallySuppressed])
 
   const shellClass = isEmbedded
     ? 'camera-background camera-background--embedded'
@@ -110,22 +136,56 @@ function LiveCameraBackground({
       ? 'camera-background camera-background--visually-suppressed'
       : 'camera-background'
 
+  const previewClassName = [
+    isEmbedded ? 'camera-preview--embedded' : 'camera-preview',
+    'camera-preview--mirror',
+    'camera-preview--live',
+    isAudioMode ? 'camera-preview--hidden' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const showPreparingOverlay = modePreparing && !resumingPreview
+  const showPlaceholder = resumingPreview && Boolean(placeholderUrl)
+
   return (
     <div className={shellClass} aria-hidden={!isEmbedded && !visuallySuppressed}>
+      {showPlaceholder && (
+        <div
+          className={`camera-preview-placeholder ${
+            isEmbedded ? 'camera-preview-placeholder--embedded' : ''
+          } ${placeholderFading ? 'camera-preview-placeholder--fading' : ''}`}
+          aria-hidden
+        >
+          <img
+            src={placeholderUrl ?? undefined}
+            alt=""
+            className="camera-preview-placeholder__frame"
+            draggable={false}
+            decoding="async"
+          />
+          {showSlowIndicator && (
+            <div className="camera-preview-placeholder__indicator" aria-hidden>
+              <div className="camera-preview-resume-spinner" />
+            </div>
+          )}
+        </div>
+      )}
+
       <video
         ref={previewRef}
         autoPlay
         muted
         {...iosBulletproofVideoProps}
-        className={`${
-          isEmbedded ? 'camera-preview--embedded' : 'camera-preview'
-        } camera-preview--mirror camera-preview--live ${
-          isAudioMode ? 'camera-preview--hidden' : ''
-        }`}
+        className={previewClassName}
       />
 
       {isAudioMode && pitchStageActive && (
         <div className="pitch-stage-ambient pitch-stage-ambient--live-tuner" aria-hidden />
+      )}
+
+      {isAudioMode && metronomeStageActive && (
+        <div className="metronome-stage-ambient metronome-stage-ambient--live" aria-hidden />
       )}
 
       {showAudioIdle && (
@@ -165,7 +225,7 @@ function LiveCameraBackground({
         }`}
       />
 
-      {modePreparing && (
+      {showPreparingOverlay && (
         <div
           className={`${overlayClass} camera-background-overlay--preparing pointer-events-none`}
           aria-hidden
@@ -183,8 +243,10 @@ export default memo(
     prev.streamGeneration === next.streamGeneration &&
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
+    prev.resumeNonce === next.resumeNonce &&
     prev.modePreparing === next.modePreparing &&
     prev.pitchStageActive === next.pitchStageActive &&
+    prev.metronomeStageActive === next.metronomeStageActive &&
     prev.variant === next.variant &&
     prev.visuallySuppressed === next.visuallySuppressed,
 )

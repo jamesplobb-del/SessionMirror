@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import { useSheetDragDismiss, readSheetSlideDistance } from '../../hooks/useSheetDragDismiss'
 import {
   iosFade,
   iosSheetBackdrop,
@@ -11,11 +12,6 @@ import {
 } from '../../utils/motionPresets'
 import { nativeGlideIn, nativeGlideShown } from '../../utils/interactiveUx'
 import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
-
-function readSlideDistance(): number {
-  if (typeof window === 'undefined') return 800
-  return window.visualViewport?.height ?? window.innerHeight
-}
 
 interface AnimatedBottomSheetProps {
   isOpen: boolean
@@ -40,8 +36,14 @@ export default function AnimatedBottomSheet({
   motionPreset = 'premium',
   onEnterComplete,
 }: AnimatedBottomSheetProps) {
-  const [slideDistance, setSlideDistance] = useState(readSlideDistance)
+  const [slideDistance, setSlideDistance] = useState(readSheetSlideDistance)
   const enterNotifiedRef = useRef(false)
+
+  const { sheetDragProps, dragHandleProps, backdropOpacity } = useSheetDragDismiss({
+    enabled: isOpen,
+    slideDistance,
+    onDismiss: onClose,
+  })
 
   useLayoutEffect(() => {
     if (isOpen) {
@@ -52,7 +54,7 @@ export default function AnimatedBottomSheet({
   useLayoutEffect(() => {
     if (!isOpen) return
 
-    const update = () => setSlideDistance(readSlideDistance())
+    const update = () => setSlideDistance(readSheetSlideDistance())
     update()
     window.addEventListener('resize', update)
     window.visualViewport?.addEventListener('resize', update)
@@ -90,10 +92,10 @@ export default function AnimatedBottomSheet({
         <>
           <motion.button
             type="button"
-            className="fixed inset-0 z-40 cursor-default touch-none bg-black/55"
+            className="tutorial-sheet-backdrop fixed inset-0 z-40 cursor-default touch-none bg-black/80"
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: backdropOpacity }}
             exit={{ opacity: 0 }}
             transition={backdropTransition}
             style={motionGpuLayer}
@@ -102,7 +104,7 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             ref={sheetRef}
-            className={`fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transform-gpu`}
+            className={`animated-bottom-sheet fixed inset-x-0 bottom-0 z-50 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transform-gpu`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
@@ -112,6 +114,7 @@ export default function AnimatedBottomSheet({
             exit={useScale ? { opacity: 0, y: slideDistance, scale: 0.985 } : { opacity: 0, y: slideDistance }}
             transition={sheetTransition}
             onAnimationComplete={handleSheetAnimationComplete}
+            {...sheetDragProps}
           >
             <motion.div
               className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -120,9 +123,11 @@ export default function AnimatedBottomSheet({
               transition={nativeGlideEase}
             >
               <div
-                className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-stone-300/90"
-                aria-hidden
-              />
+                {...dragHandleProps}
+                className={`${dragHandleProps.className} min-h-11 justify-center pb-1 pt-2.5`}
+              >
+                <div className="h-1 w-10 rounded-full bg-stone-300/90" />
+              </div>
               {children}
             </motion.div>
           </motion.div>

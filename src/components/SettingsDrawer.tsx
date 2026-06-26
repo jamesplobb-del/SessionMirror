@@ -13,8 +13,6 @@ import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
-import { applyUseIphoneMicForRecording } from '../utils/audioSessionRoute'
-
 interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
@@ -229,20 +227,10 @@ export default function SettingsDrawer({
             />
 
             <SettingToggle
-              label="Use Device Microphone"
-              description="Keeps the iPhone built-in microphone for recording and pitch analysis while routing metronome, playback, and monitoring through Bluetooth headphones (A2DP)."
+              label="Use device mic for recording (prevents Bluetooth quality drop)"
+              description="Routes backing tracks and playback through Bluetooth headphones (A2DP) while keeping the device built-in microphone for recording — better quality for the Audio Enhancer and hands-free takes."
               checked={settings.useIphoneMicForRecording}
-              onChange={(checked) => {
-                onUpdate({ useIphoneMicForRecording: checked })
-                void applyUseIphoneMicForRecording(checked)
-              }}
-            />
-
-            <SettingToggle
-              label="Bluetooth/Headphone Playback Mode"
-              description="Use the quieter headphone gain path (6×) for Bluetooth or wired headphones. Leave off for normal phone speaker playback (40×). Does not change mic routing."
-              checked={settings.bluetoothHeadphonePlaybackMode}
-              onChange={(checked) => onUpdate({ bluetoothHeadphonePlaybackMode: checked })}
+              onChange={(checked) => onUpdate({ useIphoneMicForRecording: checked })}
             />
 
             <AnimatedExpand open={settings.autoSoundRecording}>
@@ -319,12 +307,14 @@ export default function SettingsDrawer({
               Playback
             </h3>
 
-            <SettingToggle
-              label="Audio Enhancer"
-              description="Applies smart EQ, compression, and reverb presets during take playback. Off keeps the original flat mix."
-              checked={hudQuickSettings.audioEnhancerEnabled}
-              onChange={onAudioEnhancerChange}
-            />
+            <div data-tutorial="settings-enhancer">
+              <SettingToggle
+                label="Audio Enhancer"
+                description="Applies smart EQ, compression, and reverb presets during take playback. Off keeps the original flat mix."
+                checked={hudQuickSettings.audioEnhancerEnabled}
+                onChange={onAudioEnhancerChange}
+              />
+            </div>
 
             <AnimatedExpand open={hudQuickSettings.audioEnhancerEnabled}>
               <div className="pt-3">

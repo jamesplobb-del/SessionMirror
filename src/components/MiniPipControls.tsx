@@ -1,6 +1,5 @@
+import Pressable from './ui/Pressable'
 import { stopEventBubble } from '../utils/eventBubbling'
-import { triggerLightHaptic } from '../utils/haptics'
-import { NATIVE_SQUISH } from '../utils/interactiveUx'
 import { Pause, Play, Volume2 } from 'lucide-react'
 import type { PointerEvent } from 'react'
 
@@ -19,16 +18,15 @@ export default function MiniPipControls({
 }: MiniPipControlsProps) {
   return (
     <div className="flex items-center gap-1.5">
-      <button
+      <Pressable
         type="button"
+        intensity="icon"
+        haptic="light"
         onPointerDown={stopEventBubble}
         onTouchStart={stopEventBubble}
         onTouchEnd={stopEventBubble}
-        onPointerUp={(event) => {
-          triggerLightHaptic()
-          onPlayPauseClick(event)
-        }}
-        className={`flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white ${NATIVE_SQUISH}`}
+        onClick={onPlayPauseClick}
+        className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white"
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >
         {isPlaying ? (
@@ -36,7 +34,7 @@ export default function MiniPipControls({
         ) : (
           <Play className="h-2.5 w-2.5 fill-white" />
         )}
-      </button>
+      </Pressable>
       <Volume2 className="h-2.5 w-2.5 text-white/60" />
       <input
         type="range"

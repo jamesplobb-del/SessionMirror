@@ -9,6 +9,7 @@ import {
   RECORDING_TIMESLICE_MS,
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
+import { maybeBoostTabletPreviewResolution } from '../utils/videoCapture'
 import { readRecordingOrientation } from '../utils/takeVideoTransform'
 import {
   normalizeBlobMime,
@@ -16,11 +17,15 @@ import {
   StreamingTakeWriter,
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
-import { tuneMusicRecordingStream } from '../utils/audioCapture'
+import { tuneMusicRecordingStream, getActiveCaptureProfile } from '../utils/audioCapture'
+import {
+  snapshotCaptureAudioTrack,
+  type RecordingTrackSnapshot,
+} from '../utils/recordingDiagnostics'
+import { AUTO_RECORD_PREROLL_MS } from '../utils/autoRecordPlayback'
 import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
-  applyViewportCssVars,
   applyViewportCssVarsOnResume,
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
@@ -103,6 +108,32 @@ function detachRecorder(recorder: MediaRecorder) {
   recorder.onerror = null
 }
 
+function isVideoPreviewRecoverable(
+  video: HTMLVideoElement | null,
+  stream: MediaStream | null,
+  mode: RecordingMode,
+): boolean {
+  if (mode !== 'video' || !video || !stream) return true
+  const videoLive = stream
+    .getVideoTracks()
+    .some((track) => track.readyState === 'live' && track.enabled)
+  if (!videoLive) return false
+  return video.srcObject === stream
+}
+
+function isVideoPreviewHealthy(
+  video: HTMLVideoElement | null,
+  stream: MediaStream | null,
+  mode: RecordingMode,
+): boolean {
+  if (!isVideoPreviewRecoverable(video, stream, mode)) return false
+  if (mode !== 'video' || !video) return true
+  return (
+    !video.paused &&
+    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+  )
+}
+
 function attachPreviewStream(
   video: HTMLVideoElement | null,
   stream: MediaStream | null,
@@ -121,7 +152,9 @@ function attachPreviewStream(
     video.srcObject = stream
   }
   video.muted = true
-  void video.play().catch((err) => console.warn('Playback intercepted:', err))
+  if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    void video.play().catch((err) => console.warn('Playback intercepted:', err))
+  }
 }
 
 function attachPreviewTargets(
@@ -186,6 +219,9 @@ export function useCameraSession({
   } | null>(null)
   const warmAutoAudioInFlightRef = useRef(false)
   const autoAudioDisarmInFlightRef = useRef<Promise<void> | null>(null)
+  const autoPreRollActiveRef = useRef(false)
+  const autoPerformanceActiveRef = useRef(false)
+  const autoPreRollStartedAtRef = useRef(0)
   const recordingOrientationRef = useRef<'portrait' | 'landscape'>('portrait')
   const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
   onCompleteRef.current = onRecordingComplete
@@ -208,15 +244,49 @@ export function useCameraSession({
 
   const syncPreviewTargets = useCallback(
     (stream: MediaStream | null, mode?: RecordingMode) => {
+      const activeMode = mode ?? recordingModeRef.current
       attachPreviewTargets(
         previewRef.current,
         secondaryPreviewRef?.current ?? null,
         stream,
-        mode ?? recordingModeRef.current,
+        activeMode,
       )
+      return isVideoPreviewHealthy(previewRef.current, stream, activeMode)
     },
     [secondaryPreviewRef],
   )
+
+  const ensureCameraPreviewActive = useCallback((): boolean => {
+    const mode = recordingModeRef.current
+    const stream = streamRef.current
+    if (!isStreamRecordable(stream, mode)) return false
+
+    syncPreviewTargets(stream, mode)
+
+    if (mode === 'video') {
+      const videos = [previewRef.current, secondaryPreviewRef?.current ?? null]
+      for (const video of videos) {
+        if (!video || !stream) continue
+        if (video.srcObject !== stream) {
+          video.srcObject = stream
+        }
+        video.muted = true
+        if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          void video.play().catch((err) => console.warn('Playback intercepted:', err))
+        }
+      }
+    }
+
+    setNeedsPermission(false)
+    setReady(true)
+    return isVideoPreviewRecoverable(previewRef.current, stream, mode)
+  }, [secondaryPreviewRef, syncPreviewTargets])
+
+  const retuneCaptureAudio = useCallback(async () => {
+    const stream = streamRef.current
+    if (!stream) return
+    await tuneMusicRecordingStream(stream)
+  }, [])
 
   const detachAllPreviewTargets = useCallback(() => {
     detachPreviewTargets(
@@ -335,6 +405,9 @@ export function useCameraSession({
         }
 
         await tuneMusicRecordingStream(mediaStream)
+        if (mode === 'video') {
+          await maybeBoostTabletPreviewResolution(mediaStream)
+        }
         streamRef.current = mediaStream
         syncPreviewTargets(mediaStream, mode)
         setStreamGeneration((generation) => generation + 1)
@@ -350,6 +423,19 @@ export function useCameraSession({
     },
     [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets],
   )
+
+  const reacquireCaptureStream = useCallback(async () => {
+    if (isRecordingRef.current || resumeInFlightRef.current) return
+
+    cancelScheduledRelease()
+    releaseLiveStream()
+
+    if (Capacitor.isNativePlatform()) {
+      await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
+    }
+
+    await acquireStream(recordingModeRef.current)
+  }, [acquireStream, cancelScheduledRelease, releaseLiveStream])
 
   const requestCameraAccess = useCallback(() => {
     if (isRecordingRef.current || permissionRequestInFlightRef.current) return
@@ -384,6 +470,9 @@ export function useCameraSession({
     getUserMedia(constraints)
       .then(async (mediaStream) => {
         await tuneMusicRecordingStream(mediaStream)
+        if (mode === 'video') {
+          await maybeBoostTabletPreviewResolution(mediaStream)
+        }
         streamRef.current = mediaStream
         syncPreviewTargets(mediaStream, mode)
         setStreamGeneration((generation) => generation + 1)
@@ -556,6 +645,14 @@ export function useCameraSession({
 
       recorder.onstop = () => {
         void (async () => {
+          const shouldSaveTake =
+            !autoPreRollActiveRef.current || autoPerformanceActiveRef.current
+          const preRollStartedAt = autoPreRollStartedAtRef.current
+          autoPreRollActiveRef.current = false
+          autoPerformanceActiveRef.current = false
+          autoPreRollStartedAtRef.current = 0
+          isRecordingRef.current = false
+
           const recorderInstance = recorderRef.current
           if (recorderInstance) {
             detachRecorder(recorderInstance)
@@ -570,9 +667,25 @@ export function useCameraSession({
           const stoppedTakeId = activeTakeIdRef.current ?? takeId
           activeTakeIdRef.current = null
           const completedMode = recordingModeRef.current
-          const durationSeconds = elapsedRef.current
+          const durationSeconds =
+            preRollStartedAt > 0
+              ? Math.max(0.1, (performance.now() - preRollStartedAt) / 1000)
+              : elapsedRef.current
+          const captureTrackSnapshot: RecordingTrackSnapshot | null =
+            snapshotCaptureAudioTrack(
+              streamRef.current?.getAudioTracks().find((t) => t.readyState === 'live') ??
+                null,
+            )
+          const captureProfile = getActiveCaptureProfile()
 
           try {
+            if (!shouldSaveTake) {
+              if (activeWriter) {
+                await activeWriter.abort().catch(() => {})
+              }
+              return
+            }
+
             if (activeWriter) {
               const persisted = await activeWriter.finalize()
               onCompleteRef.current({
@@ -583,6 +696,8 @@ export function useCameraSession({
                 videoUrl: persisted.videoUrl,
                 durationSeconds,
                 recordingOrientation: recordingOrientationRef.current,
+                captureProfile,
+                captureTrackSnapshot,
               })
             } else {
               const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
@@ -607,6 +722,8 @@ export function useCameraSession({
                 durationSeconds,
                 recordingOrientation: recordingOrientationRef.current,
                 blob,
+                captureProfile,
+                captureTrackSnapshot,
               })
             }
           } catch {
@@ -641,9 +758,39 @@ export function useCameraSession({
     [abortActiveWriter],
   )
 
+  const cancelAutoPreRollCapture = useCallback(() => {
+    if (!autoPreRollActiveRef.current || autoPerformanceActiveRef.current) return
+
+    const recorder = recorderRef.current
+    if (recorder?.state === 'recording') {
+      recorder.stop()
+      return
+    }
+
+    autoPreRollActiveRef.current = false
+    autoPreRollStartedAtRef.current = 0
+    const writer = writerRef.current
+    writerRef.current = null
+    activeTakeIdRef.current = null
+    if (writer) {
+      void writer.abort().catch(() => {})
+    }
+    if (recorder) {
+      detachRecorder(recorder)
+    }
+    recorderRef.current = null
+    releaseRecorderStream(recordStreamRef.current, streamRef.current)
+    recordStreamRef.current = null
+  }, [])
+
   const disarmAutoAudioRecorder = useCallback(async () => {
     if (autoAudioDisarmInFlightRef.current) {
       await autoAudioDisarmInFlightRef.current
+      return
+    }
+
+    if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
+      cancelAutoPreRollCapture()
       return
     }
 
@@ -669,13 +816,65 @@ export function useCameraSession({
         autoAudioDisarmInFlightRef.current = null
       }
     }
+  }, [cancelAutoPreRollCapture])
+
+  const beginAutoPreRollCapture = useCallback(
+    (armed: NonNullable<typeof armedAutoAudioRef.current>) => {
+      armedAutoAudioRef.current = null
+      recorderRef.current = armed.recorder
+      writerRef.current = armed.writer
+      activeTakeIdRef.current = armed.takeId
+      recorderMimeTypeRef.current = armed.mimeType
+      chunksRef.current = []
+
+      try {
+        if (shouldUseRecordingTimeslice(armed.mimeType)) {
+          armed.recorder.start(RECORDING_TIMESLICE_MS)
+        } else {
+          armed.recorder.start()
+        }
+        autoPreRollActiveRef.current = true
+        autoPerformanceActiveRef.current = false
+        autoPreRollStartedAtRef.current = performance.now()
+        recordStreamRef.current = streamRef.current
+      } catch {
+        autoPreRollActiveRef.current = false
+        autoPreRollStartedAtRef.current = 0
+        recorderRef.current = null
+        writerRef.current = null
+        activeTakeIdRef.current = null
+        void armed.writer.abort().catch(() => {})
+      }
+    },
+    [],
+  )
+
+  const tryMarkAutoPerformanceStart = useCallback((): 'started' | 'pending' | 'unavailable' => {
+    if (autoPerformanceActiveRef.current || isRecordingRef.current) {
+      return 'started'
+    }
+    if (!autoPreRollActiveRef.current) {
+      return 'unavailable'
+    }
+
+    const elapsed = performance.now() - autoPreRollStartedAtRef.current
+    if (elapsed < AUTO_RECORD_PREROLL_MS) {
+      return 'pending'
+    }
+
+    autoPerformanceActiveRef.current = true
+    isRecordingRef.current = true
+    setIsRecording(true)
+    setElapsed(0)
+    elapsedRef.current = 0
+    return 'started'
   }, [])
 
   const warmAutoAudioRecorder = useCallback(async () => {
     if (
       recordingModeRef.current !== 'audio' ||
       isRecordingRef.current ||
-      armedAutoAudioRef.current ||
+      autoPreRollActiveRef.current ||
       warmAutoAudioInFlightRef.current ||
       isAutoPlaybackHoldingMicWarmup()
     ) {
@@ -689,7 +888,7 @@ export function useCameraSession({
         !stream ||
         recordingModeRef.current !== 'audio' ||
         isRecordingRef.current ||
-        armedAutoAudioRef.current
+        autoPreRollActiveRef.current
       ) {
         return
       }
@@ -702,7 +901,7 @@ export function useCameraSession({
       if (
         isRecordingRef.current ||
         recordingModeRef.current !== 'audio' ||
-        armedAutoAudioRef.current
+        autoPreRollActiveRef.current
       ) {
         await writer.abort().catch(() => {})
         return
@@ -711,13 +910,21 @@ export function useCameraSession({
       const recorder = createMediaRecorder(stream, mimeType)
       bindRecordingHandlers(recorder, takeId)
 
-      armedAutoAudioRef.current = { recorder, writer, takeId, mimeType }
+      beginAutoPreRollCapture({ recorder, writer, takeId, mimeType })
     } catch {
       /* cold start on trigger if warm fails */
     } finally {
       warmAutoAudioInFlightRef.current = false
     }
-  }, [bindRecordingHandlers, ensureRecordableStream])
+  }, [beginAutoPreRollCapture, bindRecordingHandlers, ensureRecordableStream])
+
+  const restartAutoPreRollCapture = useCallback(() => {
+    if (!autoPreRollActiveRef.current || autoPerformanceActiveRef.current) return
+    cancelAutoPreRollCapture()
+    window.setTimeout(() => {
+      void warmAutoAudioRecorder()
+    }, 120)
+  }, [cancelAutoPreRollCapture, warmAutoAudioRecorder])
 
   scheduleWarmAutoAudioRef.current = () => {
     if (recordingModeRef.current !== 'audio') return
@@ -731,6 +938,15 @@ export function useCameraSession({
 
   const startRecording = useCallback(() => {
     if (isRecording) return
+
+    if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
+      autoPerformanceActiveRef.current = true
+      isRecordingRef.current = true
+      setIsRecording(true)
+      setElapsed(0)
+      elapsedRef.current = 0
+      return
+    }
 
     void (async () => {
       const currentStream = await ensureRecordableStream()
@@ -796,6 +1012,11 @@ export function useCameraSession({
   }, [bindRecordingHandlers, ensureRecordableStream, isRecording])
 
   const startAutoAudioRecording = useCallback(() => {
+    const preRollMark = tryMarkAutoPerformanceStart()
+    if (preRollMark === 'started' || preRollMark === 'pending') {
+      return
+    }
+
     if (isRecordingRef.current) return
 
     const armed = armedAutoAudioRef.current
@@ -826,7 +1047,12 @@ export function useCameraSession({
     }
 
     startRecording()
-  }, [disarmAutoAudioRecorder, startRecording, warmAutoAudioRecorder])
+  }, [
+    disarmAutoAudioRecorder,
+    startRecording,
+    tryMarkAutoPerformanceStart,
+    warmAutoAudioRecorder,
+  ])
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current
@@ -908,9 +1134,9 @@ export function useCameraSession({
       const mode = recordingModeRef.current
       const stream = streamRef.current
       if (isStreamRecordable(stream, mode)) {
-        syncPreviewTargets(stream, mode)
-        setReady(true)
-        return
+        if (ensureCameraPreviewActive()) {
+          return
+        }
       }
 
       releaseLiveStream()
@@ -933,7 +1159,7 @@ export function useCameraSession({
       }
       onAfterForegroundRestartRef.current?.()
     }
-  }, [acquireStream, cancelScheduledRelease, releaseLiveStream, syncPreviewTargets])
+  }, [acquireStream, cancelScheduledRelease, ensureCameraPreviewActive, releaseLiveStream])
 
   const scheduleForegroundRecovery = useCallback(() => {
     if (backgroundSuspendTimerRef.current !== null) {
@@ -966,7 +1192,7 @@ export function useCameraSession({
     if (isRecordingRef.current || resumeInFlightRef.current) return
 
     cancelScheduledRelease()
-    applyViewportCssVars()
+    applyViewportCssVarsOnResume()
 
     const mode = recordingModeRef.current
     const stream = streamRef.current
@@ -976,8 +1202,16 @@ export function useCameraSession({
       return
     }
 
-    syncPreviewTargets(stream, mode)
-  }, [cancelScheduledRelease, restartCameraAfterForeground, syncPreviewTargets])
+    if (ensureCameraPreviewActive()) {
+      return
+    }
+
+    await restartCameraAfterForeground()
+  }, [
+    cancelScheduledRelease,
+    ensureCameraPreviewActive,
+    restartCameraAfterForeground,
+  ])
 
   /** Re-open getUserMedia after AVAudioSession route changes (e.g. device mic vs BT HFP). */
   const reacquireStreamForAudioRoute = useCallback(async () => {
@@ -1005,27 +1239,15 @@ export function useCameraSession({
   }, [])
 
   const resumeMicAfterPlayback = useCallback(async () => {
-    const mode = recordingModeRef.current
     const stream = streamRef.current
-    const audioLive = stream
-      ?.getAudioTracks()
-      .some((track) => track.readyState === 'live')
+    if (!stream) return
 
-    if (!audioLive) {
-      await refreshCameraSession()
-      if (!isStreamRecordable(streamRef.current, mode)) {
-        await restartCameraAfterForeground()
-      }
-    } else if (stream) {
-      for (const track of stream.getAudioTracks()) {
-        if (track.readyState === 'live') {
-          track.enabled = true
-        }
+    for (const track of stream.getAudioTracks()) {
+      if (track.readyState === 'live') {
+        track.enabled = true
       }
     }
-
-    setStreamGeneration((generation) => generation + 1)
-  }, [refreshCameraSession, restartCameraAfterForeground])
+  }, [])
 
   useEffect(() => {
     const bindAppLifecycle = async () => {
@@ -1094,7 +1316,7 @@ export function useCameraSession({
     }
 
     revivePreview()
-    const intervalId = window.setInterval(revivePreview, 350)
+    const intervalId = window.setInterval(revivePreview, 2500)
 
     return () => {
       window.clearInterval(intervalId)
@@ -1120,8 +1342,18 @@ export function useCameraSession({
     stopRecording,
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
+    tryMarkAutoPerformanceStart,
+    isAutoPreRollCaptureActive: () =>
+      autoPreRollActiveRef.current && !autoPerformanceActiveRef.current,
+    getAutoPreRollAgeMs: () =>
+      autoPreRollActiveRef.current
+        ? performance.now() - autoPreRollStartedAtRef.current
+        : 0,
+    restartAutoPreRollCapture,
     refreshCameraSession,
     reacquireStreamForAudioRoute,
+    retuneCaptureAudio,
+    reacquireCaptureStream,
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,

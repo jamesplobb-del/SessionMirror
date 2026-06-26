@@ -1,8 +1,13 @@
 import { Capacitor } from '@capacitor/core'
-import { refreshPlaybackOutputProfile } from '../audioOutputProfile'
+import { logPlaybackGainAuditYoutubeStart } from '../playbackGainAudit'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
 import { YOUTUBE_PROXY_ORIGIN } from '../youtubeEmbed'
-import BestTakeAudioPlugin from '../audioSessionRoute'
+import {
+  engageStereoPlayback,
+  isStereoPlaybackEngaged,
+  refreshStereoPlaybackRoute,
+  releaseStereoPlayback,
+} from '../stereoPlaybackRoute'
 
 const YOUTUBE_BOOST_DELAYS_MS = [
   0, 15, 30, 50, 80, 120, 180, 260, 380, 540, 760, 1100, 1600, 2300, 3200, 4500, 6300, 9000,
@@ -10,9 +15,9 @@ const YOUTUBE_BOOST_DELAYS_MS = [
 
 const YOUTUBE_WAKE_RETRY_MS = [0, 200, 450, 900, 1600, 2800, 4500]
 
-const STEREO_REFRESH_MIN_MS = 750
+const STEREO_REFRESH_MIN_MS = 3000
+const PLAYING_MAINTAIN_COOLDOWN_MS = 5000
 
-let youtubeStereoEngaged = false
 let mayUseYoutubeStereoRoute: () => boolean = () => true
 let playbackListenerInstalled = false
 let activeYoutubeIframe: HTMLIFrameElement | null = null
@@ -20,6 +25,7 @@ let loudnessBurstGeneration = 0
 let wakeRetryGeneration = 0
 let pendingYoutubeWake = false
 let lastStereoRefreshAt = 0
+let lastPlayingMaintainAt = 0
 
 /** Skip stereo while recording or during hands-free auto-playback. */
 export function registerYoutubeStereoGuard(guard: () => boolean): void {
@@ -44,25 +50,28 @@ function postToYoutubeIframe(
   )
 }
 
-/** Re-apply iOS stereo playback — iOS can silently revert to playAndRecord. */
+/** Re-apply iOS stereo playback — throttled to avoid AVAudioSession churn that stalls camera preview. */
 function refreshYoutubeStereoRoute(force = false): void {
   if (!Capacitor.isNativePlatform()) return
   if (!mayUseYoutubeStereoRoute()) return
 
   const now = Date.now()
+  if (isStereoPlaybackEngaged() && now - lastStereoRefreshAt < STEREO_REFRESH_MIN_MS) return
   if (!force && now - lastStereoRefreshAt < STEREO_REFRESH_MIN_MS) return
   lastStereoRefreshAt = now
 
-  youtubeStereoEngaged = true
-  void BestTakeAudioPlugin.enableStereoPlayback()
+  if (isStereoPlaybackEngaged()) {
+    refreshStereoPlaybackRoute()
+  } else {
+    engageStereoPlayback()
+  }
 }
 
 export function releaseYoutubeReferenceRoute(): void {
   if (!Capacitor.isNativePlatform()) return
-  if (!youtubeStereoEngaged) return
-  youtubeStereoEngaged = false
+  if (!isStereoPlaybackEngaged()) return
   lastStereoRefreshAt = 0
-  void BestTakeAudioPlugin.enableRecordingRoute()
+  releaseStereoPlayback()
 }
 
 function cancelScheduledLoudnessWork(): void {
@@ -76,6 +85,7 @@ export function prepareNewYoutubeReference(): void {
   releaseYoutubeReferenceRoute()
   pendingYoutubeWake = true
   activeYoutubeIframe = null
+  lastPlayingMaintainAt = 0
 }
 
 export function registerYoutubeIframe(iframe: HTMLIFrameElement | null | undefined): void {
@@ -85,52 +95,24 @@ export function registerYoutubeIframe(iframe: HTMLIFrameElement | null | undefin
   }
 }
 
-function postVolumeProfileToIframe(
-  iframe: HTMLIFrameElement | null | undefined,
-  profile: 'speaker' | 'headphones',
-): void {
-  if (!iframe?.contentWindow) return
-  iframe.contentWindow.postMessage(
-    JSON.stringify({ event: 'volume-profile', profile }),
-    YOUTUBE_PROXY_ORIGIN,
-  )
-}
-
 function boostYoutubeProxyAudio(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,
-  profile: 'speaker' | 'headphones',
 ): void {
   if (!iframe) return
   unmuteYoutubeProxy(iframe)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
-  postVolumeProfileToIframe(iframe, profile)
-
-  const cap = youtubeVolumeFromUiSlider(uiVolume)
-  if (profile === 'headphones') {
-    postToYoutubeIframe(iframe, 'unMute')
-    postToYoutubeIframe(iframe, 'setVolume', [cap])
-    return
-  }
-
-  for (let i = 0; i < 16; i++) {
-    postToYoutubeIframe(iframe, 'unMute')
-    postToYoutubeIframe(iframe, 'setVolume', [cap])
-  }
 }
 
 function scheduleYoutubeLoudnessBursts(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume: number,
-  profile: 'speaker' | 'headphones',
 ): void {
-  if (profile === 'headphones') return
-
   const generation = loudnessBurstGeneration
   for (const delay of YOUTUBE_BOOST_DELAYS_MS) {
     window.setTimeout(() => {
       if (generation !== loudnessBurstGeneration) return
-      boostYoutubeProxyAudio(iframe, uiVolume, profile)
+      boostYoutubeProxyAudio(iframe, uiVolume)
     }, delay)
   }
 }
@@ -148,19 +130,20 @@ function handleProxyPlaybackMessage(data: unknown): void {
   const iframe = activeYoutubeIframe
   if (!iframe) return
 
-  void refreshPlaybackOutputProfile().then((profile) => {
-    if (payload.state === 'ready') {
-      refreshYoutubeStereoRoute(true)
-      boostYoutubeProxyAudio(iframe, 1, profile)
-      return
-    }
+  if (payload.state === 'ready') {
+    refreshYoutubeStereoRoute(true)
+    boostYoutubeProxyAudio(iframe, 1)
+    return
+  }
 
-    if (payload.state === 'playing') {
-      refreshYoutubeStereoRoute(true)
-      boostYoutubeProxyAudio(iframe, 1, profile)
-      scheduleYoutubeLoudnessBursts(iframe, 1, profile)
-    }
-  })
+  if (payload.state === 'playing') {
+    logPlaybackGainAuditYoutubeStart()
+    refreshYoutubeStereoRoute(false)
+    const now = Date.now()
+    if (now - lastPlayingMaintainAt < PLAYING_MAINTAIN_COOLDOWN_MS) return
+    lastPlayingMaintainAt = now
+    boostYoutubeProxyAudio(iframe, 1)
+  }
 }
 
 /** Listen for ready/playing from the Netlify proxy player. */
@@ -184,17 +167,14 @@ export function wakeYoutubeReference(
   registerYoutubeIframe(iframe)
   pendingYoutubeWake = false
 
-  void refreshPlaybackOutputProfile().then((profile) => {
-    refreshYoutubeStereoRoute(true)
-    boostYoutubeProxyAudio(iframe, uiVolume, profile)
+  refreshYoutubeStereoRoute(true)
+  boostYoutubeProxyAudio(iframe, uiVolume)
 
-    if (attemptPlay) {
-      postToYoutubeIframe(iframe, 'playVideo')
-      boostYoutubeProxyAudio(iframe, uiVolume, profile)
-    }
+  if (attemptPlay) {
+    postToYoutubeIframe(iframe, 'playVideo')
+  }
 
-    scheduleYoutubeLoudnessBursts(iframe, uiVolume, profile)
-  })
+  scheduleYoutubeLoudnessBursts(iframe, uiVolume)
 }
 
 /** Retry wake until the proxy player has had time to boot after a paste. */
@@ -231,14 +211,13 @@ export function startYoutubeProxyPlayback(
   scheduleYoutubeReferenceWake(iframe)
 }
 
+/** Light touch during playback — avoid iframe/audio spam that freezes YouTube and camera preview. */
 export function maintainYoutubeProxyLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  void refreshPlaybackOutputProfile().then((profile) => {
-    refreshYoutubeStereoRoute(false)
-    boostYoutubeProxyAudio(iframe, uiVolume, profile)
-  })
+  refreshYoutubeStereoRoute(false)
+  setYoutubeProxyVolumeFromUi(iframe, uiVolume)
 }
 
 export function setYoutubeProxyVolumeFromUi(
@@ -247,6 +226,9 @@ export function setYoutubeProxyVolumeFromUi(
 ): void {
   const clamped = youtubeVolumeFromUiSlider(uiVolume)
   postToYoutubeIframe(iframe, 'setVolume', [clamped])
+  void import('../playbackGainAudit').then((m) =>
+    m.maybeLogYoutubePlaybackGain(uiVolume, 'setVolume'),
+  )
 }
 
 /** @deprecated Prefer setYoutubeProxyVolumeFromUi — accepts 0–1 UI slider values. */

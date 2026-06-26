@@ -362,7 +362,28 @@ export default function DraggableMetronomeWidget({
   )
 
   const canShellDrag = !pinching && !editingBpm
-  const shellDragListener = canShellDrag && !playing
+  const shellDragListener = false
+
+  const handleShellPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      onPinchPointerDown(event)
+      if (pinching || editingBpm || playing) return
+      const target = event.target as HTMLElement
+      if (target.closest('button, input, textarea, select, a, [data-no-drag]')) return
+      dragControls.start(event)
+    },
+    [dragControls, editingBpm, onPinchPointerDown, pinching, playing],
+  )
+
+  const handleClosePress = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      if (event.button !== 0) return
+      stop()
+      onClose?.()
+    },
+    [onClose, stop],
+  )
 
   return (
     <motion.div
@@ -373,7 +394,7 @@ export default function DraggableMetronomeWidget({
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
-      onPointerDown={onPinchPointerDown}
+      onPointerDown={handleShellPointerDown}
       onPointerMove={onPinchPointerMove}
       onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
@@ -397,17 +418,15 @@ export default function DraggableMetronomeWidget({
         className="ui-orient-spin metronome-widget relative h-full min-h-0 w-full rounded-3xl"
         aria-label="Metronome. Pinch to resize. Double-tap empty space to reset size."
       >
-        {playing && (
-          <div
-            className="metronome-widget__drag-handle"
-            aria-label="Drag metronome"
-            onPointerDown={(event) => {
-              if (pinching || editingBpm) return
-              event.stopPropagation()
-              dragControls.start(event)
-            }}
-          />
-        )}
+        <div
+          className="metronome-widget__drag-handle"
+          aria-label="Drag metronome"
+          onPointerDown={(event) => {
+            if (pinching || editingBpm) return
+            event.stopPropagation()
+            dragControls.start(event)
+          }}
+        />
 
         <div
           className={`metronome-widget__accent ${beatIndex === 0 && playing ? 'metronome-widget__accent--pulse' : ''}`}
@@ -417,12 +436,9 @@ export default function DraggableMetronomeWidget({
         {onClose && (
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              stop()
-              onClose()
-            }}
+            data-no-drag
             onPointerDown={(event) => event.stopPropagation()}
+            onPointerUp={handleClosePress}
             className="pitch-widget-close pointer-events-auto absolute right-3 top-3 z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full transition hover:bg-white/20 active:scale-95"
             aria-label="Close metronome"
           >

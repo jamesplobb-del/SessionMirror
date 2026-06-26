@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { initAppFilesystem, isFilesystemMissingError, nativeDataFileExists, TAKES_DIR } from './filesystemInit'
+import type { CaptureProfile } from './audioCapture'
+import type { RecordingCaptureDiagnostics, RecordingTrackSnapshot } from './recordingDiagnostics'
 
 export const NATIVE_VIDEO_MIME = 'video/mp4'
 export const NATIVE_AUDIO_MIME = 'audio/mp4'
@@ -22,6 +24,10 @@ export interface RecordingCompletePayload {
   recordingOrientation?: 'portrait' | 'landscape'
   /** Only set on web dev fallback — native recordings are already on disk */
   blob?: Blob
+  captureProfile?: CaptureProfile
+  captureTrackSnapshot?: RecordingTrackSnapshot | null
+  /** Populated after post-save loudness analysis. */
+  captureDiagnostics?: RecordingCaptureDiagnostics
 }
 
 function extensionForMime(mimeType: string): string {
@@ -214,6 +220,23 @@ export async function toCapacitorPlaybackSrc(
 
   playbackSrcCache.set(uriOrPath, converted)
   return converted
+}
+
+/** Raw file:// URI for native AVPlayer — not the capacitor:// WebView URL. */
+export async function resolveNativeFileUri(filePath: string): Promise<string> {
+  if (!filePath) return ''
+  if (filePath.startsWith('file://')) return filePath
+
+  try {
+    const { uri } = await Filesystem.getUri({
+      path: filePath,
+      directory: Directory.Data,
+    })
+    return uri
+  } catch (err) {
+    if (isFilesystemMissingError(err)) return ''
+    return ''
+  }
 }
 
 function blobToBase64(blob: Blob): Promise<string> {

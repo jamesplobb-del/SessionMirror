@@ -1,60 +1,40 @@
-import { ChevronDown, FolderOpen, Layout } from 'lucide-react'
-import Pressable from './ui/Pressable'
-
-const HUD_GLASS_BTN =
-  'flex h-10 w-10 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white shadow-lg backdrop-blur-2xl transition-all duration-200 ease-out hover:bg-black/55'
-
-interface HudHeaderProps {
-  sessionName: string
-  onOpenVault: () => void
-  className?: string
-  splitViewActive?: boolean
-  onExitSplitView?: () => void
-}
-
-export default function HudHeader({
-  sessionName,
-  onOpenVault,
-  className = '',
-  splitViewActive = false,
-  onExitSplitView,
-}: HudHeaderProps) {
-  return (
-    <header
-      className={`pointer-events-none relative flex shrink-0 items-center justify-center px-4 pt-2 transition-opacity duration-200 ${className}`}
-    >
-      {splitViewActive && onExitSplitView && (
-        <Pressable
-          type="button"
-          intensity="soft"
-          onClick={onExitSplitView}
-          haptic="light"
-          className={`pointer-events-auto absolute right-4 top-2 z-10 ${HUD_GLASS_BTN}`}
-          aria-label="Return to normal view"
-        >
-          <Layout className="h-[18px] w-[18px] stroke-[1.5]" aria-hidden />
-        </Pressable>
-      )}
-
-      <Pressable
-        type="button"
-        intensity="soft"
-        onClick={onOpenVault}
-        haptic="light"
-        className="ui-orient-spin pointer-events-auto flex max-w-[min(100%,16rem)] items-center justify-center rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 shadow-lg backdrop-blur-md hover:border-white/25 hover:bg-black/55"
-        aria-label={`Open vault — current session: ${sessionName}`}
-      >
-        <span className="flex max-w-full items-center gap-1.5">
-          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-sky-300" />
-          <span
-            className="truncate text-xs font-semibold tracking-tight text-white drop-shadow-sm"
-            title={sessionName}
-          >
-            {sessionName}
-          </span>
-          <ChevronDown className="h-3 w-3 shrink-0 text-white/55" aria-hidden />
-        </span>
-      </Pressable>
-    </header>
-  )
-}
+import { memo } from 'react'
+import { ChevronDown, FolderOpen } from 'lucide-react'
+import Pressable from './ui/Pressable'
+
+interface HudHeaderProps {
+  sessionName: string
+  onOpenVault: () => void
+  className?: string
+}
+
+function HudHeader({ sessionName, onOpenVault, className = '' }: HudHeaderProps) {
+  return (
+    <header
+      className={`hud-header pointer-events-none relative flex w-full shrink-0 items-center justify-center px-4 pt-2 transition-opacity duration-200 ${className}`}
+    >
+      <Pressable
+        type="button"
+        intensity="soft"
+        squish={false}
+        onClick={onOpenVault}
+        haptic="light"
+        className="hud-header__vault ui-orient-spin pointer-events-auto flex max-w-[min(100%,16rem)] items-center justify-center rounded-full border border-white/15 bg-black/55 px-3.5 py-1.5 shadow-lg transition-opacity duration-200 ease-out hover:border-white/25 hover:bg-black/70"
+        aria-label={`Open vault — current session: ${sessionName}`}
+      >
+        <span className="flex max-w-full items-center gap-1.5">
+          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-sky-300" />
+          <span
+            className="truncate text-xs font-semibold tracking-tight text-white drop-shadow-sm"
+            title={sessionName}
+          >
+            {sessionName}
+          </span>
+          <ChevronDown className="h-3 w-3 shrink-0 text-white/55" aria-hidden />
+        </span>
+      </Pressable>
+    </header>
+  )
+}
+
+export default memo(HudHeader)

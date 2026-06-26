@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FolderPlus, Trash2 } from 'lucide-react'
+import { useActionSheet } from '../context/ActionSheetContext'
 import type { Project } from '../db/types'
 import AnimatedExpand from './ui/AnimatedExpand'
 import Pressable from './ui/Pressable'
@@ -19,6 +20,7 @@ export default function ProjectSessionBar({
   onCreateProject,
   onDeleteProject,
 }: ProjectSessionBarProps) {
+  const { showConfirm } = useActionSheet()
   const [isNamingSession, setIsNamingSession] = useState(false)
   const [sessionNameDraft, setSessionNameDraft] = useState('New Session')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -47,14 +49,15 @@ export default function ProjectSessionBar({
 
   const handleDeleteSession = (project: Project) => {
     if (!onDeleteProject) return
-    if (
-      !window.confirm(
-        `Delete session "${project.name}" and all takes inside it? This cannot be undone.`,
-      )
-    ) {
-      return
-    }
-    void onDeleteProject(project.id)
+    void (async () => {
+      const confirmed = await showConfirm({
+        message: `Delete session "${project.name}" and all takes inside it? This cannot be undone.`,
+        destructive: true,
+        confirmLabel: 'Delete',
+      })
+      if (!confirmed) return
+      void onDeleteProject(project.id)
+    })()
   }
 
   return (
@@ -86,6 +89,7 @@ export default function ProjectSessionBar({
               type="button"
               intensity="soft"
               onClick={cancelNaming}
+              haptic="light"
               className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100"
             >
               Cancel
@@ -93,6 +97,7 @@ export default function ProjectSessionBar({
             <Pressable
               type="submit"
               intensity="soft"
+              haptic="medium"
               className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
             >
               Create
@@ -106,6 +111,7 @@ export default function ProjectSessionBar({
           type="button"
           intensity="soft"
           onClick={openNamingForm}
+          haptic="light"
           className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-stone-400 hover:bg-stone-50"
         >
           <FolderPlus className="h-3.5 w-3.5" />
@@ -126,6 +132,7 @@ export default function ProjectSessionBar({
                 type="button"
                 intensity="soft"
                 onClick={() => onSelectProject(project.id)}
+                haptic="light"
                 className={`rounded-full px-3 py-1.5 text-xs font-medium ${
                   active ? 'text-sky-800' : 'text-stone-600 hover:text-stone-800'
                 }`}
@@ -135,8 +142,9 @@ export default function ProjectSessionBar({
               {onDeleteProject && (
                 <Pressable
                   type="button"
-                  intensity="soft"
+                  intensity="icon"
                   onClick={() => handleDeleteSession(project)}
+                  haptic="light"
                   className="rounded-full px-2 py-1.5 text-stone-400 hover:bg-stone-100 hover:text-red-600"
                   aria-label={`Delete session ${project.name}`}
                 >

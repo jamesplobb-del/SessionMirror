@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { FolderOpen, Settings, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
 import type { RecordingMode } from '../types'
+import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 
 interface ControlDeckProps {
   isRecording: boolean
@@ -45,7 +46,7 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export default function ControlDeck({
+function ControlDeck({
   isRecording,
   elapsed,
   ready,
@@ -136,15 +137,16 @@ export default function ControlDeck({
         onAudioEnhancerChange={(enabled) => onAudioEnhancerChange?.(enabled)}
       />
 
-      <div className="relative flex w-full max-w-xs items-center justify-center">
+      <div className="control-deck__main-row relative flex w-full max-w-xs items-center justify-center">
         <Pressable
           type="button"
           intensity="icon"
+          squish={false}
           onClick={onOpenVault}
           haptic="light"
           hapticFeedback={hapticFeedback}
           data-tutorial="vault-button"
-          className="control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border-[0.5px] border-white/10 bg-black/40 text-white backdrop-blur-2xl hover:bg-black/55"
+          className={`control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full ${HUD_SOLID_BTN}`}
           aria-label={`View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
         >
           <span className="relative flex h-full w-full items-center justify-center">
@@ -160,7 +162,8 @@ export default function ControlDeck({
         <button
           type="button"
           ref={settingsButtonRef}
-          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full border-[0.5px] border-white/10 backdrop-blur-2xl transition-colors interactive-native ${
+          data-tutorial="settings-button"
+          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full ${HUD_SOLID_BTN} ${
             branchActive
               ? 'bg-sky-500/10 text-sky-400 ring-1 ring-sky-400/30 shadow-[0_0_15px_rgba(56,189,248,0.3)]'
               : 'bg-black/40 text-white hover:bg-black/55'
@@ -272,3 +275,5 @@ export default function ControlDeck({
     </div>
   )
 }
+
+export default memo(ControlDeck)

@@ -2,7 +2,21 @@
 
 CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(setHighQualityBluetoothMode, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setDeviceMicForRecording, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setBluetoothHeadphonePlaybackMode, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(reapplyHeadphonePlaybackRoute, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(enableStereoPlayback, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(enableRecordingRoute, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(getPlaybackOutputProfile, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(startNativePlaybackTest, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(stopNativePlaybackTest, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(prepareCameraLikePlaybackSession, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setCameraSessionState, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(getCameraSessionState, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setPlaybackRouteActive, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(restoreRecordingRouteAfterPlayback, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(startNativeCameraRecording, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(stopNativeCameraRecording, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(playNativeCameraTestPostProcess, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(stopNativeCameraTestPostProcess, CAPPluginReturnPromise);
 )

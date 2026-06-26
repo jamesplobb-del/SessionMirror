@@ -2,13 +2,17 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { installPlaybackOutputProfileRouteListener } from './utils/audioOutputProfile'
+import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
+import { primeWebStatusBarChrome } from './utils/nativeStatusBar'
+import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
 
 function bootstrap() {
-  installPlaybackOutputProfileRouteListener()
-
   const rootEl = document.getElementById('root')
   if (!rootEl) return
+
+  primeWebStatusBarChrome()
+  registerKeepAwakeLifecycle()
+  initHeadphoneOutputDetection()
 
   createRoot(rootEl).render(
     <StrictMode>

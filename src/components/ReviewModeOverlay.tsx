@@ -5,8 +5,6 @@ import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import Pressable from './ui/Pressable'
-import { Capacitor } from '@capacitor/core'
-import BestTakeAudioPlugin from '../utils/audioSessionRoute'
 import { iosEaseOut, iosScreenEnter, iosScreenExit, motionGpuLayer } from '../utils/motionPresets'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
@@ -14,7 +12,7 @@ import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
-import { releaseTakePlaybackAudio } from '../utils/takePlaybackAudio'
+import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
@@ -371,11 +369,8 @@ export default function ReviewModeOverlay({
         challengerVideoRef.current,
         vaultVideoRef.current,
       )
-      void releaseTakePlaybackAudio()
+      void finalizeTakePlaybackCleanup()
       pauseAllReviewVideosSafe()
-      if (isVault && Capacitor.isNativePlatform()) {
-        void BestTakeAudioPlugin.enableRecordingRoute()
-      }
       window.requestAnimationFrame(() => {
         onClose()
       })
@@ -388,9 +383,6 @@ export default function ReviewModeOverlay({
     if (!video) return
 
     if (video.paused || video.ended) {
-      if (isVault && Capacitor.isNativePlatform()) {
-        void BestTakeAudioPlugin.enableStereoPlayback()
-      }
       revealPlayOverlay(true)
       const started = toggleInlineTakePlayback(video, {
         onPlaying: () => {
@@ -407,9 +399,6 @@ export default function ReviewModeOverlay({
         revealPlayOverlay(true)
       }
     } else {
-      if (isVault && Capacitor.isNativePlatform()) {
-        void BestTakeAudioPlugin.enableRecordingRoute()
-      }
       toggleInlineTakePlayback(video, {
         onPaused: () => {
           setIsPlaying(false)
@@ -500,13 +489,13 @@ export default function ReviewModeOverlay({
       setIsPlaying(true)
     }
     const onPause = () => {
-      void releaseTakePlaybackAudio()
+      void finalizeTakePlaybackCleanup()
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
     }
     const onEnded = () => {
-      void releaseTakePlaybackAudio()
+      void finalizeTakePlaybackCleanup()
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
@@ -728,6 +717,7 @@ export default function ReviewModeOverlay({
             <Pressable
               type="button"
               intensity="icon"
+              haptic="light"
               onClick={handleCloseClick}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/25"
               aria-label="Done"
@@ -856,6 +846,7 @@ export default function ReviewModeOverlay({
               <Pressable
                 type="button"
                 intensity="icon"
+                haptic="light"
                 data-play-overlay
                 onClick={(e) => {
                   e.stopPropagation()
