@@ -5,7 +5,6 @@ const TABS: { id: AudioPracticeTab; label: string }[] = [
   { id: 'audio', label: 'Audio' },
   { id: 'metronome', label: 'Metronome' },
   { id: 'tuner', label: 'Tuner' },
-  { id: 'combo', label: 'Tuner + Met' },
 ]
 
 interface AudioPracticeTopTabsProps {
