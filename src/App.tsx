@@ -132,7 +132,6 @@ import type { BenchmarkBinding } from './types/library'
 import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
 import {
   applyNativeExperimentalAudioMode,
-  applyUseIphoneMicForRecording,
 } from './utils/audioSessionRoute'
 import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
 import { setActiveCaptureProfile } from './utils/audioCapture'
@@ -158,10 +157,12 @@ import {
 } from './utils/audioCapture'
 import AppBootGate from './components/ui/AppBootGate'
 import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTabs'
+import AudioModeHome from './components/audioPractice/AudioModeHome'
 import AudioMetronomeTab from './components/audioPractice/AudioMetronomeTab'
 import AudioTunerTab from './components/audioPractice/AudioTunerTab'
+import { AudioModePlaybackProvider } from './context/AudioModePlaybackContext'
 
-const AUTO_PLAYBACK_POST_COOLDOWN_MS = 2800
+const AUTO_PLAYBACK_POST_COOLDOWN_MS = 650
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
   if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
@@ -410,19 +411,22 @@ function StandardApp({
   const pitchCommitTimerRef = useRef<number | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
   const autoPlaybackGenerationRef = useRef(0)
-  const playAutoTakeAudioRef = useRef<(playbackUrl: string, takeId: string) => void>(() => {})
+  const playAutoTakeAudioRef = useRef<(
+    playbackUrl: string,
+    takeId: string,
+    performanceStartSeconds?: number,
+  ) => void>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
   const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
   autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
-  const nativeExperimentalAudioWasEnabledRef = useRef(false)
-
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
   const splitPreviewRef = useRef<HTMLVideoElement>(null)
   const youtubeIframeRef = useRef<HTMLIFrameElement>(null)
   const youtubeUrlRef = useRef<string | null>(null)
+  const lastMicPreferenceRouteRef = useRef(settings.micInputPreference)
   const [youtubeHostEl, setYoutubeHostEl] = useState<HTMLElement | null>(null)
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
@@ -563,7 +567,7 @@ function StandardApp({
   }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const playAutoTakeAudio = useCallback(
-    (playbackUrl: string, takeId: string) => {
+    (playbackUrl: string, takeId: string, performanceStartSeconds?: number) => {
       if (recordingModeRef.current !== 'audio') {
         pendingAutoPlaybackRef.current = false
         setHandsFreePlaybackPending(false)
@@ -618,7 +622,7 @@ function StandardApp({
           return
         }
 
-        await applyAutoPlaybackLeadIn(audio)
+        await applyAutoPlaybackLeadIn(audio, undefined, performanceStartSeconds)
 
         audio.onended = () => finishAutoPlayback()
         audio.onerror = () => finishAutoPlayback()
@@ -829,6 +833,7 @@ function StandardApp({
       recordingOrientation,
       captureProfile,
       captureTrackSnapshot,
+      autoPerformanceStartSeconds,
     } = payload
 
     const shouldAutoPlay =
@@ -857,7 +862,11 @@ function StandardApp({
 
     if (shouldAutoPlay && optimisticUrl) {
       pendingAutoPlaybackRef.current = false
-      playAutoTakeAudioRef.current(optimisticUrl, takeId)
+      playAutoTakeAudioRef.current(
+        optimisticUrl,
+        takeId,
+        autoPerformanceStartSeconds,
+      )
     } else if (shouldAutoPlay) {
       pendingAutoPlaybackRef.current = false
       setHandsFreePlaybackPending(false)
@@ -1060,6 +1069,7 @@ function StandardApp({
     restartAutoPreRollCapture,
     refreshCameraSession,
     requestCameraPreviewResume,
+    reacquireStreamForAudioRoute,
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
@@ -1069,6 +1079,7 @@ function StandardApp({
     onBeforeForegroundRestart: handleBeforeForegroundRestart,
     onAfterForegroundRestart: resumeYoutubeReference,
     nativeExperimentalAudioEnabled: settings.nativeExperimentalAudioEnabled,
+    micInputPreference: settings.micInputPreference,
   })
 
   useEffect(() => {
@@ -1080,14 +1091,23 @@ function StandardApp({
     )
   }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
 
-  // Re-assert the mic preference whenever the camera (re)starts so it survives
-  // cold launch / foreground / mode changes. Gentle input-only switch — no reacquire.
+  // Re-open WebKit capture so iOS applies the queued mic preference before getUserMedia.
   useEffect(() => {
-    if (!ready) return
+    if (lastMicPreferenceRouteRef.current === settings.micInputPreference) return
+    if (!ready) {
+      lastMicPreferenceRouteRef.current = settings.micInputPreference
+      return
+    }
     if (isPlaybackRouteHoldActive()) return
-    if (settings.nativeExperimentalAudioEnabled) return
-    void applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
-  }, [settings.nativeExperimentalAudioEnabled, settings.useIphoneMicForRecording, ready])
+    if (isRecording) return
+    lastMicPreferenceRouteRef.current = settings.micInputPreference
+    void reacquireStreamForAudioRoute()
+  }, [
+    isRecording,
+    reacquireStreamForAudioRoute,
+    ready,
+    settings.micInputPreference,
+  ])
 
   useEffect(() => {
     if (isPlaybackRouteHoldActive()) return
@@ -1747,41 +1767,36 @@ function StandardApp({
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
 
-  const selectedAudioEngine = settings.nativeExperimentalAudioEnabled
-    ? settings.audioEnhancerEnabled
-      ? 'Native Experimental + Enhanced'
-      : 'Native Experimental'
-    : settings.audioEnhancerEnabled
-      ? 'Enhanced'
-      : 'Standard'
+  const selectedAudioEngine = settings.audioEnhancerEnabled
+    ? 'Native + Enhanced'
+    : 'Native'
 
   useEffect(() => {
     console.info(`[AudioEngine] selected=${selectedAudioEngine}`)
   }, [selectedAudioEngine])
 
   useEffect(() => {
-    const active = settings.nativeExperimentalAudioEnabled && recordingMode === 'video'
-    document.documentElement.classList.toggle('native-camera-preview-active', active)
+    document.documentElement.classList.remove('native-camera-preview-active')
     return () => {
       document.documentElement.classList.remove('native-camera-preview-active')
     }
-  }, [recordingMode, settings.nativeExperimentalAudioEnabled])
+  }, [])
 
   useEffect(() => {
-    const wasEnabled = nativeExperimentalAudioWasEnabledRef.current
-    if (!settings.nativeExperimentalAudioEnabled && !wasEnabled) return
-
-    nativeExperimentalAudioWasEnabledRef.current = settings.nativeExperimentalAudioEnabled
+    if (ready && recordingMode === 'video' && !takePlaybackActive) return
     void applyNativeExperimentalAudioMode({
-      enabled: settings.nativeExperimentalAudioEnabled,
+      enabled: true,
       selectedAudioEngine,
+      micInputPreference: settings.micInputPreference,
       recordingActive: isRecording,
       playbackActive: takePlaybackActive,
     })
   }, [
     isRecording,
+    ready,
+    recordingMode,
     selectedAudioEngine,
-    settings.nativeExperimentalAudioEnabled,
+    settings.micInputPreference,
     takePlaybackActive,
   ])
 
@@ -2456,6 +2471,7 @@ function StandardApp({
       isTakePlaying={takePlaybackActive}
       muteDuringPlayback={settings.muteMetronomeDuringPlayback}
     >
+    <AudioModePlaybackProvider>
     <div ref={appShellRef} className="app-shell">
       <audio
         ref={autoPlaybackAudioRef}
@@ -2490,9 +2506,12 @@ function StandardApp({
           (showPitch && mainVideoPitchSource !== null)
         }
         metronomeStageActive={metronomeStageActive}
-        audioPracticeOverlayActive={isAudioPracticeToolTab}
+        audioPracticeOverlayActive={
+          isAudioPracticeToolTab ||
+          (recordingMode === 'audio' && audioPracticeTab === 'audio')
+        }
         visuallySuppressed={isSplitView}
-        nativePreviewActive={settings.nativeExperimentalAudioEnabled && recordingMode === 'video'}
+        nativePreviewActive={false}
       />
 
       {cameraNeedsPermission && (
@@ -2643,6 +2662,25 @@ function StandardApp({
           </div>
         )}
 
+        {recordingMode === 'audio' &&
+          audioPracticeTab === 'audio' &&
+          !quickSettingsOpen &&
+          settings.showTakeCards &&
+          !isSplitView && (
+            <div className="audio-mode-home-layer min-h-0 flex-1">
+              <AudioModeHome
+                isRecording={isRecording}
+                ready={ready}
+                benchmarkTake={benchmarkTake}
+                libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                challengerTake={challengerTake}
+                onExpandBenchmark={handleExpandBenchmark}
+                onExpandChallenger={handleExpandChallenger}
+                onPinCurrentAsBest={handlePinCurrentAsBest}
+              />
+            </div>
+          )}
+
         {!quickSettingsOpen && settings.showTakeCards && isSplitView && isAudioPracticeMainTab && (
           <div
             className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2"
@@ -2697,7 +2735,10 @@ function StandardApp({
         )}
 
         <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
-          {!quickSettingsOpen && settings.showTakeCards && !isSplitView && (
+          {!quickSettingsOpen &&
+            settings.showTakeCards &&
+            !isSplitView &&
+            recordingMode !== 'audio' && (
               <motion.div
                 key="pip-row"
                 className="app-pip-row-wrap pointer-events-auto w-full"
@@ -2791,6 +2832,8 @@ function StandardApp({
           onVaultIndexChange={setVaultReviewIndex}
           benchmarkSrc={libraryBenchmarkPlayback?.playbackUrl ?? benchmarkTake?.videoUrl ?? null}
           challengerSrc={challengerTake?.videoUrl ?? null}
+          benchmarkTake={libraryBenchmarkPlayback ? null : benchmarkTake}
+          challengerTake={challengerTake}
           benchmarkFilePath={libraryBenchmarkPlayback?.filePath ?? benchmarkTake?.filePath}
           challengerFilePath={challengerTake?.filePath}
           benchmarkName={libraryBenchmarkPlayback?.name ?? benchmarkTake?.name}
@@ -2816,6 +2859,9 @@ function StandardApp({
           isOpen
           onClose={handleCloseReview}
           onSlotChange={handleReviewSlotChange}
+          onUpdateTake={handleUpdateTake}
+          onDeleteTake={handleDeleteTake}
+          onFavoriteTake={handlePinBenchmark}
         />
       )}
       </AnimatePresence>
@@ -2858,6 +2904,7 @@ function StandardApp({
           stopAutoPlaybackAudio()
           pausePipVideos()
         }}
+        preferredMediaFilter={recordingMode === 'audio' ? 'audio' : 'all'}
         onEnterComplete={handleVaultEnterComplete}
       />
 
@@ -2890,6 +2937,7 @@ function StandardApp({
       </Suspense>
     </div>
     </div>
+    </AudioModePlaybackProvider>
     </MetronomeProvider>
     </ActionSheetProvider>
     </TutorialProvider>

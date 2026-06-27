@@ -49,17 +49,19 @@ function LiveCameraBackground({
   const overlayClass = isEmbedded
     ? 'camera-background-overlay camera-background-overlay--embedded'
     : 'camera-background-overlay'
+  const webPreviewMode = nativePreviewActive ? 'audio' : recordingMode
 
   const { resumingPreview, placeholderUrl, placeholderFading, showSlowIndicator } =
     useCameraPreviewResume({
       previewRef,
       streamRef,
       streamGeneration,
-      recordingMode,
+      recordingMode: webPreviewMode,
       resumeNonce,
     })
 
   useEffect(() => {
+    if (nativePreviewActive) return
     const video = previewRef.current
     if (!video || isAudioMode) {
       if (video?.srcObject) {
@@ -77,9 +79,10 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive])
 
   useEffect(() => {
+    if (nativePreviewActive) return
     if (isAudioMode || modePreparing || resumingPreview) return
 
     let reviveTimer: number | null = null
@@ -122,9 +125,10 @@ function LiveCameraBackground({
       video?.removeEventListener('stalled', scheduleRevive)
       video?.removeEventListener('suspend', scheduleRevive)
     }
-  }, [isAudioMode, modePreparing, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
+  }, [isAudioMode, modePreparing, nativePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
 
   useEffect(() => {
+    if (nativePreviewActive) return
     if (visuallySuppressed || isAudioMode || modePreparing) return
     const video = previewRef.current
     const stream = streamRef.current
@@ -135,7 +139,7 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [isAudioMode, modePreparing, previewRef, streamRef, streamGeneration, visuallySuppressed])
+  }, [isAudioMode, modePreparing, nativePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
 
   const shellClass = isEmbedded
     ? 'camera-background camera-background--embedded'
@@ -155,7 +159,7 @@ function LiveCameraBackground({
     .join(' ')
 
   const showPreparingOverlay = modePreparing && !resumingPreview
-  const showPlaceholder = resumingPreview && Boolean(placeholderUrl)
+  const showPlaceholder = !nativePreviewActive && resumingPreview && Boolean(placeholderUrl)
 
   return (
     <div className={shellClass} aria-hidden={!isEmbedded && !visuallySuppressed}>

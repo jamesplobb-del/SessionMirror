@@ -26,6 +26,8 @@ export interface RecordingCompletePayload {
   blob?: Blob
   captureProfile?: CaptureProfile
   captureTrackSnapshot?: RecordingTrackSnapshot | null
+  /** Seconds from file start to the hands-free performance trigger. Not persisted. */
+  autoPerformanceStartSeconds?: number
   /** Populated after post-save loudness analysis. */
   captureDiagnostics?: RecordingCaptureDiagnostics
 }

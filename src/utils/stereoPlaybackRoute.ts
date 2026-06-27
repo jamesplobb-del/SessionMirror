@@ -1,6 +1,5 @@
 import { Capacitor } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
-import { isHeadphoneOutputActive } from './headphoneOutput'
 
 let holdCount = 0
 let nativeRouteEngaged = false
@@ -12,15 +11,22 @@ export function registerRecordingRouteRestoredHandler(handler: () => void): void
 }
 
 /**
- * Native moviePlayback route is only attempted for external outputs (headphones/AirPlay).
- * Built-in speaker playback uses the stable playAndRecord + defaultToSpeaker session and
- * the Web Audio mastering bus — never AVAudioSession category churn.
+ * Native Web playback route is attempted for both speaker and external output.
+ * Swift still refuses the route while camera preview or recording is active.
  */
 function shouldAttemptNativeStereoRoute(): boolean {
   if (!Capacitor.isNativePlatform()) return false
   if (nativeStereoPermanentlySkipped) return false
-  if (!isHeadphoneOutputActive()) return false
   return true
+}
+
+async function isCameraSessionActive(): Promise<boolean> {
+  try {
+    const snapshot = await BestTakeAudioPlugin.getCameraSessionState()
+    return snapshot.previewActive === true || snapshot.recordingActive === true
+  } catch {
+    return false
+  }
 }
 
 function markNativeStereoUnavailable(error: unknown): void {
@@ -42,25 +48,54 @@ export function engageStereoPlayback(): void {
   if (holdCount > 1) return
   if (!shouldAttemptNativeStereoRoute()) return
 
-  void BestTakeAudioPlugin.enableStereoPlayback()
-    .then(() => {
-      nativeRouteEngaged = true
+  void (async () => {
+    if (await isCameraSessionActive()) {
+      nativeRouteEngaged = false
+      console.info('[AudioRoute] Native stereo route skipped while camera preview is active')
+      return
+    }
+    if (holdCount <= 0) return
+
+    return BestTakeAudioPlugin.enableStereoPlayback()
+  })()
+    .then((snapshot) => {
+      if (!snapshot) return
+      nativeRouteEngaged = snapshot.routeApplied !== false
+      if (snapshot.routeApplied === false) {
+        console.info('[AudioRoute] Web playback route unchanged', snapshot)
+      }
     })
     .catch((error) => {
       markNativeStereoUnavailable(error)
     })
 }
 
-/** Re-apply native stereo only when it was previously engaged for an external output. */
+/** Re-apply native Web playback route while a YouTube/playback hold is active. */
 export function refreshStereoPlaybackRoute(): void {
   if (!Capacitor.isNativePlatform()) return
   if (holdCount <= 0) return
-  if (!nativeRouteEngaged) return
   if (!shouldAttemptNativeStereoRoute()) return
 
-  void BestTakeAudioPlugin.enableStereoPlayback().catch((error) => {
-    markNativeStereoUnavailable(error)
-  })
+  void (async () => {
+    if (await isCameraSessionActive()) {
+      nativeRouteEngaged = false
+      console.info('[AudioRoute] Native stereo route refresh skipped while camera preview is active')
+      return
+    }
+    if (holdCount <= 0) return
+
+    return BestTakeAudioPlugin.enableStereoPlayback()
+  })()
+    .then((snapshot) => {
+      if (!snapshot) return
+      nativeRouteEngaged = snapshot.routeApplied !== false
+      if (snapshot.routeApplied === false) {
+        console.info('[AudioRoute] Web playback route unchanged', snapshot)
+      }
+    })
+    .catch((error) => {
+      markNativeStereoUnavailable(error)
+    })
 }
 
 /** Restore recording route only when native stereo was actually engaged. */

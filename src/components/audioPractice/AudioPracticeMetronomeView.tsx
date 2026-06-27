@@ -64,6 +64,12 @@ export default function AudioPracticeMetronomeView() {
   const bpmInputId = useId()
   const prefersReducedMotion = usePrefersReducedMotion()
   const didNormalizeBpmRef = useRef(false)
+  const tempoDragRef = useRef<{
+    pointerId: number
+    startY: number
+    startBpm: number
+    moved: boolean
+  } | null>(null)
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState('')
 
@@ -165,6 +171,50 @@ export default function AudioPracticeMetronomeView() {
     [bpm, setPracticeBpm],
   )
 
+  const handleTempoWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      const direction = event.deltaY > 0 ? -1 : 1
+      setPracticeBpm(bpm + direction)
+    },
+    [bpm, setPracticeBpm],
+  )
+
+  const handleTempoPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return
+      tempoDragRef.current = {
+        pointerId: event.pointerId,
+        startY: event.clientY,
+        startBpm: bpm,
+        moved: false,
+      }
+      event.currentTarget.setPointerCapture(event.pointerId)
+    },
+    [bpm],
+  )
+
+  const handleTempoPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const drag = tempoDragRef.current
+      if (!drag || drag.pointerId !== event.pointerId) return
+      const deltaY = drag.startY - event.clientY
+      if (Math.abs(deltaY) > 4) drag.moved = true
+      const delta = Math.round(deltaY / 6)
+      setPracticeBpm(drag.startBpm + delta)
+    },
+    [setPracticeBpm],
+  )
+
+  const handleTempoPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = tempoDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    tempoDragRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }, [])
+
   const openBpmEditor = useCallback(() => {
     if (playing) stop()
     setBpmDraft(String(bpm))
@@ -204,39 +254,75 @@ export default function AudioPracticeMetronomeView() {
               <Minus className="h-5 w-5" strokeWidth={2.4} aria-hidden />
             </PracticeControlButton>
 
-            <div className="audio-practice-metronome__bpm-center">
-              {editingBpm ? (
-                <input
-                  id={bpmInputId}
-                  type="number"
-                  inputMode="numeric"
-                  min={AUDIO_PRACTICE_MIN_BPM}
-                  max={AUDIO_PRACTICE_MAX_BPM}
-                  value={bpmDraft}
-                  autoFocus
-                  onChange={(event) => setBpmDraft(event.target.value)}
-                  onBlur={commitBpmDraft}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') commitBpmDraft()
-                    if (event.key === 'Escape') setEditingBpm(false)
-                  }}
-                  className="metronome-audio-stage__bpm-input pointer-events-auto"
-                  aria-label="Beats per minute"
-                />
-              ) : (
-                <button
-                  type="button"
-                  className="metronome-audio-stage__bpm pointer-events-auto"
-                  aria-label={`${bpm} beats per minute. Tap to edit.`}
-                  onPointerUp={(event) => {
-                    if (event.button !== 0) return
-                    openBpmEditor()
-                  }}
-                >
-                  <span className="metronome-audio-stage__bpm-value">{bpm}</span>
-                  <span className="metronome-audio-stage__bpm-label">BPM</span>
-                </button>
-              )}
+            <div
+              className="audio-practice-metronome__tempo-dial pointer-events-auto"
+              onWheel={handleTempoWheel}
+              onPointerDown={handleTempoPointerDown}
+              onPointerMove={handleTempoPointerMove}
+              onPointerUp={handleTempoPointerEnd}
+              onPointerCancel={handleTempoPointerEnd}
+              role="group"
+              aria-label={`${bpm} beats per minute. Drag up or down to change tempo.`}
+            >
+              <div className="audio-practice-metronome__tempo-glow" aria-hidden />
+              <div className="audio-practice-metronome__tempo-rim" aria-hidden>
+                {Array.from({ length: 72 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="audio-practice-metronome__tempo-tick"
+                    style={{ '--tick-rotation': `${index * 5}deg` } as React.CSSProperties}
+                  />
+                ))}
+                <span className="audio-practice-metronome__tempo-marker" />
+              </div>
+              <div className="audio-practice-metronome__bpm-center">
+                {editingBpm ? (
+                  <input
+                    id={bpmInputId}
+                    type="number"
+                    inputMode="numeric"
+                    min={AUDIO_PRACTICE_MIN_BPM}
+                    max={AUDIO_PRACTICE_MAX_BPM}
+                    value={bpmDraft}
+                    autoFocus
+                    onChange={(event) => setBpmDraft(event.target.value)}
+                    onBlur={commitBpmDraft}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') commitBpmDraft()
+                      if (event.key === 'Escape') setEditingBpm(false)
+                    }}
+                    className="metronome-audio-stage__bpm-input pointer-events-auto"
+                    aria-label="Beats per minute"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="metronome-audio-stage__bpm pointer-events-auto"
+                    aria-label={`${bpm} beats per minute. Tap to edit.`}
+                    onPointerUp={(event) => {
+                      if (event.button !== 0) return
+                      if (tempoDragRef.current?.moved) return
+                      openBpmEditor()
+                    }}
+                  >
+                    <span className="audio-practice-metronome__tempo-label">Tempo</span>
+                    <span className="metronome-audio-stage__bpm-value">{bpm}</span>
+                    <span className="metronome-audio-stage__bpm-label">BPM</span>
+                  </button>
+                )}
+              </div>
+              <PracticeControlButton
+                label={playing ? 'Stop metronome' : 'Start metronome'}
+                haptic={false}
+                onPress={handleTogglePlay}
+                className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
+              >
+                {playing ? (
+                  <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+                ) : (
+                  <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+                )}
+              </PracticeControlButton>
             </div>
 
             <PracticeControlButton
@@ -256,19 +342,6 @@ export default function AudioPracticeMetronomeView() {
               className="metronome-audio-stage__tap-btn audio-practice-metronome__tap-btn"
             >
               Tap Tempo
-            </PracticeControlButton>
-
-            <PracticeControlButton
-              label={playing ? 'Stop metronome' : 'Start metronome'}
-              haptic={false}
-              onPress={handleTogglePlay}
-              className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
-            >
-              {playing ? (
-                <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-              ) : (
-                <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-              )}
             </PracticeControlButton>
           </div>
         </header>
@@ -380,7 +453,7 @@ export default function AudioPracticeMetronomeView() {
             className="audio-practice-metronome__selectors pointer-events-auto shrink-0"
             aria-label="Time signature and rhythm"
           >
-            <MetronomeHorizontalScroller label="Time" ariaLabel="Time signature" selectedKey={meter}>
+            <MetronomeHorizontalScroller label="Time Signature" ariaLabel="Time signature" selectedKey={meter}>
               {PRACTICE_ALL_METERS.map((value) => (
                 <MetronomeScrollChip
                   key={value}
@@ -396,7 +469,7 @@ export default function AudioPracticeMetronomeView() {
             </MetronomeHorizontalScroller>
 
             <MetronomeHorizontalScroller
-              label="Rhythm"
+              label="Subdivision"
               ariaLabel="Rhythm subdivision"
               selectedKey={subdivision}
             >
@@ -429,6 +502,7 @@ export default function AudioPracticeMetronomeView() {
           role="group"
           aria-label="Metronome click sound"
         >
+          <span className="metronome-audio-stage__sound-label">Accent</span>
           {AUDIO_PRACTICE_CLICK_SOUNDS.map(({ id, label }) => (
             <PracticeControlButton
               key={id}

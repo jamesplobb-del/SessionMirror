@@ -26,25 +26,32 @@ class PortraitBridgeViewController: CAPBridgeViewController {
 
     override open func viewDidLoad() {
         super.viewDidLoad()
-        configureNativePreviewHostView()
         configureWebViewForNativePreview()
     }
 
     override open func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        configureNativePreviewHostView()
-        nativePreviewHostView.frame = view.bounds
+        if nativePreviewHostView.superview != nil {
+            nativePreviewHostView.frame = view.bounds
+        }
         NativeCameraRecordingEngine.shared.layoutPreview(in: nativePreviewHostView)
     }
 
     private func configureNativePreviewHostView() {
-        guard nativePreviewHostView.superview == nil else { return }
-
         nativePreviewHostView.backgroundColor = .black
         nativePreviewHostView.clipsToBounds = true
         nativePreviewHostView.isUserInteractionEnabled = false
         nativePreviewHostView.frame = view.bounds
-        view.insertSubview(nativePreviewHostView, at: 0)
+
+        if nativePreviewHostView.superview == nil {
+            if let webView = self.webView {
+                view.insertSubview(nativePreviewHostView, belowSubview: webView)
+            } else {
+                view.insertSubview(nativePreviewHostView, at: 0)
+            }
+        } else if let webView = self.webView {
+            view.insertSubview(nativePreviewHostView, belowSubview: webView)
+        }
     }
 
     private func configureWebViewForNativePreview() {
@@ -52,11 +59,12 @@ class PortraitBridgeViewController: CAPBridgeViewController {
 
         webView.configuration.allowsInlineMediaPlayback = true
         webView.configuration.mediaTypesRequiringUserActionForPlayback = []
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
+        webView.isOpaque = true
+        webView.backgroundColor = .black
+        webView.scrollView.backgroundColor = .black
         if #available(iOS 15.0, *) {
-            webView.underPageBackgroundColor = .clear
+            webView.underPageBackgroundColor = .black
         }
+        view.bringSubviewToFront(webView)
     }
 }

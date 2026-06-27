@@ -167,6 +167,7 @@ export async function completePlaybackRouteRestore(): Promise<void> {
 
   const shouldResumeCamera = cameraWasSuspendedForPlayback
   const shouldRestoreLoudSession = loudSessionAppliedForPlayback
+  const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
 
   restoreInFlight = (async () => {
     playbackRouteActive = false
@@ -191,7 +192,8 @@ export async function completePlaybackRouteRestore(): Promise<void> {
       /* ignore */
     }
 
-    if (shouldResumeCamera) {
+    if (shouldResumeCamera || shouldRefreshLivePreview) {
+      await delay(120)
       await cameraHandlers?.resume()
     }
   })()
@@ -215,6 +217,7 @@ export function installPlaybackRouteEndedListener(
       if (!playbackRouteActive) return
 
       const shouldResumeCamera = cameraWasSuspendedForPlayback
+      const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
       playbackRouteActive = false
       cameraWasSuspendedForPlayback = false
       loudSessionAppliedForPlayback = false
@@ -226,7 +229,7 @@ export function installPlaybackRouteEndedListener(
         /* ignore */
       }
 
-      if (shouldResumeCamera) {
+      if (shouldResumeCamera || shouldRefreshLivePreview) {
         await onEnded()
       }
     })()

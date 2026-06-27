@@ -15,6 +15,8 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(getCameraSessionState, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setPlaybackRouteActive, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(restoreRecordingRouteAfterPlayback, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(shareMediaFile, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(saveVideoToPhotos, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setNativeExperimentalAudioMode, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startNativeCameraPreview, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopNativeCameraPreview, CAPPluginReturnPromise);

@@ -40,13 +40,16 @@ let takePlaybackStereoHeld = false
 function primeTakePlayback(
   media: Array<HTMLMediaElement | null | undefined>,
   allowNativeDirect: boolean,
+  options: { engageNativeStereo?: boolean } = {},
 ): void {
   const elements = media.filter(
     (element): element is HTMLMediaElement => !!element,
   )
   if (elements.length === 0) return
 
-  if (!takePlaybackStereoHeld) {
+  const engageNativeStereo = options.engageNativeStereo !== false
+
+  if (engageNativeStereo && !takePlaybackStereoHeld) {
     takePlaybackStereoHeld = true
     engageStereoPlayback()
   }
@@ -77,6 +80,13 @@ export function primeTakePlaybackForUserGesture(
 ): void {
   const count = media.filter(Boolean).length
   primeTakePlayback(media, count === 1)
+}
+
+export function primeTakePlaybackForPreparedSession(
+  ...media: Array<HTMLMediaElement | null | undefined>
+): void {
+  const count = media.filter(Boolean).length
+  primeTakePlayback(media, count === 1, { engageNativeStereo: false })
 }
 
 export async function primeTakePlaybackAudio(

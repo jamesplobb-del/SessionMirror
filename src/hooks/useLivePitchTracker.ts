@@ -266,6 +266,17 @@ function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
   )
 }
 
+function logPitchGetUserMediaEvent(
+  phase: string,
+  payload: Record<string, unknown> = {},
+): void {
+  console.info(`[WebRTCTrace] getUserMedia ${phase}`, {
+    caller: 'useLivePitchTracker.createMicPitchGraph',
+    ...payload,
+    stack: new Error().stack,
+  })
+}
+
 async function createMicPitchGraph(
   profile: PitchTunerProfile,
   existingStream?: MediaStream | null,
@@ -287,9 +298,22 @@ async function createMicPitchGraph(
         throw new Error('Microphone unavailable')
       }
 
-      stream = await getUserMedia({
+      const constraints: MediaStreamConstraints = {
         audio: getMusicRecordingAudioConstraints(),
         video: false,
+      }
+      logPitchGetUserMediaEvent('before', { constraints })
+      stream = await getUserMedia(constraints)
+      logPitchGetUserMediaEvent('after', {
+        id: stream.id,
+        active: stream.active,
+        audioTracks: stream.getAudioTracks().map((track) => ({
+          id: track.id,
+          label: track.label,
+          enabled: track.enabled,
+          readyState: track.readyState,
+          settings: track.getSettings?.(),
+        })),
       })
     } catch (err) {
       console.warn('Failed to acquire microphone for pitch tracking', err)

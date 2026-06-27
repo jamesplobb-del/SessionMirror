@@ -10,6 +10,8 @@ import {
 } from './speakerLoudnessMastering'
 import { parseCaptureProfile, type CaptureProfile } from './audioCapture'
 
+export type MicInputPreference = 'auto' | 'headphone' | 'iphone'
+
 export interface AppSettings {
   /** Audio mode: auto-start/stop recording from mic levels. */
   autoSoundRecording: boolean
@@ -35,7 +37,7 @@ export interface AppSettings {
   takeCardScale: number
   /** Dolby On-style playback enhancer (EQ, compression, reverb). */
   audioEnhancerEnabled: boolean
-  /** iOS-only AVAudioSession experiment for native input/output routing. */
+  /** iOS-only AVAudioSession path for native input/output routing. */
   nativeExperimentalAudioEnabled: boolean
   /** Persisted enhancer preset and slider values. */
   audioEnhancerSettings: AudioEnhancerSettings
@@ -43,8 +45,8 @@ export interface AppSettings {
   speakerLoudnessPreset: SpeakerLoudnessPreset
   /** Pause YouTube and enable mic echo cancellation while recording to reduce bleed. */
   excludeYoutubeFromRecording: boolean
-  /** Bluetooth headphones for playback, device mic for recording (avoids HFP headset mic). */
-  useIphoneMicForRecording: boolean
+  /** Native iOS mic input preference when headphones are connected. */
+  micInputPreference: MicInputPreference
   /** Mic capture profile — Natural preserves prior behavior; Loud Camera-like enables AGC. */
   captureProfile: CaptureProfile
 }
@@ -62,11 +64,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   muteMetronomeDuringPlayback: true,
   takeCardScale: 100,
   audioEnhancerEnabled: false,
-  nativeExperimentalAudioEnabled: false,
+  nativeExperimentalAudioEnabled: true,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
   speakerLoudnessPreset: 'loud',
   excludeYoutubeFromRecording: false,
-  useIphoneMicForRecording: false,
+  micInputPreference: 'headphone',
   captureProfile: 'natural',
 }
 
@@ -84,6 +86,18 @@ function parseTunerInstrument(value: unknown): TunerInstrument {
   return DEFAULT_APP_SETTINGS.tunerInstrument
 }
 
+function parseMicInputPreference(
+  value: unknown,
+  legacyUseIphoneMic?: unknown,
+): MicInputPreference {
+  if (value === 'iphone') {
+    return value
+  }
+  if (value === 'auto' || value === 'headphone') return 'headphone'
+  if (legacyUseIphoneMic === true) return 'iphone'
+  return 'headphone'
+}
+
 const STORAGE_KEY = 'sessionmirror:settings'
 
 function clamp(value: number, min: number, max: number): number {
@@ -95,7 +109,9 @@ export function loadAppSettings(): AppSettings {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_APP_SETTINGS }
 
-    const parsed = JSON.parse(raw) as Partial<AppSettings>
+    const parsed = JSON.parse(raw) as Partial<AppSettings> & {
+      useIphoneMicForRecording?: boolean
+    }
     return {
       autoSoundRecording: Boolean(parsed.autoSoundRecording),
       soundSilenceSeconds: clamp(
@@ -142,10 +158,7 @@ export function loadAppSettings(): AppSettings {
         parsed.audioEnhancerEnabled !== undefined
           ? Boolean(parsed.audioEnhancerEnabled)
           : DEFAULT_APP_SETTINGS.audioEnhancerEnabled,
-      nativeExperimentalAudioEnabled:
-        parsed.nativeExperimentalAudioEnabled !== undefined
-          ? Boolean(parsed.nativeExperimentalAudioEnabled)
-          : DEFAULT_APP_SETTINGS.nativeExperimentalAudioEnabled,
+      nativeExperimentalAudioEnabled: true,
       audioEnhancerSettings: parseAudioEnhancerSettings(
         parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),
@@ -156,10 +169,10 @@ export function loadAppSettings(): AppSettings {
         parsed.excludeYoutubeFromRecording !== undefined
           ? Boolean(parsed.excludeYoutubeFromRecording)
           : DEFAULT_APP_SETTINGS.excludeYoutubeFromRecording,
-      useIphoneMicForRecording:
-        parsed.useIphoneMicForRecording !== undefined
-          ? Boolean(parsed.useIphoneMicForRecording)
-          : DEFAULT_APP_SETTINGS.useIphoneMicForRecording,
+      micInputPreference: parseMicInputPreference(
+        parsed.micInputPreference,
+        parsed.useIphoneMicForRecording,
+      ),
       captureProfile: parseCaptureProfile(
         parsed.captureProfile ?? DEFAULT_APP_SETTINGS.captureProfile,
       ),

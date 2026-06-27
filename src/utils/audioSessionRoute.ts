@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
 import { isPlaybackRouteHoldActive } from './playbackRouteCoordinator'
+import type { MicInputPreference } from './appSettings'
 
 /** Read-only snapshot of the current AVAudioSession route. */
 export interface AudioRouteSnapshot {
@@ -13,6 +14,15 @@ export interface AudioRouteSnapshot {
   splitRouteAchieved?: boolean
   usesHeadphones?: boolean
   portType?: string
+  routeApplied?: boolean
+  webPlaybackActive?: boolean
+  recordingActive?: boolean
+  cameraPreviewActive?: boolean
+  playbackRouteActive?: boolean
+  queued?: boolean
+  fallbackReason?: string
+  selectedMicPreference?: MicInputPreference
+  preferredInput?: string
 }
 
 export interface NativePlaybackTestStartResult {
@@ -101,6 +111,11 @@ export interface CameraSessionStateSnapshot {
   playbackSessionPrepared?: boolean
 }
 
+export interface NativeShareResult {
+  success: boolean
+  completed?: boolean
+}
+
 export interface NativeExperimentalAudioSnapshot extends AudioRouteSnapshot {
   selectedAudioEngine: string
   enabled: boolean
@@ -115,14 +130,19 @@ export interface NativeExperimentalAudioSnapshot extends AudioRouteSnapshot {
   sampleRate?: number
   ioBufferDuration?: number
   outputVolume?: number
+  nativeLoudnessProfile?: string
+  selectedMicPreference?: MicInputPreference
   fallbackReason?: string
 }
 
 export interface BestTakeAudioPluginType {
   setHighQualityBluetoothMode(options: { enable: boolean }): Promise<{ success: boolean }>
   /** Gentle input-only switch: prefer the built-in mic without disrupting camera/output route. */
-  setDeviceMicForRecording(options: { enable: boolean }): Promise<AudioRouteSnapshot>
-  enableStereoPlayback(): Promise<void>
+  setDeviceMicForRecording(options: {
+    enable?: boolean
+    preference?: MicInputPreference
+  }): Promise<AudioRouteSnapshot>
+  enableStereoPlayback(): Promise<AudioRouteSnapshot>
   enableRecordingRoute(): Promise<void>
   /** Read-only — reports the current output route without changing it. */
   getPlaybackOutputProfile(): Promise<AudioRouteSnapshot>
@@ -139,9 +159,12 @@ export interface BestTakeAudioPluginType {
   getCameraSessionState(): Promise<CameraSessionStateSnapshot>
   setPlaybackRouteActive(options: { active: boolean }): Promise<CameraSessionStateSnapshot>
   restoreRecordingRouteAfterPlayback(): Promise<AudioRouteSnapshot>
+  shareMediaFile(options: { path: string; title?: string; audioGain?: number }): Promise<NativeShareResult>
+  saveVideoToPhotos(options: { path: string; audioGain?: number }): Promise<{ success: boolean }>
   setNativeExperimentalAudioMode(options: {
     enabled: boolean
     selectedAudioEngine: string
+    micInputPreference?: MicInputPreference
     recordingActive?: boolean
     playbackActive?: boolean
   }): Promise<NativeExperimentalAudioSnapshot>
@@ -175,24 +198,36 @@ const BestTakeAudioPlugin = registerPlugin<BestTakeAudioPluginType>('BestTakeAud
  * headset mic, while keeping A2DP playback. Input-only change — never reacquires
  * the camera or reconfigures the session, so the live preview is undisturbed.
  */
-export async function applyUseIphoneMicForRecording(enabled: boolean): Promise<void> {
+export async function applyMicInputPreference(
+  preference: MicInputPreference,
+): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
   if (isPlaybackRouteHoldActive()) return
   try {
-    const snapshot = await BestTakeAudioPlugin.setDeviceMicForRecording({ enable: enabled })
-    console.info(
-      `[AudioRoute] device mic ${enabled ? 'ON' : 'OFF'}`,
-      `input=${snapshot.inputPort ?? 'unknown'}`,
-      `output=${snapshot.outputPort ?? 'unknown'}`,
-    )
+    const snapshot = await BestTakeAudioPlugin.setDeviceMicForRecording({ preference })
+    console.info('[AudioRoute] mic input preference', {
+      selectedMicPreference: snapshot.selectedMicPreference ?? preference,
+      preferredInput: snapshot.preferredInput,
+      input: snapshot.inputPort,
+      output: snapshot.outputPort,
+      availableInputs: snapshot.availableInputPorts,
+      queued: snapshot.queued,
+      fallbackReason: snapshot.fallbackReason,
+    })
   } catch (error) {
-    console.warn('Failed to apply device mic routing:', error)
+    console.warn('Failed to apply mic input preference:', error)
   }
+}
+
+/** @deprecated Use applyMicInputPreference. */
+export async function applyUseIphoneMicForRecording(enabled: boolean): Promise<void> {
+  await applyMicInputPreference(enabled ? 'iphone' : 'headphone')
 }
 
 export async function applyNativeExperimentalAudioMode(options: {
   enabled: boolean
   selectedAudioEngine: string
+  micInputPreference?: MicInputPreference
   recordingActive?: boolean
   playbackActive?: boolean
 }): Promise<void> {
@@ -211,6 +246,9 @@ export async function applyNativeExperimentalAudioMode(options: {
       availableInputs: snapshot.availableInputs ?? snapshot.availableInputPorts,
       recordingActive: snapshot.recordingActive,
       playbackActive: snapshot.playbackActive,
+      nativeLoudnessProfile: snapshot.nativeLoudnessProfile,
+      selectedMicPreference: snapshot.selectedMicPreference,
+      preferredInput: snapshot.preferredInput,
       fallbackReason: snapshot.fallbackReason,
     })
   } catch (error) {

@@ -470,8 +470,8 @@ function PipWindow({
             )}
           </>
         ) : (
-          <div className="absolute inset-0 flex flex-col bg-stone-800/90 px-2 pb-2 pt-6">
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
+          <div className="pip-empty-state absolute inset-0 flex flex-col px-2 pb-2 pt-6">
+            <div className="pip-empty-state__body flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
               <p className="text-center text-[8px] leading-snug text-white/50">
                 {emptyMessage}
               </p>

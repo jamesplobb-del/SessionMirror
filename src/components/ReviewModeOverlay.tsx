@@ -1,6 +1,16 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Pause, Play, X } from 'lucide-react'
+import {
+  Activity,
+  ChevronLeft,
+  Download,
+  Ellipsis,
+  Heart,
+  Info,
+  Pencil,
+  Share2,
+  Trash2,
+} from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
@@ -9,15 +19,39 @@ import { iosEaseOut, iosScreenEnter, iosScreenExit, motionGpuLayer } from '../ut
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
-import type { MediaType, ReviewContext, ReviewSlot, Take } from '../types'
+import type { MediaType, ReviewContext, ReviewSlot, Take, TakeUpdate } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
 import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
+import { describeSaveTakeResult, shareTakeToSystem, shareTakeVideo } from '../utils/shareTakeVideo'
+import { triggerBestTakeHaptic, triggerLightHaptic, triggerWarningHaptic } from '../utils/haptics'
+import { useActionSheet } from '../context/ActionSheetContext'
+import {
+  useAudioModePlayback,
+  type AudioModePlaybackItem,
+} from '../context/AudioModePlaybackContext'
 
 const SWIPE_THRESHOLD = 60
-const OVERLAY_HIDE_MS = 1000
+const OVERLAY_HIDE_MS = 2800
+
+function formatReviewDate(timestamp?: number): string {
+  if (!timestamp) return 'SessionMirror'
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(timestamp))
+}
+
+function formatReviewTime(timestamp?: number): string {
+  if (!timestamp) return ''
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(timestamp))
+}
 
 interface ReviewTakeLayerProps {
   takeKey: string
@@ -34,6 +68,7 @@ interface ReviewTakeLayerProps {
   onPointerMove?: React.PointerEventHandler<HTMLVideoElement>
   onPointerUp?: React.PointerEventHandler<HTMLVideoElement>
   onPointerCancel?: React.PointerEventHandler<HTMLVideoElement>
+  useSharedAudioPlayer?: boolean
 }
 
 function ReviewTakeLayer({
@@ -51,6 +86,7 @@ function ReviewTakeLayer({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  useSharedAudioPlayer = false,
 }: ReviewTakeLayerProps) {
   const [mediaRepairKey, setMediaRepairKey] = useState(0)
   const playerKey = `${takeKey}-r${mediaRepairKey}`
@@ -75,19 +111,25 @@ function ReviewTakeLayer({
       <div
         className="absolute inset-0 h-full w-full bg-black transition-all duration-200 ease-out"
         style={swipeLayerStyle}
+        onPointerDown={onPointerDown as React.PointerEventHandler<HTMLDivElement> | undefined}
+        onPointerMove={onPointerMove as React.PointerEventHandler<HTMLDivElement> | undefined}
+        onPointerUp={onPointerUp as React.PointerEventHandler<HTMLDivElement> | undefined}
+        onPointerCancel={onPointerCancel as React.PointerEventHandler<HTMLDivElement> | undefined}
       >
-        <TakeVideoPlayer
-          key={playerKey}
-          filePath={filePath}
-          videoUrl={videoUrl}
-          mimeType={mimeType}
-          videoRef={videoRef}
-          videoSourceKey={takeKey}
-          className="absolute inset-0 h-full w-full"
-          mirror={false}
-          audible={playbackAudible}
-          manualPlayOnly
-        />
+        {!useSharedAudioPlayer && (
+          <TakeVideoPlayer
+            key={playerKey}
+            filePath={filePath}
+            videoUrl={videoUrl}
+            mimeType={mimeType}
+            videoRef={videoRef}
+            videoSourceKey={takeKey}
+            className="absolute inset-0 h-full w-full"
+            mirror={false}
+            audible={playbackAudible}
+            manualPlayOnly
+          />
+        )}
       </div>
     )
   }
@@ -130,6 +172,8 @@ interface ReviewModeOverlayProps {
   onVaultIndexChange: (index: number) => void
   benchmarkSrc: string | null
   challengerSrc: string | null
+  benchmarkTake?: Take | null
+  challengerTake?: Take | null
   benchmarkFilePath?: string
   challengerFilePath?: string
   benchmarkName?: string
@@ -148,6 +192,9 @@ interface ReviewModeOverlayProps {
   isOpen: boolean
   onClose: () => void
   onSlotChange: (slot: ReviewSlot) => void
+  onUpdateTake?: (id: string, updates: TakeUpdate) => void
+  onDeleteTake?: (id: string) => void
+  onFavoriteTake?: (id: string) => void
 }
 
 export default function ReviewModeOverlay({
@@ -158,6 +205,8 @@ export default function ReviewModeOverlay({
   onVaultIndexChange,
   benchmarkSrc,
   challengerSrc,
+  benchmarkTake = null,
+  challengerTake = null,
   benchmarkFilePath = '',
   challengerFilePath = '',
   benchmarkName,
@@ -176,7 +225,12 @@ export default function ReviewModeOverlay({
   isOpen,
   onClose,
   onSlotChange,
+  onUpdateTake,
+  onDeleteTake,
+  onFavoriteTake,
 }: ReviewModeOverlayProps) {
+  const { showAlert, showConfirm } = useActionSheet()
+  const audioPlayback = useAudioModePlayback()
   const benchmarkVideoRef = useRef<HTMLMediaElement>(null)
   const challengerVideoRef = useRef<HTMLMediaElement>(null)
   const vaultVideoRef = useRef<HTMLMediaElement>(null)
@@ -198,6 +252,7 @@ export default function ReviewModeOverlay({
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [showPitch, setShowPitch] = useState(false)
+  const [actionMenuOpen, setActionMenuOpen] = useState(false)
 
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
@@ -212,6 +267,14 @@ export default function ReviewModeOverlay({
     : activeSlot === 'benchmark'
       ? benchmarkName
       : challengerName
+  const activeTake = isVault
+    ? vaultTake
+    : activeSlot === 'benchmark'
+      ? benchmarkTake
+      : challengerTake
+  const activeTimestamp = activeTake?.timestamp
+  const activeDate = formatReviewDate(activeTimestamp)
+  const activeTime = formatReviewTime(activeTimestamp)
   const activeLabel = isVault
     ? 'Take Vault'
     : activeSlot === 'benchmark'
@@ -252,6 +315,63 @@ export default function ReviewModeOverlay({
       ? isAudioMedia(benchmarkMimeType, benchmarkMediaType)
       : isAudioMedia(challengerMimeType, challengerMediaType)
 
+  const activeTimelineFilePath = isVault
+    ? vaultTake?.filePath ?? ''
+    : activeSlot === 'benchmark'
+      ? benchmarkFilePath
+      : challengerFilePath
+
+  const activeTimelineUrl = isVault
+    ? vaultTake?.videoUrl ?? ''
+    : activeSlot === 'benchmark'
+      ? benchmarkSrc ?? ''
+      : challengerSrc ?? ''
+
+  const activeAudioPlaybackItem = useMemo<AudioModePlaybackItem | null>(() => {
+    if (!activeIsAudio || (!activeTimelineFilePath && !activeTimelineUrl)) return null
+    const mimeType = isVault
+      ? vaultTake?.videoMimeType ??
+        (vaultTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
+      : activeSlot === 'benchmark'
+        ? benchmarkMimeType
+        : challengerMimeType
+
+    return {
+      id: activeTake?.id ? `take:${activeTake.id}` : `review:${activeTimelineFilePath}:${activeTimelineUrl}`,
+      takeId: activeTake?.id,
+      name: activeName ?? activeLabel,
+      filePath: activeTimelineFilePath,
+      mediaUrl: activeTimelineUrl,
+      mimeType,
+    }
+  }, [
+    activeIsAudio,
+    activeLabel,
+    activeName,
+    activeSlot,
+    activeTake?.id,
+    activeTimelineFilePath,
+    activeTimelineUrl,
+    benchmarkMimeType,
+    challengerMimeType,
+    isVault,
+    vaultTake?.mediaType,
+    vaultTake?.videoMimeType,
+  ])
+
+  const audioControllerActive = activeAudioPlaybackItem
+    ? audioPlayback.matchesCurrentSource(activeAudioPlaybackItem)
+    : false
+  const displayCurrentTime = activeAudioPlaybackItem && audioControllerActive
+    ? audioPlayback.state.currentTime
+    : currentTime
+  const displayDuration = activeAudioPlaybackItem && audioControllerActive
+    ? audioPlayback.state.duration
+    : duration
+  const displayIsPlaying = activeAudioPlaybackItem && audioControllerActive
+    ? audioPlayback.state.isPlaying
+    : isPlaying
+
   const pauseAllReviewVideos = useCallback(() => {
     resetVideoPlayback(benchmarkVideoRef.current)
     resetVideoPlayback(challengerVideoRef.current)
@@ -265,11 +385,12 @@ export default function ReviewModeOverlay({
   }, [])
 
   const getActiveVideo = useCallback((): HTMLMediaElement | null => {
+    if (activeAudioPlaybackItem) return audioPlayback.playerRef.current
     if (isVault) return vaultVideoRef.current
     return activeSlot === 'benchmark'
       ? benchmarkVideoRef.current
       : challengerVideoRef.current
-  }, [activeSlot, isVault])
+  }, [activeAudioPlaybackItem, activeSlot, audioPlayback.playerRef, isVault])
 
   const scheduleHideOverlay = useCallback(() => {
     if (hideOverlayTimerRef.current !== null) {
@@ -341,6 +462,18 @@ export default function ReviewModeOverlay({
 
   const scrubToClientX = useCallback(
     (clientX: number) => {
+      if (activeAudioPlaybackItem) {
+        const track = timelineTrackRef.current
+        if (!track) return
+        const playableDuration = audioPlayback.state.duration
+        if (playableDuration <= 0) return
+        const rect = track.getBoundingClientRect()
+        if (rect.width <= 0) return
+        const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+        audioPlayback.seek(percent * playableDuration)
+        return
+      }
+
       const video = getActiveVideo()
       const track = timelineTrackRef.current
       if (!video || !track) return
@@ -356,7 +489,7 @@ export default function ReviewModeOverlay({
       video.currentTime = time
       scheduleTimeUpdate(time)
     },
-    [duration, getActiveVideo, scheduleTimeUpdate],
+    [activeAudioPlaybackItem, audioPlayback, duration, getActiveVideo, scheduleTimeUpdate],
   )
 
   const handleCloseClick = useCallback(
@@ -364,6 +497,13 @@ export default function ReviewModeOverlay({
       event.stopPropagation()
       reviewAutoplayEnabledRef.current = false
       stopProgressLoop()
+      if (activeAudioPlaybackItem) {
+        audioPlayback.closeFullscreen()
+        window.requestAnimationFrame(() => {
+          onClose()
+        })
+        return
+      }
       pausePitchGraphsForMedia(
         benchmarkVideoRef.current,
         challengerVideoRef.current,
@@ -375,10 +515,16 @@ export default function ReviewModeOverlay({
         onClose()
       })
     },
-    [isVault, onClose, pauseAllReviewVideosSafe, stopProgressLoop],
+    [activeAudioPlaybackItem, audioPlayback, onClose, pauseAllReviewVideosSafe, stopProgressLoop],
   )
 
   const togglePlayPause = useCallback(() => {
+    if (activeAudioPlaybackItem) {
+      audioPlayback.toggle(activeAudioPlaybackItem)
+      revealPlayOverlay(true)
+      return
+    }
+
     const video = getActiveVideo()
     if (!video) return
 
@@ -406,7 +552,110 @@ export default function ReviewModeOverlay({
         },
       })
     }
-  }, [getActiveVideo, isVault, revealPlayOverlay])
+  }, [activeAudioPlaybackItem, audioPlayback, getActiveVideo, revealPlayOverlay])
+
+  const handleToggleChrome = useCallback(() => {
+    setActionMenuOpen(false)
+    setShowPlayOverlay((visible) => {
+      const next = !visible
+      if (next && isPlaying) {
+        scheduleHideOverlay()
+      } else if (!next && hideOverlayTimerRef.current !== null) {
+        window.clearTimeout(hideOverlayTimerRef.current)
+        hideOverlayTimerRef.current = null
+      }
+      return next
+    })
+  }, [isPlaying, scheduleHideOverlay])
+
+  const handleRenameActiveTake = useCallback(() => {
+    if (!activeTake || !onUpdateTake) return
+    setActionMenuOpen(false)
+    triggerLightHaptic()
+    const nextName = window.prompt('Rename recording', activeTake.name)
+    const trimmed = nextName?.trim()
+    if (!trimmed || trimmed === activeTake.name) return
+    onUpdateTake(activeTake.id, { name: trimmed })
+  }, [activeTake, onUpdateTake])
+
+  const handleShareActiveTake = useCallback(() => {
+    if (!activeTake) return
+    setActionMenuOpen(false)
+    triggerLightHaptic()
+    void shareTakeToSystem(activeTake).then((result) => {
+      if (result.ok) return
+      void showAlert({
+        title: 'Unable to Share',
+        message:
+          result.reason === 'missing_file'
+            ? 'This take could not be found on your device.'
+            : 'The system share sheet could not be opened.',
+        tone: 'error',
+      })
+    })
+  }, [activeTake, showAlert])
+
+  const handleSaveActiveTake = useCallback(() => {
+    if (!activeTake) return
+    setActionMenuOpen(false)
+    triggerLightHaptic()
+    void shareTakeVideo(activeTake).then((result) => {
+      const message = describeSaveTakeResult(result)
+      if (!message) return
+      void showAlert({
+        message,
+        tone: result.ok ? 'success' : 'error',
+      })
+    })
+  }, [activeTake, showAlert])
+
+  const handleFavoriteActiveTake = useCallback(() => {
+    if (!activeTake || !onFavoriteTake) return
+    setActionMenuOpen(false)
+    triggerBestTakeHaptic()
+    onFavoriteTake(activeTake.id)
+  }, [activeTake, onFavoriteTake])
+
+  const handleInfoActiveTake = useCallback(() => {
+    if (!activeTake) return
+    setActionMenuOpen(false)
+    triggerLightHaptic()
+    void showAlert({
+      title: activeTake.name,
+      message: [
+        formatReviewDate(activeTake.timestamp),
+        formatReviewTime(activeTake.timestamp),
+        activeTake.mediaType === 'audio' ? 'Audio take' : 'Video take',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    })
+  }, [activeTake, showAlert])
+
+  const handleDeleteActiveTake = useCallback(() => {
+    if (!activeTake || !onDeleteTake) return
+    setActionMenuOpen(false)
+    void (async () => {
+      const confirmed = await showConfirm({
+        title: 'Delete Recording?',
+        message: `"${activeTake.name}" will be removed from this project.`,
+        destructive: true,
+        confirmLabel: 'Delete',
+      })
+      if (!confirmed) return
+      triggerWarningHaptic()
+      onDeleteTake(activeTake.id)
+      onClose()
+    })()
+  }, [activeTake, onClose, onDeleteTake, showConfirm])
+
+  const handleDuplicateActiveTake = useCallback(() => {
+    setActionMenuOpen(false)
+    void showAlert({
+      title: 'Duplicate',
+      message: 'Duplicate will be added in a dedicated take-management pass.',
+    })
+  }, [showAlert])
 
   const hasBenchmark = Boolean(benchmarkSrc || benchmarkFilePath)
   const hasChallenger = Boolean(challengerSrc || challengerFilePath)
@@ -423,25 +672,44 @@ export default function ReviewModeOverlay({
   useEffect(() => {
     if (!isOpen) {
       setShowPitch(false)
+      setActionMenuOpen(false)
     }
   }, [isOpen])
+
+  useEffect(() => {
+    setActionMenuOpen(false)
+  }, [activeSlot, vaultTake?.id, vaultIndex])
 
   useEffect(() => {
     reviewAutoplayEnabledRef.current = isOpen
 
     if (!isOpen) {
+      if (activeAudioPlaybackItem) {
+        audioPlayback.closeFullscreen()
+        return
+      }
       pauseAllReviewVideos()
       return
     }
 
     return () => {
       reviewAutoplayEnabledRef.current = false
+      if (activeAudioPlaybackItem) {
+        audioPlayback.closeFullscreen()
+        return
+      }
       pauseAllReviewVideosSafe()
     }
-  }, [isOpen, pauseAllReviewVideos, pauseAllReviewVideosSafe])
+  }, [activeAudioPlaybackItem, audioPlayback, isOpen, pauseAllReviewVideos, pauseAllReviewVideosSafe])
 
   useEffect(() => {
     if (!isOpen || !reviewAutoplayEnabledRef.current) return
+
+    if (activeAudioPlaybackItem) {
+      audioPlayback.openFullscreen(activeAudioPlaybackItem)
+      setShowPlayOverlay(true)
+      return
+    }
 
     if (!isVault) {
       if (activeSlot === 'benchmark') {
@@ -467,6 +735,8 @@ export default function ReviewModeOverlay({
     isVault,
     vaultTake?.id,
     vaultIndex,
+    activeAudioPlaybackItem,
+    audioPlayback,
   ])
 
   useEffect(() => {
@@ -489,16 +759,20 @@ export default function ReviewModeOverlay({
       setIsPlaying(true)
     }
     const onPause = () => {
-      void finalizeTakePlaybackCleanup()
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
+      if (!activeAudioPlaybackItem) {
+        void finalizeTakePlaybackCleanup()
+      }
     }
     const onEnded = () => {
-      void finalizeTakePlaybackCleanup()
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
+      if (!activeAudioPlaybackItem) {
+        void finalizeTakePlaybackCleanup()
+      }
     }
 
     video.addEventListener('durationchange', onDurationChange)
@@ -532,9 +806,19 @@ export default function ReviewModeOverlay({
     syncDurationFromVideo,
     vaultTake?.id,
     vaultIndex,
+    activeAudioPlaybackItem,
   ])
 
   const handleScrubStart = useCallback(() => {
+    if (activeAudioPlaybackItem) {
+      wasPlayingBeforeScrubRef.current = audioPlayback.state.isPlaying
+      audioPlayback.pause()
+      isScrubbingRef.current = true
+      setIsScrubbing(true)
+      revealPlayOverlay(false)
+      return
+    }
+
     const video = getActiveVideo()
     if (video) {
       wasPlayingBeforeScrubRef.current = !video.paused
@@ -544,11 +828,20 @@ export default function ReviewModeOverlay({
     isScrubbingRef.current = true
     setIsScrubbing(true)
     revealPlayOverlay(false)
-  }, [getActiveVideo, revealPlayOverlay, stopProgressLoop])
+  }, [activeAudioPlaybackItem, audioPlayback, getActiveVideo, revealPlayOverlay, stopProgressLoop])
 
   const handleScrubEnd = useCallback(() => {
     isScrubbingRef.current = false
     setIsScrubbing(false)
+
+    if (activeAudioPlaybackItem) {
+      if (wasPlayingBeforeScrubRef.current) {
+        audioPlayback.play(activeAudioPlaybackItem)
+      }
+      wasPlayingBeforeScrubRef.current = false
+      revealPlayOverlay(false)
+      return
+    }
 
     const video = getActiveVideo()
     if (video) {
@@ -574,6 +867,8 @@ export default function ReviewModeOverlay({
     revealPlayOverlay,
     scheduleTimeUpdate,
     syncDurationFromVideo,
+    activeAudioPlaybackItem,
+    audioPlayback,
   ])
 
   const completeSwipe = useCallback(
@@ -654,7 +949,10 @@ export default function ReviewModeOverlay({
     if (!isTrackingPointer.current) return
     isTrackingPointer.current = false
 
-    if (!swipeCommitted.current) return
+    if (!swipeCommitted.current) {
+      handleToggleChrome()
+      return
+    }
 
     swipeCommitted.current = false
     const deltaX = e.clientX - pointerStart.current.x
@@ -703,30 +1001,89 @@ export default function ReviewModeOverlay({
       aria-hidden={!isOpen}
     >
       <div ref={reviewBoundsRef} className="relative h-full w-full">
-      <div className="review-overlay-header pointer-events-none absolute inset-x-0 top-0 z-10 px-5 pb-3">
-        <div className="ui-orient-spin relative flex items-start justify-between gap-3 bg-gradient-to-b from-black/50 to-transparent pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
-              {activeLabel}
-            </p>
-            {activeName && (
-              <p className="text-sm font-medium text-white">{activeName}</p>
-            )}
-          </div>
-          <div className="pointer-events-auto flex shrink-0 items-center gap-2">
-            <Pressable
-              type="button"
-              intensity="icon"
-              haptic="light"
-              onClick={handleCloseClick}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/25"
-              aria-label="Done"
-            >
-              <X className="h-5 w-5" />
-            </Pressable>
-          </div>
-        </div>
-      </div>
+      <AnimatePresence>
+        {showPlayOverlay && (
+          <motion.div
+            className="review-overlay-header pointer-events-none absolute inset-x-0 top-0 z-30 px-3"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={iosEaseOut}
+          >
+            <div className="ui-orient-spin review-native-nav pointer-events-auto grid grid-cols-[3.25rem_1fr_3.25rem] items-center gap-2">
+              <Pressable
+                type="button"
+                intensity="icon"
+                haptic="light"
+                onClick={handleCloseClick}
+                className="review-nav-button"
+                aria-label="Back"
+              >
+                <ChevronLeft className="h-7 w-7" strokeWidth={2.4} />
+              </Pressable>
+
+              <div className="min-w-0 text-center">
+                <p className="truncate text-[17px] font-semibold leading-tight text-white">
+                  {activeName || activeLabel}
+                </p>
+                <p className="mt-0.5 truncate text-[12px] font-medium leading-tight text-white/58">
+                  {activeTime ? `${activeDate} · ${activeTime}` : activeDate}
+                </p>
+              </div>
+
+              <div className="relative flex justify-end">
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  haptic="light"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setActionMenuOpen((open) => !open)
+                  }}
+                  className="review-nav-button"
+                  aria-label="More actions"
+                  aria-expanded={actionMenuOpen}
+                >
+                  <Ellipsis className="h-6 w-6" strokeWidth={2.4} />
+                </Pressable>
+
+                <AnimatePresence>
+                  {actionMenuOpen && (
+                    <motion.div
+                      className="review-action-menu absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-2xl border border-white/12 bg-[#1c1c1e]/88 py-1.5 text-white shadow-2xl backdrop-blur-2xl"
+                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                      transition={iosEaseOut}
+                    >
+                      <button type="button" className="review-menu-item" onClick={handleRenameActiveTake} disabled={!activeTake || !onUpdateTake}>
+                        <Pencil className="h-4 w-4" />
+                        Rename
+                      </button>
+                      <button type="button" className="review-menu-item" onClick={handleSaveActiveTake} disabled={!activeTake || activeTake.mediaType === 'audio'}>
+                        <Download className="h-4 w-4" />
+                        Save to Photos
+                      </button>
+                      <button type="button" className="review-menu-item" onClick={handleShareActiveTake} disabled={!activeTake}>
+                        <Share2 className="h-4 w-4" />
+                        Share
+                      </button>
+                      <button type="button" className="review-menu-item" onClick={handleDuplicateActiveTake} disabled={!activeTake}>
+                        <span className="flex h-4 w-4 items-center justify-center text-sm">+</span>
+                        Duplicate
+                      </button>
+                      <button type="button" className="review-menu-item review-menu-item--destructive" onClick={handleDeleteActiveTake} disabled={!activeTake || !onDeleteTake}>
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="review-video-stage relative min-h-0 flex-1 overflow-hidden">
         {isOpen && !isVault && (canSwipeLeft || canSwipeRight) && (
@@ -755,6 +1112,7 @@ export default function ReviewModeOverlay({
             recordingOrientation={vaultTake.recordingOrientation}
             videoRef={vaultVideoRef}
             playbackAudible={isPlaying}
+            useSharedAudioPlayer={Boolean(activeAudioPlaybackItem)}
             swipeLayerStyle={swipeLayerStyle}
             onPointerDown={handleVideoPointerDown}
             onPointerMove={handleVideoPointerMove}
@@ -781,6 +1139,7 @@ export default function ReviewModeOverlay({
                   recordingOrientation={benchmarkRecordingOrientation}
                   videoRef={benchmarkVideoRef}
                   playbackAudible={isPlaying && activeSlot === 'benchmark'}
+                  useSharedAudioPlayer={Boolean(activeAudioPlaybackItem)}
                   swipeLayerStyle={
                     activeSlot === 'benchmark' ? swipeLayerStyle : undefined
                   }
@@ -818,6 +1177,7 @@ export default function ReviewModeOverlay({
                   recordingOrientation={challengerRecordingOrientation}
                   videoRef={challengerVideoRef}
                   playbackAudible={isPlaying && activeSlot === 'challenger'}
+                  useSharedAudioPlayer={Boolean(activeAudioPlaybackItem)}
                   swipeLayerStyle={
                     activeSlot === 'challenger' ? swipeLayerStyle : undefined
                   }
@@ -840,44 +1200,15 @@ export default function ReviewModeOverlay({
         ) : null}
       </div>
 
-        {isOpen && (
-          <AnimatePresence>
-            {showPlayOverlay && (
-              <Pressable
-                type="button"
-                intensity="icon"
-                haptic="light"
-                data-play-overlay
-                onClick={(e) => {
-                  e.stopPropagation()
-                  togglePlayPause()
-                }}
-                className="pointer-events-auto absolute left-1/2 top-1/2 z-20 flex h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-                aria-label={isPlaying ? 'Pause' : 'Play'}
-                initial={{ opacity: 0, scale: 0.88 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.88 }}
-                transition={iosEaseOut}
-              >
-                {isPlaying ? (
-                  <Pause className="h-8 w-8 fill-white text-white" />
-                ) : (
-                  <Play className="h-8 w-8 fill-white text-white" />
-                )}
-              </Pressable>
-            )}
-          </AnimatePresence>
-        )}
-
         {showPitchPanel && (
           <AnimatePresence mode="wait">
             {showPitch && (
               <DraggablePitchWidget
                 boundaryRef={reviewBoundsRef}
                 positionId="review-pitch"
-                mediaRef={activePitchMediaRef}
+                mediaRef={activeAudioPlaybackItem ? audioPlayback.playerRef : activePitchMediaRef}
                 enabled={showPitch}
-                isPlaying={isPlaying}
+                isPlaying={displayIsPlaying}
                 mediaKey={activePitchMediaKey}
                 takeName={activeName}
                 label="Pitch Analysis"
@@ -892,24 +1223,62 @@ export default function ReviewModeOverlay({
           </AnimatePresence>
         )}
 
-        {isOpen && (
-          <div className="review-bottom-ui pointer-events-none absolute inset-x-0 bottom-0 z-10">
-            <div className="ui-orient-spin pointer-events-auto">
-            <ReviewTimeline
-              trackRef={timelineTrackRef}
-              currentTime={currentTime}
-              duration={duration}
-              isScrubbing={isScrubbing}
-              onScrubStart={handleScrubStart}
-              onScrub={scrubToClientX}
-              onScrubEnd={handleScrubEnd}
-              pitchToggleVisible={showPitchPanel}
-              pitchToggleActive={showPitch}
-              onPitchToggle={() => setShowPitch((prev) => !prev)}
-            />
-            </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {isOpen && showPlayOverlay && (
+            <motion.div
+              className="review-bottom-ui pointer-events-none absolute inset-x-0 bottom-0 z-30"
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 18 }}
+              transition={iosEaseOut}
+            >
+              <div className="ui-orient-spin pointer-events-auto">
+                <div className="review-controls-cluster">
+                  <ReviewTimeline
+                    trackRef={timelineTrackRef}
+                    currentTime={displayCurrentTime}
+                    duration={displayDuration}
+                    isScrubbing={isScrubbing}
+                    onScrubStart={handleScrubStart}
+                    onScrub={scrubToClientX}
+                    onScrubEnd={handleScrubEnd}
+                    isPlaying={displayIsPlaying}
+                    onPlayPause={togglePlayPause}
+                    mediaFilePath={activeTimelineFilePath}
+                    mediaUrl={activeTimelineUrl}
+                  />
+
+                  <div className="review-native-toolbar">
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleShareActiveTake} disabled={!activeTake} aria-label="Share">
+                      <Share2 className="h-5 w-5" />
+                    </Pressable>
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleFavoriteActiveTake} disabled={!activeTake || !onFavoriteTake} aria-label="Favorite">
+                      <Heart className="h-5 w-5" />
+                    </Pressable>
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleInfoActiveTake} disabled={!activeTake} aria-label="Info">
+                      <Info className="h-5 w-5" />
+                    </Pressable>
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      haptic="light"
+                      className={`review-toolbar-button ${showPitch ? 'review-toolbar-button--active' : ''}`}
+                      onClick={() => setShowPitch((prev) => !prev)}
+                      disabled={!showPitchPanel}
+                      aria-label="Pitch Analysis"
+                      aria-pressed={showPitch}
+                    >
+                      <Activity className="h-5 w-5" />
+                    </Pressable>
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button review-toolbar-button--destructive" onClick={handleDeleteActiveTake} disabled={!activeTake || !onDeleteTake} aria-label="Delete">
+                      <Trash2 className="h-5 w-5" />
+                    </Pressable>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   )

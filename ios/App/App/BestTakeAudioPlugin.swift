@@ -1,5 +1,7 @@
 ﻿import AVFoundation
 import Capacitor
+import Photos
+import UIKit
 
 @objc(BestTakeAudioPlugin)
 public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -20,6 +22,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getCameraSessionState", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setPlaybackRouteActive", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restoreRecordingRouteAfterPlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "shareMediaFile", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveVideoToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraPreview", returnType: CAPPluginReturnPromise),
@@ -76,28 +80,40 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func setDeviceMicForRecording(_ call: CAPPluginCall) {
-        let enable = call.getBool("enable") ?? false
+        let preference = AudioRouteConfigurator.parseMicInputPreference(call.getString("preference"))
+        let legacyEnable = call.getBool("enable")
+        let resolvedPreference: AudioRouteConfigurator.MicInputPreference = legacyEnable == nil
+            ? preference
+            : (legacyEnable == true ? .iphone : .auto)
 
         if CameraSessionGuard.shouldBlockDeviceMicChanges() {
             CameraSessionGuard.skipDeviceMicLog()
-            call.resolve(AudioRouteConfigurator.routeSnapshot())
+            var snapshot = AudioRouteConfigurator.routeSnapshot()
+            snapshot["success"] = true
+            snapshot["selectedMicPreference"] = resolvedPreference.rawValue
+            snapshot["queued"] = true
+            print("[MicInputPreference] queued selected=\(resolvedPreference.rawValue) reason=input preference blocked during preview/playback overlap")
+            call.resolve(snapshot)
             return
         }
 
         if CameraSessionGuard.shouldBlockRouteChanges() {
             CameraSessionGuard.skipRouteChangeLog()
-            call.resolve(AudioRouteConfigurator.routeSnapshot())
+            var snapshot = AudioRouteConfigurator.routeSnapshot()
+            snapshot["success"] = true
+            snapshot["selectedMicPreference"] = resolvedPreference.rawValue
+            snapshot["queued"] = true
+            print("[MicInputPreference] queued selected=\(resolvedPreference.rawValue) reason=route change blocked while camera preview or recording is active")
+            call.resolve(snapshot)
             return
         }
 
         do {
-            try AudioRouteConfigurator.setPreferredBuiltInMic(enable)
-            var result = AudioRouteConfigurator.routeSnapshot()
-            result["success"] = true
+            let result = try AudioRouteConfigurator.setMicInputPreference(resolvedPreference)
             call.resolve(result)
         } catch {
             print("BestTake Audio Error: \(error.localizedDescription)")
-            call.reject("Device mic routing failed: \(error.localizedDescription)")
+            call.reject("Mic input preference failed: \(error.localizedDescription)")
         }
     }
 
@@ -134,33 +150,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func enableStereoPlayback(_ call: CAPPluginCall) {
-        if CameraSessionGuard.shouldBlockRouteChanges() {
-            CameraSessionGuard.skipRouteChangeLog()
-            call.resolve()
-            return
-        }
-
-        let session = AVAudioSession.sharedInstance()
-        let outputPort = session.currentRoute.outputs.first?.portType ?? .builtInSpeaker
-
-        // Built-in speaker: keep playAndRecord + defaultToSpeaker (Web Audio uses current route).
-        let builtInSpeakerOutputs: Set<AVAudioSession.Port> = [.builtInSpeaker, .builtInReceiver]
-        if builtInSpeakerOutputs.contains(outputPort) {
-            AudioRouteConfigurator.logRoute("stereo playback skipped (built-in speaker)")
-            call.resolve()
-            return
-        }
-
         do {
-            // .allowBluetoothA2DP is invalid with .playback (OSStatus -50). External outputs only.
-            try session.setCategory(
-                .playback,
-                mode: .default,
-                options: [.mixWithOthers, .allowAirPlay]
-            )
-            try session.setActive(true, options: [])
-            AudioRouteConfigurator.logRoute("stereo playback (external output)")
-            call.resolve()
+            let result = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
+            call.resolve(result)
         } catch {
             call.reject("Failed to set stereo playback", nil, error)
         }
@@ -290,9 +282,219 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve(AudioRouteConfigurator.routeSnapshot())
     }
 
+    private func fileURL(from path: String?) -> URL? {
+        guard let path = path, !path.isEmpty else { return nil }
+        if let url = URL(string: path), url.isFileURL {
+            return url
+        }
+        return URL(fileURLWithPath: path)
+    }
+
+    private func amplifiedExportURL(
+        from sourceURL: URL,
+        audioGain: Float,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        guard audioGain > 1.01 else {
+            completion(.success(sourceURL))
+            return
+        }
+
+        let asset = AVURLAsset(url: sourceURL)
+        guard !asset.tracks(withMediaType: .audio).isEmpty else {
+            completion(.success(sourceURL))
+            return
+        }
+
+        let composition = AVMutableComposition()
+
+        do {
+            for sourceTrack in asset.tracks(withMediaType: .video) {
+                guard let compositionTrack = composition.addMutableTrack(
+                    withMediaType: .video,
+                    preferredTrackID: kCMPersistentTrackID_Invalid
+                ) else { continue }
+                try compositionTrack.insertTimeRange(
+                    CMTimeRange(start: .zero, duration: asset.duration),
+                    of: sourceTrack,
+                    at: .zero
+                )
+                compositionTrack.preferredTransform = sourceTrack.preferredTransform
+            }
+
+            var audioParameters: [AVMutableAudioMixInputParameters] = []
+            for sourceTrack in asset.tracks(withMediaType: .audio) {
+                guard let compositionTrack = composition.addMutableTrack(
+                    withMediaType: .audio,
+                    preferredTrackID: kCMPersistentTrackID_Invalid
+                ) else { continue }
+                try compositionTrack.insertTimeRange(
+                    CMTimeRange(start: .zero, duration: asset.duration),
+                    of: sourceTrack,
+                    at: .zero
+                )
+                let parameters = AVMutableAudioMixInputParameters(track: compositionTrack)
+                parameters.setVolume(min(max(audioGain, 1.0), 3.0), at: .zero)
+                audioParameters.append(parameters)
+            }
+
+            guard let exportSession = AVAssetExportSession(
+                asset: composition,
+                presetName: AVAssetExportPresetHighestQuality
+            ) else {
+                completion(.success(sourceURL))
+                return
+            }
+
+            let audioMix = AVMutableAudioMix()
+            audioMix.inputParameters = audioParameters
+            exportSession.audioMix = audioMix
+            exportSession.outputFileType = .mp4
+            exportSession.shouldOptimizeForNetworkUse = true
+
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("besttake-export-\(UUID().uuidString).mp4")
+            try? FileManager.default.removeItem(at: outputURL)
+            exportSession.outputURL = outputURL
+
+            exportSession.exportAsynchronously {
+                DispatchQueue.main.async {
+                    if exportSession.status == .completed {
+                        completion(.success(outputURL))
+                    } else if let error = exportSession.error {
+                        completion(.failure(error))
+                    } else {
+                        completion(.success(sourceURL))
+                    }
+                }
+            }
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
+    @objc func shareMediaFile(_ call: CAPPluginCall) {
+        guard let fileURL = fileURL(from: call.getString("path")) else {
+            call.reject("Missing media file path")
+            return
+        }
+
+        let title = call.getString("title") ?? fileURL.lastPathComponent
+        let audioGain = Float(call.getDouble("audioGain") ?? 1.0)
+
+        amplifiedExportURL(from: fileURL, audioGain: audioGain) { result in
+            let shareURL: URL
+            switch result {
+            case .success(let url):
+                shareURL = url
+            case .failure(let error):
+                print("[NativeExport] share gain export failed: \(error.localizedDescription)")
+                shareURL = fileURL
+            }
+
+            guard let viewController = self.bridge?.viewController else {
+                call.reject("Unable to present share sheet")
+                return
+            }
+
+            let activityViewController = UIActivityViewController(
+                activityItems: [title, fileURL],
+                applicationActivities: nil
+            )
+            activityViewController.popoverPresentationController?.sourceView = viewController.view
+            activityViewController.popoverPresentationController?.sourceRect = CGRect(
+                x: viewController.view.bounds.midX,
+                y: viewController.view.bounds.maxY - 1,
+                width: 1,
+                height: 1
+            )
+            activityViewController.completionWithItemsHandler = { _, completed, _, error in
+                if let error = error {
+                    call.reject("Share failed", error.localizedDescription)
+                    return
+                }
+                call.resolve([
+                    "success": true,
+                    "completed": completed
+                ])
+            }
+
+            viewController.present(activityViewController, animated: true)
+        }
+    }
+
+    @objc func saveVideoToPhotos(_ call: CAPPluginCall) {
+        guard let fileURL = fileURL(from: call.getString("path")) else {
+            call.reject("Missing video file path")
+            return
+        }
+        let audioGain = Float(call.getDouble("audioGain") ?? 1.0)
+
+        let performSave = { (saveURL: URL) in
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: saveURL)
+            }) { success, error in
+                DispatchQueue.main.async {
+                    if success {
+                        call.resolve(["success": true])
+                        return
+                    }
+                    call.reject("Save to Photos failed", error?.localizedDescription)
+                }
+            }
+        }
+
+        let prepareAndSave = {
+            self.amplifiedExportURL(from: fileURL, audioGain: audioGain) { result in
+                switch result {
+                case .success(let saveURL):
+                    performSave(saveURL)
+                case .failure(let error):
+                    print("[NativeExport] photos gain export failed: \(error.localizedDescription)")
+                    performSave(fileURL)
+                }
+            }
+        }
+
+        if #available(iOS 14, *) {
+            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+            switch status {
+            case .authorized, .limited:
+                prepareAndSave()
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { nextStatus in
+                    if nextStatus == .authorized || nextStatus == .limited {
+                        prepareAndSave()
+                    } else {
+                        call.reject("Photos permission denied")
+                    }
+                }
+            default:
+                call.reject("Photos permission denied")
+            }
+        } else {
+            let status = PHPhotoLibrary.authorizationStatus()
+            switch status {
+            case .authorized:
+                prepareAndSave()
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization { nextStatus in
+                    if nextStatus == .authorized {
+                        prepareAndSave()
+                    } else {
+                        call.reject("Photos permission denied")
+                    }
+                }
+            default:
+                call.reject("Photos permission denied")
+            }
+        }
+    }
+
     @objc func setNativeExperimentalAudioMode(_ call: CAPPluginCall) {
         let enabled = call.getBool("enabled") ?? false
         let selectedAudioEngine = call.getString("selectedAudioEngine") ?? (enabled ? "Native Experimental" : "Standard")
+        let micInputPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
         let recordingActive = call.getBool("recordingActive") ?? CameraSessionGuard.recordingActive
         let playbackActive = call.getBool("playbackActive") ?? CameraSessionGuard.playbackRouteActive
 
@@ -300,6 +502,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             let result = try AudioRouteConfigurator.applyNativeExperimentalAudioMode(
                 enabled: enabled,
                 selectedAudioEngine: selectedAudioEngine,
+                micInputPreference: micInputPreference,
                 recordingActive: recordingActive,
                 playbackActive: playbackActive
             )
@@ -309,6 +512,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             snapshot["success"] = false
             snapshot["enabled"] = enabled
             snapshot["selectedAudioEngine"] = selectedAudioEngine
+            snapshot["selectedMicPreference"] = micInputPreference.rawValue
             snapshot["recordingActive"] = recordingActive
             snapshot["playbackActive"] = playbackActive
             snapshot["fallbackReason"] = error.localizedDescription

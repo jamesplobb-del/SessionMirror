@@ -45,12 +45,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func configurePersistentAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(
-                .playAndRecord,
+            try AudioRouteConfigurator.debugSetCategory(
+                session,
+                category: .playAndRecord,
                 mode: .default,
-                options: [.allowBluetoothA2DP, .allowBluetoothHFP, .defaultToSpeaker]
+                options: [.allowBluetoothA2DP, .defaultToSpeaker],
+                caller: "AppDelegate.configurePersistentAudioSession"
             )
-            try session.setActive(true, options: [])
+            try AudioRouteConfigurator.debugSetActive(
+                session,
+                active: true,
+                options: [],
+                caller: "AppDelegate.configurePersistentAudioSession"
+            )
             AudioRouteConfigurator.logRoute("launch passive session")
         } catch {
             print("Failed to configure passive audio session: \(error.localizedDescription)")

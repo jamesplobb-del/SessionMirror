@@ -1,12 +1,12 @@
 import { useCallback, useRef, memo } from 'react'
-import { Camera, Mic, Square, AudioWaveform } from 'lucide-react'
+import { Camera, Mic, Square } from 'lucide-react'
 import {
   triggerLightHaptic,
   triggerRecordStartHaptic,
   triggerRecordStopHaptic,
 } from '../utils/haptics'
-import { stopEventBubble } from '../utils/eventBubbling'
 import type { RecordingMode } from '../types'
+import { useLongPress } from '../hooks/useLongPress'
 
 const SWIPE_THRESHOLD_PX = 36
 
@@ -36,6 +36,9 @@ interface ModeSlotProps {
   ready: boolean
   modeSwitchLocked: boolean
   onActivate: () => void
+  onLongPress?: () => void
+  longPressActive?: boolean
+  hapticFeedback?: boolean
 }
 
 function ModeSlot({
@@ -45,6 +48,9 @@ function ModeSlot({
   ready,
   modeSwitchLocked,
   onActivate,
+  onLongPress,
+  longPressActive = false,
+  hapticFeedback = true,
 }: ModeSlotProps) {
   const isCenter = position === 'center'
   const isVideo = mode === 'video'
@@ -55,10 +61,26 @@ function ModeSlot({
       ? 'Stop recording'
       : isVideo
         ? 'Start video recording'
-        : 'Start audio recording'
+        : onLongPress
+          ? 'Start audio recording. Long press to toggle hands-free practice.'
+          : 'Start audio recording'
     : isVideo
       ? 'Switch to video mode'
       : 'Switch to audio mode'
+
+  const longPressHandlers = useLongPress({
+    onClick: onActivate,
+    onLongPress: () => onLongPress?.(),
+    disabled: !isCenter || !onLongPress || slotDisabled,
+    hapticFeedback,
+  })
+
+  const buttonHandlers =
+    isCenter && onLongPress
+      ? longPressHandlers
+      : {
+          onClick: onActivate,
+        }
 
   return (
     <button
@@ -67,12 +89,13 @@ function ModeSlot({
       aria-label={ariaLabel}
       aria-pressed={isCenter}
       {...(isCenter ? { 'data-tutorial': 'record-controls' } : {})}
-      onClick={onActivate}
+      onContextMenu={(event) => event.preventDefault()}
+      {...buttonHandlers}
       className={`record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
         isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
       } ${isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
         isCenter && isRecording ? 'record-carousel-slot--recording' : ''
-      }`}
+      } ${longPressActive ? 'record-carousel-slot--hands-free' : ''}`}
     >
       {isCenter && isRecording ? (
         <Square className="h-5 w-5 fill-red-500 text-red-500" />
@@ -121,6 +144,12 @@ function RecordingModeCarousel({
     [hapticFeedback, isRecording, modeSwitchLocked, onChange, onToggleRecord, value],
   )
 
+  const handleRecordLongPress = useCallback(() => {
+    if (value !== 'audio' || isRecording || !onAutoSoundRecordingChange) return
+    triggerLightHaptic(hapticFeedback)
+    onAutoSoundRecordingChange(!autoSoundRecording)
+  }, [autoSoundRecording, hapticFeedback, isRecording, onAutoSoundRecordingChange, value])
+
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
     touchStartXRef.current = event.touches[0]?.clientX ?? 0
   }, [])
@@ -151,29 +180,6 @@ function RecordingModeCarousel({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {value === 'audio' && !isRecording && onAutoSoundRecordingChange && (
-        <button
-          type="button"
-          data-tutorial="auto-record-toggle"
-          className={`record-carousel-auto-btn ${autoSoundRecording ? 'record-carousel-auto-btn--active' : ''}`}
-          aria-label={
-            autoSoundRecording
-              ? 'Turn off auto sound recording'
-              : 'Turn on auto sound recording'
-          }
-          aria-pressed={autoSoundRecording}
-          onPointerDown={stopEventBubble}
-          onTouchStart={stopEventBubble}
-          onTouchEnd={stopEventBubble}
-          onClick={(event) => {
-            stopEventBubble(event)
-            triggerLightHaptic(hapticFeedback)
-            onAutoSoundRecordingChange(!autoSoundRecording)
-          }}
-        >
-          <AudioWaveform className="h-4 w-4" strokeWidth={2.25} />
-        </button>
-      )}
       <div className="record-carousel-track">
         <ModeSlot
           mode="video"
@@ -182,6 +188,7 @@ function RecordingModeCarousel({
           ready={ready}
           modeSwitchLocked={modeSwitchLocked}
           onActivate={() => handleSlotActivate('video')}
+          hapticFeedback={hapticFeedback}
         />
         <ModeSlot
           mode="audio"
@@ -190,6 +197,9 @@ function RecordingModeCarousel({
           ready={ready}
           modeSwitchLocked={modeSwitchLocked}
           onActivate={() => handleSlotActivate('audio')}
+          onLongPress={value === 'audio' ? handleRecordLongPress : undefined}
+          longPressActive={value === 'audio' && autoSoundRecording}
+          hapticFeedback={hapticFeedback}
         />
       </div>
     </div>

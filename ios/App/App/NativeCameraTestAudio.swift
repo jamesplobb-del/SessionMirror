@@ -18,15 +18,42 @@ enum NativeCameraAudioSessionProfile: String {
     func apply(to audioSession: AVAudioSession) throws {
         switch self {
         case .videoRecording:
-            try audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker])
+            try AudioRouteConfigurator.debugSetCategory(
+                audioSession,
+                category: .playAndRecord,
+                mode: .videoRecording,
+                options: [.defaultToSpeaker],
+                caller: "NativeCameraAudioSessionProfile.videoRecording"
+            )
         case .playAndRecordDefault:
-            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try AudioRouteConfigurator.debugSetCategory(
+                audioSession,
+                category: .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker],
+                caller: "NativeCameraAudioSessionProfile.playAndRecordDefault"
+            )
         case .recordVideoRecording:
-            try audioSession.setCategory(.record, mode: .videoRecording, options: [])
+            try AudioRouteConfigurator.debugSetCategory(
+                audioSession,
+                category: .record,
+                mode: .videoRecording,
+                options: [],
+                caller: "NativeCameraAudioSessionProfile.recordVideoRecording"
+            )
         }
-        try audioSession.setActive(true, options: [])
+        try AudioRouteConfigurator.debugSetActive(
+            audioSession,
+            active: true,
+            options: [],
+            caller: "NativeCameraAudioSessionProfile.\(rawValue)"
+        )
         if let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) {
-            try audioSession.setPreferredInput(builtInMic)
+            try AudioRouteConfigurator.debugSetPreferredInput(
+                audioSession,
+                input: builtInMic,
+                caller: "NativeCameraAudioSessionProfile.\(rawValue)"
+            )
         }
     }
 
@@ -65,7 +92,14 @@ enum NativeCameraTestAudio {
 
         print("[PlaybackRoute] applying playback session")
         print("[CameraLikePlayback] applying session")
-        try NativeCameraAudioSessionProfile.videoRecording.apply(to: audioSession)
+        try NativeCameraAudioSessionProfile.playAndRecordDefault.apply(to: audioSession)
+        try audioSession.setPreferredSampleRate(48_000)
+        try audioSession.setPreferredIOBufferDuration(0.005)
+        if !audioSession.currentRoute.outputs.contains(where: { output in
+            [.airPlay, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .carAudio, .headphones, .usbAudio].contains(output.portType)
+        }) {
+            try audioSession.overrideOutputAudioPort(.speaker)
+        }
         CameraSessionGuard.markPlaybackSessionPrepared()
 
         let category = audioSession.category.rawValue

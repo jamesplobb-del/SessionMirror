@@ -1,5 +1,4 @@
 import { useCallback, type MouseEvent } from 'react'
-import { Capacitor } from '@capacitor/core'
 import { RotateCcw, X, GraduationCap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -15,7 +14,6 @@ import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
 
-type NativeCaptureChoice = 'standard' | 'nativeExperimental'
 interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
@@ -172,10 +170,6 @@ export default function SettingsDrawer({
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
-  const isIosNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
-  const selectedCapturePath: NativeCaptureChoice = settings.nativeExperimentalAudioEnabled
-    ? 'nativeExperimental'
-    : 'standard'
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -198,13 +192,6 @@ export default function SettingsDrawer({
       onClose()
     },
     [onClose],
-  )
-
-  const handleAudioEngineChange = useCallback(
-    (engine: NativeCaptureChoice) => {
-      onUpdate({ nativeExperimentalAudioEnabled: engine === 'nativeExperimental' })
-    },
-    [onUpdate],
   )
 
   return (
@@ -252,10 +239,12 @@ export default function SettingsDrawer({
             />
 
             <SettingToggle
-              label="Use device mic for recording (prevents Bluetooth quality drop)"
-              description="Routes backing tracks and playback through Bluetooth headphones (A2DP) while keeping the device built-in microphone for recording — better quality for the Audio Enhancer and hands-free takes."
-              checked={settings.useIphoneMicForRecording}
-              onChange={(checked) => onUpdate({ useIphoneMicForRecording: checked })}
+              label="Use iPhone Mic"
+              description="When headphones are connected, record with the iPhone microphone instead of the headset mic."
+              checked={settings.micInputPreference === 'iphone'}
+              onChange={(checked) =>
+                onUpdate({ micInputPreference: checked ? 'iphone' : 'headphone' })
+              }
             />
 
             <AnimatedExpand open={settings.autoSoundRecording}>
@@ -331,37 +320,6 @@ export default function SettingsDrawer({
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Playback
             </h3>
-
-            {isIosNative ? (
-              <div
-                className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl"
-                data-tutorial="settings-enhancer"
-              >
-                <p className="text-sm font-semibold text-stone-900">Capture Path</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                  Standard keeps the current app recorder. Native Experimental uses iOS camera-style capture for louder, more dynamic input.
-                </p>
-                <IOSSegmentedControl<NativeCaptureChoice>
-                  className="mt-3"
-                  layoutId="settings-audio-engine-segment"
-                  ariaLabel="Capture path"
-                  value={selectedCapturePath}
-                  onChange={handleAudioEngineChange}
-                  size="sm"
-                  segments={[
-                    { id: 'standard', label: 'Standard' },
-                    { id: 'nativeExperimental', label: 'Native' },
-                  ]}
-                />
-                {settings.nativeExperimentalAudioEnabled && (
-                  <p className="mt-2.5 text-[11px] leading-relaxed text-stone-400">
-                    iOS only. Can be combined with Audio Enhancer for musician-focused playback polish.
-                  </p>
-                )}
-              </div>
-            ) : (
-              null
-            )}
 
             <div data-tutorial="settings-enhancer">
               <SettingToggle

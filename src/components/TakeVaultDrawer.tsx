@@ -50,6 +50,7 @@ interface TakeVaultDrawerProps {
   onClearAllTakes: () => void
   onOpenTake: (take: Take) => void
   onBeforeExport?: () => void
+  preferredMediaFilter?: VaultMediaFilter
   /** Fires after the sheet slide completes — use for deferred DB hydration. */
   onEnterComplete?: () => void
 }
@@ -83,6 +84,7 @@ export default function TakeVaultDrawer({
   onClearAllTakes,
   onOpenTake,
   onBeforeExport,
+  preferredMediaFilter = 'all',
   onEnterComplete,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
@@ -148,6 +150,12 @@ export default function TakeVaultDrawer({
     setSelectedIds(new Set())
     setVaultSection('takes')
   }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    setVaultSection('takes')
+    setVaultMediaTab(preferredMediaFilter)
+  }, [isOpen, preferredMediaFilter])
 
   useEffect(() => {
     teardownVideosInContainer(drawerRef.current)

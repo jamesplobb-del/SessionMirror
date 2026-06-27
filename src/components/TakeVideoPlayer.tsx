@@ -5,6 +5,7 @@ import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
 import { pauseVideoElement } from '../utils/videoPlayback'
+import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
   buildPlaybackShellStyle,
@@ -124,9 +125,13 @@ export default function TakeVideoPlayer({
   }, [audible, manualPlayOnly, mediaSrc, mediaRef])
 
   useEffect(() => {
-    if (manualPlayOnly) return
     return () => {
-      pauseVideoElement(mediaRef.current)
+      const media = mediaRef.current
+      const wasActive = Boolean(media && !media.paused && !media.ended)
+      pauseVideoElement(media)
+      if (manualPlayOnly && wasActive) {
+        void finalizeTakePlaybackCleanup()
+      }
     }
   }, [mediaSrc, mediaRef, manualPlayOnly])
 

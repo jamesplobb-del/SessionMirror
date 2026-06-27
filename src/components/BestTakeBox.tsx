@@ -36,7 +36,7 @@ import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 const UPLOAD_BADGE_BTN = HUD_SOLID_FLOAT_BADGE
 
 const emptyActionClass =
-  'pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition-opacity duration-200 ease-out hover:bg-white/10'
+  'pip-empty-action pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition-opacity duration-200 ease-out hover:bg-white/10'
 
 function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
   return (
@@ -468,15 +468,15 @@ function BestTakeBox({
               )}
             </>
           ) : (
-            <div className="absolute inset-0 flex flex-col bg-black/95">
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 pb-2 pt-7">
+            <div className="pip-empty-state absolute inset-0 flex flex-col bg-black/95">
+              <div className="pip-empty-state__body flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 pb-2 pt-7">
                 <p className={`text-center leading-snug text-white/50 ${isFill ? 'text-xs' : 'text-[8px]'}`}>
                   Drag Current Take here or upload.
                 </p>
               </div>
-              <div className="flex shrink-0 gap-1.5 border-t border-white/10 bg-black/20 p-1.5">
+              <div className="pip-empty-state__actions flex shrink-0 gap-1.5 border-t border-white/10 bg-black/20 p-1.5">
                 {onUpload && (
-                  <label htmlFor="benchmark-upload" className={emptyActionClass}>
+                  <label htmlFor="benchmark-upload" className={`${emptyActionClass} pip-empty-action--upload`}>
                     <Upload className="h-3 w-3" />
                     Upload
                   </label>
@@ -493,7 +493,7 @@ function BestTakeBox({
                     e.stopPropagation()
                     setYoutubeDialogOpen(true)
                   }}
-                  className={emptyActionClass}
+                  className={`${emptyActionClass} pip-empty-action--youtube`}
                   aria-label="Load YouTube reference"
                 >
                   <Youtube className="h-3 w-3 text-red-500" />

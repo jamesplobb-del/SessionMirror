@@ -5,6 +5,12 @@ enum AudioRouteConfigurator {
     static let headphonePlaybackModeDefaultsKey = "SessionMirror.bluetoothHeadphonePlaybackMode"
     static let nativeExperimentalDefaultsKey = "SessionMirror.nativeExperimentalAudio"
 
+    enum MicInputPreference: String {
+        case auto
+        case headphone
+        case iphone
+    }
+
     static func isHighQualityModeEnabled() -> Bool {
         UserDefaults.standard.bool(forKey: highQualityDefaultsKey)
     }
@@ -72,6 +78,242 @@ enum AudioRouteConfigurator {
         return snapshot
     }
 
+    private static func compactStack(skipFrames: Int = 2, maxFrames: Int = 8) -> String {
+        Thread.callStackSymbols
+            .dropFirst(skipFrames)
+            .prefix(maxFrames)
+            .joined(separator: " | ")
+    }
+
+    private static func routeSummary(_ session: AVAudioSession = .sharedInstance()) -> String {
+        let snapshot = routeSnapshot(for: session)
+        return "category=\(snapshot["category"] ?? "unknown") " +
+            "mode=\(snapshot["mode"] ?? "unknown") " +
+            "options=\(snapshot["options"] ?? []) " +
+            "input=\(snapshot["currentInputRoute"] ?? "unknown") " +
+            "output=\(snapshot["currentOutputRoute"] ?? "unknown") " +
+            "preferredInput=\(snapshot["preferredInput"] ?? "auto") " +
+            "availableInputs=\(snapshot["availableInputs"] ?? [])"
+    }
+
+    static func debugSetCategory(
+        _ session: AVAudioSession,
+        category: AVAudioSession.Category,
+        mode: AVAudioSession.Mode,
+        options: AVAudioSession.CategoryOptions,
+        caller: String
+    ) throws {
+        print("[AVAudioSessionTrace] setCategory caller=\(caller) requestedCategory=\(category.rawValue) requestedMode=\(mode.rawValue) requestedOptions=\(optionNames(options)) before=\(routeSummary(session)) stack=\(compactStack())")
+        try session.setCategory(category, mode: mode, options: options)
+        print("[AVAudioSessionTrace] setCategory complete caller=\(caller) after=\(routeSummary(session))")
+    }
+
+    static func debugSetActive(
+        _ session: AVAudioSession,
+        active: Bool,
+        options: AVAudioSession.SetActiveOptions = [],
+        caller: String
+    ) throws {
+        print("[AVAudioSessionTrace] setActive caller=\(caller) active=\(active) options=\(options.rawValue) before=\(routeSummary(session)) stack=\(compactStack())")
+        try session.setActive(active, options: options)
+        print("[AVAudioSessionTrace] setActive complete caller=\(caller) after=\(routeSummary(session))")
+    }
+
+    static func debugSetPreferredInput(
+        _ session: AVAudioSession,
+        input: AVAudioSessionPortDescription?,
+        caller: String
+    ) throws {
+        let requestedInput = input?.portType.rawValue ?? "auto"
+        print("[AVAudioSessionTrace] setPreferredInput caller=\(caller) requestedInput=\(requestedInput) before=\(routeSummary(session)) stack=\(compactStack())")
+        try session.setPreferredInput(input)
+        print("[AVAudioSessionTrace] setPreferredInput complete caller=\(caller) after=\(routeSummary(session))")
+    }
+
+    static func debugCaptureEvent(_ label: String, details: String = "") {
+        print("[AVCaptureTrace] \(label) \(details) route=\(routeSummary()) stack=\(compactStack())")
+    }
+
+    private static func hasExternalOutput(_ session: AVAudioSession) -> Bool {
+        let externalOutputPorts: Set<AVAudioSession.Port> = [
+            .airPlay,
+            .bluetoothA2DP,
+            .bluetoothHFP,
+            .bluetoothLE,
+            .carAudio,
+            .headphones,
+            .usbAudio,
+        ]
+        return session.currentRoute.outputs.contains { externalOutputPorts.contains($0.portType) }
+    }
+
+    private static func preferBuiltInSpeakerIfSafe(_ session: AVAudioSession) throws {
+        guard !hasExternalOutput(session) else { return }
+        try session.overrideOutputAudioPort(.speaker)
+    }
+
+    static func parseMicInputPreference(_ raw: String?) -> MicInputPreference {
+        guard let raw = raw, let preference = MicInputPreference(rawValue: raw) else {
+            return .auto
+        }
+        return preference
+    }
+
+    private static func preferredInputPort(
+        for preference: MicInputPreference,
+        availableInputs: [AVAudioSessionPortDescription]
+    ) -> AVAudioSessionPortDescription? {
+        switch preference {
+        case .auto:
+            return nil
+        case .iphone:
+            return availableInputs.first(where: { $0.portType == .builtInMic })
+        case .headphone:
+            let headphoneInputPorts: Set<AVAudioSession.Port> = [
+                .bluetoothHFP,
+                .bluetoothLE,
+                .headsetMic,
+            ]
+            return availableInputs.first(where: { headphoneInputPorts.contains($0.portType) })
+        }
+    }
+
+    private static func routeUsesBluetoothHFP(_ session: AVAudioSession) -> Bool {
+        session.currentRoute.inputs.contains { $0.portType == .bluetoothHFP } ||
+            session.currentRoute.outputs.contains { $0.portType == .bluetoothHFP }
+    }
+
+    private static func resetSessionAwayFromBluetoothHFPIfNeeded(
+        _ session: AVAudioSession,
+        mode: AVAudioSession.Mode = .videoRecording
+    ) throws {
+        guard routeUsesBluetoothHFP(session) || session.categoryOptions.contains(.allowBluetoothHFP) else {
+            return
+        }
+
+        print("[MicInputPreference] resetting session away from BluetoothHFP before iPhone mic")
+        try debugSetPreferredInput(session, input: nil, caller: "resetSessionAwayFromBluetoothHFPIfNeeded.clearPreferredInput")
+        try debugSetCategory(
+            session,
+            category: .playAndRecord,
+            mode: mode,
+            options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+            caller: "resetSessionAwayFromBluetoothHFPIfNeeded"
+        )
+        try session.setPreferredSampleRate(48_000)
+        try session.setPreferredIOBufferDuration(0.0029)
+        try debugSetActive(session, active: false, options: .notifyOthersOnDeactivation, caller: "resetSessionAwayFromBluetoothHFPIfNeeded.deactivate")
+        try debugSetActive(session, active: true, options: [], caller: "resetSessionAwayFromBluetoothHFPIfNeeded.activate")
+    }
+
+    @discardableResult
+    static func applyMicInputPreference(
+        _ preference: MicInputPreference,
+        session: AVAudioSession = .sharedInstance()
+    ) throws -> [String: Any] {
+        var fallbackReason: String?
+
+        if preference == .auto {
+            try debugSetPreferredInput(session, input: nil, caller: "applyMicInputPreference.auto")
+        } else {
+            if preference == .iphone { try resetSessionAwayFromBluetoothHFPIfNeeded(session) }
+            let availableInputs = session.availableInputs ?? []
+            if let input = preferredInputPort(for: preference, availableInputs: availableInputs) {
+                try debugSetPreferredInput(session, input: input, caller: "applyMicInputPreference.\(preference.rawValue)")
+            } else {
+                try debugSetPreferredInput(session, input: nil, caller: "applyMicInputPreference.fallbackAuto")
+                fallbackReason = "\(preference.rawValue) input unavailable; fell back to Auto"
+            }
+        }
+
+        var snapshot = routeSnapshot(for: session)
+        snapshot["success"] = true
+        snapshot["selectedMicPreference"] = preference.rawValue
+        if let preferredInput = session.preferredInput {
+            snapshot["preferredInputSet"] = preferredInput.portType.rawValue
+        } else {
+            snapshot["preferredInputSet"] = "auto"
+        }
+        if let fallbackReason = fallbackReason {
+            snapshot["fallbackReason"] = fallbackReason
+        }
+
+        print(
+            "[MicInputPreference] selected=\(preference.rawValue) " +
+            "availableInputs=\(snapshot["availableInputs"] ?? []) " +
+            "currentInputs=\(session.currentRoute.inputs.map { $0.portType.rawValue }) " +
+            "currentOutputs=\(session.currentRoute.outputs.map { $0.portType.rawValue }) " +
+            "preferredInput=\(snapshot["preferredInputSet"] ?? "auto") " +
+            "fallback=\(fallbackReason ?? "none")"
+        )
+
+        return snapshot
+    }
+
+    static func applyWebPlaybackRoute(webPlaybackActive: Bool = true) throws -> [String: Any] {
+        let session = AVAudioSession.sharedInstance()
+        var fallbackReason: String?
+        var routeApplied = false
+
+        if CameraSessionGuard.shouldBlockRouteChanges() {
+            fallbackReason = "route change blocked while camera preview or recording is active"
+            CameraSessionGuard.skipRouteChangeLog()
+        } else {
+            let outputPort = session.currentRoute.outputs.first?.portType ?? .builtInSpeaker
+            let builtInSpeakerOutputs: Set<AVAudioSession.Port> = [.builtInSpeaker, .builtInReceiver]
+
+            if builtInSpeakerOutputs.contains(outputPort) {
+                try debugSetCategory(
+                    session,
+                    category: .playAndRecord,
+                    mode: .default,
+                    options: [.allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+                    caller: "applyWebPlaybackRoute.builtInSpeaker"
+                )
+                try session.setPreferredSampleRate(48_000)
+                try session.setPreferredIOBufferDuration(0.005)
+                try debugSetActive(session, active: true, options: [], caller: "applyWebPlaybackRoute.builtInSpeaker")
+                try preferBuiltInSpeakerIfSafe(session)
+            } else {
+                // Full-volume external playback. Do not use duckOthers; omit mixWithOthers so WebView audio is not softened.
+                try debugSetCategory(
+                    session,
+                    category: .playback,
+                    mode: .default,
+                    options: [.allowAirPlay],
+                    caller: "applyWebPlaybackRoute.externalOutput"
+                )
+                try session.setPreferredSampleRate(48_000)
+                try session.setPreferredIOBufferDuration(0.005)
+                try debugSetActive(session, active: true, options: [], caller: "applyWebPlaybackRoute.externalOutput")
+            }
+
+            routeApplied = true
+        }
+
+        var snapshot = routeSnapshot(for: session)
+        snapshot["success"] = true
+        snapshot["routeApplied"] = routeApplied
+        snapshot["webPlaybackActive"] = webPlaybackActive
+        snapshot["recordingActive"] = CameraSessionGuard.recordingActive
+        snapshot["cameraPreviewActive"] = CameraSessionGuard.previewActive
+        snapshot["playbackRouteActive"] = CameraSessionGuard.playbackRouteActive
+        snapshot["nativeLoudnessProfile"] = routeApplied ? "web-playback-full-volume" : "unchanged"
+        if let fallbackReason = fallbackReason {
+            snapshot["fallbackReason"] = fallbackReason
+        }
+
+        print(
+            "[WebPlaybackAudio] routeApplied=\(routeApplied) webPlaybackActive=\(webPlaybackActive) " +
+            "recordingActive=\(CameraSessionGuard.recordingActive) cameraPreviewActive=\(CameraSessionGuard.previewActive) " +
+            "category=\(snapshot["category"] ?? "unknown") mode=\(snapshot["mode"] ?? "unknown") " +
+            "options=\(snapshot["options"] ?? []) input=\(snapshot["currentInputRoute"] ?? "unknown") " +
+            "output=\(snapshot["currentOutputRoute"] ?? "unknown") fallback=\(fallbackReason ?? "none")"
+        )
+
+        return snapshot
+    }
+
     static func logRoute(_ label: String, session: AVAudioSession = .sharedInstance()) {
         let snapshot = routeSnapshot(for: session)
         let inputPort = snapshot["inputPort"] as? String ?? "unknown"
@@ -99,9 +341,9 @@ enum AudioRouteConfigurator {
         if enableHQ {
             try configureHighQualitySession()
         } else {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothHFP, .defaultToSpeaker])
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
-            try session.setPreferredInput(nil)
+            try debugSetCategory(session, category: .playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .defaultToSpeaker], caller: "applyRecordingRoute.default")
+            try debugSetActive(session, active: true, options: .notifyOthersOnDeactivation, caller: "applyRecordingRoute.default")
+            try debugSetPreferredInput(session, input: nil, caller: "applyRecordingRoute.default")
         }
 
         UserDefaults.standard.set(enableHQ, forKey: highQualityDefaultsKey)
@@ -113,26 +355,23 @@ enum AudioRouteConfigurator {
     /// category or calling setActive, so the live camera capture session is never
     /// interrupted (no zoom/FOV change) and Bluetooth A2DP playback stays intact.
     static func setPreferredBuiltInMic(_ enabled: Bool) throws {
+        _ = try setMicInputPreference(enabled ? .iphone : .auto)
+    }
+
+    static func setMicInputPreference(_ preference: MicInputPreference) throws -> [String: Any] {
         if CameraSessionGuard.shouldBlockDeviceMicChanges() {
             CameraSessionGuard.skipDeviceMicLog()
-            return
+            var snapshot = routeSnapshot()
+            snapshot["success"] = true
+            snapshot["selectedMicPreference"] = preference.rawValue
+            snapshot["queued"] = true
+            print("[MicInputPreference] queued selected=\(preference.rawValue) reason=input preference blocked during preview/playback overlap")
+            return snapshot
         }
 
         let session = AVAudioSession.sharedInstance()
-        UserDefaults.standard.set(enabled, forKey: highQualityDefaultsKey)
-
-        if enabled {
-            let availableInputs = session.availableInputs ?? []
-            if let builtInMic = availableInputs.first(where: { $0.portType == .builtInMic }) {
-                try session.setPreferredInput(builtInMic)
-                logRoute("device mic ON (preferred input -> built-in mic)")
-            } else {
-                logRoute("device mic ON (built-in mic unavailable — left unchanged)")
-            }
-        } else {
-            try session.setPreferredInput(nil)
-            logRoute("device mic OFF (preferred input -> system default)")
-        }
+        UserDefaults.standard.set(preference == .iphone, forKey: highQualityDefaultsKey)
+        return try applyMicInputPreference(preference, session: session)
     }
 
     static func applyHeadphonePlaybackRoute() throws {
@@ -153,12 +392,12 @@ enum AudioRouteConfigurator {
 
         let session = AVAudioSession.sharedInstance()
         // A2DP output only — omit .allowBluetooth so iOS does not force HFP duplex.
-        try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .defaultToSpeaker])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        try debugSetCategory(session, category: .playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .defaultToSpeaker], caller: "configureHighQualitySession")
+        try debugSetActive(session, active: true, options: .notifyOthersOnDeactivation, caller: "configureHighQualitySession")
 
         let availableInputs = session.availableInputs ?? []
         if let builtInMic = availableInputs.first(where: { $0.portType == .builtInMic }) {
-            try session.setPreferredInput(builtInMic)
+            try debugSetPreferredInput(session, input: builtInMic, caller: "configureHighQualitySession")
         } else {
             print("BestTake Audio: built-in mic not found in availableInputs=\(availableInputs.map { $0.portType.rawValue })")
         }
@@ -186,6 +425,7 @@ enum AudioRouteConfigurator {
     static func applyNativeExperimentalAudioMode(
         enabled: Bool,
         selectedAudioEngine: String,
+        micInputPreference: MicInputPreference,
         recordingActive: Bool,
         playbackActive: Bool
     ) throws -> [String: Any] {
@@ -199,20 +439,29 @@ enum AudioRouteConfigurator {
                 fallbackReason = "route change blocked while camera preview or recording is active"
                 CameraSessionGuard.skipRouteChangeLog()
             } else {
-                let options: AVAudioSession.CategoryOptions = [
-                    .mixWithOthers,
-                    .allowBluetoothA2DP,
-                    .allowAirPlay,
-                    .defaultToSpeaker,
-                ]
-                try session.setCategory(.playAndRecord, mode: .videoRecording, options: options)
-                try session.setActive(true, options: [])
+                let playbackFocused = playbackActive && !recordingActive
+                let options: AVAudioSession.CategoryOptions = playbackFocused
+                    ? [.allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                    : micInputPreference == .headphone
+                        ? [.mixWithOthers, .allowBluetoothHFP, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                        : [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                let mode: AVAudioSession.Mode = playbackFocused ? .default : .videoRecording
 
-                let availableInputs = session.availableInputs ?? []
-                if let builtInMic = availableInputs.first(where: { $0.portType == .builtInMic }) {
-                    try session.setPreferredInput(builtInMic)
-                } else {
-                    fallbackReason = "built-in mic unavailable; kept system-selected input"
+                try debugSetCategory(session, category: .playAndRecord, mode: mode, options: options, caller: "applyNativeExperimentalAudioMode")
+                try session.setPreferredSampleRate(48_000)
+                try session.setPreferredIOBufferDuration(playbackFocused ? 0.005 : 0.0029)
+                try debugSetActive(session, active: true, options: [], caller: "applyNativeExperimentalAudioMode")
+
+                let micSnapshot = try applyMicInputPreference(micInputPreference, session: session)
+                fallbackReason = micSnapshot["fallbackReason"] as? String
+
+                if playbackFocused {
+                    do {
+                        try preferBuiltInSpeakerIfSafe(session)
+                    } catch {
+                        let speakerFallback = "speaker override failed: \(error.localizedDescription)"
+                        fallbackReason = fallbackReason.map { "\($0); \(speakerFallback)" } ?? speakerFallback
+                    }
                 }
             }
         } else {
@@ -228,8 +477,10 @@ enum AudioRouteConfigurator {
         snapshot["success"] = true
         snapshot["enabled"] = enabled
         snapshot["selectedAudioEngine"] = selectedAudioEngine
+        snapshot["selectedMicPreference"] = micInputPreference.rawValue
         snapshot["recordingActive"] = recordingActive
         snapshot["playbackActive"] = playbackActive
+        snapshot["nativeLoudnessProfile"] = playbackActive && !recordingActive ? "speaker-playback" : "camera-input"
         if let fallbackReason = fallbackReason {
             snapshot["fallbackReason"] = fallbackReason
         }
@@ -239,6 +490,8 @@ enum AudioRouteConfigurator {
             "category=\(snapshot["category"] ?? "unknown") mode=\(snapshot["mode"] ?? "unknown") " +
             "options=\(snapshot["options"] ?? []) input=\(snapshot["currentInputRoute"] ?? "unknown") " +
             "output=\(snapshot["currentOutputRoute"] ?? "unknown") availableInputs=\(snapshot["availableInputs"] ?? []) " +
+            "nativeLoudnessProfile=\(snapshot["nativeLoudnessProfile"] ?? "unknown") " +
+            "micPreference=\(micInputPreference.rawValue) preferredInput=\(snapshot["preferredInput"] ?? "auto") " +
             "recordingActive=\(recordingActive) playbackActive=\(playbackActive) " +
             "fallback=\(fallbackReason ?? "none")"
         )

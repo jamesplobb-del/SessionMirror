@@ -8,11 +8,23 @@ export const AUTO_RECORD_MAX_IDLE_PREROLL_MS = 20_000
 export const AUTO_PLAYBACK_LEAD_IN_S = 1
 
 const ANALYSIS_WINDOW_S = 0.02
-const ONSET_RMS_DB = -42
-const ONSET_PEAK_DB = -36
+const BASELINE_WINDOW_S = 0.75
+const MIN_ONSET_RMS_DB = -32
+const MIN_ONSET_PEAK_DB = -24
+const RMS_HEADROOM_DB = 20
+const PEAK_HEADROOM_DB = 24
+const RMS_CONTENT_DROP_DB = 10
+const PEAK_CONTENT_DROP_DB = 12
+const CONSECUTIVE_RMS_WINDOWS = 3
 
 function linearToDb(value: number): number {
   return 20 * Math.log10(Math.max(value, 1e-8))
+}
+
+function percentile(sorted: number[], ratio: number): number {
+  if (sorted.length === 0) return -96
+  const index = Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))
+  return sorted[index] ?? -96
 }
 
 /**
@@ -37,6 +49,7 @@ export async function findAutoPlaybackLeadInStartSeconds(
     const windowSamples = Math.max(1, Math.floor(sampleRate * ANALYSIS_WINDOW_S))
     const channelCount = buffer.numberOfChannels
     const totalSamples = buffer.length
+    const windows: Array<{ offset: number; rmsDb: number; peakDb: number }> = []
 
     for (let offset = 0; offset < totalSamples; offset += windowSamples) {
       let peak = 0
@@ -56,8 +69,55 @@ export async function findAutoPlaybackLeadInStartSeconds(
       }
 
       const rms = Math.sqrt(sumSq / Math.max(1, count))
-      if (linearToDb(rms) >= ONSET_RMS_DB || linearToDb(peak) >= ONSET_PEAK_DB) {
-        const onsetSeconds = offset / sampleRate
+      windows.push({
+        offset,
+        rmsDb: linearToDb(rms),
+        peakDb: linearToDb(peak),
+      })
+    }
+
+    if (windows.length === 0) {
+      return 0
+    }
+
+    const baselineWindowCount = Math.max(
+      1,
+      Math.floor(BASELINE_WINDOW_S / ANALYSIS_WINDOW_S),
+    )
+    const baseline = windows.slice(0, baselineWindowCount)
+    const baselineRms = baseline.map((window) => window.rmsDb).sort((a, b) => a - b)
+    const baselinePeak = baseline.map((window) => window.peakDb).sort((a, b) => a - b)
+    const contentRms = windows.map((window) => window.rmsDb).sort((a, b) => a - b)
+    const contentPeak = windows.map((window) => window.peakDb).sort((a, b) => a - b)
+    const rmsThreshold = Math.max(
+      MIN_ONSET_RMS_DB,
+      percentile(baselineRms, 0.75) + RMS_HEADROOM_DB,
+      percentile(contentRms, 0.95) - RMS_CONTENT_DROP_DB,
+    )
+    const peakThreshold = Math.max(
+      MIN_ONSET_PEAK_DB,
+      percentile(baselinePeak, 0.75) + PEAK_HEADROOM_DB,
+      percentile(contentPeak, 0.95) - PEAK_CONTENT_DROP_DB,
+    )
+
+    let consecutiveRmsWindows = 0
+    for (const window of windows) {
+      if (window.rmsDb >= rmsThreshold) {
+        consecutiveRmsWindows += 1
+      } else {
+        consecutiveRmsWindows = 0
+      }
+
+      const sustainedOnset = consecutiveRmsWindows >= CONSECUTIVE_RMS_WINDOWS
+      const transientOnset =
+        window.peakDb >= peakThreshold &&
+        window.rmsDb >= rmsThreshold - 4
+
+      if (sustainedOnset || transientOnset) {
+        const correctedOffset = sustainedOnset
+          ? Math.max(0, window.offset - (CONSECUTIVE_RMS_WINDOWS - 1) * windowSamples)
+          : window.offset
+        const onsetSeconds = correctedOffset / sampleRate
         return Math.max(0, onsetSeconds - leadInSeconds)
       }
     }
@@ -75,8 +135,13 @@ export async function findAutoPlaybackLeadInStartSeconds(
 export async function applyAutoPlaybackLeadIn(
   media: HTMLMediaElement,
   leadInSeconds = AUTO_PLAYBACK_LEAD_IN_S,
+  performanceStartSeconds?: number,
 ): Promise<void> {
-  const start = await findAutoPlaybackLeadInStartSeconds(media, leadInSeconds)
+  const start =
+    typeof performanceStartSeconds === 'number' &&
+    Number.isFinite(performanceStartSeconds)
+      ? Math.max(0, performanceStartSeconds - leadInSeconds)
+      : await findAutoPlaybackLeadInStartSeconds(media, leadInSeconds)
   if (start <= 0.01) return
 
   const apply = () => {

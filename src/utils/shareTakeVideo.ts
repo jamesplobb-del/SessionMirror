@@ -1,15 +1,22 @@
-import { Media } from '@capacitor-community/media'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
+import BestTakeAudioPlugin from './audioSessionRoute'
 import { getTakeMediaType } from './mediaType'
 import { prepareTakeVideoExportUri, prepareTakeVideoExportUrl } from './prepareTakeVideoExport'
 import type { Take } from '../types'
 
 const EXPORT_CACHE_DIR = 'export-cache'
+const FALLBACK_NATIVE_EXPORT_AUDIO_GAIN = 1.85
+const MAX_NATIVE_EXPORT_AUDIO_GAIN = 3
 
 export type SaveTakeResult =
   | { ok: true }
   | { ok: false; reason: 'missing_file' | 'permission_denied' | 'save_failed' | 'unsupported' }
+
+export type ShareTakeResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing_file' | 'share_failed' }
 
 function classifySaveError(err: unknown): SaveTakeResult {
   const message =
@@ -97,6 +104,14 @@ function downloadTakeOnWeb(take: Take, url: string): SaveTakeResult {
   anchor.download = `${take.name.replace(/[^\w.-]+/g, '_') || 'take'}.mp4`
   anchor.click()
   return { ok: true }
+}
+
+function resolveNativeExportAudioGain(take: Take): number {
+  const suggestedGainDb = take.playbackGainMetadata?.suggestedGainDb
+  if (typeof suggestedGainDb === 'number' && Number.isFinite(suggestedGainDb) && suggestedGainDb > 0) {
+    return Math.min(MAX_NATIVE_EXPORT_AUDIO_GAIN, Math.max(1, 10 ** (suggestedGainDb / 20)))
+  }
+  return FALLBACK_NATIVE_EXPORT_AUDIO_GAIN
 }
 
 export function describeSaveTakeResult(result: SaveTakeResult): string | null {
@@ -197,13 +212,25 @@ export async function shareTakeVideo(take: Take): Promise<SaveTakeResult> {
   }
 
   try {
-    await Media.saveVideo({ path })
+    const audioGain = resolveNativeExportAudioGain(take)
+    if (Capacitor.getPlatform() === 'ios') {
+      await BestTakeAudioPlugin.saveVideoToPhotos({ path, audioGain })
+    } else {
+      const { Media } = await import('@capacitor-community/media')
+      await Media.saveVideo({ path })
+    }
     return { ok: true }
   } catch (firstError) {
     if (take.filePath) {
       try {
         const cacheUri = await copyTakeToExportCache(take.filePath)
-        await Media.saveVideo({ path: cacheUri })
+        const audioGain = resolveNativeExportAudioGain(take)
+        if (Capacitor.getPlatform() === 'ios') {
+          await BestTakeAudioPlugin.saveVideoToPhotos({ path: cacheUri, audioGain })
+        } else {
+          const { Media } = await import('@capacitor-community/media')
+          await Media.saveVideo({ path: cacheUri })
+        }
         return { ok: true }
       } catch {
         /* fall through to classified error */
@@ -211,5 +238,56 @@ export async function shareTakeVideo(take: Take): Promise<SaveTakeResult> {
     }
 
     return classifySaveError(firstError)
+  }
+}
+
+/** Opens the native system share sheet for an existing take file. */
+export async function shareTakeToSystem(take: Take): Promise<ShareTakeResult> {
+  let url: string | null = null
+
+  if (Capacitor.isNativePlatform()) {
+    url = await resolveNativeFileUri(take)
+    if (url) {
+      try {
+        const orientedUrl = await prepareTakeVideoExportUri(take)
+        if (orientedUrl) url = orientedUrl
+      } catch {
+        /* Share the raw take if orientation export is unavailable. */
+      }
+    }
+  } else {
+    url = await prepareTakeVideoExportUrl(take)
+  }
+
+  if (!url) {
+    return { ok: false, reason: 'missing_file' }
+  }
+
+  try {
+    if (Capacitor.getPlatform() === 'ios') {
+      await BestTakeAudioPlugin.shareMediaFile({
+        path: url,
+        title: take.name || 'SessionMirror Take',
+        audioGain: resolveNativeExportAudioGain(take),
+      })
+    } else {
+      await Share.share({
+        title: take.name || 'SessionMirror Take',
+        text: take.name || 'SessionMirror Take',
+        url,
+        dialogTitle: 'Share Take',
+      })
+    }
+    return { ok: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (/cancel|dismiss|abort/i.test(message)) {
+      return { ok: true }
+    }
+    return { ok: false, reason: 'share_failed' }
+  } finally {
+    if (!Capacitor.isNativePlatform() && url.startsWith('blob:')) {
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
   }
 }

@@ -1,6 +1,7 @@
-import { AudioLines } from 'lucide-react'
+import { Pause, Play } from 'lucide-react'
 import type { RefObject } from 'react'
 import { formatTime } from '../hooks/useVideoPlayback'
+import { useMediaWaveform } from '../hooks/useMediaWaveform'
 import Pressable from './ui/Pressable'
 
 interface ReviewTimelineProps {
@@ -11,9 +12,10 @@ interface ReviewTimelineProps {
   onScrubStart: () => void
   onScrub: (clientX: number) => void
   onScrubEnd: () => void
-  pitchToggleVisible?: boolean
-  pitchToggleActive?: boolean
-  onPitchToggle?: () => void
+  isPlaying: boolean
+  onPlayPause: () => void
+  mediaFilePath?: string
+  mediaUrl?: string
 }
 
 export default function ReviewTimeline({
@@ -24,11 +26,17 @@ export default function ReviewTimeline({
   onScrubStart,
   onScrub,
   onScrubEnd,
-  pitchToggleVisible = false,
-  pitchToggleActive = false,
-  onPitchToggle,
+  isPlaying,
+  onPlayPause,
+  mediaFilePath = '',
+  mediaUrl = '',
 }: ReviewTimelineProps) {
   const percent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0
+  const peaks = useMediaWaveform({
+    filePath: mediaFilePath,
+    mediaUrl,
+    barCount: 88,
+  })
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -55,68 +63,72 @@ export default function ReviewTimeline({
 
   return (
     <div
-      className="review-timeline pointer-events-auto w-full touch-none select-none border-t border-white/10 bg-transparent px-5 pt-3 backdrop-blur-sm"
+      className="review-timeline pointer-events-auto w-full touch-none select-none"
       style={{
         touchAction: 'none',
-        paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom, 0px))',
       }}
     >
-      <div
-        ref={trackRef}
-        role="slider"
-        aria-valuemin={0}
-        aria-valuemax={duration}
-        aria-valuenow={currentTime}
-        aria-label="Video timeline"
-        className="relative h-8 cursor-pointer touch-none"
-        style={{ touchAction: 'none' }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/30" />
-        <div
-          className={`absolute left-0 top-1/2 h-px -translate-y-1/2 bg-white/85 ${
-            isScrubbing ? '' : 'transition-[width] duration-100 ease-linear'
-          }`}
-          style={{ width: `${percent}%` }}
-        />
-        <div
-          className={`pointer-events-none absolute top-1/2 z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/95 shadow-[0_0_8px_rgba(255,255,255,0.35)] ${
-            isScrubbing ? 'scale-125' : 'transition-[left] duration-100 ease-linear'
-          }`}
-          style={{ left: `${percent}%` }}
-        />
-      </div>
+      <div className="review-playback-controls flex items-center gap-3">
+        <Pressable
+          type="button"
+          intensity="icon"
+          haptic="light"
+          onClick={(event) => {
+            event.stopPropagation()
+            onPlayPause()
+          }}
+          className="review-playback-button flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+        >
+          {isPlaying ? (
+            <Pause className="h-5 w-5 fill-white" />
+          ) : (
+            <Play className="ml-0.5 h-5 w-5 fill-white" />
+          )}
+        </Pressable>
 
-      <div className="mt-1 flex items-center justify-between tabular-nums">
-        <span className="text-[11px] font-medium tracking-tight text-white/70">
+        <span className="w-11 text-right text-[11px] font-medium tabular-nums tracking-tight text-white/78">
           {formatTime(currentTime)}
         </span>
 
-        {pitchToggleVisible && onPitchToggle && (
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={(event) => {
-              event.stopPropagation()
-              onPitchToggle()
-            }}
-            className={`flex h-7 items-center gap-1 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wide ${
-              pitchToggleActive
-                ? 'border-[#5ce625]/40 bg-[#5ce625]/20 text-[#5ce625]'
-                : 'border-white/15 bg-white/10 text-white/65 hover:bg-white/15 hover:text-white/85'
+        <div
+          ref={trackRef}
+          role="slider"
+          aria-valuemin={0}
+          aria-valuemax={duration}
+          aria-valuenow={currentTime}
+          aria-label="Video timeline"
+          className="review-timeline-track review-timeline-track--waveform relative h-12 min-w-0 flex-1 cursor-pointer touch-none"
+          style={{ touchAction: 'none' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          <div className="review-timeline-waveform absolute inset-0 flex items-center gap-[2px]">
+            {peaks.map((peak, index) => (
+              <span
+                key={index}
+                className={
+                  index / Math.max(1, peaks.length - 1) <= percent / 100
+                    ? 'review-timeline-waveform__bar review-timeline-waveform__bar--played'
+                    : 'review-timeline-waveform__bar'
+                }
+                style={{ height: `${Math.round(12 + peak * 78)}%` }}
+              />
+            ))}
+          </div>
+          <div
+            className={`pointer-events-none absolute top-1/2 z-10 h-full w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] ${
+              isScrubbing ? 'scale-125' : 'transition-[left] duration-100 ease-linear'
             }`}
-            aria-label={pitchToggleActive ? 'Hide pitch tuner' : 'Show pitch tuner'}
-            aria-pressed={pitchToggleActive}
+            style={{ left: `${percent}%` }}
           >
-            <AudioLines className="h-3.5 w-3.5" strokeWidth={2.25} />
-            Pitch
-          </Pressable>
-        )}
+            <span className="absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-white" />
+          </div>
+        </div>
 
-        <span className="text-[11px] font-medium tracking-tight text-white/45">
+        <span className="w-11 text-left text-[11px] font-medium tabular-nums tracking-tight text-white/52">
           {formatTime(duration)}
         </span>
       </div>

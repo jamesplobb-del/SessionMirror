@@ -17,9 +17,9 @@ const TIER_WOODBLOCK: Record<MetronomeClickTier, { hz: number; peak: number; dec
 }
 
 const TIER_SOFT: Record<MetronomeClickTier, { hz: number; peak: number; decaySec: number }> = {
-  downbeat: { hz: 720, peak: 0.42, decaySec: 0.07 },
-  macro: { hz: 620, peak: 0.28, decaySec: 0.06 },
-  subdivision: { hz: 520, peak: 0.12, decaySec: 0.05 },
+  downbeat: { hz: 660, peak: 0.34, decaySec: 0.085 },
+  macro: { hz: 540, peak: 0.22, decaySec: 0.072 },
+  subdivision: { hz: 440, peak: 0.08, decaySec: 0.052 },
 }
 
 const TIER_ELECTRONIC: Record<MetronomeClickTier, { hz: number; peak: number; decaySec: number }> = {
@@ -74,10 +74,10 @@ export function scheduleMetronomeClick(
 
   switch (sound) {
     case 'woodblock':
-      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_SOFT, 'sine')
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_WOODBLOCK, 'triangle')
       return
     case 'soft':
-      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_WOODBLOCK, 'triangle')
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_SOFT, 'sine')
       return
     case 'electronic':
       scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_ELECTRONIC, 'square')

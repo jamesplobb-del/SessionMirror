@@ -113,7 +113,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                         }
                         self.previewUsesFrontCamera = useFrontCamera
                         if !self.session.isRunning {
+                            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startPreview startRunning.begin")
                             self.session.startRunning()
+                            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startPreview startRunning.end")
                         }
                         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
                         DispatchQueue.main.async {
@@ -143,7 +145,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
         sessionQueue.async {
             guard !self.isRecording, self.session.isRunning else { return }
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.begin")
             self.session.stopRunning()
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.end")
         }
     }
 
@@ -207,14 +211,23 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     }
 
     private func configureCaptureSession(useFrontCamera: Bool) throws -> AVCaptureMovieFileOutput {
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession beginConfiguration.begin")
         session.beginConfiguration()
-        defer { session.commitConfiguration() }
+        defer {
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession commitConfiguration.begin")
+            session.commitConfiguration()
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession commitConfiguration.end")
+        }
 
         for input in session.inputs {
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession removeInput.begin", details: "input=\(input)")
             session.removeInput(input)
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession removeInput.end", details: "input=\(input)")
         }
         for output in session.outputs {
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession removeOutput.begin", details: "output=\(output)")
             session.removeOutput(output)
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession removeOutput.end", details: "output=\(output)")
         }
 
         movieOutput = nil
@@ -239,7 +252,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         videoDevice.videoZoomFactor = 1.0
         videoDevice.unlockForConfiguration()
 
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession createVideoInput.begin", details: "device=\(videoDevice.localizedName)")
         let videoInput = try AVCaptureDeviceInput(device: videoDevice)
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession createVideoInput.end", details: "device=\(videoDevice.localizedName)")
         guard session.canAddInput(videoInput) else {
             throw NSError(
                 domain: "NativeCameraTest",
@@ -247,7 +262,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 userInfo: [NSLocalizedDescriptionKey: "Cannot add video input"]
             )
         }
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addVideoInput.begin", details: "device=\(videoDevice.localizedName)")
         session.addInput(videoInput)
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addVideoInput.end", details: "device=\(videoDevice.localizedName)")
 
         guard let audioDevice = AVCaptureDevice.default(for: .audio) else {
             throw NSError(
@@ -257,7 +274,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             )
         }
 
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession createAudioInput.begin", details: "device=\(audioDevice.localizedName)")
         let audioInput = try AVCaptureDeviceInput(device: audioDevice)
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession createAudioInput.end", details: "device=\(audioDevice.localizedName)")
         guard session.canAddInput(audioInput) else {
             throw NSError(
                 domain: "NativeCameraTest",
@@ -265,7 +284,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 userInfo: [NSLocalizedDescriptionKey: "Cannot add audio input"]
             )
         }
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addAudioInput.begin", details: "device=\(audioDevice.localizedName)")
         session.addInput(audioInput)
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addAudioInput.end", details: "device=\(audioDevice.localizedName)")
 
         let movieOutput = AVCaptureMovieFileOutput()
         guard session.canAddOutput(movieOutput) else {
@@ -275,7 +296,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 userInfo: [NSLocalizedDescriptionKey: "Cannot add movie output"]
             )
         }
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addMovieOutput.begin")
         session.addOutput(movieOutput)
+        AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addMovieOutput.end")
 
         if let connection = movieOutput.connection(with: .video) {
             if cameraPosition == .front {
@@ -328,7 +351,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         if !session.isRunning {
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startOnSessionQueue startRunning.begin")
             session.startRunning()
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startOnSessionQueue startRunning.end")
         }
 
         let takesDir = try takesDirectoryURL()
@@ -445,7 +470,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             self.pendingStartResult = nil
 
             if self.session.isRunning && !self.isPreviewActive {
+                AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.didFinishRecording stopRunning.begin")
                 self.session.stopRunning()
+                AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.didFinishRecording stopRunning.end")
             }
 
             let completion = self.stopCompletion
