@@ -35,6 +35,8 @@ export interface AppSettings {
   takeCardScale: number
   /** Dolby On-style playback enhancer (EQ, compression, reverb). */
   audioEnhancerEnabled: boolean
+  /** iOS-only AVAudioSession experiment for native input/output routing. */
+  nativeExperimentalAudioEnabled: boolean
   /** Persisted enhancer preset and slider values. */
   audioEnhancerSettings: AudioEnhancerSettings
   /** Speaker-only loudness mastering preset for built-in iPhone speakers. */
@@ -60,6 +62,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   muteMetronomeDuringPlayback: true,
   takeCardScale: 100,
   audioEnhancerEnabled: false,
+  nativeExperimentalAudioEnabled: false,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
   speakerLoudnessPreset: 'loud',
   excludeYoutubeFromRecording: false,
@@ -139,6 +142,10 @@ export function loadAppSettings(): AppSettings {
         parsed.audioEnhancerEnabled !== undefined
           ? Boolean(parsed.audioEnhancerEnabled)
           : DEFAULT_APP_SETTINGS.audioEnhancerEnabled,
+      nativeExperimentalAudioEnabled:
+        parsed.nativeExperimentalAudioEnabled !== undefined
+          ? Boolean(parsed.nativeExperimentalAudioEnabled)
+          : DEFAULT_APP_SETTINGS.nativeExperimentalAudioEnabled,
       audioEnhancerSettings: parseAudioEnhancerSettings(
         parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),

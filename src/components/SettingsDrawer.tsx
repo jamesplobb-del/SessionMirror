@@ -1,4 +1,5 @@
 import { useCallback, type MouseEvent } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { RotateCcw, X, GraduationCap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -13,6 +14,8 @@ import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
+
+type NativeCaptureChoice = 'standard' | 'nativeExperimental'
 interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
@@ -46,7 +49,7 @@ function SettingToggle({
 }) {
   return (
     <motion.label
-      className={`flex items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-3.5 ${
+      className={`settings-group-row flex min-h-[4.75rem] items-start justify-between gap-4 rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl ${
         disabled ? 'opacity-50' : 'cursor-pointer'
       }`}
       whileTap={disabled ? undefined : { scale: 0.995 }}
@@ -77,7 +80,7 @@ function SettingInstrumentPicker({
   const activeProfile = getTunerProfile(value)
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
+    <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
       <p className="text-sm font-semibold text-stone-900">Source Instrument</p>
       <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
         Adjusts how aggressively pitch is detected and how smooth the tuner trace looks.
@@ -124,7 +127,7 @@ function SettingSlider({
   const display = formatValue ? formatValue(value) : `${value}${unit}`
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5">
+    <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-stone-900">{label}</p>
@@ -169,6 +172,10 @@ export default function SettingsDrawer({
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
+  const isIosNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
+  const selectedCapturePath: NativeCaptureChoice = settings.nativeExperimentalAudioEnabled
+    ? 'nativeExperimental'
+    : 'standard'
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -193,6 +200,13 @@ export default function SettingsDrawer({
     [onClose],
   )
 
+  const handleAudioEngineChange = useCallback(
+    (engine: NativeCaptureChoice) => {
+      onUpdate({ nativeExperimentalAudioEnabled: engine === 'nativeExperimental' })
+    },
+    [onUpdate],
+  )
+
   return (
     <AnimatedBottomSheet
       isOpen={isOpen}
@@ -202,29 +216,30 @@ export default function SettingsDrawer({
       elevated
       onEnterComplete={handleSheetEnterComplete}
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
-        <div>
-          <h2 className="text-base font-semibold text-stone-900">Settings</h2>
-          <p className="text-xs text-stone-500">Recording, pitch tools, and on-screen controls</p>
+      <div className="native-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
+        <div className="native-sheet-title-block min-w-0 flex-1">
+          <span className="native-sheet-kicker">BestTake</span>
+          <h2 className="native-sheet-title">Settings</h2>
+          <p className="native-sheet-subtitle">Recording, pitch tools, and on-screen controls</p>
         </div>
         <Pressable
           type="button"
           intensity="icon"
           onClick={handleCloseClick}
           haptic="light"
-          className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+          className="native-sheet-close relative z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white/70 text-stone-500 shadow-sm ring-1 ring-stone-200/70 hover:bg-white hover:text-stone-800"
           aria-label="Close settings"
         >
           <X className="h-5 w-5" />
         </Pressable>
       </div>
 
-      <div className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+      <div className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-4">
         {!contentReady ? (
           <SettingsDrawerSkeleton />
         ) : (
-        <div className="space-y-6 pb-2">
-          <section className="space-y-3">
+        <div className="space-y-5 pb-2">
+          <section className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Audio Recording
             </h3>
@@ -284,7 +299,7 @@ export default function SettingsDrawer({
             </AnimatedExpand>
           </section>
 
-          <section className="space-y-3">
+          <section className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Pitch & Tuning
             </h3>
@@ -312,10 +327,41 @@ export default function SettingsDrawer({
             </AnimatedExpand>
           </section>
 
-          <section className="space-y-3">
+          <section className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Playback
             </h3>
+
+            {isIosNative ? (
+              <div
+                className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl"
+                data-tutorial="settings-enhancer"
+              >
+                <p className="text-sm font-semibold text-stone-900">Capture Path</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                  Standard keeps the current app recorder. Native Experimental uses iOS camera-style capture for louder, more dynamic input.
+                </p>
+                <IOSSegmentedControl<NativeCaptureChoice>
+                  className="mt-3"
+                  layoutId="settings-audio-engine-segment"
+                  ariaLabel="Capture path"
+                  value={selectedCapturePath}
+                  onChange={handleAudioEngineChange}
+                  size="sm"
+                  segments={[
+                    { id: 'standard', label: 'Standard' },
+                    { id: 'nativeExperimental', label: 'Native' },
+                  ]}
+                />
+                {settings.nativeExperimentalAudioEnabled && (
+                  <p className="mt-2.5 text-[11px] leading-relaxed text-stone-400">
+                    iOS only. Can be combined with Audio Enhancer for musician-focused playback polish.
+                  </p>
+                )}
+              </div>
+            ) : (
+              null
+            )}
 
             <div data-tutorial="settings-enhancer">
               <SettingToggle
@@ -337,7 +383,7 @@ export default function SettingsDrawer({
             </AnimatedExpand>
           </section>
 
-          <section className="space-y-3">
+          <section className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               On-Screen Tools
             </h3>
@@ -396,7 +442,7 @@ export default function SettingsDrawer({
             />
           </section>
 
-          <section className="space-y-3">
+          <section className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Play Along
             </h3>

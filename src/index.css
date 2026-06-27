@@ -110,6 +110,12 @@ html.platform-ios #root {
   min-height: var(--app-height, -webkit-fill-available);
 }
 
+html.native-camera-preview-active,
+html.native-camera-preview-active body,
+html.native-camera-preview-active #root {
+  background-color: transparent;
+}
+
 /* Native touch — eliminate web-like tap delay, flash, and accidental selection. */
 *,
 *::before,
@@ -1438,6 +1444,29 @@ body.settings-branch-open * {
 
 .control-deck {
   padding-bottom: 0;
+  touch-action: manipulation;
+}
+
+.control-deck__vault-btn,
+.control-deck__settings-btn {
+  min-width: 44px;
+  min-height: 44px;
+  transition:
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1.18),
+    background 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
+  will-change: transform;
+}
+
+.control-deck__vault-btn:active,
+.control-deck__settings-btn:active {
+  transform: scale(0.92);
+}
+
+.control-deck__settings-btn[aria-expanded='true'] {
+  color: rgb(186, 230, 253);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
 }
 
 .app-ui-overlay--quick-settings .hud-header-hidden {
@@ -1580,6 +1609,133 @@ html.physical-landscape-right .ui-orient-spin {
 .vault-drawer-scroll {
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  padding-bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1.25rem));
+}
+
+.vault-drawer-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.native-sheet-backdrop {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.native-bottom-sheet {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 247, 248, 0.9) 54%, rgba(242, 242, 244, 0.94) 100%);
+  box-shadow:
+    0 -28px 80px rgba(0, 0, 0, 0.28),
+    0 -8px 24px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.native-sheet-header {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 248, 249, 0.74) 100%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.78),
+    0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.native-sheet-title-block {
+  border-radius: 1.25rem;
+}
+
+.native-sheet-kicker {
+  display: block;
+  margin-bottom: 0.125rem;
+  color: rgba(120, 113, 108, 0.82);
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.native-sheet-title {
+  color: rgb(12, 10, 9);
+  font-size: 1.35rem;
+  font-weight: 760;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+.native-sheet-subtitle {
+  margin-top: 0.3rem;
+  max-width: min(100%, 18rem);
+  overflow: hidden;
+  color: rgba(87, 83, 78, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.native-sheet-actions {
+  min-height: 2.75rem;
+}
+
+.native-sheet-action-pill {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.native-sheet-close {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 8px 20px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.native-sheet-handle {
+  background: rgba(248, 248, 249, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
+}
+
+.vault-library-shell {
+  min-height: 100%;
+}
+
+.vault-media-segment {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.75),
+    0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.vault-section-toolbar {
+  margin-bottom: 0.75rem;
+}
+
+.vault-card-strip {
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 1.25rem;
+}
+
+.vault-card-strip > * {
+  scroll-snap-align: start;
+}
+
+.vault-take-card {
+  box-shadow:
+    0 16px 36px rgba(15, 23, 42, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.vault-empty-state {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84) 0%, rgba(248, 250, 252, 0.68) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
 }
 
 .record-carousel-viewport {
@@ -1646,6 +1802,8 @@ html.physical-landscape-right .ui-orient-spin {
   position: relative;
   width: 100%;
   height: 100%;
+  transition: transform 360ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
 }
 
 .record-carousel-slot {
@@ -1665,29 +1823,61 @@ html.physical-landscape-right .ui-orient-spin {
   user-select: none;
   transform: translate(-50%, -50%);
   transition:
-    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 240ms cubic-bezier(0.32, 0.72, 0, 1);
-  will-change: transform, opacity;
+    transform 380ms cubic-bezier(0.32, 0.72, 0, 1.12),
+    opacity 260ms cubic-bezier(0.32, 0.72, 0, 1),
+    background 220ms ease,
+    box-shadow 240ms ease,
+    border-color 220ms ease;
+  will-change: transform, opacity, box-shadow;
+}
+
+.record-carousel-slot svg,
+.record-carousel-slot-dot {
+  transition:
+    transform 260ms cubic-bezier(0.32, 0.72, 0, 1.08),
+    opacity 220ms ease;
 }
 
 .record-carousel-slot--center {
   opacity: 1;
   transform: translate(-50%, -50%) translateX(0) scale(1);
   border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.record-carousel-slot--center:active {
+  transform: translate(-50%, -50%) translateX(0) scale(0.9);
+}
+
+.record-carousel-slot--center:active svg,
+.record-carousel-slot--center:active .record-carousel-slot-dot {
+  transform: scale(0.92);
 }
 
 .record-carousel-slot--left {
-  opacity: 0.5;
+  opacity: 0.58;
   transform: translate(-50%, -50%) translateX(var(--record-slot-side-x))
     scale(var(--record-slot-inactive-scale));
   background: rgba(255, 255, 255, 0.08);
 }
 
 .record-carousel-slot--right {
-  opacity: 0.5;
+  opacity: 0.58;
   transform: translate(-50%, -50%) translateX(calc(-1 * var(--record-slot-side-x)))
     scale(var(--record-slot-inactive-scale));
   background: rgba(255, 255, 255, 0.08);
+}
+
+.record-carousel-slot--left:active {
+  transform: translate(-50%, -50%) translateX(var(--record-slot-side-x))
+    scale(calc(var(--record-slot-inactive-scale) * 0.94));
+}
+
+.record-carousel-slot--right:active {
+  transform: translate(-50%, -50%) translateX(calc(-1 * var(--record-slot-side-x)))
+    scale(calc(var(--record-slot-inactive-scale) * 0.94));
 }
 
 .record-carousel-slot--video-active {
@@ -1797,6 +1987,11 @@ html.physical-landscape-right .ui-orient-spin {
   overflow: hidden;
   background: var(--midnight-base);
   padding: 0;
+}
+
+html.native-camera-preview-active .app-shell,
+.camera-background--native-preview {
+  background: transparent !important;
 }
 
 /* Portrait-locked app — camera fills the fixed portrait viewport. */
@@ -2364,6 +2559,20 @@ video.camera-preview--embedded.camera-preview--mirror {
 
 .settings-drawer-scroll {
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  padding-bottom: max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1.25rem));
+}
+
+.settings-drawer-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-group-row {
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .pitch-glass-panel {

@@ -20,6 +20,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getCameraSessionState", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setPlaybackRouteActive", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restoreRecordingRouteAfterPlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startNativeCameraPreview", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
@@ -285,6 +288,70 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
         call.resolve(AudioRouteConfigurator.routeSnapshot())
+    }
+
+    @objc func setNativeExperimentalAudioMode(_ call: CAPPluginCall) {
+        let enabled = call.getBool("enabled") ?? false
+        let selectedAudioEngine = call.getString("selectedAudioEngine") ?? (enabled ? "Native Experimental" : "Standard")
+        let recordingActive = call.getBool("recordingActive") ?? CameraSessionGuard.recordingActive
+        let playbackActive = call.getBool("playbackActive") ?? CameraSessionGuard.playbackRouteActive
+
+        do {
+            let result = try AudioRouteConfigurator.applyNativeExperimentalAudioMode(
+                enabled: enabled,
+                selectedAudioEngine: selectedAudioEngine,
+                recordingActive: recordingActive,
+                playbackActive: playbackActive
+            )
+            call.resolve(result)
+        } catch {
+            var snapshot = AudioRouteConfigurator.routeSnapshot()
+            snapshot["success"] = false
+            snapshot["enabled"] = enabled
+            snapshot["selectedAudioEngine"] = selectedAudioEngine
+            snapshot["recordingActive"] = recordingActive
+            snapshot["playbackActive"] = playbackActive
+            snapshot["fallbackReason"] = error.localizedDescription
+            print("[NativeExperimentalAudio] failed: \(error.localizedDescription)")
+            call.resolve(snapshot)
+        }
+    }
+
+    @objc func startNativeCameraPreview(_ call: CAPPluginCall) {
+        let useFrontCamera = call.getBool("useFrontCamera") ?? true
+        let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
+
+        DispatchQueue.main.async {
+            guard let viewController = self.bridge?.viewController else {
+                call.reject("Native preview container unavailable")
+                return
+            }
+
+            guard let container = (viewController as? PortraitBridgeViewController)?.nativeCameraPreviewContainer
+                ?? viewController.view else {
+                call.reject("Native preview container unavailable")
+                return
+            }
+
+            self.nativeCameraEngine.startPreview(
+                in: container,
+                useFrontCamera: useFrontCamera,
+                audioSessionProfile: profile,
+                completion: { result in
+                    switch result {
+                    case .success(let payload):
+                        call.resolve(payload)
+                    case .failure(let error):
+                        call.reject("Native camera preview failed", nil, error)
+                    }
+                }
+            )
+        }
+    }
+
+    @objc func stopNativeCameraPreview(_ call: CAPPluginCall) {
+        nativeCameraEngine.stopPreview()
+        call.resolve()
     }
 
     @objc func prepareCameraLikePlaybackSession(_ call: CAPPluginCall) {

@@ -29,12 +29,20 @@ import {
   applyViewportCssVarsOnResume,
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
+import {
+  isNativeCameraTestAvailable,
+  startNativeCameraPreview,
+  startNativeCameraRecording,
+  stopNativeCameraPreview,
+  stopNativeCameraRecording,
+} from '../utils/nativeCameraTest'
 
 interface UseCameraSessionOptions {
   onRecordingComplete: (payload: RecordingCompletePayload) => void
   secondaryPreviewRef?: RefObject<HTMLVideoElement | null>
   onBeforeForegroundRestart?: () => void
   onAfterForegroundRestart?: () => void
+  nativeExperimentalAudioEnabled?: boolean
 }
 
 const CAMERA_RELEASE_DELAY_MS = 700
@@ -189,6 +197,7 @@ export function useCameraSession({
   secondaryPreviewRef,
   onBeforeForegroundRestart,
   onAfterForegroundRestart,
+  nativeExperimentalAudioEnabled = false,
 }: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -213,6 +222,10 @@ export function useCameraSession({
   const onCompleteRef = useRef(onRecordingComplete)
   const onBeforeForegroundRestartRef = useRef(onBeforeForegroundRestart)
   const onAfterForegroundRestartRef = useRef(onAfterForegroundRestart)
+  const nativeExperimentalAudioEnabledRef = useRef(nativeExperimentalAudioEnabled)
+  const nativeExperimentalRecordingRef = useRef(false)
+  const nativePreviewActiveRef = useRef(false)
+  const ensureRecordableStreamRef = useRef<(() => Promise<MediaStream | null>) | null>(null)
   const armedAutoAudioRef = useRef<{
     recorder: MediaRecorder
     writer: StreamingTakeWriter
@@ -229,6 +242,7 @@ export function useCameraSession({
   onCompleteRef.current = onRecordingComplete
   onBeforeForegroundRestartRef.current = onBeforeForegroundRestart
   onAfterForegroundRestartRef.current = onAfterForegroundRestart
+  nativeExperimentalAudioEnabledRef.current = nativeExperimentalAudioEnabled
 
   const [error, setError] = useState<string | null>(null)
   const [needsPermission, setNeedsPermission] = useState(false)
@@ -372,6 +386,61 @@ export function useCameraSession({
     setStreamGeneration((generation) => generation + 1)
     detachAllPreviewTargets()
   }, [detachAllPreviewTargets, stopStreamTracks])
+
+  useEffect(() => {
+    let cancelled = false
+    const shouldRunNativePreview =
+      nativeExperimentalAudioEnabled &&
+      recordingMode === 'video' &&
+      isNativeCameraTestAvailable()
+
+    if (!shouldRunNativePreview) {
+      if (nativePreviewActiveRef.current) {
+        nativePreviewActiveRef.current = false
+        void stopNativeCameraPreview()
+        if (recordingMode === 'video') {
+          void ensureRecordableStreamRef.current?.()
+        }
+      }
+      return
+    }
+
+    releaseLiveStream()
+    setReady(true)
+    setNeedsPermission(false)
+
+    void startNativeCameraPreview({
+      useFrontCamera: true,
+      audioSessionProfile: 'videoRecording',
+    }).then((result) => {
+      if (cancelled) return
+      nativePreviewActiveRef.current = Boolean(result)
+      if (!result) {
+        setReady(false)
+        void ensureRecordableStreamRef.current?.()
+      }
+    })
+
+    return () => {
+      cancelled = true
+      if (nativePreviewActiveRef.current && (!nativeExperimentalAudioEnabled || recordingMode !== 'video')) {
+        nativePreviewActiveRef.current = false
+        void stopNativeCameraPreview()
+      }
+    }
+  }, [
+    nativeExperimentalAudioEnabled,
+    recordingMode,
+    releaseLiveStream,
+  ])
+
+  useEffect(() => {
+    return () => {
+      if (!nativePreviewActiveRef.current) return
+      nativePreviewActiveRef.current = false
+      void stopNativeCameraPreview()
+    }
+  }, [])
 
   const scheduleReleaseCameraState = useCallback(() => {
     cancelScheduledRelease()
@@ -521,6 +590,8 @@ export function useCameraSession({
     }
   }, [acquireStream])
 
+  ensureRecordableStreamRef.current = ensureRecordableStream
+
   useEffect(() => {
     let cancelled = false
     let activeStream: MediaStream | null = null
@@ -529,6 +600,18 @@ export function useCameraSession({
       cancelScheduledRelease()
 
       const mode = recordingMode
+      if (
+        nativeExperimentalAudioEnabled &&
+        mode === 'video' &&
+        isNativeCameraTestAvailable()
+      ) {
+        previousRecordingModeRef.current = mode
+        releaseLiveStream()
+        setNeedsPermission(false)
+        setReady(true)
+        return
+      }
+
       if (streamRef.current && isStreamCompatibleForMode(streamRef.current, mode)) {
         previousRecordingModeRef.current = mode
         syncPreviewTargets(streamRef.current, mode)
@@ -623,7 +706,9 @@ export function useCameraSession({
     acquireStream,
     cancelScheduledRelease,
     forceClearCameraState,
+    nativeExperimentalAudioEnabled,
     recordingMode,
+    releaseLiveStream,
     stopStreamTracks,
   ])
 
@@ -957,8 +1042,122 @@ export function useCameraSession({
     }, 200)
   }
 
+  const shouldUseNativeExperimentalRecording = useCallback(() => {
+    return (
+      nativeExperimentalAudioEnabledRef.current &&
+      recordingModeRef.current === 'video' &&
+      isNativeCameraTestAvailable()
+    )
+  }, [])
+
+  const recoverAfterNativeExperimentalFailure = useCallback(() => {
+    if (shouldUseNativeExperimentalRecording()) {
+      setNeedsPermission(false)
+      setReady(true)
+      return
+    }
+
+    void ensureRecordableStream()
+  }, [ensureRecordableStream, shouldUseNativeExperimentalRecording])
+
+  const startNativeExperimentalRecording = useCallback(() => {
+    if (isRecordingRef.current) return
+
+    void (async () => {
+      const takeId = crypto.randomUUID()
+      activeTakeIdRef.current = takeId
+      recordingOrientationRef.current = readRecordingOrientation()
+      recorderMimeTypeRef.current = 'video/mp4'
+
+      let result = await startNativeCameraRecording({
+        useFrontCamera: true,
+        audioSessionProfile: 'videoRecording',
+      })
+
+      if (!result && streamRef.current) {
+        console.warn('[NativeExperimentalAudio] native capture could not share the live preview; retrying after preview release')
+        releaseLiveStream()
+        result = await startNativeCameraRecording({
+          useFrontCamera: true,
+          audioSessionProfile: 'videoRecording',
+        })
+      }
+
+      if (!result) {
+        activeTakeIdRef.current = null
+        nativeExperimentalRecordingRef.current = false
+        isRecordingRef.current = false
+        setIsRecording(false)
+        recoverAfterNativeExperimentalFailure()
+        return
+      }
+
+      nativeExperimentalRecordingRef.current = true
+      isRecordingRef.current = true
+      setIsRecording(true)
+      setElapsed(0)
+      elapsedRef.current = 0
+    })().catch((error) => {
+      console.warn('[NativeExperimentalAudio] native recording start failed', error)
+      activeTakeIdRef.current = null
+      nativeExperimentalRecordingRef.current = false
+      isRecordingRef.current = false
+      setIsRecording(false)
+      recoverAfterNativeExperimentalFailure()
+    })
+  }, [recoverAfterNativeExperimentalFailure, releaseLiveStream])
+
+  const stopNativeExperimentalRecording = useCallback(() => {
+    if (!nativeExperimentalRecordingRef.current) {
+      setIsRecording(false)
+      return
+    }
+
+    nativeExperimentalRecordingRef.current = false
+
+    void (async () => {
+      const stoppedTakeId = activeTakeIdRef.current ?? crypto.randomUUID()
+      activeTakeIdRef.current = null
+
+      const result = await stopNativeCameraRecording()
+      isRecordingRef.current = false
+      setIsRecording(false)
+
+      if (!result) {
+        recoverAfterNativeExperimentalFailure()
+        return
+      }
+
+      const videoUrl = Capacitor.convertFileSrc(result.fileURL)
+      onCompleteRef.current({
+        takeId: stoppedTakeId,
+        mimeType: result.mimeType,
+        mediaType: 'video',
+        filePath: result.filePath,
+        videoUrl,
+        durationSeconds: Math.max(0.1, result.duration || elapsedRef.current),
+        recordingOrientation: recordingOrientationRef.current,
+        captureProfile: getActiveCaptureProfile(),
+        captureTrackSnapshot: null,
+      })
+
+      void ensureRecordableStream()
+    })().catch((error) => {
+      console.warn('[NativeExperimentalAudio] native recording stop failed', error)
+      isRecordingRef.current = false
+      activeTakeIdRef.current = null
+      setIsRecording(false)
+      recoverAfterNativeExperimentalFailure()
+    })
+  }, [ensureRecordableStream, recoverAfterNativeExperimentalFailure])
+
   const startRecording = useCallback(() => {
     if (isRecording) return
+
+    if (shouldUseNativeExperimentalRecording()) {
+      startNativeExperimentalRecording()
+      return
+    }
 
     if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
       autoPerformanceActiveRef.current = true
@@ -1030,7 +1229,13 @@ export function useCameraSession({
       isRecordingRef.current = false
       setIsRecording(false)
     })
-  }, [bindRecordingHandlers, ensureRecordableStream, isRecording])
+  }, [
+    bindRecordingHandlers,
+    ensureRecordableStream,
+    isRecording,
+    shouldUseNativeExperimentalRecording,
+    startNativeExperimentalRecording,
+  ])
 
   const startAutoAudioRecording = useCallback(() => {
     const preRollMark = tryMarkAutoPerformanceStart()
@@ -1076,6 +1281,11 @@ export function useCameraSession({
   ])
 
   const stopRecording = useCallback(() => {
+    if (nativeExperimentalRecordingRef.current) {
+      stopNativeExperimentalRecording()
+      return
+    }
+
     const recorder = recorderRef.current
     if (!recorder || recorder.state === 'inactive') {
       setIsRecording(false)
@@ -1097,7 +1307,7 @@ export function useCameraSession({
     }
 
     recorder.stop()
-  }, [])
+  }, [stopNativeExperimentalRecording])
 
   const toggleRecording = useCallback(() => {
     if (isRecording) {

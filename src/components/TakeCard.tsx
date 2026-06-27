@@ -1,9 +1,22 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronUp, Clapperboard, Download, Pin, StickyNote, Trash2 } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clapperboard,
+  Download,
+  Mic2,
+  Pin,
+  PlayCircle,
+  StickyNote,
+  Trash2,
+  Video,
+} from 'lucide-react'
 import StarRating from './StarRating'
 import Pressable from './ui/Pressable'
 import { useActionSheet } from '../context/ActionSheetContext'
 import { triggerLightHaptic } from '../utils/haptics'
+import { getTakeMediaType } from '../utils/mediaType'
 import type { Take, TakeUpdate } from '../types'
 import TakeCardThumbnailSkeleton from './ui/TakeCardThumbnailSkeleton'
 
@@ -163,10 +176,12 @@ function TakeCard({
 
   const showThumbnailImage = Boolean(take.thumbnailUrl) && !thumbnailBroken
   const showThumbnailSkeleton = !take.thumbnailUrl && !thumbnailBroken
+  const mediaType = getTakeMediaType(take)
+  const MediaIcon = mediaType === 'audio' ? Mic2 : Video
 
   return (
     <div
-      className={`group interactive-native flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${cardRingClass}`}
+      className={`vault-take-card group interactive-native flex w-[17rem] shrink-0 flex-col overflow-hidden rounded-[1.35rem] border bg-white/86 shadow-sm backdrop-blur-xl transition hover:shadow-md ${cardRingClass}`}
     >
       <div className="relative aspect-video bg-black">
         {thumbnailVideo ? (
@@ -220,15 +235,26 @@ function TakeCard({
         {!selectionMode && (isBenchmark || isChallenger) && (
           <div className="absolute left-2 top-2 flex gap-1">
             {isBenchmark && (
-              <span className="rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="rounded-full bg-amber-400 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
                 Best Take
               </span>
             )}
             {isChallenger && (
-              <span className="rounded-md bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="rounded-full bg-sky-500 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
                 {take.name}
               </span>
             )}
+          </div>
+        )}
+        {!selectionMode && (
+          <div className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur-md">
+            <MediaIcon className="h-3 w-3" />
+            {mediaType}
+          </div>
+        )}
+        {!selectionMode && onOpenTake && (
+          <div className="pointer-events-none absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/88 text-stone-950 shadow-lg backdrop-blur-md">
+            <PlayCircle className="h-5 w-5" />
           </div>
         )}
         {!selectionMode && (
@@ -250,7 +276,7 @@ function TakeCard({
                 if (confirmed) onDelete()
               })()
             }}
-            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-stone-200/80 bg-white/90 text-stone-400 shadow-sm backdrop-blur-sm hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+            className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-white/88 text-stone-400 shadow-sm backdrop-blur-md hover:border-red-200 hover:bg-red-50 hover:text-red-500"
             aria-label={`Delete ${take.name}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -282,13 +308,13 @@ function TakeCard({
               intensity="soft"
               haptic="light"
               onClick={() => setIsEditingName(true)}
-              className="w-full truncate text-left text-sm font-semibold text-stone-900 hover:text-sky-600"
+              className="w-full truncate text-left text-[15px] font-semibold tracking-tight text-stone-950 hover:text-sky-600"
               title="Click to rename"
             >
               {take.name}
             </Pressable>
           )}
-          <p className="mt-0.5 text-[11px] text-stone-400">
+          <p className="mt-1 text-[11px] font-medium text-stone-400">
             {new Date(take.timestamp).toLocaleString([], {
               month: 'short',
               day: 'numeric',
@@ -350,14 +376,14 @@ function TakeCard({
                   e.stopPropagation()
                   onPinBenchmark()
                 }}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium ${
+                className={`flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-semibold ${
                   isBenchmark
                     ? 'border-amber-300 bg-amber-100 text-amber-800'
                     : 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100'
                 }`}
               >
                 <Pin className="h-3.5 w-3.5" />
-                Set BestTake
+                {isBenchmark ? 'Best Take' : 'Make Best'}
               </Pressable>
               <Pressable
                 type="button"
@@ -370,7 +396,7 @@ function TakeCard({
                   e.stopPropagation()
                   onPinChallenger()
                 }}
-                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium ${
+                className={`flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-semibold ${
                   isChallenger
                     ? 'border-sky-300 bg-sky-100 text-sky-800'
                     : 'border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100'
@@ -392,7 +418,7 @@ function TakeCard({
                     e.stopPropagation()
                     onExport()
                   }}
-                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-medium text-stone-700 hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
+                  className="flex min-h-10 w-full touch-manipulation items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3 text-xs font-semibold text-stone-700 hover:border-stone-300 hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
                   aria-label={`Save ${take.name} to Photos`}
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -413,6 +439,7 @@ export default memo(TakeCard, (previous, next) =>
   previous.take.name === next.take.name &&
   previous.take.notes === next.take.notes &&
   previous.take.rating === next.take.rating &&
+  previous.take.mediaType === next.take.mediaType &&
   previous.isBenchmark === next.isBenchmark &&
   previous.isChallenger === next.isChallenger &&
   previous.selectionMode === next.selectionMode &&

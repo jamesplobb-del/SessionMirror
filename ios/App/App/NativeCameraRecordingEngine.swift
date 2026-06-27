@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import UIKit
 
 /// Debug-only AVCaptureSession recorder — bypasses WKWebView getUserMedia.
 final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingDelegate {
@@ -12,10 +13,16 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var isRecording = false
     private var isStarting = false
     private var outputURL: URL?
+    private var startCompletion: ((Result<[String: Any], Error>) -> Void)?
+    private var pendingStartResult: [String: Any]?
     private var stopCompletion: ((Result<[String: Any], Error>) -> Void)?
     private var recordedVideoWidth: Int = 0
     private var recordedVideoHeight: Int = 0
     private var activeAudioProfile: NativeCameraAudioSessionProfile = .videoRecording
+    private weak var previewContainer: UIView?
+    private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var isPreviewActive = false
+    private var previewUsesFrontCamera = true
 
     private override init() {
         super.init()
@@ -58,11 +65,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
-    func start(
-        useFrontCamera: Bool,
-        audioSessionProfile: NativeCameraAudioSessionProfile,
-        completion: @escaping (Result<[String: Any], Error>) -> Void
-    ) {
+    private func requestCaptureAccess(completion: @escaping (Result<Void, Error>) -> Void) {
         requestMediaAccess(mediaType: .video) { [weak self] videoGranted in
             guard let self = self else { return }
             guard videoGranted else {
@@ -84,15 +87,115 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                     return
                 }
 
+                completion(.success(()))
+            }
+        }
+    }
+
+    func startPreview(
+        in container: UIView,
+        useFrontCamera: Bool,
+        audioSessionProfile: NativeCameraAudioSessionProfile,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        requestCaptureAccess { [weak self, weak container] accessResult in
+            guard let self = self else { return }
+            switch accessResult {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success:
+                self.sessionQueue.async {
+                    do {
+                        try self.configureAudioSessionForRecording(profile: audioSessionProfile)
+                        if !self.isSessionConfigured {
+                            self.movieOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
+                            self.isSessionConfigured = true
+                        }
+                        self.previewUsesFrontCamera = useFrontCamera
+                        if !self.session.isRunning {
+                            self.session.startRunning()
+                        }
+                        let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
+                        DispatchQueue.main.async {
+                            if let container = container {
+                                self.attachPreviewLayer(to: container)
+                                self.isPreviewActive = true
+                            }
+                            completion(.success(sessionInfo))
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            completion(.failure(error))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func stopPreview() {
+        DispatchQueue.main.async {
+            self.previewLayer?.removeFromSuperlayer()
+            self.previewLayer = nil
+            self.previewContainer = nil
+            self.isPreviewActive = false
+        }
+
+        sessionQueue.async {
+            guard !self.isRecording, self.session.isRunning else { return }
+            self.session.stopRunning()
+        }
+    }
+
+    func layoutPreview(in container: UIView) {
+        guard previewContainer === container else { return }
+        previewLayer?.frame = container.bounds
+    }
+
+    private func applyFrontCameraMirroring(to connection: AVCaptureConnection) {
+        guard connection.isVideoMirroringSupported else { return }
+        connection.automaticallyAdjustsVideoMirroring = false
+        connection.isVideoMirrored = true
+    }
+
+    private func attachPreviewLayer(to container: UIView) {
+        previewContainer = container
+        let layer = previewLayer ?? AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        layer.frame = container.bounds
+        if let connection = layer.connection {
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = .portrait
+            }
+            applyFrontCameraMirroring(to: connection)
+        }
+        if layer.superlayer !== container.layer {
+            layer.removeFromSuperlayer()
+            container.layer.insertSublayer(layer, at: 0)
+        }
+        previewLayer = layer
+    }
+
+    func start(
+        useFrontCamera: Bool,
+        audioSessionProfile: NativeCameraAudioSessionProfile,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        requestCaptureAccess { [weak self] accessResult in
+            guard let self = self else { return }
+            switch accessResult {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success:
                 self.sessionQueue.async {
                     do {
                         let result = try self.startOnSessionQueue(
                             useFrontCamera: useFrontCamera,
-                            audioSessionProfile: audioSessionProfile
+                            audioSessionProfile: audioSessionProfile,
+                            completion: completion
                         )
-                        DispatchQueue.main.async {
-                            completion(.success(result))
-                        }
+                        print("[NativeCameraTest] start requested")
+                        print("[NativeCameraTest] fileURL = \(result["fileURL"] ?? "unknown")")
                     } catch {
                         DispatchQueue.main.async {
                             completion(.failure(error))
@@ -131,6 +234,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 userInfo: [NSLocalizedDescriptionKey: "Front camera unavailable"]
             )
         }
+
+        try videoDevice.lockForConfiguration()
+        videoDevice.videoZoomFactor = 1.0
+        videoDevice.unlockForConfiguration()
 
         let videoInput = try AVCaptureDeviceInput(device: videoDevice)
         guard session.canAddInput(videoInput) else {
@@ -171,11 +278,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         session.addOutput(movieOutput)
 
         if let connection = movieOutput.connection(with: .video) {
-            if connection.isVideoMirroringSupported && cameraPosition == .front {
-                connection.isVideoMirrored = true
+            if cameraPosition == .front {
+                applyFrontCameraMirroring(to: connection)
             }
             if connection.isVideoOrientationSupported {
                 connection.videoOrientation = .portrait
+            }
+            if connection.isVideoStabilizationSupported {
+                connection.preferredVideoStabilizationMode = .off
             }
         }
 
@@ -188,7 +298,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     private func startOnSessionQueue(
         useFrontCamera: Bool,
-        audioSessionProfile: NativeCameraAudioSessionProfile
+        audioSessionProfile: NativeCameraAudioSessionProfile,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
     ) throws -> [String: Any] {
         if isRecording || isStarting {
             throw NSError(
@@ -205,15 +316,16 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
         }
 
-        try configureAudioSessionForRecording(profile: audioSessionProfile)
-
-        if session.isRunning {
-            session.stopRunning()
+        if !(isPreviewActive && session.isRunning && isSessionConfigured) {
+            try configureAudioSessionForRecording(profile: audioSessionProfile)
         }
 
-        let configuredOutput = try configureCaptureSession(useFrontCamera: useFrontCamera)
-        movieOutput = configuredOutput
-        isSessionConfigured = true
+        if !isSessionConfigured || movieOutput == nil || (isPreviewActive && previewUsesFrontCamera != useFrontCamera) {
+            let configuredOutput = try configureCaptureSession(useFrontCamera: useFrontCamera)
+            movieOutput = configuredOutput
+            isSessionConfigured = true
+            previewUsesFrontCamera = useFrontCamera
+        }
 
         if !session.isRunning {
             session.startRunning()
@@ -230,13 +342,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         let inputRoute = sessionInfo["inputRoute"] as? String ?? "unknown"
 
         print("[NativeCameraTest] session started")
-        configuredOutput.startRecording(to: fileURL, recordingDelegate: self)
-
-        isRecording = true
-        isStarting = false
-
-        print("[NativeCameraTest] recording started")
-        print("[NativeCameraTest] fileURL = \(fileURL.absoluteString)")
+        guard let activeMovieOutput = movieOutput else {
+            throw NSError(
+                domain: "NativeCameraTest",
+                code: 9,
+                userInfo: [NSLocalizedDescriptionKey: "Movie output unavailable"]
+            )
+        }
 
         var result: [String: Any] = [
             "filePath": "takes/\(filename)",
@@ -250,6 +362,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         for (key, value) in sessionInfo {
             result[key] = value
         }
+
+        startCompletion = completion
+        pendingStartResult = result
+        activeMovieOutput.startRecording(to: fileURL, recordingDelegate: self)
+
         return result
     }
 
@@ -257,7 +374,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
 
-            guard self.isRecording, let movieOutput = self.movieOutput else {
+            guard (self.isRecording || self.isStarting), let movieOutput = self.movieOutput else {
                 DispatchQueue.main.async {
                     completion(.failure(NSError(
                         domain: "NativeCameraTest",
@@ -269,7 +386,46 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
 
             self.stopCompletion = completion
+            guard movieOutput.isRecording else {
+                self.stopCompletion = nil
+                self.isStarting = false
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(
+                        domain: "NativeCameraTest",
+                        code: 11,
+                        userInfo: [NSLocalizedDescriptionKey: "Recording has not started yet"]
+                    )))
+                }
+                return
+            }
             movieOutput.stopRecording()
+        }
+    }
+
+    func fileOutput(
+        _ output: AVCaptureFileOutput,
+        didStartRecordingTo fileURL: URL,
+        from connections: [AVCaptureConnection]
+    ) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            self.isRecording = true
+            self.isStarting = false
+
+            let completion = self.startCompletion
+            let result = self.pendingStartResult
+            self.startCompletion = nil
+            self.pendingStartResult = nil
+
+            print("[NativeCameraTest] recording started")
+            print("[NativeCameraTest] fileURL = \(fileURL.absoluteString)")
+
+            DispatchQueue.main.async {
+                if let result = result {
+                    completion?(.success(result))
+                }
+            }
         }
     }
 
@@ -284,8 +440,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             self.isRecording = false
             self.isStarting = false
+            let startCompletion = self.startCompletion
+            self.startCompletion = nil
+            self.pendingStartResult = nil
 
-            if self.session.isRunning {
+            if self.session.isRunning && !self.isPreviewActive {
                 self.session.stopRunning()
             }
 
@@ -296,6 +455,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 print("[NativeCameraTest] recording stopped with error: \(error.localizedDescription)")
                 self.restoreAudioSessionAfterTest()
                 DispatchQueue.main.async {
+                    startCompletion?(.failure(error))
                     completion?(.failure(error))
                 }
                 return

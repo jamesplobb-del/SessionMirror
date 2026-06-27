@@ -1,6 +1,7 @@
 import { useDragControls, type PanInfo } from 'framer-motion'
-import { useCallback, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { iosSheetDragTransition } from '../utils/motionPresets'
 
 export function readSheetSlideDistance(): number {
   if (typeof window === 'undefined') return 800
@@ -10,6 +11,8 @@ export function readSheetSlideDistance(): number {
 const DISMISS_VELOCITY_PX_S = 720
 const DISMISS_DISTANCE_RATIO = 0.24
 const BACKDROP_FADE_RATIO = 0.38
+const DISMISS_VELOCITY_PROJECTION_S = 0.16
+const MAX_BACKDROP_FADE = 0.58
 
 export interface UseSheetDragDismissOptions {
   enabled: boolean
@@ -29,10 +32,20 @@ export function useSheetDragDismiss({
 
   const dismissDistance = slideDistance * DISMISS_DISTANCE_RATIO
 
+  useEffect(() => {
+    if (!enabled) {
+      setBackdropOpacity(1)
+    }
+  }, [enabled])
+
+  const onDragStart = useCallback(() => {
+    setBackdropOpacity(1)
+  }, [])
+
   const onDrag = useCallback(
     (_event: unknown, info: PanInfo) => {
       const offsetY = Math.max(0, info.offset.y)
-      const fade = Math.min(0.5, offsetY / (slideDistance * BACKDROP_FADE_RATIO))
+      const fade = Math.min(MAX_BACKDROP_FADE, offsetY / (slideDistance * BACKDROP_FADE_RATIO))
       setBackdropOpacity(1 - fade)
     },
     [slideDistance],
@@ -41,8 +54,10 @@ export function useSheetDragDismiss({
   const onDragEnd = useCallback(
     (_event: unknown, info: PanInfo) => {
       const offsetY = Math.max(0, info.offset.y)
+      const projectedOffset =
+        offsetY + Math.max(0, info.velocity.y) * DISMISS_VELOCITY_PROJECTION_S
       const shouldDismiss =
-        info.velocity.y > DISMISS_VELOCITY_PX_S || offsetY > dismissDistance
+        info.velocity.y > DISMISS_VELOCITY_PX_S || projectedOffset > dismissDistance
       if (shouldDismiss) {
         onDismiss()
       } else {
@@ -69,11 +84,15 @@ export function useSheetDragDismiss({
             dragListener: false,
             dragConstraints: { top: 0, bottom: 0 },
             dragElastic: { top: 0.16, bottom: 0.62 },
+            dragMomentum: false,
+            dragDirectionLock: true,
+            dragTransition: iosSheetDragTransition,
+            onDragStart,
             onDrag,
             onDragEnd,
           }
         : {},
-    [dragActive, dragControls, onDrag, onDragEnd],
+    [dragActive, dragControls, onDrag, onDragEnd, onDragStart],
   )
 
   const dragHandleProps = useMemo(

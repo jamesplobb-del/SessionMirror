@@ -41,6 +41,19 @@ export interface NativeCameraRecordingStartResult {
   captureInputGainSettable?: boolean
 }
 
+export interface NativeCameraSessionDiagnostics {
+  audioSessionProfile?: string
+  category?: string
+  mode?: string
+  inputRoute?: string
+  outputRoute?: string
+  sampleRate?: number
+  inputGain?: number
+  isInputGainSettable?: boolean
+  captureInputGain?: number
+  captureInputGainSettable?: boolean
+}
+
 export interface NativeCameraRecordingStopResult {
   filePath: string
   fileURL: string
@@ -88,6 +101,23 @@ export interface CameraSessionStateSnapshot {
   playbackSessionPrepared?: boolean
 }
 
+export interface NativeExperimentalAudioSnapshot extends AudioRouteSnapshot {
+  selectedAudioEngine: string
+  enabled: boolean
+  category?: string
+  mode?: string
+  options?: string[]
+  currentInputRoute?: string
+  currentOutputRoute?: string
+  availableInputs?: string[]
+  recordingActive?: boolean
+  playbackActive?: boolean
+  sampleRate?: number
+  ioBufferDuration?: number
+  outputVolume?: number
+  fallbackReason?: string
+}
+
 export interface BestTakeAudioPluginType {
   setHighQualityBluetoothMode(options: { enable: boolean }): Promise<{ success: boolean }>
   /** Gentle input-only switch: prefer the built-in mic without disrupting camera/output route. */
@@ -109,11 +139,22 @@ export interface BestTakeAudioPluginType {
   getCameraSessionState(): Promise<CameraSessionStateSnapshot>
   setPlaybackRouteActive(options: { active: boolean }): Promise<CameraSessionStateSnapshot>
   restoreRecordingRouteAfterPlayback(): Promise<AudioRouteSnapshot>
+  setNativeExperimentalAudioMode(options: {
+    enabled: boolean
+    selectedAudioEngine: string
+    recordingActive?: boolean
+    playbackActive?: boolean
+  }): Promise<NativeExperimentalAudioSnapshot>
   /** Debug A/B — AVCaptureSession camera+mic recording. iOS only. */
   startNativeCameraRecording(options?: {
     useFrontCamera?: boolean
     audioSessionProfile?: string
   }): Promise<NativeCameraRecordingStartResult>
+  startNativeCameraPreview(options?: {
+    useFrontCamera?: boolean
+    audioSessionProfile?: string
+  }): Promise<NativeCameraSessionDiagnostics>
+  stopNativeCameraPreview(): Promise<void>
   stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult>
   playNativeCameraTestPostProcess(options: { url: string }): Promise<NativeCameraPostProcessPlaybackResult>
   stopNativeCameraTestPostProcess(): Promise<void>
@@ -146,6 +187,34 @@ export async function applyUseIphoneMicForRecording(enabled: boolean): Promise<v
     )
   } catch (error) {
     console.warn('Failed to apply device mic routing:', error)
+  }
+}
+
+export async function applyNativeExperimentalAudioMode(options: {
+  enabled: boolean
+  selectedAudioEngine: string
+  recordingActive?: boolean
+  playbackActive?: boolean
+}): Promise<void> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return
+
+  try {
+    const snapshot = await BestTakeAudioPlugin.setNativeExperimentalAudioMode(options)
+    console.info('[AudioEngine] Native Experimental diagnostics', {
+      selectedAudioEngine: snapshot.selectedAudioEngine,
+      enabled: snapshot.enabled,
+      category: snapshot.category,
+      mode: snapshot.mode,
+      options: snapshot.options,
+      currentInputRoute: snapshot.currentInputRoute ?? snapshot.inputPort,
+      currentOutputRoute: snapshot.currentOutputRoute ?? snapshot.outputPort,
+      availableInputs: snapshot.availableInputs ?? snapshot.availableInputPorts,
+      recordingActive: snapshot.recordingActive,
+      playbackActive: snapshot.playbackActive,
+      fallbackReason: snapshot.fallbackReason,
+    })
+  } catch (error) {
+    console.warn('[AudioEngine] Native Experimental failed:', error)
   }
 }
 

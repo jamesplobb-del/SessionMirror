@@ -15,7 +15,8 @@ import ProjectSessionBar from './ProjectSessionBar'
 import { useActionSheet } from '../context/ActionSheetContext'
 import { describeSaveTakeResult, describeBulkSaveResult, shareTakeVideo, shareTakeVideos } from '../utils/shareTakeVideo'
 import { getTakeMediaType } from '../utils/mediaType'
-import type { MediaType, SortMode, Take, TakeUpdate } from '../types'
+import type { SortMode, Take, TakeUpdate } from '../types'
+import type { VaultMediaFilter } from './VaultMediaSegment'
 import type { BenchmarkBinding } from '../types/library'
 import type { Project } from '../db/types'
 import type { HydratedLibraryItem } from '../utils/libraryBridge'
@@ -88,7 +89,7 @@ export default function TakeVaultDrawer({
   const { showAlert, showConfirm } = useActionSheet()
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
   const [vaultSection, setVaultSection] = useState<VaultSection>('takes')
-  const [vaultMediaTab, setVaultMediaTab] = useState<MediaType>('video')
+  const [vaultMediaTab, setVaultMediaTab] = useState<VaultMediaFilter>('all')
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
@@ -109,13 +110,29 @@ export default function TakeVaultDrawer({
       contentReady ? takes.filter((take) => getTakeMediaType(take) === 'audio').length : 0,
     [contentReady, takes],
   )
-  const filteredTakes = useMemo(
+  const vaultBenchmarkTakeId =
+    benchmarkBinding?.source === 'take' ? benchmarkBinding.refId : benchmarkId
+  const bestCount = useMemo(
     () =>
-      contentReady
-        ? sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab)
-        : [],
-    [contentReady, sortedTakes, vaultMediaTab],
+      contentReady && vaultBenchmarkTakeId
+        ? takes.filter((take) => take.id === vaultBenchmarkTakeId).length
+        : 0,
+    [contentReady, takes, vaultBenchmarkTakeId],
   )
+  const filteredTakes = useMemo(
+    () => {
+      if (!contentReady) return []
+      if (vaultMediaTab === 'all') return sortedTakes
+      if (vaultMediaTab === 'best') {
+        return vaultBenchmarkTakeId
+          ? sortedTakes.filter((take) => take.id === vaultBenchmarkTakeId)
+          : []
+      }
+      return sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab)
+    },
+    [contentReady, sortedTakes, vaultBenchmarkTakeId, vaultMediaTab],
+  )
+  const takeCountLabel = `${takes.length} take${takes.length === 1 ? '' : 's'}`
 
   const silenceAllVaultVideos = useCallback(() => {
     resetVideosInContainer(drawerRef.current)
@@ -254,32 +271,30 @@ export default function TakeVaultDrawer({
     [onClose],
   )
 
-  const vaultBenchmarkTakeId =
-    benchmarkBinding?.source === 'take' ? benchmarkBinding.refId : benchmarkId
-
   return (
     <AnimatedBottomSheet
       isOpen={isOpen}
       onClose={onClose}
       ariaLabel="Take Vault"
-      maxHeightClass="h-[min(75vh,100dvh)]"
+      maxHeightClass="h-[min(82vh,100dvh)]"
       sheetRef={drawerRef}
       motionPreset="premium"
       elevated
       onEnterComplete={handleSheetEnterComplete}
     >
-        <div className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-6 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-stone-900">Take Vault</h2>
-            <p className="text-xs text-stone-500">
+        <div className="native-sheet-header vault-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
+          <div className="native-sheet-title-block min-w-0 flex-1">
+            <span className="native-sheet-kicker">Library</span>
+            <h2 className="native-sheet-title">Take Vault</h2>
+            <p className="native-sheet-subtitle">
               {selectionMode
                 ? `${selectedCount} selected`
                 : activeProject
-                  ? `Session: ${activeProject.name}`
-                  : 'Set your Best Take and load a take to the HUD'}
+                  ? `${takeCountLabel} • ${activeProject.name}`
+                  : `${takeCountLabel} • Current session`}
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="native-sheet-actions relative z-30 flex shrink-0 items-center gap-1">
             {contentReady && takes.length > 0 && !selectionMode && (
               <>
                 <Pressable
@@ -287,7 +302,7 @@ export default function TakeVaultDrawer({
                   intensity="soft"
                   onClick={() => setSelectionMode(true)}
                   haptic="light"
-                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+                  className="native-sheet-action-pill min-h-10 rounded-full px-3 text-xs font-semibold text-stone-600 hover:bg-white/70 hover:text-stone-900"
                 >
                   Select
                 </Pressable>
@@ -296,7 +311,7 @@ export default function TakeVaultDrawer({
                   intensity="soft"
                   onClick={handleClearAll}
                   haptic="light"
-                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  className="native-sheet-action-pill min-h-10 rounded-full px-3 text-xs font-semibold text-red-600 hover:bg-red-50"
                 >
                   Clear All
                 </Pressable>
@@ -308,7 +323,7 @@ export default function TakeVaultDrawer({
                 intensity="soft"
                 onClick={exitSelectionMode}
                 haptic="light"
-                className="rounded-full px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100"
+                className="native-sheet-action-pill min-h-10 rounded-full px-3 text-xs font-semibold text-stone-600 hover:bg-white/70"
               >
                 Cancel
               </Pressable>
@@ -319,7 +334,7 @@ export default function TakeVaultDrawer({
               onClick={handleCloseClick}
               haptic="light"
               data-tutorial="vault-close"
-              className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+              className="native-sheet-close relative z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white/70 text-stone-500 shadow-sm ring-1 ring-stone-200/70 hover:bg-white hover:text-stone-800"
               aria-label="Close vault"
             >
               <X className="h-5 w-5" />
@@ -327,11 +342,11 @@ export default function TakeVaultDrawer({
           </div>
         </div>
 
-        <div className="vault-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-4">
+        <div className="vault-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-4">
           {!contentReady ? (
             <VaultDrawerSkeleton />
           ) : (
-            <>
+            <div className="vault-library-shell space-y-4">
           <ProjectSessionBar
             projects={projects}
             activeProjectId={activeProject?.id ?? null}
@@ -355,9 +370,13 @@ export default function TakeVaultDrawer({
               onSetAsReference={onSetLibraryReference}
             />
           ) : takes.length === 0 ? (
-            <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
-              <p className="text-sm text-stone-400">
-                No takes yet. Hit Record to start your session.
+            <div className="vault-empty-state flex min-h-52 flex-col items-center justify-center rounded-[1.75rem] border border-white/70 bg-white/58 px-6 py-8 text-center shadow-sm">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-900 text-white shadow-lg">
+                <CheckSquare className="h-6 w-6" />
+              </div>
+              <p className="text-base font-semibold text-stone-950">No takes yet</p>
+              <p className="mt-1 text-sm leading-relaxed text-stone-500">
+                Record a take to start comparing.
               </p>
             </div>
           ) : (
@@ -365,18 +384,23 @@ export default function TakeVaultDrawer({
               <VaultMediaSegment
                 value={vaultMediaTab}
                 onChange={setVaultMediaTab}
+                allCount={takes.length}
                 videoCount={videoCount}
                 audioCount={audioCount}
+                bestCount={bestCount}
               />
               {filteredTakes.length === 0 ? (
-                <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
-                  <p className="text-sm text-stone-400">
-                    No {vaultMediaTab} takes yet.
+                <div className="vault-empty-state flex min-h-44 flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-stone-200/80 bg-white/50 px-6 py-8 text-center">
+                  <p className="text-base font-semibold text-stone-900">No takes here</p>
+                  <p className="mt-1 text-sm text-stone-500">
+                    {vaultMediaTab === 'best'
+                      ? 'Mark a take as Best to see it here.'
+                      : `No ${vaultMediaTab} takes yet.`}
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="vault-section-toolbar flex items-center justify-between gap-3">
                     <GallerySortStrip
                       sortMode={sortMode}
                       onSortChange={onSortChange}
@@ -388,13 +412,13 @@ export default function TakeVaultDrawer({
                         intensity="soft"
                         onClick={toggleSelectAllFiltered}
                         haptic="light"
-                        className="shrink-0 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                        className="min-h-10 shrink-0 rounded-xl border border-stone-200 bg-white/80 px-3 text-xs font-semibold text-stone-700 hover:bg-white"
                       >
                         {allFilteredSelected ? 'Deselect All' : 'Select All'}
                       </Pressable>
                     )}
                   </div>
-                  <div className="vault-card-strip flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
+                  <div className="vault-card-strip no-scrollbar flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-3">
                     {filteredTakes.map((take) => (
                       <TakeCard
                         key={take.id}
@@ -454,7 +478,7 @@ export default function TakeVaultDrawer({
               )}
             </>
           )}
-            </>
+            </div>
           )}
         </div>
 

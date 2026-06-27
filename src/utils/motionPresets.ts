@@ -23,9 +23,9 @@ export const iosSpringSnappy = {
 
 export const iosSpringSheet = {
   type: 'spring' as const,
-  stiffness: 400,
-  damping: 36,
-  mass: 0.95,
+  stiffness: 430,
+  damping: 38,
+  mass: 0.9,
 }
 
 export const iosSpringTap = {
@@ -33,6 +33,25 @@ export const iosSpringTap = {
   stiffness: 560,
   damping: 30,
   mass: 0.75,
+}
+
+export const iosPressTransition = {
+  type: 'spring' as const,
+  stiffness: 680,
+  damping: 34,
+  mass: 0.55,
+}
+
+export const iosDragGhostTransition = {
+  type: 'spring' as const,
+  stiffness: 720,
+  damping: 42,
+  mass: 0.45,
+}
+
+export const iosSheetDragTransition = {
+  bounceStiffness: 520,
+  bounceDamping: 42,
 }
 
 export const iosEaseOut = {
@@ -64,12 +83,14 @@ export const iosHudDim = {
 
 /** Bottom sheets — smooth ease (GPU-friendly, no spring layout cost). */
 export const iosSheetPremium = {
-  duration: 0.36,
-  ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+  type: 'spring' as const,
+  stiffness: 360,
+  damping: 34,
+  mass: 0.9,
 }
 
 /** Milliseconds — matches iosSheetPremium duration for deferred drawer content. */
-export const iosSheetPremiumDurationMs = Math.round(iosSheetPremium.duration * 1000)
+export const iosSheetPremiumDurationMs = 420
 
 export const iosSheetBackdrop = {
   duration: 0.3,
@@ -83,4 +104,4 @@ export const nativeGlideEase = {
 
 export const motionTap = { scale: 0.96 }
 export const motionTapSoft = { scale: 0.98 }
-export const motionTapIcon = { scale: 0.92 }
+export const motionTapIcon = { scale: 0.94 }

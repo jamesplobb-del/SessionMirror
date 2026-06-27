@@ -8,7 +8,12 @@ import {
   triggerWarningHaptic,
 } from '../../utils/haptics'
 import { NATIVE_SQUISH } from '../../utils/interactiveUx'
-import { motionTap, motionTapIcon, motionTapSoft } from '../../utils/motionPresets'
+import {
+  iosPressTransition,
+  motionTap,
+  motionTapIcon,
+  motionTapSoft,
+} from '../../utils/motionPresets'
 
 export type PressableHaptic = 'light' | 'medium' | 'success' | 'warning' | 'error' | false
 
@@ -92,7 +97,7 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
       type={type}
       className={`${squishClass} ${className}`.trim()}
       whileTap={tapMotion}
-      transition={transition}
+      transition={transition ?? iosPressTransition}
       onClick={handleClick}
       {...props}
     >

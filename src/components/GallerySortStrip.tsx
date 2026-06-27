@@ -13,10 +13,11 @@ export default function GallerySortStrip({
   takeCount,
 }: GallerySortStripProps) {
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <p className="text-xs text-stone-500">{takeCount} take{takeCount === 1 ? '' : 's'}</p>
+    <div className="gallery-sort-strip flex flex-1 items-center justify-between gap-3">
+      <p className="text-xs font-semibold text-stone-500">{takeCount} take{takeCount === 1 ? '' : 's'}</p>
       <SimpleSegmentedControl
         size="sm"
+        className="bg-white/65 ring-1 ring-stone-200/70"
         ariaLabel="Sort takes"
         value={sortMode}
         onChange={onSortChange}

@@ -114,7 +114,7 @@ export default function AnimatedBottomSheet({
         <>
           <motion.button
             type="button"
-            className={`tutorial-sheet-backdrop fixed inset-0 cursor-default touch-none bg-black/80 ${elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
+            className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none bg-black/70 backdrop-blur-[10px] ${elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: backdropOpacity }}
@@ -129,14 +129,18 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             ref={sheetRef}
-            className={`animated-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl transform-gpu ${elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
+            className={`animated-bottom-sheet native-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-[2rem] border border-white/70 bg-white/90 shadow-2xl backdrop-blur-2xl transform-gpu ${elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
-            style={{ ...motionGpuLayer, paddingBottom: 'env(safe-area-inset-bottom)', pointerEvents: 'auto' }}
-            initial={useScale ? { opacity: 0, y: slideDistance, scale: 0.975 } : { opacity: 0, y: slideDistance }}
+            style={{
+              ...motionGpuLayer,
+              paddingBottom: 'env(safe-area-inset-bottom)',
+              pointerEvents: 'auto',
+            }}
+            initial={useScale ? { opacity: 0, y: slideDistance, scale: 0.965 } : { opacity: 0, y: slideDistance }}
             animate={useScale ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0 }}
-            exit={useScale ? { opacity: 0, y: slideDistance, scale: 0.985 } : { opacity: 0, y: slideDistance }}
+            exit={useScale ? { opacity: 0, y: slideDistance, scale: 0.98 } : { opacity: 0, y: slideDistance }}
             transition={sheetTransition}
             onAnimationComplete={handleSheetAnimationComplete}
             {...sheetDragProps}
@@ -149,7 +153,7 @@ export default function AnimatedBottomSheet({
             >
               <div
                 {...dragHandleProps}
-                className={`${dragHandleProps.className} min-h-11 justify-center pb-1 pt-2.5`}
+                className={`${dragHandleProps.className} native-sheet-handle min-h-11 justify-center pb-1 pt-2.5`}
               >
                 <div className="h-1 w-10 rounded-full bg-stone-300/90" />
               </div>

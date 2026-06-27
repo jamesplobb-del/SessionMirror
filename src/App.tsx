@@ -117,7 +117,11 @@ import {
   hydrateLibraryItems,
   type HydratedLibraryItem,
 } from './utils/libraryBridge'
-import { triggerBestTakeHaptic, triggerWarningHaptic } from './utils/haptics'
+import {
+  triggerBestTakeHaptic,
+  triggerLightHaptic,
+  triggerWarningHaptic,
+} from './utils/haptics'
 import {
   deleteLibraryFile,
   normalizeLibraryAudioMime,
@@ -126,7 +130,10 @@ import {
 } from './utils/libraryStorage'
 import type { BenchmarkBinding } from './types/library'
 import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
-import { applyUseIphoneMicForRecording } from './utils/audioSessionRoute'
+import {
+  applyNativeExperimentalAudioMode,
+  applyUseIphoneMicForRecording,
+} from './utils/audioSessionRoute'
 import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
 import { setActiveCaptureProfile } from './utils/audioCapture'
 import {
@@ -409,6 +416,7 @@ function StandardApp({
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
   const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
   autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
+  const nativeExperimentalAudioWasEnabledRef = useRef(false)
 
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -1060,6 +1068,7 @@ function StandardApp({
     secondaryPreviewRef: splitPreviewRef,
     onBeforeForegroundRestart: handleBeforeForegroundRestart,
     onAfterForegroundRestart: resumeYoutubeReference,
+    nativeExperimentalAudioEnabled: settings.nativeExperimentalAudioEnabled,
   })
 
   useEffect(() => {
@@ -1076,8 +1085,9 @@ function StandardApp({
   useEffect(() => {
     if (!ready) return
     if (isPlaybackRouteHoldActive()) return
+    if (settings.nativeExperimentalAudioEnabled) return
     void applyUseIphoneMicForRecording(settings.useIphoneMicForRecording)
-  }, [settings.useIphoneMicForRecording, ready])
+  }, [settings.nativeExperimentalAudioEnabled, settings.useIphoneMicForRecording, ready])
 
   useEffect(() => {
     if (isPlaybackRouteHoldActive()) return
@@ -1420,20 +1430,22 @@ function StandardApp({
     if (import.meta.env.DEV) {
       console.log('[OverlayClose] vault close pressed')
     }
+    triggerLightHaptic(settings.hapticFeedback)
     markOverlayClosed()
     setIsVaultOpen(false)
     if (import.meta.env.DEV) {
       console.log('[OverlayState] vaultOpen=false')
     }
-  }, [markOverlayClosed])
+  }, [markOverlayClosed, settings.hapticFeedback])
 
   const handleOpenVault = useCallback(() => {
     if (!canOpenOverlaySheet()) return
+    triggerLightHaptic(settings.hapticFeedback)
     setShowPitch(false)
     setIsSettingsOpen(false)
     setIsVaultOpen(true)
     deferHudMediaPause()
-  }, [canOpenOverlaySheet, deferHudMediaPause])
+  }, [canOpenOverlaySheet, deferHudMediaPause, settings.hapticFeedback])
 
   const handleToggleVault = useCallback(() => {
     if (isVaultOpen) {
@@ -1455,11 +1467,12 @@ function StandardApp({
 
   const handleOpenSettings = useCallback(() => {
     if (!canOpenOverlaySheet()) return
+    triggerLightHaptic(settings.hapticFeedback)
     setShowPitch(false)
     setIsVaultOpen(false)
     setIsSettingsOpen(true)
     deferHudMediaPause()
-  }, [canOpenOverlaySheet, deferHudMediaPause])
+  }, [canOpenOverlaySheet, deferHudMediaPause, settings.hapticFeedback])
 
   const handleRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
@@ -1485,12 +1498,13 @@ function StandardApp({
     if (import.meta.env.DEV) {
       console.log('[OverlayClose] settings close pressed')
     }
+    triggerLightHaptic(settings.hapticFeedback)
     markOverlayClosed()
     setIsSettingsOpen(false)
     if (import.meta.env.DEV) {
       console.log('[OverlayState] settingsOpen=false')
     }
-  }, [markOverlayClosed])
+  }, [markOverlayClosed, settings.hapticFeedback])
 
   const schedulePitchTrackerCommit = useCallback(
     (enabled: boolean) => {
@@ -1732,6 +1746,44 @@ function StandardApp({
 
   const takePlaybackActive =
     autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
+
+  const selectedAudioEngine = settings.nativeExperimentalAudioEnabled
+    ? settings.audioEnhancerEnabled
+      ? 'Native Experimental + Enhanced'
+      : 'Native Experimental'
+    : settings.audioEnhancerEnabled
+      ? 'Enhanced'
+      : 'Standard'
+
+  useEffect(() => {
+    console.info(`[AudioEngine] selected=${selectedAudioEngine}`)
+  }, [selectedAudioEngine])
+
+  useEffect(() => {
+    const active = settings.nativeExperimentalAudioEnabled && recordingMode === 'video'
+    document.documentElement.classList.toggle('native-camera-preview-active', active)
+    return () => {
+      document.documentElement.classList.remove('native-camera-preview-active')
+    }
+  }, [recordingMode, settings.nativeExperimentalAudioEnabled])
+
+  useEffect(() => {
+    const wasEnabled = nativeExperimentalAudioWasEnabledRef.current
+    if (!settings.nativeExperimentalAudioEnabled && !wasEnabled) return
+
+    nativeExperimentalAudioWasEnabledRef.current = settings.nativeExperimentalAudioEnabled
+    void applyNativeExperimentalAudioMode({
+      enabled: settings.nativeExperimentalAudioEnabled,
+      selectedAudioEngine,
+      recordingActive: isRecording,
+      playbackActive: takePlaybackActive,
+    })
+  }, [
+    isRecording,
+    selectedAudioEngine,
+    settings.nativeExperimentalAudioEnabled,
+    takePlaybackActive,
+  ])
 
   useAppShellPolicies({
     keepAwake: isRecording || isReviewOpen || takePlaybackActive,
@@ -2440,6 +2492,7 @@ function StandardApp({
         metronomeStageActive={metronomeStageActive}
         audioPracticeOverlayActive={isAudioPracticeToolTab}
         visuallySuppressed={isSplitView}
+        nativePreviewActive={settings.nativeExperimentalAudioEnabled && recordingMode === 'video'}
       />
 
       {cameraNeedsPermission && (

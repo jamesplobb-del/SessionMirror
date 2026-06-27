@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { FolderOpen, Settings, Trash2, X } from 'lucide-react'
+import { ListMusic, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
@@ -150,7 +150,7 @@ function ControlDeck({
           haptic="light"
           hapticFeedback={hapticFeedback}
           data-tutorial="vault-button"
-          className={`control-deck__vault-btn pointer-events-auto absolute left-0 flex h-10 w-10 items-center justify-center rounded-full ${HUD_SOLID_BTN}`}
+          className={`control-deck__vault-btn pointer-events-auto absolute left-0 flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN}`}
           aria-label={
             vaultToggleEnabled && isVaultOpen
               ? 'Close take vault'
@@ -158,7 +158,7 @@ function ControlDeck({
           }
         >
           <span className="relative flex h-full w-full items-center justify-center">
-            <FolderOpen className="h-5 w-5" />
+            <ListMusic className="h-[1.18rem] w-[1.18rem]" strokeWidth={2.25} />
             {takeCount > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[9px] font-semibold text-stone-900">
                 {takeCount > 99 ? '99+' : takeCount}
@@ -171,7 +171,7 @@ function ControlDeck({
           type="button"
           ref={settingsButtonRef}
           data-tutorial="settings-button"
-          className={`control-deck__settings-btn absolute right-0 flex h-10 w-10 items-center justify-center rounded-full ${HUD_SOLID_BTN} ${
+          className={`control-deck__settings-btn absolute right-0 flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN} ${
             branchActive
               ? 'bg-sky-500/10 text-sky-400 ring-1 ring-sky-400/30 shadow-[0_0_15px_rgba(56,189,248,0.3)]'
               : 'bg-black/40 text-white hover:bg-black/55'
@@ -207,7 +207,7 @@ function ControlDeck({
                   transition={{ duration: 0.16, ease: 'easeOut' }}
                   className="flex items-center justify-center"
                 >
-                  <Settings className="h-5 w-5" />
+                  <SlidersHorizontal className="h-5 w-5" strokeWidth={2.15} />
                 </motion.span>
               )}
             </AnimatePresence>

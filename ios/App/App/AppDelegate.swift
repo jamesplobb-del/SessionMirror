@@ -48,7 +48,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             try session.setCategory(
                 .playAndRecord,
                 mode: .default,
-                options: [.allowBluetoothA2DP, .allowBluetooth, .defaultToSpeaker]
+                options: [.allowBluetoothA2DP, .allowBluetoothHFP, .defaultToSpeaker]
             )
             try session.setActive(true, options: [])
             AudioRouteConfigurator.logRoute("launch passive session")

@@ -23,6 +23,8 @@ interface LiveCameraBackgroundProps {
   variant?: 'fullscreen' | 'embedded'
   /** Keep the preview element mounted but off-screen (split view uses embedded preview). */
   visuallySuppressed?: boolean
+  /** Native iOS preview is rendered below the transparent WebView. */
+  nativePreviewActive?: boolean
 }
 
 function LiveCameraBackground({
@@ -38,6 +40,7 @@ function LiveCameraBackground({
   audioPracticeOverlayActive = false,
   variant = 'fullscreen',
   visuallySuppressed = false,
+  nativePreviewActive = false,
 }: LiveCameraBackgroundProps) {
   const isAudioMode = recordingMode === 'audio'
   const showAudioIdle =
@@ -138,13 +141,15 @@ function LiveCameraBackground({
     ? 'camera-background camera-background--embedded'
     : visuallySuppressed
       ? 'camera-background camera-background--visually-suppressed'
-      : 'camera-background'
+      : nativePreviewActive
+        ? 'camera-background camera-background--native-preview'
+        : 'camera-background'
 
   const previewClassName = [
     isEmbedded ? 'camera-preview--embedded' : 'camera-preview',
     'camera-preview--mirror',
     'camera-preview--live',
-    isAudioMode ? 'camera-preview--hidden' : '',
+    isAudioMode || nativePreviewActive ? 'camera-preview--hidden' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -253,5 +258,6 @@ export default memo(
     prev.metronomeStageActive === next.metronomeStageActive &&
     prev.audioPracticeOverlayActive === next.audioPracticeOverlayActive &&
     prev.variant === next.variant &&
-    prev.visuallySuppressed === next.visuallySuppressed,
+    prev.visuallySuppressed === next.visuallySuppressed &&
+    prev.nativePreviewActive === next.nativePreviewActive,
 )

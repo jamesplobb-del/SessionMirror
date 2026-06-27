@@ -96,6 +96,45 @@ export async function startNativeCameraRecording(
   }
 }
 
+export async function startNativeCameraPreview(
+  options: {
+    useFrontCamera?: boolean
+    audioSessionProfile?: NativeCameraAudioSessionProfile
+  } = {},
+): Promise<NativeCameraSessionDiagnostics | null> {
+  if (!isNativeCameraTestAvailable()) return null
+
+  const useFrontCamera = options.useFrontCamera ?? true
+  const audioSessionProfile = options.audioSessionProfile ?? 'videoRecording'
+
+  try {
+    const result = await BestTakeAudioPlugin.startNativeCameraPreview({
+      useFrontCamera,
+      audioSessionProfile,
+    })
+    console.log('[NativeCameraPreview] started')
+    console.log('audioSessionProfile =', result.audioSessionProfile ?? audioSessionProfile)
+    console.log('category =', result.category)
+    console.log('mode =', result.mode)
+    console.log('inputRoute =', result.inputRoute)
+    console.log('outputRoute =', result.outputRoute)
+    return result
+  } catch (error) {
+    console.warn('[NativeCameraPreview] start failed', error)
+    return null
+  }
+}
+
+export async function stopNativeCameraPreview(): Promise<void> {
+  if (!isNativeCameraTestAvailable()) return
+  try {
+    await BestTakeAudioPlugin.stopNativeCameraPreview()
+    console.log('[NativeCameraPreview] stopped')
+  } catch (error) {
+    console.warn('[NativeCameraPreview] stop failed', error)
+  }
+}
+
 export async function stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult | null> {
   if (!isNativeCameraTestAvailable()) return null
 

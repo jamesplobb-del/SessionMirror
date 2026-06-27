@@ -1,26 +1,42 @@
 import SimpleSegmentedControl from './ui/SimpleSegmentedControl'
-import type { MediaType } from '../types'
+
+export type VaultMediaFilter = 'all' | 'video' | 'audio' | 'best'
 
 interface VaultMediaSegmentProps {
-  value: MediaType
-  onChange: (value: MediaType) => void
+  value: VaultMediaFilter
+  onChange: (value: VaultMediaFilter) => void
+  allCount: number
   videoCount: number
   audioCount: number
+  bestCount: number
 }
 
 export default function VaultMediaSegment({
   value,
   onChange,
+  allCount,
   videoCount,
   audioCount,
+  bestCount,
 }: VaultMediaSegmentProps) {
   return (
     <SimpleSegmentedControl
-      className="mb-4 bg-stone-200/80"
+      className="vault-media-segment mb-4 bg-stone-200/80"
       ariaLabel="Filter takes by media type"
       value={value}
       onChange={onChange}
       segments={[
+        {
+          id: 'all' as const,
+          label: (
+            <>
+              All
+              {allCount > 0 && (
+                <span className="ml-1.5 text-xs text-stone-400">({allCount})</span>
+              )}
+            </>
+          ),
+        },
         {
           id: 'video' as const,
           label: (
@@ -39,6 +55,17 @@ export default function VaultMediaSegment({
               Audio
               {audioCount > 0 && (
                 <span className="ml-1.5 text-xs text-stone-400">({audioCount})</span>
+              )}
+            </>
+          ),
+        },
+        {
+          id: 'best' as const,
+          label: (
+            <>
+              Best
+              {bestCount > 0 && (
+                <span className="ml-1.5 text-xs text-stone-400">({bestCount})</span>
               )}
             </>
           ),

@@ -57,6 +57,8 @@ export function useDragToPin({
   const startRef = useRef({ x: 0, y: 0 })
   const pointerIdRef = useRef<number | null>(null)
   const longPressTimerRef = useRef<number | null>(null)
+  const ghostFrameRef = useRef<number | null>(null)
+  const pendingGhostRef = useRef<DragGhostState | null>(null)
   const [ghost, setGhost] = useState<DragGhostState | null>(null)
   const [isArming, setIsArming] = useState(false)
   const onDragStateChangeRef = useRef(onDragStateChange)
@@ -96,8 +98,29 @@ export function useDragToPin({
     }
   }, [])
 
+  const flushGhost = useCallback(() => {
+    ghostFrameRef.current = null
+    if (pendingGhostRef.current) {
+      setGhost(pendingGhostRef.current)
+    }
+  }, [])
+
+  const scheduleGhost = useCallback(
+    (next: DragGhostState) => {
+      pendingGhostRef.current = next
+      if (ghostFrameRef.current !== null) return
+      ghostFrameRef.current = window.requestAnimationFrame(flushGhost)
+    },
+    [flushGhost],
+  )
+
   const reset = useCallback(() => {
     clearLongPressTimer()
+    if (ghostFrameRef.current !== null) {
+      window.cancelAnimationFrame(ghostFrameRef.current)
+      ghostFrameRef.current = null
+    }
+    pendingGhostRef.current = null
     draggingRef.current = false
     armedRef.current = false
     pointerIdRef.current = null
@@ -142,6 +165,14 @@ export function useDragToPin({
     }
   }, [ghost, isArming])
 
+  useEffect(() => {
+    return () => {
+      if (ghostFrameRef.current !== null) {
+        window.cancelAnimationFrame(ghostFrameRef.current)
+      }
+    }
+  }, [])
+
   const resolveDropTargets = useCallback(
     (clientX: number, clientY: number) => {
       const pinRect = dropTargetRef.current?.getBoundingClientRect()
@@ -169,7 +200,11 @@ export function useDragToPin({
       armedRef.current = false
       setIsArming(false)
 
-      event.currentTarget.setPointerCapture(event.pointerId)
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        /* pointer capture can fail if the press target leaves the tree */
+      }
 
       longPressTimerRef.current = window.setTimeout(() => {
         armedRef.current = true
@@ -218,7 +253,7 @@ export function useDragToPin({
         event.clientY,
       )
 
-      setGhost({
+      scheduleGhost({
         x: event.clientX,
         y: event.clientY,
         overPin,
@@ -231,6 +266,7 @@ export function useDragToPin({
       emitDragState,
       hapticFeedback,
       resolveDropTargets,
+      scheduleGhost,
     ],
   )
 
@@ -240,8 +276,12 @@ export function useDragToPin({
 
       clearLongPressTimer()
 
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId)
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+      } catch {
+        /* ignore pointer capture cleanup races */
       }
 
       const deltaX = event.clientX - startRef.current.x
@@ -288,6 +328,7 @@ export function useDragToPin({
       onPointerMove: handlePointerMove,
       onPointerUp: handlePointerEnd,
       onPointerCancel: handlePointerEnd,
+      style: { touchAction: 'none' as const },
     },
   }
 }

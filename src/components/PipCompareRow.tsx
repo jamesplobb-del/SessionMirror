@@ -1,10 +1,12 @@
 import { useRef, memo, type RefObject } from 'react'
+import { motion } from 'framer-motion'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
+import { iosDragGhostTransition, motionGpuLayer } from '../utils/motionPresets'
 import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
@@ -59,18 +61,22 @@ export function PipDragGhost({
     <div
       className="pip-drag-ghost pointer-events-none fixed z-[60]"
       style={{
+        ...motionGpuLayer,
         left: x,
         top: y,
         transform: 'translate(-50%, -50%)',
       }}
       aria-hidden
     >
-      <div
+      <motion.div
         className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-xl border-[0.5px] border-white/10 bg-black shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
           overDelete
             ? 'border-red-400/70 ring-red-400/50'
             : 'border-cyan-400/60 ring-cyan-400/40'
         }`}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: overDelete ? 1.05 : 1 }}
+        transition={iosDragGhostTransition}
       >
         {poster ? (
           <img
@@ -89,7 +95,7 @@ export function PipDragGhost({
         >
           {overDelete ? 'Delete' : 'Pin'}
         </span>
-      </div>
+      </motion.div>
     </div>
   )
 }

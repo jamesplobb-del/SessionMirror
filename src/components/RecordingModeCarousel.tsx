@@ -133,12 +133,14 @@ function RecordingModeCarousel({
       const deltaX = endX - touchStartXRef.current
 
       if (deltaX <= -SWIPE_THRESHOLD_PX && value === 'video') {
+        triggerLightHaptic(hapticFeedback)
         onChange('audio')
       } else if (deltaX >= SWIPE_THRESHOLD_PX && value === 'audio') {
+        triggerLightHaptic(hapticFeedback)
         onChange('video')
       }
     },
-    [modeSwitchLocked, onChange, value],
+    [hapticFeedback, modeSwitchLocked, onChange, value],
   )
 
   return (
