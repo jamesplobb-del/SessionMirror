@@ -1,11 +1,21 @@
 /* Audio Mode — light Apple-style visual system (scoped to audio overlay) */
 
-.app-ui-overlay--audio-mode {
+.app-shell--audio-mode {
+  background-color: var(--audio-bg-base) !important;
+}
+
+html.app-audio-mode,
+html.app-audio-mode body,
+html.app-audio-mode #root {
+  background-color: var(--audio-bg-base) !important;
+}
+
+.app-shell--audio-mode .camera-background {
   background: var(--audio-bg-base) !important;
 }
 
-.app-shell:has(.app-ui-overlay--audio-mode) {
-  background: var(--audio-bg-base);
+.app-ui-overlay--audio-mode {
+  background: var(--audio-bg-base) !important;
 }
 
 /* —— Header menu —— */
@@ -104,9 +114,11 @@
 
 .audio-mode-hero {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
-  flex: 0 0 auto;
+  justify-content: center;
+  min-height: 0;
   text-align: center;
 }
 
@@ -228,6 +240,8 @@
   gap: 0.25rem;
   padding: 0 0 0.2rem;
   justify-content: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .audio-mode-hero {
@@ -260,8 +274,13 @@
 
 .audio-mode-hero-mic__dial {
   position: relative;
-  width: clamp(7.25rem, 17vh, 9.5rem);
+  width: clamp(9.5rem, 24vh, 12.25rem);
   aspect-ratio: 1;
+}
+
+.audio-mode-hero-mic__icon {
+  width: clamp(2.35rem, 6.5vh, 3.1rem);
+  height: clamp(2.35rem, 6.5vh, 3.1rem);
 }
 
 .audio-mode-hero-mic__ticks {
@@ -292,11 +311,6 @@
   border-radius: var(--audio-radius-circle);
   background: var(--audio-surface);
   box-shadow: var(--audio-shadow-fab);
-}
-
-.audio-mode-hero-mic__icon {
-  width: clamp(2rem, 5.5vh, 2.65rem);
-  height: clamp(2rem, 5.5vh, 2.65rem);
 }
 
 .audio-mode-hero-mic__mini-wave {
@@ -563,7 +577,7 @@
 
 @media (max-height: 760px) {
   .audio-mode-hero-mic__dial {
-    width: clamp(6.5rem, 15vh, 8.25rem);
+    width: clamp(8.25rem, 20vh, 10.5rem);
   }
 
   .audio-mode-hero h2 {

@@ -1193,6 +1193,13 @@ function StandardApp({
   }, [recordingMode, resetToAudioTab])
 
   useEffect(() => {
+    document.documentElement.classList.toggle('app-audio-mode', recordingMode === 'audio')
+    return () => {
+      document.documentElement.classList.remove('app-audio-mode')
+    }
+  }, [recordingMode])
+
+  useEffect(() => {
     const audio = autoPlaybackAudioRef.current
     if (!audio) return
 
@@ -2473,7 +2480,10 @@ function StandardApp({
       muteDuringPlayback={settings.muteMetronomeDuringPlayback}
     >
     <AudioModePlaybackProvider>
-    <div ref={appShellRef} className="app-shell">
+    <div
+      ref={appShellRef}
+      className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}`}
+    >
       <audio
         ref={autoPlaybackAudioRef}
         className="sr-only"

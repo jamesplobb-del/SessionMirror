@@ -275,6 +275,10 @@ body.settings-branch-open * {
   transform-origin: center bottom;
 }
 
+.app-ui-overlay.app-ui-overlay--audio-mode {
+  background: var(--audio-bg-base) !important;
+}
+
 /** Live audio pitch — full HUD plane captures touches (iOS pass-through fix). Metronome sits above at z-36. */
 .app-ui-overlay--pitch-hud-lock {
   pointer-events: auto !important;
