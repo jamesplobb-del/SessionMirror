@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { AudioPracticeTab } from '../../types/audioPractice'
 import Pressable from '../ui/Pressable'
 
@@ -21,19 +22,22 @@ export default function AudioPracticeTopTabs({
       className="audio-practice-top-tabs pointer-events-auto"
       aria-label="Audio practice tools"
     >
-      {TABS.map((tab) => {
+      {TABS.map((tab, index) => {
         const isActive = activeTab === tab.id
         return (
-          <Pressable
-            key={tab.id}
-            type="button"
-            intensity="soft"
-            onClick={() => onTabChange(tab.id)}
-            className={`audio-practice-top-tabs__btn ${isActive ? 'audio-practice-top-tabs__btn--active' : ''}`}
-            aria-current={isActive ? 'page' : undefined}
-          >
-            {tab.label}
-          </Pressable>
+          <Fragment key={tab.id}>
+            {index > 0 ? <span className="audio-practice-top-tabs__divider" aria-hidden /> : null}
+            <Pressable
+              type="button"
+              intensity="soft"
+              squish={false}
+              onClick={() => onTabChange(tab.id)}
+              className={`audio-practice-top-tabs__btn ${isActive ? 'audio-practice-top-tabs__btn--active' : ''}`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              {tab.label}
+            </Pressable>
+          </Fragment>
         )
       })}
     </nav>

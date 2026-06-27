@@ -16,6 +16,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import CameraPermissionPrompt from './components/CameraPermissionPrompt'
 import HudHeader from './components/HudHeader'
+import AudioModeHeader from './components/audioPractice/AudioModeHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
@@ -2606,7 +2607,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
+        className={`app-ui-overlay ${recordingMode === 'audio' ? 'app-ui-overlay--audio-mode' : ''} ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2624,11 +2625,18 @@ function StandardApp({
                 : undefined,
         }}
       >
-        <HudHeader
-          sessionName={activeProject?.name ?? 'BestTake'}
-          onOpenVault={handleOpenVault}
-          className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
-        />
+        {recordingMode === 'audio' ? (
+          <AudioModeHeader
+            onOpenMenu={handleOpenSettings}
+            className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
+          />
+        ) : (
+          <HudHeader
+            sessionName={activeProject?.name ?? 'BestTake'}
+            onOpenVault={handleOpenVault}
+            className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
+          />
+        )}
 
         {recordingMode === 'audio' && !quickSettingsOpen && (
           <AudioPracticeTopTabs

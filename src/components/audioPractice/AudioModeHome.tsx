@@ -1,7 +1,8 @@
 import { memo, useCallback, useMemo, type PointerEvent } from 'react'
 import { motion } from 'framer-motion'
-import { Ellipsis, Mic, Pause, Play, Star } from 'lucide-react'
+import { Ellipsis, Pause, Play, Star } from 'lucide-react'
 import Pressable from '../ui/Pressable'
+import AudioModeHeroMic from './AudioModeHeroMic'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { stopEventBubble } from '../../utils/eventBubbling'
 import {
@@ -12,6 +13,14 @@ import { iosHudDim, motionGpuLayer } from '../../utils/motionPresets'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../../utils/takeStorage'
 import type { Take } from '../../types'
 import type { LibraryPlaybackReference } from '../../types/library'
+
+const EMPTY_WAVEFORM_PEAKS = [
+  0.18, 0.28, 0.42, 0.58, 0.72, 0.84, 0.92, 0.98, 0.92, 0.84, 0.72, 0.58, 0.42, 0.28, 0.18,
+  0.22, 0.34, 0.48, 0.62, 0.76, 0.88, 0.94, 0.88, 0.76, 0.62, 0.48, 0.34, 0.22, 0.3, 0.44,
+  0.58, 0.7, 0.8, 0.88, 0.8, 0.7, 0.58, 0.44, 0.3, 0.24, 0.36, 0.5, 0.64, 0.78, 0.86, 0.78,
+  0.64, 0.5, 0.36, 0.24, 0.2, 0.32, 0.46, 0.6, 0.74, 0.86, 0.74, 0.6, 0.46, 0.32, 0.2, 0.26,
+  0.38, 0.52, 0.66, 0.8,
+]
 
 function formatDuration(seconds?: number): string {
   if (!seconds || !Number.isFinite(seconds)) return '00:00'
@@ -159,6 +168,7 @@ function AudioModeTakeCard({
     barCount: 64,
   })
   const playbackProgress = durationSeconds > 0 ? currentTime / durationSeconds : 0
+  const displayPeaks = waveformPeaks.length > 0 ? waveformPeaks : EMPTY_WAVEFORM_PEAKS
 
   const togglePlayback = useCallback(() => {
     if (!playbackItem) return
@@ -237,8 +247,8 @@ function AudioModeTakeCard({
         <AudioWaveform
           tone={tone}
           active={isPlaying}
-          peaks={waveformPeaks}
-          progress={playbackProgress}
+          peaks={displayPeaks}
+          progress={hasMedia ? playbackProgress : 0}
           onScrub={handleWaveformScrub}
         />
         <Pressable
@@ -254,7 +264,11 @@ function AudioModeTakeCard({
           className="audio-mode-take-card__play"
           aria-label={isPlaying ? 'Pause take' : 'Play take'}
         >
-          {isPlaying ? <Pause className="h-6 w-6 fill-white" /> : <Play className="ml-0.5 h-6 w-6 fill-white" />}
+          {isPlaying ? (
+            <Pause className="h-5 w-5 fill-[#171A22]" />
+          ) : (
+            <Play className="ml-0.5 h-5 w-5 fill-[#171A22]" />
+          )}
         </Pressable>
       </div>
     </motion.article>
@@ -284,12 +298,6 @@ function AudioModeHome({
 }: AudioModeHomeProps) {
   const status = isRecording ? 'Recording...' : ready ? 'Ready to record' : 'Preparing audio'
   const hint = isRecording ? 'Listening now' : 'Tap the mic to start'
-  const bestHasMedia = Boolean(libraryBenchmarkPlayback || benchmarkTake)
-
-  const meterBars = useMemo(
-    () => Array.from({ length: 18 }, (_, index) => 8 + ((index * 7) % 22)),
-    [],
-  )
 
   return (
     <section className="audio-mode-home pointer-events-auto">
@@ -299,20 +307,7 @@ function AudioModeHome({
         animate={{ opacity: 1, scale: 1 }}
         transition={iosHudDim}
       >
-        <div className="audio-mode-mic-orb" aria-hidden>
-          <Mic className="h-14 w-14" strokeWidth={2.1} />
-        </div>
-        <div className="audio-mode-meter" aria-hidden>
-          {meterBars.map((height, index) => (
-            <span
-              key={index}
-              style={{
-                height,
-                animationDelay: isRecording ? `${index * 45}ms` : undefined,
-              }}
-            />
-          ))}
-        </div>
+        <AudioModeHeroMic isRecording={isRecording} />
         <h2>{status}</h2>
         <p>{hint}</p>
       </motion.div>
@@ -323,7 +318,7 @@ function AudioModeHome({
           tone="best"
           take={benchmarkTake}
           libraryPlayback={libraryBenchmarkPlayback}
-          onOpen={bestHasMedia ? onExpandBenchmark : undefined}
+          onOpen={Boolean(libraryBenchmarkPlayback || benchmarkTake) ? onExpandBenchmark : undefined}
         />
         <AudioModeTakeCard
           label="Current Take"
