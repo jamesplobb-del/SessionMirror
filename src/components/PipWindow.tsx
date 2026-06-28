@@ -13,7 +13,7 @@ import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
-import { HUD_SOLID_FLOAT_BADGE, HUD_SOLID_PIP_PLAY_ICON } from '../utils/interactiveUx'
+import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
 
 interface PipWindowProps {
   layout?: 'pip' | 'fill'
@@ -318,14 +318,14 @@ function PipWindow({
   )
 
   const emptyUploadClass =
-    'pointer-events-auto flex cursor-pointer items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[8px] font-medium text-amber-100 transition hover:bg-amber-400/25'
+    'pip-empty-action pip-empty-action--upload pip-empty-action--interactive pointer-events-auto flex cursor-pointer items-center justify-center gap-1.5'
 
   const playbackFit =
     layout === 'fill' && recordingOrientation === 'landscape' ? 'contain' : 'cover'
 
   const pipTouchTargetClass =
     'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
-  const pipTouchIconClass = HUD_SOLID_PIP_PLAY_ICON
+  const pipTouchIconClass = HUD_GLASS_PIP_PLAY_ICON
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -498,7 +498,7 @@ function PipWindow({
               e.stopPropagation()
               onPinAsBest()
             }}
-            className={`${HUD_SOLID_FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
+            className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold`}
             style={{ top: chromeInset, left: chromeInset }}
             aria-label="Pin current take as Best Take"
             title="Pin as Best Take"
@@ -520,7 +520,7 @@ function PipWindow({
               e.stopPropagation()
               onUnpin()
             }}
-            className={HUD_SOLID_FLOAT_BADGE}
+            className={HUD_GLASS_FLOAT_BADGE}
             style={{ top: chromeInset, right: chromeInset }}
             aria-label={`Unload ${label}`}
           >
@@ -541,7 +541,7 @@ function PipWindow({
             e.stopPropagation()
             onPinAsBest()
           }}
-          className={`${HUD_SOLID_FLOAT_BADGE} border-amber-300/40 bg-amber-500/90 hover:bg-amber-500`}
+          className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold`}
           style={{ top: -10, left: -10 }}
           aria-label="Pin current take as Best Take"
           title="Pin as Best Take"
@@ -562,7 +562,7 @@ function PipWindow({
             e.stopPropagation()
             onUnpin()
           }}
-          className={HUD_SOLID_FLOAT_BADGE}
+          className={HUD_GLASS_FLOAT_BADGE}
           style={{ top: -10, right: -10 }}
           aria-label={`Unload ${label}`}
         >
@@ -577,7 +577,7 @@ function PipWindow({
           onTouchStart={stopEventBubble}
           onTouchEnd={stopEventBubble}
           onClick={stopEventBubble}
-          className={HUD_SOLID_FLOAT_BADGE}
+          className={HUD_GLASS_FLOAT_BADGE}
           style={{ top: -12, left: -12 }}
           aria-label="Upload best take media"
         >

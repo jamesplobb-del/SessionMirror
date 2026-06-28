@@ -12,6 +12,11 @@ export const HUD_SOLID_FLOAT_BADGE =
 export const HUD_SOLID_PIP_PLAY_ICON =
   'flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white/90 transition-opacity duration-200 ease-out hover:bg-black/70'
 
+/** Glass chrome for pip badges — styled in camera-mode-glass.css */
+export const HUD_GLASS_FLOAT_BADGE = `${HUD_SOLID_FLOAT_BADGE} hud-glass-badge`
+
+export const HUD_GLASS_PIP_PLAY_ICON = `${HUD_SOLID_PIP_PLAY_ICON} hud-glass-badge`
+
 /** Framer-motion glide-in for modals, menus, and panels. */
 export const nativeGlideTransition = {
   duration: 0.3,

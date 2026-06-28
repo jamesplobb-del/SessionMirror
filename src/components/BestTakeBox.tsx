@@ -28,15 +28,15 @@ import { useTutorialAction } from '../context/TutorialContext'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
 import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
-import { HUD_SOLID_FLOAT_BADGE, HUD_SOLID_PIP_PLAY_ICON } from '../utils/interactiveUx'
+import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 
-const UPLOAD_BADGE_BTN = HUD_SOLID_FLOAT_BADGE
+const UPLOAD_BADGE_BTN = HUD_GLASS_FLOAT_BADGE
 
 const emptyActionClass =
-  'pip-empty-action pointer-events-auto flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[9px] font-medium text-white/75 transition-opacity duration-200 ease-out hover:bg-white/10'
+  'pip-empty-action pip-empty-action--interactive pointer-events-auto flex flex-1 items-center justify-center gap-1.5'
 
 function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
   return (
@@ -281,7 +281,7 @@ function BestTakeBox({
 
   const pipTouchTargetClass =
     'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
-  const pipTouchIconClass = HUD_SOLID_PIP_PLAY_ICON
+  const pipTouchIconClass = HUD_GLASS_PIP_PLAY_ICON
 
   const playbackFit =
     isFill && take?.recordingOrientation === 'landscape' ? 'contain' : 'cover'
@@ -468,13 +468,13 @@ function BestTakeBox({
               )}
             </>
           ) : (
-            <div className="pip-empty-state absolute inset-0 flex flex-col bg-black/95">
+            <div className="pip-empty-state absolute inset-0 flex flex-col">
               <div className="pip-empty-state__body flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 pb-2 pt-7">
-                <p className={`text-center leading-snug text-white/50 ${isFill ? 'text-xs' : 'text-[8px]'}`}>
+                <p className={`text-center leading-snug ${isFill ? 'text-xs' : 'text-[8px]'}`}>
                   Drag Current Take here or upload.
                 </p>
               </div>
-              <div className="pip-empty-state__actions flex shrink-0 gap-1.5 border-t border-white/10 bg-black/20 p-1.5">
+              <div className="pip-empty-state__actions flex shrink-0">
                 {onUpload && (
                   <label htmlFor="benchmark-upload" className={`${emptyActionClass} pip-empty-action--upload`}>
                     <Upload className="h-3 w-3" />
@@ -496,7 +496,7 @@ function BestTakeBox({
                   className={`${emptyActionClass} pip-empty-action--youtube`}
                   aria-label="Load YouTube reference"
                 >
-                  <Youtube className="h-3 w-3 text-red-500" />
+                  <Youtube className="h-3 w-3" aria-hidden />
                   YouTube
                 </Pressable>
               </div>
