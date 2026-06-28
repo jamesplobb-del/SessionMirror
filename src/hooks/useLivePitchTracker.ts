@@ -1425,7 +1425,7 @@ export function useLivePitchTracker(
     let retryTimer: number | null = null
     let initTimer: number | null = null
     let attachAttempt = 0
-    const MAX_ATTACH_ATTEMPTS = sourceRef.current === 'microphone' ? 12 : 36
+    const MAX_ATTACH_ATTEMPTS = sourceRef.current === 'microphone' ? 120 : 36
 
     const scheduleRetry = (delayMs: number) => {
       if (cancelled || attachAttempt >= MAX_ATTACH_ATTEMPTS) return
@@ -1443,7 +1443,22 @@ export function useLivePitchTracker(
         sourceRef.current === 'microphone' &&
         !isMediaPitchGraph(graphRef.current)
       ) {
-        return
+        const micGraph = graphRef.current
+        const sharedStream = micStreamRefStable.current?.current
+        const graphStreamLive = micStreamIsLive(micGraph.stream)
+        const graphMatchesShared =
+          !micStreamRefStable.current || micGraph.stream === sharedStream
+
+        if (
+          graphStreamLive &&
+          graphMatchesShared &&
+          micGraph.context.state !== 'closed'
+        ) {
+          return
+        }
+
+        safeDisposeMicGraph(micGraph)
+        graphRef.current = null
       }
 
       isAttaching.current = true

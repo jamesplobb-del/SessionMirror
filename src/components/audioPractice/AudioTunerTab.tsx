@@ -17,7 +17,7 @@ export default function AudioTunerTab({
   ready,
   isRecording,
   tunerInstrument,
-  liveMicTunerEnabled,
+  liveMicTunerEnabled: _liveMicTunerEnabled,
 }: AudioTunerTabProps) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
 
@@ -29,11 +29,11 @@ export default function AudioTunerTab({
       <LivePitchTuner
         variant="audio"
         mediaRef={mediaRef}
-        enabled={ready || isRecording}
+        enabled
         isPlaying={isRecording}
-        mediaKey={`tuner-tab-${streamGeneration}`}
+        mediaKey={`tuner-tab-${streamGeneration}-${ready ? 'live' : 'warm'}`}
         label="Pitch Analysis"
-        liveMicEnabled={liveMicTunerEnabled}
+        liveMicEnabled
         micStreamRef={streamRef}
         liveMicOnly
         tunerInstrument={tunerInstrument}

@@ -349,7 +349,9 @@ function LivePitchTunerAudio({
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const showPlayback = isPlaying && !liveMicOnly
-  const showLive = liveMicOnly && (isPlaying || liveMicEnabled || enabled)
+  const showLive = liveMicOnly
+    ? enabled
+    : isPlaying || liveMicEnabled || enabled
   const liveTrackerEnabled = enabled && showLive
   const playbackTrackerEnabled = enabled && showPlayback
 
@@ -358,6 +360,7 @@ function LivePitchTunerAudio({
       source: 'microphone' as const,
       micStreamRef,
       continuousScroll: true,
+      persistWhenPaused: true,
       tunerInstrument,
       realtimeMode: true,
     }),

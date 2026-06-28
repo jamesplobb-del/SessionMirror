@@ -274,12 +274,42 @@
   color: var(--audio-text-secondary);
 }
 
+.app-ui-overlay--audio-mode .metronome-audio-stage__sound-label::before,
+.app-ui-overlay--audio-mode .metronome-audio-stage__sound-label::after {
+  background: linear-gradient(90deg, transparent, rgba(23, 26, 34, 0.1));
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-stage__sound-label::after {
+  background: linear-gradient(90deg, rgba(23, 26, 34, 0.1), transparent);
+}
+
 .app-ui-overlay--audio-mode .audio-practice-metronome__controls {
   padding-top: 0.15rem;
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-stage__control-row--sounds {
   gap: 0.35rem;
+  padding: 1.05rem 0.65rem 0.55rem;
+  border: 1px solid rgba(23, 26, 34, 0.06);
+  border-radius: var(--audio-radius-card);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-stage__sound-btn {
+  border: 1.5px solid rgba(23, 26, 34, 0.08);
+  background: var(--audio-bg-base);
+  color: var(--audio-text-primary);
+  box-shadow: none;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-stage__sound-btn.metronome-audio-stage__btn--active {
+  border-color: var(--audio-blue);
+  background: var(--audio-surface);
+  color: var(--audio-blue);
+  box-shadow: var(--audio-shadow-fab);
 }
 
 .app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__btn.metronome-h-scroll__chip,
