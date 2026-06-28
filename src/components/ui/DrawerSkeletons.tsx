@@ -3,14 +3,14 @@
 export function VaultDrawerSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-hidden>
-      <div className="h-10 rounded-xl bg-white/6" />
-      <div className="h-10 rounded-full bg-white/6" />
+      <div className="vault-skeleton-line h-10 w-full rounded-xl" />
+      <div className="vault-skeleton-line h-10 w-full rounded-full" />
       <div className="flex gap-2">
         {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="h-8 w-16 rounded-full bg-white/6" />
+          <div key={index} className="vault-skeleton-line h-8 w-16 rounded-full" />
         ))}
       </div>
-      <div className="h-8 w-28 rounded-lg bg-white/6" />
+      <div className="vault-skeleton-line h-8 w-28 rounded-lg" />
       {Array.from({ length: 3 }, (_, index) => (
         <div key={index} className="vault-skeleton-row">
           <div className="vault-skeleton-thumb" />

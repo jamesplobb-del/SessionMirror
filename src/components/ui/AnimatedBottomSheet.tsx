@@ -28,7 +28,7 @@ interface AnimatedBottomSheetProps {
   elevated?: boolean
   /** Flat elevated light surface — matches Audio Mode (#F7F8FA). */
   elevatedLight?: boolean
-  /** Dark glass Take Vault surface — gold/blue accents. */
+  /** Elevated Take Vault — audio-mode light colorway. */
   vaultTheme?: boolean
 }
 
@@ -111,13 +111,13 @@ export default function AnimatedBottomSheet({
   }
 
   const sheetSurfaceClass = vaultTheme
-    ? 'native-bottom-sheet--vault border border-white/10 bg-[#1a1410]/92 shadow-2xl backdrop-blur-2xl'
+    ? 'native-bottom-sheet--audio-light native-bottom-sheet--vault'
     : elevatedLight
       ? 'native-bottom-sheet--audio-light'
       : 'border border-white/70 bg-white/90 shadow-2xl backdrop-blur-2xl'
 
   const backdropClass = vaultTheme
-    ? 'bg-black/75 backdrop-blur-[12px]'
+    ? 'native-sheet-backdrop--audio-light'
     : elevatedLight
       ? 'native-sheet-backdrop--audio-light'
       : 'bg-black/70 backdrop-blur-[10px]'

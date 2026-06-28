@@ -328,7 +328,7 @@ export default function TakeVaultDrawer({
       vaultTheme
       onEnterComplete={handleSheetEnterComplete}
     >
-        <div className="native-sheet-header vault-sheet-header sticky top-0 z-20 flex shrink-0 flex-col gap-3 border-b border-white/60 px-5 pb-4 pt-1">
+        <div className="native-sheet-header vault-sheet-header sticky top-0 z-20 flex shrink-0 flex-col gap-3 border-b px-5 pb-4 pt-1">
           <div className="flex items-start justify-between gap-3">
             <div className="native-sheet-title-block min-w-0 flex-1">
               <h2 className="native-sheet-title">Take Vault</h2>
@@ -469,8 +469,8 @@ export default function TakeVaultDrawer({
               onSetAsReference={onSetLibraryReference}
             />
           ) : takes.length === 0 ? (
-            <div className="vault-empty-state flex min-h-52 flex-col items-center justify-center rounded-[1.75rem] border border-white/70 bg-white/58 px-6 py-8 text-center shadow-sm">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-900 text-white shadow-lg">
+            <div className="vault-empty-state flex min-h-52 flex-col items-center justify-center rounded-[1.75rem] px-6 py-8 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
                 <CheckSquare className="h-6 w-6" />
               </div>
               <p className="text-base font-semibold text-stone-950">No takes yet</p>
@@ -489,7 +489,7 @@ export default function TakeVaultDrawer({
                 bestCount={bestCount}
               />
               {filteredTakes.length === 0 ? (
-                <div className="vault-empty-state flex min-h-44 flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-stone-200/80 bg-white/50 px-6 py-8 text-center">
+                <div className="vault-empty-state flex min-h-44 flex-col items-center justify-center rounded-[1.75rem] border-dashed px-6 py-8 text-center">
                   <p className="text-base font-semibold text-stone-900">No takes here</p>
                   <p className="mt-1 text-sm text-stone-500">
                     {searchQuery.trim()
