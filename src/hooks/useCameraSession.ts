@@ -35,6 +35,7 @@ import {
   stopNativeCameraRecording,
 } from '../utils/nativeCameraTest'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
+import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
 import type { MicInputPreference } from '../utils/appSettings'
 
@@ -52,7 +53,7 @@ const FOREGROUND_RESTART_DELAY_MS = 250
 const IOS_CAMERA_RELEASE_DELAY_MS = 250
 const IOS_AUDIO_TO_VIDEO_DELAY_MS = 200
 const IOS_VIDEO_TO_AUDIO_DELAY_MS = 280
-const BACKGROUND_SUSPEND_DELAY_MS = 500
+const BACKGROUND_SUSPEND_DELAY_MS = 100
 const RESUME_IN_FLIGHT_TIMEOUT_MS = 15000
 
 function detachPreviewStream(video: HTMLVideoElement | null) {
@@ -1369,8 +1370,20 @@ export function useCameraSession({
   const suspendCameraForBackground = useCallback(() => {
     if (isRecordingRef.current) return
     cancelScheduledRelease()
+    if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
+      cancelAutoPreRollCapture()
+    }
+    releaseAllLiveMicPitchGraphs()
     releaseLiveStream()
-  }, [cancelScheduledRelease, releaseLiveStream])
+    if (nativePreviewActiveRef.current) {
+      nativePreviewActiveRef.current = false
+      void stopNativeCameraPreview()
+    }
+    void syncNativeCameraSessionState({
+      previewActive: false,
+      recordingActive: false,
+    })
+  }, [cancelAutoPreRollCapture, cancelScheduledRelease, releaseLiveStream])
 
   const restartCameraAfterForeground = useCallback(async () => {
     if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
@@ -1445,6 +1458,12 @@ export function useCameraSession({
   }, [restartCameraAfterForeground])
 
   const scheduleBackgroundSuspend = useCallback(() => {
+    if (foregroundRestartTimerRef.current !== null) {
+      window.clearTimeout(foregroundRestartTimerRef.current)
+      foregroundRestartTimerRef.current = null
+    }
+    foregroundRestartTokenRef.current += 1
+
     if (backgroundSuspendTimerRef.current !== null) {
       window.clearTimeout(backgroundSuspendTimerRef.current)
     }

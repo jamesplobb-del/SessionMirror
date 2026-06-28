@@ -217,6 +217,7 @@ interface PitchGraph {
 }
 
 const elementGraphs = new WeakMap<HTMLMediaElement, PitchGraph>()
+const activeMicPitchGraphs = new Set<MicPitchGraph>()
 
 interface MicPitchGraph {
   context: AudioContext
@@ -352,8 +353,17 @@ async function createMicPitchGraph(
   }
 }
 
+function registerMicPitchGraph(graph: MicPitchGraph): void {
+  activeMicPitchGraphs.add(graph)
+}
+
+function unregisterMicPitchGraph(graph: MicPitchGraph): void {
+  activeMicPitchGraphs.delete(graph)
+}
+
 function safeDisposeMicGraph(graph: MicPitchGraph | null): void {
   if (!graph) return
+  unregisterMicPitchGraph(graph)
 
   try {
     graph.source.disconnect()
@@ -1494,6 +1504,7 @@ export function useLivePitchTracker(
               : null,
           )
           graphRef.current = graph
+          registerMicPitchGraph(graph)
           return
         }
 
@@ -1953,6 +1964,14 @@ export function useLivePitchTracker(
   ])
 
   return { readout, inTuneGlow }
+}
+
+/** Tear down all live mic pitch graphs (e.g. when backgrounding the app). */
+export function releaseAllLiveMicPitchGraphs(): void {
+  for (const graph of [...activeMicPitchGraphs]) {
+    safeDisposeMicGraph(graph)
+  }
+  activeMicPitchGraphs.clear()
 }
 
 /** Resume speaker routing for pitch graphs attached to playback media. */
