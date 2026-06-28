@@ -27,6 +27,112 @@
   box-shadow: var(--audio-shadow-card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__selectors--dropdown {
+  max-width: 20rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__select-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__control {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.45rem 2rem 0.45rem 0.7rem;
+  border: 1.5px solid rgba(23, 26, 34, 0.08);
+  border-radius: var(--audio-radius-pill);
+  background: var(--audio-bg-base);
+  color: var(--audio-text-primary);
+  font-family: var(--audio-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__control:focus-visible {
+  outline: 2px solid var(--audio-blue);
+  outline-offset: 2px;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__chevron {
+  position: absolute;
+  right: 0.62rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--audio-text-secondary);
+  pointer-events: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__visual {
+  min-height: clamp(3.5rem, 9vh, 5rem);
+  gap: 0.4rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat-row {
+  gap: clamp(0.28rem, 2vw, 0.55rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat {
+  width: clamp(1.7rem, 7.5vw, 2.15rem);
+  height: clamp(1.7rem, 7.5vw, 2.15rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat--downbeat {
+  width: clamp(1.85rem, 8vw, 2.3rem);
+  height: clamp(1.85rem, 8vw, 2.3rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat-number {
+  font-size: 0.74rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat-row--compact .audio-practice-metronome__beat {
+  width: clamp(1.35rem, 5.8vw, 1.65rem);
+  height: clamp(1.35rem, 5.8vw, 1.65rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat-row--compact .audio-practice-metronome__beat--downbeat {
+  width: clamp(1.45rem, 6.2vw, 1.75rem);
+  height: clamp(1.45rem, 6.2vw, 1.75rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat-row--compact .audio-practice-metronome__beat-number {
+  font-size: 0.625rem;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__step-btn {
@@ -105,6 +211,7 @@
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__pulse {
+  opacity: 0.55;
   border-color: rgba(21, 152, 255, 0.2);
   background: radial-gradient(
     circle at center,
@@ -163,6 +270,18 @@
   background: var(--audio-blue);
 }
 
+.app-ui-overlay--audio-mode .metronome-audio-stage__sound-label {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__controls {
+  padding-top: 0.15rem;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-stage__control-row--sounds {
+  gap: 0.35rem;
+}
+
 .app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__btn.metronome-h-scroll__chip,
 .app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__meter-btn,
 .app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__subdivision-btn {
@@ -195,8 +314,24 @@
 
 /* —— Tuner —— */
 
+.app-ui-overlay--audio-mode .audio-practice-tuner-shell {
+  padding: 0.35rem 0.5rem 0.45rem;
+  background: var(--audio-bg-base);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished {
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem 0.5rem;
+  background: transparent;
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__hero {
+  padding-top: 0.25rem;
+  padding-bottom: 0.1rem;
+}
+
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit {
-  filter: drop-shadow(0 8px 22px rgba(23, 26, 34, 0.08));
+  filter: drop-shadow(0 8px 22px rgba(23, 26, 34, 0.06));
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit__ring-track {
@@ -236,6 +371,24 @@
   border-radius: var(--audio-radius-card);
   background: var(--audio-surface);
   box-shadow: var(--audio-shadow-card);
+  overflow: hidden;
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-chart-card .pitch-chart-shell {
+  background: var(--audio-surface);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-spectrogram--glass {
+  filter: none;
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__chart {
+  min-height: min(32vh, 14rem);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished {
+  margin: 0.35rem 0.5rem;
+  border-radius: var(--audio-radius-card);
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished {

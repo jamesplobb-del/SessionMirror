@@ -154,16 +154,19 @@ function NoteOrbitReadout({
   cents,
   active,
   inTuneGlow = 0,
+  lightSurface = false,
 }: {
   noteName: string
   frequencyHz: number
   cents: number
   active: boolean
   inTuneGlow?: number
+  lightSurface?: boolean
 }) {
   const inTune = active && isInTune(cents, TUNING_GREEN_CENTS)
   const zone = active ? getIntonationZone(cents) : null
-  const accent = active ? getIntonationColor(cents) : 'rgba(255,255,255,0.55)'
+  const idleAccent = lightSurface ? 'rgba(108, 112, 119, 0.72)' : 'rgba(255,255,255,0.55)'
+  const accent = active ? getIntonationColor(cents) : idleAccent
   const isSharp = active && cents > TUNING_GREEN_CENTS
   const isFlat = active && cents < -TUNING_GREEN_CENTS
   const pulseDuration = zone === 'red' ? 0.38 : zone === 'yellow' ? 0.58 : 0.85
@@ -308,6 +311,7 @@ function LiveAudioTunerPane({
           cents={displayCents}
           active={active}
           inTuneGlow={inTuneGlow}
+          lightSurface
         />
       </div>
 
@@ -376,7 +380,7 @@ function LivePitchTunerAudio({
     liveTrackerEnabled,
     `live-mic-${mediaKey}`,
     liveCanvasRef,
-    'glass-legacy',
+    'glass-audio',
     liveTrackerOptions,
   )
 
@@ -386,7 +390,7 @@ function LivePitchTunerAudio({
     playbackTrackerEnabled,
     `${mediaKey}-playback`,
     playbackCanvasRef,
-    'glass-legacy',
+    'glass-audio',
     playbackTrackerOptions,
   )
 

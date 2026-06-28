@@ -720,13 +720,13 @@ function drawSmoothPitchTrace(
 ): void {
   if (points.length < 2) return
 
-  if (theme === 'glass-legacy' && !responsiveTrace) {
+  if ((theme === 'glass-legacy' || theme === 'glass-audio') && !responsiveTrace) {
     drawColoredTraceSegments(ctx, points, 6.5, 0.26, true)
     drawColoredTraceSegments(ctx, points, 4.35, 0.98)
     return
   }
 
-  if (theme === 'glass-widget' || theme === 'glass-legacy') {
+  if (theme === 'glass-widget' || theme === 'glass-legacy' || theme === 'glass-audio') {
     drawColoredTraceSegments(ctx, points, 3.1, 0.96)
     return
   }
@@ -774,7 +774,8 @@ function drawTraceEndpointDot(
   const isGreen = Math.abs(point.cents) <= TUNING_GREEN_CENTS
   const glowBoost = isGreen ? Math.max(0, inTuneGlow) : 0
   const isWidgetGlass = theme === 'glass-widget'
-  const isLegacyGlass = theme === 'glass-legacy'
+  const isAudioGlass = theme === 'glass-audio'
+  const isLegacyGlass = theme === 'glass-legacy' || isAudioGlass
   const isGlassStyle = isWidgetGlass || isLegacyGlass
   const radius = isLegacyGlass
     ? 6.25 + glowBoost * 1.5
@@ -800,7 +801,7 @@ function drawTraceEndpointDot(
   ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
   ctx.fillStyle = dotColor
   ctx.fill()
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+  ctx.strokeStyle = isAudioGlass ? 'rgba(23, 26, 34, 0.14)' : 'rgba(255,255,255,0.9)'
   ctx.lineWidth = 1.75
   ctx.stroke()
   ctx.shadowBlur = 0
@@ -905,10 +906,77 @@ function drawGlassLegacyGrid(
   ctx.fillText('-50', labelX, centsToY(-50))
 }
 
-/** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 6
+function drawGlassAudioGrid(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  pitchTop: number,
+  pitchBottom: number,
+  centsToY: (cents: number) => number,
+): void {
+  const labelPad = 36
 
-type GlassStaticVariant = 'widget' | 'legacy'
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+
+  const bandTop = Math.min(centsToY(10), centsToY(-10))
+  const bandBottom = Math.max(centsToY(10), centsToY(-10))
+  ctx.fillStyle = 'rgba(34, 197, 94, 0.07)'
+  ctx.fillRect(labelPad, bandTop, width - labelPad, bandBottom - bandTop)
+
+  ctx.strokeStyle = 'rgba(23, 26, 34, 0.05)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  const vStep = Math.max(28, Math.floor((width - labelPad) / 9))
+  for (let x = labelPad + vStep; x < width - 4; x += vStep) {
+    ctx.beginPath()
+    ctx.moveTo(x + 0.5, pitchTop)
+    ctx.lineTo(x + 0.5, pitchBottom)
+    ctx.stroke()
+  }
+
+  ctx.strokeStyle = 'rgba(23, 26, 34, 0.07)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([3, 7])
+  for (const cents of [50, 25, -25, -50]) {
+    const y = centsToY(cents)
+    ctx.beginPath()
+    ctx.moveTo(labelPad, y + 0.5)
+    ctx.lineTo(width, y + 0.5)
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+
+  const centerY = centsToY(0)
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.28)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(labelPad, centerY + 0.5)
+  ctx.lineTo(width, centerY + 0.5)
+  ctx.stroke()
+
+  const labelX = 7
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+
+  ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
+  ctx.fillStyle = 'rgba(108, 112, 119, 0.72)'
+  ctx.fillText('Sharp', labelX, centsToY(50) - 11)
+  ctx.fillText('Flat', labelX, centsToY(-50) + 11)
+
+  ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
+  ctx.fillStyle = 'rgba(108, 112, 119, 0.55)'
+  ctx.fillText('+50', labelX, centsToY(50))
+  ctx.fillText('+25', labelX, centsToY(25))
+  ctx.fillText('0', labelX, centsToY(0))
+  ctx.fillText('-25', labelX, centsToY(-25))
+  ctx.fillText('-50', labelX, centsToY(-50))
+}
+
+/** Bumped when static grid art changes — invalidates cached offscreen layers. */
+const GLASS_STATIC_GRID_VERSION = 7
+
+type GlassStaticVariant = 'widget' | 'legacy' | 'audio'
 
 interface GlassStaticLayerCache {
   width: number
@@ -960,6 +1028,10 @@ function blitGlassStaticLayer(
     offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
     if (variant === 'widget') {
       drawGlassWidgetStaticContent(offCtx, width, height)
+    } else if (variant === 'audio') {
+      const { pitchTop, pitchBottom, centsToY } = getGlassLayoutMetrics(height)
+      offCtx.clearRect(0, 0, width, height)
+      drawGlassAudioGrid(offCtx, width, height, pitchTop, pitchBottom, centsToY)
     } else {
       const { pitchTop, pitchBottom, pitchHeight, centsToY } = getGlassLayoutMetrics(height)
       offCtx.clearRect(0, 0, width, height)
@@ -998,9 +1070,9 @@ function drawPitchCanvas(
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   }
 
-  const isGlass = theme === 'glass-widget' || theme === 'glass-legacy'
+  const isGlass = theme === 'glass-widget' || theme === 'glass-legacy' || theme === 'glass-audio'
   const isWidgetGlass = theme === 'glass-widget'
-  const isLegacyGlass = theme === 'glass-legacy'
+  const isAudioGlass = theme === 'glass-audio'
   const pitchTop = isGlass ? height * 0.12 : height * 0.04
   const pitchBottom = isGlass ? height * 0.92 : height * 0.86
   const pitchHeight = pitchBottom - pitchTop
@@ -1015,7 +1087,10 @@ function drawPitchCanvas(
   if (isWidgetGlass) {
     const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'widget')
     centsToY = metrics.centsToY
-  } else if (isLegacyGlass) {
+  } else if (isAudioGlass) {
+    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'audio')
+    centsToY = metrics.centsToY
+  } else if (theme === 'glass-legacy') {
     const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'legacy')
     centsToY = metrics.centsToY
   } else {
@@ -1048,7 +1123,7 @@ function drawPitchCanvas(
     }
   }
 
-  if (isLegacyGlass) {
+  if (theme === 'glass-legacy' || isAudioGlass) {
     if (inTuneHighlight > 0.01) {
       const yTop = centsToY(TUNING_GREEN_CENTS)
       const yBottom = centsToY(-TUNING_GREEN_CENTS)

@@ -25,8 +25,7 @@ import {
   clampAudioPracticeBpm,
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
-import MetronomeHorizontalScroller, { MetronomeScrollChip } from './MetronomeHorizontalScroller'
-import TripletRhythmSymbol from './TripletRhythmSymbol'
+import MetronomeAudioSelect from './MetronomeAudioSelect'
 
 function PracticeControlButton({
   label,
@@ -450,48 +449,28 @@ export default function AudioPracticeMetronomeView() {
           </div>
 
           <section
-            className="audio-practice-metronome__selectors pointer-events-auto shrink-0"
+            className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown pointer-events-auto shrink-0"
             aria-label="Time signature and rhythm"
           >
-            <MetronomeHorizontalScroller label="Time Signature" ariaLabel="Time signature" selectedKey={meter}>
-              {PRACTICE_ALL_METERS.map((value) => (
-                <MetronomeScrollChip
-                  key={value}
-                  scrollKey={value}
-                  label={`${value} time signature`}
-                  active={meter === value}
-                  onPress={() => handleMeterChange(value)}
-                  className="metronome-audio-stage__meter-btn"
-                >
-                  {value}
-                </MetronomeScrollChip>
-              ))}
-            </MetronomeHorizontalScroller>
-
-            <MetronomeHorizontalScroller
-              label="Subdivision"
-              ariaLabel="Rhythm subdivision"
-              selectedKey={subdivision}
-            >
-              {PRACTICE_ALL_RHYTHM_OPTIONS.map((option) => (
-                <MetronomeScrollChip
-                  key={option.id}
-                  scrollKey={option.value}
-                  label={option.name}
-                  active={subdivision === option.value}
-                  onPress={() => handleSubdivisionChange(option.value)}
-                  className="metronome-h-scroll__chip--rhythm metronome-audio-stage__subdivision-btn"
-                >
-                  <span className="metronome-h-scroll__rhythm-symbol" aria-hidden>
-                    {option.id === 'triplet' ? (
-                      <TripletRhythmSymbol className="metronome-h-scroll__triplet-symbol" />
-                    ) : (
-                      option.label
-                    )}
-                  </span>
-                </MetronomeScrollChip>
-              ))}
-            </MetronomeHorizontalScroller>
+            <div className="audio-practice-metronome__select-row">
+              <MetronomeAudioSelect
+                label="Time"
+                ariaLabel="Time signature"
+                value={meter}
+                options={PRACTICE_ALL_METERS.map((value) => ({ value, label: value }))}
+                onChange={handleMeterChange}
+              />
+              <MetronomeAudioSelect
+                label="Rhythm"
+                ariaLabel="Rhythm subdivision"
+                value={subdivision}
+                options={PRACTICE_ALL_RHYTHM_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.name,
+                }))}
+                onChange={handleSubdivisionChange}
+              />
+            </div>
           </section>
         </div>
       </div>
