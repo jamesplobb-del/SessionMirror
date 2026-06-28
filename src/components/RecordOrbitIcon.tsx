@@ -41,9 +41,9 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
             className="record-orbit-icon__ring record-orbit-icon__ring--outer"
             cx="28"
             cy="28"
-            r="24"
+            r="24.75"
             stroke={`url(#${ringGradientId})`}
-            strokeWidth="1.35"
+            strokeWidth="1.45"
           />
         </g>
 
@@ -52,20 +52,20 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
             className="record-orbit-icon__ring record-orbit-icon__ring--inner"
             cx="28"
             cy="28"
-            r="18.25"
+            r="18.75"
             stroke={`url(#${ringGradientId})`}
-            strokeWidth="1.2"
+            strokeWidth="1.3"
           />
         </g>
 
         {recording ? (
           <rect
             className="record-orbit-icon__stop"
-            x="22"
-            y="22"
-            width="12"
-            height="12"
-            rx="2.25"
+            x="21.25"
+            y="21.25"
+            width="13.5"
+            height="13.5"
+            rx="2.5"
             fill={`url(#${dotGradientId})`}
           />
         ) : (
@@ -73,7 +73,7 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
             className="record-orbit-icon__dot"
             cx="28"
             cy="28"
-            r="5.25"
+            r="5.75"
             fill={`url(#${dotGradientId})`}
           />
         )}

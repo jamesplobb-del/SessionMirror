@@ -2099,14 +2099,14 @@ html.physical-landscape-right .ui-orient-spin {
 .record-carousel-viewport {
   position: relative;
   --record-carousel-viewport-width: 9.5rem;
-  --record-slot-active-size: 56px;
+  --record-slot-active-size: 60px;
   --record-slot-inactive-size: 40px;
   --record-slot-inactive-scale: calc(var(--record-slot-inactive-size) / var(--record-slot-active-size));
   --record-slot-side-x: calc(
     var(--record-slot-inactive-size) / 2 - var(--record-carousel-viewport-width) / 2
   );
   width: var(--record-carousel-viewport-width);
-  height: 56px;
+  height: 60px;
   touch-action: pan-y;
   overflow: visible;
 }
@@ -2140,7 +2140,7 @@ html.physical-landscape-right .ui-orient-spin {
 
 .record-delete-drop {
   width: var(--record-carousel-viewport-width, 9.5rem);
-  height: 56px;
+  height: 60px;
   overflow: visible;
 }
 
@@ -2288,8 +2288,8 @@ html.physical-landscape-right .ui-orient-spin {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   pointer-events: none;
 }
 
