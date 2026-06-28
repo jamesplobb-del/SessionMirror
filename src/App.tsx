@@ -16,7 +16,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import CameraPermissionPrompt from './components/CameraPermissionPrompt'
 import HudHeader from './components/HudHeader'
-import AudioModeHeader from './components/audioPractice/AudioModeHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
@@ -2635,12 +2634,7 @@ function StandardApp({
                 : undefined,
         }}
       >
-        {recordingMode === 'audio' ? (
-          <AudioModeHeader
-            onOpenMenu={handleOpenSettings}
-            className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
-          />
-        ) : (
+        {recordingMode !== 'audio' && (
           <HudHeader
             sessionName={activeProject?.name ?? 'BestTake'}
             onOpenVault={handleOpenVault}
