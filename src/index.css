@@ -1092,6 +1092,12 @@ body.settings-branch-open * {
   margin: clamp(0.35rem, 1.2vh, 0.55rem) auto 0;
 }
 
+.audio-practice-metronome__selectors--under-wheel {
+  width: 100%;
+  max-width: min(100%, 23.5rem);
+  margin-inline: auto;
+}
+
 .audio-practice-metronome__transport-row {
   display: flex;
   align-items: center;

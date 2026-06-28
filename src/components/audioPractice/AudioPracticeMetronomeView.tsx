@@ -321,29 +321,46 @@ export default function AudioPracticeMetronomeView() {
             </PracticeControlButton>
           </div>
 
-          <div
-            className="metronome-audio-stage__control-row metronome-audio-stage__control-row--sounds audio-practice-metronome__accent-card pointer-events-auto"
-            role="group"
-            aria-label="Metronome click sound"
-          >
-            <span className="metronome-audio-stage__sound-label">Accent</span>
-            {AUDIO_PRACTICE_CLICK_SOUNDS.map(({ id, label }) => (
-              <PracticeControlButton
-                key={id}
-                label={`${label} click sound`}
-                active={soundId === id}
-                onPress={() => handleSoundChange(id)}
-                className="metronome-audio-stage__sound-btn"
-              >
-                {label}
-              </PracticeControlButton>
-            ))}
-          </div>
         </header>
 
+        <section
+          className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel pointer-events-auto shrink-0"
+          aria-label="Metronome time, rhythm, and accent"
+        >
+          <div className="audio-practice-metronome__select-row audio-practice-metronome__select-row--triple">
+            <MetronomeAudioSelect
+              label="Time"
+              ariaLabel="Time signature"
+              value={meter}
+              options={PRACTICE_ALL_METERS.map((value) => ({ value, label: value }))}
+              onChange={handleMeterChange}
+            />
+            <MetronomeAudioSelect
+              label="Rhythm"
+              ariaLabel="Rhythm subdivision"
+              value={subdivision}
+              options={PRACTICE_ALL_RHYTHM_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.name,
+              }))}
+              onChange={handleSubdivisionChange}
+            />
+            <MetronomeAudioSelect<AudioPracticeClickSoundId>
+              label="Accent"
+              ariaLabel="Metronome click sound"
+              value={soundId as AudioPracticeClickSoundId}
+              options={AUDIO_PRACTICE_CLICK_SOUNDS.map(({ id, label }) => ({
+                value: id,
+                label,
+              }))}
+              onChange={handleSoundChange}
+            />
+          </div>
+        </section>
+
         <div className="audio-practice-metronome__center-stack min-h-0 flex-1">
-          <div className="metronome-audio-stage__beats min-h-0" aria-live="polite" aria-atomic>
-          <div className="audio-practice-metronome__visual">
+          <div className="metronome-audio-stage__beats min-h-0 flex-1" aria-live="polite" aria-atomic>
+          <div className="audio-practice-metronome__visual audio-practice-metronome__visual--large">
             <div
               key={beatPulseId}
               className={[
@@ -443,31 +460,6 @@ export default function AudioPracticeMetronomeView() {
             </div>
           </div>
           </div>
-
-          <section
-            className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown pointer-events-auto shrink-0"
-            aria-label="Time signature and rhythm"
-          >
-            <div className="audio-practice-metronome__select-row">
-              <MetronomeAudioSelect
-                label="Time"
-                ariaLabel="Time signature"
-                value={meter}
-                options={PRACTICE_ALL_METERS.map((value) => ({ value, label: value }))}
-                onChange={handleMeterChange}
-              />
-              <MetronomeAudioSelect
-                label="Rhythm"
-                ariaLabel="Rhythm subdivision"
-                value={subdivision}
-                options={PRACTICE_ALL_RHYTHM_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: option.name,
-                }))}
-                onChange={handleSubdivisionChange}
-              />
-            </div>
-          </section>
         </div>
       </div>
 
