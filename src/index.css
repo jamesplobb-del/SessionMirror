@@ -1084,6 +1084,7 @@ body.settings-branch-open * {
   z-index: 2;
   display: flex;
   justify-content: center;
+  margin-bottom: clamp(0.85rem, 4vw, 1.15rem);
 }
 
 .audio-practice-metronome__step-btn {
@@ -1125,14 +1126,23 @@ body.settings-branch-open * {
     0 10px 26px rgba(0, 0, 0, 0.24);
 }
 
-.audio-practice-metronome .audio-practice-metronome__play-btn {
+.audio-practice-metronome .audio-practice-metronome__play-anchor {
   position: absolute;
   left: 50%;
-  bottom: clamp(0.42rem, 2.3vw, 0.7rem);
-  z-index: 3;
+  bottom: 0;
+  z-index: 4;
+  transform: translate(-50%, 46%);
+  pointer-events: auto;
+}
+
+.audio-practice-metronome .audio-practice-metronome__play-btn {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  z-index: 1;
   width: clamp(2.85rem, 12vw, 3.45rem);
   height: clamp(2.85rem, 12vw, 3.45rem);
-  transform: translateX(-50%);
+  transform: none;
   border-color: rgba(14, 165, 233, 0.68);
   background:
     radial-gradient(circle at 48% 42%, rgba(56, 189, 248, 0.3), rgba(3, 7, 18, 0.88) 72%),
@@ -1141,6 +1151,11 @@ body.settings-branch-open * {
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 0 0 1px rgba(14, 165, 233, 0.24),
     0 14px 36px rgba(14, 165, 233, 0.18);
+}
+
+.audio-practice-metronome .audio-practice-metronome__play-btn:active,
+.audio-practice-metronome .audio-practice-metronome__play-btn.interactive-native:active {
+  transform: scale(0.96);
 }
 
 .audio-practice-metronome__visual {

@@ -310,18 +310,24 @@ export default function AudioPracticeMetronomeView() {
                   </button>
                 )}
               </div>
-              <PracticeControlButton
-                label={playing ? 'Stop metronome' : 'Start metronome'}
-                haptic={false}
-                onPress={handleTogglePlay}
-                className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
+              <div
+                className="audio-practice-metronome__play-anchor pointer-events-auto"
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerMove={(event) => event.stopPropagation()}
               >
-                {playing ? (
-                  <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-                ) : (
-                  <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-                )}
-              </PracticeControlButton>
+                <PracticeControlButton
+                  label={playing ? 'Stop metronome' : 'Start metronome'}
+                  haptic={false}
+                  onPress={handleTogglePlay}
+                  className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
+                >
+                  {playing ? (
+                    <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+                  ) : (
+                    <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+                  )}
+                </PracticeControlButton>
+              </div>
             </div>
 
             <PracticeControlButton

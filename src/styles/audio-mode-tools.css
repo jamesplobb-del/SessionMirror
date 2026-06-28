@@ -149,11 +149,25 @@
   box-shadow: var(--audio-shadow-fab);
 }
 
+.app-ui-overlay--audio-mode .audio-practice-metronome .audio-practice-metronome__play-anchor {
+  transform: translate(-50%, 48%);
+}
+
 .app-ui-overlay--audio-mode .audio-practice-metronome .audio-practice-metronome__play-btn {
   border: 1.5px solid var(--audio-blue);
   color: var(--audio-blue);
   background: var(--audio-surface);
   box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .audio-practice-metronome__play-btn:active,
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome
+  .audio-practice-metronome__play-btn.interactive-native:active,
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome
+  .metronome-audio-stage__play-btn.metronome-audio-stage__btn:active {
+  transform: scale(0.96);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-glow {
@@ -271,6 +285,15 @@
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-stage__sound-label {
+  position: relative;
+  top: auto;
+  left: auto;
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-bottom: 0.1rem;
+  transform: none;
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
   color: var(--audio-text-secondary);
 }
 
@@ -284,12 +307,19 @@
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__controls {
-  padding-top: 0.15rem;
+  padding: 0.15rem 0.5rem 0.35rem;
+  max-width: 100%;
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-stage__control-row--sounds {
-  gap: 0.35rem;
-  padding: 1.05rem 0.65rem 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0.28rem;
+  width: 100%;
+  max-width: 100%;
+  padding: 0.72rem 0.45rem 0.42rem;
+  overflow: hidden;
   border: 1px solid rgba(23, 26, 34, 0.06);
   border-radius: var(--audio-radius-card);
   background: var(--audio-surface);
@@ -299,10 +329,24 @@
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-stage__sound-btn {
+  min-width: 0;
+  width: 100%;
+  min-height: 1.8rem;
+  padding: 0.24rem 0.15rem;
+  font-size: 0.64rem;
+  line-height: 1.1;
   border: 1.5px solid rgba(23, 26, 34, 0.08);
   background: var(--audio-bg-base);
   color: var(--audio-text-primary);
   box-shadow: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__controls {
+  max-width: 100%;
+  padding-inline: 0.5rem;
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-stage__sound-btn.metronome-audio-stage__btn--active {
