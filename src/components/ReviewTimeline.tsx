@@ -77,17 +77,17 @@ export default function ReviewTimeline({
             event.stopPropagation()
             onPlayPause()
           }}
-          className="review-playback-button flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+          className="review-playback-button flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#171a22]"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
-            <Pause className="h-5 w-5 fill-white" />
+            <Pause className="h-5 w-5 fill-[#171a22]" />
           ) : (
-            <Play className="ml-0.5 h-5 w-5 fill-white" />
+            <Play className="ml-0.5 h-5 w-5 fill-[#171a22]" />
           )}
         </Pressable>
 
-        <span className="w-11 text-right text-[11px] font-medium tabular-nums tracking-tight text-white/78">
+        <span className="w-11 text-right text-[11px] font-medium tabular-nums tracking-tight text-[#6c7077]">
           {formatTime(currentTime)}
         </span>
 
@@ -119,16 +119,16 @@ export default function ReviewTimeline({
             ))}
           </div>
           <div
-            className={`pointer-events-none absolute top-1/2 z-10 h-full w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_10px_rgba(0,0,0,0.35)] ${
+            className={`pointer-events-none absolute top-1/2 z-10 h-full w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#171a22] shadow-[0_1px_10px_rgba(23,26,34,0.2)] ${
               isScrubbing ? 'scale-125' : 'transition-[left] duration-100 ease-linear'
             }`}
             style={{ left: `${percent}%` }}
           >
-            <span className="absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-white" />
+            <span className="absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-[#171a22]" />
           </div>
         </div>
 
-        <span className="w-11 text-left text-[11px] font-medium tabular-nums tracking-tight text-white/52">
+        <span className="w-11 text-left text-[11px] font-medium tabular-nums tracking-tight text-[#6c7077]/80">
           {formatTime(duration)}
         </span>
       </div>

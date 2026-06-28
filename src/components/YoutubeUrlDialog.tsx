@@ -92,7 +92,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
           }}
         >
           <motion.div
-            className="absolute inset-0 bg-black/70"
+            className="absolute inset-0 bg-[rgba(23,26,34,0.2)] backdrop-blur-[6px]"
             aria-hidden
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -100,7 +100,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
             transition={nativeGlideEase}
           />
           <motion.div
-            className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-black p-4 shadow-2xl"
+            className="relative w-full max-w-sm rounded-2xl border border-[rgba(23,26,34,0.06)] bg-[#f7f8fa] p-4 shadow-[0_-18px_48px_rgba(23,26,34,0.1),0_-4px_14px_rgba(23,26,34,0.05)]"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
             role="dialog"
@@ -114,7 +114,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
             <div className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Youtube className="h-4 w-4 text-red-500" />
-                <h2 id="youtube-url-title" className="text-sm font-semibold text-white">
+                <h2 id="youtube-url-title" className="text-sm font-semibold text-[#171a22]">
                   YouTube Reference
                 </h2>
               </div>
@@ -124,14 +124,14 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
                   triggerLightHaptic()
                   handleClose()
                 }}
-                className={`flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/80 ${NATIVE_SQUISH}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(23,26,34,0.08)] bg-white text-[#6c7077] ${NATIVE_SQUISH}`}
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <p className="mb-2 text-[11px] leading-snug text-white/45">
+            <p className="mb-2 text-[11px] leading-snug text-[#6c7077]">
               Paste a link here, or switch to YouTube and copy the URL — tap the field when you return.
             </p>
 
@@ -156,7 +156,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
                 if (event.key === 'Enter') handleSubmit()
                 if (event.key === 'Escape') handleClose()
               }}
-              className="w-full touch-manipulation rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-base text-white placeholder:text-white/35 focus:border-red-500/60 focus:outline-none"
+              className="w-full touch-manipulation rounded-lg border border-[rgba(23,26,34,0.08)] bg-white px-3 py-3 text-base text-[#171a22] placeholder:text-[#6c7077]/70 focus:border-red-500/60 focus:outline-none"
             />
 
             {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
@@ -168,7 +168,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
                   triggerLightHaptic()
                   handleClose()
                 }}
-                className={`rounded-lg px-3 py-2 text-xs font-medium text-white/70 ${NATIVE_SQUISH}`}
+                className={`rounded-lg px-3 py-2 text-xs font-medium text-[#6c7077] ${NATIVE_SQUISH}`}
               >
                 Cancel
               </button>

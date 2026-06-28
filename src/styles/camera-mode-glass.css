@@ -247,24 +247,31 @@
 }
 
 /* —— Full-screen expand / review overlay —— */
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .review-overlay-header {
+.review-overlay-header {
   background: linear-gradient(
     to bottom,
-    rgba(11, 18, 32, 0.78) 0%,
-    rgba(11, 18, 32, 0.38) 58%,
-    rgba(11, 18, 32, 0) 100%
+    rgba(247, 248, 250, 0.96) 0%,
+    rgba(247, 248, 250, 0.62) 58%,
+    rgba(247, 248, 250, 0) 100%
   );
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .review-nav-button {
-  border: 1px solid var(--sm-glass-border);
-  background: var(--sm-glass-surface);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
-  backdrop-filter: blur(18px) saturate(1.15);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+.review-nav-button {
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  background: #ffffff;
+  color: var(--audio-text-primary, #171a22);
+  box-shadow: 0 2px 8px rgba(23, 26, 34, 0.06);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .review-nav-button:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
+.review-nav-button:active:not(:disabled) {
+  background: rgba(23, 26, 34, 0.05);
   border-color: var(--sm-gold-border);
+}
+
+/* Hide session pill while fullscreen expand/review is open */
+.app-ui-overlay--review-open .hud-header {
+  visibility: hidden;
+  pointer-events: none;
 }

@@ -2651,7 +2651,7 @@ function StandardApp({
           <HudHeader
             sessionName={activeProject?.name ?? 'BestTake'}
             onOpenVault={handleOpenVault}
-            className={quickSettingsOpen ? 'hud-header-hidden' : undefined}
+            className={quickSettingsOpen || isReviewOpen ? 'hud-header-hidden' : undefined}
           />
         )}
 

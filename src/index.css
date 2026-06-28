@@ -705,13 +705,13 @@ body.settings-branch-open * {
   flex: 1 1 0;
   min-width: 1px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(23, 26, 34, 0.14);
   box-shadow: none;
 }
 
 .review-timeline-waveform__bar--played {
-  background: rgb(34, 211, 238);
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.18);
+  background: var(--audio-blue, #1598ff);
+  box-shadow: 0 0 10px rgba(21, 152, 255, 0.18);
 }
 
 .review-timeline-track--waveform > .pointer-events-none {
@@ -2830,8 +2830,8 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .review-overlay--immersive {
-  background: #000000 !important;
-  color: #ffffff;
+  background: var(--audio-bg-base, #f7f8fa) !important;
+  color: var(--audio-text-primary, #171a22);
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui,
     sans-serif;
@@ -2844,7 +2844,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: var(--audio-bg-base, #f7f8fa);
 }
 
 .review-video-bleed {
@@ -2855,7 +2855,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   justify-content: center;
   width: 100%;
   height: 100%;
-  background: #000000;
+  background: var(--audio-bg-base, #f7f8fa);
 }
 
 .review-video-bleed__player,
@@ -2878,9 +2878,9 @@ video.camera-preview--embedded.camera-preview--mirror {
   padding-top: max(0.7rem, env(safe-area-inset-top, 0px));
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.72) 0%,
-    rgba(0, 0, 0, 0.34) 58%,
-    rgba(0, 0, 0, 0) 100%
+    rgba(247, 248, 250, 0.96) 0%,
+    rgba(247, 248, 250, 0.62) 58%,
+    rgba(247, 248, 250, 0) 100%
   );
 }
 
@@ -2895,7 +2895,10 @@ video.camera-preview--embedded.camera-preview--mirror {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  background: #ffffff;
+  color: var(--audio-text-primary, #171a22);
+  box-shadow: 0 2px 8px rgba(23, 26, 34, 0.06);
   transition:
     transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
     background-color 180ms ease;
@@ -2903,7 +2906,7 @@ video.camera-preview--embedded.camera-preview--mirror {
 
 .review-nav-button:active:not(:disabled) {
   transform: scale(0.9);
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(23, 26, 34, 0.05);
 }
 
 .review-action-menu {
@@ -2918,7 +2921,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   align-items: center;
   gap: 11px;
   padding: 0 14px;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--audio-text-primary, #171a22);
   font-size: 15px;
   font-weight: 500;
   text-align: left;
@@ -2926,11 +2929,11 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .review-menu-item:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(23, 26, 34, 0.05);
 }
 
 .review-menu-item:disabled {
-  color: rgba(255, 255, 255, 0.32);
+  color: rgba(108, 112, 119, 0.45);
 }
 
 .review-menu-item--destructive {
@@ -2945,7 +2948,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   z-index: 10;
   overflow: hidden;
   padding: 0 12px max(0.75rem, env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.84), rgba(0, 0, 0, 0));
+  background: linear-gradient(to top, rgba(247, 248, 250, 0.96), rgba(247, 248, 250, 0));
   pointer-events: none;
 }
 
@@ -2954,11 +2957,11 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .review-controls-cluster {
-  border: 0.5px solid rgba(255, 255, 255, 0.13);
-  background: rgba(28, 28, 30, 0.72);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(23, 26, 34, 0.1), 0 2px 8px rgba(23, 26, 34, 0.04);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .review-controls-cluster {
@@ -2972,7 +2975,8 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .review-playback-button {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(23, 26, 34, 0.06);
+  border: 1px solid rgba(23, 26, 34, 0.08);
 }
 
 .review-playback-button:active:not(:disabled),
@@ -2984,7 +2988,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: center;
-  border-top: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-top: 0.5px solid rgba(23, 26, 34, 0.08);
   padding: 8px 8px 9px;
 }
 
@@ -2995,7 +2999,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--audio-text-secondary, #6c7077);
   transition:
     transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
     background-color 180ms ease,
@@ -3003,8 +3007,8 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .review-toolbar-button--active {
-  background: rgba(10, 132, 255, 0.22);
-  color: #64d2ff;
+  background: rgba(21, 152, 255, 0.12);
+  color: var(--audio-blue, #1598ff);
 }
 
 .review-toolbar-button--destructive {
@@ -3012,7 +3016,7 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .review-toolbar-button:disabled {
-  color: rgba(255, 255, 255, 0.28);
+  color: rgba(108, 112, 119, 0.4);
 }
 
 .take-video-shell {

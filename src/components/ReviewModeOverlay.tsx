@@ -109,7 +109,7 @@ function ReviewTakeLayer({
   if (isAudio) {
     return (
       <div
-        className="absolute inset-0 h-full w-full bg-black transition-all duration-200 ease-out"
+        className="absolute inset-0 h-full w-full bg-[#f7f8fa] transition-all duration-200 ease-out"
         style={swipeLayerStyle}
         onPointerDown={onPointerDown as React.PointerEventHandler<HTMLDivElement> | undefined}
         onPointerMove={onPointerMove as React.PointerEventHandler<HTMLDivElement> | undefined}
@@ -1023,10 +1023,10 @@ export default function ReviewModeOverlay({
               </Pressable>
 
               <div className="min-w-0 text-center">
-                <p className="truncate text-[17px] font-semibold leading-tight text-white">
+                <p className="truncate text-[17px] font-semibold leading-tight text-[#171a22]">
                   {activeName || activeLabel}
                 </p>
-                <p className="mt-0.5 truncate text-[12px] font-medium leading-tight text-white/58">
+                <p className="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#6c7077]">
                   {activeTime ? `${activeDate} · ${activeTime}` : activeDate}
                 </p>
               </div>
@@ -1050,7 +1050,7 @@ export default function ReviewModeOverlay({
                 <AnimatePresence>
                   {actionMenuOpen && (
                     <motion.div
-                      className="review-action-menu absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-2xl border border-white/12 bg-[#1c1c1e]/88 py-1.5 text-white shadow-2xl backdrop-blur-2xl"
+                      className="review-action-menu absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-2xl border border-[rgba(23,26,34,0.08)] bg-white py-1.5 text-[#171a22] shadow-[0_14px_36px_rgba(23,26,34,0.12)]"
                       initial={{ opacity: 0, y: -6, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -6, scale: 0.98 }}
@@ -1088,7 +1088,7 @@ export default function ReviewModeOverlay({
       <div className="review-video-stage relative min-h-0 flex-1 overflow-hidden">
         {isOpen && !isVault && (canSwipeLeft || canSwipeRight) && (
           <div className="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center">
-            <p className="rounded-full bg-black/40 px-3 py-1 text-[10px] text-white/50 backdrop-blur-sm">
+            <p className="rounded-full border border-[rgba(23,26,34,0.08)] bg-white/90 px-3 py-1 text-[10px] text-[#6c7077] shadow-sm backdrop-blur-sm">
               {canSwipeLeft && canSwipeRight
                 ? 'Swipe to compare takes'
                 : canSwipeLeft
