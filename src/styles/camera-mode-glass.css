@@ -60,6 +60,8 @@
 /* —— Pip take boxes (Best Take gold / Current Take blue) —— */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container > .ui-orient-spin > .relative {
   background: var(--sm-glass-chrome) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+  backdrop-filter: blur(20px) saturate(1.12);
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -69,9 +71,9 @@
   --tw-ring-color: var(--sm-gold-border) !important;
   border-color: var(--sm-gold-border) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 8px 20px rgba(0, 0, 0, 0.08),
-    0 0 14px var(--sm-gold-soft) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 22px rgba(0, 0, 0, 0.1),
+    0 0 10px var(--sm-gold-soft) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -81,9 +83,9 @@
   --tw-ring-color: var(--sm-blue-border) !important;
   border-color: var(--sm-blue-border) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 8px 20px rgba(0, 0, 0, 0.08),
-    0 0 14px var(--sm-blue-soft) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 22px rgba(0, 0, 0, 0.1),
+    0 0 10px var(--sm-blue-soft) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .bg-amber-400\/90,
@@ -103,7 +105,7 @@
 /* —— Empty state + upload / YouTube actions —— */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state {
-  background: var(--sm-glass-chrome) !important;
+  background: rgba(255, 255, 255, 0.025) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__body p,
@@ -114,7 +116,7 @@
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__actions,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__actions {
   gap: 0.38rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
   background: transparent !important;
   padding: 0.38rem 0.42rem 0.42rem;
 }
@@ -124,15 +126,15 @@
   min-height: clamp(1.45rem, 4.2vw, 1.85rem);
   gap: 0.32rem;
   border-radius: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  background: rgba(255, 255, 255, 0.035) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  background: rgba(255, 255, 255, 0.012) !important;
   color: rgba(255, 255, 255, 0.88) !important;
   font-size: clamp(0.5rem, 1.45vw, 0.6rem) !important;
   font-weight: 500;
   letter-spacing: 0.01em;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  -webkit-backdrop-filter: blur(20px) saturate(1.15);
-  backdrop-filter: blur(20px) saturate(1.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.04);
+  backdrop-filter: blur(14px) saturate(1.04);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -141,8 +143,8 @@
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action:hover,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action:hover {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(255, 255, 255, 0.22) !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  border-color: rgba(255, 255, 255, 0.34) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action svg,
