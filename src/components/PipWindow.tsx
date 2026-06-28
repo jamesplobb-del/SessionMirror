@@ -14,6 +14,7 @@ import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
+import { isAudioMimeType } from '../utils/mobileVideo'
 
 interface PipWindowProps {
   layout?: 'pip' | 'fill'
@@ -53,9 +54,18 @@ interface PipWindowProps {
   splitViewActive?: boolean
 }
 
-function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
+function PipMediaPoster({
+  posterUrl,
+  isAudio = false,
+}: {
+  posterUrl?: string | null
+  isAudio?: boolean
+}) {
   return (
-    <div className="absolute inset-0 h-full w-full bg-black" aria-hidden>
+    <div
+      className={`absolute inset-0 h-full w-full ${isAudio ? 'take-audio-surface' : 'bg-black'}`}
+      aria-hidden
+    >
       {posterUrl ? (
         <img
           src={posterUrl}
@@ -107,6 +117,8 @@ function PipWindow({
   const [volume, setVolume] = useState(1)
 
   const hasMedia = Boolean(src || filePath)
+  const isAudioMedia = isAudioMimeType(mimeType)
+  const mediaStageClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
   const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && hasMedia
   const isFill = layout === 'fill'
   const pillLeft = showUploadBadge || showPinAsBest ? 32 : 8
@@ -336,7 +348,7 @@ function PipWindow({
       ? 'bg-amber-400/90 text-white'
       : 'bg-sky-500/90 text-white'
 
-  const chromeInset = isFill ? 8 : 4
+  const chromeInset = isFill ? (splitViewActive ? 3 : 6) : 4
   const exteriorBadgeInset = isFill && splitViewActive ? chromeInset : isFill ? -10 : chromeInset
   const exteriorUploadInset = isFill && splitViewActive ? chromeInset : isFill ? -12 : chromeInset
 
@@ -345,12 +357,12 @@ function PipWindow({
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-black/95 ring-1 ${accentRing} transition-opacity duration-200 ease-in ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden ${mediaStageClass} ring-1 ${accentRing} transition-opacity duration-200 ease-in ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 transition-opacity duration-200 ease-in ${accentRing} ${
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] ${mediaStageClass} shadow-lg shadow-black/50 ring-1 transition-opacity duration-200 ease-in ${accentRing} ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
@@ -400,7 +412,7 @@ function PipWindow({
                 videoRef={videoRef}
                 videoSourceKey={videoSourceKey}
                 className="absolute inset-0 h-full w-full pointer-events-none"
-                loadingClassName="absolute inset-0 h-full w-full bg-black"
+                loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
                 mirror={mirror}
                 recordingOrientation={recordingOrientation}
                 fit={playbackFit}
@@ -408,7 +420,7 @@ function PipWindow({
                 audible={playbackAudible}
               />
             ) : (
-              <PipMediaPoster posterUrl={posterUrl} />
+              <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
             )}
 
             {onExpand && (
@@ -460,7 +472,9 @@ function PipWindow({
 
             {!suspendPlayback && (
             <div
-              className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/70 px-2 py-1 transition-transform duration-200 group-hover:translate-y-0"
+              className={`absolute inset-x-0 bottom-0 z-20 translate-y-full px-2 py-1 transition-transform duration-200 group-hover:translate-y-0 ${
+                isAudioMedia ? 'take-audio-controls-bar' : 'bg-black/70'
+              }`}
               onClick={(e) => e.stopPropagation()}
               {...touchBubbleBlockProps()}
             >
@@ -566,7 +580,7 @@ function PipWindow({
             e.stopPropagation()
             onUnpin()
           }}
-          className={HUD_GLASS_FLOAT_BADGE}
+          className={`${HUD_GLASS_FLOAT_BADGE} pip-chrome-btn pip-chrome-btn--clear`}
           style={{ top: exteriorBadgeInset, right: exteriorBadgeInset }}
           aria-label={`Unload ${label}`}
         >

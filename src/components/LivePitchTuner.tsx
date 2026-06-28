@@ -456,7 +456,7 @@ export default function LivePitchTuner({
   const isWidget = variant === 'widget'
   const isAudio = variant === 'audio'
   const isStage = variant === 'stage'
-  const canvasTheme = isWidget ? 'glass-widget' : isPanel ? 'glass-legacy' : 'solid'
+  const canvasTheme = isWidget ? 'glass-audio' : isPanel ? 'glass-legacy' : 'solid'
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const widgetContinuousScroll = isWidget && persistWhenPaused
   const liveMicWidget = isWidget && pitchSource === 'microphone'
@@ -506,35 +506,17 @@ export default function LivePitchTuner({
   if (isWidget) {
     return (
       <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col">
-        <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget flex h-full min-h-0 w-full flex-col overflow-hidden">
-          <div className="pitch-widget-chrome relative flex shrink-0 justify-center px-3.5 pt-3 pb-1 pr-10">
-            <p
-              className="pitch-widget-note pitch-readout-display text-center text-[clamp(0.875rem,4.5cqw,1rem)] font-bold leading-none tracking-tight"
-              style={{ color: accent }}
-            >
-              {tracker.readout.noteName}
-              {active && (
-                <span className="ml-1.5 text-[clamp(0.75rem,3.8cqw,0.875rem)] font-semibold">
-                  {active ? formatDisplayCents(tracker.readout.cents) : '—'}
-                </span>
-              )}
+        <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget pitch-glass-panel--elevated relative flex h-full min-h-0 w-full flex-col overflow-hidden">
+          <LiveAudioTunerPane
+            readout={tracker.readout}
+            inTuneGlow={tracker.inTuneGlow}
+            canvasRef={canvasRef}
+          />
+          {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
+            <p className="pitch-widget-hint pointer-events-none absolute inset-x-3 bottom-2 z-10 text-center">
+              Pitch trace during playback
             </p>
-            <p
-              className="pitch-widget-hz pitch-readout-display absolute right-3.5 top-3 shrink-0"
-              style={{ color: accent }}
-            >
-              {formatFrequencyHz(tracker.readout.frequencyHz)}
-            </p>
-          </div>
-
-          <div className="pitch-widget-chart relative min-h-0 flex-1 overflow-hidden">
-            <PitchChartCanvas canvasRef={canvasRef} glass fill />
-            {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
-              <p className="pitch-widget-hint pointer-events-none absolute inset-x-3.5 bottom-2 text-center">
-                Pitch trace during playback
-              </p>
-            )}
-          </div>
+          )}
         </div>
       </div>
     )

@@ -387,7 +387,7 @@ function StandardApp({
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
-  const [splitRatio, setSplitRatio] = useState(50)
+  const [splitRatio, setSplitRatio] = useState(56)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0)
 
@@ -2746,7 +2746,7 @@ function StandardApp({
 
         {!quickSettingsOpen && settings.showTakeCards && isSplitView && isAudioPracticeMainTab && (
           <div
-            className="split-compare-host pointer-events-auto min-h-0 flex-1 px-3 pb-1 pt-0.5"
+            className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-0.5 pt-0"
             style={pipScaleStyle}
           >
             <SplitCompareLayout

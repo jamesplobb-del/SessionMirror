@@ -8,6 +8,7 @@ import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { RecordingMode, Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
 import { takeHasPlaybackMedia } from '../utils/takes'
+import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 interface SplitCompareLayoutProps {
@@ -121,6 +122,15 @@ export default function SplitCompareLayout({
       ? 'Audio Recording'
       : 'Current Camera'
 
+  const benchmarkIsAudio =
+    libraryBenchmarkPlayback != null ||
+    benchmarkTake?.mediaType === 'audio' ||
+    benchmarkTake?.videoMimeType?.startsWith('audio/') === true
+
+  const challengerIsAudio =
+    challengerTake?.mediaType === 'audio' ||
+    challengerTake?.videoMimeType?.startsWith('audio/') === true
+
   return (
     <>
       <div ref={layoutRef} className="split-compare-layout flex h-full w-full min-h-0 flex-col">
@@ -130,7 +140,9 @@ export default function SplitCompareLayout({
         >
           <div
             ref={benchmarkDropRef}
-            className="split-compare-panel split-compare-panel--best h-full w-full min-h-0"
+            className={`split-compare-panel split-compare-panel--best h-full w-full min-h-0${
+              benchmarkIsAudio ? ' split-compare-panel--media-audio' : ''
+            }`}
           >
             <span className="split-compare-panel__label split-compare-panel__label--best">
               Best Take
@@ -170,7 +182,9 @@ export default function SplitCompareLayout({
           style={{ height: `${bottomHeight}%` }}
         >
           {showCurrentTake && challengerTake ? (
-            <div className="split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0">
+            <div className={`split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0${
+              challengerIsAudio ? ' split-compare-panel--media-audio' : ''
+            }`}>
               <span className="split-compare-panel__label split-compare-panel__label--current">
                 Current Take
               </span>
@@ -203,6 +217,10 @@ export default function SplitCompareLayout({
                 dragSourceArming={isArming}
                 dragSourceProps={dragEnabled ? dragSourceProps : undefined}
                 splitViewActive
+                posterUrl={
+                  challengerTake.thumbnailUrl ??
+                  (challengerIsAudio ? AUDIO_TAKE_THUMBNAIL : null)
+                }
               />
             </div>
           ) : (

@@ -392,7 +392,41 @@ html.app-audio-mode #root {
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-host {
-  padding-bottom: 0.15rem;
+  padding-bottom: 0;
+  padding-top: 0;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .audio-practice-top-tabs {
+  margin-top: 0.1rem;
+  margin-bottom: 0.3rem;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout {
+  gap: 0.28rem;
+  padding: 0.28rem;
+}
+
+.app-ui-overlay--audio-mode .pip-chrome-btn--expand {
+  background: transparent !important;
+  border: 2px solid var(--audio-gold-border) !important;
+  color: var(--audio-text-primary) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.95),
+    0 4px 14px rgba(23, 26, 34, 0.14) !important;
+}
+
+.app-ui-overlay--audio-mode .pip-video-container .pip-chrome-btn--expand {
+  border-color: var(--audio-gold-border) !important;
+}
+
+.app-ui-overlay--audio-mode .take-audio-surface {
+  background: var(--audio-bg-base);
+}
+
+.app-ui-overlay--audio-mode .pip-empty-state--split .pip-empty-action {
+  border: 1.5px solid var(--audio-divider) !important;
+  background: var(--audio-surface) !important;
+  box-shadow: var(--audio-shadow-fab);
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .app-hud-bottom {
@@ -591,8 +625,15 @@ html.app-audio-mode #root {
 
 .app-ui-overlay--audio-mode .record-carousel-slot--active.record-carousel-slot--video-active:not(.record-carousel-slot--recording) {
   border: 0 !important;
-  background: var(--audio-surface) !important;
+  color: #171a22 !important;
+  background:
+    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
+    linear-gradient(145deg, #f7b84d, #f7a600) !important;
   box-shadow: var(--audio-shadow-record) !important;
+}
+
+.app-ui-overlay--audio-mode .record-carousel-slot--active.record-carousel-slot--video-active:not(.record-carousel-slot--recording) svg {
+  color: #171a22 !important;
 }
 
 .app-ui-overlay--audio-mode .record-carousel-auto-btn {

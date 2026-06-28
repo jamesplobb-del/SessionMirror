@@ -1018,11 +1018,7 @@ function drawGlassWidgetStaticContent(
   height: number,
 ): void {
   ctx.clearRect(0, 0, width, height)
-
-  const bg = ctx.createLinearGradient(0, 0, 0, height)
-  bg.addColorStop(0, 'rgba(6, 8, 12, 0.72)')
-  bg.addColorStop(1, 'rgba(2, 3, 5, 0.82)')
-  ctx.fillStyle = bg
+  ctx.fillStyle = '#f7f8fa'
   ctx.fillRect(0, 0, width, height)
 }
 

@@ -30,6 +30,7 @@ import type { LibraryPlaybackReference } from '../types/library'
 import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
+import { isAudioMimeType } from '../utils/mobileVideo'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 
@@ -38,9 +39,18 @@ const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 const emptyActionClass =
   'pip-empty-action pip-empty-action--interactive pointer-events-auto flex flex-1 items-center justify-center gap-1.5'
 
-function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
+function PipMediaPoster({
+  posterUrl,
+  isAudio = false,
+}: {
+  posterUrl?: string | null
+  isAudio?: boolean
+}) {
   return (
-    <div className="absolute inset-0 h-full w-full bg-black" aria-hidden>
+    <div
+      className={`absolute inset-0 h-full w-full ${isAudio ? 'take-audio-surface' : 'bg-black'}`}
+      aria-hidden
+    >
       {posterUrl ? (
         <img
           src={posterUrl}
@@ -283,6 +293,9 @@ function BestTakeBox({
     'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
   const pipTouchIconClass = HUD_GLASS_PIP_PLAY_ICON
 
+  const isAudioMedia = isAudioMimeType(playbackMimeType)
+  const mediaStageClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
+
   const playbackFit =
     isFill && take?.recordingOrientation === 'landscape' ? 'contain' : 'cover'
 
@@ -293,16 +306,16 @@ function BestTakeBox({
     : 'pip-video-container group relative aspect-video'
 
   const innerClass = isFill
-    ? `group relative z-0 h-full w-full overflow-hidden bg-black/95 ring-1 ring-amber-400/50 ${
+    ? `group relative z-0 h-full w-full overflow-hidden ${mediaStageClass} ring-1 ring-amber-400/50 ${
         hasReference ? 'opacity-100' : 'opacity-90'
       }`
-    : `group relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] bg-black/95 shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-opacity duration-200 ease-in ${
+    : `group relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] ${mediaStageClass} shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-opacity duration-200 ease-in ${
         hasReference ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'}`
 
   const pillLeft = showUploadBadge ? 36 : 8
 
-  const cornerInset = isFill ? 8 : 3
+  const cornerInset = isFill ? (splitViewActive ? 3 : 6) : 2
   const pipControlsClearance = 0
 
   const renderClearButton = () => {
@@ -405,7 +418,7 @@ function BestTakeBox({
                   videoRef={videoRef}
                   videoSourceKey={videoSourceKey}
                   className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                  loadingClassName="absolute inset-0 h-full w-full bg-black"
+                  loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
                   mirror={hasLibraryPlayback ? false : take!.mirrorPlayback !== false}
                   recordingOrientation={take?.recordingOrientation}
                   fit={playbackFit}
@@ -413,7 +426,7 @@ function BestTakeBox({
                   audible={playbackAudible}
                 />
               ) : (
-                <PipMediaPoster posterUrl={posterUrl} />
+                <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
               )}
 
               {onExpand && (
@@ -455,7 +468,9 @@ function BestTakeBox({
 
               {!suspendPlayback && (
                 <div
-                  className="absolute inset-x-0 bottom-0 z-20 translate-y-full bg-black/70 px-2 py-1 transition-transform duration-200 group-hover:translate-y-0"
+                  className={`absolute inset-x-0 bottom-0 z-20 translate-y-full px-2 py-1 transition-transform duration-200 group-hover:translate-y-0 ${
+                    isAudioMedia ? 'take-audio-controls-bar' : 'bg-black/70'
+                  }`}
                   onClick={(e) => e.stopPropagation()}
                   {...touchBubbleBlockProps()}
                 >
@@ -469,8 +484,12 @@ function BestTakeBox({
               )}
             </>
           ) : (
-            <div className="pip-empty-state absolute inset-0 flex flex-col">
-              <div className="pip-empty-state__body flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 pb-2 pt-7">
+            <div className={`pip-empty-state absolute inset-0 flex flex-col ${isFill ? 'pip-empty-state--split' : ''}`}>
+              <div
+                className={`pip-empty-state__body flex min-h-0 flex-col items-center justify-center gap-2 px-3 pb-2 ${
+                  isFill ? 'flex-none pt-2' : 'flex-1 pt-7'
+                }`}
+              >
                 <p className={`text-center leading-snug ${isFill ? 'text-xs' : 'text-[8px]'}`}>
                   Drag Current Take here or upload.
                 </p>

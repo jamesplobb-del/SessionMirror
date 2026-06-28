@@ -23,8 +23,8 @@ interface DraggablePitchWidgetProps extends TunerProps {
   liveMicOnly?: boolean
 }
 
-const DEFAULT_WIDGET_SIZE = { width: 288, height: 188 }
-const MIN_WIDGET_SIZE = { width: 168, height: 112 }
+const DEFAULT_WIDGET_SIZE = { width: 288, height: 220 }
+const MIN_WIDGET_SIZE = { width: 168, height: 148 }
 
 function PitchWidgetCloseButton({ onClose }: { onClose: () => void }) {
   return (
@@ -35,7 +35,7 @@ function PitchWidgetCloseButton({ onClose }: { onClose: () => void }) {
         onClose()
       }}
       onPointerDown={(event) => event.stopPropagation()}
-      className="pitch-widget-close absolute right-3 top-3 z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full transition hover:bg-white/20 active:scale-95"
+      className="pitch-widget-close pitch-widget-close--elevated absolute right-3 top-3 z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full transition active:scale-95"
       aria-label="Hide pitch tuner"
     >
       <svg
@@ -43,7 +43,7 @@ function PitchWidgetCloseButton({ onClose }: { onClose: () => void }) {
         width="10"
         height="10"
         aria-hidden
-        className="text-white/90"
+        className="text-[var(--audio-text-secondary,#6c7077)]"
       >
         <path
           d="M2.5 2.5l7 7M9.5 2.5l-7 7"

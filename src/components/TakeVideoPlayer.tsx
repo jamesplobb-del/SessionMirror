@@ -42,7 +42,7 @@ export default function TakeVideoPlayer({
   mimeType: mimeTypeProp = NATIVE_VIDEO_MIME,
   videoRef: externalVideoRef,
   className,
-  loadingClassName = 'h-full w-full animate-pulse bg-black',
+  loadingClassName: loadingClassNameProp,
   mirror = false,
   recordingOrientation,
   fit = 'cover',
@@ -60,6 +60,9 @@ export default function TakeVideoPlayer({
   const mediaRef = externalVideoRef ?? internalRef
   const playbackSrc = useCapacitorVideoSrc(filePath, videoUrl)
   const isAudio = isAudioMimeType(mimeTypeProp)
+  const loadingClassName =
+    loadingClassNameProp ??
+    (isAudio ? 'h-full w-full animate-pulse take-audio-surface' : 'h-full w-full animate-pulse bg-black')
   const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 })
   const loadedSrcRef = useRef<string | null>(null)
 
@@ -165,7 +168,7 @@ export default function TakeVideoPlayer({
     const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, ...audioRest } = rest
     return (
       <div
-        className={`relative h-full w-full bg-black ${className ?? ''}`.trim()}
+        className={`relative h-full w-full ${isAudio ? 'take-audio-surface' : 'bg-black'} ${className ?? ''}`.trim()}
         onPointerDown={onPointerDown as PointerEventHandler<HTMLDivElement> | undefined}
         onPointerMove={onPointerMove as PointerEventHandler<HTMLDivElement> | undefined}
         onPointerUp={onPointerUp as PointerEventHandler<HTMLDivElement> | undefined}
@@ -189,7 +192,7 @@ export default function TakeVideoPlayer({
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
           aria-hidden
         >
-          <Mic className="h-8 w-8 text-stone-500/80" />
+          <Mic className="h-8 w-8 text-[#6c7077]/80" />
         </div>
       </div>
     )
