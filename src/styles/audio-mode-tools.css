@@ -249,6 +249,22 @@
     var(--audio-shadow-card);
 }
 
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-glow {
+  background:
+    radial-gradient(circle at center, rgba(21, 152, 255, 0.14), transparent 62%),
+    radial-gradient(circle at center, rgba(247, 166, 0, 0.08), transparent 72%);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-rim {
+  border-color: rgba(21, 152, 255, 0.44);
+  background:
+    radial-gradient(circle at 50% 48%, rgba(15, 23, 42, 0.92) 0 52%, transparent 53%),
+    radial-gradient(circle at center, rgba(21, 152, 255, 0.13), rgba(247, 166, 0, 0.08) 74%);
+  box-shadow:
+    inset 0 0 34px rgba(21, 152, 255, 0.08),
+    var(--audio-shadow-card);
+}
+
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-tick {
   background: rgba(21, 152, 255, 0.45);
 }
@@ -554,6 +570,14 @@
 
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-chart-card .pitch-chart-shell {
   background: var(--audio-surface);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-chart-card,
+html.app-dark-mode .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-chart-card .pitch-chart-shell {
+  border-color: rgba(226, 232, 240, 0.1);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(8, 13, 25, 0.96)),
+    var(--audio-surface);
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-spectrogram--glass {

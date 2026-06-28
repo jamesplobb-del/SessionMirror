@@ -156,3 +156,107 @@ html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-action-pill {
   background: var(--audio-surface, #ffffff);
   box-shadow: var(--audio-shadow-card);
 }
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-sheet-header {
+  border-bottom-color: rgba(226, 232, 240, 0.12) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-library-shell {
+  color: var(--audio-text-primary, #f8fafc);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-media-segment,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-library-shell [role='tablist'],
+html.app-dark-mode .native-bottom-sheet--audio-light .gallery-sort-strip [role='tablist'] {
+  border: 1px solid rgba(226, 232, 240, 0.1);
+  background: rgba(2, 6, 23, 0.34) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-library-shell button,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-library-shell [role='tab'],
+html.app-dark-mode .native-bottom-sheet--audio-light .gallery-sort-strip p {
+  color: var(--audio-text-secondary, #aab3c2);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card {
+  border-color: rgba(226, 232, 240, 0.16) !important;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(8, 13, 25, 0.96)) !important;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card input,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card textarea {
+  border-color: rgba(226, 232, 240, 0.14) !important;
+  background: rgba(2, 6, 23, 0.44) !important;
+  color: var(--audio-text-primary, #f8fafc) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card input::placeholder,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card textarea::placeholder {
+  color: rgba(170, 179, 194, 0.58) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card button[title='Click to rename'],
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .text-stone-950,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .text-stone-900,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .text-stone-800,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-empty-state .text-stone-950,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-empty-state .text-stone-900 {
+  color: var(--audio-text-primary, #f8fafc) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card p,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card button,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .text-stone-700,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .text-stone-500,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .text-stone-400,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-empty-state .text-stone-500 {
+  color: var(--audio-text-secondary, #aab3c2) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .border-stone-200,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .border-stone-300 {
+  border-color: rgba(226, 232, 240, 0.14) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .bg-stone-50,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .bg-stone-100,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .bg-white\/88 {
+  background: rgba(226, 232, 240, 0.08) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .bg-amber-50,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .bg-amber-100 {
+  border-color: rgba(247, 166, 0, 0.36) !important;
+  background: rgba(247, 166, 0, 0.13) !important;
+  color: rgb(253, 230, 138) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .bg-sky-50,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card .bg-sky-100 {
+  border-color: rgba(21, 152, 255, 0.36) !important;
+  background: rgba(21, 152, 255, 0.13) !important;
+  color: rgb(186, 230, 253) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-empty-state {
+  border-color: rgba(226, 232, 240, 0.14) !important;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(8, 13, 25, 0.96)) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-bulk-bar {
+  border-top-color: rgba(226, 232, 240, 0.12) !important;
+  background: rgba(8, 13, 25, 0.96) !important;
+  color: var(--audio-text-secondary, #aab3c2) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-bulk-bar button {
+  border-color: rgba(226, 232, 240, 0.14) !important;
+  background: rgba(226, 232, 240, 0.08) !important;
+  color: var(--audio-text-primary, #f8fafc) !important;
+}
