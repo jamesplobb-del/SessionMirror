@@ -1,0 +1,293 @@
+/**
+ * Metronome + Tuner light theme — scoped under audio mode overlay.
+ * Loaded after index.css dark rules; functionality unchanged.
+ */
+
+.app-ui-overlay--audio-mode .audio-practice-metronome-scrim {
+  background: var(--audio-bg-base);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome-layer,
+.app-ui-overlay--audio-mode .audio-practice-tuner-layer {
+  background: var(--audio-bg-base);
+  border-top: 0;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+  background: var(--audio-bg-base) !important;
+}
+
+/* —— Metronome —— */
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+  border: 1px solid rgba(23, 26, 34, 0.06);
+  border-radius: var(--audio-radius-card);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__step-btn {
+  border: 1.5px solid rgba(23, 26, 34, 0.08);
+  color: var(--audio-text-primary);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .audio-practice-metronome__tap-btn {
+  border: 1.5px solid rgba(23, 26, 34, 0.08);
+  color: var(--audio-text-primary);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .audio-practice-metronome__play-btn {
+  border: 1.5px solid var(--audio-blue);
+  color: var(--audio-blue);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-glow {
+  background:
+    radial-gradient(circle at center, rgba(21, 152, 255, 0.1), transparent 62%),
+    radial-gradient(circle at center, rgba(247, 166, 0, 0.06), transparent 72%);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-rim {
+  border: 2px solid rgba(21, 152, 255, 0.35);
+  background:
+    radial-gradient(circle at 50% 48%, #ffffff 0 52%, transparent 53%),
+    radial-gradient(circle at center, rgba(21, 152, 255, 0.06), rgba(247, 166, 0, 0.04) 74%);
+  box-shadow:
+    inset 0 0 24px rgba(21, 152, 255, 0.05),
+    var(--audio-shadow-card);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-tick {
+  background: rgba(21, 152, 255, 0.45);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-tick:nth-child(5n) {
+  background: var(--audio-blue);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-marker {
+  background: var(--audio-gold);
+  box-shadow:
+    0 0 10px rgba(247, 166, 0, 0.45),
+    0 0 20px rgba(247, 166, 0, 0.2);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-label {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .metronome-audio-stage__bpm {
+  color: var(--audio-text-primary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .metronome-audio-stage__bpm-value {
+  color: var(--audio-text-primary);
+  text-shadow: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .metronome-audio-stage__bpm-label {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .metronome-audio-stage__bpm-input {
+  color: var(--audio-text-primary);
+  border: 1.5px solid rgba(23, 26, 34, 0.1);
+  background: var(--audio-surface);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__pulse {
+  border-color: rgba(21, 152, 255, 0.2);
+  background: radial-gradient(
+    circle at center,
+    rgba(21, 152, 255, 0.1) 0%,
+    rgba(21, 152, 255, 0.02) 68%,
+    transparent 100%
+  );
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat {
+  border: 1.5px solid rgba(23, 26, 34, 0.12);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat--accented {
+  border-color: rgba(21, 152, 255, 0.35);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat-number {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat--active {
+  background: var(--audio-blue);
+  border-color: var(--audio-blue);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat--active .audio-practice-metronome__beat-number {
+  color: #ffffff;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat {
+  background: var(--audio-gold);
+  border-color: var(--audio-gold);
+  box-shadow: 0 0 16px rgba(247, 166, 0, 0.28);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat
+  .audio-practice-metronome__beat-number {
+  color: #ffffff;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat--sub-active {
+  background: rgba(21, 152, 255, 0.18);
+  border-color: rgba(21, 152, 255, 0.35);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__sub-notch {
+  background: rgba(108, 112, 119, 0.28);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__sub-notch--active {
+  background: var(--audio-blue);
+}
+
+.app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__btn.metronome-h-scroll__chip,
+.app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__meter-btn,
+.app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__subdivision-btn {
+  border: 1.5px solid rgba(23, 26, 34, 0.08);
+  color: var(--audio-text-secondary);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__btn--active.metronome-h-scroll__chip,
+.app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__btn--active.metronome-audio-stage__meter-btn,
+.app-ui-overlay--audio-mode .metronome-h-scroll .metronome-audio-stage__btn--active.metronome-audio-stage__subdivision-btn {
+  border-color: var(--audio-gold);
+  color: var(--audio-gold);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-stage__btn {
+  border: 1.5px solid rgba(23, 26, 34, 0.08);
+  color: var(--audio-text-secondary);
+  background: var(--audio-surface);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-stage__btn--active {
+  border-color: var(--audio-gold);
+  color: var(--audio-gold);
+  background: var(--audio-surface);
+}
+
+/* —— Tuner —— */
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit {
+  filter: drop-shadow(0 8px 22px rgba(23, 26, 34, 0.08));
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit__ring-track {
+  stroke: rgba(108, 112, 119, 0.28);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit--in-tune .pitch-note-orbit__ring-track {
+  stroke: rgba(34, 197, 94, 0.55);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit__note,
+.app-ui-overlay--audio-mode .pitch-note-orbit__note {
+  color: var(--audio-text-primary);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit__meta,
+.app-ui-overlay--audio-mode .pitch-note-orbit__meta {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit__sep,
+.app-ui-overlay--audio-mode .pitch-note-orbit__sep {
+  color: rgba(108, 112, 119, 0.35);
+}
+
+.app-ui-overlay--audio-mode .pitch-note-orbit--in-tune .pitch-note-orbit__ring-track {
+  stroke: rgba(34, 197, 94, 0.45);
+}
+
+.app-ui-overlay--audio-mode .pitch-note-orbit--sharp:not(.pitch-note-orbit--in-tune) .pitch-note-orbit__ring-track,
+.app-ui-overlay--audio-mode .pitch-note-orbit--flat:not(.pitch-note-orbit--in-tune) .pitch-note-orbit__ring-track {
+  stroke: rgba(108, 112, 119, 0.22);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-chart-card {
+  border: 1px solid rgba(23, 26, 34, 0.06);
+  border-radius: var(--audio-radius-card);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-card);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished {
+  border: 1px solid rgba(23, 26, 34, 0.06);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-card);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished .pitch-audio-idle-pane__title {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished .pitch-audio-idle-pane__copy {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-idle-pane__title {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-idle-pane__copy {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-pane__eyebrow,
+.app-ui-overlay--audio-mode .pitch-audio-pane__eyebrow--live {
+  color: var(--audio-text-secondary);
+  text-shadow: none;
+}
+
+.app-ui-overlay--audio-mode .pitch-audio-pane__take-name {
+  color: var(--audio-text-primary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-placeholder {
+  border: 1px dashed rgba(23, 26, 34, 0.12);
+  background: var(--audio-surface);
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-placeholder__icon-wrap {
+  background: var(--audio-blue-soft);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-placeholder__title {
+  color: var(--audio-text-primary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-placeholder__body {
+  color: var(--audio-text-secondary);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-placeholder__todo {
+  color: var(--audio-gold);
+}

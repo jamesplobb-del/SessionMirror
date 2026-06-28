@@ -4461,3 +4461,5 @@ html.native-dark-chrome body {
 .studio-metronome-bar .metronome-widget__row--main {
   gap: 0.65rem;
 }
+
+@import './styles/audio-mode-tools.css';
