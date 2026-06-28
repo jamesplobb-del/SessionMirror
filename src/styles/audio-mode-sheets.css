@@ -18,7 +18,8 @@
   backdrop-filter: none;
 }
 
-.native-bottom-sheet--audio-light .native-sheet-handle {
+.native-bottom-sheet--audio-light .native-sheet-handle,
+.native-bottom-sheet--audio-light .native-sheet-header {
   background: var(--audio-bg-base, #f7f8fa);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -30,9 +31,6 @@
 
 .native-bottom-sheet--audio-light .native-sheet-header {
   border-bottom-color: var(--audio-divider, rgba(23, 26, 34, 0.08));
-  background: var(--audio-bg-base, #f7f8fa);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
   box-shadow: none;
 }
 
