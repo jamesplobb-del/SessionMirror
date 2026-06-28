@@ -1199,6 +1199,15 @@ function StandardApp({
   }, [recordingMode])
 
   useEffect(() => {
+    document.documentElement.classList.toggle('app-dark-mode', settings.darkMode)
+    document.documentElement.style.colorScheme = settings.darkMode ? 'dark' : 'light'
+    return () => {
+      document.documentElement.classList.remove('app-dark-mode')
+      document.documentElement.style.removeProperty('color-scheme')
+    }
+  }, [settings.darkMode])
+
+  useEffect(() => {
     const audio = autoPlaybackAudioRef.current
     if (!audio) return
 
@@ -1516,9 +1525,13 @@ function StandardApp({
         scheduleAfterPaint(() => {
           void requestCameraPreviewResume('mode-switch')
         })
+        window.setTimeout(() => {
+          if (recordingModeRef.current !== 'video' || isRecording) return
+          void requestCameraPreviewResume('mode-switch-retry')
+        }, 360)
       }
     },
-    [changeRecordingMode, requestCameraPreviewResume, resetToAudioTab],
+    [changeRecordingMode, isRecording, requestCameraPreviewResume, resetToAudioTab],
   )
 
   const handleCloseSettings = useCallback(() => {

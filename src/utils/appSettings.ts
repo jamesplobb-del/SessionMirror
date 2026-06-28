@@ -13,6 +13,8 @@ import { parseCaptureProfile, type CaptureProfile } from './audioCapture'
 export type MicInputPreference = 'auto' | 'headphone' | 'iphone'
 
 export interface AppSettings {
+  /** App appearance: use dark materials where the UI is not camera-backed. */
+  darkMode: boolean
   /** Audio mode: auto-start/stop recording from mic levels. */
   autoSoundRecording: boolean
   /** Seconds of silence before auto-stop (0.5–6). */
@@ -52,6 +54,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
+  darkMode: false,
   autoSoundRecording: false,
   soundSilenceSeconds: 2,
   soundVolumeThreshold: 20,
@@ -113,6 +116,10 @@ export function loadAppSettings(): AppSettings {
       useIphoneMicForRecording?: boolean
     }
     return {
+      darkMode:
+        parsed.darkMode !== undefined
+          ? Boolean(parsed.darkMode)
+          : DEFAULT_APP_SETTINGS.darkMode,
       autoSoundRecording: Boolean(parsed.autoSoundRecording),
       soundSilenceSeconds: clamp(
         Number(parsed.soundSilenceSeconds) || DEFAULT_APP_SETTINGS.soundSilenceSeconds,

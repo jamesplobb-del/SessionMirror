@@ -229,6 +229,19 @@ export default function SettingsDrawer({
         <div className="space-y-5 pb-2">
           <section className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Appearance
+            </h3>
+
+            <SettingToggle
+              label="Dark Mode"
+              description="Uses darker native-style surfaces for Audio Mode, sheets, and non-camera UI."
+              checked={settings.darkMode}
+              onChange={(checked) => onUpdate({ darkMode: checked })}
+            />
+          </section>
+
+          <section className="settings-group space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Audio Recording
             </h3>
 

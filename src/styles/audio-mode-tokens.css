@@ -48,3 +48,27 @@ html.app-audio-mode,
 
   font-family: var(--audio-font);
 }
+
+html.app-dark-mode.app-audio-mode,
+html.app-dark-mode .app-ui-overlay--audio-mode {
+  --audio-bg-top: #111827;
+  --audio-bg-mid: #0f172a;
+  --audio-bg-base: #0b1220;
+  --audio-bg-bottom: #050816;
+
+  --audio-text-primary: #f8fafc;
+  --audio-text-secondary: #aab3c2;
+
+  --audio-gold-border: rgba(247, 166, 0, 0.54);
+  --audio-gold-soft: rgba(247, 166, 0, 0.16);
+  --audio-blue-border: rgba(21, 152, 255, 0.54);
+  --audio-blue-soft: rgba(21, 152, 255, 0.17);
+
+  --audio-surface: rgba(15, 23, 42, 0.82);
+  --audio-divider: rgba(226, 232, 240, 0.12);
+
+  --audio-shadow-segment: 0 14px 34px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --audio-shadow-card: 0 16px 42px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --audio-shadow-fab: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --audio-shadow-record: 0 16px 40px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.18);
+}

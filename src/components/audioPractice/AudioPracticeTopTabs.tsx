@@ -31,6 +31,7 @@ export default function AudioPracticeTopTabs({
               type="button"
               intensity="soft"
               squish={false}
+              haptic="light"
               onClick={() => onTabChange(tab.id)}
               className={`audio-practice-top-tabs__btn ${isActive ? 'audio-practice-top-tabs__btn--active' : ''}`}
               aria-current={isActive ? 'page' : undefined}
