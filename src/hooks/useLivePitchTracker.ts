@@ -924,7 +924,7 @@ function drawGlassAudioGrid(
   pitchBottom: number,
   centsToY: (cents: number) => number,
 ): void {
-  const labelPad = 36
+  const labelPad = 48
 
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, width, height)
@@ -965,26 +965,39 @@ function drawGlassAudioGrid(
   ctx.lineTo(width, centerY + 0.5)
   ctx.stroke()
 
-  const labelX = 7
-  ctx.textAlign = 'left'
+  const labelX = 8
+  ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
-  ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
-  ctx.fillStyle = 'rgba(108, 112, 119, 0.72)'
-  ctx.fillText('Sharp', labelX, centsToY(50) - 11)
-  ctx.fillText('Flat', labelX, centsToY(-50) + 11)
+  const drawLabelPill = (text: string, y: number, widthPx: number, accent: string) => {
+    const x = labelX + widthPx / 2
+    const radius = 7
+    ctx.beginPath()
+    ctx.roundRect(labelX, y - 8, widthPx, 16, radius)
+    ctx.fillStyle = accent
+    ctx.fill()
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.66)'
+    ctx.font = '600 9px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif'
+    ctx.fillText(text, x, y + 0.25)
+  }
 
-  ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
-  ctx.fillStyle = 'rgba(108, 112, 119, 0.55)'
-  ctx.fillText('+50', labelX, centsToY(50))
-  ctx.fillText('+25', labelX, centsToY(25))
-  ctx.fillText('0', labelX, centsToY(0))
-  ctx.fillText('-25', labelX, centsToY(-25))
-  ctx.fillText('-50', labelX, centsToY(-50))
+  drawLabelPill('Sharp', centsToY(50) - 13, 34, 'rgba(59, 130, 246, 0.08)')
+  drawLabelPill('Flat', centsToY(-50) + 13, 28, 'rgba(251, 146, 60, 0.08)')
+
+  ctx.font = '600 8px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif'
+  ctx.fillStyle = 'rgba(17, 24, 39, 0.44)'
+  const numberX = labelX + 16
+  ctx.fillText('+50', numberX, centsToY(50))
+  ctx.fillText('+25', numberX, centsToY(25))
+  ctx.fillStyle = 'rgba(22, 163, 74, 0.68)'
+  ctx.fillText('0', numberX, centsToY(0))
+  ctx.fillStyle = 'rgba(17, 24, 39, 0.44)'
+  ctx.fillText('-25', numberX, centsToY(-25))
+  ctx.fillText('-50', numberX, centsToY(-50))
 }
 
 /** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 7
+const GLASS_STATIC_GRID_VERSION = 8
 
 type GlassStaticVariant = 'widget' | 'legacy' | 'audio'
 

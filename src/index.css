@@ -1099,6 +1099,10 @@ body.settings-branch-open * {
   background: transparent;
 }
 
+.app-ui-overlay--audio-practice-metronome .audio-practice-metronome {
+  padding-top: clamp(0.2rem, 1vh, 0.55rem);
+}
+
 .animated-bottom-sheet--elevated,
 .tutorial-sheet-backdrop--elevated {
   pointer-events: auto !important;
@@ -1325,9 +1329,13 @@ body.settings-branch-open * {
   min-height: 11.25rem;
   border-radius: 999px;
   touch-action: none;
-  cursor: ns-resize;
+  cursor: grab;
   -webkit-user-select: none;
   user-select: none;
+}
+
+.audio-practice-metronome__tempo-dial:active {
+  cursor: grabbing;
 }
 
 .audio-practice-metronome__tempo-glow {
@@ -1353,6 +1361,9 @@ body.settings-branch-open * {
     inset 0 0 44px rgba(56, 189, 248, 0.08),
     0 0 42px rgba(8, 145, 178, 0.18);
   pointer-events: none;
+  transform: rotate(var(--tempo-wheel-rotation, 0deg));
+  transition: transform 80ms linear;
+  will-change: transform;
 }
 
 .audio-practice-metronome__tempo-tick {

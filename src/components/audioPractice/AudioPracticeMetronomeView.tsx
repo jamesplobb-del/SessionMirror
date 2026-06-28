@@ -27,6 +27,21 @@ import {
 } from './audioPracticeMetronome'
 import MetronomeAudioSelect from './MetronomeAudioSelect'
 
+const TEMPO_DEGREES_PER_BPM = 7
+
+function pointerAngleFromCenter(event: React.PointerEvent<HTMLElement>): number {
+  const rect = event.currentTarget.getBoundingClientRect()
+  const centerX = rect.left + rect.width / 2
+  const centerY = rect.top + rect.height / 2
+  return Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI)
+}
+
+function normalizeAngleDelta(delta: number): number {
+  if (delta > 180) return delta - 360
+  if (delta < -180) return delta + 360
+  return delta
+}
+
 function PracticeControlButton({
   label,
   active = false,
@@ -65,12 +80,15 @@ export default function AudioPracticeMetronomeView() {
   const didNormalizeBpmRef = useRef(false)
   const tempoDragRef = useRef<{
     pointerId: number
-    startY: number
-    startBpm: number
+    lastAngle: number
+    accumulatedDegrees: number
+    lastBpm: number
     moved: boolean
   } | null>(null)
+  const currentBpmRef = useRef(0)
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState('')
+  const [tempoWheelRotation, setTempoWheelRotation] = useState(0)
 
   const {
     bpm,
@@ -111,6 +129,10 @@ export default function AudioPracticeMetronomeView() {
   const ticksPerBeat = subdivisionsPerBeat(subdivision)
   const subNotchCount =
     compoundMeter && subdivision === 'off' ? compoundGroupSize - 1 : Math.max(0, ticksPerBeat - 1)
+
+  useEffect(() => {
+    currentBpmRef.current = bpm
+  }, [bpm])
 
   useEffect(() => {
     if (didNormalizeBpmRef.current) return
@@ -179,33 +201,55 @@ export default function AudioPracticeMetronomeView() {
     (event: React.WheelEvent<HTMLDivElement>) => {
       event.preventDefault()
       const direction = event.deltaY > 0 ? -1 : 1
-      setPracticeBpm(bpm + direction)
+      const nextBpm = clampAudioPracticeBpm(currentBpmRef.current + direction)
+      if (nextBpm === currentBpmRef.current) return
+      triggerLightHaptic()
+      currentBpmRef.current = nextBpm
+      setTempoWheelRotation((rotation) => rotation + direction * TEMPO_DEGREES_PER_BPM)
+      setPracticeBpm(nextBpm)
     },
-    [bpm, setPracticeBpm],
+    [setPracticeBpm],
   )
 
   const handleTempoPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return
+      event.preventDefault()
       tempoDragRef.current = {
         pointerId: event.pointerId,
-        startY: event.clientY,
-        startBpm: bpm,
+        lastAngle: pointerAngleFromCenter(event),
+        accumulatedDegrees: 0,
+        lastBpm: currentBpmRef.current,
         moved: false,
       }
       event.currentTarget.setPointerCapture(event.pointerId)
     },
-    [bpm],
+    [],
   )
 
   const handleTempoPointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const drag = tempoDragRef.current
       if (!drag || drag.pointerId !== event.pointerId) return
-      const deltaY = drag.startY - event.clientY
-      if (Math.abs(deltaY) > 4) drag.moved = true
-      const delta = Math.round(deltaY / 6)
-      setPracticeBpm(drag.startBpm + delta)
+      event.preventDefault()
+      const nextAngle = pointerAngleFromCenter(event)
+      const deltaDegrees = normalizeAngleDelta(nextAngle - drag.lastAngle)
+      drag.lastAngle = nextAngle
+      drag.accumulatedDegrees += deltaDegrees
+      if (Math.abs(drag.accumulatedDegrees) > 3) drag.moved = true
+
+      const steps = Math.trunc(drag.accumulatedDegrees / TEMPO_DEGREES_PER_BPM)
+      if (steps === 0) return
+
+      drag.accumulatedDegrees -= steps * TEMPO_DEGREES_PER_BPM
+      const nextBpm = clampAudioPracticeBpm(drag.lastBpm + steps)
+      if (nextBpm === drag.lastBpm) return
+
+      drag.lastBpm = nextBpm
+      currentBpmRef.current = nextBpm
+      triggerLightHaptic()
+      setTempoWheelRotation((rotation) => rotation + steps * TEMPO_DEGREES_PER_BPM)
+      setPracticeBpm(nextBpm)
     },
     [setPracticeBpm],
   )
@@ -269,7 +313,11 @@ export default function AudioPracticeMetronomeView() {
               aria-label={`${bpm} beats per minute. Drag up or down to change tempo.`}
             >
               <div className="audio-practice-metronome__tempo-glow" aria-hidden />
-              <div className="audio-practice-metronome__tempo-rim" aria-hidden>
+              <div
+                className="audio-practice-metronome__tempo-rim"
+                style={{ '--tempo-wheel-rotation': `${tempoWheelRotation}deg` } as React.CSSProperties}
+                aria-hidden
+              >
                 {Array.from({ length: 72 }, (_, index) => (
                   <span
                     key={index}
@@ -277,8 +325,8 @@ export default function AudioPracticeMetronomeView() {
                     style={{ '--tick-rotation': `${index * 5}deg` } as React.CSSProperties}
                   />
                 ))}
-                <span className="audio-practice-metronome__tempo-marker" />
               </div>
+              <span className="audio-practice-metronome__tempo-marker" aria-hidden />
               <div className="audio-practice-metronome__bpm-center">
                 {editingBpm ? (
                   <input
