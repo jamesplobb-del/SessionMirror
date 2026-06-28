@@ -254,6 +254,7 @@ function AudioModeTakeCard({
         <Pressable
           type="button"
           intensity="icon"
+          squish={false}
           haptic="light"
           disabled={!hasMedia}
           onClick={(event) => {
