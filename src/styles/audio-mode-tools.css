@@ -767,3 +767,31 @@ html.app-dark-mode .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pit
 .app-ui-overlay--audio-mode .audio-practice-placeholder__todo {
   color: var(--audio-gold);
 }
+
+/* Late-loaded Audio Mode split buttons — override older generic split chrome. */
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode
+  .split-compare-layout
+  .pip-chrome-btn--expand.hud-glass-badge--ghost {
+  border: 0 !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: var(--audio-text-primary) !important;
+  box-shadow:
+    0 8px 20px rgba(23, 26, 34, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-empty-state--split .pip-empty-action {
+  min-height: 2.05rem;
+  border: 0 !important;
+  border-radius: 0.82rem;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--audio-text-primary) !important;
+  font-weight: 650;
+  box-shadow:
+    0 8px 20px rgba(23, 26, 34, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+}

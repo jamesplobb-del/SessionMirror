@@ -673,6 +673,73 @@ html.app-audio-mode #root {
   pointer-events: none;
 }
 
+/* Audio split polish — keep tabs in place, clean up lower panel and native buttons. */
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout,
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-panel {
+  box-sizing: border-box;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout {
+  gap: 0.36rem;
+  padding: 0.34rem;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom {
+  padding-bottom: 0.12rem;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode
+  .split-compare-layout
+  .pip-chrome-btn--expand.hud-glass-badge--ghost {
+  border: 0 !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: var(--audio-text-primary) !important;
+  box-shadow:
+    0 8px 20px rgba(23, 26, 34, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-empty-state--split {
+  background: transparent !important;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-empty-state--split .pip-empty-state__body p {
+  color: var(--audio-text-secondary) !important;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-empty-state--split .pip-empty-action {
+  min-height: 2.05rem;
+  border: 0 !important;
+  border-radius: 0.82rem;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--audio-text-primary) !important;
+  font-weight: 650;
+  box-shadow:
+    0 8px 20px rgba(23, 26, 34, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-empty-state--split .pip-empty-action:active {
+  transform: scale(0.97);
+}
+
+html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
+  .split-compare-layout
+  .pip-chrome-btn--expand.hud-glass-badge--ghost,
+html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
+  .pip-empty-state--split
+  .pip-empty-action {
+  background: rgba(15, 23, 42, 0.82) !important;
+  color: var(--audio-text-primary) !important;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
 @keyframes audio-mode-meter-pulse {
   from {
     transform: scaleY(0.45);
