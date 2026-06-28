@@ -151,32 +151,32 @@
 .app-ui-overlay--audio-mode .audio-practice-metronome__visual {
   flex: 1 1 auto;
   width: 100%;
-  min-height: clamp(7rem, 24vh, 11.5rem);
-  gap: 0.55rem;
-  padding-block: clamp(0.35rem, 1.2vh, 0.75rem);
+  min-height: clamp(10.5rem, 34vh, 17rem);
+  gap: clamp(0.65rem, 1.8vh, 1rem);
+  padding-block: clamp(0.5rem, 1.6vh, 1rem);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large .audio-practice-metronome__pulse {
-  width: clamp(6.5rem, 34vw, 10.5rem);
-  height: clamp(6.5rem, 34vw, 10.5rem);
+  width: clamp(8.5rem, 44vw, 14rem);
+  height: clamp(8.5rem, 44vw, 14rem);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__beat-row {
-  gap: clamp(0.42rem, 2.8vw, 0.85rem);
+  gap: clamp(0.5rem, 3.2vw, 1rem);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__beat {
-  width: clamp(2.55rem, 11.5vw, 3.35rem);
-  height: clamp(2.55rem, 11.5vw, 3.35rem);
+  width: clamp(3rem, 14.5vw, 4.25rem);
+  height: clamp(3rem, 14.5vw, 4.25rem);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__beat--downbeat {
-  width: clamp(2.8rem, 12.5vw, 3.65rem);
-  height: clamp(2.8rem, 12.5vw, 3.65rem);
+  width: clamp(3.35rem, 16vw, 4.65rem);
+  height: clamp(3.35rem, 16vw, 4.65rem);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__beat-number {
-  font-size: clamp(0.82rem, 2.8vw, 1rem);
+  font-size: clamp(0.95rem, 3.4vw, 1.2rem);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__beat-row--compact .audio-practice-metronome__beat {
@@ -194,8 +194,8 @@
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__sub-notch {
-  width: 0.34rem;
-  height: 0.34rem;
+  width: 0.42rem;
+  height: 0.42rem;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__step-btn {

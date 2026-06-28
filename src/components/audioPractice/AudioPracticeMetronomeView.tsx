@@ -120,6 +120,11 @@ export default function AudioPracticeMetronomeView() {
     }
   }, [bpm, setPracticeBpm])
 
+  useEffect(() => {
+    if (PRACTICE_ALL_METERS.includes(meter)) return
+    setMeter('4/4')
+  }, [meter, setMeter])
+
   const handleTogglePlay = useCallback(() => {
     triggerMetronomeToggleHaptic(playing)
     togglePlay()

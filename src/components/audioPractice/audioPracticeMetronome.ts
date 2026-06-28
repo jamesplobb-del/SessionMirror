@@ -24,14 +24,6 @@ export const PRACTICE_EXTENDED_METERS: MetronomeMeter[] = [
   '8/8',
   '10/8',
   '11/8',
-  '3/16',
-  '5/16',
-  '7/16',
-  '9/16',
-  '11/16',
-  '13/16',
-  '15/16',
-  '16/16',
 ]
 
 export const PRACTICE_ALL_METERS: MetronomeMeter[] = [
