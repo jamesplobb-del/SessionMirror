@@ -1,0 +1,119 @@
+/**
+ * Settings + Take Vault — elevated light surfaces (portaled to body in Audio Mode).
+ */
+
+.native-sheet-backdrop--audio-light {
+  background: rgba(23, 26, 34, 0.2) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.native-bottom-sheet--audio-light {
+  border: 1px solid rgba(23, 26, 34, 0.06);
+  background: var(--audio-bg-base, #f7f8fa);
+  box-shadow:
+    0 -18px 48px rgba(23, 26, 34, 0.1),
+    0 -4px 14px rgba(23, 26, 34, 0.05);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.native-bottom-sheet--audio-light .native-sheet-handle {
+  background: var(--audio-bg-base, #f7f8fa);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.native-bottom-sheet--audio-light .native-sheet-handle > div {
+  background: rgba(108, 112, 119, 0.35);
+}
+
+.native-bottom-sheet--audio-light .native-sheet-header {
+  border-bottom-color: var(--audio-divider, rgba(23, 26, 34, 0.08));
+  background: var(--audio-bg-base, #f7f8fa);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.native-bottom-sheet--audio-light .native-sheet-kicker {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.native-bottom-sheet--audio-light .native-sheet-title {
+  color: var(--audio-text-primary, #171a22);
+}
+
+.native-bottom-sheet--audio-light .native-sheet-subtitle {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.native-bottom-sheet--audio-light .native-sheet-close {
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  background: var(--audio-surface, #ffffff);
+  color: var(--audio-text-secondary, #6c7077);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.native-bottom-sheet--audio-light .native-sheet-action-pill {
+  background: var(--audio-surface, #ffffff);
+  border: 1px solid rgba(23, 26, 34, 0.06);
+  color: var(--audio-text-primary, #171a22);
+  box-shadow: none;
+}
+
+.native-bottom-sheet--audio-light .settings-drawer-scroll,
+.native-bottom-sheet--audio-light .vault-drawer-scroll {
+  background: var(--audio-bg-base, #f7f8fa);
+}
+
+.native-bottom-sheet--audio-light .settings-group > h3 {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.native-bottom-sheet--audio-light .settings-group-row {
+  border-color: rgba(23, 26, 34, 0.06);
+  background: var(--audio-surface, #ffffff);
+  box-shadow: var(--audio-shadow-card);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.native-bottom-sheet--audio-light .settings-group-row p:first-child {
+  color: var(--audio-text-primary, #171a22);
+}
+
+.native-bottom-sheet--audio-light .settings-group-row p:last-child {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.native-bottom-sheet--audio-light .vault-take-card {
+  border-color: rgba(23, 26, 34, 0.06);
+  background: var(--audio-surface, #ffffff);
+  box-shadow: var(--audio-shadow-card);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.native-bottom-sheet--audio-light .vault-empty-state {
+  border-color: rgba(23, 26, 34, 0.06);
+  background: var(--audio-surface, #ffffff);
+  box-shadow: var(--audio-shadow-card);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.native-bottom-sheet--audio-light .vault-empty-state > div:first-child {
+  background: var(--audio-text-primary, #171a22);
+}
+
+.native-bottom-sheet--audio-light .vault-media-segment {
+  background: rgba(23, 26, 34, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(23, 26, 34, 0.06);
+}
+
+.native-bottom-sheet--audio-light .vault-bulk-bar {
+  border-color: rgba(23, 26, 34, 0.06);
+  background: var(--audio-surface, #ffffff);
+  box-shadow: var(--audio-shadow-card);
+}

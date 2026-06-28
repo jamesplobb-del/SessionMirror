@@ -310,24 +310,6 @@ export default function AudioPracticeMetronomeView() {
                   </button>
                 )}
               </div>
-              <div
-                className="audio-practice-metronome__play-anchor pointer-events-auto"
-                onPointerDown={(event) => event.stopPropagation()}
-                onPointerMove={(event) => event.stopPropagation()}
-              >
-                <PracticeControlButton
-                  label={playing ? 'Stop metronome' : 'Start metronome'}
-                  haptic={false}
-                  onPress={handleTogglePlay}
-                  className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
-                >
-                  {playing ? (
-                    <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-                  ) : (
-                    <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-                  )}
-                </PracticeControlButton>
-              </div>
             </div>
 
             <PracticeControlButton
@@ -339,15 +321,23 @@ export default function AudioPracticeMetronomeView() {
             </PracticeControlButton>
           </div>
 
-          <div className="audio-practice-metronome__actions">
-            <PracticeControlButton
-              label="Tap tempo"
-              haptic={false}
-              onPress={handleTapTempo}
-              className="metronome-audio-stage__tap-btn audio-practice-metronome__tap-btn"
-            >
-              Tap Tempo
-            </PracticeControlButton>
+          <div
+            className="metronome-audio-stage__control-row metronome-audio-stage__control-row--sounds audio-practice-metronome__accent-card pointer-events-auto"
+            role="group"
+            aria-label="Metronome click sound"
+          >
+            <span className="metronome-audio-stage__sound-label">Accent</span>
+            {AUDIO_PRACTICE_CLICK_SOUNDS.map(({ id, label }) => (
+              <PracticeControlButton
+                key={id}
+                label={`${label} click sound`}
+                active={soundId === id}
+                onPress={() => handleSoundChange(id)}
+                className="metronome-audio-stage__sound-btn"
+              >
+                {label}
+              </PracticeControlButton>
+            ))}
           </div>
         </header>
 
@@ -483,22 +473,30 @@ export default function AudioPracticeMetronomeView() {
 
       <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
         <div
-          className="metronome-audio-stage__control-row metronome-audio-stage__control-row--sounds"
+          className="audio-practice-metronome__transport-row pointer-events-auto"
           role="group"
-          aria-label="Metronome click sound"
+          aria-label="Metronome transport"
         >
-          <span className="metronome-audio-stage__sound-label">Accent</span>
-          {AUDIO_PRACTICE_CLICK_SOUNDS.map(({ id, label }) => (
-            <PracticeControlButton
-              key={id}
-              label={`${label} click sound`}
-              active={soundId === id}
-              onPress={() => handleSoundChange(id)}
-              className="metronome-audio-stage__sound-btn"
-            >
-              {label}
-            </PracticeControlButton>
-          ))}
+          <PracticeControlButton
+            label={playing ? 'Stop metronome' : 'Start metronome'}
+            haptic={false}
+            onPress={handleTogglePlay}
+            className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
+          >
+            {playing ? (
+              <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+            ) : (
+              <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+            )}
+          </PracticeControlButton>
+          <PracticeControlButton
+            label="Tap tempo"
+            haptic={false}
+            onPress={handleTapTempo}
+            className="metronome-audio-stage__tap-btn audio-practice-metronome__tap-btn"
+          >
+            Tap Tempo
+          </PracticeControlButton>
         </div>
       </footer>
     </div>

@@ -26,6 +26,8 @@ interface AnimatedBottomSheetProps {
   onEnterComplete?: () => void
   /** Portal above floating HUD layers (metronome/pitch display). */
   elevated?: boolean
+  /** Flat elevated light surface — matches Audio Mode (#F7F8FA). */
+  elevatedLight?: boolean
 }
 
 export default function AnimatedBottomSheet({
@@ -38,6 +40,7 @@ export default function AnimatedBottomSheet({
   motionPreset = 'premium',
   onEnterComplete,
   elevated = false,
+  elevatedLight = false,
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSheetSlideDistance)
   const enterNotifiedRef = useRef(false)
@@ -114,7 +117,7 @@ export default function AnimatedBottomSheet({
         <>
           <motion.button
             type="button"
-            className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none bg-black/70 backdrop-blur-[10px] ${elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
+            className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none ${elevatedLight ? 'native-sheet-backdrop--audio-light' : 'bg-black/70 backdrop-blur-[10px]'} ${elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: backdropOpacity }}
@@ -129,7 +132,7 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             ref={sheetRef}
-            className={`animated-bottom-sheet native-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-[2rem] border border-white/70 bg-white/90 shadow-2xl backdrop-blur-2xl transform-gpu ${elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
+            className={`animated-bottom-sheet native-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-[2rem] transform-gpu ${elevatedLight ? 'native-bottom-sheet--audio-light' : 'border border-white/70 bg-white/90 shadow-2xl backdrop-blur-2xl'} ${elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}

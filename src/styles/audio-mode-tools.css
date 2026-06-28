@@ -20,6 +20,17 @@
 
 /* —— Metronome —— */
 
+.app-ui-overlay--audio-mode .metronome-audio-stage__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__accent-card {
+  max-width: 20rem;
+}
+
 .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
   border: 1px solid rgba(23, 26, 34, 0.06);
   border-radius: var(--audio-radius-card);
@@ -29,8 +40,8 @@
   -webkit-backdrop-filter: none;
   flex-direction: row;
   align-items: stretch;
-  gap: 0.55rem;
-  padding: 0.55rem 0.65rem;
+  gap: 0.65rem;
+  padding: 0.85rem 0.9rem;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__selectors--dropdown {
@@ -40,7 +51,7 @@
 .app-ui-overlay--audio-mode .audio-practice-metronome__select-row {
   display: flex;
   align-items: stretch;
-  gap: 0.55rem;
+  gap: 0.65rem;
   width: 100%;
 }
 
@@ -48,7 +59,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 0.28rem;
+  gap: 0.42rem;
   min-width: 0;
 }
 
@@ -290,7 +301,7 @@
   left: auto;
   grid-column: 1 / -1;
   width: 100%;
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.28rem;
   transform: none;
   font-size: 0.58rem;
   letter-spacing: 0.07em;
@@ -307,18 +318,35 @@
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__controls {
-  padding: 0.15rem 0.5rem 0.35rem;
+  padding: 0.1rem 0.5rem 0.25rem;
   max-width: 100%;
 }
 
-.app-ui-overlay--audio-mode .metronome-audio-stage__control-row--sounds {
+.app-ui-overlay--audio-mode .audio-practice-metronome__accent-card.metronome-audio-stage__control-row--sounds {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
-  gap: 0.28rem;
+  gap: 0.38rem;
   width: 100%;
   max-width: 100%;
-  padding: 0.72rem 0.45rem 0.42rem;
+  padding: 0.85rem 0.75rem 0.65rem;
+  overflow: hidden;
+  border: 1px solid rgba(23, 26, 34, 0.06);
+  border-radius: var(--audio-radius-card);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-stage__control-row--sounds:not(.audio-practice-metronome__accent-card) {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0.38rem;
+  width: 100%;
+  max-width: 100%;
+  padding: 0.85rem 0.75rem 0.65rem;
   overflow: hidden;
   border: 1px solid rgba(23, 26, 34, 0.06);
   border-radius: var(--audio-radius-card);
@@ -331,8 +359,8 @@
 .app-ui-overlay--audio-mode .metronome-audio-stage__sound-btn {
   min-width: 0;
   width: 100%;
-  min-height: 1.8rem;
-  padding: 0.24rem 0.15rem;
+  min-height: 1.9rem;
+  padding: 0.32rem 0.22rem;
   font-size: 0.64rem;
   line-height: 1.1;
   border: 1.5px solid rgba(23, 26, 34, 0.08);
@@ -344,9 +372,33 @@
   text-overflow: ellipsis;
 }
 
-.app-ui-overlay--audio-mode .audio-practice-metronome__controls {
-  max-width: 100%;
-  padding-inline: 0.5rem;
+.app-ui-overlay--audio-mode .audio-practice-metronome__transport-row .audio-practice-metronome__play-btn {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  flex: 0 0 auto;
+  width: clamp(3rem, 13vw, 3.45rem);
+  height: clamp(3rem, 13vw, 3.45rem);
+  padding: 0;
+  transform: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__transport-row .audio-practice-metronome__play-btn:active,
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__transport-row
+  .audio-practice-metronome__play-btn.interactive-native:active {
+  transform: scale(0.96);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__transport-row .audio-practice-metronome__tap-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 11.5rem;
+  min-height: 2.75rem;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-stage__sound-btn.metronome-audio-stage__btn--active {

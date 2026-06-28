@@ -2923,6 +2923,7 @@ function StandardApp({
           pausePipVideos()
         }}
         preferredMediaFilter={recordingMode === 'audio' ? 'audio' : 'all'}
+        recordingMode={recordingMode}
         onEnterComplete={handleVaultEnterComplete}
       />
 

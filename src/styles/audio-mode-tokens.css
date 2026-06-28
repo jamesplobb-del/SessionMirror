@@ -1,7 +1,8 @@
 /**
  * Audio Mode design tokens — source of truth for the light Apple-style audio UI.
- * Scoped usage: prefer under `.app-ui-overlay--audio-mode`.
+ * Scoped usage: prefer under `.app-ui-overlay--audio-mode` or `html.app-audio-mode`.
  */
+html.app-audio-mode,
 .app-ui-overlay--audio-mode {
   --audio-bg-top: #ffffff;
   --audio-bg-mid: #f8f9fb;

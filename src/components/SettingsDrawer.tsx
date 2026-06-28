@@ -201,6 +201,7 @@ export default function SettingsDrawer({
       ariaLabel="Settings"
       motionPreset="premium"
       elevated
+      elevatedLight={recordingMode === 'audio'}
       onEnterComplete={handleSheetEnterComplete}
     >
       <div className="native-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
