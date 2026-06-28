@@ -302,8 +302,8 @@ function BestTakeBox({
 
   const pillLeft = showUploadBadge ? 36 : 8
 
-  const chromeInset = isFill ? 8 : 4
-  const pipControlsClearance = hasTake && !suspendPlayback ? 28 : 0
+  const cornerInset = isFill ? 8 : 3
+  const pipControlsClearance = 0
 
   const renderClearButton = () => {
     if (!hasReference) return null
@@ -321,8 +321,8 @@ function BestTakeBox({
           e.stopPropagation()
           handleClearReference()
         }}
-        className={CHROME_BADGE_BTN}
-        style={{ top: chromeInset, right: chromeInset }}
+        className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--clear`}
+        style={{ top: cornerInset, right: cornerInset }}
         aria-label={hasYoutube ? 'Clear YouTube reference' : hasLibraryPlayback ? 'Clear library reference' : 'Unload Best Take'}
       >
         <X className="h-3 w-3" />
@@ -334,8 +334,8 @@ function BestTakeBox({
     if (!onToggleSplitView) return null
 
     const splitStyle = hasReference
-      ? { bottom: chromeInset + pipControlsClearance, right: chromeInset }
-      : { top: chromeInset, right: chromeInset }
+      ? { bottom: cornerInset + pipControlsClearance, right: cornerInset }
+      : { top: cornerInset, right: cornerInset }
 
     return (
       <Pressable
@@ -351,7 +351,7 @@ function BestTakeBox({
           e.stopPropagation()
           onToggleSplitView()
         }}
-        className={CHROME_BADGE_BTN}
+        className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--expand`}
         style={splitStyle}
         aria-label={splitViewActive ? 'Return to normal view' : 'Open split view layout'}
       >
@@ -514,8 +514,8 @@ function BestTakeBox({
               onTouchStart={stopEventBubble}
               onTouchEnd={stopEventBubble}
               onClick={stopEventBubble}
-              className={CHROME_BADGE_BTN}
-              style={{ top: chromeInset, left: chromeInset }}
+              className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--upload`}
+              style={{ top: cornerInset, left: cornerInset }}
               aria-label="Upload best take media"
             >
               <Upload className="h-3 w-3" />

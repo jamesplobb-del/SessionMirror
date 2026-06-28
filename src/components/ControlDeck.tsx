@@ -135,6 +135,7 @@ function ControlDeck({
         showMetronome={showMetronome}
         audioEnhancerEnabled={audioEnhancerEnabled}
         pitchToggleVisible={pitchToggleVisible}
+        takeCardsToggleVisible={recordingMode !== 'audio'}
         onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
         onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}

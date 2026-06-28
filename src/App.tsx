@@ -1521,6 +1521,9 @@ function StandardApp({
         }
       }
       changeRecordingMode(mode)
+      if (mode === 'audio' && !showTakeCardsRef.current) {
+        updateSettings({ showTakeCards: true })
+      }
       if (mode === 'video') {
         scheduleAfterPaint(() => {
           void requestCameraPreviewResume('mode-switch')
@@ -1531,7 +1534,7 @@ function StandardApp({
         }, 360)
       }
     },
-    [changeRecordingMode, isRecording, requestCameraPreviewResume, resetToAudioTab],
+    [changeRecordingMode, isRecording, requestCameraPreviewResume, resetToAudioTab, updateSettings],
   )
 
   const handleCloseSettings = useCallback(() => {

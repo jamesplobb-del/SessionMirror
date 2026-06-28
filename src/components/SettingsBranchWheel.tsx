@@ -18,6 +18,7 @@ interface SettingsBranchWheelProps {
   showMetronome: boolean
   audioEnhancerEnabled: boolean
   pitchToggleVisible: boolean
+  takeCardsToggleVisible?: boolean
   onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
   onShowMetronomeChange: (show: boolean) => void
@@ -44,6 +45,7 @@ export default function SettingsBranchWheel({
   showMetronome,
   audioEnhancerEnabled,
   pitchToggleVisible,
+  takeCardsToggleVisible = true,
   onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
@@ -121,14 +123,17 @@ export default function SettingsBranchWheel({
       })
     }
 
-    items.push(
-      {
+    if (takeCardsToggleVisible) {
+      items.push({
         id: 'take-cards',
         label: 'Take Cards',
         icon: 'take-cards',
         active: showTakeCards,
         onSelect: () => onShowTakeCardsChange(!showTakeCards),
-      },
+      })
+    }
+
+    items.push(
       {
         id: 'metronome',
         label: 'Metronome',
@@ -156,6 +161,7 @@ export default function SettingsBranchWheel({
     pitchTrackerEnabled,
     showMetronome,
     showTakeCards,
+    takeCardsToggleVisible,
   ])
 
   const positions = anchor ? layoutBranchItems(branchItems.length, anchor.rect) : []
