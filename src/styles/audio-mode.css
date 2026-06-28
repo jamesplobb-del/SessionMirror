@@ -391,6 +391,30 @@ html.app-audio-mode #root {
   background: var(--audio-bg-base, #f7f8fa);
 }
 
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-host {
+  padding-bottom: 0.15rem;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .app-hud-bottom {
+  position: relative;
+  z-index: 12;
+  flex-shrink: 0;
+  padding-top: 0.35rem;
+  background: linear-gradient(
+    to top,
+    var(--audio-bg-base) 82%,
+    rgba(247, 248, 250, 0) 100%
+  );
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-panel--best {
+  border-color: var(--audio-gold-border);
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-panel--current {
+  border-color: var(--audio-blue-border);
+}
+
 /* —— Take cards —— */
 .audio-mode-take-stack {
   flex: 0 1 auto;

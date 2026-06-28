@@ -4,36 +4,29 @@
  */
 
 /* —— Split compare / expand layout (elevated light) —— */
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout {
-  border-color: rgba(23, 26, 34, 0.08);
-  background: var(--audio-bg-base, #f7f8fa);
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--best {
+  border: 2px solid var(--sm-gold-border-strong);
   box-shadow:
-    0 14px 36px rgba(23, 26, 34, 0.07),
-    0 2px 8px rgba(23, 26, 34, 0.04);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+    var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)),
+    0 0 0 1px rgba(247, 166, 0, 0.1);
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__top > div > .relative > .relative > .relative {
-  --tw-ring-color: var(--sm-gold-border-strong) !important;
-  border-color: var(--sm-gold-border-strong) !important;
-  background: #ffffff !important;
-  box-shadow: var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)) !important;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
+  border: 2px solid var(--sm-blue-border-strong);
+  box-shadow:
+    var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)),
+    0 0 0 1px rgba(21, 152, 255, 0.1);
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel .group.relative.z-0,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
-  .split-compare-layout__bottom
+  .split-compare-panel
   .pip-window--fill
   > .relative
   > .relative {
-  --tw-ring-color: var(--sm-blue-border-strong) !important;
-  border-color: var(--sm-blue-border-strong) !important;
-  background: #ffffff !important;
-  box-shadow: var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)) !important;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  border: none !important;
+  box-shadow: none !important;
+  --tw-ring-color: transparent !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle {

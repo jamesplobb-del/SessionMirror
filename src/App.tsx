@@ -2708,7 +2708,7 @@ function StandardApp({
 
         {!quickSettingsOpen && settings.showTakeCards && isSplitView && isAudioPracticeMainTab && (
           <div
-            className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-2"
+            className="split-compare-host pointer-events-auto min-h-0 flex-1 px-3 pb-1 pt-0.5"
             style={pipScaleStyle}
           >
             <SplitCompareLayout

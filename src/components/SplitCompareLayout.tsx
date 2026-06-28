@@ -115,14 +115,26 @@ export default function SplitCompareLayout({
     hapticFeedback,
   })
 
+  const currentPanelLabel = isRecording
+    ? 'Recording…'
+    : recordingMode === 'audio'
+      ? 'Audio Recording'
+      : 'Current Camera'
+
   return (
     <>
       <div ref={layoutRef} className="split-compare-layout flex h-full w-full min-h-0 flex-col">
         <div
-          className="split-compare-layout__top relative min-h-0 w-full shrink-0 overflow-hidden"
+          className="split-compare-layout__top relative min-h-0 w-full shrink-0"
           style={{ height: `${splitRatio}%` }}
         >
-          <div ref={benchmarkDropRef} className="h-full w-full min-h-0">
+          <div
+            ref={benchmarkDropRef}
+            className="split-compare-panel split-compare-panel--best h-full w-full min-h-0"
+          >
+            <span className="split-compare-panel__label split-compare-panel__label--best">
+              Best Take
+            </span>
             <BestTakeBox
               layout="fill"
               take={benchmarkTake}
@@ -154,11 +166,14 @@ export default function SplitCompareLayout({
         />
 
         <div
-          className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col overflow-hidden"
+          className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col"
           style={{ height: `${bottomHeight}%` }}
         >
           {showCurrentTake && challengerTake ? (
-            <div className="split-compare-layout__bottom-inner relative flex h-full w-full min-h-0 flex-1 flex-col">
+            <div className="split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0">
+              <span className="split-compare-panel__label split-compare-panel__label--current">
+                Current Take
+              </span>
               <PipWindow
                 layout="fill"
                 className="h-full w-full min-h-0 flex-1"
@@ -187,16 +202,13 @@ export default function SplitCompareLayout({
                 dragSourceActive={isDragging}
                 dragSourceArming={isArming}
                 dragSourceProps={dragEnabled ? dragSourceProps : undefined}
+                splitViewActive
               />
             </div>
           ) : (
-            <>
-              <span className="split-compare-layout__panel-label split-compare-layout__panel-label--current pointer-events-none absolute left-2 top-2 z-10">
-                {isRecording
-                  ? 'Recording…'
-                  : recordingMode === 'audio'
-                    ? 'Audio Recording'
-                    : 'Current Camera'}
+            <div className="split-compare-panel split-compare-panel--current h-full w-full min-h-0">
+              <span className="split-compare-panel__label split-compare-panel__label--current">
+                {currentPanelLabel}
               </span>
               <div className="relative h-full w-full min-h-0 overflow-hidden">
                 <LiveCameraBackground
@@ -212,7 +224,7 @@ export default function SplitCompareLayout({
                   metronomeStageActive={metronomeStageActive}
                 />
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

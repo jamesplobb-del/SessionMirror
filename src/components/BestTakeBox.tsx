@@ -303,11 +303,10 @@ function BestTakeBox({
   const pillLeft = showUploadBadge ? 36 : 8
 
   const chromeInset = isFill ? 8 : 4
+  const pipControlsClearance = hasTake && !suspendPlayback ? 28 : 0
 
   const renderClearButton = () => {
     if (!hasReference) return null
-
-    const clearRight = onToggleSplitView ? chromeInset + 32 : chromeInset
 
     return (
       <Pressable
@@ -323,7 +322,7 @@ function BestTakeBox({
           handleClearReference()
         }}
         className={CHROME_BADGE_BTN}
-        style={{ top: chromeInset, right: clearRight }}
+        style={{ top: chromeInset, right: chromeInset }}
         aria-label={hasYoutube ? 'Clear YouTube reference' : hasLibraryPlayback ? 'Clear library reference' : 'Unload Best Take'}
       >
         <X className="h-3 w-3" />
@@ -333,6 +332,10 @@ function BestTakeBox({
 
   const renderSplitViewToggle = () => {
     if (!onToggleSplitView) return null
+
+    const splitStyle = hasReference
+      ? { bottom: chromeInset + pipControlsClearance, right: chromeInset }
+      : { top: chromeInset, right: chromeInset }
 
     return (
       <Pressable
@@ -349,7 +352,7 @@ function BestTakeBox({
           onToggleSplitView()
         }}
         className={CHROME_BADGE_BTN}
-        style={{ top: chromeInset, right: chromeInset }}
+        style={splitStyle}
         aria-label={splitViewActive ? 'Return to normal view' : 'Open split view layout'}
       >
         {splitViewActive ? (

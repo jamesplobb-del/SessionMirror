@@ -50,6 +50,7 @@ interface PipWindowProps {
   takeId?: string | null
   onAutoPlayComplete?: () => void
   posterUrl?: string | null
+  splitViewActive?: boolean
 }
 
 function PipMediaPoster({ posterUrl }: { posterUrl?: string | null }) {
@@ -96,6 +97,7 @@ function PipWindow({
   takeId = null,
   onAutoPlayComplete,
   posterUrl = null,
+  splitViewActive = false,
 }: PipWindowProps) {
   const videoSourceKey = src || filePath || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
@@ -335,6 +337,8 @@ function PipWindow({
       : 'bg-sky-500/90 text-white'
 
   const chromeInset = isFill ? 8 : 4
+  const exteriorBadgeInset = isFill && splitViewActive ? chromeInset : isFill ? -10 : chromeInset
+  const exteriorUploadInset = isFill && splitViewActive ? chromeInset : isFill ? -12 : chromeInset
 
   const shellClass = isFill
     ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-visible ${className}`.trim()
@@ -542,7 +546,7 @@ function PipWindow({
             onPinAsBest()
           }}
           className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold`}
-          style={{ top: -10, left: -10 }}
+          style={{ top: exteriorBadgeInset, left: exteriorBadgeInset }}
           aria-label="Pin current take as Best Take"
           title="Pin as Best Take"
         >
@@ -563,7 +567,7 @@ function PipWindow({
             onUnpin()
           }}
           className={HUD_GLASS_FLOAT_BADGE}
-          style={{ top: -10, right: -10 }}
+          style={{ top: exteriorBadgeInset, right: exteriorBadgeInset }}
           aria-label={`Unload ${label}`}
         >
           <X className="h-3 w-3" />
@@ -578,7 +582,7 @@ function PipWindow({
           onTouchEnd={stopEventBubble}
           onClick={stopEventBubble}
           className={HUD_GLASS_FLOAT_BADGE}
-          style={{ top: -12, left: -12 }}
+          style={{ top: exteriorUploadInset, left: exteriorUploadInset }}
           aria-label="Upload best take media"
         >
           <Upload className="h-3 w-3" />
