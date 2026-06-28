@@ -118,7 +118,7 @@ function PipWindow({
 
   const hasMedia = Boolean(src || filePath)
   const isAudioMedia = isAudioMimeType(mimeType)
-  const mediaStageClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
+  const mediaSurfaceClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
   const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && hasMedia
   const isFill = layout === 'fill'
   const pillLeft = showUploadBadge || showPinAsBest ? 32 : 8
@@ -357,12 +357,12 @@ function PipWindow({
     : `pip-video-container group relative aspect-video ${className}`.trim()
 
   const innerShellClass = isFill
-    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden ${mediaStageClass} ring-1 ${accentRing} transition-opacity duration-200 ease-in ${
+    ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden ${mediaSurfaceClass} ring-1 ${accentRing} transition-opacity duration-200 ease-in ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : ''} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
-    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] ${mediaStageClass} shadow-lg shadow-black/50 ring-1 transition-opacity duration-200 ease-in ${accentRing} ${
+    : `relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] ${mediaSurfaceClass} shadow-lg shadow-black/50 ring-1 transition-opacity duration-200 ease-in ${accentRing} ${
         hasMedia ? 'opacity-100' : 'opacity-90'
       } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'} ${
         dragSourceActive ? 'pip-drag-source--active' : ''
