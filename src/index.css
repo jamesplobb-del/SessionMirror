@@ -719,6 +719,129 @@ body.settings-branch-open * {
   will-change: left, transform;
 }
 
+.audio-mode-take-card {
+  position: relative;
+  overflow: hidden;
+  min-height: clamp(9.35rem, 19.4vh, 11.85rem);
+}
+
+.audio-mode-take-card__chrome,
+.audio-mode-take-card__title-row,
+.audio-mode-take-card__media {
+  position: relative;
+  z-index: 1;
+}
+
+.audio-mode-take-card__media {
+  position: relative;
+  display: flex;
+  min-height: clamp(3.6rem, 7.7vh, 4.5rem);
+  align-items: center;
+  margin-top: clamp(0.7rem, 1.35vh, 1rem);
+  overflow: hidden;
+  padding-left: clamp(4.35rem, 12.5vw, 5.35rem);
+}
+
+.audio-mode-waveform {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  height: clamp(3.15rem, 7.6vh, 4.35rem);
+  align-items: center;
+  gap: 0.12rem;
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.audio-mode-take-card__play {
+  position: absolute;
+  top: 50%;
+  left: clamp(0.35rem, 1.6vw, 0.65rem);
+  z-index: 2;
+  flex: 0 0 auto;
+  width: clamp(3.05rem, 6.4vh, 3.75rem);
+  height: clamp(3.05rem, 6.4vh, 3.75rem);
+  min-width: clamp(3.05rem, 6.4vh, 3.75rem);
+  border-radius: 999px;
+  transform: translateY(-50%);
+  transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.audio-mode-take-card__play:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.96);
+}
+
+.audio-mode-hero h2 {
+  font-size: clamp(1.28rem, 3.25vh, 1.85rem);
+  line-height: 1.08;
+}
+
+.audio-mode-hero p {
+  font-size: clamp(0.78rem, 1.65vh, 0.95rem);
+}
+
+.app-ui-overlay:has(.audio-mode-home-layer) .auto-sound-hint {
+  color: rgba(17, 24, 39, 0.9) !important;
+  text-shadow: none;
+}
+
+.audio-mode-waveform__bar {
+  width: max(2px, 0.16rem);
+  border-radius: 999px;
+  background: rgb(21, 152, 255);
+  box-shadow: none;
+}
+
+.audio-mode-waveform--best .audio-mode-waveform__bar {
+  background: rgb(247, 166, 0);
+}
+
+.audio-mode-waveform__bar--future {
+  opacity: 0.28;
+}
+
+.audio-mode-take-card--empty .audio-mode-waveform__bar--future {
+  opacity: 1;
+}
+
+.audio-mode-waveform--active .audio-mode-waveform__bar:not(.audio-mode-waveform__bar--future) {
+  animation: audio-mode-meter-pulse 0.82s ease-in-out infinite alternate;
+}
+
+.audio-mode-waveform__playhead {
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateX(-50%);
+  transition: left 90ms linear;
+  will-change: left;
+}
+
+.audio-mode-waveform__playhead::before {
+  position: absolute;
+  top: -0.18rem;
+  left: 50%;
+  width: 0.44rem;
+  height: 0.44rem;
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.audio-mode-waveform--best .audio-mode-waveform__playhead::before {
+  background: rgb(247, 166, 0);
+}
+
+.audio-mode-waveform--current .audio-mode-waveform__playhead::before {
+  background: rgb(21, 152, 255);
+}
+
 .audio-practice-tab-panel {
   position: relative;
   z-index: 2;
