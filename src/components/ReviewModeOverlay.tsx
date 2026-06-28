@@ -978,7 +978,7 @@ export default function ReviewModeOverlay({
 
   return (
     <motion.div
-      className="review-overlay review-overlay--immersive fixed inset-0 z-[60] flex h-full w-full flex-col overflow-hidden transform-gpu"
+      className={`review-overlay review-overlay--immersive ${activeIsAudio ? 'review-overlay--audio' : 'review-overlay--camera'} fixed inset-0 z-[60] flex h-full w-full flex-col overflow-hidden transform-gpu`}
       variants={{
         initial: { opacity: 0, scale: 0.96, y: 10 },
         animate: {

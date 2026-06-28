@@ -725,12 +725,13 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom {
-  padding-bottom: 0.32rem;
+  overflow: visible;
+  padding-bottom: 0.42rem;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom-inner,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom > .split-compare-panel {
-  height: calc(100% - 0.08rem) !important;
+  height: calc(100% - 0.1rem) !important;
   min-height: 0;
 }
 
@@ -752,6 +753,13 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
   border-color: var(--audio-blue-border, rgba(21, 152, 255, 0.45)) !important;
+  box-shadow:
+    var(
+      --audio-shadow-card,
+      0 14px 36px rgba(23, 26, 34, 0.07),
+      0 2px 8px rgba(23, 26, 34, 0.04)
+    ),
+    inset 0 0 0 1.5px var(--audio-blue-border, rgba(21, 152, 255, 0.45)) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -844,6 +852,106 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
   background:
     radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
     linear-gradient(145deg, #f7b84d, var(--sm-gold)) !important;
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(21, 152, 255, 0.16), transparent 36%),
+    linear-gradient(180deg, #020617 0%, #07111f 48%, #0b1220 100%) !important;
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open .app-hud-bottom {
+  background: linear-gradient(to top, rgba(2, 6, 23, 0.96) 82%, rgba(2, 6, 23, 0) 100%) !important;
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout {
+  border-color: rgba(226, 232, 240, 0.12) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.06), transparent 48%),
+    rgba(15, 23, 42, 0.76) !important;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.18);
+  backdrop-filter: blur(24px) saturate(1.18);
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel {
+  background:
+    radial-gradient(circle at 72% 0%, rgba(255, 255, 255, 0.07), transparent 56%),
+    rgba(15, 23, 42, 0.88) !important;
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--best {
+  border-color: rgba(247, 166, 0, 0.6) !important;
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
+  border-color: rgba(21, 152, 255, 0.64) !important;
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.32),
+    inset 0 0 0 1.5px rgba(21, 152, 255, 0.64) !important;
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-panel
+  .group.relative.z-0,
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-panel
+  .pip-window--fill
+  > .relative
+  > .relative {
+  background: rgba(2, 6, 23, 0.42) !important;
+}
+
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .pip-chrome-btn--expand.hud-glass-badge--ghost,
+html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .pip-empty-action {
+  border-color: rgba(226, 232, 240, 0.12) !important;
+  background: rgba(15, 23, 42, 0.78) !important;
+  color: rgba(248, 250, 252, 0.94) !important;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html.app-dark-mode .review-overlay--camera.review-overlay--immersive {
+  background: #020617 !important;
+  color: rgba(248, 250, 252, 0.96);
+}
+
+html.app-dark-mode .review-overlay--camera .review-video-stage {
+  background:
+    radial-gradient(ellipse 130% 88% at 50% 44%, rgba(21, 152, 255, 0.1) 0%, rgba(15, 23, 42, 0.94) 42%, #020617 100%) !important;
+}
+
+html.app-dark-mode .review-overlay--camera .review-overlay-header {
+  background: linear-gradient(to bottom, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.58) 58%, rgba(2, 6, 23, 0) 100%) !important;
+}
+
+html.app-dark-mode .review-overlay--camera .review-native-nav p:first-child {
+  color: rgba(248, 250, 252, 0.96) !important;
+}
+
+html.app-dark-mode .review-overlay--camera .review-native-nav p:last-child {
+  color: rgba(170, 179, 194, 0.94) !important;
+}
+
+html.app-dark-mode .review-overlay--camera .review-nav-button {
+  border-color: rgba(226, 232, 240, 0.12) !important;
+  background: rgba(15, 23, 42, 0.82) !important;
+  color: rgba(248, 250, 252, 0.96) !important;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.14);
+  backdrop-filter: blur(20px) saturate(1.14);
 }
 
 /* Hide session pill while fullscreen expand/review or split compare is open */
