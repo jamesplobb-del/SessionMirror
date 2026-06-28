@@ -32,9 +32,9 @@ export default function LibraryTab({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="vault-library-intro mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-stone-800">Audio references</p>
+          <p className="text-sm font-medium">Audio references</p>
           <p className="text-xs text-stone-500">
             Imported audio stays in Library — not mixed into your takes.
           </p>
@@ -44,7 +44,7 @@ export default function LibraryTab({
           intensity="soft"
           haptic="light"
           onClick={() => fileInputRef.current?.click()}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-800 shadow-sm hover:bg-stone-50"
+          className="vault-import-btn flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold shadow-sm"
         >
           <Upload className="h-3.5 w-3.5" />
           Import Audio
@@ -61,17 +61,18 @@ export default function LibraryTab({
       </div>
 
       {items.length === 0 ? (
-        <div className="flex h-36 items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-stone-50">
+        <div className="vault-empty-state flex h-36 items-center justify-center rounded-2xl border border-dashed px-4 text-center">
           <p className="text-sm text-stone-400">
             No library audio yet. Import an MP3 or audio file.
           </p>
         </div>
       ) : (
-        <div className="vault-card-strip flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-2">
-          {items.map((item) => (
+        <div className="vault-take-list">
+          {items.map((item, index) => (
             <LibraryItemCard
               key={item.id}
               item={item}
+              itemIndex={index}
               isReference={
                 benchmarkBinding?.source === 'library' &&
                 benchmarkBinding.refId === item.id

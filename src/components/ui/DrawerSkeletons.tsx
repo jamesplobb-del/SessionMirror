@@ -3,36 +3,24 @@
 export function VaultDrawerSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-hidden>
-      <div className="space-y-2">
-        <div className="h-3 w-20 rounded bg-stone-200/80" />
-        <div className="flex gap-2 overflow-hidden">
-          <div className="h-8 w-24 shrink-0 rounded-lg bg-stone-100" />
-          <div className="h-8 w-28 shrink-0 rounded-lg bg-stone-100" />
-          <div className="h-8 w-24 shrink-0 rounded-lg bg-stone-100" />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-32 rounded-lg bg-stone-100" />
-        <div className="h-4 w-16 rounded bg-stone-200/80" />
-      </div>
-
-      <div className="flex items-start gap-4 overflow-hidden pb-2">
+      <div className="h-10 rounded-xl bg-white/6" />
+      <div className="h-10 rounded-full bg-white/6" />
+      <div className="flex gap-2">
         {Array.from({ length: 4 }, (_, index) => (
-          <div
-            key={index}
-            className="w-56 shrink-0 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
-          >
-            <div className="vault-card-skeleton-thumb relative aspect-video w-full overflow-hidden">
-              <div className="vault-card-skeleton-shimmer absolute inset-0" />
-            </div>
-            <div className="space-y-2 px-3 py-3">
-              <div className="h-3.5 w-3/4 rounded bg-stone-200/90" />
-              <div className="h-3 w-1/2 rounded bg-stone-100" />
-            </div>
-          </div>
+          <div key={index} className="h-8 w-16 rounded-full bg-white/6" />
         ))}
       </div>
+      <div className="h-8 w-28 rounded-lg bg-white/6" />
+      {Array.from({ length: 3 }, (_, index) => (
+        <div key={index} className="vault-skeleton-row">
+          <div className="vault-skeleton-thumb" />
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 py-1">
+            <div className="vault-skeleton-line w-3/5" />
+            <div className="vault-skeleton-line w-2/5" />
+            <div className="vault-skeleton-line w-1/3" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

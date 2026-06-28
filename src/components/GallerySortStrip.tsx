@@ -1,4 +1,6 @@
-import SimpleSegmentedControl from './ui/SimpleSegmentedControl'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import Pressable from './ui/Pressable'
+import { triggerLightHaptic } from '../utils/haptics'
 import type { SortMode } from '../types'
 
 interface GallerySortStripProps {
@@ -10,22 +12,31 @@ interface GallerySortStripProps {
 export default function GallerySortStrip({
   sortMode,
   onSortChange,
-  takeCount,
+  takeCount: _takeCount,
 }: GallerySortStripProps) {
+  const toggleSort = () => {
+    triggerLightHaptic()
+    onSortChange(sortMode === 'newest' ? 'highest-rated' : 'newest')
+  }
+
   return (
-    <div className="gallery-sort-strip flex flex-1 items-center justify-between gap-3">
-      <p className="text-xs font-semibold text-stone-500">{takeCount} take{takeCount === 1 ? '' : 's'}</p>
-      <SimpleSegmentedControl
-        size="sm"
-        className="bg-white/65 ring-1 ring-stone-200/70"
-        ariaLabel="Sort takes"
-        value={sortMode}
-        onChange={onSortChange}
-        segments={[
-          { id: 'newest' as const, label: 'Newest' },
-          { id: 'highest-rated' as const, label: 'Top rated' },
-        ]}
-      />
+    <div className="vault-sort-row">
+      <Pressable
+        type="button"
+        intensity="soft"
+        haptic="light"
+        onClick={toggleSort}
+        className="vault-sort-trigger"
+        aria-label={`Sort by ${sortMode === 'newest' ? 'newest' : 'top rated'}. Tap to change.`}
+      >
+        {sortMode === 'newest' ? 'Newest' : 'Top rated'}
+        <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+      </Pressable>
+      <div className="vault-sort-icons">
+        <span className="vault-sort-icon-btn vault-sort-icon-btn--active" aria-hidden>
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+        </span>
+      </div>
     </div>
   )
 }

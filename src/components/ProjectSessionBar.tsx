@@ -11,6 +11,7 @@ interface ProjectSessionBarProps {
   onSelectProject: (projectId: string) => void
   onCreateProject: (name: string) => void | Promise<void>
   onDeleteProject?: (projectId: string) => void | Promise<void>
+  className?: string
 }
 
 export default function ProjectSessionBar({
@@ -19,6 +20,7 @@ export default function ProjectSessionBar({
   onSelectProject,
   onCreateProject,
   onDeleteProject,
+  className = '',
 }: ProjectSessionBarProps) {
   const { showConfirm } = useActionSheet()
   const [isNamingSession, setIsNamingSession] = useState(false)
@@ -61,7 +63,7 @@ export default function ProjectSessionBar({
   }
 
   return (
-    <div className="mb-4 flex flex-col gap-2">
+    <div className={`mb-4 flex flex-col gap-2 ${className}`.trim()}>
       <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sessions</p>
 
       <AnimatedExpand open={isNamingSession}>

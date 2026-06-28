@@ -25,12 +25,12 @@ export default function StarRating({
             intensity="icon"
             onClick={() => onChange(value === rating ? 0 : value)}
             haptic="light"
-            className="rounded p-0.5 text-amber-400 hover:text-amber-500"
+            className="rounded p-0.5 text-[var(--sm-gold)] hover:opacity-90"
             aria-label={`${value} star${value === 1 ? '' : 's'}`}
             aria-pressed={filled}
           >
             <Star
-              className={`${iconClass} ${filled ? 'fill-amber-400' : 'fill-transparent'}`}
+              className={`${iconClass} ${filled ? 'fill-[var(--sm-gold)]' : 'fill-transparent opacity-30'}`}
               strokeWidth={filled ? 0 : 1.5}
             />
           </Pressable>

@@ -17,7 +17,7 @@ export default function VaultSectionTabs({
 }: VaultSectionTabsProps) {
   return (
     <SimpleSegmentedControl
-      className="mb-4 bg-stone-200/80"
+      className="vault-section-tabs"
       ariaLabel="Vault section"
       value={value}
       onChange={onChange}

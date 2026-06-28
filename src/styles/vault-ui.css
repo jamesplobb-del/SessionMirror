@@ -1,0 +1,560 @@
+/**
+ * Take Vault redesign — dark warm glass + gold/blue accents (app colorway).
+ */
+
+.native-bottom-sheet--vault {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(247, 166, 0, 0.14), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 100% 100%, rgba(21, 152, 255, 0.08), transparent 50%),
+    linear-gradient(180deg, #2a2218 0%, #1a1410 42%, #14100e 100%) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow:
+    0 -24px 64px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+.native-bottom-sheet--vault .native-sheet-handle,
+.native-bottom-sheet--vault .native-sheet-header,
+.native-bottom-sheet--vault .vault-drawer-scroll {
+  background: transparent !important;
+}
+
+.native-bottom-sheet--vault .native-sheet-handle > div {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.native-bottom-sheet--vault .vault-sheet-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.native-bottom-sheet--vault .native-sheet-kicker {
+  display: none;
+}
+
+.native-bottom-sheet--vault .native-sheet-title {
+  color: #ffffff;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.native-bottom-sheet--vault .native-sheet-subtitle {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.82rem;
+}
+
+.native-bottom-sheet--vault .vault-header-icon-btn {
+  display: flex;
+  height: 2.35rem;
+  width: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.native-bottom-sheet--vault .vault-header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.native-bottom-sheet--vault .vault-header-icon-btn--active {
+  border-color: var(--sm-gold-border);
+  color: var(--sm-gold);
+  background: rgba(247, 166, 0, 0.1);
+}
+
+.native-bottom-sheet--vault .vault-search-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.55rem 0.75rem;
+  color: #ffffff;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.native-bottom-sheet--vault .vault-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.native-bottom-sheet--vault .vault-search-input:focus {
+  border-color: var(--sm-gold-border);
+  box-shadow: 0 0 0 2px rgba(247, 166, 0, 0.15);
+}
+
+/* Section tabs (Takes / Library) */
+.native-bottom-sheet--vault .vault-section-tabs {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.22rem;
+}
+
+.native-bottom-sheet--vault .vault-section-tabs [role='tab'] {
+  border-radius: 999px !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-weight: 600;
+  box-shadow: none !important;
+  ring: none !important;
+}
+
+.native-bottom-sheet--vault .vault-section-tabs [role='tab'][aria-selected='true'] {
+  background: #ffffff !important;
+  color: var(--sm-gold) !important;
+}
+
+/* Media filter pills */
+.native-bottom-sheet--vault .vault-filter-pills {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+  scrollbar-width: none;
+}
+
+.native-bottom-sheet--vault .vault-filter-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.native-bottom-sheet--vault .vault-filter-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.42rem 0.85rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.native-bottom-sheet--vault .vault-filter-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.native-bottom-sheet--vault .vault-filter-pill--active {
+  border-color: transparent;
+  background: var(--sm-gold);
+  color: #ffffff;
+  box-shadow: 0 4px 14px var(--sm-gold-soft);
+}
+
+.native-bottom-sheet--vault .vault-filter-pill__count {
+  margin-left: 0.2rem;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+/* Sort row */
+.native-bottom-sheet--vault .vault-sort-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.native-bottom-sheet--vault .vault-sort-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.38rem 0.62rem;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.native-bottom-sheet--vault .vault-sort-trigger svg {
+  opacity: 0.55;
+}
+
+.native-bottom-sheet--vault .vault-sort-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.native-bottom-sheet--vault .vault-sort-icon-btn {
+  display: flex;
+  height: 1.85rem;
+  width: 1.85rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.native-bottom-sheet--vault .vault-sort-icon-btn--active {
+  border-color: var(--sm-gold-border);
+  color: var(--sm-gold);
+  background: rgba(247, 166, 0, 0.1);
+}
+
+/* Session bar */
+.native-bottom-sheet--vault .vault-session-bar {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.55rem 0.65rem;
+}
+
+.native-bottom-sheet--vault .vault-session-bar button,
+.native-bottom-sheet--vault .vault-session-bar p,
+.native-bottom-sheet--vault .vault-session-bar input {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.native-bottom-sheet--vault .vault-session-bar .text-stone-400,
+.native-bottom-sheet--vault .vault-session-bar .text-stone-500 {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Take list */
+.native-bottom-sheet--vault .vault-take-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.native-bottom-sheet--vault .vault-take-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.72rem;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.06), transparent 55%),
+    rgba(255, 255, 255, 0.05);
+  padding: 0.62rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: blur(18px) saturate(1.1);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.native-bottom-sheet--vault .vault-take-row:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.native-bottom-sheet--vault .vault-take-row--benchmark {
+  border-color: var(--sm-gold-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 18px var(--sm-gold-soft);
+}
+
+.native-bottom-sheet--vault .vault-take-row--challenger {
+  border-color: var(--sm-blue-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 18px var(--sm-blue-soft);
+}
+
+.native-bottom-sheet--vault .vault-take-row--selected {
+  border-color: var(--sm-blue-border-strong);
+  box-shadow: 0 0 16px var(--sm-blue-soft);
+}
+
+.native-bottom-sheet--vault .vault-take-row__thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 4.85rem;
+  height: 4.85rem;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  background: #000000;
+}
+
+.native-bottom-sheet--vault .vault-take-row__thumb img,
+.native-bottom-sheet--vault .vault-take-row__thumb .vault-thumb-placeholder {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.native-bottom-sheet--vault .vault-take-row__take-tag {
+  position: absolute;
+  left: 0.32rem;
+  top: 0.32rem;
+  border-radius: 0.35rem;
+  background: var(--sm-gold);
+  padding: 0.12rem 0.38rem;
+  color: #ffffff;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.native-bottom-sheet--vault .vault-take-row__body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.28rem;
+  padding-block: 0.08rem;
+}
+
+.native-bottom-sheet--vault .vault-take-row__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.native-bottom-sheet--vault .vault-take-row__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.native-bottom-sheet--vault .vault-take-row__title-input {
+  width: 100%;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.2rem 0.4rem;
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  outline: none;
+}
+
+.native-bottom-sheet--vault .vault-take-row__date {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
+.native-bottom-sheet--vault .vault-take-row__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.native-bottom-sheet--vault .vault-take-row__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.native-bottom-sheet--vault .vault-take-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.native-bottom-sheet--vault .vault-take-row__icon-btn {
+  display: flex;
+  height: 1.65rem;
+  width: 1.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.native-bottom-sheet--vault .vault-take-row__play-btn {
+  display: flex;
+  height: 2.15rem;
+  width: 2.15rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  background: var(--sm-gold);
+  color: #ffffff;
+  box-shadow: 0 4px 14px var(--sm-gold-soft);
+}
+
+.native-bottom-sheet--vault .vault-take-row__play-btn:active {
+  transform: scale(0.96);
+}
+
+.native-bottom-sheet--vault .vault-star-rating button {
+  color: var(--sm-gold) !important;
+}
+
+.native-bottom-sheet--vault .vault-star-rating svg {
+  color: var(--sm-gold);
+}
+
+.native-bottom-sheet--vault .vault-star-rating svg.fill-transparent {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.native-bottom-sheet--vault .vault-take-row__menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  z-index: 20;
+  min-width: 9.5rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(28, 22, 18, 0.96);
+  padding: 0.28rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.native-bottom-sheet--vault .vault-take-row__menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 0.5rem;
+  padding: 0.48rem 0.55rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+.native-bottom-sheet--vault .vault-take-row__menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.native-bottom-sheet--vault .vault-take-row__menu button.vault-take-row__menu-danger {
+  color: #ff8a8a;
+}
+
+.native-bottom-sheet--vault .vault-empty-state {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.native-bottom-sheet--vault .vault-empty-state .text-stone-950,
+.native-bottom-sheet--vault .vault-empty-state .text-stone-900,
+.native-bottom-sheet--vault .vault-empty-state .text-stone-500 {
+  color: inherit !important;
+}
+
+.native-bottom-sheet--vault .vault-empty-state > div:first-child {
+  background: var(--sm-gold) !important;
+  color: #ffffff !important;
+}
+
+.native-bottom-sheet--vault .vault-bulk-bar {
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(20, 16, 14, 0.92) !important;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.native-bottom-sheet--vault .vault-bulk-bar button {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.native-bottom-sheet--vault .vault-bulk-bar button:last-child {
+  border-color: rgba(255, 90, 90, 0.28) !important;
+  background: rgba(255, 90, 90, 0.1) !important;
+  color: #ff9a9a !important;
+}
+
+.native-bottom-sheet--vault .vault-library-intro p {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.native-bottom-sheet--vault .vault-library-intro .text-stone-500 {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.native-bottom-sheet--vault .vault-import-btn {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.native-bottom-sheet--vault .vault-take-list > * {
+  animation: vault-row-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.native-bottom-sheet--vault .vault-take-list > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.native-bottom-sheet--vault .vault-take-list > *:nth-child(2) {
+  animation-delay: 35ms;
+}
+.native-bottom-sheet--vault .vault-take-list > *:nth-child(3) {
+  animation-delay: 70ms;
+}
+.native-bottom-sheet--vault .vault-take-list > *:nth-child(4) {
+  animation-delay: 105ms;
+}
+.native-bottom-sheet--vault .vault-take-list > *:nth-child(n + 5) {
+  animation-delay: 140ms;
+}
+
+@keyframes vault-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.native-bottom-sheet--vault .vault-skeleton-row {
+  display: flex;
+  gap: 0.72rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.62rem;
+}
+
+.native-bottom-sheet--vault .vault-skeleton-thumb {
+  height: 4.85rem;
+  width: 4.85rem;
+  flex-shrink: 0;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.native-bottom-sheet--vault .vault-skeleton-line {
+  height: 0.65rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.08);
+}

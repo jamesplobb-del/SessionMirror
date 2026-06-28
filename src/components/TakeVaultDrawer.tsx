@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { CheckSquare, Download, Trash2, X } from 'lucide-react'
+import { CheckSquare, Download, MoreHorizontal, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
@@ -86,7 +86,7 @@ export default function TakeVaultDrawer({
   onOpenTake,
   onBeforeExport,
   preferredMediaFilter = 'all',
-  recordingMode = 'video',
+  recordingMode: _recordingMode = 'video',
   onEnterComplete,
 }: TakeVaultDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null)
@@ -98,6 +98,10 @@ export default function TakeVaultDrawer({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
   const [exportingTakeId, setExportingTakeId] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
+  const headerMenuRef = useRef<HTMLDivElement>(null)
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -126,15 +130,24 @@ export default function TakeVaultDrawer({
   const filteredTakes = useMemo(
     () => {
       if (!contentReady) return []
-      if (vaultMediaTab === 'all') return sortedTakes
+      let list = sortedTakes
       if (vaultMediaTab === 'best') {
-        return vaultBenchmarkTakeId
+        list = vaultBenchmarkTakeId
           ? sortedTakes.filter((take) => take.id === vaultBenchmarkTakeId)
           : []
+      } else if (vaultMediaTab !== 'all') {
+        list = sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab)
       }
-      return sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab)
+
+      const query = searchQuery.trim().toLowerCase()
+      if (!query) return list
+      return list.filter(
+        (take) =>
+          take.name.toLowerCase().includes(query) ||
+          take.notes.toLowerCase().includes(query),
+      )
     },
-    [contentReady, sortedTakes, vaultBenchmarkTakeId, vaultMediaTab],
+    [contentReady, searchQuery, sortedTakes, vaultBenchmarkTakeId, vaultMediaTab],
   )
   const takeCountLabel = `${takes.length} take${takes.length === 1 ? '' : 's'}`
 
@@ -151,6 +164,9 @@ export default function TakeVaultDrawer({
     setSelectionMode(false)
     setSelectedIds(new Set())
     setVaultSection('takes')
+    setSearchOpen(false)
+    setSearchQuery('')
+    setHeaderMenuOpen(false)
   }, [isOpen])
 
   useEffect(() => {
@@ -267,10 +283,29 @@ export default function TakeVaultDrawer({
   }, [activeProject?.name, exitSelectionMode, onClearAllTakes, showConfirm, takes.length])
 
   useEffect(() => {
+    if (!headerMenuOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!headerMenuRef.current?.contains(event.target as Node)) {
+        setHeaderMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [headerMenuOpen])
+
+  useEffect(() => {
     return () => {
       teardownVideosInContainer(drawerRef.current)
     }
   }, [])
+
+  const takeIndexById = useMemo(() => {
+    const map = new Map<string, number>()
+    sortedTakes.forEach((take, index) => {
+      map.set(take.id, index)
+    })
+    return map
+  }, [sortedTakes])
 
   const handleCloseClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -290,67 +325,119 @@ export default function TakeVaultDrawer({
       sheetRef={drawerRef}
       motionPreset="premium"
       elevated
-      elevatedLight={recordingMode === 'audio'}
+      vaultTheme
       onEnterComplete={handleSheetEnterComplete}
     >
-        <div className="native-sheet-header vault-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
-          <div className="native-sheet-title-block min-w-0 flex-1">
-            <span className="native-sheet-kicker">Library</span>
-            <h2 className="native-sheet-title">Take Vault</h2>
-            <p className="native-sheet-subtitle">
-              {selectionMode
-                ? `${selectedCount} selected`
-                : activeProject
-                  ? `${takeCountLabel} • ${activeProject.name}`
-                  : `${takeCountLabel} • Current session`}
-            </p>
-          </div>
-          <div className="native-sheet-actions relative z-30 flex shrink-0 items-center gap-1">
-            {contentReady && takes.length > 0 && !selectionMode && (
-              <>
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setSelectionMode(true)}
-                  haptic="light"
-                  className="native-sheet-action-pill min-h-10 rounded-full px-3 text-xs font-semibold text-stone-600 hover:bg-white/70 hover:text-stone-900"
-                >
-                  Select
-                </Pressable>
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={handleClearAll}
-                  haptic="light"
-                  className="native-sheet-action-pill min-h-10 rounded-full px-3 text-xs font-semibold text-red-600 hover:bg-red-50"
-                >
-                  Clear All
-                </Pressable>
-              </>
-            )}
-            {selectionMode && (
+        <div className="native-sheet-header vault-sheet-header sticky top-0 z-20 flex shrink-0 flex-col gap-3 border-b border-white/60 px-5 pb-4 pt-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="native-sheet-title-block min-w-0 flex-1">
+              <h2 className="native-sheet-title">Take Vault</h2>
+              <p className="native-sheet-subtitle">
+                {selectionMode
+                  ? `${selectedCount} selected`
+                  : activeProject
+                    ? `${takeCountLabel} • ${activeProject.name}`
+                    : `${takeCountLabel} • Current session`}
+              </p>
+            </div>
+            <div className="native-sheet-actions relative z-30 flex shrink-0 items-center gap-1.5">
               <Pressable
                 type="button"
-                intensity="soft"
-                onClick={exitSelectionMode}
+                intensity="icon"
+                onClick={() => {
+                  setSearchOpen((open) => !open)
+                  if (searchOpen) setSearchQuery('')
+                }}
                 haptic="light"
-                className="native-sheet-action-pill min-h-10 rounded-full px-3 text-xs font-semibold text-stone-600 hover:bg-white/70"
+                className={`vault-header-icon-btn ${searchOpen ? 'vault-header-icon-btn--active' : ''}`}
+                aria-label={searchOpen ? 'Close search' : 'Search takes'}
               >
-                Cancel
+                <Search className="h-4 w-4" />
               </Pressable>
-            )}
-            <Pressable
-              type="button"
-              intensity="icon"
-              onClick={handleCloseClick}
-              haptic="light"
-              data-tutorial="vault-close"
-              className="native-sheet-close relative z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white/70 text-stone-500 shadow-sm ring-1 ring-stone-200/70 hover:bg-white hover:text-stone-800"
-              aria-label="Close vault"
-            >
-              <X className="h-5 w-5" />
-            </Pressable>
+              <Pressable
+                type="button"
+                intensity="icon"
+                onClick={() => onSortChange(sortMode === 'newest' ? 'highest-rated' : 'newest')}
+                haptic="light"
+                className="vault-header-icon-btn"
+                aria-label="Toggle sort order"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </Pressable>
+              <div className="relative" ref={headerMenuRef}>
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  onClick={() => setHeaderMenuOpen((open) => !open)}
+                  haptic="light"
+                  className="vault-header-icon-btn"
+                  aria-label="More vault actions"
+                  aria-expanded={headerMenuOpen}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Pressable>
+                {headerMenuOpen && (
+                  <div className="vault-take-row__menu right-0 left-auto" role="menu">
+                    {selectionMode ? (
+                      <button type="button" role="menuitem" onClick={() => { setHeaderMenuOpen(false); exitSelectionMode() }}>
+                        Cancel selection
+                      </button>
+                    ) : (
+                      <>
+                        {contentReady && takes.length > 0 && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setHeaderMenuOpen(false)
+                              setSelectionMode(true)
+                            }}
+                          >
+                            Select takes
+                          </button>
+                        )}
+                        {contentReady && takes.length > 0 && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="vault-take-row__menu-danger"
+                            onClick={() => {
+                              setHeaderMenuOpen(false)
+                              handleClearAll()
+                            }}
+                          >
+                            Clear all takes
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Pressable
+                type="button"
+                intensity="icon"
+                onClick={handleCloseClick}
+                haptic="light"
+                data-tutorial="vault-close"
+                className="vault-header-icon-btn"
+                aria-label="Close vault"
+              >
+                <X className="h-4 w-4" />
+              </Pressable>
+            </div>
           </div>
+          {searchOpen && (
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search takes…"
+              className="vault-search-input"
+              aria-label="Search takes"
+              autoFocus
+            />
+          )}
         </div>
 
         <div className="vault-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-4">
@@ -359,6 +446,7 @@ export default function TakeVaultDrawer({
           ) : (
             <div className="vault-library-shell space-y-4">
           <ProjectSessionBar
+            className="vault-session-bar"
             projects={projects}
             activeProjectId={activeProject?.id ?? null}
             onSelectProject={onSelectProject}
@@ -404,9 +492,11 @@ export default function TakeVaultDrawer({
                 <div className="vault-empty-state flex min-h-44 flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-stone-200/80 bg-white/50 px-6 py-8 text-center">
                   <p className="text-base font-semibold text-stone-900">No takes here</p>
                   <p className="mt-1 text-sm text-stone-500">
-                    {vaultMediaTab === 'best'
-                      ? 'Mark a take as Best to see it here.'
-                      : `No ${vaultMediaTab} takes yet.`}
+                    {searchQuery.trim()
+                      ? 'No takes match your search.'
+                      : vaultMediaTab === 'best'
+                        ? 'Mark a take as Best to see it here.'
+                        : `No ${vaultMediaTab} takes yet.`}
                   </p>
                 </div>
               ) : (
@@ -429,11 +519,12 @@ export default function TakeVaultDrawer({
                       </Pressable>
                     )}
                   </div>
-                  <div className="vault-card-strip no-scrollbar flex items-start gap-4 overflow-x-auto overscroll-x-contain pb-3">
+                  <div className="vault-take-list">
                     {filteredTakes.map((take) => (
                       <TakeCard
                         key={take.id}
                         take={take}
+                        takeIndex={takeIndexById.get(take.id) ?? 0}
                         isBenchmark={take.id === vaultBenchmarkTakeId}
                         isChallenger={take.id === challengerId}
                         selectionMode={selectionMode}

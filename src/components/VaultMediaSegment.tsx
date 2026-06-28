@@ -1,5 +1,3 @@
-import SimpleSegmentedControl from './ui/SimpleSegmentedControl'
-
 export type VaultMediaFilter = 'all' | 'video' | 'audio' | 'best'
 
 interface VaultMediaSegmentProps {
@@ -11,6 +9,32 @@ interface VaultMediaSegmentProps {
   bestCount: number
 }
 
+function Pill({
+  active,
+  label,
+  count,
+  onPress,
+}: {
+  active: boolean
+  label: string
+  count?: number
+  onPress: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`vault-filter-pill interactive-native ${active ? 'vault-filter-pill--active' : ''}`}
+      aria-pressed={active}
+      onClick={onPress}
+    >
+      {label}
+      {typeof count === 'number' && count > 0 && (
+        <span className="vault-filter-pill__count">({count})</span>
+      )}
+    </button>
+  )
+}
+
 export default function VaultMediaSegment({
   value,
   onChange,
@@ -20,57 +44,15 @@ export default function VaultMediaSegment({
   bestCount,
 }: VaultMediaSegmentProps) {
   return (
-    <SimpleSegmentedControl
-      className="vault-media-segment mb-4 bg-stone-200/80"
-      ariaLabel="Filter takes by media type"
-      value={value}
-      onChange={onChange}
-      segments={[
-        {
-          id: 'all' as const,
-          label: (
-            <>
-              All
-              {allCount > 0 && (
-                <span className="ml-1.5 text-xs text-stone-400">({allCount})</span>
-              )}
-            </>
-          ),
-        },
-        {
-          id: 'video' as const,
-          label: (
-            <>
-              Video
-              {videoCount > 0 && (
-                <span className="ml-1.5 text-xs text-stone-400">({videoCount})</span>
-              )}
-            </>
-          ),
-        },
-        {
-          id: 'audio' as const,
-          label: (
-            <>
-              Audio
-              {audioCount > 0 && (
-                <span className="ml-1.5 text-xs text-stone-400">({audioCount})</span>
-              )}
-            </>
-          ),
-        },
-        {
-          id: 'best' as const,
-          label: (
-            <>
-              Best
-              {bestCount > 0 && (
-                <span className="ml-1.5 text-xs text-stone-400">({bestCount})</span>
-              )}
-            </>
-          ),
-        },
-      ]}
-    />
+    <div
+      className="vault-filter-pills no-scrollbar"
+      role="tablist"
+      aria-label="Filter takes by media type"
+    >
+      <Pill active={value === 'all'} label="All" count={allCount} onPress={() => onChange('all')} />
+      <Pill active={value === 'video'} label="Video" count={videoCount} onPress={() => onChange('video')} />
+      <Pill active={value === 'audio'} label="Audio" count={audioCount} onPress={() => onChange('audio')} />
+      <Pill active={value === 'best'} label="Best" count={bestCount} onPress={() => onChange('best')} />
+    </div>
   )
 }

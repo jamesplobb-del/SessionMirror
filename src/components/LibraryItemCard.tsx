@@ -6,6 +6,7 @@ import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 
 interface LibraryItemCardProps {
   item: HydratedLibraryItem
+  itemIndex: number
   isReference: boolean
   onRename: (name: string) => void
   onDelete: () => void
@@ -14,6 +15,7 @@ interface LibraryItemCardProps {
 
 export default function LibraryItemCard({
   item,
+  itemIndex,
   isReference,
   onRename,
   onDelete,
@@ -43,95 +45,96 @@ export default function LibraryItemCard({
     setIsEditingName(false)
   }
 
-  const cardRingClass = isReference
-    ? 'border-amber-300 ring-1 ring-amber-200'
-    : 'border-stone-200'
+  const rowClass = [
+    'vault-take-row interactive-native group relative',
+    isReference ? 'vault-take-row--benchmark' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <div
-      className={`group flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${cardRingClass}`}
-    >
-      <div className="relative aspect-video bg-black">
+    <article className={rowClass}>
+      <div className="vault-take-row__thumb">
         <img
           src={AUDIO_TAKE_THUMBNAIL}
           alt=""
           className="h-full w-full object-cover"
           draggable={false}
         />
-        <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/90">
-          Library
-        </span>
-        {isReference && (
-          <span className="pointer-events-none absolute right-2 top-2 rounded bg-amber-400/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">
-            Reference
-          </span>
-        )}
+        <span className="vault-take-row__take-tag">REF {itemIndex + 1}</span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <div className="flex items-start gap-2">
-          <Music2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-400" aria-hidden />
-          {isEditingName ? (
-            <input
-              ref={nameInputRef}
-              value={nameDraft}
-              onChange={(event) => setNameDraft(event.target.value)}
-              onBlur={commitName}
-              onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  commitName()
-                }
-                if (event.key === 'Escape') {
-                  setNameDraft(item.name)
-                  setIsEditingName(false)
-                }
-              }}
-              className="min-w-0 flex-1 rounded border border-stone-200 px-1.5 py-0.5 text-sm text-stone-900 outline-none ring-sky-400 focus:ring-1"
-              aria-label="Library item name"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsEditingName(true)}
-              className="min-w-0 flex-1 truncate text-left text-sm font-medium text-stone-900 hover:text-sky-700"
-              title="Click to rename"
-            >
-              {item.name || 'Untitled reference'}
-            </button>
+      <div className="vault-take-row__body">
+        <div>
+          <div className="vault-take-row__title-row">
+            {isEditingName ? (
+              <input
+                ref={nameInputRef}
+                value={nameDraft}
+                onChange={(event) => setNameDraft(event.target.value)}
+                onBlur={commitName}
+                onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    commitName()
+                  }
+                  if (event.key === 'Escape') {
+                    setNameDraft(item.name)
+                    setIsEditingName(false)
+                  }
+                }}
+                className="vault-take-row__title-input"
+                aria-label="Library item name"
+              />
+            ) : (
+              <Pressable
+                type="button"
+                intensity="soft"
+                haptic="light"
+                onClick={() => setIsEditingName(true)}
+                className="vault-take-row__title min-w-0 flex-1 truncate text-left"
+                title="Click to rename"
+              >
+                {item.name || 'Untitled reference'}
+              </Pressable>
+            )}
+          </div>
+          {item.duration > 0 && (
+            <p className="vault-take-row__date">{item.duration}s</p>
           )}
         </div>
 
-        {item.duration > 0 && (
-          <p className="text-xs text-stone-400">{item.duration}s</p>
-        )}
-
-        <div className="mt-auto flex flex-wrap gap-1.5">
-          {!isReference && (
+        <div className="vault-take-row__footer">
+          <span className="vault-take-row__type">
+            <Music2 className="h-3 w-3" aria-hidden />
+            audio
+          </span>
+          <div className="vault-take-row__actions">
+            {!isReference && (
+              <Pressable
+                type="button"
+                intensity="soft"
+                haptic="light"
+                onClick={onSetAsReference}
+                className="vault-take-row__icon-btn !w-auto px-2 text-[0.62rem] font-semibold"
+              >
+                <Star className="h-3 w-3" />
+                Set Ref
+              </Pressable>
+            )}
             <Pressable
               type="button"
-              intensity="soft"
+              intensity="icon"
               haptic="light"
-              onClick={onSetAsReference}
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100"
+              onClick={onDelete}
+              className="vault-take-row__icon-btn text-red-300"
+              aria-label={`Delete ${item.name}`}
             >
-              <Star className="h-3 w-3" />
-              Set Reference
+              <Trash2 className="h-3.5 w-3.5" />
             </Pressable>
-          )}
-          <Pressable
-            type="button"
-            intensity="soft"
-            haptic="light"
-            onClick={onDelete}
-            className="flex items-center justify-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-100"
-            aria-label={`Delete ${item.name}`}
-          >
-            <Trash2 className="h-3 w-3" />
-            Delete
-          </Pressable>
+          </div>
         </div>
       </div>
-    </div>
+    </article>
   )
 }
