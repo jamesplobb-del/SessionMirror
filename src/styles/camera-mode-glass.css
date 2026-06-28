@@ -55,30 +55,48 @@
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge {
-  border: 0 !important;
+  z-index: 40;
+  border: 1.5px solid rgba(23, 26, 34, 0.14) !important;
   background: #ffffff !important;
   color: var(--audio-text-primary, #171a22) !important;
-  box-shadow: var(--audio-shadow-fab, 0 8px 22px rgba(23, 26, 34, 0.1), 0 2px 6px rgba(23, 26, 34, 0.05)) !important;
+  box-shadow:
+    0 6px 18px rgba(23, 26, 34, 0.14),
+    0 2px 6px rgba(23, 26, 34, 0.08) !important;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge svg {
+  color: currentColor;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge svg.fill-white,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge .fill-white {
+  fill: currentColor !important;
+}
+
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--ghost {
-  border: 1px solid rgba(23, 26, 34, 0.08) !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  border: 1.5px solid rgba(23, 26, 34, 0.16) !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 6px 18px rgba(23, 26, 34, 0.14),
+    0 2px 6px rgba(23, 26, 34, 0.08) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--ghost:hover {
-  background: rgba(23, 26, 34, 0.04) !important;
-  border-color: rgba(23, 26, 34, 0.14) !important;
+  background: #ffffff !important;
+  border-color: rgba(23, 26, 34, 0.24) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--gold {
   border: 0 !important;
   color: #ffffff !important;
   background: var(--sm-gold) !important;
-  box-shadow: 0 4px 14px var(--sm-gold-soft) !important;
+  box-shadow: 0 4px 14px rgba(247, 166, 0, 0.28) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--gold svg {
+  color: #ffffff !important;
 }
 
 /* —— Pip take boxes (Best Take gold / Current Take blue) —— */
@@ -319,9 +337,9 @@
 .review-overlay-header {
   background: linear-gradient(
     to bottom,
-    rgba(247, 248, 250, 0.96) 0%,
-    rgba(247, 248, 250, 0.62) 58%,
-    rgba(247, 248, 250, 0) 100%
+    rgba(228, 232, 238, 0.96) 0%,
+    rgba(228, 232, 238, 0.62) 58%,
+    rgba(228, 232, 238, 0) 100%
   );
 }
 

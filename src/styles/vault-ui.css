@@ -275,6 +275,21 @@
     box-shadow 160ms ease;
 }
 
+.native-bottom-sheet--vault .vault-take-row--expanded {
+  flex-direction: column;
+  gap: 0;
+  padding-bottom: 0.72rem;
+  border-color: var(--audio-gold-border);
+  box-shadow: var(--audio-shadow-card), 0 0 0 2px var(--audio-gold-soft);
+}
+
+.native-bottom-sheet--vault .vault-take-row__main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 0.72rem;
+}
+
 .native-bottom-sheet--vault .vault-take-row--benchmark {
   border-color: var(--audio-gold-border);
 }
@@ -367,6 +382,101 @@
   color: var(--audio-text-secondary);
   font-size: 0.68rem;
   font-weight: 500;
+}
+
+.native-bottom-sheet--vault .vault-take-row__rating-hint {
+  margin-top: 0.18rem;
+  color: var(--audio-gold);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+.native-bottom-sheet--vault .vault-take-row__notes-hint {
+  margin-top: 0.12rem;
+  color: var(--audio-text-secondary);
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail {
+  width: 100%;
+  margin-top: 0.72rem;
+  padding-top: 0.72rem;
+  border-top: 1px solid var(--audio-divider);
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-section {
+  margin-bottom: 0.72rem;
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.38rem;
+  color: var(--audio-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.native-bottom-sheet--vault .vault-take-row__notes-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 4.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-bg-base);
+  padding: 0.55rem 0.65rem;
+  color: var(--audio-text-primary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  outline: none;
+}
+
+.native-bottom-sheet--vault .vault-take-row__notes-input::placeholder {
+  color: var(--audio-text-secondary);
+}
+
+.native-bottom-sheet--vault .vault-take-row__notes-input:focus {
+  border-color: var(--audio-gold-border);
+  box-shadow: 0 0 0 2px var(--audio-gold-soft);
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-bg-base);
+  padding: 0.45rem 0.62rem;
+  color: var(--audio-text-primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-btn:hover {
+  background: #ffffff;
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-btn:disabled {
+  opacity: 0.55;
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-btn--danger {
+  border-color: rgba(220, 38, 38, 0.18);
+  color: #dc2626;
+  background: #fef2f2;
 }
 
 .native-bottom-sheet--vault .vault-take-row__footer {

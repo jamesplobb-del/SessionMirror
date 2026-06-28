@@ -1,5 +1,5 @@
 import { memo, useEffect, type RefObject } from 'react'
-import { Mic } from 'lucide-react'
+import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
 import { iosBulletproofVideoProps } from '../utils/mobileVideo'
@@ -203,32 +203,14 @@ function LiveCameraBackground({
 
       {showAudioIdle && (
         <div
-          className={`${overlayClass} camera-background-overlay--audio-idle pitch-audio-idle flex flex-col items-center justify-center`}
+          className={`${overlayClass} camera-background-overlay--audio-hero flex flex-col items-center justify-center ${
+            isEmbedded ? 'camera-background-overlay--audio-hero-embedded' : ''
+          }`}
         >
-          <div
-            className={`pitch-audio-idle__orb mb-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full ${
-              isRecording ? 'pitch-audio-idle__orb--recording' : ''
-            }`}
-          >
-            <Mic className={`h-7 w-7 ${isRecording ? 'text-sky-200' : 'text-sky-300/90'}`} />
-          </div>
-          <div className="flex h-9 items-end justify-center gap-1.5">
-            {[0, 1, 2, 3, 4].map((bar) => (
-              <div
-                key={bar}
-                className={`pitch-audio-idle__bar w-[3px] rounded-full ${
-                  isRecording ? 'pitch-audio-idle__bar--live' : ''
-                }`}
-                style={{
-                  height: `${14 + bar * 5}px`,
-                  animationDelay: `${bar * 90}ms`,
-                }}
-              />
-            ))}
-          </div>
-          <p className="pitch-audio-idle__label mt-5 text-sm font-medium">
-            Audio Mode
-          </p>
+          <AudioModeHeroMic isRecording={isRecording} compact={isEmbedded} />
+          {!isEmbedded && (
+            <p className="audio-mode-hero-mic__caption mt-4 text-sm font-medium">Audio Mode</p>
+          )}
         </div>
       )}
 

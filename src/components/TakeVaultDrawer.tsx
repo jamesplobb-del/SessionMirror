@@ -101,7 +101,14 @@ export default function TakeVaultDrawer({
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
+  const [detailTakeId, setDetailTakeId] = useState<string | null>(null)
   const headerMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDetailTakeId(null)
+    }
+  }, [isOpen])
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -527,6 +534,10 @@ export default function TakeVaultDrawer({
                         takeIndex={takeIndexById.get(take.id) ?? 0}
                         isBenchmark={take.id === vaultBenchmarkTakeId}
                         isChallenger={take.id === challengerId}
+                        detailOpen={detailTakeId === take.id}
+                        onToggleDetail={() =>
+                          setDetailTakeId((current) => (current === take.id ? null : take.id))
+                        }
                         selectionMode={selectionMode}
                         selected={selectedIds.has(take.id)}
                         onToggleSelect={() => toggleTakeSelection(take.id)}

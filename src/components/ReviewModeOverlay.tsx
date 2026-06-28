@@ -109,7 +109,7 @@ function ReviewTakeLayer({
   if (isAudio) {
     return (
       <div
-        className="absolute inset-0 h-full w-full bg-[#f7f8fa] transition-all duration-200 ease-out"
+        className="absolute inset-0 h-full w-full transition-all duration-200 ease-out review-video-bleed--audio"
         style={swipeLayerStyle}
         onPointerDown={onPointerDown as React.PointerEventHandler<HTMLDivElement> | undefined}
         onPointerMove={onPointerMove as React.PointerEventHandler<HTMLDivElement> | undefined}

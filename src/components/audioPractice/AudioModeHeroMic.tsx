@@ -1,12 +1,14 @@
-import { memo } from 'react'
+import { memo, useId } from 'react'
 
 interface AudioModeHeroMicProps {
   isRecording: boolean
+  compact?: boolean
 }
 
 const TICK_COUNT = 72
 
-function AudioModeHeroMic({ isRecording }: AudioModeHeroMicProps) {
+function AudioModeHeroMic({ isRecording, compact = false }: AudioModeHeroMicProps) {
+  const gradientId = useId().replace(/:/g, '')
   const ticks = Array.from({ length: TICK_COUNT }, (_, index) => {
     const angle = (index / TICK_COUNT) * 360 - 90
     const isGold = angle >= -90 && angle < 90
@@ -17,7 +19,7 @@ function AudioModeHeroMic({ isRecording }: AudioModeHeroMicProps) {
 
   return (
     <div
-      className={`audio-mode-hero-mic ${isRecording ? 'audio-mode-hero-mic--recording' : ''}`}
+      className={`audio-mode-hero-mic ${compact ? 'audio-mode-hero-mic--compact' : ''} ${isRecording ? 'audio-mode-hero-mic--recording' : ''}`}
       aria-hidden
     >
       <div className="audio-mode-hero-mic__dial">
@@ -57,20 +59,20 @@ function AudioModeHeroMic({ isRecording }: AudioModeHeroMicProps) {
             aria-hidden
           >
             <defs>
-              <linearGradient id="audio-mic-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#F7A600" />
                 <stop offset="100%" stopColor="#1598FF" />
               </linearGradient>
             </defs>
-            <rect x="9" y="3" width="6" height="11" rx="3" stroke="url(#audio-mic-gradient)" strokeWidth="1.75" />
+            <rect x="9" y="3" width="6" height="11" rx="3" stroke={`url(#${gradientId})`} strokeWidth="1.75" />
             <path
               d="M6 11a6 6 0 0 0 12 0"
-              stroke="url(#audio-mic-gradient)"
+              stroke={`url(#${gradientId})`}
               strokeWidth="1.75"
               strokeLinecap="round"
             />
-            <path d="M12 17v3.5" stroke="url(#audio-mic-gradient)" strokeWidth="1.75" strokeLinecap="round" />
-            <path d="M8.5 20.5h7" stroke="url(#audio-mic-gradient)" strokeWidth="1.75" strokeLinecap="round" />
+            <path d="M12 17v3.5" stroke={`url(#${gradientId})`} strokeWidth="1.75" strokeLinecap="round" />
+            <path d="M8.5 20.5h7" stroke={`url(#${gradientId})`} strokeWidth="1.75" strokeLinecap="round" />
           </svg>
 
           <div className="audio-mode-hero-mic__mini-wave">

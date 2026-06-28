@@ -2494,7 +2494,7 @@ function StandardApp({
     <AudioModePlaybackProvider>
     <div
       ref={appShellRef}
-      className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}`}
+      className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${isSplitView ? ' app-shell--split-open' : ''}`}
     >
       <audio
         ref={autoPlaybackAudioRef}

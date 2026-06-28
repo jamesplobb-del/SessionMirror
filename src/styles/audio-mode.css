@@ -365,6 +365,32 @@ html.app-audio-mode #root {
   animation: audio-mode-meter-pulse 0.82s ease-in-out infinite alternate;
 }
 
+.audio-mode-hero-mic__caption {
+  color: var(--audio-text-secondary);
+  font-family: var(--audio-font);
+  font-weight: 500;
+}
+
+.audio-mode-hero-mic--compact .audio-mode-hero-mic__dial {
+  width: clamp(6.75rem, 16vh, 8.75rem);
+}
+
+.camera-background-overlay--audio-hero {
+  background: var(--audio-bg-base, #f7f8fa);
+}
+
+.camera-background-overlay--audio-hero-embedded {
+  background: var(--audio-bg-base, #f7f8fa);
+}
+
+.split-compare-layout__bottom .camera-background--embedded {
+  background: var(--audio-bg-base, #f7f8fa);
+}
+
+.app-ui-overlay--audio-mode .camera-background--embedded {
+  background: var(--audio-bg-base, #f7f8fa);
+}
+
 /* —— Take cards —— */
 .audio-mode-take-stack {
   flex: 0 1 auto;
