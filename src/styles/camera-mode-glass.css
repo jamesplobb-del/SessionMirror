@@ -4,18 +4,56 @@
  */
 
 /* —— Split compare / expand layout (elevated light) —— */
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--best {
-  border: 2px solid var(--sm-gold-border-strong);
+.app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open {
+  background:
+    radial-gradient(circle at 50% 12%, rgba(21, 152, 255, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(3, 7, 18, 0.08), rgba(3, 7, 18, 0.18)) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-host {
+  padding: 0.35rem 0.35rem 0.55rem;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout {
+  gap: 0.55rem;
+  padding: 0.5rem;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.1), transparent 48%),
+    rgba(15, 23, 42, 0.16) !important;
   box-shadow:
-    var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)),
-    0 0 0 1px rgba(247, 166, 0, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 44px rgba(0, 0, 0, 0.16) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
+  backdrop-filter: blur(18px) saturate(1.12);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel {
+  border-width: 1px !important;
+  background:
+    radial-gradient(circle at 70% 0%, rgba(255, 255, 255, 0.12), transparent 54%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(15, 23, 42, 0.22)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.12) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.12);
+  backdrop-filter: blur(22px) saturate(1.12);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--best {
+  border: 1px solid var(--sm-gold-border-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.12),
+    0 0 14px rgba(247, 166, 0, 0.16) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
-  border: 2px solid var(--sm-blue-border-strong);
+  border: 1px solid var(--sm-blue-border-strong);
   box-shadow:
-    var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)),
-    0 0 0 1px rgba(21, 152, 255, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.12),
+    0 0 14px rgba(21, 152, 255, 0.16) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel .group.relative.z-0,
@@ -30,16 +68,17 @@
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle {
-  border-top-color: rgba(23, 26, 34, 0.08);
-  border-bottom-color: rgba(23, 26, 34, 0.08);
-  background: #ffffff;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  height: 18px;
+  margin-inline: 0.55rem;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backdrop-filter: blur(14px) saturate(1.08);
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle--active {
   border-color: var(--sm-gold-border);
-  background: #ffffff;
+  background: rgba(247, 166, 0, 0.12) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle--active .split-ratio-handle__grip,
@@ -49,14 +88,14 @@
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge {
   z-index: 40;
-  border: 1.5px solid rgba(23, 26, 34, 0.14) !important;
-  background: #ffffff !important;
-  color: var(--audio-text-primary, #171a22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.94) !important;
   box-shadow:
-    0 6px 18px rgba(23, 26, 34, 0.14),
-    0 2px 6px rgba(23, 26, 34, 0.08) !important;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 8px 22px rgba(0, 0, 0, 0.22) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.14);
+  backdrop-filter: blur(18px) saturate(1.14);
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge svg {
@@ -69,16 +108,14 @@
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--ghost {
-  border: 1.5px solid rgba(23, 26, 34, 0.16) !important;
-  background: #ffffff !important;
-  box-shadow:
-    0 6px 18px rgba(23, 26, 34, 0.14),
-    0 2px 6px rgba(23, 26, 34, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--ghost:hover {
-  background: #ffffff !important;
-  border-color: rgba(23, 26, 34, 0.24) !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--gold {
@@ -218,39 +255,65 @@
   height: 1.85rem;
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-chrome-btn--expand {
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.18), transparent 58%),
+    rgba(15, 23, 42, 0.28) !important;
+  color: rgba(255, 255, 255, 0.98) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 6px 16px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(21, 152, 255, 0.12) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.16);
+  backdrop-filter: blur(18px) saturate(1.16);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-chrome-btn--expand:hover {
+  border-color: rgba(255, 255, 255, 0.38) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.22), transparent 58%),
+    rgba(15, 23, 42, 0.34) !important;
+}
+
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state {
-  background: #ffffff !important;
+  justify-content: center;
+  gap: 0.7rem;
+  background: transparent !important;
+  padding: 2.25rem 0.75rem 0.9rem !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__body p {
-  color: var(--audio-text-secondary, #6c7077) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__actions {
+  width: min(100%, 19rem);
+  align-self: center;
   gap: 0.38rem;
-  border-top: 1px solid rgba(23, 26, 34, 0.08) !important;
+  border-top: 0 !important;
   background: transparent !important;
-  padding: 0.38rem 0.42rem 0.42rem;
+  padding: 0;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action {
   min-height: clamp(1.45rem, 4.2vw, 1.85rem);
   gap: 0.32rem;
-  border-radius: 0.55rem;
-  border: 1px solid rgba(23, 26, 34, 0.1) !important;
-  background: #ffffff !important;
-  color: var(--audio-text-primary, #171a22) !important;
+  border-radius: 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
   font-size: clamp(0.5rem, 1.45vw, 0.6rem) !important;
   font-weight: 500;
   letter-spacing: 0.01em;
-  box-shadow: 0 2px 8px rgba(23, 26, 34, 0.05) !important;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backdrop-filter: blur(14px) saturate(1.08);
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action:hover {
-  background: #f7f8fa !important;
-  border-color: rgba(23, 26, 34, 0.16) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--upload:hover {
@@ -394,6 +457,19 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-header_
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     0 0 14px var(--sm-blue-soft) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active {
+  border-color: rgba(255, 255, 255, 0.92) !important;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.18), transparent 45%),
+    conic-gradient(from 210deg, var(--sm-gold), var(--sm-blue), var(--sm-gold)) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.2),
+    0 0 18px rgba(21, 152, 255, 0.2),
+    0 0 18px rgba(247, 166, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
 }
 
 /* —— Full-screen expand / review overlay —— */

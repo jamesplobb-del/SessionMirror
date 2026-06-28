@@ -53,7 +53,7 @@ const FOREGROUND_RESTART_DELAY_MS = 250
 const IOS_CAMERA_RELEASE_DELAY_MS = 250
 const IOS_AUDIO_TO_VIDEO_DELAY_MS = 200
 const IOS_VIDEO_TO_AUDIO_DELAY_MS = 280
-const BACKGROUND_SUSPEND_DELAY_MS = 100
+const BACKGROUND_SUSPEND_DELAY_MS = 0
 const RESUME_IN_FLIGHT_TIMEOUT_MS = 15000
 
 function detachPreviewStream(video: HTMLVideoElement | null) {
@@ -1466,6 +1466,12 @@ export function useCameraSession({
 
     if (backgroundSuspendTimerRef.current !== null) {
       window.clearTimeout(backgroundSuspendTimerRef.current)
+    }
+
+    if (BACKGROUND_SUSPEND_DELAY_MS <= 0) {
+      backgroundSuspendTimerRef.current = null
+      suspendCameraForBackground()
+      return
     }
 
     backgroundSuspendTimerRef.current = window.setTimeout(() => {

@@ -559,6 +559,41 @@ function StandardApp({
     teardownActiveAutoPlayback()
   }, [teardownActiveAutoPlayback])
 
+  useEffect(() => {
+    const suspendInteractiveAudio = () => {
+      pauseYoutubeProxy(youtubeIframeRef.current)
+      stopAutoPlaybackAudio()
+      pausePipVideos()
+      void finalizeTakePlaybackCleanup()
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      let removeListener: (() => void) | undefined
+      void import('@capacitor/app').then(({ App }) => {
+        void App.addListener('appStateChange', ({ isActive }) => {
+          if (!isActive) suspendInteractiveAudio()
+        }).then((sub) => {
+          removeListener = () => {
+            void sub.remove()
+          }
+        })
+      })
+
+      return () => {
+        removeListener?.()
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') suspendInteractiveAudio()
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [pausePipVideos, stopAutoPlaybackAudio])
+
   const finishAutoPlayback = useCallback(() => {
     void finalizeTakePlaybackCleanup().finally(() => {
       stopAutoPlaybackAudio()

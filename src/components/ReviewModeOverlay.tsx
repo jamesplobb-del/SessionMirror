@@ -556,17 +556,14 @@ export default function ReviewModeOverlay({
 
   const handleToggleChrome = useCallback(() => {
     setActionMenuOpen(false)
+    if (hideOverlayTimerRef.current !== null) {
+      window.clearTimeout(hideOverlayTimerRef.current)
+      hideOverlayTimerRef.current = null
+    }
     setShowPlayOverlay((visible) => {
-      const next = !visible
-      if (next && isPlaying) {
-        scheduleHideOverlay()
-      } else if (!next && hideOverlayTimerRef.current !== null) {
-        window.clearTimeout(hideOverlayTimerRef.current)
-        hideOverlayTimerRef.current = null
-      }
-      return next
+      return !visible
     })
-  }, [isPlaying, scheduleHideOverlay])
+  }, [])
 
   const handleRenameActiveTake = useCallback(() => {
     if (!activeTake || !onUpdateTake) return
@@ -911,7 +908,6 @@ export default function ReviewModeOverlay({
   const handleVideoPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     if ((e.target as HTMLElement).closest('[data-play-overlay]')) return
 
-    revealPlayOverlay(isPlaying)
     pointerStart.current = { x: e.clientX, y: e.clientY }
     isTrackingPointer.current = true
     swipeCommitted.current = false
@@ -950,6 +946,7 @@ export default function ReviewModeOverlay({
     isTrackingPointer.current = false
 
     if (!swipeCommitted.current) {
+      e.preventDefault()
       handleToggleChrome()
       return
     }
@@ -966,6 +963,12 @@ export default function ReviewModeOverlay({
       return
     }
 
+    setSwipeOffset(0)
+  }
+
+  const handleVideoPointerCancel = () => {
+    isTrackingPointer.current = false
+    swipeCommitted.current = false
     setSwipeOffset(0)
   }
 
@@ -1117,7 +1120,7 @@ export default function ReviewModeOverlay({
             onPointerDown={handleVideoPointerDown}
             onPointerMove={handleVideoPointerMove}
             onPointerUp={handleVideoPointerUp}
-            onPointerCancel={handleVideoPointerUp}
+            onPointerCancel={handleVideoPointerCancel}
           />
         ) : isOpen ? (
           <>
@@ -1153,7 +1156,7 @@ export default function ReviewModeOverlay({
                     activeSlot === 'benchmark' ? handleVideoPointerUp : undefined
                   }
                   onPointerCancel={
-                    activeSlot === 'benchmark' ? handleVideoPointerUp : undefined
+                    activeSlot === 'benchmark' ? handleVideoPointerCancel : undefined
                   }
                 />
               </div>
@@ -1191,7 +1194,7 @@ export default function ReviewModeOverlay({
                     activeSlot === 'challenger' ? handleVideoPointerUp : undefined
                   }
                   onPointerCancel={
-                    activeSlot === 'challenger' ? handleVideoPointerUp : undefined
+                    activeSlot === 'challenger' ? handleVideoPointerCancel : undefined
                   }
                 />
               </div>

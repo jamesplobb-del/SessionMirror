@@ -66,6 +66,9 @@
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-select__control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   width: 100%;
   min-height: 2.35rem;
   padding: 0.45rem 2rem 0.45rem 0.7rem;
@@ -81,11 +84,37 @@
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+  text-align: left;
+  transition:
+    transform 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-select__control:focus-visible {
   outline: 2px solid var(--audio-blue);
   outline-offset: 2px;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__control:active {
+  transform: scale(0.98);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select--open .metronome-audio-select__control {
+  border-color: var(--audio-blue-border);
+  background: var(--audio-surface);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 0 0 2px var(--audio-blue-soft);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-ui-overlay--audio-mode .metronome-audio-select__chevron {
@@ -95,6 +124,60 @@
   height: 0.95rem;
   color: var(--audio-text-secondary);
   pointer-events: none;
+  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select--open .metronome-audio-select__chevron {
+  transform: rotate(180deg);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.32rem);
+  z-index: 80;
+  max-height: min(13.5rem, 34vh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.28rem;
+  box-shadow:
+    0 18px 42px rgba(23, 26, 34, 0.16),
+    0 4px 12px rgba(23, 26, 34, 0.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__option {
+  display: flex;
+  min-height: 2.05rem;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  border-radius: 0.64rem;
+  padding: 0.42rem 0.52rem;
+  color: var(--audio-text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: left;
+  transition:
+    transform 150ms cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__option:active {
+  transform: scale(0.98);
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__option--selected {
+  background: var(--audio-blue-soft);
+  color: var(--audio-blue);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__selectors--under-wheel {
@@ -132,6 +215,44 @@
   right: 0.42rem;
   width: 0.82rem;
   height: 0.82rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__select-row--triple .metronome-audio-select__menu {
+  max-height: min(11rem, 30vh);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .metronome-audio-select__control {
+  border-color: rgba(226, 232, 240, 0.12);
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--audio-text-primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 20px rgba(0, 0, 0, 0.16);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .metronome-audio-select--open .metronome-audio-select__control {
+  border-color: var(--audio-blue-border);
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 2px var(--audio-blue-soft);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .metronome-audio-select__menu {
+  border-color: rgba(226, 232, 240, 0.12);
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .metronome-audio-select__option {
+  color: var(--audio-text-primary);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .metronome-audio-select__option--selected {
+  background: rgba(21, 152, 255, 0.18);
+  color: #bae6fd;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
