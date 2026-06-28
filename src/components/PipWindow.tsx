@@ -516,7 +516,7 @@ function PipWindow({
               e.stopPropagation()
               onPinAsBest()
             }}
-            className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold`}
+            className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn--pin-best`}
             style={{ top: chromeInset, left: chromeInset }}
             aria-label="Pin current take as Best Take"
             title="Pin as Best Take"
@@ -559,7 +559,7 @@ function PipWindow({
             e.stopPropagation()
             onPinAsBest()
           }}
-          className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold`}
+          className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn--pin-best`}
           style={{ top: exteriorBadgeInset, left: exteriorBadgeInset }}
           aria-label="Pin current take as Best Take"
           title="Pin as Best Take"

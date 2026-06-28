@@ -782,7 +782,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pit
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom-inner,
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom > .split-compare-panel {
-  height: 100% !important;
+  height: calc(100% - 0.08rem) !important;
   min-height: 0;
 }
 
@@ -797,6 +797,22 @@ html.app-dark-mode .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pit
     inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
   -webkit-backdrop-filter: blur(16px) saturate(1.08);
   backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode
+  .split-compare-layout
+  .pip-chrome-btn--upload {
+  top: auto !important;
+  bottom: 0.48rem !important;
+  left: 0.48rem !important;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode
+  .split-compare-layout
+  .pip-chrome-btn--pin-best {
+  top: auto !important;
+  bottom: 0.48rem !important;
+  left: 0.48rem !important;
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-empty-state--split .pip-empty-action {
