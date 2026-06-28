@@ -3,27 +3,24 @@
  * Scoped away from `.app-ui-overlay--audio-mode` (audio uses opaque elevated surfaces).
  */
 
-/* —— Split compare / expand layout —— */
+/* —— Split compare / expand layout (elevated light) —— */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout {
-  border-color: var(--sm-glass-border);
-  background:
-    radial-gradient(ellipse 90% 45% at 50% 0%, var(--sm-gold-soft), transparent 58%),
-    radial-gradient(ellipse 90% 45% at 50% 100%, var(--sm-blue-soft), transparent 58%),
-    rgba(11, 18, 32, 0.62);
+  border-color: rgba(23, 26, 34, 0.08);
+  background: var(--audio-bg-base, #f7f8fa);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 14px 40px rgba(0, 0, 0, 0.38);
-  -webkit-backdrop-filter: blur(22px) saturate(1.12);
-  backdrop-filter: blur(22px) saturate(1.12);
+    0 14px 36px rgba(23, 26, 34, 0.07),
+    0 2px 8px rgba(23, 26, 34, 0.04);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__top > div > .relative > .relative > .relative {
   --tw-ring-color: var(--sm-gold-border-strong) !important;
   border-color: var(--sm-gold-border-strong) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 8px 20px rgba(0, 0, 0, 0.08),
-    0 0 18px var(--sm-gold-glow-strong) !important;
+  background: #ffffff !important;
+  box-shadow: var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -33,28 +30,55 @@
   > .relative {
   --tw-ring-color: var(--sm-blue-border-strong) !important;
   border-color: var(--sm-blue-border-strong) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 8px 20px rgba(0, 0, 0, 0.08),
-    0 0 18px var(--sm-blue-glow-strong) !important;
+  background: #ffffff !important;
+  box-shadow: var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle {
-  border-top-color: var(--sm-glass-border);
-  border-bottom-color: var(--sm-glass-border);
-  background: rgba(15, 23, 42, 0.55);
-  -webkit-backdrop-filter: blur(20px) saturate(1.1);
-  backdrop-filter: blur(20px) saturate(1.1);
+  border-top-color: rgba(23, 26, 34, 0.08);
+  border-bottom-color: rgba(23, 26, 34, 0.08);
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle--active {
   border-color: var(--sm-gold-border);
-  background: rgba(15, 23, 42, 0.72);
+  background: #ffffff;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle--active .split-ratio-handle__grip,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle--arming .split-ratio-handle__grip {
   color: var(--sm-gold);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge {
+  border: 0 !important;
+  background: #ffffff !important;
+  color: var(--audio-text-primary, #171a22) !important;
+  box-shadow: var(--audio-shadow-fab, 0 8px 22px rgba(23, 26, 34, 0.1), 0 2px 6px rgba(23, 26, 34, 0.05)) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--ghost {
+  border: 1px solid rgba(23, 26, 34, 0.08) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--ghost:hover {
+  background: rgba(23, 26, 34, 0.04) !important;
+  border-color: rgba(23, 26, 34, 0.14) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .hud-glass-badge--gold {
+  border: 0 !important;
+  color: #ffffff !important;
+  background: var(--sm-gold) !important;
+  box-shadow: 0 4px 14px var(--sm-gold-soft) !important;
 }
 
 /* —— Pip take boxes (Best Take gold / Current Take blue) —— */
@@ -88,41 +112,47 @@
     0 0 16px var(--sm-blue-glow-strong) !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .bg-amber-400\/90,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .bg-amber-400\/90 {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .bg-amber-400\/90 {
   background: linear-gradient(135deg, rgba(247, 166, 0, 0.96), rgba(220, 140, 0, 0.9)) !important;
   color: #ffffff !important;
   box-shadow: 0 2px 10px var(--sm-gold-soft);
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .bg-sky-500\/90,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .bg-sky-500\/90 {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .bg-sky-500\/90 {
   background: linear-gradient(135deg, rgba(21, 152, 255, 0.96), rgba(11, 120, 220, 0.9)) !important;
   color: #ffffff !important;
   box-shadow: 0 2px 10px var(--sm-blue-soft);
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .bg-amber-400\/90 {
+  background: var(--sm-gold) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 10px var(--sm-gold-soft);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .bg-sky-500\/90 {
+  background: var(--sm-blue) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 10px var(--sm-blue-soft);
+}
+
 /* —— Empty state + upload / YouTube actions —— */
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state {
   background: transparent !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__body p,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__body p {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__body p {
   color: rgba(255, 255, 255, 0.78) !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__actions,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__actions {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__actions {
   gap: 0.38rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
   background: transparent !important;
   padding: 0.38rem 0.42rem 0.42rem;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action {
   min-height: clamp(1.45rem, 4.2vw, 1.85rem);
   gap: 0.32rem;
   border-radius: 0.55rem;
@@ -140,42 +170,81 @@
     border-color 160ms ease;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action:hover,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action:hover {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action:hover {
   background: rgba(255, 255, 255, 0.04) !important;
   border-color: rgba(255, 255, 255, 0.24) !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action svg,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action svg {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action svg {
   width: clamp(0.72rem, 2.2vw, 0.88rem);
   height: clamp(0.72rem, 2.2vw, 0.88rem);
   stroke-width: 1.85;
   flex-shrink: 0;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--upload svg,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--upload svg {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--upload svg {
   color: var(--sm-gold);
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--upload:hover,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--upload:hover {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--upload:hover {
   border-color: var(--sm-gold-border-strong) !important;
   background: rgba(247, 166, 0, 0.06) !important;
   box-shadow: none;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--youtube svg,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--youtube svg {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--youtube svg {
   color: #ff5a5a !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--youtube:hover,
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--youtube:hover {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--youtube:hover {
   border-color: rgba(255, 90, 90, 0.42) !important;
   background: rgba(255, 90, 90, 0.06) !important;
   box-shadow: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state {
+  background: #ffffff !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__body p {
+  color: var(--audio-text-secondary, #6c7077) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__actions {
+  gap: 0.38rem;
+  border-top: 1px solid rgba(23, 26, 34, 0.08) !important;
+  background: transparent !important;
+  padding: 0.38rem 0.42rem 0.42rem;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action {
+  min-height: clamp(1.45rem, 4.2vw, 1.85rem);
+  gap: 0.32rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(23, 26, 34, 0.1) !important;
+  background: #ffffff !important;
+  color: var(--audio-text-primary, #171a22) !important;
+  font-size: clamp(0.5rem, 1.45vw, 0.6rem) !important;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(23, 26, 34, 0.05) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action:hover {
+  background: #f7f8fa !important;
+  border-color: rgba(23, 26, 34, 0.16) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--upload:hover {
+  border-color: var(--sm-gold-border-strong) !important;
+  background: rgba(247, 166, 0, 0.06) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--youtube:hover {
+  border-color: rgba(255, 90, 90, 0.42) !important;
+  background: rgba(255, 90, 90, 0.06) !important;
 }
 
 /* —— Floating icon badges on pip boxes —— */
@@ -270,8 +339,9 @@
   border-color: var(--sm-gold-border);
 }
 
-/* Hide session pill while fullscreen expand/review is open */
-.app-ui-overlay--review-open .hud-header {
+/* Hide session pill while fullscreen expand/review or split compare is open */
+.app-ui-overlay--review-open .hud-header,
+.app-ui-overlay--split-open .hud-header {
   visibility: hidden;
   pointer-events: none;
 }

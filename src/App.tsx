@@ -2629,7 +2629,7 @@ function StandardApp({
       )}
 
       <motion.div
-        className={`app-ui-overlay ${recordingMode === 'audio' ? 'app-ui-overlay--audio-mode' : ''} ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
+        className={`app-ui-overlay ${recordingMode === 'audio' ? 'app-ui-overlay--audio-mode' : ''} ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isSplitView ? 'app-ui-overlay--split-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
         aria-hidden={hudModalState === 'review'}
         animate={{
           opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -2651,7 +2651,7 @@ function StandardApp({
           <HudHeader
             sessionName={activeProject?.name ?? 'BestTake'}
             onOpenVault={handleOpenVault}
-            className={quickSettingsOpen || isReviewOpen ? 'hud-header-hidden' : undefined}
+            className={quickSettingsOpen || isReviewOpen || isSplitView ? 'hud-header-hidden' : undefined}
           />
         )}
 
