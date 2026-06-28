@@ -18,12 +18,12 @@
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__top > div > .relative > .relative > .relative {
-  --tw-ring-color: var(--sm-gold-border) !important;
-  border-color: var(--sm-gold-border) !important;
+  --tw-ring-color: var(--sm-gold-border-strong) !important;
+  border-color: var(--sm-gold-border-strong) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 8px 20px rgba(0, 0, 0, 0.08),
-    0 0 14px var(--sm-gold-soft) !important;
+    0 0 18px var(--sm-gold-glow-strong) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -31,12 +31,12 @@
   .pip-window--fill
   > .relative
   > .relative {
-  --tw-ring-color: var(--sm-blue-border) !important;
-  border-color: var(--sm-blue-border) !important;
+  --tw-ring-color: var(--sm-blue-border-strong) !important;
+  border-color: var(--sm-blue-border-strong) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 8px 20px rgba(0, 0, 0, 0.08),
-    0 0 14px var(--sm-blue-soft) !important;
+    0 0 18px var(--sm-blue-glow-strong) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-ratio-handle {
@@ -68,24 +68,24 @@
   .pip-video-container:has(.ring-amber-400\/50)
   > .ui-orient-spin
   > .relative {
-  --tw-ring-color: var(--sm-gold-border) !important;
-  border-color: var(--sm-gold-border) !important;
+  --tw-ring-color: var(--sm-gold-border-strong) !important;
+  border-color: var(--sm-gold-border-strong) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     0 8px 22px rgba(0, 0, 0, 0.1),
-    0 0 10px var(--sm-gold-soft) !important;
+    0 0 16px var(--sm-gold-glow-strong) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .pip-video-container:has(.ring-sky-400\/50)
   > .ui-orient-spin
   > .relative {
-  --tw-ring-color: var(--sm-blue-border) !important;
-  border-color: var(--sm-blue-border) !important;
+  --tw-ring-color: var(--sm-blue-border-strong) !important;
+  border-color: var(--sm-blue-border-strong) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     0 8px 22px rgba(0, 0, 0, 0.1),
-    0 0 10px var(--sm-blue-soft) !important;
+    0 0 16px var(--sm-blue-glow-strong) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .bg-amber-400\/90,
@@ -105,7 +105,7 @@
 /* —— Empty state + upload / YouTube actions —— */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state {
-  background: rgba(255, 255, 255, 0.025) !important;
+  background: transparent !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__body p,
@@ -116,7 +116,7 @@
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-state__actions,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__actions {
   gap: 0.38rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
   background: transparent !important;
   padding: 0.38rem 0.42rem 0.42rem;
 }
@@ -126,25 +126,24 @@
   min-height: clamp(1.45rem, 4.2vw, 1.85rem);
   gap: 0.32rem;
   border-radius: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
-  background: rgba(255, 255, 255, 0.012) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: transparent !important;
   color: rgba(255, 255, 255, 0.88) !important;
   font-size: clamp(0.5rem, 1.45vw, 0.6rem) !important;
   font-weight: 500;
   letter-spacing: 0.01em;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  -webkit-backdrop-filter: blur(14px) saturate(1.04);
-  backdrop-filter: blur(14px) saturate(1.04);
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   transition:
     background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    border-color 160ms ease;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action:hover,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action:hover {
-  background: rgba(255, 255, 255, 0.035) !important;
-  border-color: rgba(255, 255, 255, 0.34) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action svg,
@@ -162,10 +161,9 @@
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--upload:hover,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--upload:hover {
-  border-color: var(--sm-gold-border) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 14px var(--sm-gold-soft);
+  border-color: var(--sm-gold-border-strong) !important;
+  background: rgba(247, 166, 0, 0.06) !important;
+  box-shadow: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--youtube svg,
@@ -175,10 +173,9 @@
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container .pip-empty-action--youtube:hover,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action--youtube:hover {
-  border-color: rgba(255, 90, 90, 0.38) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 12px rgba(255, 90, 90, 0.14);
+  border-color: rgba(255, 90, 90, 0.42) !important;
+  background: rgba(255, 90, 90, 0.06) !important;
+  box-shadow: none;
 }
 
 /* —— Floating icon badges on pip boxes —— */
@@ -195,6 +192,19 @@
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-glass-badge:hover {
   background: rgba(255, 255, 255, 0.16) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-glass-badge--ghost {
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-glass-badge--ghost:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-glass-badge--gold {

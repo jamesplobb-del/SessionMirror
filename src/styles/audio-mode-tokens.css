@@ -4,12 +4,16 @@
 :root {
   --sm-gold: #f7a600;
   --sm-gold-border: rgba(247, 166, 0, 0.54);
+  --sm-gold-border-strong: rgba(247, 166, 0, 0.68);
   --sm-gold-soft: rgba(247, 166, 0, 0.14);
   --sm-gold-glow: rgba(247, 166, 0, 0.22);
+  --sm-gold-glow-strong: rgba(247, 166, 0, 0.28);
   --sm-blue: #1598ff;
   --sm-blue-border: rgba(21, 152, 255, 0.54);
+  --sm-blue-border-strong: rgba(21, 152, 255, 0.68);
   --sm-blue-soft: rgba(21, 152, 255, 0.14);
   --sm-blue-glow: rgba(21, 152, 255, 0.22);
+  --sm-blue-glow-strong: rgba(21, 152, 255, 0.28);
   --sm-glass-border: rgba(255, 255, 255, 0.22);
   --sm-glass-surface: rgba(255, 255, 255, 0.08);
   --sm-glass-chrome:

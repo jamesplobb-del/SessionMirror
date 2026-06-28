@@ -33,7 +33,7 @@ import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 
-const UPLOAD_BADGE_BTN = HUD_GLASS_FLOAT_BADGE
+const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 
 const emptyActionClass =
   'pip-empty-action pip-empty-action--interactive pointer-events-auto flex flex-1 items-center justify-center gap-1.5'
@@ -307,6 +307,8 @@ function BestTakeBox({
   const renderClearButton = () => {
     if (!hasReference) return null
 
+    const clearRight = onToggleSplitView ? chromeInset + 32 : chromeInset
+
     return (
       <Pressable
         type="button"
@@ -320,8 +322,8 @@ function BestTakeBox({
           e.stopPropagation()
           handleClearReference()
         }}
-        className={UPLOAD_BADGE_BTN}
-        style={{ top: chromeInset, right: chromeInset }}
+        className={CHROME_BADGE_BTN}
+        style={{ top: chromeInset, right: clearRight }}
         aria-label={hasYoutube ? 'Clear YouTube reference' : hasLibraryPlayback ? 'Clear library reference' : 'Unload Best Take'}
       >
         <X className="h-3 w-3" />
@@ -331,10 +333,6 @@ function BestTakeBox({
 
   const renderSplitViewToggle = () => {
     if (!onToggleSplitView) return null
-
-    const togglePosition = hasReference
-      ? { bottom: chromeInset, right: chromeInset }
-      : { top: chromeInset, right: chromeInset }
 
     return (
       <Pressable
@@ -350,8 +348,8 @@ function BestTakeBox({
           e.stopPropagation()
           onToggleSplitView()
         }}
-        className={UPLOAD_BADGE_BTN}
-        style={togglePosition}
+        className={CHROME_BADGE_BTN}
+        style={{ top: chromeInset, right: chromeInset }}
         aria-label={splitViewActive ? 'Return to normal view' : 'Open split view layout'}
       >
         {splitViewActive ? (
@@ -513,7 +511,7 @@ function BestTakeBox({
               onTouchStart={stopEventBubble}
               onTouchEnd={stopEventBubble}
               onClick={stopEventBubble}
-              className={UPLOAD_BADGE_BTN}
+              className={CHROME_BADGE_BTN}
               style={{ top: chromeInset, left: chromeInset }}
               aria-label="Upload best take media"
             >
