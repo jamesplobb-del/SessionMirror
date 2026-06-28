@@ -1,5 +1,6 @@
 import { useCallback, useRef, memo } from 'react'
-import { Camera, Mic, Square } from 'lucide-react'
+import { Camera, Mic } from 'lucide-react'
+import RecordOrbitIcon from './RecordOrbitIcon'
 import {
   triggerLightHaptic,
   triggerRecordStartHaptic,
@@ -93,14 +94,15 @@ function ModeSlot({
       {...buttonHandlers}
       className={`record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
         isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
-      } ${isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
+      } ${isCenter && isVideo ? 'record-carousel-slot--orbit' : ''} ${
+        isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
         isCenter && isRecording ? 'record-carousel-slot--recording' : ''
       } ${longPressActive ? 'record-carousel-slot--hands-free' : ''}`}
     >
-      {isCenter && isRecording ? (
-        <Square className="h-5 w-5 fill-red-500 text-red-500" />
-      ) : isCenter && isVideo ? (
-        <span className="record-carousel-slot-dot block rounded-full bg-red-500" aria-hidden />
+      {isCenter && isVideo ? (
+        <RecordOrbitIcon recording={isRecording} />
+      ) : isCenter && isRecording ? (
+        <span className="record-carousel-slot-stop block h-3 w-3 rounded-[3px] bg-red-500" aria-hidden />
       ) : isCenter ? (
         <Mic className="h-5 w-5 text-white" strokeWidth={2.25} />
       ) : isVideo ? (

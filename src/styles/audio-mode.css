@@ -623,17 +623,17 @@ html.app-audio-mode #root {
   box-shadow: var(--audio-shadow-record) !important;
 }
 
-.app-ui-overlay--audio-mode .record-carousel-slot--active.record-carousel-slot--video-active:not(.record-carousel-slot--recording) {
+.app-ui-overlay--audio-mode .record-carousel-slot--active.record-carousel-slot--video-active:not(.record-carousel-slot--recording),
+.app-ui-overlay--audio-mode .record-carousel-slot--active.record-carousel-slot--orbit:not(.record-carousel-slot--recording) {
   border: 0 !important;
-  color: #171a22 !important;
-  background:
-    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
-    linear-gradient(145deg, #f7b84d, #f7a600) !important;
-  box-shadow: var(--audio-shadow-record) !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.app-ui-overlay--audio-mode .record-carousel-slot--active.record-carousel-slot--video-active:not(.record-carousel-slot--recording) svg {
-  color: #171a22 !important;
+.app-ui-overlay--audio-mode .record-carousel-slot--active.record-carousel-slot--recording.record-carousel-slot--orbit {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .app-ui-overlay--audio-mode .record-carousel-auto-btn {

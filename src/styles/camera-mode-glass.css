@@ -479,43 +479,21 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-header_
     0 0 14px var(--sm-blue-soft) !important;
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--orbit,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active {
-  border-color: rgba(255, 255, 255, 0.96) !important;
-  background:
-    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
-    conic-gradient(from 220deg, var(--sm-gold), var(--sm-blue) 42%, #ffffff 56%, var(--sm-gold) 100%) !important;
-  color: #ffffff !important;
-  box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.2),
-    0 0 20px rgba(21, 152, 255, 0.24),
-    0 0 18px rgba(247, 166, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active .record-carousel-slot-dot {
-  background:
-    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.42), transparent 46%),
-    linear-gradient(145deg, var(--sm-blue), var(--sm-gold)) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.38),
-    0 0 12px rgba(21, 152, 255, 0.32),
-    0 0 10px rgba(247, 166, 0, 0.24) !important;
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording.record-carousel-slot--orbit {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording {
-  border-color: rgba(255, 255, 255, 0.96) !important;
-  background:
-    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.28), transparent 42%),
-    conic-gradient(from 220deg, var(--sm-gold), var(--sm-blue) 48%, #ffffff 62%, var(--sm-gold) 100%) !important;
-}
-
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording svg {
-  color: #ffffff !important;
-  fill: #ffffff !important;
-}
-
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording::after {
-  border-color: rgba(247, 166, 0, 0.5) !important;
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording.record-carousel-slot--orbit::after {
+  display: none;
 }
 
 /* —— Full-screen expand / review overlay —— */
@@ -826,32 +804,16 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
   backdrop-filter: blur(16px) saturate(1.08);
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--orbit,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active {
   border: 0 !important;
-  background:
-    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
-    linear-gradient(145deg, #f7b84d, var(--sm-gold)) !important;
-  color: #171a22 !important;
-  box-shadow:
-    0 12px 32px rgba(23, 26, 34, 0.12),
-    0 4px 10px rgba(23, 26, 34, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active .record-carousel-slot-dot {
-  background:
-    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.44), transparent 46%),
-    linear-gradient(145deg, #ffffff, var(--sm-gold)) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.58),
-    0 0 14px rgba(247, 166, 0, 0.26) !important;
-}
-
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording.record-carousel-slot--orbit {
   border: 0 !important;
-  background:
-    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
-    linear-gradient(145deg, #f7b84d, var(--sm-gold)) !important;
+  background: transparent !important;
 }
 
 html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open {
