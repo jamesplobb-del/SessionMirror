@@ -2099,14 +2099,14 @@ html.physical-landscape-right .ui-orient-spin {
 .record-carousel-viewport {
   position: relative;
   --record-carousel-viewport-width: 9.5rem;
-  --record-slot-active-size: 60px;
+  --record-slot-active-size: 66px;
   --record-slot-inactive-size: 40px;
   --record-slot-inactive-scale: calc(var(--record-slot-inactive-size) / var(--record-slot-active-size));
   --record-slot-side-x: calc(
     var(--record-slot-inactive-size) / 2 - var(--record-carousel-viewport-width) / 2
   );
   width: var(--record-carousel-viewport-width);
-  height: 60px;
+  height: 66px;
   touch-action: pan-y;
   overflow: visible;
 }
@@ -2140,7 +2140,7 @@ html.physical-landscape-right .ui-orient-spin {
 
 .record-delete-drop {
   width: var(--record-carousel-viewport-width, 9.5rem);
-  height: 60px;
+  height: 66px;
   overflow: visible;
 }
 
@@ -2288,8 +2288,8 @@ html.physical-landscape-right .ui-orient-spin {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
+  width: 66px;
+  height: 66px;
   pointer-events: none;
 }
 
@@ -2306,7 +2306,7 @@ html.physical-landscape-right .ui-orient-spin {
 }
 
 .record-orbit-icon__ring-group {
-  transform-origin: 28px 28px;
+  transform-origin: 32px 32px;
 }
 
 .record-orbit-icon__dot,
@@ -2314,20 +2314,12 @@ html.physical-landscape-right .ui-orient-spin {
   filter: drop-shadow(0 2px 5px rgba(239, 68, 68, 0.38));
 }
 
-.record-orbit-icon--recording .record-orbit-icon__ring-group--outer {
+.record-orbit-icon--recording .record-orbit-icon__ring-group {
   animation: record-orbit-ring-breathe 1.55s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
-.record-orbit-icon--recording .record-orbit-icon__ring-group--inner {
-  animation: record-orbit-ring-breathe 1.55s cubic-bezier(0.22, 1, 0.36, 1) infinite 0.32s;
-}
-
-.record-orbit-icon--recording .record-orbit-icon__ring--outer {
+.record-orbit-icon--recording .record-orbit-icon__ring {
   animation: record-orbit-ring-glow 1.55s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-}
-
-.record-orbit-icon--recording .record-orbit-icon__ring--inner {
-  animation: record-orbit-ring-glow 1.55s cubic-bezier(0.22, 1, 0.36, 1) infinite 0.28s;
 }
 
 .record-orbit-icon--recording .record-orbit-icon__stop {
@@ -2781,17 +2773,21 @@ video.camera-preview--embedded.camera-preview--mirror {
 }
 
 .app-ui-overlay--split-open .split-compare-host {
+  overflow: visible;
   padding-inline: 0.15rem;
+  padding-bottom: 0.55rem;
+  z-index: 2;
 }
 
 .app-ui-overlay--split-open .app-hud-bottom {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  padding-top: 0.35rem;
+  margin-top: 0.2rem;
+  padding-top: 0.55rem;
   background: linear-gradient(
     to top,
-    var(--audio-bg-base, #f7f8fa) 82%,
+    var(--audio-bg-base, #f7f8fa) 78%,
     rgba(247, 248, 250, 0) 100%
   );
 }
@@ -2803,8 +2799,9 @@ video.camera-preview--embedded.camera-preview--mirror {
   height: 100%;
   min-height: 0;
   padding: 0.3rem;
+  padding-bottom: 0.55rem;
   border-radius: 1.65rem;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid rgba(23, 26, 34, 0.08);
   background: var(--audio-bg-base, #f7f8fa);
   box-shadow:
@@ -2815,9 +2812,28 @@ video.camera-preview--embedded.camera-preview--mirror {
 .split-compare-layout__top,
 .split-compare-layout__bottom {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
   contain: layout style;
+}
+
+.app-ui-overlay--split-open .split-compare-layout__bottom {
+  padding-bottom: 0.3rem;
+}
+
+.app-ui-overlay--split-open .split-compare-layout__bottom-inner,
+.app-ui-overlay--split-open .split-compare-layout__bottom > .split-compare-panel--current {
+  box-sizing: border-box;
+  height: 100%;
+  max-height: calc(100% - 0.15rem);
+  min-height: 0;
+}
+
+.app-ui-overlay--split-open .split-compare-panel--current {
+  border: 2px solid var(--audio-blue-border, rgba(21, 152, 255, 0.45)) !important;
+  box-shadow:
+    var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)),
+    0 0 0 1px rgba(21, 152, 255, 0.12) !important;
 }
 
 .split-compare-panel {

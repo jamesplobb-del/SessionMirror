@@ -14,14 +14,14 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
       className={`record-orbit-icon ${recording ? 'record-orbit-icon--recording' : ''}`}
       aria-hidden
     >
-      <svg viewBox="0 0 56 56" className="record-orbit-icon__svg" fill="none">
+      <svg viewBox="0 0 64 64" className="record-orbit-icon__svg" fill="none">
         <defs>
           <linearGradient
             id={ringGradientId}
             x1="0"
-            y1="28"
-            x2="56"
-            y2="28"
+            y1="32"
+            x2="64"
+            y2="32"
             gradientUnits="userSpaceOnUse"
           >
             <stop offset="0%" stopColor="var(--sm-gold, #f7a600)" />
@@ -36,44 +36,33 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
           </radialGradient>
         </defs>
 
-        <g className="record-orbit-icon__ring-group record-orbit-icon__ring-group--outer">
+        <g className="record-orbit-icon__ring-group">
           <circle
-            className="record-orbit-icon__ring record-orbit-icon__ring--outer"
-            cx="28"
-            cy="28"
-            r="24.75"
+            className="record-orbit-icon__ring"
+            cx="32"
+            cy="32"
+            r="28"
             stroke={`url(#${ringGradientId})`}
-            strokeWidth="1.45"
-          />
-        </g>
-
-        <g className="record-orbit-icon__ring-group record-orbit-icon__ring-group--inner">
-          <circle
-            className="record-orbit-icon__ring record-orbit-icon__ring--inner"
-            cx="28"
-            cy="28"
-            r="18.75"
-            stroke={`url(#${ringGradientId})`}
-            strokeWidth="1.3"
+            strokeWidth="1.55"
           />
         </g>
 
         {recording ? (
           <rect
             className="record-orbit-icon__stop"
-            x="21.25"
-            y="21.25"
-            width="13.5"
-            height="13.5"
-            rx="2.5"
+            x="24"
+            y="24"
+            width="16"
+            height="16"
+            rx="2.75"
             fill={`url(#${dotGradientId})`}
           />
         ) : (
           <circle
             className="record-orbit-icon__dot"
-            cx="28"
-            cy="28"
-            r="5.75"
+            cx="32"
+            cy="32"
+            r="7.25"
             fill={`url(#${dotGradientId})`}
           />
         )}

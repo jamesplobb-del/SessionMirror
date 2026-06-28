@@ -392,7 +392,7 @@ html.app-audio-mode #root {
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-host {
-  padding-bottom: 0;
+  padding-bottom: 0.55rem;
   padding-top: 0;
 }
 
@@ -433,10 +433,11 @@ html.app-audio-mode #root {
   position: relative;
   z-index: 12;
   flex-shrink: 0;
-  padding-top: 0.35rem;
+  margin-top: 0.2rem;
+  padding-top: 0.55rem;
   background: linear-gradient(
     to top,
-    var(--audio-bg-base) 82%,
+    var(--audio-bg-base) 78%,
     rgba(247, 248, 250, 0) 100%
   );
 }
@@ -446,7 +447,10 @@ html.app-audio-mode #root {
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-panel--current {
-  border-color: var(--audio-blue-border);
+  border: 2px solid var(--audio-blue-border) !important;
+  box-shadow:
+    var(--audio-shadow-card),
+    0 0 0 1px rgba(21, 152, 255, 0.12) !important;
 }
 
 /* —— Take cards —— */
@@ -659,13 +663,13 @@ html.app-audio-mode #root {
 }
 
 .app-ui-overlay--audio-mode .record-carousel-viewport {
-  --record-slot-active-size: 62px;
-  height: 62px;
+  --record-slot-active-size: 66px;
+  height: 66px;
 }
 
 .app-ui-overlay--audio-mode .record-carousel-slot--active:not(.record-carousel-slot--recording) {
-  width: 62px;
-  height: 62px;
+  width: 66px;
+  height: 66px;
 }
 
 .app-ui-overlay--audio-mode .hud-header-hidden {
@@ -685,7 +689,8 @@ html.app-audio-mode #root {
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom {
-  padding-bottom: 0.12rem;
+  overflow: visible;
+  padding-bottom: 0.3rem;
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode

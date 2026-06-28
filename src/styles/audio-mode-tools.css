@@ -778,19 +778,21 @@ html.app-dark-mode .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pit
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom {
   overflow: visible;
-  padding-bottom: 0.42rem;
+  padding-bottom: 0.3rem;
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom-inner,
-.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom > .split-compare-panel {
-  height: calc(100% - 0.1rem) !important;
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom > .split-compare-panel--current {
+  height: 100%;
+  max-height: calc(100% - 0.15rem);
   min-height: 0;
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-panel--current {
+  border: 2px solid var(--audio-blue-border, rgba(21, 152, 255, 0.45)) !important;
   box-shadow:
     var(--audio-shadow-card, 0 14px 36px rgba(23, 26, 34, 0.07), 0 2px 8px rgba(23, 26, 34, 0.04)),
-    inset 0 0 0 1.5px var(--audio-blue-border, rgba(21, 152, 255, 0.45)) !important;
+    0 0 0 1px rgba(21, 152, 255, 0.12) !important;
 }
 
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode
