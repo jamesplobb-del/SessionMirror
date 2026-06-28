@@ -769,6 +769,23 @@ html.app-dark-mode .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pit
 }
 
 /* Late-loaded Audio Mode split buttons — override older generic split chrome. */
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout,
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout *,
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-panel,
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-window--fill {
+  box-sizing: border-box;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom {
+  padding-bottom: 0.32rem;
+}
+
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom-inner,
+.app-ui-overlay--split-open.app-ui-overlay--audio-mode .split-compare-layout__bottom > .split-compare-panel {
+  height: 100% !important;
+  min-height: 0;
+}
+
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode
   .split-compare-layout
   .pip-chrome-btn--expand.hud-glass-badge--ghost {

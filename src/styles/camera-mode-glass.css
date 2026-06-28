@@ -675,6 +675,152 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
   color: #ff5a5a !important;
 }
 
+/* Camera split should match Audio Mode's elevated native sheet language. */
+.app-shell--split-open:not(.app-shell--audio-mode) {
+  background-color: var(--audio-bg-base, #f7f8fa) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open {
+  background: var(--audio-bg-base, #f7f8fa) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open .app-hud-bottom {
+  background: linear-gradient(
+    to top,
+    var(--audio-bg-base, #f7f8fa) 82%,
+    rgba(247, 248, 250, 0) 100%
+  ) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open .split-compare-host {
+  padding: 0.05rem 0.35rem 0.35rem;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout {
+  gap: 0.34rem;
+  padding: 0.34rem;
+  border-color: rgba(23, 26, 34, 0.08) !important;
+  background: var(--audio-bg-base, #f7f8fa) !important;
+  box-shadow:
+    0 14px 36px rgba(23, 26, 34, 0.07),
+    0 2px 8px rgba(23, 26, 34, 0.04) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout *,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-window--fill {
+  box-sizing: border-box;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom {
+  padding-bottom: 0.32rem;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom-inner,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom > .split-compare-panel {
+  height: 100% !important;
+  min-height: 0;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel {
+  border-width: 2px !important;
+  background: var(--audio-surface, #ffffff) !important;
+  box-shadow: var(
+    --audio-shadow-card,
+    0 14px 36px rgba(23, 26, 34, 0.07),
+    0 2px 8px rgba(23, 26, 34, 0.04)
+  ) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--best {
+  border-color: var(--audio-gold-border, rgba(247, 166, 0, 0.45)) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
+  border-color: var(--audio-blue-border, rgba(21, 152, 255, 0.45)) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-panel
+  .group.relative.z-0,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-panel
+  .pip-window--fill
+  > .relative
+  > .relative {
+  background: var(--audio-bg-base, #f7f8fa) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .pip-chrome-btn--expand.hud-glass-badge--ghost {
+  border: 0 !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: var(--audio-text-primary, #171a22) !important;
+  box-shadow:
+    0 8px 20px rgba(23, 26, 34, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel .pip-empty-state {
+  background: transparent !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-state__body p {
+  color: var(--audio-text-secondary, #6c7077) !important;
+  text-shadow: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .pip-empty-action {
+  min-height: 2.05rem;
+  border: 0 !important;
+  border-radius: 0.82rem;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--audio-text-primary, #171a22) !important;
+  font-weight: 650;
+  box-shadow:
+    0 8px 20px rgba(23, 26, 34, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active {
+  border: 0 !important;
+  background:
+    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
+    linear-gradient(145deg, #f7b84d, var(--sm-gold)) !important;
+  color: #171a22 !important;
+  box-shadow:
+    0 12px 32px rgba(23, 26, 34, 0.12),
+    0 4px 10px rgba(23, 26, 34, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active .record-carousel-slot-dot {
+  background:
+    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.44), transparent 46%),
+    linear-gradient(145deg, #ffffff, var(--sm-gold)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 0 14px rgba(247, 166, 0, 0.26) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--recording {
+  border: 0 !important;
+  background:
+    radial-gradient(circle at 42% 28%, rgba(255, 255, 255, 0.32), transparent 42%),
+    linear-gradient(145deg, #f7b84d, var(--sm-gold)) !important;
+}
+
 /* Hide session pill while fullscreen expand/review or split compare is open */
 .app-ui-overlay--review-open .hud-header,
 .app-ui-overlay--split-open .hud-header {
