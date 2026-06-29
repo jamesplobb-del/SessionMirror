@@ -42,7 +42,7 @@ export function useDrone({
     restoredRef.current = true
     const saved = loadDronePrefs()
     void droneRestoreState({
-      activeNotes: saved.activeNotes,
+      activeNotes: [],
       octave: saved.octave,
       volume,
       waveform,
@@ -111,6 +111,14 @@ export function useDrone({
         })
         return
       }
+
+      setPrefs((current) => {
+        const has = current.activeNotes.includes(pitchClass)
+        const activeNotes = has
+          ? current.activeNotes.filter((note) => note !== pitchClass)
+          : [...current.activeNotes, pitchClass].sort((a, b) => a - b)
+        return { ...current, activeNotes, enabled: activeNotes.length > 0 }
+      })
 
       void droneToggleNote(pitchClass)
         .then((result) => {
@@ -183,9 +191,9 @@ export function useDrone({
       if (!isDroneNativeAvailable()) return
       void droneStop().then((state) => {
         const next: DronePrefs = {
-          activeNotes: state.activeNotes,
+          activeNotes: [],
           octave: state.octave,
-          enabled: state.enabled,
+          enabled: false,
           volume: state.volume,
           waveform: state.waveform,
         }

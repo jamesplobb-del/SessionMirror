@@ -140,12 +140,12 @@ export async function analyzeRecordingLevels(
 
 export function computePlaybackGainMetadata(
   analysis: RecordingLevelAnalysis,
-  targetActiveRmsDb = -14,
-  peakCeilingDb = -1,
+  targetActiveRmsDb = -10,
+  peakCeilingDb = -0.75,
 ): PlaybackGainMetadata {
   const rmsGainDb = targetActiveRmsDb - analysis.recordedActiveRmsDb
   const peakGainDb = peakCeilingDb - analysis.recordedPeakDb
-  const suggestedGainDb = Math.min(24, Math.max(0, Math.min(rmsGainDb, peakGainDb)))
+  const suggestedGainDb = Math.min(13, Math.max(0, Math.min(rmsGainDb, peakGainDb)))
 
   return {
     targetActiveRmsDb,

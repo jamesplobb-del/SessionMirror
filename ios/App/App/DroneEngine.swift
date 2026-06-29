@@ -141,7 +141,7 @@ final class DroneEngine {
         stateLock.lock()
         defer { stateLock.unlock() }
         return voices
-            .filter { $0.value.targetGain > 0.001 || $0.value.currentGain > 0.001 }
+            .filter { $0.value.targetGain > 0.001 }
             .map(\.key)
             .sorted()
     }

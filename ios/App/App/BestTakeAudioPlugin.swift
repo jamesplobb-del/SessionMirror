@@ -333,8 +333,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     of: sourceTrack,
                     at: .zero
                 )
+                let resolvedGain = min(max(audioGain, 1.0), 4.5)
                 let parameters = AVMutableAudioMixInputParameters(track: compositionTrack)
-                parameters.setVolume(min(max(audioGain, 1.0), 3.0), at: .zero)
+                parameters.setVolume(resolvedGain, at: .zero)
                 audioParameters.append(parameters)
             }
 
@@ -356,6 +357,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 .appendingPathComponent("besttake-export-\(UUID().uuidString).mp4")
             try? FileManager.default.removeItem(at: outputURL)
             exportSession.outputURL = outputURL
+
+            print("[NativeExport] audioGain requested=\(audioGain) applied=\(min(max(audioGain, 1.0), 4.5)) source=\(sourceURL.lastPathComponent)")
 
             exportSession.exportAsynchronously {
                 DispatchQueue.main.async {

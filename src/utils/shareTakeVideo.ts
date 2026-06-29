@@ -7,8 +7,8 @@ import { prepareTakeVideoExportUri, prepareTakeVideoExportUrl } from './prepareT
 import type { Take } from '../types'
 
 const EXPORT_CACHE_DIR = 'export-cache'
-const FALLBACK_NATIVE_EXPORT_AUDIO_GAIN = 2.35
-const MAX_NATIVE_EXPORT_AUDIO_GAIN = 3
+const FALLBACK_NATIVE_EXPORT_AUDIO_GAIN = 2.75
+const MAX_NATIVE_EXPORT_AUDIO_GAIN = 4.5
 
 export type SaveTakeResult =
   | { ok: true }
