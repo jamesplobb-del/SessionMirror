@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom'
 import type { ActionSheetTone } from '../../context/ActionSheetContext'
 import { useSheetDragDismiss, readSheetSlideDistance } from '../../hooks/useSheetDragDismiss'
 import { iosFade, iosSheetPremium, motionGpuLayer } from '../../utils/motionPresets'
-import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
 
 type SheetRequest =
   | {
@@ -32,7 +31,8 @@ function resolvePortalRoot(): HTMLElement {
   if (typeof document === 'undefined') {
     return globalThis.document?.body ?? (null as unknown as HTMLElement)
   }
-  return document.getElementById(PHYSICAL_UI_ROOT_ID) ?? document.body
+  // Keep confirmations above nested drawers such as Take Vault.
+  return document.body
 }
 
 export default function ActionSheet({ request, onCancel, onConfirm }: ActionSheetProps) {

@@ -26,6 +26,7 @@ final class DroneEngine {
     private var masterVolume: Float = 0.35
     private var waveform: DroneWaveform = .sine
     private var isRunning = false
+    private var audioSessionPrepared = false
     private let stateLock = NSLock()
 
     private let fadeDuration: TimeInterval = 0.020
@@ -72,7 +73,7 @@ final class DroneEngine {
         stateLock.lock()
         defer { stateLock.unlock() }
 
-        if var voice = voices[pitchClass], voice.targetGain > 0.001 {
+        if let voice = voices[pitchClass], voice.targetGain > 0.001 {
             fadeVoice(pitchClass: pitchClass, to: 0)
             scheduleDetachIfSilent(pitchClass: pitchClass)
             return false
@@ -201,6 +202,7 @@ final class DroneEngine {
     private func attachVoiceIfNeeded(pitchClass: Int) {
         if voices[pitchClass] != nil { return }
 
+        prepareAudioSessionIfNeeded()
         let format = outputFormat ?? AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
 
         let sourceNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
@@ -319,12 +321,44 @@ final class DroneEngine {
     private func ensureEngineRunning() {
         guard !isRunning else { return }
         do {
+            prepareAudioSessionIfNeeded()
             if !engine.isRunning {
                 try engine.start()
             }
             isRunning = true
         } catch {
             print("[DroneEngine] failed to start: \(error.localizedDescription)")
+        }
+    }
+
+    private func prepareAudioSessionIfNeeded() {
+        guard !audioSessionPrepared else { return }
+        let session = AVAudioSession.sharedInstance()
+        do {
+            let options: AVAudioSession.CategoryOptions = [
+                .mixWithOthers,
+                .allowBluetoothA2DP,
+                .defaultToSpeaker,
+            ]
+            try AudioRouteConfigurator.debugSetCategory(
+                session,
+                category: .playAndRecord,
+                mode: .default,
+                options: options,
+                caller: "DroneEngine.prepareAudioSession"
+            )
+            try session.setPreferredSampleRate(48000)
+            try session.setPreferredIOBufferDuration(0.005)
+            try AudioRouteConfigurator.debugSetActive(
+                session,
+                active: true,
+                caller: "DroneEngine.prepareAudioSession"
+            )
+            outputFormat = engine.outputNode.inputFormat(forBus: 0)
+            audioSessionPrepared = true
+            print("[DroneEngine] prepared audio session route=\(AudioRouteConfigurator.routeSnapshot())")
+        } catch {
+            print("[DroneEngine] audio session prepare failed: \(error.localizedDescription)")
         }
     }
 

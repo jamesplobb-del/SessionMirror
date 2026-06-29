@@ -34,7 +34,6 @@ export default function AudioTunerTab({
     volume: normalizedVolume,
     waveform: droneWaveform,
     hapticFeedback,
-    micStreamRef: streamRef,
   })
 
   const droneKeyboard = useMemo(

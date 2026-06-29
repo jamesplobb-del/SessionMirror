@@ -12,7 +12,7 @@ export const DEFAULT_DRONE_PREFS: DronePrefs = {
   activeNotes: [],
   octave: 4,
   enabled: false,
-  volume: 0.35,
+  volume: 0.55,
   waveform: 'sine',
 }
 

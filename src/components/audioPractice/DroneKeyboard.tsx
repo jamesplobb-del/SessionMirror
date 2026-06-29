@@ -9,6 +9,13 @@ export interface DroneKeyboardProps {
   onDecrementOctave: () => void
 }
 
+function noteWithOctave(label: string, octave: number): string {
+  return label
+    .split('/')
+    .map((part) => `${part}${octave}`)
+    .join('/')
+}
+
 export default function DroneKeyboard({
   activeNotes,
   octave,
@@ -21,15 +28,17 @@ export default function DroneKeyboard({
       <div className="drone-keyboard__strip" role="group" aria-label="Drone notes">
         {DRONE_NOTE_STRIP.map(({ pitchClass, label }) => {
           const active = activeNotes.includes(pitchClass)
+          const displayLabel = noteWithOctave(label, octave)
           return (
             <button
               key={pitchClass}
               type="button"
               className={`drone-keyboard__note ${active ? 'drone-keyboard__note--active' : ''}`}
               aria-pressed={active}
+              aria-label={`${active ? 'Stop' : 'Start'} ${displayLabel} drone`}
               onClick={() => onToggleNote(pitchClass)}
             >
-              {label}
+              {displayLabel}
             </button>
           )
         })}
@@ -56,7 +65,7 @@ export default function DroneKeyboard({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
             >
-              {octave}
+              C{octave}
             </motion.span>
           </AnimatePresence>
         </div>

@@ -62,28 +62,28 @@ function isNativeIos(): boolean {
 /** In-memory fallback for web dev — silent no-op. */
 const webStub: DronePluginType = {
   async start() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
   async stop() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
   async toggleNote() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
   async setOctave() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
   async setVolume() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
   async setWaveform() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
   async getState() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
   async restoreState() {
-    return { activeNotes: [], octave: 4, volume: 0.35, waveform: 'sine', enabled: false }
+    return { activeNotes: [], octave: 4, volume: 0.55, waveform: 'sine', enabled: false }
   },
 }
 

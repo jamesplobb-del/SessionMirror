@@ -5,19 +5,18 @@ import {
   droneSetOctave,
   droneSetVolume,
   droneSetWaveform,
+  droneStop,
   droneToggleNote,
   isDroneNativeAvailable,
   type DroneWaveform,
 } from '../utils/droneEngine'
 import { loadDronePrefs, saveDronePrefs, type DronePrefs } from '../utils/dronePrefs'
-import { tunePlaybackIsolationStream } from '../utils/audioCapture'
 import { triggerLightHaptic } from '../utils/haptics'
 
 export interface UseDroneOptions {
   volume: number
   waveform: DroneWaveform
   hapticFeedback?: boolean
-  micStreamRef?: React.RefObject<MediaStream | null>
 }
 
 export interface UseDroneResult {
@@ -34,24 +33,9 @@ export function useDrone({
   volume,
   waveform,
   hapticFeedback = true,
-  micStreamRef,
 }: UseDroneOptions): UseDroneResult {
   const [prefs, setPrefs] = useState<DronePrefs>(() => loadDronePrefs())
   const restoredRef = useRef(false)
-  const echoIsolationRef = useRef(false)
-
-  const applyEchoIsolation = useCallback(async (enabled: boolean) => {
-    const stream = micStreamRef?.current
-    if (!stream) return
-    if (enabled && !echoIsolationRef.current) {
-      await tunePlaybackIsolationStream(stream)
-      echoIsolationRef.current = true
-      return
-    }
-    if (!enabled && echoIsolationRef.current) {
-      echoIsolationRef.current = false
-    }
-  }, [micStreamRef])
 
   useEffect(() => {
     if (!isDroneNativeAvailable() || restoredRef.current) return
@@ -72,11 +56,8 @@ export function useDrone({
       }
       setPrefs(next)
       saveDronePrefs(next)
-      if (state.activeNotes.length > 0) {
-        void applyEchoIsolation(true)
-      }
     })
-  }, [applyEchoIsolation, volume, waveform])
+  }, [volume, waveform])
 
   useEffect(() => {
     if (!isDroneNativeAvailable()) return
@@ -113,8 +94,7 @@ export function useDrone({
       saveDronePrefs(next)
       return next
     })
-    void applyEchoIsolation(state.activeNotes.length > 0)
-  }, [applyEchoIsolation])
+  }, [])
 
   const toggleNote = useCallback(
     (pitchClass: number) => {
@@ -132,23 +112,26 @@ export function useDrone({
         return
       }
 
-      void droneToggleNote(pitchClass).then((result) => {
-        setPrefs((current) => {
-          const next: DronePrefs = {
-            ...current,
-            activeNotes: result.activeNotes,
-            octave: result.octave,
-            enabled: result.enabled,
-            volume: result.volume,
-            waveform: result.waveform,
-          }
-          saveDronePrefs(next)
-          return next
+      void droneToggleNote(pitchClass)
+        .then((result) => {
+          setPrefs((current) => {
+            const next: DronePrefs = {
+              ...current,
+              activeNotes: result.activeNotes,
+              octave: result.octave,
+              enabled: result.enabled,
+              volume: result.volume,
+              waveform: result.waveform,
+            }
+            saveDronePrefs(next)
+            return next
+          })
         })
-        void applyEchoIsolation(result.activeNotes.length > 0)
-      })
+        .catch(() => {
+          void syncFromNative()
+        })
     },
-    [applyEchoIsolation, hapticFeedback],
+    [hapticFeedback, syncFromNative],
   )
 
   const setOctave = useCallback(
@@ -197,9 +180,19 @@ export function useDrone({
 
   useEffect(() => {
     return () => {
-      void syncFromNative()
+      if (!isDroneNativeAvailable()) return
+      void droneStop().then((state) => {
+        const next: DronePrefs = {
+          activeNotes: state.activeNotes,
+          octave: state.octave,
+          enabled: state.enabled,
+          volume: state.volume,
+          waveform: state.waveform,
+        }
+        saveDronePrefs(next)
+      })
     }
-  }, [syncFromNative])
+  }, [])
 
   return {
     activeNotes: prefs.activeNotes,
