@@ -398,7 +398,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             let activityViewController = UIActivityViewController(
-                activityItems: [title, fileURL],
+                activityItems: [title, shareURL],
                 applicationActivities: nil
             )
             activityViewController.popoverPresentationController?.sourceView = viewController.view

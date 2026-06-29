@@ -13,7 +13,7 @@ export const YOUTUBE_VOLUME_BOOST = 12
 /** Minimum non-zero YouTube API volume — reference playback stays at API max. */
 export const YOUTUBE_VOLUME_FLOOR = 100
 
-let activeSpeakerLoudnessPreset: SpeakerLoudnessPreset = 'loud'
+let activeSpeakerLoudnessPreset: SpeakerLoudnessPreset = 'phone'
 
 export function setActiveSpeakerLoudnessPreset(preset: SpeakerLoudnessPreset): void {
   activeSpeakerLoudnessPreset = preset

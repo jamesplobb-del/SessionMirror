@@ -462,10 +462,18 @@ export function disposeSpeakerLoudnessChain(nodes: SpeakerLoudnessNodes): void {
 }
 
 export function parseSpeakerLoudnessPreset(value: unknown): SpeakerLoudnessPreset {
-  if (value === 'off' || value === 'clear' || value === 'loud') {
+  if (
+    value === 'off' ||
+    value === 'clear' ||
+    value === 'loud' ||
+    value === 'max' ||
+    value === 'phone' ||
+    value === 'extreme' ||
+    value === 'insane'
+  ) {
     return value
   }
-  return 'loud'
+  return 'phone'
 }
 
 export function isFixedBusGainTestPreset(

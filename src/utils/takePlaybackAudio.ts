@@ -152,6 +152,11 @@ function wireTakePlaybackAfterStart(
   primeTakePlayback([media], allowNativeDirect)
 }
 
+async function prepareLoudPlaybackBeforeStart(media: HTMLMediaElement): Promise<void> {
+  primeTakePlaybackForPreparedSession(media)
+  await resumePlaybackAudioContext()
+}
+
 export function playTakeMediaFromUserGesture(
   media: HTMLMediaElement,
   callbacks: UserGesturePlaybackCallbacks = {},
@@ -161,6 +166,7 @@ export function playTakeMediaFromUserGesture(
   void (async () => {
     try {
       await preparePlaybackRoute({ suspendCamera: false })
+      await prepareLoudPlaybackBeforeStart(media)
       await media.play()
       attachPlaybackRouteEndedListener(media)
       wireTakePlaybackAfterStart(media, true)
@@ -244,8 +250,7 @@ export async function playTakeMediaAudible(
     return false
   }
 
-  primeTakePlaybackForUserGesture(media)
-  await resumePlaybackAudioContext()
+  await prepareLoudPlaybackBeforeStart(media)
 
   try {
     await media.play()

@@ -1,4 +1,5 @@
 import AVFoundation
+import Darwin
 
 enum DroneWaveform: String, CaseIterable {
     case sine
@@ -14,36 +15,57 @@ enum DroneWaveform: String, CaseIterable {
     }
 }
 
-/// Standalone reference-tone engine — decoupled from tuner UI.
-/// Uses AVAudioEngine source nodes with 20 ms per-note crossfades.
+/// Standalone reference-tone engine — decoupled from tuner pitch detection.
+/// Uses one stable source node and mixes selected notes internally to avoid graph churn.
 final class DroneEngine {
     static let shared = DroneEngine()
 
     private let engine = AVAudioEngine()
     private let mainMixer = AVAudioMixerNode()
+    private let renderFormat = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+    private lazy var sourceNode = AVAudioSourceNode(format: renderFormat) { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
+        guard let self = self else { return noErr }
+        return self.render(frameCount: frameCount, audioBufferList: audioBufferList)
+    }
+
     private var voices: [Int: DroneVoice] = [:]
     private var octave = 4
-    private var masterVolume: Float = 0.35
+    private var requestedVolume: Float = 0.75
+    private var masterVolume: Float = DroneEngine.outputVolume(for: 0.75)
     private var waveform: DroneWaveform = .sine
     private var isRunning = false
     private var audioSessionPrepared = false
+    private var configurationObserver: NSObjectProtocol?
     private let stateLock = NSLock()
 
-    private let fadeDuration: TimeInterval = 0.020
-    private var outputFormat: AVAudioFormat?
+    private let fadeDuration: TimeInterval = 0.035
+    private let oscillatorHeadroom: Float = 0.9
 
     private init() {
         engine.attach(mainMixer)
+        engine.attach(sourceNode)
+        engine.connect(sourceNode, to: mainMixer, format: renderFormat)
         engine.connect(mainMixer, to: engine.outputNode, format: nil)
-        outputFormat = engine.outputNode.inputFormat(forBus: 0)
         mainMixer.outputVolume = masterVolume
+
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleEngineConfigurationChange()
+        }
+    }
+
+    deinit {
+        if let configurationObserver = configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+        }
     }
 
     // MARK: - Public API
 
     func start() {
-        stateLock.lock()
-        defer { stateLock.unlock() }
         ensureEngineRunning()
     }
 
@@ -55,14 +77,12 @@ final class DroneEngine {
             fadeVoice(pitchClass: pitchClass, to: 0)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDuration + 0.005) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDuration + 0.02) { [weak self] in
             guard let self = self else { return }
             self.stateLock.lock()
-            defer { self.stateLock.unlock() }
             self.detachIdleVoices()
-            if self.voices.isEmpty {
-                self.stopEngineIfIdle()
-            }
+            self.stateLock.unlock()
+            self.stopEngineIfIdle()
         }
     }
 
@@ -71,17 +91,18 @@ final class DroneEngine {
         guard (0...11).contains(pitchClass) else { return false }
 
         stateLock.lock()
-        defer { stateLock.unlock() }
 
         if let voice = voices[pitchClass], voice.targetGain > 0.001 {
             fadeVoice(pitchClass: pitchClass, to: 0)
             scheduleDetachIfSilent(pitchClass: pitchClass)
+            stateLock.unlock()
             return false
         }
 
         attachVoiceIfNeeded(pitchClass: pitchClass)
         updateVoiceFrequency(pitchClass: pitchClass)
         fadeVoice(pitchClass: pitchClass, to: 1)
+        stateLock.unlock()
         ensureEngineRunning()
         return true
     }
@@ -95,33 +116,17 @@ final class DroneEngine {
         }
 
         let activePitchClasses = voices.filter { $0.value.targetGain > 0.001 }.map(\.key)
-        guard !activePitchClasses.isEmpty else {
-            octave = clamped
-            stateLock.unlock()
-            return
-        }
-
-        for pitchClass in activePitchClasses {
-            fadeVoice(pitchClass: pitchClass, to: 0)
-        }
         octave = clamped
-        stateLock.unlock()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDuration) { [weak self] in
-            guard let self = self else { return }
-            self.stateLock.lock()
-            defer { self.stateLock.unlock() }
-            for pitchClass in activePitchClasses {
-                self.updateVoiceFrequency(pitchClass: pitchClass)
-                self.fadeVoice(pitchClass: pitchClass, to: 1)
-            }
-            self.ensureEngineRunning()
+        for pitchClass in activePitchClasses {
+            updateVoiceFrequency(pitchClass: pitchClass)
         }
+        stateLock.unlock()
     }
 
     func setVolume(_ volume: Float) {
         stateLock.lock()
-        masterVolume = max(0, min(1, volume))
+        requestedVolume = max(0, min(1, volume))
+        masterVolume = Self.outputVolume(for: requestedVolume)
         mainMixer.outputVolume = masterVolume
         stateLock.unlock()
     }
@@ -150,7 +155,7 @@ final class DroneEngine {
     func currentVolume() -> Float {
         stateLock.lock()
         defer { stateLock.unlock() }
-        return masterVolume
+        return requestedVolume
     }
 
     func currentWaveform() -> String {
@@ -162,19 +167,17 @@ final class DroneEngine {
     func restoreState(activeNotes: [Int], octave: Int, volume: Float, waveform: String?) {
         stateLock.lock()
         self.octave = max(0, min(8, octave))
-        masterVolume = max(0, min(1, volume))
+        requestedVolume = max(0, min(1, volume))
+        masterVolume = Self.outputVolume(for: requestedVolume)
         mainMixer.outputVolume = masterVolume
         self.waveform = DroneWaveform.parse(waveform)
         let notes = Set(activeNotes.filter { (0...11).contains($0) })
-        stateLock.unlock()
-
         for pitchClass in notes {
-            stateLock.lock()
             attachVoiceIfNeeded(pitchClass: pitchClass)
             updateVoiceFrequency(pitchClass: pitchClass)
             fadeVoice(pitchClass: pitchClass, to: 1)
-            stateLock.unlock()
         }
+        stateLock.unlock()
         ensureEngineRunning()
     }
 
@@ -182,12 +185,10 @@ final class DroneEngine {
 
     private struct DroneVoice {
         let pitchClass: Int
-        let sourceNode: AVAudioSourceNode
         var currentGain: Float = 0
         var targetGain: Float = 0
         var phase: Float = 0
         var frequency: Float = 440
-        var isAttached = false
     }
 
     private func midi(for pitchClass: Int) -> Int {
@@ -201,50 +202,48 @@ final class DroneEngine {
 
     private func attachVoiceIfNeeded(pitchClass: Int) {
         if voices[pitchClass] != nil { return }
-
-        prepareAudioSessionIfNeeded()
-        let format = outputFormat ?? AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
-
-        let sourceNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
-            guard let self = self else { return noErr }
-            return self.render(pitchClass: pitchClass, frameCount: frameCount, audioBufferList: audioBufferList)
-        }
-
-        var voice = DroneVoice(pitchClass: pitchClass, sourceNode: sourceNode)
+        var voice = DroneVoice(pitchClass: pitchClass)
         voice.frequency = frequency(for: pitchClass)
         voices[pitchClass] = voice
-
-        engine.attach(sourceNode)
-        engine.connect(sourceNode, to: mainMixer, format: format)
-        voices[pitchClass]?.isAttached = true
     }
 
-    private func render(pitchClass: Int, frameCount: AVAudioFrameCount, audioBufferList: UnsafeMutablePointer<AudioBufferList>) -> OSStatus {
+    private func render(frameCount: AVAudioFrameCount, audioBufferList: UnsafeMutablePointer<AudioBufferList>) -> OSStatus {
         stateLock.lock()
-        guard var voice = voices[pitchClass] else {
-            stateLock.unlock()
-            return noErr
-        }
+        var renderVoices = voices
         let wave = waveform
-        let fadeStep = Float(1.0 / (fadeDuration * (outputFormat?.sampleRate ?? 44100)))
+        let activeCount = max(
+            1,
+            renderVoices.values.filter { $0.targetGain > 0.001 || $0.currentGain > 0.001 }.count
+        )
         stateLock.unlock()
 
         let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
         let channelCount = Int(ablPointer.count)
         let frames = Int(frameCount)
         let twoPi = Float.pi * 2
+        let sampleRate = Float(renderFormat.sampleRate)
+        let fadeStep = Float(1.0 / (fadeDuration * renderFormat.sampleRate))
+        let chordNormalization = min(1, 1 / sqrt(Float(activeCount)))
 
         for frame in 0..<frames {
-            if voice.currentGain < voice.targetGain {
-                voice.currentGain = min(voice.targetGain, voice.currentGain + fadeStep)
-            } else if voice.currentGain > voice.targetGain {
-                voice.currentGain = max(voice.targetGain, voice.currentGain - fadeStep)
+            var mixed: Float = 0
+
+            for pitchClass in renderVoices.keys {
+                guard var voice = renderVoices[pitchClass] else { continue }
+
+                if voice.currentGain < voice.targetGain {
+                    voice.currentGain = min(voice.targetGain, voice.currentGain + fadeStep)
+                } else if voice.currentGain > voice.targetGain {
+                    voice.currentGain = max(voice.targetGain, voice.currentGain - fadeStep)
+                }
+
+                mixed += Self.waveSample(phase: voice.phase, waveform: wave) * voice.currentGain
+                voice.phase += twoPi * voice.frequency / sampleRate
+                if voice.phase > twoPi { voice.phase -= twoPi }
+                renderVoices[pitchClass] = voice
             }
 
-            let sample = Self.waveSample(phase: voice.phase, waveform: wave) * voice.currentGain
-            voice.phase += twoPi * voice.frequency / Float(outputFormat?.sampleRate ?? 44100)
-            if voice.phase > twoPi { voice.phase -= twoPi }
-
+            let sample = Self.softLimit(mixed * chordNormalization * oscillatorHeadroom)
             for channel in 0..<channelCount {
                 guard let buffer = ablPointer[channel].mData?.assumingMemoryBound(to: Float.self) else { continue }
                 buffer[frame] = sample
@@ -252,7 +251,12 @@ final class DroneEngine {
         }
 
         stateLock.lock()
-        voices[pitchClass] = voice
+        for (pitchClass, renderedVoice) in renderVoices {
+            guard var liveVoice = voices[pitchClass] else { continue }
+            liveVoice.phase = renderedVoice.phase
+            liveVoice.currentGain = renderedVoice.currentGain
+            voices[pitchClass] = liveVoice
+        }
         stateLock.unlock()
         return noErr
     }
@@ -273,6 +277,18 @@ final class DroneEngine {
         }
     }
 
+    private static func softLimit(_ value: Float) -> Float {
+        let drive: Float = 1.35
+        let normalized = tanhf(value * drive) / tanhf(drive)
+        return max(-0.95, min(0.95, normalized))
+    }
+
+    private static func outputVolume(for requestedVolume: Float) -> Float {
+        let clamped = max(0, min(1, requestedVolume))
+        if clamped <= 0 { return 0 }
+        return min(1, 0.08 + pow(clamped, 0.7) * 0.92)
+    }
+
     private func fadeVoice(pitchClass: Int, to target: Float) {
         guard var voice = voices[pitchClass] else { return }
         voice.targetGain = max(0, min(1, target))
@@ -286,14 +302,15 @@ final class DroneEngine {
     }
 
     private func scheduleDetachIfSilent(pitchClass: Int) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDuration + 0.005) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDuration + 0.04) { [weak self] in
             guard let self = self else { return }
             self.stateLock.lock()
-            defer { self.stateLock.unlock() }
             guard let voice = self.voices[pitchClass], voice.currentGain <= 0.001, voice.targetGain <= 0.001 else {
+                self.stateLock.unlock()
                 return
             }
-            self.detachVoice(pitchClass: pitchClass)
+            self.voices.removeValue(forKey: pitchClass)
+            self.stateLock.unlock()
             self.stopEngineIfIdle()
         }
     }
@@ -303,31 +320,36 @@ final class DroneEngine {
             guard let voice = voices[pitchClass], voice.currentGain <= 0.001, voice.targetGain <= 0.001 else {
                 continue
             }
-            detachVoice(pitchClass: pitchClass)
-        }
-    }
-
-    private func detachVoice(pitchClass: Int) {
-        guard let voice = voices[pitchClass], voice.isAttached else {
             voices.removeValue(forKey: pitchClass)
-            return
         }
-        engine.disconnectNodeInput(voice.sourceNode)
-        engine.disconnectNodeOutput(voice.sourceNode)
-        engine.detach(voice.sourceNode)
-        voices.removeValue(forKey: pitchClass)
     }
 
     private func ensureEngineRunning() {
-        guard !isRunning else { return }
+        stateLock.lock()
+        if isRunning && engine.isRunning {
+            stateLock.unlock()
+            return
+        }
+        isRunning = false
+        stateLock.unlock()
+
         do {
             prepareAudioSessionIfNeeded()
             if !engine.isRunning {
+                engine.prepare()
                 try engine.start()
             }
+            stateLock.lock()
             isRunning = true
+            let activeNotes = voices.keys.sorted()
+            stateLock.unlock()
+            print("[DroneEngine] started activeNotes=\(activeNotes) requestedVolume=\(requestedVolume) outputVolume=\(masterVolume)")
         } catch {
+            stateLock.lock()
+            isRunning = false
+            stateLock.unlock()
             print("[DroneEngine] failed to start: \(error.localizedDescription)")
+            engine.reset()
         }
     }
 
@@ -336,8 +358,8 @@ final class DroneEngine {
         let session = AVAudioSession.sharedInstance()
         do {
             let options: AVAudioSession.CategoryOptions = [
-                .mixWithOthers,
                 .allowBluetoothA2DP,
+                .allowAirPlay,
                 .defaultToSpeaker,
             ]
             try AudioRouteConfigurator.debugSetCategory(
@@ -347,14 +369,13 @@ final class DroneEngine {
                 options: options,
                 caller: "DroneEngine.prepareAudioSession"
             )
-            try session.setPreferredSampleRate(48000)
+            try session.setPreferredSampleRate(48_000)
             try session.setPreferredIOBufferDuration(0.005)
             try AudioRouteConfigurator.debugSetActive(
                 session,
                 active: true,
                 caller: "DroneEngine.prepareAudioSession"
             )
-            outputFormat = engine.outputNode.inputFormat(forBus: 0)
             audioSessionPrepared = true
             print("[DroneEngine] prepared audio session route=\(AudioRouteConfigurator.routeSnapshot())")
         } catch {
@@ -362,10 +383,24 @@ final class DroneEngine {
         }
     }
 
-    private func stopEngineIfIdle() {
-        let hasAudibleVoice = voices.contains { $0.value.currentGain > 0.001 || $0.value.targetGain > 0.001 }
-        guard !hasAudibleVoice else { return }
-        engine.stop()
+    private func handleEngineConfigurationChange() {
+        stateLock.lock()
         isRunning = false
+        audioSessionPrepared = false
+        stateLock.unlock()
+        print("[DroneEngine] configuration changed; will restart on next note")
+    }
+
+    private func stopEngineIfIdle() {
+        stateLock.lock()
+        let hasAudibleVoice = voices.contains { $0.value.currentGain > 0.001 || $0.value.targetGain > 0.001 }
+        if hasAudibleVoice {
+            stateLock.unlock()
+            return
+        }
+        isRunning = false
+        stateLock.unlock()
+        engine.stop()
+        print("[DroneEngine] stopped")
     }
 }

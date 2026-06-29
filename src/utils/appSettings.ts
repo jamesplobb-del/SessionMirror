@@ -67,7 +67,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   pitchTrackerEnabled: false,
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
-  droneVolume: 55,
+  droneVolume: 75,
   droneWaveform: 'sine',
   showTakeCards: true,
   showMetronome: false,
@@ -76,7 +76,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   audioEnhancerEnabled: false,
   nativeExperimentalAudioEnabled: true,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
-  speakerLoudnessPreset: 'loud',
+  speakerLoudnessPreset: 'phone',
   excludeYoutubeFromRecording: false,
   micInputPreference: 'headphone',
   captureProfile: 'natural',
@@ -156,11 +156,10 @@ export function loadAppSettings(): AppSettings {
           ? Boolean(parsed.liveMicTunerEnabled)
           : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
       tunerInstrument: parseTunerInstrument(parsed.tunerInstrument),
-      droneVolume: clamp(
-        Number(parsed.droneVolume) || DEFAULT_APP_SETTINGS.droneVolume,
-        0,
-        100,
-      ),
+      droneVolume:
+        parsed.droneVolume === undefined || Number(parsed.droneVolume) <= 55
+          ? DEFAULT_APP_SETTINGS.droneVolume
+          : clamp(Number(parsed.droneVolume) || DEFAULT_APP_SETTINGS.droneVolume, 0, 100),
       droneWaveform: parseDroneWaveform(parsed.droneWaveform),
       showTakeCards:
         parsed.showTakeCards !== undefined
@@ -187,9 +186,10 @@ export function loadAppSettings(): AppSettings {
       audioEnhancerSettings: parseAudioEnhancerSettings(
         parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),
-      speakerLoudnessPreset: parseSpeakerLoudnessPreset(
-        parsed.speakerLoudnessPreset ?? DEFAULT_APP_SETTINGS.speakerLoudnessPreset,
-      ),
+      speakerLoudnessPreset:
+        parsed.speakerLoudnessPreset === undefined || parsed.speakerLoudnessPreset === 'loud'
+          ? DEFAULT_APP_SETTINGS.speakerLoudnessPreset
+          : parseSpeakerLoudnessPreset(parsed.speakerLoudnessPreset),
       excludeYoutubeFromRecording:
         parsed.excludeYoutubeFromRecording !== undefined
           ? Boolean(parsed.excludeYoutubeFromRecording)

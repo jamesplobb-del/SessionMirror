@@ -79,7 +79,7 @@ const routedSpeakerElements = new Set<HTMLMediaElement>()
 
 let enhancerEnabled = false
 let enhancerSettings: AudioEnhancerSettings | null = null
-let speakerLoudnessPreset: SpeakerLoudnessPreset = 'loud'
+let speakerLoudnessPreset: SpeakerLoudnessPreset = 'phone'
 
 export function setSpeakerLoudnessPreset(preset: SpeakerLoudnessPreset): void {
   speakerLoudnessPreset = preset

@@ -12,7 +12,7 @@ export const DEFAULT_DRONE_PREFS: DronePrefs = {
   activeNotes: [],
   octave: 4,
   enabled: false,
-  volume: 0.55,
+  volume: 0.75,
   waveform: 'sine',
 }
 
@@ -45,7 +45,10 @@ export function loadDronePrefs(): DronePrefs {
       activeNotes,
       octave: clampOctave(Number(parsed.octave) || DEFAULT_DRONE_PREFS.octave),
       enabled: activeNotes.length > 0 || Boolean(parsed.enabled),
-      volume: Math.min(1, Math.max(0, Number(parsed.volume) || DEFAULT_DRONE_PREFS.volume)),
+      volume:
+        parsed.volume === undefined
+          ? DEFAULT_DRONE_PREFS.volume
+          : Math.min(1, Math.max(0, Number(parsed.volume) || DEFAULT_DRONE_PREFS.volume)),
       waveform: parseWaveform(parsed.waveform),
     }
   } catch {

@@ -59,7 +59,7 @@ public class DronePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func setVolume(_ call: CAPPluginCall) {
-        let volume = Float(call.getFloat("volume") ?? 0.35)
+        let volume = Float(call.getFloat("volume") ?? 0.75)
         engine.setVolume(volume)
         call.resolve(statePayload())
     }
@@ -81,7 +81,7 @@ public class DronePlugin: CAPPlugin, CAPBridgedPlugin {
             return nil
         }
         let octave = call.getInt("octave") ?? 4
-        let volume = Float(call.getFloat("volume") ?? 0.35)
+        let volume = Float(call.getFloat("volume") ?? 0.75)
         let waveform = call.getString("waveform")
         engine.restoreState(activeNotes: notes, octave: octave, volume: volume, waveform: waveform)
         call.resolve(statePayload())
