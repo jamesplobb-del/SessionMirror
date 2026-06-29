@@ -9,7 +9,7 @@
     "build": "npm run copy:sql:wasm && tsc -b && vite build",
     "preview": "vite preview",
     "cap:sync": "npm run build && npx cap sync ios && node scripts/patch-ios-audio-plugin.mjs",
-    "cap:icons": "npx @capacitor/assets generate --iconBackgroundColor \"#f7f9fd\" --iconBackgroundColorDark \"#f7f9fd\" --splashBackgroundColor \"#0c0a09\" --splashBackgroundColorDark \"#0c0a09\"",
+    "cap:icons": "node scripts/generate-app-icon.mjs && npx @capacitor/assets generate --iconBackgroundColor \"#ffffff\" --iconBackgroundColorDark \"#ffffff\" --splashBackgroundColor \"#0c0a09\" --splashBackgroundColorDark \"#0c0a09\"",
     "cap:open": "npx cap open ios",
     "ios:refresh": "npm run cap:icons && npm run build && npx cap sync ios && node scripts/patch-ios-audio-plugin.mjs"
   },
@@ -43,6 +43,7 @@
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "@vitejs/plugin-react": "^4.5.2",
     "copyfiles": "^2.4.1",
+    "sharp": "^0.35.2",
     "tailwindcss": "^4.1.8",
     "typescript": "~5.8.3",
     "vite": "^6.3.5"
