@@ -19,6 +19,7 @@ interface DronePluginType {
   start(): Promise<DroneState>
   stop(): Promise<DroneState>
   toggleNote(options: { pitchClass: number }): Promise<DroneToggleResult>
+  soloNote(options: { pitchClass: number }): Promise<DroneToggleResult>
   setOctave(options: { octave: number }): Promise<DroneState>
   setVolume(options: { volume: number }): Promise<DroneState>
   setWaveform(options: { waveform: DroneWaveform }): Promise<DroneState>
@@ -70,6 +71,17 @@ const webStub: DronePluginType = {
   async toggleNote() {
     return { activeNotes: [], octave: 4, volume: 0.75, waveform: 'sine', enabled: false }
   },
+  async soloNote(options: { pitchClass: number }) {
+    return {
+      activeNotes: [options.pitchClass],
+      octave: 4,
+      volume: 0.75,
+      waveform: 'sine' as const,
+      enabled: true,
+      pitchClass: options.pitchClass,
+      noteActive: true,
+    }
+  },
   async setOctave() {
     return { activeNotes: [], octave: 4, volume: 0.75, waveform: 'sine', enabled: false }
   },
@@ -101,6 +113,10 @@ export async function droneStop(): Promise<DroneState> {
 
 export async function droneToggleNote(pitchClass: number): Promise<DroneToggleResult> {
   return plugin().toggleNote({ pitchClass })
+}
+
+export async function droneSoloNote(pitchClass: number): Promise<DroneToggleResult> {
+  return plugin().soloNote({ pitchClass })
 }
 
 export async function droneSetOctave(octave: number): Promise<DroneState> {

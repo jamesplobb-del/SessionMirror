@@ -5,6 +5,7 @@ import {
   droneSetOctave,
   droneSetVolume,
   droneSetWaveform,
+  droneSoloNote,
   droneStop,
   droneToggleNote,
   isDroneNativeAvailable,
@@ -25,6 +26,7 @@ export interface UseDroneResult {
   enabled: boolean
   nativeAvailable: boolean
   toggleNote: (pitchClass: number) => void
+  soloNote: (pitchClass: number) => void
   incrementOctave: () => void
   decrementOctave: () => void
 }
@@ -142,6 +144,49 @@ export function useDrone({
     [hapticFeedback, syncFromNative],
   )
 
+  const soloNote = useCallback(
+    (pitchClass: number) => {
+      if (!isDroneNativeAvailable()) {
+        setPrefs((current) => {
+          const next = {
+            ...current,
+            activeNotes: [pitchClass],
+            enabled: true,
+          }
+          saveDronePrefs(next)
+          return next
+        })
+        return
+      }
+
+      setPrefs((current) => ({
+        ...current,
+        activeNotes: [pitchClass],
+        enabled: true,
+      }))
+
+      void droneSoloNote(pitchClass)
+        .then((result) => {
+          setPrefs((current) => {
+            const next: DronePrefs = {
+              ...current,
+              activeNotes: result.activeNotes,
+              octave: result.octave,
+              enabled: result.enabled,
+              volume: result.volume,
+              waveform: result.waveform,
+            }
+            saveDronePrefs(next)
+            return next
+          })
+        })
+        .catch(() => {
+          void syncFromNative()
+        })
+    },
+    [syncFromNative],
+  )
+
   const setOctave = useCallback(
     (octave: number) => {
       const clamped = Math.min(8, Math.max(0, octave))
@@ -208,6 +253,7 @@ export function useDrone({
     enabled: prefs.enabled,
     nativeAvailable: isDroneNativeAvailable(),
     toggleNote,
+    soloNote,
     incrementOctave,
     decrementOctave,
   }

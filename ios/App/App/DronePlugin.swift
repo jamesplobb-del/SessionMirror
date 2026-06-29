@@ -8,6 +8,7 @@ public class DronePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "toggleNote", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "soloNote", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setOctave", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setVolume", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setWaveform", returnType: CAPPluginReturnPromise),
@@ -43,6 +44,18 @@ public class DronePlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let active = engine.toggleNote(pitchClass: pitchClass)
+        var result = statePayload()
+        result["pitchClass"] = pitchClass
+        result["noteActive"] = active
+        call.resolve(result)
+    }
+
+    @objc func soloNote(_ call: CAPPluginCall) {
+        guard let pitchClass = call.getInt("pitchClass") else {
+            call.reject("pitchClass is required")
+            return
+        }
+        let active = engine.soloNote(pitchClass: pitchClass)
         var result = statePayload()
         result["pitchClass"] = pitchClass
         result["noteActive"] = active

@@ -107,6 +107,30 @@ final class DroneEngine {
         return true
     }
 
+    @discardableResult
+    func soloNote(pitchClass: Int) -> Bool {
+        guard (0...11).contains(pitchClass) else { return false }
+
+        stateLock.lock()
+        let activePitchClasses = voices.filter { $0.value.targetGain > 0.001 }.map(\.key).sorted()
+        if activePitchClasses == [pitchClass] {
+            stateLock.unlock()
+            return true
+        }
+
+        for activePitchClass in activePitchClasses where activePitchClass != pitchClass {
+            fadeVoice(pitchClass: activePitchClass, to: 0)
+            scheduleDetachIfSilent(pitchClass: activePitchClass)
+        }
+
+        attachVoiceIfNeeded(pitchClass: pitchClass)
+        updateVoiceFrequency(pitchClass: pitchClass)
+        fadeVoice(pitchClass: pitchClass, to: 1)
+        stateLock.unlock()
+        ensureEngineRunning()
+        return true
+    }
+
     func setOctave(_ newOctave: Int) {
         let clamped = max(0, min(8, newOctave))
         stateLock.lock()

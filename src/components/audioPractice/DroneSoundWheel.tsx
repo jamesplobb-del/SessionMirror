@@ -1,14 +1,18 @@
-import { useRef, type PointerEvent, type ReactNode } from 'react'
+import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DRONE_NOTE_STRIP } from '../../utils/droneEngine'
 
 const WHEEL_NOTE_COUNT = 12
-const WHEEL_RADIUS_PERCENT = 44.5
+const WHEEL_RADIUS_PERCENT = 36.5
+const GLISSANDO_THRESHOLD_PX = 10
+const INNER_DEAD_ZONE_RATIO = 0.34
+const OUTER_EDGE_RATIO = 0.5
 
 export interface DroneSoundWheelProps {
   activeNotes: number[]
   octave: number
   onToggleNote: (pitchClass: number) => void
+  onSoloNote: (pitchClass: number) => void
   onIncrementOctave: () => void
   onDecrementOctave: () => void
   children: ReactNode
@@ -16,16 +20,6 @@ export interface DroneSoundWheelProps {
 
 function shortNoteLabel(label: string): string {
   return label.split('/')[0] ?? label
-}
-
-function noteFromPoint(clientX: number, clientY: number): number | null {
-  const element = document
-    .elementFromPoint(clientX, clientY)
-    ?.closest<HTMLButtonElement>('[data-drone-note]')
-  const rawPitchClass = element?.dataset.pitchClass
-  if (!rawPitchClass) return null
-  const pitchClass = Number(rawPitchClass)
-  return Number.isInteger(pitchClass) && pitchClass >= 0 && pitchClass <= 11 ? pitchClass : null
 }
 
 function notePosition(index: number): { left: string; top: string } {
@@ -36,49 +30,127 @@ function notePosition(index: number): { left: string; top: string } {
   }
 }
 
+function pitchClassFromWheelPoint(rect: DOMRect, clientX: number, clientY: number): number | null {
+  const cx = rect.left + rect.width / 2
+  const cy = rect.top + rect.height / 2
+  const dx = clientX - cx
+  const dy = clientY - cy
+  const dist = Math.hypot(dx, dy)
+  const minR = rect.width * INNER_DEAD_ZONE_RATIO
+  const maxR = rect.width * OUTER_EDGE_RATIO
+  if (dist < minR || dist > maxR) return null
+
+  let angle = Math.atan2(dy, dx) + Math.PI / 2
+  if (angle < 0) angle += Math.PI * 2
+  const index = Math.round((angle / (Math.PI * 2)) * WHEEL_NOTE_COUNT) % WHEEL_NOTE_COUNT
+  return DRONE_NOTE_STRIP[index]?.pitchClass ?? null
+}
+
 export default function DroneSoundWheel({
   activeNotes,
   octave,
   onToggleNote,
+  onSoloNote,
   onIncrementOctave,
   onDecrementOctave,
   children,
 }: DroneSoundWheelProps) {
-  const touchedNotesRef = useRef<Set<number>>(new Set())
+  const ringRef = useRef<HTMLDivElement>(null)
+  const [glissandoPitch, setGlissandoPitch] = useState<number | null>(null)
+  const sessionRef = useRef({
+    pointerId: -1,
+    startX: 0,
+    startY: 0,
+    isGlissando: false,
+    downPitchClass: null as number | null,
+    lastSoloPitch: null as number | null,
+  })
 
-  const touchNote = (pitchClass: number) => {
-    if (touchedNotesRef.current.has(pitchClass)) return
-    touchedNotesRef.current.add(pitchClass)
-    onToggleNote(pitchClass)
+  const readPitchAt = (clientX: number, clientY: number): number | null => {
+    const rect = ringRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return pitchClassFromWheelPoint(rect, clientX, clientY)
+  }
+
+  const resetSession = () => {
+    sessionRef.current = {
+      pointerId: -1,
+      startX: 0,
+      startY: 0,
+      isGlissando: false,
+      downPitchClass: null,
+      lastSoloPitch: null,
+    }
+    setGlissandoPitch(null)
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    const pitchClass = readPitchAt(event.clientX, event.clientY)
+    if (pitchClass === null) return
+
     event.preventDefault()
-    touchedNotesRef.current = new Set()
+    sessionRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      isGlissando: false,
+      downPitchClass: pitchClass,
+      lastSoloPitch: null,
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
-    const pitchClass = noteFromPoint(event.clientX, event.clientY)
-    if (pitchClass !== null) touchNote(pitchClass)
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+
+    const session = sessionRef.current
+    const pitchClass = readPitchAt(event.clientX, event.clientY)
+    const distance = Math.hypot(event.clientX - session.startX, event.clientY - session.startY)
+
+    if (
+      !session.isGlissando &&
+      (distance >= GLISSANDO_THRESHOLD_PX ||
+        (pitchClass !== null &&
+          session.downPitchClass !== null &&
+          pitchClass !== session.downPitchClass &&
+          distance > 4))
+    ) {
+      session.isGlissando = true
+    }
+
+    if (!session.isGlissando || pitchClass === null) return
+
     event.preventDefault()
-    const pitchClass = noteFromPoint(event.clientX, event.clientY)
-    if (pitchClass !== null) touchNote(pitchClass)
+    setGlissandoPitch(pitchClass)
+
+    if (session.lastSoloPitch === pitchClass) return
+    session.lastSoloPitch = pitchClass
+    onSoloNote(pitchClass)
   }
 
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    const session = sessionRef.current
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-    touchedNotesRef.current = new Set()
+
+    if (!session.isGlissando && session.downPitchClass !== null) {
+      const pitchClass = readPitchAt(event.clientX, event.clientY)
+      if (pitchClass === session.downPitchClass) {
+        onToggleNote(session.downPitchClass)
+      }
+    }
+
+    resetSession()
   }
 
   return (
     <div className="drone-sound-wheel pointer-events-auto">
       <div className="drone-sound-wheel__stage">
+        <div className="drone-sound-wheel__guide" aria-hidden />
         <div className="drone-sound-wheel__center">{children}</div>
         <div
+          ref={ringRef}
           className="drone-sound-wheel__ring"
           role="group"
           aria-label="Drone notes"
@@ -89,23 +161,21 @@ export default function DroneSoundWheel({
         >
           {DRONE_NOTE_STRIP.map(({ pitchClass, label }, index) => {
             const active = activeNotes.includes(pitchClass)
+            const glissando = glissandoPitch === pitchClass
             const position = notePosition(index)
             return (
-              <button
+              <span
                 key={pitchClass}
-                type="button"
                 data-drone-note
                 data-pitch-class={pitchClass}
-                className={`drone-sound-wheel__note ${active ? 'drone-sound-wheel__note--active' : ''}`}
+                className={`drone-sound-wheel__note ${
+                  active ? 'drone-sound-wheel__note--active' : ''
+                } ${glissando ? 'drone-sound-wheel__note--glissando' : ''}`}
                 style={position}
-                aria-pressed={active}
-                aria-label={`${active ? 'Stop' : 'Start'} ${label} octave ${octave}`}
-                onClick={(event) => {
-                  if (event.detail === 0) onToggleNote(pitchClass)
-                }}
+                aria-hidden
               >
                 {shortNoteLabel(label)}
-              </button>
+              </span>
             )
           })}
         </div>

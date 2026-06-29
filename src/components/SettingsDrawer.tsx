@@ -82,7 +82,7 @@ function SettingInstrumentPicker({
     <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
       <p className="text-sm font-semibold text-stone-900">Source Instrument</p>
       <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-        Adjusts how aggressively pitch is detected and how smooth the tuner trace looks.
+        Adjusts pitch detection and trace smoothing for the Audio Tuner tab and pitch analysis.
       </p>
 
       <IOSSegmentedControl
@@ -315,6 +315,13 @@ export default function SettingsDrawer({
               onChange={handlePitchTrackerToggle}
             />
 
+            <div className="pt-1">
+              <SettingInstrumentPicker
+                value={settings.tunerInstrument}
+                onChange={(tunerInstrument) => onUpdate({ tunerInstrument })}
+              />
+            </div>
+
             <AnimatedExpand open={hudQuickSettings.pitchTrackerEnabled}>
               <div className="space-y-3 pt-3">
                 <SettingToggle
@@ -322,10 +329,6 @@ export default function SettingsDrawer({
                   description="Between takes, listen through the microphone and show a live tuner on the main screen. Turn off to analyze pitch only during playback."
                   checked={settings.liveMicTunerEnabled}
                   onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
-                />
-                <SettingInstrumentPicker
-                  value={settings.tunerInstrument}
-                  onChange={(tunerInstrument) => onUpdate({ tunerInstrument })}
                 />
               </div>
             </AnimatedExpand>

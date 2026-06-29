@@ -41,6 +41,7 @@ export default function AudioTunerTab({
       activeNotes: drone.activeNotes,
       octave: drone.octave,
       onToggleNote: drone.toggleNote,
+      onSoloNote: drone.soloNote,
       onIncrementOctave: drone.incrementOctave,
       onDecrementOctave: drone.decrementOctave,
     }),
@@ -49,6 +50,7 @@ export default function AudioTunerTab({
       drone.decrementOctave,
       drone.incrementOctave,
       drone.octave,
+      drone.soloNote,
       drone.toggleNote,
     ]
   )
