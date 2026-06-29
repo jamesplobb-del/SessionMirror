@@ -82,6 +82,49 @@
   box-shadow: var(--audio-shadow-fab), 0 0 0 1.5px var(--audio-gold-border);
 }
 
+.native-bottom-sheet--vault .vault-header-action-btn {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-surface);
+  padding: 0.42rem 0.72rem;
+  color: var(--audio-text-primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: var(--audio-shadow-fab);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.native-bottom-sheet--vault .vault-header-action-btn:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.native-bottom-sheet--vault .vault-header-action-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.native-bottom-sheet--vault .vault-header-action-btn--active {
+  color: var(--audio-gold);
+  border-color: var(--audio-gold-border);
+  box-shadow: var(--audio-shadow-fab), 0 0 0 1px var(--audio-gold-soft);
+}
+
+.native-bottom-sheet--vault .vault-header-action-btn--danger:not(:disabled) {
+  color: #c62828;
+}
+
+.native-bottom-sheet--vault .vault-header-action-btn--danger:not(:disabled):hover {
+  background: #fff5f5;
+  border-color: rgba(198, 40, 40, 0.28);
+}
+
 .native-bottom-sheet--vault .vault-search-input {
   width: 100%;
   border-radius: 0.75rem;
@@ -763,6 +806,7 @@ html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .text-stone-70
 }
 
 html.app-dark-mode .native-bottom-sheet--vault .vault-header-icon-btn,
+html.app-dark-mode .native-bottom-sheet--vault .vault-header-action-btn,
 html.app-dark-mode .native-bottom-sheet--vault .vault-search-input,
 html.app-dark-mode .native-bottom-sheet--vault .vault-section-tabs,
 html.app-dark-mode .native-bottom-sheet--vault .vault-filter-pill,
@@ -785,10 +829,15 @@ html.app-dark-mode .native-bottom-sheet--vault .vault-section-toolbar .min-h-10 
 
 html.app-dark-mode .native-bottom-sheet--vault .vault-filter-pill--active,
 html.app-dark-mode .native-bottom-sheet--vault .vault-sort-icon-btn--active,
-html.app-dark-mode .native-bottom-sheet--vault .vault-header-icon-btn--active {
+html.app-dark-mode .native-bottom-sheet--vault .vault-header-icon-btn--active,
+html.app-dark-mode .native-bottom-sheet--vault .vault-header-action-btn--active {
   border-color: rgba(21, 152, 255, 0.42) !important;
   background: rgba(21, 152, 255, 0.16) !important;
   color: #bae6fd !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--vault .vault-header-action-btn--danger:not(:disabled) {
+  color: #fca5a5 !important;
 }
 
 html.app-dark-mode .native-bottom-sheet--vault .vault-take-row {

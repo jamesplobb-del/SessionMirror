@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { CheckSquare, Download, MoreHorizontal, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { CheckSquare, Download, Search, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
@@ -100,9 +100,7 @@ export default function TakeVaultDrawer({
   const [exportingTakeId, setExportingTakeId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
   const [detailTakeId, setDetailTakeId] = useState<string | null>(null)
-  const headerMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isOpen) {
@@ -173,7 +171,6 @@ export default function TakeVaultDrawer({
     setVaultSection('takes')
     setSearchOpen(false)
     setSearchQuery('')
-    setHeaderMenuOpen(false)
   }, [isOpen])
 
   useEffect(() => {
@@ -290,17 +287,6 @@ export default function TakeVaultDrawer({
   }, [activeProject?.name, exitSelectionMode, onClearAllTakes, showConfirm, takes.length])
 
   useEffect(() => {
-    if (!headerMenuOpen) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!headerMenuRef.current?.contains(event.target as Node)) {
-        setHeaderMenuOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [headerMenuOpen])
-
-  useEffect(() => {
     return () => {
       teardownVideosInContainer(drawerRef.current)
     }
@@ -347,7 +333,7 @@ export default function TakeVaultDrawer({
                     : `${takeCountLabel} • Current session`}
               </p>
             </div>
-            <div className="native-sheet-actions relative z-30 flex shrink-0 items-center gap-1.5">
+            <div className="native-sheet-actions relative z-30 flex shrink-0 items-center gap-1">
               <Pressable
                 type="button"
                 intensity="icon"
@@ -361,66 +347,45 @@ export default function TakeVaultDrawer({
               >
                 <Search className="h-4 w-4" />
               </Pressable>
-              <Pressable
-                type="button"
-                intensity="icon"
-                onClick={() => onSortChange(sortMode === 'newest' ? 'highest-rated' : 'newest')}
-                haptic="light"
-                className="vault-header-icon-btn"
-                aria-label="Toggle sort order"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-              </Pressable>
-              <div className="relative" ref={headerMenuRef}>
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  onClick={() => setHeaderMenuOpen((open) => !open)}
-                  haptic="light"
-                  className="vault-header-icon-btn"
-                  aria-label="More vault actions"
-                  aria-expanded={headerMenuOpen}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Pressable>
-                {headerMenuOpen && (
-                  <div className="vault-take-row__menu right-0 left-auto" role="menu">
-                    {selectionMode ? (
-                      <button type="button" role="menuitem" onClick={() => { setHeaderMenuOpen(false); exitSelectionMode() }}>
-                        Cancel selection
-                      </button>
-                    ) : (
-                      <>
-                        {contentReady && takes.length > 0 && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setHeaderMenuOpen(false)
-                              setSelectionMode(true)
-                            }}
-                          >
-                            Select takes
-                          </button>
-                        )}
-                        {contentReady && takes.length > 0 && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="vault-take-row__menu-danger"
-                            onClick={() => {
-                              setHeaderMenuOpen(false)
-                              handleClearAll()
-                            }}
-                          >
-                            Clear all takes
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+              {contentReady && vaultSection === 'takes' && (
+                <>
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    onClick={() => {
+                      if (selectionMode) exitSelectionMode()
+                      else setSelectionMode(true)
+                    }}
+                    haptic="light"
+                    className={`vault-header-action-btn ${selectionMode ? 'vault-header-action-btn--active' : ''}`}
+                    aria-pressed={selectionMode}
+                  >
+                    {selectionMode ? 'Cancel' : 'Select'}
+                  </Pressable>
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    disabled={!selectionMode || selectedCount === 0}
+                    onClick={handleBulkDelete}
+                    haptic="light"
+                    className="vault-header-action-btn vault-header-action-btn--danger"
+                    aria-label="Delete selected takes"
+                  >
+                    Delete
+                  </Pressable>
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    disabled={takes.length === 0}
+                    onClick={handleClearAll}
+                    haptic="light"
+                    className="vault-header-action-btn vault-header-action-btn--danger"
+                    aria-label="Clear all takes"
+                  >
+                    Clear all
+                  </Pressable>
+                </>
+              )}
               <Pressable
                 type="button"
                 intensity="icon"
