@@ -149,7 +149,7 @@ import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTab
 import AudioModeHome from './components/audioPractice/AudioModeHome'
 import AudioMetronomeTab from './components/audioPractice/AudioMetronomeTab'
 import AudioTunerTab from './components/audioPractice/AudioTunerTab'
-import { AudioModePlaybackProvider } from './context/AudioModePlaybackContext'
+import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './context/AudioModePlaybackContext'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 650
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
@@ -1434,6 +1434,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(0)
       pausePipVideos()
+      audioModePlaybackControlsRef.pause?.()
     })
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
@@ -2074,6 +2075,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
     pausePipVideos()
     stopAutoPlaybackAudio()
+    audioModePlaybackControlsRef.pause?.()
     releaseAutoRecordSuppress(0)
     stabilizeViewportAfterMediaInteraction()
     window.setTimeout(() => {
@@ -2687,6 +2689,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         challengerTake={challengerTake}
                         onExpandBenchmark={handleExpandBenchmark}
                         onExpandChallenger={handleExpandChallenger}
+                        onPinCurrentAsBest={handlePinCurrentAsBest}
+                        onClearBenchmark={handleClearAudioBenchmark}
+                        onClearChallenger={handleClearAudioChallenger}
                       />
                     </div>
                   )}

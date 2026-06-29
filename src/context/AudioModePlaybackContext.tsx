@@ -55,6 +55,9 @@ interface AudioModePlaybackContextValue {
 
 const AudioModePlaybackContext = createContext<AudioModePlaybackContextValue | null>(null)
 
+/** App-level hook for pausing inline audio-mode take playback (vault, settings, review). */
+export const audioModePlaybackControlsRef: { pause: (() => void) | null } = { pause: null }
+
 interface AudioModePlaybackProviderProps {
   children: ReactNode
   onBeforePlay?: () => void | Promise<void>
@@ -420,6 +423,13 @@ export function AudioModePlaybackProvider({
       player.removeEventListener('ended', onEnded)
     }
   }, [startProgressLoop, state.currentItem, stopProgressLoop, updateSessionPrepared])
+
+  useEffect(() => {
+    audioModePlaybackControlsRef.pause = pause
+    return () => {
+      audioModePlaybackControlsRef.pause = null
+    }
+  }, [pause])
 
   useEffect(() => {
     return () => {

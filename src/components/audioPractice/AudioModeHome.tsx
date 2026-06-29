@@ -1,16 +1,12 @@
-import { memo, useCallback, useMemo, type PointerEvent } from 'react'
+import { memo, useCallback, type PointerEvent } from 'react'
 import { motion } from 'framer-motion'
 import { Pause, Play, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import AudioModeHeroMic from './AudioModeHeroMic'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
+import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
 import { stopEventBubble } from '../../utils/eventBubbling'
-import {
-  useAudioModePlayback,
-  type AudioModePlaybackItem,
-} from '../../context/AudioModePlaybackContext'
 import { iosHudDim, motionGpuLayer } from '../../utils/motionPresets'
-import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../../utils/takeStorage'
 import type { Take } from '../../types'
 import type { LibraryPlaybackReference } from '../../types/library'
 
@@ -45,32 +41,6 @@ interface AudioModeTakeCardProps {
   onOpen?: () => void
   onFavorite?: () => void
   onClear?: () => void
-}
-
-function buildPlaybackItem({
-  tone,
-  take,
-  libraryPlayback,
-}: {
-  tone: 'current' | 'best'
-  take: Take | null
-  libraryPlayback?: LibraryPlaybackReference | null
-}): AudioModePlaybackItem | null {
-  const mediaUrl = libraryPlayback?.playbackUrl ?? take?.videoUrl ?? ''
-  const filePath = libraryPlayback?.filePath ?? take?.filePath ?? ''
-  if (!mediaUrl && !filePath) return null
-
-  return {
-    id: libraryPlayback ? `library:${libraryPlayback.id}` : `take:${take?.id ?? tone}`,
-    takeId: take?.id,
-    name: libraryPlayback?.name ?? take?.name ?? (tone === 'best' ? 'Best Take' : 'Current Take'),
-    filePath,
-    mediaUrl,
-    mimeType:
-      libraryPlayback?.mimeType ??
-      take?.videoMimeType ??
-      (take?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME),
-  }
 }
 
 function AudioWaveform({
@@ -153,31 +123,25 @@ function AudioModeTakeCard({
   onFavorite,
   onClear,
 }: AudioModeTakeCardProps) {
-  const audioPlayback = useAudioModePlayback()
-  const playbackItem = useMemo(
-    () => buildPlaybackItem({ tone, take, libraryPlayback }),
-    [libraryPlayback, take, tone]
-  )
-  const title =
-    libraryPlayback?.name ?? take?.name ?? (tone === 'best' ? 'No Best Take' : 'No Current Take')
+  const {
+    playbackItem,
+    hasMedia,
+    isPlaying,
+    durationSeconds,
+    playbackProgress,
+    displayName,
+    togglePlayback,
+    openTake,
+    audioPlayback,
+    isCurrentItem,
+  } = useAudioModeTakeItem({ tone, take, libraryPlayback })
   const timestamp = take?.timestamp
-  const hasMedia = Boolean(playbackItem)
-  const isCurrentItem = playbackItem ? audioPlayback.matchesCurrentSource(playbackItem) : false
-  const isPlaying = isCurrentItem && audioPlayback.state.isPlaying
-  const durationSeconds = isCurrentItem ? audioPlayback.state.duration : 0
-  const currentTime = isCurrentItem ? audioPlayback.state.currentTime : 0
   const waveformPeaks = useMediaWaveform({
     filePath: playbackItem?.filePath ?? '',
     mediaUrl: playbackItem?.mediaUrl ?? '',
     barCount: 64,
   })
-  const playbackProgress = durationSeconds > 0 ? currentTime / durationSeconds : 0
   const displayPeaks = waveformPeaks.length > 0 ? waveformPeaks : EMPTY_WAVEFORM_PEAKS
-
-  const togglePlayback = useCallback(() => {
-    if (!playbackItem) return
-    audioPlayback.toggle(playbackItem)
-  }, [audioPlayback, playbackItem])
 
   const handleWaveformScrub = useCallback(
     (clientX: number, rect: DOMRect) => {
@@ -202,11 +166,7 @@ function AudioModeTakeCard({
       animate={{ opacity: 1, y: 0 }}
       transition={iosHudDim}
       style={motionGpuLayer}
-      onClick={() => {
-        if (!playbackItem) return
-        audioPlayback.select(playbackItem)
-        onOpen?.()
-      }}
+      onClick={() => openTake(onOpen)}
     >
       <div className="audio-mode-take-card__chrome">
         <span className="audio-mode-take-card__pill">{label}</span>
@@ -246,7 +206,7 @@ function AudioModeTakeCard({
 
       <div className="audio-mode-take-card__title-row">
         <div className="min-w-0">
-          <h3>{title}</h3>
+          <h3>{displayName}</h3>
           <p>
             {timestamp ? `Today, ${formatTakeTime(timestamp)}` : 'Ready for a new take'}
             {hasMedia ? `  •  ${formatDuration(durationSeconds)}` : ''}

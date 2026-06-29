@@ -649,7 +649,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-
 }
 
 .app-ui-overlay--audio-mode .audio-practice-tuner-shell--take-pills {
-  padding-bottom: 3.75rem;
+  padding-bottom: 4.35rem;
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
@@ -780,9 +780,9 @@ html.app-dark-mode
   min-width: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  min-height: 2.8rem;
-  padding: 0.42rem 0.45rem 0.42rem 0.62rem;
+  gap: 0.35rem;
+  min-height: 3rem;
+  padding: 0.42rem 0.42rem 0.42rem 0.62rem;
   border-radius: 999px;
   border: 1px solid rgba(23, 26, 34, 0.08);
   background: rgba(255, 255, 255, 0.86);
@@ -791,10 +791,46 @@ html.app-dark-mode
   -webkit-backdrop-filter: blur(18px) saturate(1.08);
   color: var(--audio-text-primary);
   text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill:active {
+  transform: scale(0.985);
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill--empty {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill--empty:active {
+  transform: none;
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill--playing {
+  box-shadow:
+    0 12px 30px rgba(23, 26, 34, 0.1),
+    0 0 0 1.5px rgba(59, 130, 246, 0.22);
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill--best {
   border-color: rgba(245, 158, 11, 0.36);
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill--best.audio-tuner-take-pill--playing {
+  box-shadow:
+    0 12px 30px rgba(23, 26, 34, 0.1),
+    0 0 0 1.5px rgba(245, 158, 11, 0.28);
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill--current.audio-tuner-take-pill--playing {
+  box-shadow:
+    0 12px 30px rgba(23, 26, 34, 0.1),
+    0 0 0 1.5px rgba(59, 130, 246, 0.28);
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill--current {
@@ -802,10 +838,62 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__meta {
+  position: relative;
   display: flex;
   min-width: 0;
+  flex: 1 1 auto;
   flex-direction: column;
   line-height: 1.05;
+  overflow: hidden;
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill__progress {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -0.18rem;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+  transform-origin: left center;
+  transition: transform 120ms linear;
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill--best .audio-tuner-take-pill__progress {
+  color: var(--audio-gold);
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill--current .audio-tuner-take-pill__progress {
+  color: var(--audio-blue);
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--audio-text-primary);
+  box-shadow: 0 4px 12px rgba(23, 26, 34, 0.08);
+  transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn:active {
+  transform: scale(0.94);
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn--best {
+  color: var(--audio-gold);
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__label {
@@ -861,6 +949,12 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill--current {
 html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__play {
   border-color: rgba(226, 232, 240, 0.14);
   background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 252, 0.94);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn {
+  border: 1px solid rgba(226, 232, 240, 0.1);
+  background: rgba(255, 255, 255, 0.06);
   color: rgba(248, 250, 252, 0.94);
 }
 

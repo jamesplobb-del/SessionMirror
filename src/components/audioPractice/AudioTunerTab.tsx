@@ -1,13 +1,12 @@
 import { useMemo, useRef, type RefObject } from 'react'
-import { Pause, Play } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Pause, Play, Star, X } from 'lucide-react'
 import LivePitchTuner from '../LivePitchTuner'
 import Pressable from '../ui/Pressable'
 import { useDrone } from '../../hooks/useDrone'
-import {
-  useAudioModePlayback,
-  type AudioModePlaybackItem,
-} from '../../context/AudioModePlaybackContext'
-import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../../utils/takeStorage'
+import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
+import { stopEventBubble } from '../../utils/eventBubbling'
+import { iosHudDim, motionGpuLayer } from '../../utils/motionPresets'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { DroneWaveform } from '../../utils/droneEngine'
 import type { Take } from '../../types'
@@ -29,88 +28,123 @@ export interface AudioTunerTabProps {
   challengerTake: Take | null
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
-}
-
-function buildTunerPlaybackItem({
-  tone,
-  take,
-  libraryPlayback,
-}: {
-  tone: 'current' | 'best'
-  take: Take | null
-  libraryPlayback?: LibraryPlaybackReference | null
-}): AudioModePlaybackItem | null {
-  const mediaUrl = libraryPlayback?.playbackUrl ?? take?.videoUrl ?? ''
-  const filePath = libraryPlayback?.filePath ?? take?.filePath ?? ''
-  if (!mediaUrl && !filePath) return null
-
-  return {
-    id: libraryPlayback ? `library:${libraryPlayback.id}` : `take:${take?.id ?? tone}`,
-    takeId: take?.id,
-    name: libraryPlayback?.name ?? take?.name ?? (tone === 'best' ? 'Best Take' : 'Current Take'),
-    filePath,
-    mediaUrl,
-    mimeType:
-      libraryPlayback?.mimeType ??
-      take?.videoMimeType ??
-      (take?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME),
-  }
+  onPinCurrentAsBest?: () => void
+  onClearBenchmark?: () => void
+  onClearChallenger?: () => void
 }
 
 function TunerTakePill({
   label,
   tone,
-  item,
+  take,
+  libraryPlayback = null,
   onOpen,
+  onFavorite,
+  onClear,
 }: {
   label: string
   tone: 'current' | 'best'
-  item: AudioModePlaybackItem
+  take: Take | null
+  libraryPlayback?: LibraryPlaybackReference | null
   onOpen?: () => void
+  onFavorite?: () => void
+  onClear?: () => void
 }) {
-  const audioPlayback = useAudioModePlayback()
-  const isCurrentItem = audioPlayback.matchesCurrentSource(item)
-  const isPlaying = isCurrentItem && audioPlayback.state.isPlaying
-  const openItem = () => {
-    audioPlayback.select(item)
-    onOpen?.()
-  }
+  const {
+    hasMedia,
+    isPlaying,
+    playbackProgress,
+    displayName,
+    togglePlayback,
+    openTake,
+  } = useAudioModeTakeItem({ tone, take, libraryPlayback })
 
   return (
-    <div
+    <motion.div
+      className={`audio-tuner-take-pill audio-tuner-take-pill--${tone} ${
+        hasMedia ? '' : 'audio-tuner-take-pill--empty'
+      } ${isPlaying ? 'audio-tuner-take-pill--playing' : ''}`}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={iosHudDim}
+      style={motionGpuLayer}
       role="button"
-      tabIndex={0}
-      className={`audio-tuner-take-pill audio-tuner-take-pill--${tone}`}
-      onClick={openItem}
+      tabIndex={hasMedia ? 0 : -1}
+      aria-disabled={!hasMedia}
+      onClick={() => openTake(onOpen)}
       onKeyDown={(event) => {
+        if (!hasMedia) return
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          openItem()
+          openTake(onOpen)
         }
       }}
     >
       <span className="audio-tuner-take-pill__meta">
         <span className="audio-tuner-take-pill__label">{label}</span>
-        <span className="audio-tuner-take-pill__name">{item.name}</span>
-      </span>
-      <Pressable
-        type="button"
-        intensity="icon"
-        haptic="light"
-        className="audio-tuner-take-pill__play"
-        aria-label={isPlaying ? `Pause ${label}` : `Play ${label}`}
-        onClick={(event) => {
-          event.stopPropagation()
-          audioPlayback.toggle(item)
-        }}
-      >
-        {isPlaying ? (
-          <Pause className="h-3.5 w-3.5 fill-current" />
-        ) : (
-          <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
+        <span className="audio-tuner-take-pill__name">{displayName}</span>
+        {hasMedia && isPlaying && (
+          <span
+            className="audio-tuner-take-pill__progress"
+            aria-hidden
+            style={{ transform: `scaleX(${Math.max(0, Math.min(1, playbackProgress))})` }}
+          />
         )}
-      </Pressable>
-    </div>
+      </span>
+      <div className="audio-tuner-take-pill__actions">
+        {tone === 'current' && hasMedia && (
+          <Pressable
+            type="button"
+            intensity="icon"
+            haptic="light"
+            onClick={(event) => {
+              event.stopPropagation()
+              onFavorite?.()
+            }}
+            onPointerDown={stopEventBubble}
+            className="audio-tuner-take-pill__mini-btn audio-tuner-take-pill__mini-btn--best"
+            aria-label="Pin Current Take as Best Take"
+          >
+            <Star className="h-3.5 w-3.5 fill-current" />
+          </Pressable>
+        )}
+        {hasMedia && (
+          <Pressable
+            type="button"
+            intensity="icon"
+            haptic="light"
+            onClick={(event) => {
+              event.stopPropagation()
+              onClear?.()
+            }}
+            onPointerDown={stopEventBubble}
+            className="audio-tuner-take-pill__mini-btn"
+            aria-label={`Clear ${label}`}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Pressable>
+        )}
+        <Pressable
+          type="button"
+          intensity="icon"
+          haptic="light"
+          disabled={!hasMedia}
+          onClick={(event) => {
+            event.stopPropagation()
+            togglePlayback()
+          }}
+          onPointerDown={stopEventBubble}
+          className="audio-tuner-take-pill__play"
+          aria-label={isPlaying ? `Pause ${label}` : `Play ${label}`}
+        >
+          {isPlaying ? (
+            <Pause className="h-3.5 w-3.5 fill-current" />
+          ) : (
+            <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
+          )}
+        </Pressable>
+      </div>
+    </motion.div>
   )
 }
 
@@ -130,6 +164,9 @@ export default function AudioTunerTab({
   challengerTake,
   onExpandBenchmark,
   onExpandChallenger,
+  onPinCurrentAsBest,
+  onClearBenchmark,
+  onClearChallenger,
 }: AudioTunerTabProps) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const normalizedVolume = droneVolume / 100
@@ -157,25 +194,10 @@ export default function AudioTunerTab({
     ]
   )
 
-  const benchmarkItem = useMemo(
-    () =>
-      buildTunerPlaybackItem({
-        tone: 'best',
-        take: benchmarkTake,
-        libraryPlayback: libraryBenchmarkPlayback,
-      }),
-    [benchmarkTake, libraryBenchmarkPlayback]
-  )
-  const challengerItem = useMemo(
-    () => buildTunerPlaybackItem({ tone: 'current', take: challengerTake }),
-    [challengerTake]
-  )
-  const shouldShowTakePills = showTakeCards && (benchmarkItem || challengerItem)
-
   return (
     <section
       className={`audio-practice-tuner-shell flex min-h-0 flex-1 flex-col ${
-        shouldShowTakePills ? 'audio-practice-tuner-shell--take-pills' : ''
+        showTakeCards ? 'audio-practice-tuner-shell--take-pills' : ''
       }`}
       aria-label="Tuner"
     >
@@ -192,24 +214,26 @@ export default function AudioTunerTab({
         tunerInstrument={tunerInstrument}
         drone={droneKeyboard}
       />
-      {shouldShowTakePills && (
+      {showTakeCards && (
         <div className="audio-tuner-take-pills" aria-label="Tuner takes">
-          {benchmarkItem && (
-            <TunerTakePill
-              label="Best"
-              tone="best"
-              item={benchmarkItem}
-              onOpen={onExpandBenchmark}
-            />
-          )}
-          {challengerItem && (
-            <TunerTakePill
-              label="Current"
-              tone="current"
-              item={challengerItem}
-              onOpen={onExpandChallenger}
-            />
-          )}
+          <TunerTakePill
+            label="Best"
+            tone="best"
+            take={benchmarkTake}
+            libraryPlayback={libraryBenchmarkPlayback}
+            onOpen={
+              libraryBenchmarkPlayback || benchmarkTake ? onExpandBenchmark : undefined
+            }
+            onClear={onClearBenchmark}
+          />
+          <TunerTakePill
+            label="Current"
+            tone="current"
+            take={challengerTake}
+            onOpen={onExpandChallenger}
+            onFavorite={onPinCurrentAsBest}
+            onClear={onClearChallenger}
+          />
         </div>
       )}
     </section>
