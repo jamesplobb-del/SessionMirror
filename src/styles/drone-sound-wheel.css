@@ -1,27 +1,30 @@
 .drone-sound-wheel {
   display: flex;
   width: 100%;
-  flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0 0.25rem;
+  justify-content: center;
+  padding: 0;
 }
 
 .drone-sound-wheel__stage {
   position: relative;
-  width: min(76vw, 16.75rem);
+  width: min(82vw, 18.25rem);
   aspect-ratio: 1;
   margin-inline: auto;
 }
 
 .drone-sound-wheel__guide {
   position: absolute;
-  inset: 18%;
+  inset: 9.5%;
   z-index: 0;
   border-radius: 50%;
-  border: 1.5px solid rgba(23, 26, 34, 0.08);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(23, 26, 34, 0.07);
+  background:
+    radial-gradient(circle at center, transparent 61%, rgba(59, 130, 246, 0.045) 62%, transparent 68%),
+    radial-gradient(circle at center, transparent 72%, rgba(247, 166, 0, 0.05) 73%, transparent 78%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.68),
+    0 10px 28px rgba(23, 26, 34, 0.045);
   pointer-events: none;
 }
 
@@ -40,7 +43,7 @@
 }
 
 .drone-sound-wheel__center .pitch-note-orbit {
-  --orbit-size: min(50vw, 11.35rem);
+  --orbit-size: min(57vw, 12.85rem);
 }
 
 .drone-sound-wheel__center .pitch-note-orbit--light-native::before {
@@ -63,19 +66,21 @@
   position: absolute;
   z-index: 2;
   display: grid;
-  width: 1.72rem;
-  height: 1.72rem;
+  width: 1.42rem;
+  height: 1.42rem;
   place-items: center;
   padding: 0;
   border-radius: 999px;
-  border: 1px solid rgba(23, 26, 34, 0.1);
-  background: rgba(255, 255, 255, 0.92);
-  color: rgba(23, 26, 34, 0.72);
-  font-size: 0.54rem;
+  border: 1px solid rgba(23, 26, 34, 0.075);
+  background: rgba(255, 255, 255, 0.56);
+  color: rgba(23, 26, 34, 0.48);
+  font-size: 0.49rem;
   font-weight: 750;
   line-height: 1;
   letter-spacing: -0.02em;
-  box-shadow: 0 3px 10px rgba(23, 26, 34, 0.07);
+  box-shadow:
+    0 1px 4px rgba(23, 26, 34, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
   transform: translate(-50%, -50%);
   pointer-events: none;
   transition:
@@ -87,12 +92,12 @@
 }
 
 .drone-sound-wheel__note--active {
-  border-color: rgba(16, 185, 129, 0.48);
-  background: rgba(16, 185, 129, 0.16);
-  color: #047857;
+  border-color: rgba(59, 130, 246, 0.34);
+  background: rgba(59, 130, 246, 0.13);
+  color: #1d4ed8;
   box-shadow:
-    0 0 0 1px rgba(16, 185, 129, 0.18),
-    0 3px 10px rgba(16, 185, 129, 0.14);
+    0 0 0 1px rgba(59, 130, 246, 0.12),
+    0 3px 10px rgba(59, 130, 246, 0.12);
 }
 
 .drone-sound-wheel__note--glissando {
@@ -106,18 +111,29 @@
 }
 
 .drone-sound-wheel__octave {
+  position: absolute;
+  right: clamp(0.1rem, 1.8vw, 0.5rem);
+  top: 50%;
+  z-index: 4;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.28rem;
-  padding: 0.1rem 0.38rem;
+  flex-direction: column;
+  gap: 0.18rem;
+  padding: 0.24rem 0.2rem;
   border-radius: 999px;
   border: 1px solid rgba(23, 26, 34, 0.08);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow:
+    0 8px 22px rgba(23, 26, 34, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  transform: translateY(-50%);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: blur(16px) saturate(1.1);
 }
 
 .drone-sound-wheel__octave-label {
-  font-size: 0.58rem;
+  font-size: 0.48rem;
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -126,8 +142,8 @@
 
 .drone-sound-wheel__octave-btn {
   display: inline-grid;
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.24rem;
+  height: 1.24rem;
   place-items: center;
   border: 0;
   border-radius: 999px;
@@ -143,8 +159,8 @@
 }
 
 .drone-sound-wheel__octave-value {
-  min-width: 0.8rem;
-  font-size: 0.82rem;
+  min-width: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--audio-gold, #f7a600);
@@ -191,9 +207,9 @@ html.app-dark-mode .drone-sound-wheel__octave-btn {
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__stage {
-  width: min(72vw, 16.25rem);
+  width: min(82vw, 18rem);
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__center .pitch-note-orbit {
-  --orbit-size: min(48vw, 10.85rem);
+  --orbit-size: min(56vw, 12.6rem);
 }

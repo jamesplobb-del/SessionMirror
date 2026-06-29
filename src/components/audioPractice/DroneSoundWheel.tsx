@@ -15,6 +15,7 @@ export interface DroneSoundWheelProps {
   onSoloNote: (pitchClass: number) => void
   onIncrementOctave: () => void
   onDecrementOctave: () => void
+  onDroneInteraction?: () => void
   children: ReactNode
 }
 
@@ -53,6 +54,7 @@ export default function DroneSoundWheel({
   onSoloNote,
   onIncrementOctave,
   onDecrementOctave,
+  onDroneInteraction,
   children,
 }: DroneSoundWheelProps) {
   const ringRef = useRef<HTMLDivElement>(null)
@@ -89,6 +91,7 @@ export default function DroneSoundWheel({
     if (pitchClass === null) return
 
     event.preventDefault()
+    onDroneInteraction?.()
     sessionRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -121,6 +124,7 @@ export default function DroneSoundWheel({
     if (!session.isGlissando || pitchClass === null) return
 
     event.preventDefault()
+    onDroneInteraction?.()
     setGlissandoPitch(pitchClass)
 
     if (session.lastSoloPitch === pitchClass) return
@@ -137,6 +141,7 @@ export default function DroneSoundWheel({
     if (!session.isGlissando && session.downPitchClass !== null) {
       const pitchClass = readPitchAt(event.clientX, event.clientY)
       if (pitchClass === session.downPitchClass) {
+        onDroneInteraction?.()
         onToggleNote(session.downPitchClass)
       }
     }

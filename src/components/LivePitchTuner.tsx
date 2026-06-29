@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useMemo, useRef, type RefObject } from 'react'
+import { useCallback, useMemo, useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
 import DroneSoundWheel from './audioPractice/DroneSoundWheel'
 import {
@@ -40,6 +40,8 @@ interface LivePitchTunerProps {
     onDecrementOctave: () => void
   }
 }
+
+const DRONE_ANALYSIS_SUPPRESS_MS = 420
 
 function PitchChartCanvas({
   canvasRef,
@@ -305,11 +307,13 @@ function LiveAudioTunerPane({
   inTuneGlow,
   canvasRef,
   drone,
+  onDroneInteraction,
 }: {
   readout: PitchReadout
   inTuneGlow: number
   canvasRef: RefObject<HTMLCanvasElement | null>
   drone?: LivePitchTunerProps['drone']
+  onDroneInteraction?: () => void
 }) {
   const active = readout.noteName !== '—'
   const displayCents = active ? readout.cents : 0
@@ -325,6 +329,7 @@ function LiveAudioTunerPane({
             onSoloNote={drone.onSoloNote}
             onIncrementOctave={drone.onIncrementOctave}
             onDecrementOctave={drone.onDecrementOctave}
+            onDroneInteraction={onDroneInteraction}
           >
             <NoteOrbitReadout
               noteName={readout.noteName}
@@ -379,6 +384,11 @@ function LivePitchTunerAudio({
 }) {
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
+  const droneAnalysisSuppressUntilRef = useRef(0)
+
+  const suppressDroneAnalysis = useCallback(() => {
+    droneAnalysisSuppressUntilRef.current = performance.now() + DRONE_ANALYSIS_SUPPRESS_MS
+  }, [])
 
   const showPlayback = isPlaying && !liveMicOnly
   const showLive = liveMicOnly
@@ -395,6 +405,7 @@ function LivePitchTunerAudio({
       persistWhenPaused: true,
       tunerInstrument,
       realtimeMode: true,
+      suppressUntilRef: droneAnalysisSuppressUntilRef,
     }),
     [micStreamRef, tunerInstrument],
   )
@@ -448,6 +459,7 @@ function LivePitchTunerAudio({
               inTuneGlow={playbackTracker.inTuneGlow}
               canvasRef={playbackCanvasRef}
               drone={drone}
+              onDroneInteraction={suppressDroneAnalysis}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
@@ -455,6 +467,7 @@ function LivePitchTunerAudio({
               inTuneGlow={liveTracker.inTuneGlow}
               canvasRef={liveCanvasRef}
               drone={drone}
+              onDroneInteraction={suppressDroneAnalysis}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">

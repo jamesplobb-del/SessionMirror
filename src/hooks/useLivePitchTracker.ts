@@ -257,6 +257,8 @@ export interface PitchTrackerOptions {
   tunerInstrument?: TunerInstrument
   /** Full-rate mic analysis + canvas (camera widget). Economy mode for audio HUD. */
   realtimeMode?: boolean
+  /** Temporarily ignore mic analysis during local reference-tone touches. */
+  suppressUntilRef?: RefObject<number>
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
@@ -1268,6 +1270,7 @@ export function useLivePitchTracker(
     options.continuousScroll ?? source === 'microphone'
   const realtimeMode = options.realtimeMode ?? false
   const tunerInstrument = options.tunerInstrument ?? 'voice'
+  const suppressUntilRef = options.suppressUntilRef
   const profile = getTunerProfile(tunerInstrument)
   const profileRef = useRef(profile)
   profileRef.current = profile
@@ -1629,6 +1632,10 @@ export function useLivePitchTracker(
       }
 
       const activeProfile = profileRef.current
+      const shouldSuppressMicAnalysis =
+        sourceRef.current === 'microphone' &&
+        suppressUntilRef?.current != null &&
+        performance.now() < suppressUntilRef.current
       const snappyWidgetTrace =
         realtimeModeRef.current && !activeProfile.widgetSmoothTrace
       const responsiveTrace = snappyWidgetTrace
@@ -1650,6 +1657,36 @@ export function useLivePitchTracker(
       framesSinceAttachAttemptRef.current += 1
       tickStats.frames += 1
       let graph = graphRef.current
+
+      if (shouldSuppressMicAnalysis) {
+        historyRef.current = []
+        readoutSmoothedHzRef.current = null
+        needleCentsRef.current = null
+        goodFrameCountRef.current = 0
+        lastStableCentsRef.current = null
+        lastNoteRef.current = '—'
+        lastPitchAtRef.current = 0
+        if (graph) graph.smoothed = null
+        publishReadout(emptyReadout, true)
+
+        const canvas = canvasRef?.current
+        if (canvas) {
+          drawPitchCanvasIfDue(
+            canvas,
+            new Float32Array(activeProfile.frameSize),
+            historyRef.current,
+            false,
+            canvasTheme,
+            traceWindow,
+            traceBlend,
+            0,
+            responsiveTrace,
+          )
+        }
+
+        tickRef.current = requestAnimationFrame(tick)
+        return
+      }
 
       if (graph && isMediaPitchGraph(graph) && elementGraphs.get(graph.media) !== graph) {
         graphRef.current = null
@@ -1969,6 +2006,7 @@ export function useLivePitchTracker(
     persistWhenPaused,
     realtimeMode,
     source,
+    suppressUntilRef,
     tunerInstrument,
   ])
 
