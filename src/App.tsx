@@ -149,6 +149,7 @@ import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTab
 import AudioModeHome from './components/audioPractice/AudioModeHome'
 import AudioMetronomeTab from './components/audioPractice/AudioMetronomeTab'
 import AudioTunerTab from './components/audioPractice/AudioTunerTab'
+import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
 import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './context/AudioModePlaybackContext'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 650
@@ -2683,15 +2684,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         droneVolume={settings.droneVolume}
                         droneWaveform={settings.droneWaveform}
                         hapticFeedback={settings.hapticFeedback}
-                        showTakeCards={settings.showTakeCards}
-                        benchmarkTake={benchmarkTake}
-                        libraryBenchmarkPlayback={libraryBenchmarkPlayback}
-                        challengerTake={challengerTake}
-                        onExpandBenchmark={handleExpandBenchmark}
-                        onExpandChallenger={handleExpandChallenger}
-                        onPinCurrentAsBest={handlePinCurrentAsBest}
-                        onClearBenchmark={handleClearAudioBenchmark}
-                        onClearChallenger={handleClearAudioChallenger}
                       />
                     </div>
                   )}
@@ -2775,6 +2767,30 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
+                    {isAudioPracticeTunerTab &&
+                      !quickSettingsOpen &&
+                      settings.showTakeCards && (
+                        <motion.div
+                          key="tuner-take-pills"
+                          className="audio-tuner-take-pills-wrap pointer-events-auto w-full"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={iosHudDim}
+                          style={motionGpuLayer}
+                        >
+                          <TunerTakePillRow
+                            benchmarkTake={benchmarkTake}
+                            libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                            challengerTake={challengerTake}
+                            onExpandBenchmark={handleExpandBenchmark}
+                            onExpandChallenger={handleExpandChallenger}
+                            onPinCurrentAsBest={handlePinCurrentAsBest}
+                            onClearBenchmark={handleClearAudioBenchmark}
+                            onClearChallenger={handleClearAudioChallenger}
+                          />
+                        </motion.div>
+                      )}
+
                     {!quickSettingsOpen &&
                       settings.showTakeCards &&
                       !isSplitView &&

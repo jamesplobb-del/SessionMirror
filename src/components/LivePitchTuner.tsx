@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMemo, useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
-import DroneKeyboard from './audioPractice/DroneKeyboard'
+import DroneSoundWheel from './audioPractice/DroneSoundWheel'
 import {
   formatDisplayCents,
   formatFrequencyHz,
@@ -314,34 +314,39 @@ function LiveAudioTunerPane({
   const displayCents = active ? readout.cents : 0
 
   return (
-    <div className="pitch-audio-stage pitch-audio-stage--polished flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="pitch-audio-stage pitch-audio-stage--polished pitch-audio-stage--tuner-wheel flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="pitch-audio-stage__hero shrink-0">
-        <NoteOrbitReadout
-          noteName={readout.noteName}
-          frequencyHz={readout.frequencyHz}
-          cents={displayCents}
-          active={active}
-          inTuneGlow={inTuneGlow}
-          lightSurface
-        />
-      </div>
-
-      {drone && (
-        <div className="pitch-audio-stage__drone shrink-0">
-          <DroneKeyboard
+        {drone ? (
+          <DroneSoundWheel
             activeNotes={drone.activeNotes}
             octave={drone.octave}
             onToggleNote={drone.onToggleNote}
             onIncrementOctave={drone.onIncrementOctave}
             onDecrementOctave={drone.onDecrementOctave}
+          >
+            <NoteOrbitReadout
+              noteName={readout.noteName}
+              frequencyHz={readout.frequencyHz}
+              cents={displayCents}
+              active={active}
+              inTuneGlow={inTuneGlow}
+              lightSurface
+            />
+          </DroneSoundWheel>
+        ) : (
+          <NoteOrbitReadout
+            noteName={readout.noteName}
+            frequencyHz={readout.frequencyHz}
+            cents={displayCents}
+            active={active}
+            inTuneGlow={inTuneGlow}
+            lightSurface
           />
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="pitch-audio-stage__chart min-h-0 flex-1">
-        <div className="pitch-chart-card">
-          <PitchChartCanvas canvasRef={canvasRef} glass fill />
-        </div>
+      <div className="pitch-audio-stage__chart pitch-audio-stage__chart--flat min-h-0 flex-1">
+        <PitchChartCanvas canvasRef={canvasRef} fill />
       </div>
     </div>
   )

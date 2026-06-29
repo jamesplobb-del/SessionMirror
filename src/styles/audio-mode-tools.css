@@ -644,16 +644,8 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-
 
 .app-ui-overlay--audio-mode .audio-practice-tuner-shell {
   position: relative;
-  padding: 0.35rem 0.5rem 0.45rem;
+  padding: 0.2rem 0.35rem 0;
   background: var(--audio-bg-base);
-}
-
-.app-ui-overlay--audio-mode .audio-practice-tuner-shell--take-pills {
-  padding-bottom: 0;
-}
-
-.app-ui-overlay--audio-mode .audio-practice-tuner-shell--take-pills .pitch-audio-stage__chart {
-  padding-bottom: 0.1rem;
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
@@ -768,14 +760,14 @@ html.app-dark-mode
   color: var(--audio-text-secondary);
 }
 
-.app-ui-overlay--audio-mode .audio-tuner-take-pills {
+.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills {
   position: relative;
   z-index: 8;
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-  padding: 0.3rem 0.55rem max(0.5rem, env(safe-area-inset-bottom));
+  gap: 0.42rem;
+  padding: 0;
   pointer-events: auto;
 }
 
