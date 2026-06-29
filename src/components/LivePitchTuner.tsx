@@ -191,7 +191,7 @@ function NoteOrbitReadout({
 
   return (
     <div
-      className={`pitch-note-orbit ${inTune ? 'pitch-note-orbit--in-tune' : ''} ${isSharp ? 'pitch-note-orbit--sharp' : ''} ${isFlat ? 'pitch-note-orbit--flat' : ''}`}
+      className={`pitch-note-orbit ${lightSurface ? 'pitch-note-orbit--light-native' : ''} ${inTune ? 'pitch-note-orbit--in-tune' : ''} ${isSharp ? 'pitch-note-orbit--sharp' : ''} ${isFlat ? 'pitch-note-orbit--flat' : ''}`}
       style={{
         ['--orbit-accent' as string]: accent,
         ['--in-tune-glow' as string]: String(inTuneGlow),

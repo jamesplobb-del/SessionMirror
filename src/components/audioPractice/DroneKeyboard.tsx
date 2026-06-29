@@ -96,6 +96,7 @@ export default function DroneKeyboard({
       </div>
 
       <div className="drone-keyboard__octave" aria-label="Drone octave">
+        <span className="drone-keyboard__octave-label">Octave</span>
         <button
           type="button"
           className="drone-keyboard__octave-btn"
@@ -105,21 +106,18 @@ export default function DroneKeyboard({
         >
           −
         </button>
-        <div className="drone-keyboard__octave-readout">
-          <span className="drone-keyboard__octave-label">Octave</span>
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
-              key={octave}
-              className="drone-keyboard__octave-value"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-            >
-              C{octave}
-            </motion.span>
-          </AnimatePresence>
-        </div>
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={octave}
+            className="drone-keyboard__octave-value"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
+            {octave}
+          </motion.span>
+        </AnimatePresence>
         <button
           type="button"
           className="drone-keyboard__octave-btn"

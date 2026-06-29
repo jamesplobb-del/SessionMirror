@@ -80,7 +80,7 @@ function TunerTakePill({
         }
       }}
     >
-      <span className="audio-tuner-take-pill__meta">
+      <div className="audio-tuner-take-pill__leading">
         <span className="audio-tuner-take-pill__label">{label}</span>
         <span className="audio-tuner-take-pill__name">{displayName}</span>
         {hasMedia && isPlaying && (
@@ -90,8 +90,29 @@ function TunerTakePill({
             style={{ transform: `scaleX(${Math.max(0, Math.min(1, playbackProgress))})` }}
           />
         )}
-      </span>
-      <div className="audio-tuner-take-pill__actions">
+      </div>
+      <div className="audio-tuner-take-pill__play-slot">
+        <Pressable
+          type="button"
+          intensity="icon"
+          haptic="light"
+          disabled={!hasMedia}
+          onClick={(event) => {
+            event.stopPropagation()
+            togglePlayback()
+          }}
+          onPointerDown={stopEventBubble}
+          className="audio-tuner-take-pill__play"
+          aria-label={isPlaying ? `Pause ${label}` : `Play ${label}`}
+        >
+          {isPlaying ? (
+            <Pause className="h-3.5 w-3.5 fill-current" />
+          ) : (
+            <Play className="h-3.5 w-3.5 fill-current" />
+          )}
+        </Pressable>
+      </div>
+      <div className="audio-tuner-take-pill__trailing">
         {tone === 'current' && hasMedia && (
           <Pressable
             type="button"
@@ -124,25 +145,6 @@ function TunerTakePill({
             <X className="h-3.5 w-3.5" />
           </Pressable>
         )}
-        <Pressable
-          type="button"
-          intensity="icon"
-          haptic="light"
-          disabled={!hasMedia}
-          onClick={(event) => {
-            event.stopPropagation()
-            togglePlayback()
-          }}
-          onPointerDown={stopEventBubble}
-          className="audio-tuner-take-pill__play"
-          aria-label={isPlaying ? `Pause ${label}` : `Play ${label}`}
-        >
-          {isPlaying ? (
-            <Pause className="h-3.5 w-3.5 fill-current" />
-          ) : (
-            <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
-          )}
-        </Pressable>
       </div>
     </motion.div>
   )
@@ -201,8 +203,9 @@ export default function AudioTunerTab({
       }`}
       aria-label="Tuner"
     >
-      <LivePitchTuner
-        variant="audio"
+      <div className="flex min-h-0 flex-1 flex-col">
+        <LivePitchTuner
+          variant="audio"
         mediaRef={mediaRef}
         enabled
         isPlaying={isRecording}
@@ -213,7 +216,8 @@ export default function AudioTunerTab({
         liveMicOnly
         tunerInstrument={tunerInstrument}
         drone={droneKeyboard}
-      />
+        />
+      </div>
       {showTakeCards && (
         <div className="audio-tuner-take-pills" aria-label="Tuner takes">
           <TunerTakePill
