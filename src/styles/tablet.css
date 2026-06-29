@@ -420,6 +420,13 @@
     min-height: clamp(15rem, 34vh, 24rem);
   }
 
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-dial {
+    width: clamp(17rem, 38vw, 25rem);
+    height: clamp(17rem, 38vw, 25rem);
+    min-width: 0;
+    min-height: 0;
+  }
+
   .app-ui-overlay--audio-mode
     .audio-practice-metronome__visual--large
     .audio-practice-metronome__pulse {
@@ -608,10 +615,24 @@
     margin-bottom: clamp(0.55rem, 1.2vh, 0.9rem);
   }
 
+  .app-ui-overlay--audio-mode {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-tab-panel,
+  .app-ui-overlay--audio-mode .audio-practice-metronome-layer {
+    min-height: auto;
+    overflow: visible;
+  }
+
   .app-ui-overlay--audio-mode .audio-mode-home-layer {
     width: min(1180px, calc(100% - 3rem));
     max-width: none;
     padding-inline: 0;
+    min-height: max-content;
+    overflow: visible;
   }
 
   .app-ui-overlay--audio-mode .audio-mode-home {
@@ -619,7 +640,9 @@
     grid-template-columns: minmax(19rem, 0.82fr) minmax(24rem, 1fr);
     gap: clamp(1.4rem, 3vw, 3rem);
     align-items: center;
-    overflow: hidden;
+    min-height: max-content;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+    overflow: visible;
   }
 
   .app-ui-overlay--audio-mode .audio-mode-hero {
@@ -645,6 +668,8 @@
   .app-ui-overlay--audio-mode .audio-practice-metronome__body,
   .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
     max-width: min(1120px, calc(100% - 3rem));
+    min-height: max-content;
+    overflow: visible;
   }
 
   .app-ui-overlay--audio-mode .audio-practice-metronome__body {
@@ -652,6 +677,7 @@
     grid-template-columns: minmax(22rem, 0.9fr) minmax(24rem, 1fr);
     gap: clamp(1.5rem, 3vw, 3rem);
     align-items: center;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   }
 
   .app-ui-overlay--audio-mode .audio-practice-metronome__bpm-row {
@@ -665,6 +691,18 @@
     min-height: 0;
   }
 
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-dial {
+    width: clamp(19rem, 43vh, 30rem);
+    height: clamp(19rem, 43vh, 30rem);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__pulse {
+    width: clamp(16rem, 36vh, 25rem);
+    height: clamp(16rem, 36vh, 25rem);
+  }
+
   .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
     grid-column: 1;
     grid-row: 2;
@@ -676,6 +714,7 @@
     grid-template-columns: minmax(20rem, 0.8fr) minmax(26rem, 1fr);
     gap: clamp(1.2rem, 2.5vw, 2.5rem);
     align-items: center;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   }
 
   .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__hero {
