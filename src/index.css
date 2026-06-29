@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-@import './styles/tablet.css';
 @import './styles/audio-mode-tokens.css';
 @import './styles/audio-mode.css';
 
@@ -5258,3 +5257,4 @@ html.native-dark-chrome body {
 @import './styles/audio-mode-sheets.css';
 @import './styles/camera-mode-glass.css';
 @import './styles/vault-ui.css';
+@import './styles/tablet.css';

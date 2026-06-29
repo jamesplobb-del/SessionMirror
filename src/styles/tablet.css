@@ -209,4 +209,541 @@
     pointer-events: auto !important;
     z-index: 41;
   }
+
+  /* iPad comfort pass — visual scale only, no app logic or interaction changes. */
+  :root {
+    --ipad-content-max-width: min(760px, calc(100% - 3rem));
+    --ipad-wide-content-max-width: min(1120px, calc(100% - 3rem));
+    --ipad-pip-width: clamp(20rem, 27vw, 25rem);
+    --ipad-deck-btn-size: clamp(3.75rem, 5.8vw, 4.5rem);
+    --ipad-record-size: clamp(5.25rem, 7.2vw, 6.25rem);
+    --app-split-max-width: min(1120px, calc(100% - 2.5rem));
+    --app-sheet-max-width: min(720px, calc(100% - 3rem));
+    --pitch-pip-row-block: calc(var(--ipad-pip-width) * 9 / 16 + 1.5rem);
+    --pitch-control-deck-block: calc(var(--ipad-record-size) + 2.75rem);
+  }
+
+  .app-ui-overlay {
+    padding-left: max(env(safe-area-inset-left, 0px), 0.25rem);
+    padding-right: max(env(safe-area-inset-right, 0px), 0.25rem);
+  }
+
+  .hud-header {
+    padding-top: max(0.85rem, env(safe-area-inset-top, 0px));
+  }
+
+  .hud-header__vault {
+    min-height: 3rem;
+    max-width: min(100%, 26rem);
+    padding: 0.58rem 1.25rem;
+    font-size: 1rem;
+  }
+
+  .hud-header__vault svg {
+    width: 1.22rem;
+    height: 1.22rem;
+  }
+
+  .app-hud-bottom {
+    gap: clamp(1.55rem, 2.8vh, 2.35rem);
+    padding-bottom: max(0.7rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .control-deck__main-row {
+    max-width: min(42rem, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  .control-deck__vault-btn,
+  .control-deck__settings-btn {
+    min-width: var(--ipad-deck-btn-size);
+    min-height: var(--ipad-deck-btn-size);
+  }
+
+  .control-deck__vault-btn svg,
+  .control-deck__settings-btn svg {
+    width: clamp(1.75rem, 2.7vw, 2.1rem);
+    height: clamp(1.75rem, 2.7vw, 2.1rem);
+  }
+
+  .record-carousel-viewport,
+  .record-delete-drop {
+    --record-carousel-viewport-width: clamp(15.5rem, 24vw, 18.5rem);
+    --record-slot-inactive-size: clamp(3.35rem, 4.8vw, 4rem);
+  }
+
+  .record-carousel-auto-btn {
+    right: clamp(-4rem, -4.4vw, -3.4rem);
+    width: clamp(2.85rem, 4.2vw, 3.35rem);
+    height: clamp(2.85rem, 4.2vw, 3.35rem);
+  }
+
+  .app-pip-row-wrap {
+    width: var(--ipad-wide-content-max-width);
+    padding-bottom: 0.75rem;
+  }
+
+  .app-pip-row {
+    gap: clamp(2rem, 5vw, 4.25rem);
+  }
+
+  .app-pip-row > .app-pip-slot {
+    flex-basis: var(--ipad-pip-width);
+    width: var(--ipad-pip-width);
+  }
+
+  .pip-video-container {
+    border-radius: clamp(1.15rem, 2vw, 1.5rem);
+  }
+
+  .pip-empty-state__body p {
+    font-size: clamp(0.95rem, 1.55vw, 1.08rem);
+    line-height: 1.25;
+  }
+
+  .pip-empty-action {
+    min-height: 2.65rem;
+    padding-inline: 0.95rem;
+    font-size: clamp(0.82rem, 1.3vw, 0.94rem);
+  }
+
+  .pip-empty-action svg,
+  .pip-chrome-btn svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .pip-chrome-btn {
+    width: 2.55rem;
+    height: 2.55rem;
+  }
+
+  .split-compare-host {
+    width: var(--app-split-max-width);
+    padding-inline: 1.25rem;
+  }
+
+  .split-compare-layout {
+    gap: clamp(0.85rem, 1.8vw, 1.25rem);
+    border-radius: 2rem;
+    padding: clamp(0.8rem, 1.8vw, 1.1rem);
+  }
+
+  .split-compare-panel {
+    min-height: clamp(15rem, 28vh, 22rem);
+    border-radius: 1.55rem;
+  }
+
+  .split-ratio-handle {
+    min-height: 1.9rem;
+  }
+
+  .audio-practice-top-tabs {
+    max-width: min(46rem, calc(100% - 3rem));
+    min-height: 3.5rem;
+    margin-top: clamp(0.75rem, 1.8vh, 1.35rem);
+    margin-bottom: clamp(0.9rem, 1.8vh, 1.35rem);
+    padding: 0.35rem;
+  }
+
+  .audio-practice-top-tabs__btn {
+    min-height: 2.85rem;
+    font-size: clamp(1rem, 1.7vw, 1.13rem);
+  }
+
+  .audio-mode-home-layer {
+    max-width: var(--ipad-content-max-width);
+    margin-inline: auto;
+    padding-inline: 1.5rem;
+  }
+
+  .audio-mode-home {
+    gap: clamp(0.85rem, 1.6vh, 1.35rem);
+  }
+
+  .audio-mode-hero-mic__dial {
+    width: clamp(13rem, 24vh, 17rem);
+  }
+
+  .audio-mode-hero-mic__icon {
+    width: clamp(3rem, 5.5vh, 4rem);
+    height: clamp(3rem, 5.5vh, 4rem);
+  }
+
+  .audio-mode-hero h2 {
+    font-size: clamp(1.25rem, 2.1vh, 1.7rem);
+  }
+
+  .audio-mode-hero p {
+    font-size: clamp(0.92rem, 1.45vh, 1.08rem);
+  }
+
+  .audio-mode-take-stack {
+    gap: clamp(0.85rem, 1.5vh, 1.1rem);
+  }
+
+  .audio-mode-take-card {
+    min-height: clamp(8.75rem, 13.5vh, 11rem);
+    max-height: none;
+    border-radius: clamp(1.25rem, 2vw, 1.6rem);
+  }
+
+  .audio-mode-take-card__play {
+    width: clamp(3.05rem, 4.8vw, 3.8rem);
+    height: clamp(3.05rem, 4.8vw, 3.8rem);
+  }
+
+  .audio-mode-waveform {
+    gap: clamp(0.13rem, 0.25vw, 0.22rem);
+  }
+
+  .audio-mode-waveform__bar {
+    width: clamp(2.5px, 0.34vw, 4px);
+  }
+
+  .audio-practice-metronome-shell,
+  .audio-practice-tuner-shell {
+    max-width: var(--ipad-content-max-width);
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__body,
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
+    max-width: var(--ipad-content-max-width);
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual {
+    min-height: clamp(15rem, 34vh, 24rem);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__pulse {
+    width: clamp(13rem, 30vw, 20rem);
+    height: clamp(13rem, 30vw, 20rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__step-btn {
+    width: clamp(3.25rem, 5vw, 4.1rem);
+    height: clamp(3.25rem, 5vw, 4.1rem);
+    font-size: 1.25rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    max-width: min(46rem, 100%);
+    margin-inline: auto;
+  }
+
+  .app-ui-overlay--audio-mode .metronome-audio-stage__sound-btn,
+  .app-ui-overlay--audio-mode .metronome-audio-select__trigger {
+    min-height: 2.45rem;
+    font-size: clamp(0.78rem, 1.15vw, 0.92rem);
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-note-orbit {
+    --orbit-size: clamp(12rem, 24vw, 17.5rem);
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__chart {
+    min-height: clamp(16rem, 34vh, 24rem);
+  }
+
+  .app-ui-overlay--audio-mode .pitch-chart-card {
+    border-radius: 1.35rem;
+  }
+
+  .drone-sound-wheel,
+  .drone-sound-wheel__stage {
+    max-width: min(44rem, 100%);
+    margin-inline: auto;
+  }
+
+  .animated-bottom-sheet,
+  .native-bottom-sheet {
+    width: var(--app-sheet-max-width);
+    max-height: min(88vh, 900px);
+    border-radius: 2rem;
+  }
+
+  .native-sheet-header,
+  .native-bottom-sheet--vault .native-sheet-header {
+    padding-inline: 2rem;
+  }
+
+  .settings-drawer-scroll,
+  .native-bottom-sheet--vault .vault-drawer-scroll {
+    padding-inline: 2rem;
+  }
+
+  .settings-group-row {
+    min-height: 5.25rem;
+    padding: 1.1rem 1.2rem;
+    border-radius: 1.15rem;
+  }
+
+  .settings-group-row p:first-child {
+    font-size: 1rem;
+  }
+
+  .settings-group-row p:last-child {
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+
+  .native-bottom-sheet--vault {
+    width: min(860px, calc(100% - 3rem));
+  }
+
+  .native-bottom-sheet--vault .vault-sheet-header {
+    gap: 1rem;
+  }
+
+  .native-bottom-sheet--vault .vault-take-list {
+    gap: 0.9rem;
+  }
+
+  .native-bottom-sheet--vault .vault-take-row {
+    gap: 1rem;
+    padding: 0.85rem;
+    border-radius: 1.25rem;
+  }
+
+  .native-bottom-sheet--vault .vault-take-row__thumb {
+    width: clamp(5.8rem, 10vw, 7rem);
+    height: clamp(5.8rem, 10vw, 7rem);
+  }
+
+  .native-bottom-sheet--vault .vault-take-row__title {
+    font-size: 1.05rem;
+  }
+
+  .native-bottom-sheet--vault .vault-take-row__date {
+    font-size: 0.78rem;
+  }
+
+  .native-bottom-sheet--vault .vault-take-row__icon-btn,
+  .native-bottom-sheet--vault .vault-take-row__play-btn {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
+
+  .review-native-nav {
+    min-height: 4.35rem;
+    max-width: min(920px, calc(100% - 2.5rem));
+    margin-inline: auto;
+  }
+
+  .review-nav-button {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .review-bottom-ui {
+    padding-inline: max(2rem, env(safe-area-inset-left, 0px))
+      max(2rem, env(safe-area-inset-right, 0px));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .review-controls-cluster {
+    max-width: min(780px, calc(100% - 2rem));
+    margin-inline: auto;
+    border-radius: 1.75rem;
+  }
+
+  .review-playback-controls {
+    min-height: 4.9rem;
+    padding: 0.75rem 1rem 0.45rem;
+  }
+
+  .review-native-toolbar {
+    padding: 0.7rem 0.8rem 0.85rem;
+  }
+
+  .review-toolbar-button {
+    min-width: 3.35rem;
+    min-height: 3.35rem;
+  }
+}
+
+@media (min-width: 744px) and (orientation: landscape) {
+  :root {
+    --ipad-content-max-width: min(1180px, calc(100% - 3rem));
+    --ipad-pip-width: clamp(16rem, 21vw, 22rem);
+    --app-sheet-max-width: min(860px, calc(100% - 4rem));
+    --app-split-max-width: min(1180px, calc(100% - 3rem));
+    --pitch-pip-row-block: calc(var(--ipad-pip-width) * 9 / 16 + 1rem);
+  }
+
+  .hud-header {
+    padding-top: max(0.45rem, env(safe-area-inset-top, 0px));
+  }
+
+  .app-hud-bottom {
+    padding-bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-pip-row-wrap {
+    width: min(920px, calc(100% - 3rem));
+  }
+
+  .app-pip-row {
+    gap: clamp(1.25rem, 2.8vw, 3rem);
+  }
+
+  .split-compare-host {
+    padding-top: 0.35rem;
+  }
+
+  .split-compare-layout {
+    max-height: calc(100vh - 10rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-top-tabs {
+    max-width: min(54rem, calc(100% - 4rem));
+    margin-top: clamp(0.55rem, 1.2vh, 0.9rem);
+    margin-bottom: clamp(0.55rem, 1.2vh, 0.9rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-home-layer {
+    width: min(1180px, calc(100% - 3rem));
+    max-width: none;
+    padding-inline: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-home {
+    display: grid;
+    grid-template-columns: minmax(19rem, 0.82fr) minmax(24rem, 1fr);
+    gap: clamp(1.4rem, 3vw, 3rem);
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-hero {
+    min-height: 0;
+    justify-content: center;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-hero-mic__dial {
+    width: clamp(11.5rem, 26vh, 15.5rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-stack {
+    min-height: 0;
+    gap: clamp(0.8rem, 1.8vh, 1.2rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-card {
+    min-height: clamp(8rem, 19vh, 10rem);
+  }
+
+  .audio-practice-metronome-shell,
+  .audio-practice-tuner-shell,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__body,
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
+    max-width: min(1120px, calc(100% - 3rem));
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__body {
+    display: grid;
+    grid-template-columns: minmax(22rem, 0.9fr) minmax(24rem, 1fr);
+    gap: clamp(1.5rem, 3vw, 3rem);
+    align-items: center;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__bpm-row {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    grid-column: 1;
+    grid-row: 2;
+    max-width: min(1120px, calc(100% - 3rem));
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
+    display: grid;
+    grid-template-columns: minmax(20rem, 0.8fr) minmax(26rem, 1fr);
+    gap: clamp(1.2rem, 2.5vw, 2.5rem);
+    align-items: center;
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__hero {
+    grid-column: 1;
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-chart-card,
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-idle-pane--polished {
+    grid-column: 2;
+    min-height: clamp(18rem, 52vh, 28rem);
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__chart {
+    min-height: clamp(18rem, 52vh, 28rem);
+  }
+
+  .animated-bottom-sheet,
+  .native-bottom-sheet {
+    max-height: min(86vh, 760px);
+    bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .native-bottom-sheet--vault {
+    width: min(980px, calc(100% - 4rem));
+  }
+
+  .native-bottom-sheet--vault .vault-take-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .native-bottom-sheet--vault .vault-take-row--expanded {
+    grid-column: 1 / -1;
+  }
+
+  .settings-drawer-scroll .space-y-5 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.1rem;
+  }
+
+  .settings-drawer-scroll .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0 !important;
+  }
+
+  .review-video-stage {
+    padding-inline: max(2rem, env(safe-area-inset-left, 0px))
+      max(2rem, env(safe-area-inset-right, 0px));
+  }
+
+  .review-controls-cluster {
+    max-width: min(900px, calc(100% - 4rem));
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 1024px) {
+  .app-pip-row-wrap {
+    width: min(1160px, calc(100% - 4rem));
+  }
+
+  .native-bottom-sheet--vault {
+    width: min(940px, calc(100% - 4rem));
+  }
+
+  .audio-mode-home-layer,
+  .audio-practice-metronome-shell,
+  .audio-practice-tuner-shell {
+    max-width: min(820px, calc(100% - 4rem));
+  }
 }
