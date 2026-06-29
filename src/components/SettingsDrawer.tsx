@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
 import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
+import { DRONE_WAVEFORM_OPTIONS, type DroneWaveform } from '../utils/droneEngine'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import AnimatedExpand from './ui/AnimatedExpand'
 import AudioEnhancer from './AudioEnhancer'
@@ -328,6 +329,37 @@ export default function SettingsDrawer({
                 />
               </div>
             </AnimatedExpand>
+
+            <SettingSlider
+              label="Drone Volume"
+              description="Reference-tone loudness for the tuner drone keyboard. Lower levels reduce speaker bleed into the mic."
+              value={settings.droneVolume}
+              min={0}
+              max={100}
+              step={1}
+              unit="%"
+              formatValue={(value) => `${value}%`}
+              onChange={(droneVolume) => onUpdate({ droneVolume })}
+            />
+
+            <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
+              <p className="text-sm font-semibold text-stone-900">Drone Waveform</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                Timbre for reference tones on the tuner keyboard.
+              </p>
+
+              <IOSSegmentedControl
+                className="mt-3"
+                layoutId="settings-drone-waveform-segment"
+                ariaLabel="Drone waveform"
+                value={settings.droneWaveform}
+                onChange={(droneWaveform: DroneWaveform) => onUpdate({ droneWaveform })}
+                segments={DRONE_WAVEFORM_OPTIONS.map((option) => ({
+                  id: option.value,
+                  label: option.label,
+                }))}
+              />
+            </div>
           </section>
 
           <section className="settings-group space-y-3">

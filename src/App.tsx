@@ -2721,6 +2721,9 @@ function StandardApp({
               isRecording={isRecording}
               tunerInstrument={settings.tunerInstrument}
               liveMicTunerEnabled={settings.liveMicTunerEnabled}
+              droneVolume={settings.droneVolume}
+              droneWaveform={settings.droneWaveform}
+              hapticFeedback={settings.hapticFeedback}
             />
           </div>
         )}

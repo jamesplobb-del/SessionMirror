@@ -985,6 +985,11 @@ body.settings-branch-open * {
   color: rgba(148, 163, 184, 0.35);
 }
 
+.pitch-audio-stage--polished .pitch-audio-stage__drone {
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
 .pitch-audio-stage--polished .pitch-audio-stage__chart {
   min-height: min(36vh, 16.5rem);
   padding-top: 0.25rem;

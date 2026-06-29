@@ -1,4 +1,5 @@
 import type { TunerInstrument } from './pitchConfig'
+import type { DroneWaveform } from './droneEngine'
 import {
   DEFAULT_AUDIO_ENHANCER_SETTINGS,
   parseAudioEnhancerSettings,
@@ -29,6 +30,10 @@ export interface AppSettings {
   liveMicTunerEnabled: boolean
   /** Pitch detection profile — voice, strings, or winds. */
   tunerInstrument: TunerInstrument
+  /** Reference drone output level (0–100). */
+  droneVolume: number
+  /** Reference drone waveform timbre. */
+  droneWaveform: DroneWaveform
   /** Show Best Take and Current Take cards on the main HUD. */
   showTakeCards: boolean
   /** Floating metronome widget on the main camera/audio HUD. */
@@ -62,6 +67,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   pitchTrackerEnabled: false,
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
+  droneVolume: 35,
+  droneWaveform: 'sine',
   showTakeCards: true,
   showMetronome: false,
   muteMetronomeDuringPlayback: true,
@@ -79,6 +86,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 const SESSION_START_WIDGET_OFF: Pick<AppSettings, 'pitchTrackerEnabled' | 'showMetronome'> = {
   pitchTrackerEnabled: false,
   showMetronome: false,
+}
+
+function parseDroneWaveform(value: unknown): DroneWaveform {
+  if (value === 'triangle' || value === 'organ' || value === 'warmSynth') return value
+  return DEFAULT_APP_SETTINGS.droneWaveform
 }
 
 function parseTunerInstrument(value: unknown): TunerInstrument {
@@ -144,6 +156,12 @@ export function loadAppSettings(): AppSettings {
           ? Boolean(parsed.liveMicTunerEnabled)
           : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
       tunerInstrument: parseTunerInstrument(parsed.tunerInstrument),
+      droneVolume: clamp(
+        Number(parsed.droneVolume) || DEFAULT_APP_SETTINGS.droneVolume,
+        0,
+        100,
+      ),
+      droneWaveform: parseDroneWaveform(parsed.droneWaveform),
       showTakeCards:
         parsed.showTakeCards !== undefined
           ? Boolean(parsed.showTakeCards)

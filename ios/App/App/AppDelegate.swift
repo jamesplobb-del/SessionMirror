@@ -10,9 +10,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     /// Keep the Swift plugin class linked so Capacitor packageClassList can resolve it.
     private let bestTakeAudioPluginClass = BestTakeAudioPlugin.self
+    private let dronePluginClass = DronePlugin.self
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         _ = bestTakeAudioPluginClass
+        _ = dronePluginClass
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
         installAudioRouteObserver()

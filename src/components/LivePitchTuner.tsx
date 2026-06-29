@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMemo, useRef, type RefObject } from 'react'
 import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
+import DroneKeyboard from './audioPractice/DroneKeyboard'
 import {
   formatDisplayCents,
   formatFrequencyHz,
@@ -29,6 +30,14 @@ interface LivePitchTunerProps {
   pitchSource?: 'media' | 'microphone'
   /** Audio mode: analyze live mic stream (recording or idle tuner). */
   liveMicOnly?: boolean
+  /** Multi-select drone keyboard (audio tuner tab). */
+  drone?: {
+    activeNotes: number[]
+    octave: number
+    onToggleNote: (pitchClass: number) => void
+    onIncrementOctave: () => void
+    onDecrementOctave: () => void
+  }
 }
 
 function PitchChartCanvas({
@@ -294,10 +303,12 @@ function LiveAudioTunerPane({
   readout,
   inTuneGlow,
   canvasRef,
+  drone,
 }: {
   readout: PitchReadout
   inTuneGlow: number
   canvasRef: RefObject<HTMLCanvasElement | null>
+  drone?: LivePitchTunerProps['drone']
 }) {
   const active = readout.noteName !== '—'
   const displayCents = active ? readout.cents : 0
@@ -314,6 +325,18 @@ function LiveAudioTunerPane({
           lightSurface
         />
       </div>
+
+      {drone && (
+        <div className="pitch-audio-stage__drone shrink-0">
+          <DroneKeyboard
+            activeNotes={drone.activeNotes}
+            octave={drone.octave}
+            onToggleNote={drone.onToggleNote}
+            onIncrementOctave={drone.onIncrementOctave}
+            onDecrementOctave={drone.onDecrementOctave}
+          />
+        </div>
+      )}
 
       <div className="pitch-audio-stage__chart min-h-0 flex-1">
         <div className="pitch-chart-card">
@@ -334,6 +357,7 @@ function LivePitchTunerAudio({
   micStreamRef,
   tunerInstrument = 'voice',
   liveMicOnly = false,
+  drone,
 }: {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -344,6 +368,7 @@ function LivePitchTunerAudio({
   micStreamRef?: RefObject<MediaStream | null>
   tunerInstrument?: TunerInstrument
   liveMicOnly?: boolean
+  drone?: LivePitchTunerProps['drone']
 }) {
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -415,12 +440,14 @@ function LivePitchTunerAudio({
               readout={playbackTracker.readout}
               inTuneGlow={playbackTracker.inTuneGlow}
               canvasRef={playbackCanvasRef}
+              drone={drone}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
               readout={liveTracker.readout}
               inTuneGlow={liveTracker.inTuneGlow}
               canvasRef={liveCanvasRef}
+              drone={drone}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -451,6 +478,7 @@ export default function LivePitchTuner({
   tunerInstrument = 'voice',
   pitchSource = 'media',
   liveMicOnly = false,
+  drone,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -490,6 +518,7 @@ export default function LivePitchTuner({
         micStreamRef={micStreamRef}
         tunerInstrument={tunerInstrument}
         liveMicOnly={liveMicOnly}
+        drone={drone}
       />
     )
   }
