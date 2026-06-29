@@ -80,7 +80,11 @@ import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
-import { INTERACTIVE_TUTORIAL_STEPS, isOnboardingComplete, markOnboardingComplete } from './utils/onboardingTutorial'
+import {
+  INTERACTIVE_TUTORIAL_STEPS,
+  isOnboardingComplete,
+  markOnboardingComplete,
+} from './utils/onboardingTutorial'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
@@ -109,19 +113,9 @@ import {
   updateVaultTake,
   type Project,
 } from './db'
-import {
-  hasBenchmarkReference,
-  resolveBenchmarkPlayback,
-} from './utils/benchmarkReference'
-import {
-  hydrateLibraryItems,
-  type HydratedLibraryItem,
-} from './utils/libraryBridge'
-import {
-  triggerBestTakeHaptic,
-  triggerLightHaptic,
-  triggerWarningHaptic,
-} from './utils/haptics'
+import { hasBenchmarkReference, resolveBenchmarkPlayback } from './utils/benchmarkReference'
+import { hydrateLibraryItems, type HydratedLibraryItem } from './utils/libraryBridge'
+import { triggerBestTakeHaptic, triggerLightHaptic, triggerWarningHaptic } from './utils/haptics'
 import {
   deleteLibraryFile,
   normalizeLibraryAudioMime,
@@ -130,9 +124,7 @@ import {
 } from './utils/libraryStorage'
 import type { BenchmarkBinding } from './types/library'
 import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
-import {
-  applyNativeExperimentalAudioMode,
-} from './utils/audioSessionRoute'
+import { applyNativeExperimentalAudioMode } from './utils/audioSessionRoute'
 import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
 import { setActiveCaptureProfile } from './utils/audioCapture'
 import {
@@ -151,10 +143,7 @@ import { bootstrapViewport, stabilizeViewportAfterMediaInteraction } from './uti
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
 import { applyAutoPlaybackLeadIn } from './utils/autoRecordPlayback'
-import {
-  tuneMusicRecordingStream,
-  tunePlaybackIsolationStream,
-} from './utils/audioCapture'
+import { tuneMusicRecordingStream, tunePlaybackIsolationStream } from './utils/audioCapture'
 import AppBootGate from './components/ui/AppBootGate'
 import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTabs'
 import AudioModeHome from './components/audioPractice/AudioModeHome'
@@ -163,6 +152,11 @@ import AudioTunerTab from './components/audioPractice/AudioTunerTab'
 import { AudioModePlaybackProvider } from './context/AudioModePlaybackContext'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 650
+const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
   if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
@@ -215,14 +209,8 @@ interface AppBootSnapshot {
 const BOOT_REVEAL_DELAY_MS = 500
 
 function formatBootFailureMessage(error: unknown): string {
-  const detail =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-        ? error
-        : null
-  const base =
-    'BestTake could not start. Restart the app or reinstall if this continues.'
+  const detail = error instanceof Error ? error.message : typeof error === 'string' ? error : null
+  const base = 'BestTake could not start. Restart the app or reinstall if this continues.'
   return detail ? `${base}\n\n${detail}` : base
 }
 
@@ -256,14 +244,12 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
         filePath: row.filePath,
         mimeType: row.mimeType,
         duration: row.duration,
-      })),
+      }))
     )
     benchmarkBinding = await getProjectBenchmarkBinding(initialId)
 
     const hydrated = await hydrateVaultTakeRowsProgressive(rows, {
-      priorityIds: [benchmarkId, defaultChallengerId].filter(
-        (id): id is string => Boolean(id),
-      ),
+      priorityIds: [benchmarkId, defaultChallengerId].filter((id): id is string => Boolean(id)),
     })
     takes = mergeHydratedTakes(loadedFast, hydrated)
   }
@@ -347,22 +333,18 @@ export default function App() {
   return <StandardApp bootSnapshot={bootSnapshot} />
 }
 
-function StandardApp({
-  bootSnapshot,
-}: {
-  bootSnapshot: AppBootSnapshot
-}) {
+function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   usePhysicalOrientation()
   const [takes, setTakes] = useState<Take[]>(bootSnapshot.takes)
   const [projects, setProjects] = useState<Project[]>(bootSnapshot.projects)
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(bootSnapshot.activeProjectId)
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(
+    bootSnapshot.activeProjectId
+  )
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
-  const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(
-    bootSnapshot.libraryItems,
-  )
+  const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(bootSnapshot.libraryItems)
   const [benchmarkBinding, setBenchmarkBinding] = useState<BenchmarkBinding | null>(
-    bootSnapshot.benchmarkBinding,
+    bootSnapshot.benchmarkBinding
   )
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
@@ -381,9 +363,7 @@ function StandardApp({
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
-  const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(
-    null,
-  )
+  const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
@@ -411,11 +391,9 @@ function StandardApp({
   const pitchCommitTimerRef = useRef<number | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
   const autoPlaybackGenerationRef = useRef(0)
-  const playAutoTakeAudioRef = useRef<(
-    playbackUrl: string,
-    takeId: string,
-    performanceStartSeconds?: number,
-  ) => void>(() => {})
+  const playAutoTakeAudioRef = useRef<
+    (playbackUrl: string, takeId: string, performanceStartSeconds?: number) => void
+  >(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
@@ -438,8 +416,8 @@ function StandardApp({
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
     ? 'review'
     : isVaultOpen || isSettingsOpen
-      ? 'sheet'
-      : 'idle'
+    ? 'sheet'
+    : 'idle'
 
   useLayoutEffect(() => {
     return scheduleViewportSync(() => {})
@@ -647,10 +625,9 @@ function StandardApp({
             })
           : Promise.resolve()
 
-        const ready = await Promise.all([
-          waitForMediaReadyWithRetry(audio),
-          routePrep,
-        ]).then(([mediaReady]) => mediaReady)
+        const ready = await Promise.all([waitForMediaReadyWithRetry(audio), routePrep]).then(
+          ([mediaReady]) => mediaReady
+        )
         if (autoPlaybackGenerationRef.current !== playbackGeneration) return
         if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
           finishAutoPlayback()
@@ -675,7 +652,7 @@ function StandardApp({
         }
       })()
     },
-    [finishAutoPlayback, teardownAutoPlaybackMedia],
+    [finishAutoPlayback, teardownAutoPlaybackMedia]
   )
 
   playAutoTakeAudioRef.current = playAutoTakeAudio
@@ -685,7 +662,7 @@ function StandardApp({
       prev.map((take) => {
         const thumbnailUrl = updates.get(take.id)
         return thumbnailUrl ? { ...take, thumbnailUrl } : take
-      }),
+      })
     )
   }, [])
 
@@ -711,7 +688,7 @@ function StandardApp({
           filePath: row.filePath,
           mimeType: row.mimeType,
           duration: row.duration,
-        })),
+        }))
       )
       if (generation !== reloadTakesGenerationRef.current) return
 
@@ -730,9 +707,7 @@ function StandardApp({
         if (generation !== reloadTakesGenerationRef.current) return
 
         void hydrateVaultTakeRowsProgressive(rows, {
-          priorityIds: [bestId, defaultChallengerId].filter(
-            (id): id is string => Boolean(id),
-          ),
+          priorityIds: [bestId, defaultChallengerId].filter((id): id is string => Boolean(id)),
           onBatch: (partial) => {
             if (generation !== reloadTakesGenerationRef.current) return
             setTakes((current) => mergeHydratedTakes(current, partial))
@@ -745,7 +720,7 @@ function StandardApp({
         })
       }, 500)
     },
-    [applyTakeThumbnails],
+    [applyTakeThumbnails]
   )
 
   useEffect(() => {
@@ -768,7 +743,7 @@ function StandardApp({
       setBenchmarkBinding(null)
       await reloadProjectTakes(projectId)
     },
-    [pausePipVideos, releaseAutoRecordSuppress, reloadProjectTakes, stopAutoPlaybackAudio],
+    [pausePipVideos, releaseAutoRecordSuppress, reloadProjectTakes, stopAutoPlaybackAudio]
   )
 
   const handleCreateProject = useCallback(async (name: string) => {
@@ -853,7 +828,7 @@ function StandardApp({
       reloadProjectTakes,
       stopAutoPlaybackAudio,
       takes,
-    ],
+    ]
   )
 
   const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
@@ -897,11 +872,7 @@ function StandardApp({
 
     if (shouldAutoPlay && optimisticUrl) {
       pendingAutoPlaybackRef.current = false
-      playAutoTakeAudioRef.current(
-        optimisticUrl,
-        takeId,
-        autoPerformanceStartSeconds,
-      )
+      playAutoTakeAudioRef.current(optimisticUrl, takeId, autoPerformanceStartSeconds)
     } else if (shouldAutoPlay) {
       pendingAutoPlaybackRef.current = false
       setHandsFreePlaybackPending(false)
@@ -911,21 +882,19 @@ function StandardApp({
     if (mediaType === 'audio') {
       setTakes((current) =>
         current.map((take) =>
-          take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take,
-        ),
+          take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take
+        )
       )
     }
 
     void (async () => {
       const safeVideoUrl = resolveMediaPlaybackSrc(
-        optimisticUrl || (await resolveTakePlaybackUrl(filePath, videoUrl)),
+        optimisticUrl || (await resolveTakePlaybackUrl(filePath, videoUrl))
       )
 
       if (safeVideoUrl && safeVideoUrl !== optimisticUrl) {
         setTakes((current) =>
-          current.map((take) =>
-            take.id === takeId ? { ...take, videoUrl: safeVideoUrl } : take,
-          ),
+          current.map((take) => (take.id === takeId ? { ...take, videoUrl: safeVideoUrl } : take))
         )
       }
 
@@ -933,125 +902,116 @@ function StandardApp({
       let playbackUrl = safeVideoUrl || optimisticUrl
       let normalizedBlob = blob
 
-        if (mediaType === 'video' && recordingOrientation === 'landscape') {
-          if (blob) {
-            normalizedBlob = await normalizeLandscapeRecordingBlob(
-              blob,
-              mimeType,
-              recordingOrientation,
-            )
-            if (normalizedBlob !== blob) {
-              if (playbackUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(playbackUrl)
-              }
-              playbackUrl = URL.createObjectURL(normalizedBlob)
-            }
-          } else if (filePath) {
-            const normalized = await normalizeLandscapeTakeInPlace({
-              id: takeId,
-              filePath,
-              videoUrl: playbackUrl,
-              videoMimeType: mimeType,
-              recordingOrientation,
-            })
-            if (normalized) {
-              resolvedFilePath = normalized.filePath
-              playbackUrl = await resolveTakePlaybackUrl(
-                normalized.filePath,
-                normalized.videoUrl,
-              )
-            }
-          }
-
-          if (playbackUrl !== optimisticUrl || resolvedFilePath !== filePath) {
-            setTakes((current) =>
-              current.map((take) =>
-                take.id === takeId
-                  ? { ...take, videoUrl: playbackUrl, filePath: resolvedFilePath }
-                  : take,
-              ),
-            )
-          }
-        }
-
-        if (projectId && resolvedFilePath) {
-          const existing = await getTakesByProject(projectId)
-          const takeIndex = existing.length + 1
-          await saveTake({
-            projectId,
-            filePath: resolvedFilePath,
-            duration: durationSeconds,
-            takeId,
+      if (mediaType === 'video' && recordingOrientation === 'landscape') {
+        if (blob) {
+          normalizedBlob = await normalizeLandscapeRecordingBlob(
+            blob,
             mimeType,
-            mediaType,
+            recordingOrientation
+          )
+          if (normalizedBlob !== blob) {
+            if (playbackUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(playbackUrl)
+            }
+            playbackUrl = URL.createObjectURL(normalizedBlob)
+          }
+        } else if (filePath) {
+          const normalized = await normalizeLandscapeTakeInPlace({
+            id: takeId,
+            filePath,
+            videoUrl: playbackUrl,
+            videoMimeType: mimeType,
             recordingOrientation,
-            name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
           })
+          if (normalized) {
+            resolvedFilePath = normalized.filePath
+            playbackUrl = await resolveTakePlaybackUrl(normalized.filePath, normalized.videoUrl)
+          }
         }
 
-        let audioAnalysisSource: Blob | string | null = normalizedBlob ?? blob ?? null
-        if (!audioAnalysisSource && resolvedFilePath) {
-          const nativeUri = await resolveNativeFileUri(resolvedFilePath)
-          if (nativeUri) audioAnalysisSource = nativeUri
-        } else if (!audioAnalysisSource && playbackUrl) {
-          audioAnalysisSource = playbackUrl
-        }
-
-        const captureDiagnostics = await buildRecordingCaptureDiagnostics(
-          captureProfile ?? 'natural',
-          captureTrackSnapshot ?? null,
-          audioAnalysisSource,
-        )
-        logRecordingCaptureDiagnostics(takeId, captureDiagnostics)
-
-        if (captureDiagnostics.playbackGainMetadata) {
+        if (playbackUrl !== optimisticUrl || resolvedFilePath !== filePath) {
           setTakes((current) =>
             current.map((take) =>
               take.id === takeId
-                ? {
-                    ...take,
-                    playbackGainMetadata: captureDiagnostics.playbackGainMetadata ?? undefined,
-                  }
-                : take,
-            ),
+                ? { ...take, videoUrl: playbackUrl, filePath: resolvedFilePath }
+                : take
+            )
           )
         }
+      }
 
-        pendingChallengerIdRef.current = null
+      if (projectId && resolvedFilePath) {
+        const existing = await getTakesByProject(projectId)
+        const takeIndex = existing.length + 1
+        await saveTake({
+          projectId,
+          filePath: resolvedFilePath,
+          duration: durationSeconds,
+          takeId,
+          mimeType,
+          mediaType,
+          recordingOrientation,
+          name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
+        })
+      }
 
-        if (mediaType !== 'video') return
+      let audioAnalysisSource: Blob | string | null = normalizedBlob ?? blob ?? null
+      if (!audioAnalysisSource && resolvedFilePath) {
+        const nativeUri = await resolveNativeFileUri(resolvedFilePath)
+        if (nativeUri) audioAnalysisSource = nativeUri
+      } else if (!audioAnalysisSource && playbackUrl) {
+        audioAnalysisSource = playbackUrl
+      }
 
-        const thumbnailTake: Take = {
-          ...createTake(takeId, 1, playbackUrl, resolvedFilePath, mimeType, mediaType),
-          recordingOrientation: recordingOrientation ?? 'portrait',
-        }
+      const captureDiagnostics = await buildRecordingCaptureDiagnostics(
+        captureProfile ?? 'natural',
+        captureTrackSnapshot ?? null,
+        audioAnalysisSource
+      )
+      logRecordingCaptureDiagnostics(takeId, captureDiagnostics)
 
-        const thumbnailPromise = normalizedBlob
-          ? generateThumbnailFromBlob(
-              normalizedBlob,
-              thumbnailTake.mirrorPlayback !== false,
-              thumbnailTake.recordingOrientation,
-            ).then((dataUrl) =>
-              persistTakeThumbnail(
-                takeId,
-                dataUrl,
-                thumbnailTake.recordingOrientation ?? 'portrait',
-              ),
-            )
-          : captureAndPersistTakeThumbnail(thumbnailTake)
+      if (captureDiagnostics.playbackGainMetadata) {
+        setTakes((current) =>
+          current.map((take) =>
+            take.id === takeId
+              ? {
+                  ...take,
+                  playbackGainMetadata: captureDiagnostics.playbackGainMetadata ?? undefined,
+                }
+              : take
+          )
+        )
+      }
 
-        void thumbnailPromise
-          .then((thumbnailUrl) => {
-            if (!thumbnailUrl) return
-            setTakes((current) =>
-              current.map((take) =>
-                take.id === takeId ? { ...take, thumbnailUrl } : take,
-              ),
-            )
-          })
-          .catch(() => {
-            /* vault falls back to placeholder until thumbnail is ready */
-          })
+      pendingChallengerIdRef.current = null
+
+      if (mediaType !== 'video') return
+
+      const thumbnailTake: Take = {
+        ...createTake(takeId, 1, playbackUrl, resolvedFilePath, mimeType, mediaType),
+        recordingOrientation: recordingOrientation ?? 'portrait',
+      }
+
+      const thumbnailPromise = normalizedBlob
+        ? generateThumbnailFromBlob(
+            normalizedBlob,
+            thumbnailTake.mirrorPlayback !== false,
+            thumbnailTake.recordingOrientation
+          ).then((dataUrl) =>
+            persistTakeThumbnail(takeId, dataUrl, thumbnailTake.recordingOrientation ?? 'portrait')
+          )
+        : captureAndPersistTakeThumbnail(thumbnailTake)
+
+      void thumbnailPromise
+        .then((thumbnailUrl) => {
+          if (!thumbnailUrl) return
+          setTakes((current) =>
+            current.map((take) => (take.id === takeId ? { ...take, thumbnailUrl } : take))
+          )
+        })
+        .catch(() => {
+          /* vault falls back to placeholder until thumbnail is ready */
+        })
     })()
   }, [])
 
@@ -1117,12 +1077,15 @@ function StandardApp({
     micInputPreference: settings.micInputPreference,
   })
 
+  const handleAudioModeBeforePlaybackStart = useCallback(async () => {
+    if (!isRecording) return
+    stopRecording()
+    await waitMs(AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS)
+  }, [isRecording, stopRecording])
+
   useEffect(() => {
     registerYoutubeStereoGuard(
-      () =>
-        !isRecording &&
-        !autoPlaybackPlaying &&
-        !handsFreePlaybackPending,
+      () => !isRecording && !autoPlaybackPlaying && !handsFreePlaybackPending
     )
   }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
 
@@ -1137,12 +1100,7 @@ function StandardApp({
     if (isRecording) return
     lastMicPreferenceRouteRef.current = settings.micInputPreference
     void reacquireStreamForAudioRoute()
-  }, [
-    isRecording,
-    reacquireStreamForAudioRoute,
-    ready,
-    settings.micInputPreference,
-  ])
+  }, [isRecording, reacquireStreamForAudioRoute, ready, settings.micInputPreference])
 
   useEffect(() => {
     if (isPlaybackRouteHoldActive()) return
@@ -1185,17 +1143,14 @@ function StandardApp({
       resume: () => {
         void refreshCameraSession()
       },
-      hasLivePreview: () =>
-        cameraReadyRef.current && recordingModeRef.current === 'video',
+      hasLivePreview: () => cameraReadyRef.current && recordingModeRef.current === 'video',
     })
     installPlaybackRouteEndedListener(() => {
       void refreshCameraSession()
     })
     registerAutoPlaybackHold(
       () =>
-        pendingAutoPlaybackRef.current ||
-        autoPlaybackPlayingRef.current ||
-        handsFreePlaybackPending,
+        pendingAutoPlaybackRef.current || autoPlaybackPlayingRef.current || handsFreePlaybackPending
     )
     registerRecordingRouteRestoredHandler(() => {
       if (isPlaybackRouteHoldActive()) return
@@ -1261,8 +1216,7 @@ function StandardApp({
     }
   }, [])
 
-  const autoMonitoringAllowed =
-    !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
+  const autoMonitoringAllowed = !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
 
   const { handsFreeRecording, restartHandsFreeMonitor } = useAutoSoundRecording({
     enabled: settings.autoSoundRecording,
@@ -1324,12 +1278,7 @@ function StandardApp({
     if (stream) {
       void tunePlaybackIsolationStream(stream)
     }
-  }, [
-    isRecording,
-    pauseYoutubeReference,
-    settings.excludeYoutubeFromRecording,
-    streamGeneration,
-  ])
+  }, [isRecording, pauseYoutubeReference, settings.excludeYoutubeFromRecording, streamGeneration])
 
   useEffect(() => {
     return () => {
@@ -1386,12 +1335,7 @@ function StandardApp({
     return () => {
       document.removeEventListener('visibilitychange', recoverHandsFreeMonitor)
     }
-  }, [
-    recordingMode,
-    refreshCameraSession,
-    restartHandsFreeMonitor,
-    settings.autoSoundRecording,
-  ])
+  }, [recordingMode, refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
 
   const autoSoundListening =
     settings.autoSoundRecording &&
@@ -1417,9 +1361,7 @@ function StandardApp({
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
-    console.log(
-      `[OverlayState] vaultOpen=${isVaultOpen} settingsOpen=${isSettingsOpen}`,
-    )
+    console.log(`[OverlayState] vaultOpen=${isVaultOpen} settingsOpen=${isSettingsOpen}`)
   }, [isVaultOpen, isSettingsOpen])
 
   useEffect(() => {
@@ -1439,9 +1381,7 @@ function StandardApp({
         const bestId = findBestTakeId(rows)
         const defaultChallengerId = rows.find((row) => !row.isBestTake)?.id ?? null
         const loaded = await hydrateVaultTakeRowsProgressive(rows, {
-          priorityIds: [bestId, defaultChallengerId].filter(
-            (id): id is string => Boolean(id),
-          ),
+          priorityIds: [bestId, defaultChallengerId].filter((id): id is string => Boolean(id)),
         })
         setTakes((current) => mergeHydratedTakes(current, loaded))
         setBenchmarkId(bestId)
@@ -1450,7 +1390,7 @@ function StandardApp({
         vaultHydrateInFlightRef.current = false
       }
     },
-    [applyTakeThumbnails],
+    [applyTakeThumbnails]
   )
 
   useEffect(() => {
@@ -1552,7 +1492,9 @@ function StandardApp({
         resetToAudioTab()
         sharedMetronomeEngine.reconcileAfterModeSwitch()
         if (import.meta.env.DEV) {
-          console.log(mode === 'video' ? '[ModeSwitch] entering camera' : '[ModeSwitch] entering audio')
+          console.log(
+            mode === 'video' ? '[ModeSwitch] entering camera' : '[ModeSwitch] entering audio'
+          )
         }
       }
       changeRecordingMode(mode)
@@ -1569,7 +1511,7 @@ function StandardApp({
         }, 360)
       }
     },
-    [changeRecordingMode, isRecording, requestCameraPreviewResume, resetToAudioTab, updateSettings],
+    [changeRecordingMode, isRecording, requestCameraPreviewResume, resetToAudioTab, updateSettings]
   )
 
   const handleCloseSettings = useCallback(() => {
@@ -1600,14 +1542,13 @@ function StandardApp({
         })
       }, PITCH_ENGINE_COMMIT_DELAY_MS)
     },
-    [updateSettings],
+    [updateSettings]
   )
 
   const hudQuickSettings = useMemo(
     () => ({
       ...pickHudQuickSettings(settings),
-      pitchTrackerEnabled:
-        pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled,
+      pitchTrackerEnabled: pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled,
     }),
     [
       pendingPitchTrackerEnabled,
@@ -1615,11 +1556,10 @@ function StandardApp({
       settings.pitchTrackerEnabled,
       settings.showMetronome,
       settings.showTakeCards,
-    ],
+    ]
   )
 
-  const pitchTrackerActive =
-    pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled
+  const pitchTrackerActive = pendingPitchTrackerEnabled ?? settings.pitchTrackerEnabled
 
   const handlePitchTrackerSettingChange = useCallback(
     (enabled: boolean) => {
@@ -1639,21 +1579,21 @@ function StandardApp({
       setPendingPitchTrackerEnabled(null)
       updateSettings({ pitchTrackerEnabled: enabled })
     },
-    [schedulePitchTrackerCommit, updateSettings],
+    [schedulePitchTrackerCommit, updateSettings]
   )
 
   const handleShowTakeCardsSettingChange = useCallback(
     (show: boolean) => {
       updateSettings({ showTakeCards: show })
     },
-    [updateSettings],
+    [updateSettings]
   )
 
   const handleShowMetronomeSettingChange = useCallback(
     (show: boolean) => {
       updateSettings({ showMetronome: show })
     },
-    [updateSettings],
+    [updateSettings]
   )
 
   const handleAudioEnhancerSettingChange = useCallback(
@@ -1662,7 +1602,7 @@ function StandardApp({
         updateSettings({ audioEnhancerEnabled: enabled })
       })
     },
-    [updateSettings],
+    [updateSettings]
   )
 
   const handleResetSettings = useCallback(() => {
@@ -1692,12 +1632,11 @@ function StandardApp({
   const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
 
   /** Audio-mode hands-free plays through hidden `<audio>` — PiP must not auto-play the same take. */
-  const challengerHandsFreeAutoPlayRequestId =
-    recordingMode === 'audio' ? null : autoPlaybackTakeId
+  const challengerHandsFreeAutoPlayRequestId = recordingMode === 'audio' ? null : autoPlaybackTakeId
 
   const resolvedBenchmark = useMemo(
     () => resolveBenchmarkPlayback(benchmarkBinding, benchmarkId, takes, libraryItems),
-    [benchmarkBinding, benchmarkId, libraryItems, takes],
+    [benchmarkBinding, benchmarkId, libraryItems, takes]
   )
 
   const benchmarkTake = resolvedBenchmark.take
@@ -1705,7 +1644,7 @@ function StandardApp({
 
   const challengerTake = useMemo(
     () => takes.find((t) => t.id === challengerId) ?? null,
-    [takes, challengerId],
+    [takes, challengerId]
   )
 
   takesRef.current = takes
@@ -1714,10 +1653,10 @@ function StandardApp({
     void (async () => {
       const snapshot = takesRef.current
       const activeIds = new Set(
-        [benchmarkId, challengerId].filter((id): id is string => Boolean(id)),
+        [benchmarkId, challengerId].filter((id): id is string => Boolean(id))
       )
       const targets = snapshot.filter(
-        (take) => take.filePath && (activeIds.has(take.id) || !take.videoUrl),
+        (take) => take.filePath && (activeIds.has(take.id) || !take.videoUrl)
       )
       if (targets.length === 0) return
 
@@ -1726,15 +1665,13 @@ function StandardApp({
           const resolved = await resolveTakePlaybackUrl(take.filePath, take.videoUrl)
           const safe = resolveMediaPlaybackSrc(resolved)
           return safe && safe !== take.videoUrl ? { ...take, videoUrl: safe } : take
-        }),
+        })
       )
 
       if (!refreshed.some((take, index) => take !== targets[index])) return
 
       const refreshedById = new Map(refreshed.map((take) => [take.id, take]))
-      setTakes((current) =>
-        current.map((take) => refreshedById.get(take.id) ?? take),
-      )
+      setTakes((current) => current.map((take) => refreshedById.get(take.id) ?? take))
     })()
   }, [benchmarkId, challengerId])
 
@@ -1805,12 +1742,7 @@ function StandardApp({
       isPlaying: true,
       mediaKey: 'main-video-live',
     }
-  }, [
-    pitchTrackerActive,
-    recordingMode,
-    ready,
-    isRecording,
-  ])
+  }, [pitchTrackerActive, recordingMode, ready, isRecording])
 
   const pitchHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen
 
@@ -1822,12 +1754,9 @@ function StandardApp({
 
   const metronomeWidgetInteractive = showMetronomeWidget && !metronomeHudSuspended
 
-  const takePlaybackActive =
-    autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
+  const takePlaybackActive = autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
 
-  const selectedAudioEngine = settings.audioEnhancerEnabled
-    ? 'Native + Enhanced'
-    : 'Native'
+  const selectedAudioEngine = settings.audioEnhancerEnabled ? 'Native + Enhanced' : 'Native'
 
   useEffect(() => {
     console.info(`[AudioEngine] selected=${selectedAudioEngine}`)
@@ -1866,7 +1795,7 @@ function StandardApp({
   useEffect(() => {
     setTakePlaybackEnhancerState(
       settings.audioEnhancerEnabled,
-      settings.audioEnhancerEnabled ? settings.audioEnhancerSettings : undefined,
+      settings.audioEnhancerEnabled ? settings.audioEnhancerSettings : undefined
     )
   }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings])
 
@@ -1880,11 +1809,9 @@ function StandardApp({
 
   const audioPracticeSheetOpen = isVaultOpen || isSettingsOpen
 
-  const isAudioPracticeMetronomeTab =
-    recordingMode === 'audio' && audioPracticeTab === 'metronome'
+  const isAudioPracticeMetronomeTab = recordingMode === 'audio' && audioPracticeTab === 'metronome'
 
-  const isAudioPracticeTunerTab =
-    recordingMode === 'audio' && audioPracticeTab === 'tuner'
+  const isAudioPracticeTunerTab = recordingMode === 'audio' && audioPracticeTab === 'tuner'
 
   const isAudioPracticeToolTab = isAudioPracticeMetronomeTab || isAudioPracticeTunerTab
 
@@ -1910,16 +1837,12 @@ function StandardApp({
 
   const metronomeStageActive = false
 
-  const isAudioPracticeMainTab =
-    recordingMode !== 'audio' || audioPracticeTab === 'audio'
+  const isAudioPracticeMainTab = recordingMode !== 'audio' || audioPracticeTab === 'audio'
 
   const showFloatingMainPitch =
-    showPitch &&
-    mainAudioPitchSource !== null &&
-    !isAudioPracticeTunerTab
+    showPitch && mainAudioPitchSource !== null && !isAudioPracticeTunerTab
 
-  const pitchContextKey =
-    mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
+  const pitchContextKey = mainAudioPitchSource?.mediaKey ?? mainVideoPitchSource?.mediaKey ?? null
 
   useEffect(() => {
     pitchUserDismissedRef.current = false
@@ -1978,10 +1901,7 @@ function StandardApp({
     handsFreePlaybackPending,
   ])
 
-  const sortedTakes = useMemo(
-    () => sortTakes(takes, sortMode),
-    [takes, sortMode],
-  )
+  const sortedTakes = useMemo(() => sortTakes(takes, sortMode), [takes, sortMode])
 
   const handlePinBenchmark = useCallback(
     (id: string) => {
@@ -2021,7 +1941,7 @@ function StandardApp({
       sortMode,
       stopAutoPlaybackAudio,
       takes,
-    ],
+    ]
   )
 
   const handleSetLibraryReference = useCallback(
@@ -2035,7 +1955,7 @@ function StandardApp({
         void setProjectLibraryBenchmark(activeProjectIdRef.current, itemId)
       }
     },
-    [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio],
+    [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio]
   )
 
   const handleClearLibraryReference = useCallback(() => {
@@ -2090,7 +2010,7 @@ function StandardApp({
   const handleRenameLibraryItem = useCallback((itemId: string, name: string) => {
     void updateLibraryItemName(itemId, name)
     setLibraryItems((current) =>
-      current.map((item) => (item.id === itemId ? { ...item, name } : item)),
+      current.map((item) => (item.id === itemId ? { ...item, name } : item))
     )
   }, [])
 
@@ -2099,10 +2019,7 @@ function StandardApp({
       const item = libraryItems.find((entry) => entry.id === itemId)
       if (!item) return
 
-      if (
-        benchmarkBinding?.source === 'library' &&
-        benchmarkBinding.refId === itemId
-      ) {
+      if (benchmarkBinding?.source === 'library' && benchmarkBinding.refId === itemId) {
         handleClearLibraryReference()
       }
 
@@ -2112,7 +2029,7 @@ function StandardApp({
       }
       setLibraryItems((current) => current.filter((entry) => entry.id !== itemId))
     },
-    [benchmarkBinding, handleClearLibraryReference, libraryItems],
+    [benchmarkBinding, handleClearLibraryReference, libraryItems]
   )
 
   const handlePinChallenger = useCallback(
@@ -2120,7 +2037,7 @@ function StandardApp({
       pausePipVideos()
       setChallengerId(id)
     },
-    [pausePipVideos],
+    [pausePipVideos]
   )
 
   const handleOpenVaultTake = useCallback(
@@ -2133,7 +2050,7 @@ function StandardApp({
       setIsVaultOpen(false)
       deferHudMediaPause()
     },
-    [deferHudMediaPause, markOverlayClosed, sortedTakes],
+    [deferHudMediaPause, markOverlayClosed, sortedTakes]
   )
 
   const handleOpenCompareReview = useCallback(
@@ -2142,7 +2059,7 @@ function StandardApp({
       setReviewSlot(slot)
       deferHudMediaPause()
     },
-    [deferHudMediaPause],
+    [deferHudMediaPause]
   )
 
   const handleCloseReview = useCallback(() => {
@@ -2179,10 +2096,7 @@ function StandardApp({
         const mimeType = file.type || NATIVE_VIDEO_MIME
         const mediaType = inferMediaTypeFromMime(mimeType)
         const persisted = await persistUploadedVideo(file, takeId, mimeType)
-        const safeVideoUrl = await resolveTakePlaybackUrl(
-          persisted.filePath,
-          persisted.videoUrl,
-        )
+        const safeVideoUrl = await resolveTakePlaybackUrl(persisted.filePath, persisted.videoUrl)
 
         const uploadedTake: Take = {
           ...createTake(
@@ -2191,7 +2105,7 @@ function StandardApp({
             safeVideoUrl,
             persisted.filePath,
             mimeType,
-            mediaType,
+            mediaType
           ),
           name: mediaType === 'audio' ? 'Uploaded Audio' : 'Uploaded Best Take',
           mirrorPlayback: false,
@@ -2222,9 +2136,7 @@ function StandardApp({
           .then((thumbnailUrl) => {
             if (!thumbnailUrl) return
             setTakes((current) =>
-              current.map((take) =>
-                take.id === takeId ? { ...take, thumbnailUrl } : take,
-              ),
+              current.map((take) => (take.id === takeId ? { ...take, thumbnailUrl } : take))
             )
           })
           .catch(() => {
@@ -2232,13 +2144,11 @@ function StandardApp({
           })
       })()
     },
-    [pausePipVideos, takes.length],
+    [pausePipVideos, takes.length]
   )
 
   const handleUpdateTake = useCallback((id: string, updates: TakeUpdate) => {
-    setTakes((prev) =>
-      prev.map((take) => (take.id === id ? { ...take, ...updates } : take)),
-    )
+    setTakes((prev) => prev.map((take) => (take.id === id ? { ...take, ...updates } : take)))
     void updateVaultTake(id, updates)
   }, [])
 
@@ -2285,7 +2195,7 @@ function StandardApp({
       removeTakeResources,
       stopAutoPlaybackAudio,
       takes,
-    ],
+    ]
   )
 
   const handleDragDeleteTake = useCallback(
@@ -2294,14 +2204,14 @@ function StandardApp({
       pausePipVideos()
       handleDeleteTakes([id])
     },
-    [handleDeleteTakes, pausePipVideos, settings.hapticFeedback],
+    [handleDeleteTakes, pausePipVideos, settings.hapticFeedback]
   )
 
   const handleDeleteTake = useCallback(
     (id: string) => {
       handleDeleteTakes([id])
     },
-    [handleDeleteTakes],
+    [handleDeleteTakes]
   )
 
   const handleClearAllTakes = useCallback(() => {
@@ -2333,7 +2243,7 @@ function StandardApp({
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
-    [projects, activeProjectId],
+    [projects, activeProjectId]
   )
 
   const handleUnpinBenchmark = useCallback(() => {
@@ -2361,6 +2271,27 @@ function StandardApp({
     stopAutoPlaybackAudio,
     teardownPipMedia,
   ])
+
+  const handleClearAudioBenchmark = useCallback(() => {
+    if (libraryBenchmarkPlayback) {
+      handleClearLibraryReference()
+    }
+    pausePipVideos()
+    teardownPipMedia(benchmarkPipVideoRef.current)
+    void releaseTakePlaybackAudio()
+    stabilizeViewportAfterMediaInteraction()
+    setBenchmarkPipPlaying(false)
+    setBenchmarkBinding(null)
+    setBenchmarkId(null)
+    if (activeProjectIdRef.current) {
+      void setProjectBenchmarkBinding(activeProjectIdRef.current, null)
+    }
+  }, [handleClearLibraryReference, libraryBenchmarkPlayback, pausePipVideos, teardownPipMedia])
+
+  const handleClearAudioChallenger = useCallback(() => {
+    handleUnpinChallenger()
+  }, [handleUnpinChallenger])
+
   const handleReviewSlotChange = useCallback((slot: ReviewSlot) => {
     setReviewContext('compare')
     setReviewSlot(slot)
@@ -2384,7 +2315,7 @@ function StandardApp({
       libraryBenchmarkPlayback || takeHasPlaybackMedia(benchmarkTake)
         ? () => handleOpenCompareReview('benchmark')
         : undefined,
-    [benchmarkTake, handleOpenCompareReview, libraryBenchmarkPlayback],
+    [benchmarkTake, handleOpenCompareReview, libraryBenchmarkPlayback]
   )
 
   const handleExpandChallenger = useMemo(
@@ -2392,7 +2323,7 @@ function StandardApp({
       takeHasPlaybackMedia(challengerTake)
         ? () => handleOpenCompareReview('challenger')
         : undefined,
-    [challengerTake, handleOpenCompareReview],
+    [challengerTake, handleOpenCompareReview]
   )
 
   const prevBenchmarkIdRef = useRef<string | null>(null)
@@ -2433,7 +2364,7 @@ function StandardApp({
         setAutoPlaybackPlaying(true)
       }
     },
-    [autoPlaybackTakeId],
+    [autoPlaybackTakeId]
   )
 
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
@@ -2479,7 +2410,7 @@ function StandardApp({
     hasBestTakeReference &&
       takeHasPlaybackMedia(challengerTake) &&
       challengerId &&
-      challengerId !== benchmarkId,
+      challengerId !== benchmarkId
   )
 
   const handlePinCurrentAsBest = useCallback(() => {
@@ -2499,7 +2430,7 @@ function StandardApp({
       isSplitView,
       autoSoundRecording: settings.autoSoundRecording,
     }),
-    [isRecording, isReviewOpen, isSplitView, isVaultOpen, settings.autoSoundRecording],
+    [isRecording, isReviewOpen, isSplitView, isVaultOpen, settings.autoSoundRecording]
   )
 
   useEffect(() => {
@@ -2508,13 +2439,7 @@ function StandardApp({
     if (step?.id === 'auto-record' && recordingMode !== 'audio' && !isRecording) {
       changeRecordingMode('audio')
     }
-  }, [
-    changeRecordingMode,
-    isRecording,
-    recordingMode,
-    showOnboardingTutorial,
-    tutorialStepIndex,
-  ])
+  }, [changeRecordingMode, isRecording, recordingMode, showOnboardingTutorial, tutorialStepIndex])
 
   return (
     <TutorialProvider
@@ -2524,489 +2449,545 @@ function StandardApp({
       onComplete={handleTutorialComplete}
       signals={tutorialSignals}
     >
-    <ActionSheetProvider>
-    <MetronomeProvider
-      isTakePlaying={takePlaybackActive}
-      muteDuringPlayback={settings.muteMetronomeDuringPlayback}
-    >
-    <AudioModePlaybackProvider>
-    <div
-      ref={appShellRef}
-      className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${isSplitView ? ' app-shell--split-open' : ''}`}
-    >
-      <audio
-        ref={autoPlaybackAudioRef}
-        className="sr-only"
-        preload="none"
-        playsInline
-        {...({ 'webkit-playsinline': 'true' } as React.AudioHTMLAttributes<HTMLAudioElement>)}
-      />
-
-      {youtubeUrl && (
-        <YoutubeBenchmarkPlayer
-          embedUrl={youtubeUrl}
-          hostEl={youtubeHostEl}
-          iframeRef={youtubeIframeRef}
-        />
-      )}
-
-      {isAudioPracticeMetronomeTab && (
-        <div className="audio-practice-metronome-scrim pointer-events-none" aria-hidden />
-      )}
-
-      <LiveCameraBackground
-        previewRef={previewRef}
-        streamRef={streamRef}
-        streamGeneration={streamGeneration}
-        recordingMode={recordingMode}
-        isRecording={isRecording}
-        resumeNonce={cameraResumeNonce}
-        modePreparing={!ready && !isRecording && !cameraNeedsPermission}
-        pitchStageActive={
-          isAudioPracticeTunerTab ||
-          (showPitch && mainVideoPitchSource !== null)
-        }
-        metronomeStageActive={metronomeStageActive}
-        audioPracticeOverlayActive={
-          isAudioPracticeToolTab ||
-          (recordingMode === 'audio' && audioPracticeTab === 'audio')
-        }
-        visuallySuppressed={isSplitView}
-        nativePreviewActive={false}
-      />
-
-      {cameraNeedsPermission && (
-        <CameraPermissionPrompt
-          recordingMode={recordingMode}
-          requesting={cameraPermissionRequestInFlight}
-          onRequestPermission={requestCameraAccess}
-        />
-      )}
-
-      <div
-        className={`pitch-display-layer${pitchHudSuspended ? ' floating-widget-layer--inert' : ''}`}
-        aria-hidden={!showFloatingMainPitch || pitchHudSuspended}
-      >
-        {showMainPitchWidget && (
-          <Suspense fallback={null}>
-            <AnimatePresence>
-              {showFloatingMainPitch && (
-                <DraggablePitchWidget
-                  boundaryRef={appShellRef}
-                  mediaRef={mainAudioPitchSource.mediaRef}
-                  enabled={pitchTrackerActive && !pitchHudSuspended}
-                  isPlaying={mainAudioPitchSource.isPlaying}
-                  mediaKey={mainAudioPitchSource.mediaKey}
-                  takeName={mainAudioPitchSource.take?.name}
-                  label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
-                  isAudioMode
-                  liveMicEnabled={
-                    (settings.liveMicTunerEnabled ||
-                      mainAudioPitchSource.liveMicOnly === true) &&
-                    !handsFreePlaybackPending &&
-                    !autoPlaybackPlaying
-                  }
-                  micStreamRef={streamRef}
-                  layoutRegion="main"
-                  liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
-                  tunerInstrument={settings.tunerInstrument}
-                  onClose={handleClosePitch}
-                />
-              )}
-            </AnimatePresence>
-          </Suspense>
-        )}
-      </div>
-
-      <div
-        className={`metronome-display-layer${metronomeWidgetInteractive ? '' : ' floating-widget-layer--inert'}`}
-        aria-hidden={!metronomeWidgetInteractive}
-      >
-        {showMetronomeWidget && (
-          <Suspense fallback={null}>
-            <AnimatePresence>
-              {recordingMode === 'video' && (
-                <DraggableMetronomeWidget
-                  key="main-metronome"
-                  boundaryRef={appShellRef}
-                  positionId="main-metronome"
-                  isTakePlaying={takePlaybackActive}
-                  muteDuringPlayback={settings.muteMetronomeDuringPlayback}
-                  onClose={handleCloseMetronome}
-                />
-              )}
-            </AnimatePresence>
-          </Suspense>
-        )}
-      </div>
-
-      <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
-      {showMainPitchWidget && mainVideoPitchSource && (
-        <Suspense fallback={null}>
-        <AnimatePresence>
-          {showPitch && mainVideoPitchSource && (
-            <div className={pitchHudSuspended ? 'floating-widget-layer--inert fixed inset-0 z-[5]' : 'contents'}>
-            <DraggablePitchWidget
-              boundaryRef={appShellRef}
-              mediaRef={mainVideoPitchSource.mediaRef}
-              enabled={pitchTrackerActive && !pitchHudSuspended}
-              isPlaying={mainVideoPitchSource.isPlaying}
-              mediaKey={mainVideoPitchSource.mediaKey}
-              label="Live Pitch"
-              pitchSource="microphone"
-              micStreamRef={streamRef}
-              layoutRegion="main"
-              positionId="main-pitch-video"
-              tunerInstrument={settings.tunerInstrument}
-              onClose={handleClosePitch}
-            />
-            </div>
-          )}
-        </AnimatePresence>
-        </Suspense>
-      )}
-
-      <motion.div
-        className={`app-ui-overlay ${recordingMode === 'audio' ? 'app-ui-overlay--audio-mode' : ''} ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''} ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''} ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''} ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${isSplitView ? 'app-ui-overlay--split-open' : ''} ${isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''} ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
-        aria-hidden={hudModalState === 'review'}
-        animate={{
-          opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
-          scale: hudModalState === 'review' ? 0.94 : hudModalState === 'sheet' ? 0.985 : 1,
-        }}
-        transition={iosHudDim}
-        style={{
-          ...motionGpuLayer,
-          pointerEvents: audioPracticeSheetOpen
-            ? 'none'
-            : overlayPointerCapture
-              ? 'auto'
-              : hudModalState !== 'idle' && !showOnboardingTutorial
-                ? 'none'
-                : undefined,
-        }}
-      >
-        {recordingMode !== 'audio' && (
-          <HudHeader
-            sessionName={activeProject?.name ?? 'BestTake'}
-            onOpenVault={handleOpenVault}
-            className={quickSettingsOpen || isReviewOpen || isSplitView ? 'hud-header-hidden' : undefined}
-          />
-        )}
-
-        {recordingMode === 'audio' && !quickSettingsOpen && (
-          <AudioPracticeTopTabs
-            activeTab={audioPracticeTab}
-            onTabChange={setAudioPracticeTab}
-          />
-        )}
-
-        {recordingMode === 'audio' && audioPracticeTab === 'metronome' && !quickSettingsOpen && (
-          <div
-            key="audio-practice-metronome-layer"
-            className="audio-practice-metronome-layer flex min-h-0 flex-1 flex-col"
-          >
-            <AudioMetronomeTab key="audio-metronome-tab" />
-          </div>
-        )}
-
-        {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && (
-          <div
-            key="audio-practice-tuner-layer"
-            className="audio-practice-tuner-layer flex min-h-0 flex-1 flex-col"
-          >
-            <AudioTunerTab
-              streamRef={streamRef}
-              streamGeneration={streamGeneration}
-              ready={ready}
-              isRecording={isRecording}
-              tunerInstrument={settings.tunerInstrument}
-              liveMicTunerEnabled={settings.liveMicTunerEnabled}
-              droneVolume={settings.droneVolume}
-              droneWaveform={settings.droneWaveform}
-              hapticFeedback={settings.hapticFeedback}
-            />
-          </div>
-        )}
-
-        {recordingMode === 'audio' &&
-          audioPracticeTab === 'audio' &&
-          !quickSettingsOpen &&
-          settings.showTakeCards &&
-          !isSplitView && (
-            <div className="audio-mode-home-layer min-h-0 flex-1">
-              <AudioModeHome
-                isRecording={isRecording}
-                ready={ready}
-                benchmarkTake={benchmarkTake}
-                libraryBenchmarkPlayback={libraryBenchmarkPlayback}
-                challengerTake={challengerTake}
-                onExpandBenchmark={handleExpandBenchmark}
-                onExpandChallenger={handleExpandChallenger}
-                onPinCurrentAsBest={handlePinCurrentAsBest}
+      <ActionSheetProvider>
+        <MetronomeProvider
+          isTakePlaying={takePlaybackActive}
+          muteDuringPlayback={settings.muteMetronomeDuringPlayback}
+        >
+          <AudioModePlaybackProvider onBeforePlay={handleAudioModeBeforePlaybackStart}>
+            <div
+              ref={appShellRef}
+              className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
+                isSplitView ? ' app-shell--split-open' : ''
+              }`}
+            >
+              <audio
+                ref={autoPlaybackAudioRef}
+                className="sr-only"
+                preload="none"
+                playsInline
+                {...({
+                  'webkit-playsinline': 'true',
+                } as React.AudioHTMLAttributes<HTMLAudioElement>)}
               />
-            </div>
-          )}
 
-        {!quickSettingsOpen && settings.showTakeCards && isSplitView && isAudioPracticeMainTab && (
-          <div
-            className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-1.5 pt-0"
-            style={pipScaleStyle}
-          >
-            <SplitCompareLayout
-              splitRatio={splitRatio}
-              onSplitRatioChange={setSplitRatio}
-              benchmarkTake={benchmarkTake}
-              libraryBenchmarkPlayback={libraryBenchmarkPlayback}
-              challengerTake={challengerTake}
-              youtubeEmbedUrl={youtubeUrl}
-              suspendPipPlayback={suspendPipPlayback}
-              benchmarkPipVideoRef={benchmarkPipVideoRef}
-              challengerPipVideoRef={challengerPipVideoRef}
-              splitPreviewRef={splitPreviewRef}
-              streamRef={streamRef}
-              streamGeneration={streamGeneration}
-              cameraNeedsPermission={cameraNeedsPermission}
-              recordingMode={recordingMode}
-              isRecording={isRecording}
-              cameraReady={ready}
-              cameraResumeNonce={cameraResumeNonce}
-              pitchStageActive={
-                showPitch && (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
-              }
-              metronomeStageActive={metronomeStageActive}
-              onUnpinBenchmark={handleUnpinBenchmark}
-              onClearLibraryReference={handleClearLibraryReference}
-              onUnpinChallenger={handleUnpinChallenger}
-              onClearYoutube={handleClearYoutube}
-              onSubmitYoutube={handleSubmitYoutube}
-              onUploadBenchmark={handleUploadBenchmark}
-              onToggleSplitView={handleExitSplitView}
-              onExpandBenchmark={handleExpandBenchmark}
-              onExpandChallenger={handleExpandChallenger}
-              onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
-              onChallengerPlaybackChange={handleChallengerPlaybackChange}
-              challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
-              onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
-              showPinCurrentAsBest={showPinCurrentAsBest}
-              onPinCurrentAsBest={handlePinCurrentAsBest}
-              onYoutubeHostChange={handleYoutubeHostChange}
-              youtubeIframeRef={youtubeIframeRef}
-              deleteDropRef={recordDeleteDropRef}
-              onPinBenchmark={handlePinBenchmark}
-              onDeleteTake={handleDragDeleteTake}
-              onDragStateChange={handlePipDragStateChange}
-              hapticFeedback={settings.hapticFeedback}
-            />
-          </div>
-        )}
-
-        <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
-          {!quickSettingsOpen &&
-            settings.showTakeCards &&
-            !isSplitView &&
-            recordingMode !== 'audio' && (
-              <motion.div
-                key="pip-row"
-                className="app-pip-row-wrap pointer-events-auto w-full"
-                data-tutorial="review-mode-button"
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={iosHudDim}
-                style={{ ...motionGpuLayer, ...pipScaleStyle }}
-              >
-                <PipCompareRow
-                  benchmarkTake={benchmarkTake}
-                  libraryBenchmarkPlayback={libraryBenchmarkPlayback}
-                  challengerTake={challengerTake}
-                  youtubeEmbedUrl={youtubeUrl}
-                  suspendPipPlayback={suspendPipPlayback}
-                  benchmarkPipVideoRef={benchmarkPipVideoRef}
-                  challengerPipVideoRef={challengerPipVideoRef}
-                  deleteDropRef={recordDeleteDropRef}
-                  onPinBenchmark={handlePinBenchmark}
-                  onDeleteTake={handleDragDeleteTake}
-                  onUnpinBenchmark={handleUnpinBenchmark}
-                  onClearLibraryReference={handleClearLibraryReference}
-                  onUnpinChallenger={handleUnpinChallenger}
-                  onUploadBenchmark={handleUploadBenchmark}
-                  onSubmitYoutube={handleSubmitYoutube}
-                  onClearYoutube={handleClearYoutube}
-                  onToggleSplitView={handleToggleSplitView}
-                  onExpandBenchmark={handleExpandBenchmark}
-                  onExpandChallenger={handleExpandChallenger}
-                  onDragStateChange={handlePipDragStateChange}
-                  onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
-                  onChallengerPlaybackChange={handleChallengerPlaybackChange}
-                  challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
-                  onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
-                  showPinCurrentAsBest={showPinCurrentAsBest}
-                  onPinCurrentAsBest={handlePinCurrentAsBest}
-                  onYoutubeHostChange={handleYoutubeHostChange}
-                  youtubeIframeRef={youtubeIframeRef}
-                  hapticFeedback={settings.hapticFeedback}
+              {youtubeUrl && (
+                <YoutubeBenchmarkPlayer
+                  embedUrl={youtubeUrl}
+                  hostEl={youtubeHostEl}
+                  iframeRef={youtubeIframeRef}
                 />
-              </motion.div>
-          )}
+              )}
 
-          <ControlDeck
-            isRecording={isRecording}
-            elapsed={elapsed}
-            ready={ready}
-            recordingMode={recordingMode}
-            onRecordingModeChange={handleRecordingModeChange}
-            onToggleRecord={toggleRecording}
-            onOpenVault={recordingMode === 'audio' ? handleToggleVault : handleOpenVault}
-            isVaultOpen={isVaultOpen}
-            vaultToggleEnabled={recordingMode === 'audio'}
-            onOpenSettings={handleOpenSettings}
-            takeCount={takes.length}
-            autoSoundListening={autoSoundListening}
-            handsFreeRecording={handsFreeRecording}
-            handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
-            autoSoundRecording={settings.autoSoundRecording}
-            onAutoSoundRecordingChange={(enabled) =>
-              updateSettings({ autoSoundRecording: enabled })
-            }
-            recordDropRef={recordDeleteDropRef}
-            dragDeleteActive={pipDragState.isDragging}
-            dragOverDelete={pipDragState.overDelete}
-            pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
-            pitchToggleVisible={recordingMode === 'video'}
-            showTakeCards={hudQuickSettings.showTakeCards}
-            onPitchTrackerChange={handlePitchTrackerSettingChange}
-            onShowTakeCardsChange={handleShowTakeCardsSettingChange}
-            showMetronome={hudQuickSettings.showMetronome}
-            onShowMetronomeChange={handleShowMetronomeSettingChange}
-            audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
-            onAudioEnhancerChange={handleAudioEnhancerSettingChange}
-            settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
-            onBranchOpenChange={handleQuickSettingsOpenChange}
-            hapticFeedback={settings.hapticFeedback}
-          />
-        </div>
-      </motion.div>
+              {isAudioPracticeMetronomeTab && (
+                <div className="audio-practice-metronome-scrim pointer-events-none" aria-hidden />
+              )}
 
-      <Suspense fallback={null}>
-      <AnimatePresence>
-      {isReviewOpen && (
-        <ReviewModeOverlay
-          key="review-mode"
-          context={reviewContext}
-          activeSlot={reviewSlot ?? 'benchmark'}
-          vaultTakes={sortedTakes}
-          vaultIndex={vaultReviewIndex}
-          onVaultIndexChange={setVaultReviewIndex}
-          benchmarkSrc={libraryBenchmarkPlayback?.playbackUrl ?? benchmarkTake?.videoUrl ?? null}
-          challengerSrc={challengerTake?.videoUrl ?? null}
-          benchmarkTake={libraryBenchmarkPlayback ? null : benchmarkTake}
-          challengerTake={challengerTake}
-          benchmarkFilePath={libraryBenchmarkPlayback?.filePath ?? benchmarkTake?.filePath}
-          challengerFilePath={challengerTake?.filePath}
-          benchmarkName={libraryBenchmarkPlayback?.name ?? benchmarkTake?.name}
-          challengerName={challengerTake?.name}
-          benchmarkMimeType={
-            libraryBenchmarkPlayback?.mimeType ??
-            benchmarkTake?.videoMimeType ??
-            (benchmarkTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-          }
-          challengerMimeType={
-            challengerTake?.videoMimeType ??
-            (challengerTake?.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
-          }
-          benchmarkMediaType={libraryBenchmarkPlayback ? 'audio' : benchmarkTake?.mediaType}
-          challengerMediaType={challengerTake?.mediaType}
-          benchmarkMirror={libraryBenchmarkPlayback ? false : benchmarkTake?.mirrorPlayback !== false}
-          challengerMirror={challengerTake?.mirrorPlayback !== false}
-          benchmarkRecordingOrientation={benchmarkTake?.recordingOrientation}
-          challengerRecordingOrientation={challengerTake?.recordingOrientation}
-          liveMicTunerEnabled={settings.liveMicTunerEnabled}
-          tunerInstrument={settings.tunerInstrument}
-          micStreamRef={streamRef}
-          isOpen
-          onClose={handleCloseReview}
-          onSlotChange={handleReviewSlotChange}
-          onUpdateTake={handleUpdateTake}
-          onDeleteTake={handleDeleteTake}
-          onFavoriteTake={handlePinBenchmark}
-        />
-      )}
-      </AnimatePresence>
-      </Suspense>
+              <LiveCameraBackground
+                previewRef={previewRef}
+                streamRef={streamRef}
+                streamGeneration={streamGeneration}
+                recordingMode={recordingMode}
+                isRecording={isRecording}
+                resumeNonce={cameraResumeNonce}
+                modePreparing={!ready && !isRecording && !cameraNeedsPermission}
+                pitchStageActive={
+                  isAudioPracticeTunerTab || (showPitch && mainVideoPitchSource !== null)
+                }
+                metronomeStageActive={metronomeStageActive}
+                audioPracticeOverlayActive={
+                  isAudioPracticeToolTab ||
+                  (recordingMode === 'audio' && audioPracticeTab === 'audio')
+                }
+                visuallySuppressed={isSplitView}
+                nativePreviewActive={false}
+              />
 
-      <Suspense fallback={null}>
-      <TakeVaultDrawer
-        isOpen={isVaultOpen}
-        onClose={handleCloseVault}
-        projects={projects}
-        activeProject={activeProject}
-        onSelectProject={handleSelectProject}
-        onCreateProject={handleCreateProject}
-        onDeleteProject={handleDeleteProject}
-        takes={takes}
-        sortedTakes={sortedTakes}
-        sortMode={sortMode}
-        onSortChange={setSortMode}
-        benchmarkId={benchmarkId}
-        benchmarkBinding={benchmarkBinding}
-        challengerId={challengerId}
-        libraryItems={libraryItems}
-        onImportLibraryAudio={(file) => {
-          void handleImportLibraryAudio(file)
-        }}
-        onRenameLibraryItem={handleRenameLibraryItem}
-        onDeleteLibraryItem={(itemId) => {
-          void handleDeleteLibraryItem(itemId)
-        }}
-        onSetLibraryReference={handleSetLibraryReference}
-        onPinBenchmark={handlePinBenchmark}
-        onPinChallenger={handlePinChallenger}
-        onBeforePin={pausePipVideos}
-        onUpdateTake={handleUpdateTake}
-        onDeleteTake={handleDeleteTake}
-        onDeleteTakes={handleDeleteTakes}
-        onClearAllTakes={handleClearAllTakes}
-        onOpenTake={handleOpenVaultTake}
-        onBeforeExport={() => {
-          stopAutoPlaybackAudio()
-          pausePipVideos()
-        }}
-        preferredMediaFilter={recordingMode === 'audio' ? 'audio' : 'all'}
-        recordingMode={recordingMode}
-        onEnterComplete={handleVaultEnterComplete}
-      />
+              {cameraNeedsPermission && (
+                <CameraPermissionPrompt
+                  recordingMode={recordingMode}
+                  requesting={cameraPermissionRequestInFlight}
+                  onRequestPermission={requestCameraAccess}
+                />
+              )}
 
-      <SettingsDrawer
-        isOpen={isSettingsOpen}
-        onClose={handleCloseSettings}
-        settings={settings}
-        hudQuickSettings={hudQuickSettings}
-        onUpdate={updateSettings}
-        onPitchTrackerChange={handlePitchTrackerSettingChange}
-        onShowTakeCardsChange={handleShowTakeCardsSettingChange}
-        onShowMetronomeChange={handleShowMetronomeSettingChange}
-        onAudioEnhancerChange={handleAudioEnhancerSettingChange}
-        onReset={handleResetSettings}
-        onReplayTutorial={handleReplayOnboardingTutorial}
-        recordingMode={recordingMode}
-      />
-      </Suspense>
+              <div
+                className={`pitch-display-layer${
+                  pitchHudSuspended ? ' floating-widget-layer--inert' : ''
+                }`}
+                aria-hidden={!showFloatingMainPitch || pitchHudSuspended}
+              >
+                {showMainPitchWidget && (
+                  <Suspense fallback={null}>
+                    <AnimatePresence>
+                      {showFloatingMainPitch && (
+                        <DraggablePitchWidget
+                          boundaryRef={appShellRef}
+                          mediaRef={mainAudioPitchSource.mediaRef}
+                          enabled={pitchTrackerActive && !pitchHudSuspended}
+                          isPlaying={mainAudioPitchSource.isPlaying}
+                          mediaKey={mainAudioPitchSource.mediaKey}
+                          takeName={mainAudioPitchSource.take?.name}
+                          label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
+                          isAudioMode
+                          liveMicEnabled={
+                            (settings.liveMicTunerEnabled ||
+                              mainAudioPitchSource.liveMicOnly === true) &&
+                            !handsFreePlaybackPending &&
+                            !autoPlaybackPlaying
+                          }
+                          micStreamRef={streamRef}
+                          layoutRegion="main"
+                          liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
+                          tunerInstrument={settings.tunerInstrument}
+                          onClose={handleClosePitch}
+                        />
+                      )}
+                    </AnimatePresence>
+                  </Suspense>
+                )}
+              </div>
 
-      <Suspense fallback={null}>
-        <AnimatePresence>
-          {showOnboardingTutorial && (
-            <OnboardingTutorial
-              key="onboarding-tutorial"
-              onClose={handleCloseOnboardingTutorial}
-              hapticFeedback={settings.hapticFeedback}
-            />
-          )}
-        </AnimatePresence>
-      </Suspense>
-    </div>
-    </div>
-    </AudioModePlaybackProvider>
-    </MetronomeProvider>
-    </ActionSheetProvider>
+              <div
+                className={`metronome-display-layer${
+                  metronomeWidgetInteractive ? '' : ' floating-widget-layer--inert'
+                }`}
+                aria-hidden={!metronomeWidgetInteractive}
+              >
+                {showMetronomeWidget && (
+                  <Suspense fallback={null}>
+                    <AnimatePresence>
+                      {recordingMode === 'video' && (
+                        <DraggableMetronomeWidget
+                          key="main-metronome"
+                          boundaryRef={appShellRef}
+                          positionId="main-metronome"
+                          isTakePlaying={takePlaybackActive}
+                          muteDuringPlayback={settings.muteMetronomeDuringPlayback}
+                          onClose={handleCloseMetronome}
+                        />
+                      )}
+                    </AnimatePresence>
+                  </Suspense>
+                )}
+              </div>
+
+              <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
+                {showMainPitchWidget && mainVideoPitchSource && (
+                  <Suspense fallback={null}>
+                    <AnimatePresence>
+                      {showPitch && mainVideoPitchSource && (
+                        <div
+                          className={
+                            pitchHudSuspended
+                              ? 'floating-widget-layer--inert fixed inset-0 z-[5]'
+                              : 'contents'
+                          }
+                        >
+                          <DraggablePitchWidget
+                            boundaryRef={appShellRef}
+                            mediaRef={mainVideoPitchSource.mediaRef}
+                            enabled={pitchTrackerActive && !pitchHudSuspended}
+                            isPlaying={mainVideoPitchSource.isPlaying}
+                            mediaKey={mainVideoPitchSource.mediaKey}
+                            label="Live Pitch"
+                            pitchSource="microphone"
+                            micStreamRef={streamRef}
+                            layoutRegion="main"
+                            positionId="main-pitch-video"
+                            tunerInstrument={settings.tunerInstrument}
+                            onClose={handleClosePitch}
+                          />
+                        </div>
+                      )}
+                    </AnimatePresence>
+                  </Suspense>
+                )}
+
+                <motion.div
+                  className={`app-ui-overlay ${
+                    recordingMode === 'audio' ? 'app-ui-overlay--audio-mode' : ''
+                  } ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${
+                    metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''
+                  } ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${
+                    quickSettingsOpen ? 'app-ui-overlay--quick-settings' : ''
+                  } ${showOnboardingTutorial ? 'app-ui-overlay--tutorial' : ''} ${
+                    audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''
+                  } ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${
+                    isSplitView ? 'app-ui-overlay--split-open' : ''
+                  } ${
+                    isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
+                  } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
+                  aria-hidden={hudModalState === 'review'}
+                  animate={{
+                    opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
+                    scale:
+                      hudModalState === 'review' ? 0.94 : hudModalState === 'sheet' ? 0.985 : 1,
+                  }}
+                  transition={iosHudDim}
+                  style={{
+                    ...motionGpuLayer,
+                    pointerEvents: audioPracticeSheetOpen
+                      ? 'none'
+                      : overlayPointerCapture
+                      ? 'auto'
+                      : hudModalState !== 'idle' && !showOnboardingTutorial
+                      ? 'none'
+                      : undefined,
+                  }}
+                >
+                  {recordingMode !== 'audio' && (
+                    <HudHeader
+                      sessionName={activeProject?.name ?? 'BestTake'}
+                      onOpenVault={handleOpenVault}
+                      className={
+                        quickSettingsOpen || isReviewOpen || isSplitView
+                          ? 'hud-header-hidden'
+                          : undefined
+                      }
+                    />
+                  )}
+
+                  {recordingMode === 'audio' && !quickSettingsOpen && (
+                    <AudioPracticeTopTabs
+                      activeTab={audioPracticeTab}
+                      onTabChange={setAudioPracticeTab}
+                    />
+                  )}
+
+                  {recordingMode === 'audio' &&
+                    audioPracticeTab === 'metronome' &&
+                    !quickSettingsOpen && (
+                      <div
+                        key="audio-practice-metronome-layer"
+                        className="audio-practice-metronome-layer flex min-h-0 flex-1 flex-col"
+                      >
+                        <AudioMetronomeTab key="audio-metronome-tab" />
+                      </div>
+                    )}
+
+                  {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && (
+                    <div
+                      key="audio-practice-tuner-layer"
+                      className="audio-practice-tuner-layer flex min-h-0 flex-1 flex-col"
+                    >
+                      <AudioTunerTab
+                        streamRef={streamRef}
+                        streamGeneration={streamGeneration}
+                        ready={ready}
+                        isRecording={isRecording}
+                        tunerInstrument={settings.tunerInstrument}
+                        liveMicTunerEnabled={settings.liveMicTunerEnabled}
+                        droneVolume={settings.droneVolume}
+                        droneWaveform={settings.droneWaveform}
+                        hapticFeedback={settings.hapticFeedback}
+                        showTakeCards={settings.showTakeCards}
+                        benchmarkTake={benchmarkTake}
+                        libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                        challengerTake={challengerTake}
+                        onExpandBenchmark={handleExpandBenchmark}
+                        onExpandChallenger={handleExpandChallenger}
+                      />
+                    </div>
+                  )}
+
+                  {recordingMode === 'audio' &&
+                    audioPracticeTab === 'audio' &&
+                    !quickSettingsOpen &&
+                    settings.showTakeCards &&
+                    !isSplitView && (
+                      <div className="audio-mode-home-layer min-h-0 flex-1">
+                        <AudioModeHome
+                          isRecording={isRecording}
+                          ready={ready}
+                          benchmarkTake={benchmarkTake}
+                          libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                          challengerTake={challengerTake}
+                          onExpandBenchmark={handleExpandBenchmark}
+                          onExpandChallenger={handleExpandChallenger}
+                          onPinCurrentAsBest={handlePinCurrentAsBest}
+                          onClearBenchmark={handleClearAudioBenchmark}
+                          onClearChallenger={handleClearAudioChallenger}
+                        />
+                      </div>
+                    )}
+
+                  {!quickSettingsOpen &&
+                    settings.showTakeCards &&
+                    isSplitView &&
+                    isAudioPracticeMainTab && (
+                      <div
+                        className="split-compare-host pointer-events-auto min-h-0 flex-1 px-2 pb-1.5 pt-0"
+                        style={pipScaleStyle}
+                      >
+                        <SplitCompareLayout
+                          splitRatio={splitRatio}
+                          onSplitRatioChange={setSplitRatio}
+                          benchmarkTake={benchmarkTake}
+                          libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                          challengerTake={challengerTake}
+                          youtubeEmbedUrl={youtubeUrl}
+                          suspendPipPlayback={suspendPipPlayback}
+                          benchmarkPipVideoRef={benchmarkPipVideoRef}
+                          challengerPipVideoRef={challengerPipVideoRef}
+                          splitPreviewRef={splitPreviewRef}
+                          streamRef={streamRef}
+                          streamGeneration={streamGeneration}
+                          cameraNeedsPermission={cameraNeedsPermission}
+                          recordingMode={recordingMode}
+                          isRecording={isRecording}
+                          cameraReady={ready}
+                          cameraResumeNonce={cameraResumeNonce}
+                          pitchStageActive={
+                            showPitch &&
+                            (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
+                          }
+                          metronomeStageActive={metronomeStageActive}
+                          onUnpinBenchmark={handleUnpinBenchmark}
+                          onClearLibraryReference={handleClearLibraryReference}
+                          onUnpinChallenger={handleUnpinChallenger}
+                          onClearYoutube={handleClearYoutube}
+                          onSubmitYoutube={handleSubmitYoutube}
+                          onUploadBenchmark={handleUploadBenchmark}
+                          onToggleSplitView={handleExitSplitView}
+                          onExpandBenchmark={handleExpandBenchmark}
+                          onExpandChallenger={handleExpandChallenger}
+                          onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+                          onChallengerPlaybackChange={handleChallengerPlaybackChange}
+                          challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
+                          onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
+                          showPinCurrentAsBest={showPinCurrentAsBest}
+                          onPinCurrentAsBest={handlePinCurrentAsBest}
+                          onYoutubeHostChange={handleYoutubeHostChange}
+                          youtubeIframeRef={youtubeIframeRef}
+                          deleteDropRef={recordDeleteDropRef}
+                          onPinBenchmark={handlePinBenchmark}
+                          onDeleteTake={handleDragDeleteTake}
+                          onDragStateChange={handlePipDragStateChange}
+                          hapticFeedback={settings.hapticFeedback}
+                        />
+                      </div>
+                    )}
+
+                  <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
+                    {!quickSettingsOpen &&
+                      settings.showTakeCards &&
+                      !isSplitView &&
+                      recordingMode !== 'audio' && (
+                        <motion.div
+                          key="pip-row"
+                          className="app-pip-row-wrap pointer-events-auto w-full"
+                          data-tutorial="review-mode-button"
+                          initial={{ opacity: 0, y: 14 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={iosHudDim}
+                          style={{ ...motionGpuLayer, ...pipScaleStyle }}
+                        >
+                          <PipCompareRow
+                            benchmarkTake={benchmarkTake}
+                            libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                            challengerTake={challengerTake}
+                            youtubeEmbedUrl={youtubeUrl}
+                            suspendPipPlayback={suspendPipPlayback}
+                            benchmarkPipVideoRef={benchmarkPipVideoRef}
+                            challengerPipVideoRef={challengerPipVideoRef}
+                            deleteDropRef={recordDeleteDropRef}
+                            onPinBenchmark={handlePinBenchmark}
+                            onDeleteTake={handleDragDeleteTake}
+                            onUnpinBenchmark={handleUnpinBenchmark}
+                            onClearLibraryReference={handleClearLibraryReference}
+                            onUnpinChallenger={handleUnpinChallenger}
+                            onUploadBenchmark={handleUploadBenchmark}
+                            onSubmitYoutube={handleSubmitYoutube}
+                            onClearYoutube={handleClearYoutube}
+                            onToggleSplitView={handleToggleSplitView}
+                            onExpandBenchmark={handleExpandBenchmark}
+                            onExpandChallenger={handleExpandChallenger}
+                            onDragStateChange={handlePipDragStateChange}
+                            onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+                            onChallengerPlaybackChange={handleChallengerPlaybackChange}
+                            challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
+                            onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
+                            showPinCurrentAsBest={showPinCurrentAsBest}
+                            onPinCurrentAsBest={handlePinCurrentAsBest}
+                            onYoutubeHostChange={handleYoutubeHostChange}
+                            youtubeIframeRef={youtubeIframeRef}
+                            hapticFeedback={settings.hapticFeedback}
+                          />
+                        </motion.div>
+                      )}
+
+                    <ControlDeck
+                      isRecording={isRecording}
+                      elapsed={elapsed}
+                      ready={ready}
+                      recordingMode={recordingMode}
+                      onRecordingModeChange={handleRecordingModeChange}
+                      onToggleRecord={toggleRecording}
+                      onOpenVault={recordingMode === 'audio' ? handleToggleVault : handleOpenVault}
+                      isVaultOpen={isVaultOpen}
+                      vaultToggleEnabled={recordingMode === 'audio'}
+                      onOpenSettings={handleOpenSettings}
+                      takeCount={takes.length}
+                      autoSoundListening={autoSoundListening}
+                      handsFreeRecording={handsFreeRecording}
+                      handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
+                      autoSoundRecording={settings.autoSoundRecording}
+                      onAutoSoundRecordingChange={(enabled) =>
+                        updateSettings({ autoSoundRecording: enabled })
+                      }
+                      recordDropRef={recordDeleteDropRef}
+                      dragDeleteActive={pipDragState.isDragging}
+                      dragOverDelete={pipDragState.overDelete}
+                      pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
+                      pitchToggleVisible={recordingMode === 'video'}
+                      showTakeCards={hudQuickSettings.showTakeCards}
+                      onPitchTrackerChange={handlePitchTrackerSettingChange}
+                      onShowTakeCardsChange={handleShowTakeCardsSettingChange}
+                      showMetronome={hudQuickSettings.showMetronome}
+                      onShowMetronomeChange={handleShowMetronomeSettingChange}
+                      audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
+                      onAudioEnhancerChange={handleAudioEnhancerSettingChange}
+                      settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
+                      onBranchOpenChange={handleQuickSettingsOpenChange}
+                      hapticFeedback={settings.hapticFeedback}
+                    />
+                  </div>
+                </motion.div>
+
+                <Suspense fallback={null}>
+                  <AnimatePresence>
+                    {isReviewOpen && (
+                      <ReviewModeOverlay
+                        key="review-mode"
+                        context={reviewContext}
+                        activeSlot={reviewSlot ?? 'benchmark'}
+                        vaultTakes={sortedTakes}
+                        vaultIndex={vaultReviewIndex}
+                        onVaultIndexChange={setVaultReviewIndex}
+                        benchmarkSrc={
+                          libraryBenchmarkPlayback?.playbackUrl ?? benchmarkTake?.videoUrl ?? null
+                        }
+                        challengerSrc={challengerTake?.videoUrl ?? null}
+                        benchmarkTake={libraryBenchmarkPlayback ? null : benchmarkTake}
+                        challengerTake={challengerTake}
+                        benchmarkFilePath={
+                          libraryBenchmarkPlayback?.filePath ?? benchmarkTake?.filePath
+                        }
+                        challengerFilePath={challengerTake?.filePath}
+                        benchmarkName={libraryBenchmarkPlayback?.name ?? benchmarkTake?.name}
+                        challengerName={challengerTake?.name}
+                        benchmarkMimeType={
+                          libraryBenchmarkPlayback?.mimeType ??
+                          benchmarkTake?.videoMimeType ??
+                          (benchmarkTake?.mediaType === 'audio'
+                            ? NATIVE_AUDIO_MIME
+                            : NATIVE_VIDEO_MIME)
+                        }
+                        challengerMimeType={
+                          challengerTake?.videoMimeType ??
+                          (challengerTake?.mediaType === 'audio'
+                            ? NATIVE_AUDIO_MIME
+                            : NATIVE_VIDEO_MIME)
+                        }
+                        benchmarkMediaType={
+                          libraryBenchmarkPlayback ? 'audio' : benchmarkTake?.mediaType
+                        }
+                        challengerMediaType={challengerTake?.mediaType}
+                        benchmarkMirror={
+                          libraryBenchmarkPlayback ? false : benchmarkTake?.mirrorPlayback !== false
+                        }
+                        challengerMirror={challengerTake?.mirrorPlayback !== false}
+                        benchmarkRecordingOrientation={benchmarkTake?.recordingOrientation}
+                        challengerRecordingOrientation={challengerTake?.recordingOrientation}
+                        liveMicTunerEnabled={settings.liveMicTunerEnabled}
+                        tunerInstrument={settings.tunerInstrument}
+                        micStreamRef={streamRef}
+                        isOpen
+                        onClose={handleCloseReview}
+                        onSlotChange={handleReviewSlotChange}
+                        onUpdateTake={handleUpdateTake}
+                        onDeleteTake={handleDeleteTake}
+                        onFavoriteTake={handlePinBenchmark}
+                      />
+                    )}
+                  </AnimatePresence>
+                </Suspense>
+
+                <Suspense fallback={null}>
+                  <TakeVaultDrawer
+                    isOpen={isVaultOpen}
+                    onClose={handleCloseVault}
+                    projects={projects}
+                    activeProject={activeProject}
+                    onSelectProject={handleSelectProject}
+                    onCreateProject={handleCreateProject}
+                    onDeleteProject={handleDeleteProject}
+                    takes={takes}
+                    sortedTakes={sortedTakes}
+                    sortMode={sortMode}
+                    onSortChange={setSortMode}
+                    benchmarkId={benchmarkId}
+                    benchmarkBinding={benchmarkBinding}
+                    challengerId={challengerId}
+                    libraryItems={libraryItems}
+                    onImportLibraryAudio={(file) => {
+                      void handleImportLibraryAudio(file)
+                    }}
+                    onRenameLibraryItem={handleRenameLibraryItem}
+                    onDeleteLibraryItem={(itemId) => {
+                      void handleDeleteLibraryItem(itemId)
+                    }}
+                    onSetLibraryReference={handleSetLibraryReference}
+                    onPinBenchmark={handlePinBenchmark}
+                    onPinChallenger={handlePinChallenger}
+                    onBeforePin={pausePipVideos}
+                    onUpdateTake={handleUpdateTake}
+                    onDeleteTake={handleDeleteTake}
+                    onDeleteTakes={handleDeleteTakes}
+                    onClearAllTakes={handleClearAllTakes}
+                    onOpenTake={handleOpenVaultTake}
+                    onBeforeExport={() => {
+                      stopAutoPlaybackAudio()
+                      pausePipVideos()
+                    }}
+                    preferredMediaFilter={recordingMode === 'audio' ? 'audio' : 'all'}
+                    recordingMode={recordingMode}
+                    onEnterComplete={handleVaultEnterComplete}
+                  />
+
+                  <SettingsDrawer
+                    isOpen={isSettingsOpen}
+                    onClose={handleCloseSettings}
+                    settings={settings}
+                    hudQuickSettings={hudQuickSettings}
+                    onUpdate={updateSettings}
+                    onPitchTrackerChange={handlePitchTrackerSettingChange}
+                    onShowTakeCardsChange={handleShowTakeCardsSettingChange}
+                    onShowMetronomeChange={handleShowMetronomeSettingChange}
+                    onAudioEnhancerChange={handleAudioEnhancerSettingChange}
+                    onReset={handleResetSettings}
+                    onReplayTutorial={handleReplayOnboardingTutorial}
+                    recordingMode={recordingMode}
+                  />
+                </Suspense>
+
+                <Suspense fallback={null}>
+                  <AnimatePresence>
+                    {showOnboardingTutorial && (
+                      <OnboardingTutorial
+                        key="onboarding-tutorial"
+                        onClose={handleCloseOnboardingTutorial}
+                        hapticFeedback={settings.hapticFeedback}
+                      />
+                    )}
+                  </AnimatePresence>
+                </Suspense>
+              </div>
+            </div>
+          </AudioModePlaybackProvider>
+        </MetronomeProvider>
+      </ActionSheetProvider>
     </TutorialProvider>
   )
 }

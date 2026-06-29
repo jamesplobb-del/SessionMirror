@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, type PointerEvent } from 'react'
 import { motion } from 'framer-motion'
-import { Ellipsis, Pause, Play, Star } from 'lucide-react'
+import { Pause, Play, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import AudioModeHeroMic from './AudioModeHeroMic'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
@@ -15,11 +15,10 @@ import type { Take } from '../../types'
 import type { LibraryPlaybackReference } from '../../types/library'
 
 const EMPTY_WAVEFORM_PEAKS = [
-  0.18, 0.28, 0.42, 0.58, 0.72, 0.84, 0.92, 0.98, 0.92, 0.84, 0.72, 0.58, 0.42, 0.28, 0.18,
-  0.22, 0.34, 0.48, 0.62, 0.76, 0.88, 0.94, 0.88, 0.76, 0.62, 0.48, 0.34, 0.22, 0.3, 0.44,
-  0.58, 0.7, 0.8, 0.88, 0.8, 0.7, 0.58, 0.44, 0.3, 0.24, 0.36, 0.5, 0.64, 0.78, 0.86, 0.78,
-  0.64, 0.5, 0.36, 0.24, 0.2, 0.32, 0.46, 0.6, 0.74, 0.86, 0.74, 0.6, 0.46, 0.32, 0.2, 0.26,
-  0.38, 0.52, 0.66, 0.8,
+  0.18, 0.28, 0.42, 0.58, 0.72, 0.84, 0.92, 0.98, 0.92, 0.84, 0.72, 0.58, 0.42, 0.28, 0.18, 0.22,
+  0.34, 0.48, 0.62, 0.76, 0.88, 0.94, 0.88, 0.76, 0.62, 0.48, 0.34, 0.22, 0.3, 0.44, 0.58, 0.7, 0.8,
+  0.88, 0.8, 0.7, 0.58, 0.44, 0.3, 0.24, 0.36, 0.5, 0.64, 0.78, 0.86, 0.78, 0.64, 0.5, 0.36, 0.24,
+  0.2, 0.32, 0.46, 0.6, 0.74, 0.86, 0.74, 0.6, 0.46, 0.32, 0.2, 0.26, 0.38, 0.52, 0.66, 0.8,
 ]
 
 function formatDuration(seconds?: number): string {
@@ -45,6 +44,7 @@ interface AudioModeTakeCardProps {
   libraryPlayback?: LibraryPlaybackReference | null
   onOpen?: () => void
   onFavorite?: () => void
+  onClear?: () => void
 }
 
 function buildPlaybackItem({
@@ -111,7 +111,9 @@ function AudioWaveform({
 
   return (
     <div
-      className={`audio-mode-waveform audio-mode-waveform--${tone} ${active ? 'audio-mode-waveform--active' : ''}`}
+      className={`audio-mode-waveform audio-mode-waveform--${tone} ${
+        active ? 'audio-mode-waveform--active' : ''
+      }`}
       role="slider"
       aria-label="Take waveform"
       aria-valuemin={0}
@@ -149,13 +151,15 @@ function AudioModeTakeCard({
   libraryPlayback = null,
   onOpen,
   onFavorite,
+  onClear,
 }: AudioModeTakeCardProps) {
   const audioPlayback = useAudioModePlayback()
   const playbackItem = useMemo(
     () => buildPlaybackItem({ tone, take, libraryPlayback }),
-    [libraryPlayback, take, tone],
+    [libraryPlayback, take, tone]
   )
-  const title = libraryPlayback?.name ?? take?.name ?? (tone === 'best' ? 'No Best Take' : 'No Current Take')
+  const title =
+    libraryPlayback?.name ?? take?.name ?? (tone === 'best' ? 'No Best Take' : 'No Current Take')
   const timestamp = take?.timestamp
   const hasMedia = Boolean(playbackItem)
   const isCurrentItem = playbackItem ? audioPlayback.matchesCurrentSource(playbackItem) : false
@@ -186,12 +190,14 @@ function AudioModeTakeCard({
         audioPlayback.play(playbackItem, { startTime: nextTime })
       }
     },
-    [audioPlayback, durationSeconds, isCurrentItem, playbackItem],
+    [audioPlayback, durationSeconds, isCurrentItem, playbackItem]
   )
 
   return (
     <motion.article
-      className={`audio-mode-take-card audio-mode-take-card--${tone} ${hasMedia ? '' : 'audio-mode-take-card--empty'}`}
+      className={`audio-mode-take-card audio-mode-take-card--${tone} ${
+        hasMedia ? '' : 'audio-mode-take-card--empty'
+      }`}
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={iosHudDim}
@@ -220,16 +226,21 @@ function AudioModeTakeCard({
               <Star className="h-4 w-4 fill-current" />
             </Pressable>
           )}
-          <Pressable
-            type="button"
-            intensity="icon"
-            haptic="light"
-            onClick={(event) => event.stopPropagation()}
-            className="audio-mode-take-card__mini-btn"
-            aria-label="More take actions"
-          >
-            <Ellipsis className="h-4 w-4" />
-          </Pressable>
+          {hasMedia && (
+            <Pressable
+              type="button"
+              intensity="icon"
+              haptic="light"
+              onClick={(event) => {
+                event.stopPropagation()
+                onClear?.()
+              }}
+              className="audio-mode-take-card__mini-btn"
+              aria-label={`Clear ${label}`}
+            >
+              <X className="h-4 w-4" />
+            </Pressable>
+          )}
         </div>
       </div>
 
@@ -285,6 +296,8 @@ interface AudioModeHomeProps {
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onPinCurrentAsBest?: () => void
+  onClearBenchmark?: () => void
+  onClearChallenger?: () => void
 }
 
 function AudioModeHome({
@@ -296,6 +309,8 @@ function AudioModeHome({
   onExpandBenchmark,
   onExpandChallenger,
   onPinCurrentAsBest,
+  onClearBenchmark,
+  onClearChallenger,
 }: AudioModeHomeProps) {
   const status = isRecording ? 'Recording...' : ready ? 'Ready to record' : 'Preparing audio'
   const hint = isRecording ? 'Listening now' : 'Tap the mic to start'
@@ -319,7 +334,10 @@ function AudioModeHome({
           tone="best"
           take={benchmarkTake}
           libraryPlayback={libraryBenchmarkPlayback}
-          onOpen={Boolean(libraryBenchmarkPlayback || benchmarkTake) ? onExpandBenchmark : undefined}
+          onOpen={
+            Boolean(libraryBenchmarkPlayback || benchmarkTake) ? onExpandBenchmark : undefined
+          }
+          onClear={onClearBenchmark}
         />
         <AudioModeTakeCard
           label="Current Take"
@@ -327,6 +345,7 @@ function AudioModeHome({
           take={challengerTake}
           onOpen={onExpandChallenger}
           onFavorite={onPinCurrentAsBest}
+          onClear={onClearChallenger}
         />
       </div>
     </section>

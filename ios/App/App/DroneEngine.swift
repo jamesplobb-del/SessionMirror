@@ -39,7 +39,7 @@ final class DroneEngine {
     private let stateLock = NSLock()
 
     private let fadeDuration: TimeInterval = 0.035
-    private let oscillatorHeadroom: Float = 0.9
+    private let oscillatorHeadroom: Float = 0.62
 
     private init() {
         engine.attach(mainMixer)
@@ -223,7 +223,7 @@ final class DroneEngine {
         let twoPi = Float.pi * 2
         let sampleRate = Float(renderFormat.sampleRate)
         let fadeStep = Float(1.0 / (fadeDuration * renderFormat.sampleRate))
-        let chordNormalization = min(1, 1 / sqrt(Float(activeCount)))
+        let chordNormalization = min(1, 0.82 / sqrt(Float(activeCount)))
 
         for frame in 0..<frames {
             var mixed: Float = 0
@@ -243,7 +243,7 @@ final class DroneEngine {
                 renderVoices[pitchClass] = voice
             }
 
-            let sample = Self.softLimit(mixed * chordNormalization * oscillatorHeadroom)
+            let sample = Self.cleanLimit(mixed * chordNormalization * oscillatorHeadroom)
             for channel in 0..<channelCount {
                 guard let buffer = ablPointer[channel].mData?.assumingMemoryBound(to: Float.self) else { continue }
                 buffer[frame] = sample
@@ -277,10 +277,8 @@ final class DroneEngine {
         }
     }
 
-    private static func softLimit(_ value: Float) -> Float {
-        let drive: Float = 1.35
-        let normalized = tanhf(value * drive) / tanhf(drive)
-        return max(-0.95, min(0.95, normalized))
+    private static func cleanLimit(_ value: Float) -> Float {
+        return max(-0.98, min(0.98, value))
     }
 
     private static func outputVolume(for requestedVolume: Float) -> Float {

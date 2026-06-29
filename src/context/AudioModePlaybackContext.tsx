@@ -55,6 +55,11 @@ interface AudioModePlaybackContextValue {
 
 const AudioModePlaybackContext = createContext<AudioModePlaybackContextValue | null>(null)
 
+interface AudioModePlaybackProviderProps {
+  children: ReactNode
+  onBeforePlay?: () => void | Promise<void>
+}
+
 function logPlayback(message: string, details: Record<string, unknown> = {}): void {
   console.info('[Playback]', message, details)
 }
@@ -68,8 +73,12 @@ function resolveItemSrc(item: AudioModePlaybackItem): string {
   return resolveMediaPlaybackSrc(cached ?? item.mediaUrl)
 }
 
-export function AudioModePlaybackProvider({ children }: { children: ReactNode }) {
+export function AudioModePlaybackProvider({
+  children,
+  onBeforePlay,
+}: AudioModePlaybackProviderProps) {
   const playerRef = useRef<HTMLAudioElement>(null)
+  const onBeforePlayRef = useRef(onBeforePlay)
   const sessionPreparedRef = useRef(false)
   const pendingStartTimeRef = useRef<number | null>(null)
   const currentSourceKeyRef = useRef('')
@@ -83,6 +92,10 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
     sessionPrepared: false,
     playerExists: false,
   })
+
+  useEffect(() => {
+    onBeforePlayRef.current = onBeforePlay
+  }, [onBeforePlay])
 
   const updateSessionPrepared = useCallback((prepared: boolean) => {
     sessionPreparedRef.current = prepared
@@ -165,34 +178,40 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
     return player
   }, [])
 
-  const prepareSessionOnce = useCallback(async (item: AudioModePlaybackItem) => {
-    if (sessionPreparedRef.current || isPlaybackRouteHoldActive()) {
-      logPlayback('Playback session already prepared', {
+  const prepareSessionOnce = useCallback(
+    async (item: AudioModePlaybackItem) => {
+      if (sessionPreparedRef.current || isPlaybackRouteHoldActive()) {
+        logPlayback('Playback session already prepared', {
+          takeId: item.takeId ?? item.id,
+          sessionPrepared: sessionPreparedRef.current,
+          routeActive: isPlaybackRouteHoldActive(),
+        })
+        updateSessionPrepared(true)
+        return
+      }
+
+      logPlayback('Preparing playback session', {
         takeId: item.takeId ?? item.id,
-        sessionPrepared: sessionPreparedRef.current,
-        routeActive: isPlaybackRouteHoldActive(),
+        playerExists: Boolean(playerRef.current),
       })
+      await preparePlaybackRoute({ suspendCamera: false })
       updateSessionPrepared(true)
-      return
-    }
+    },
+    [updateSessionPrepared]
+  )
 
-    logPlayback('Preparing playback session', {
-      takeId: item.takeId ?? item.id,
-      playerExists: Boolean(playerRef.current),
-    })
-    await preparePlaybackRoute({ suspendCamera: false })
-    updateSessionPrepared(true)
-  }, [updateSessionPrepared])
-
-  const select = useCallback((item: AudioModePlaybackItem) => {
-    const player = ensurePlayerSource(item)
-    logPlayback('Selected playback item', {
-      takeId: item.takeId ?? item.id,
-      position: player?.currentTime ?? 0,
-      playerExists: Boolean(player),
-      sessionPrepared: sessionPreparedRef.current,
-    })
-  }, [ensurePlayerSource])
+  const select = useCallback(
+    (item: AudioModePlaybackItem) => {
+      const player = ensurePlayerSource(item)
+      logPlayback('Selected playback item', {
+        takeId: item.takeId ?? item.id,
+        position: player?.currentTime ?? 0,
+        playerExists: Boolean(player),
+        sessionPrepared: sessionPreparedRef.current,
+      })
+    },
+    [ensurePlayerSource]
+  )
 
   const play = useCallback(
     (item: AudioModePlaybackItem, options: { startTime?: number } = {}) => {
@@ -221,6 +240,7 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
 
       void (async () => {
         try {
+          await onBeforePlayRef.current?.()
           await prepareSessionOnce(item)
           primeTakePlaybackForPreparedSession(player)
           if (pendingStartTimeRef.current !== null) {
@@ -243,7 +263,11 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
             playerExists: true,
             sessionPrepared: sessionPreparedRef.current,
           })
-          setState((prev) => ({ ...prev, isPlaying: true, playerExists: true }))
+          setState((prev) => ({
+            ...prev,
+            isPlaying: true,
+            playerExists: true,
+          }))
         } catch (error) {
           logPlayback('Playback intercepted', {
             takeId: item.takeId ?? item.id,
@@ -255,7 +279,7 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
         }
       })()
     },
-    [ensurePlayerSource, prepareSessionOnce],
+    [ensurePlayerSource, prepareSessionOnce]
   )
 
   const pause = useCallback(() => {
@@ -268,7 +292,11 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
       playerExists: true,
       sessionPrepared: sessionPreparedRef.current,
     })
-    setState((prev) => ({ ...prev, isPlaying: false, currentTime: player.currentTime }))
+    setState((prev) => ({
+      ...prev,
+      isPlaying: false,
+      currentTime: player.currentTime,
+    }))
   }, [state.currentItem])
 
   const toggle = useCallback(
@@ -281,34 +309,43 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
       }
       play(item)
     },
-    [pause, play],
+    [pause, play]
   )
 
-  const seek = useCallback((time: number) => {
-    const player = playerRef.current
-    if (!player) return
-    const nextTime = Math.max(0, Math.min(time, Number.isFinite(player.duration) ? player.duration : time))
-    player.currentTime = nextTime
-    setState((prev) => ({ ...prev, currentTime: nextTime }))
-    logPlayback('Seeked', {
-      takeId: state.currentItem?.takeId ?? state.currentItem?.id,
-      position: nextTime,
-      playerExists: true,
-      sessionPrepared: sessionPreparedRef.current,
-    })
-  }, [state.currentItem])
+  const seek = useCallback(
+    (time: number) => {
+      const player = playerRef.current
+      if (!player) return
+      const nextTime = Math.max(
+        0,
+        Math.min(time, Number.isFinite(player.duration) ? player.duration : time)
+      )
+      player.currentTime = nextTime
+      setState((prev) => ({ ...prev, currentTime: nextTime }))
+      logPlayback('Seeked', {
+        takeId: state.currentItem?.takeId ?? state.currentItem?.id,
+        position: nextTime,
+        playerExists: true,
+        sessionPrepared: sessionPreparedRef.current,
+      })
+    },
+    [state.currentItem]
+  )
 
-  const openFullscreen = useCallback((item: AudioModePlaybackItem) => {
-    select(item)
-    const player = playerRef.current
-    logPlayback('Opening fullscreen', {
-      takeId: item.takeId ?? item.id,
-      position: player?.currentTime ?? 0,
-      isPlaying: player ? !player.paused && !player.ended : false,
-      playerExists: Boolean(player),
-      sessionPrepared: sessionPreparedRef.current,
-    })
-  }, [select])
+  const openFullscreen = useCallback(
+    (item: AudioModePlaybackItem) => {
+      select(item)
+      const player = playerRef.current
+      logPlayback('Opening fullscreen', {
+        takeId: item.takeId ?? item.id,
+        position: player?.currentTime ?? 0,
+        isPlaying: player ? !player.paused && !player.ended : false,
+        playerExists: Boolean(player),
+        sessionPrepared: sessionPreparedRef.current,
+      })
+    },
+    [select]
+  )
 
   const closeFullscreen = useCallback(() => {
     const player = playerRef.current
@@ -324,7 +361,7 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
   const matchesCurrentSource = useCallback(
     (item: Pick<AudioModePlaybackItem, 'filePath' | 'mediaUrl'>) =>
       currentSourceKeyRef.current === sourceKeyFor(item),
-    [],
+    []
   )
 
   useEffect(() => {
@@ -345,7 +382,11 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
     }
     const onPause = () => {
       stopProgressLoop()
-      setState((prev) => ({ ...prev, isPlaying: false, currentTime: player.currentTime }))
+      setState((prev) => ({
+        ...prev,
+        isPlaying: false,
+        currentTime: player.currentTime,
+      }))
     }
     const onEnded = () => {
       stopProgressLoop()
@@ -401,7 +442,17 @@ export function AudioModePlaybackProvider({ children }: { children: ReactNode })
       closeFullscreen,
       matchesCurrentSource,
     }),
-    [closeFullscreen, matchesCurrentSource, pause, play, seek, select, state, toggle, openFullscreen],
+    [
+      closeFullscreen,
+      matchesCurrentSource,
+      pause,
+      play,
+      seek,
+      select,
+      state,
+      toggle,
+      openFullscreen,
+    ]
   )
 
   return (
