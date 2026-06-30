@@ -8,12 +8,17 @@ import {
   getBeatsPerBar,
   getDefaultAccentPattern,
   getEighthNotesPerBar,
+  getMeterDef,
   isCompoundMeter,
+  isSimpleEighthMeter,
+  isSixteenthMeter,
   loadMetronomePrefs,
+  naturalPulseDivisor,
   normalizeAccentPattern,
   resolveClickTierWithAccents,
   saveMetronomePrefs,
   subdivisionsPerBeat,
+  suggestSubdivisionForMeterChange,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
@@ -46,6 +51,12 @@ function secondsPerSchedulerTick(
   if (isCompoundMeter(meter) && subdivision === 'off') {
     return macroBeatSec / 3
   }
+  if (subdivision === 'off') {
+    const divisor = naturalPulseDivisor(meter)
+    if (divisor > 1) {
+      return macroBeatSec / divisor
+    }
+  }
   const ticksPerBeat = subdivisionsPerBeat(subdivision)
   return macroBeatSec / ticksPerBeat
 }
@@ -62,6 +73,11 @@ function resolveUiTick(
     return { beatIndex, subTickIndex }
   }
 
+  if (subdivision === 'off' && (isSimpleEighthMeter(meter) || isSixteenthMeter(meter))) {
+    const beatsPerBar = getBeatsPerBar(meter)
+    return { beatIndex: tickIndexInBar % beatsPerBar, subTickIndex: 0 }
+  }
+
   const ticksPerBeat = subdivisionsPerBeat(subdivision)
   const beatsPerBar = getBeatsPerBar(meter)
   const beatIndex = Math.floor(tickIndexInBar / ticksPerBeat) % beatsPerBar
@@ -72,6 +88,9 @@ function resolveUiTick(
 function ticksPerBar(meter: MetronomeMeter, subdivision: MetronomeSubdivision): number {
   if (isCompoundMeter(meter) && subdivision === 'off') {
     return getEighthNotesPerBar(meter)
+  }
+  if (subdivision === 'off' && (isSimpleEighthMeter(meter) || isSixteenthMeter(meter))) {
+    return getMeterDef(meter).numerator
   }
   return getBeatsPerBar(meter) * subdivisionsPerBeat(subdivision)
 }
@@ -176,7 +195,9 @@ class SharedMetronomeEngine {
 
     const onForeground = () => {
       this.isBackgrounded = false
-      this.reconcileAfterInterrupt()
+      void resumePlaybackAudioContext().finally(() => {
+        this.reconcileAfterInterrupt()
+      })
     }
 
     const onVisibilityChange = () => {
@@ -332,10 +353,21 @@ class SharedMetronomeEngine {
   }
 
   setMeter = (nextMeter: MetronomeMeter): void => {
+    const nextSubdivision = suggestSubdivisionForMeterChange(
+      nextMeter,
+      this.snapshot.meter,
+      this.snapshot.subdivision,
+    )
     const nextAccentPattern = getDefaultAccentPattern(nextMeter)
     this.tickCounter = 0
-    this.patchState({ meter: nextMeter, beatIndex: 0, subTickIndex: 0, accentPattern: nextAccentPattern })
-    this.persistPrefs(this.snapshot.bpm, nextMeter, this.snapshot.subdivision, nextAccentPattern)
+    this.patchState({
+      meter: nextMeter,
+      subdivision: nextSubdivision,
+      beatIndex: 0,
+      subTickIndex: 0,
+      accentPattern: nextAccentPattern,
+    })
+    this.persistPrefs(this.snapshot.bpm, nextMeter, nextSubdivision, nextAccentPattern)
     if (import.meta.env.DEV) {
       console.log(`[MetronomeTab] timeSignature=${nextMeter}`)
     }
@@ -420,6 +452,8 @@ class SharedMetronomeEngine {
 
   private async prepareAudioContextForStart(): Promise<AudioContext | null> {
     const wasReleased = this.audioCtx === null
+
+    await resumePlaybackAudioContext()
 
     let ctx = primePlaybackAudioContextSync()
     if (ctx.state === 'closed') {

@@ -15,6 +15,7 @@ import Pressable from './ui/Pressable'
 import { useActionSheet } from '../context/ActionSheetContext'
 import { triggerLightHaptic } from '../utils/haptics'
 import { getTakeMediaType } from '../utils/mediaType'
+import { reResolveCachedTakeThumbnail } from '../utils/takeThumbnailCache'
 import type { Take, TakeUpdate } from '../types'
 import TakeCardThumbnailSkeleton from './ui/TakeCardThumbnailSkeleton'
 
@@ -68,6 +69,8 @@ function TakeCard({
   const [nameDraft, setNameDraft] = useState(take.name)
   const [notesDraft, setNotesDraft] = useState(take.notes)
   const [thumbnailBroken, setThumbnailBroken] = useState(false)
+  const [thumbnailSrc, setThumbnailSrc] = useState(take.thumbnailUrl)
+  const [thumbnailRevision, setThumbnailRevision] = useState(0)
   const notesDebounceRef = useRef<number | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -88,8 +91,42 @@ function TakeCard({
   }, [])
 
   useEffect(() => {
+    setThumbnailSrc(take.thumbnailUrl)
     setThumbnailBroken(false)
+    setThumbnailRevision(0)
   }, [take.id, take.thumbnailUrl])
+
+  useEffect(() => {
+    const refreshThumbnail = () => {
+      if (document.visibilityState !== 'visible' || !take.thumbnailUrl) return
+      setThumbnailRevision((revision) => revision + 1)
+      void reResolveCachedTakeThumbnail(take.id, take.recordingOrientation ?? 'portrait').then(
+        (refreshed) => {
+          if (refreshed) {
+            setThumbnailSrc(refreshed)
+            setThumbnailBroken(false)
+          }
+        },
+      )
+    }
+
+    document.addEventListener('visibilitychange', refreshThumbnail)
+    return () => document.removeEventListener('visibilitychange', refreshThumbnail)
+  }, [take.id, take.recordingOrientation, take.thumbnailUrl])
+
+  const handleThumbnailError = () => {
+    void reResolveCachedTakeThumbnail(take.id, take.recordingOrientation ?? 'portrait').then(
+      (refreshed) => {
+        if (refreshed && refreshed !== thumbnailSrc) {
+          setThumbnailSrc(refreshed)
+          setThumbnailRevision((revision) => revision + 1)
+          setThumbnailBroken(false)
+          return
+        }
+        setThumbnailBroken(true)
+      },
+    )
+  }
 
   useEffect(() => {
     if (!isEditingName) return
@@ -139,8 +176,8 @@ function TakeCard({
     })()
   }
 
-  const showThumbnailImage = Boolean(take.thumbnailUrl) && !thumbnailBroken
-  const showThumbnailSkeleton = !take.thumbnailUrl && !thumbnailBroken
+  const showThumbnailImage = Boolean(thumbnailSrc) && !thumbnailBroken
+  const showThumbnailSkeleton = !thumbnailSrc && !thumbnailBroken
   const mediaType = getTakeMediaType(take)
   const MediaIcon = mediaType === 'audio' ? Mic2 : Video
 
@@ -179,13 +216,17 @@ function TakeCard({
         >
           {showThumbnailImage ? (
             <img
-              src={take.thumbnailUrl}
+              src={
+                thumbnailRevision > 0
+                  ? `${thumbnailSrc}${thumbnailSrc.includes('?') ? '&' : '?'}v=${thumbnailRevision}`
+                  : thumbnailSrc
+              }
               alt=""
               className="pointer-events-none h-full w-full object-cover"
               draggable={false}
               loading="lazy"
               decoding="async"
-              onError={() => setThumbnailBroken(true)}
+              onError={handleThumbnailError}
             />
           ) : showThumbnailSkeleton ? (
             <TakeCardThumbnailSkeleton />

@@ -72,7 +72,6 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   traceSpikeCapCents: 3.5,
   traceNoteJumpCapCents: 10,
   readoutCentsStep: 1,
-  widgetSmoothTrace: true,
   readoutDeadbandCents: 2,
 }
 
@@ -102,7 +101,6 @@ const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   traceSpikeCapCents: 5,
   traceNoteJumpCapCents: 10,
   readoutCentsStep: 0.5,
-  widgetSmoothTrace: true,
 }
 
 const WINDS_TUNER_PROFILE: PitchTunerProfile = {

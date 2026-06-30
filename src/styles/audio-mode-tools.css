@@ -773,9 +773,9 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 0.28rem;
+  column-gap: 0.38rem;
   min-height: 2.75rem;
   padding: 0.34rem 0.38rem 0.34rem 0.55rem;
   border-radius: 999px;
@@ -841,23 +841,17 @@ html.app-dark-mode
   justify-self: start;
   line-height: 1.05;
   overflow: hidden;
-}
-
-.app-ui-overlay--audio-mode .audio-tuner-take-pill__play-slot {
-  grid-column: 2;
-  display: flex;
-  justify-content: center;
-  justify-self: center;
+  padding-right: 0.2rem;
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__trailing {
-  grid-column: 3;
+  grid-column: 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   justify-self: end;
   gap: 0.2rem;
-  min-width: 2.35rem;
+  flex-shrink: 0;
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__progress {

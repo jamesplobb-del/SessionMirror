@@ -5,8 +5,8 @@ import { DRONE_NOTE_STRIP } from '../../utils/droneEngine'
 const WHEEL_NOTE_COUNT = 12
 const WHEEL_RADIUS_PERCENT = 36.5
 const GLISSANDO_THRESHOLD_PX = 10
-const INNER_DEAD_ZONE_RATIO = 0.34
-const OUTER_EDGE_RATIO = 0.5
+const INNER_DEAD_ZONE_RATIO = 0.28
+const OUTER_EDGE_RATIO = 0.56
 
 export interface DroneSoundWheelProps {
   activeNotes: number[]

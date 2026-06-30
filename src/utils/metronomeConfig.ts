@@ -262,6 +262,41 @@ export function isCompoundMeter(meter: MetronomeMeter): boolean {
   return METRONOME_METERS[meter].group === 'compound'
 }
 
+/** Odd /8 meters (5/8, 7/8, …) — natural pulse is eighth notes, not quarters. */
+export function isSimpleEighthMeter(meter: MetronomeMeter): boolean {
+  const def = METRONOME_METERS[meter]
+  return def.denominator === 8 && def.group === 'odd'
+}
+
+export function isSixteenthMeter(meter: MetronomeMeter): boolean {
+  return METRONOME_METERS[meter].denominator === 16
+}
+
+/** Divisor applied to quarter-note beat when subdivision is off (eighth = 2, sixteenth = 4). */
+export function naturalPulseDivisor(meter: MetronomeMeter): number {
+  if (isCompoundMeter(meter)) return 3
+  const def = METRONOME_METERS[meter]
+  if (def.denominator === 8) return 2
+  if (def.denominator === 16) return 4
+  return 1
+}
+
+export function suggestSubdivisionForMeterChange(
+  nextMeter: MetronomeMeter,
+  previousMeter: MetronomeMeter,
+  currentSubdivision: MetronomeSubdivision,
+): MetronomeSubdivision {
+  const prevDef = METRONOME_METERS[previousMeter]
+  const nextDef = METRONOME_METERS[nextMeter]
+  if (
+    prevDef.denominator !== nextDef.denominator ||
+    isCompoundMeter(nextMeter) !== isCompoundMeter(previousMeter)
+  ) {
+    return 'off'
+  }
+  return currentSubdivision
+}
+
 export function getEighthNotesPerBar(meter: MetronomeMeter): number {
   const def = METRONOME_METERS[meter]
   return def.eighthNotesPerBar ?? def.beatsPerBar
@@ -305,6 +340,16 @@ export function resolveClickTierWithAccents(
     const tickInGroup = tickIndexInBar % 3
     if (tickInGroup !== 0) return 'subdivision'
     return getAccentedMainBeatTier(macroBeatIndex, pattern)
+  }
+
+  if (isSimpleEighthMeter(meter) && subdivision === 'off') {
+    if (tickIndexInBar === 0) return 'downbeat'
+    return getAccentedMainBeatTier(tickIndexInBar, pattern)
+  }
+
+  if (isSixteenthMeter(meter) && subdivision === 'off') {
+    if (tickIndexInBar === 0) return 'downbeat'
+    return getAccentedMainBeatTier(tickIndexInBar, pattern)
   }
 
   const ticksPerBeat = subdivisionsPerBeat(subdivision)

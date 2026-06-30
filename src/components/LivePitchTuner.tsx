@@ -391,10 +391,9 @@ function LivePitchTunerAudio({
   }, [])
 
   const showPlayback = isPlaying && !liveMicOnly
-  const showLive = liveMicOnly
-    ? enabled
-    : isPlaying || liveMicEnabled || enabled
-  const liveTrackerEnabled = enabled && showLive
+  const showLive = liveMicOnly ? enabled : isPlaying || liveMicEnabled || enabled
+  const liveTrackerEnabled =
+    enabled && showLive && (!liveMicOnly || liveMicEnabled)
   const playbackTrackerEnabled = enabled && showPlayback
 
   const liveTrackerOptions = useMemo(

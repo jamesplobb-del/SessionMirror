@@ -1561,9 +1561,66 @@ export function useLivePitchTracker(
 
     tryAttachRef.current = tryAttach
 
+    const recoverMicGraph = () => {
+      if (cancelled || sourceRef.current !== 'microphone' || !enabled) return
+
+      const graph = graphRef.current
+      if (graph && isMediaPitchGraph(graph)) return
+
+      if (graph && !isMediaPitchGraph(graph)) {
+        const sharedStream = micStreamRefStable.current?.current
+        const graphStreamLive = micStreamIsLive(graph.stream)
+        const graphMatchesShared =
+          !micStreamRefStable.current || graph.stream === sharedStream
+
+        if (graph.context.state === 'suspended') {
+          void graph.context.resume().catch(() => {})
+        }
+
+        if (graphStreamLive && graphMatchesShared && graph.context.state !== 'closed') {
+          return
+        }
+
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+      }
+
+      if (!isAttaching.current) {
+        void tryAttach()
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        recoverMicGraph()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', recoverMicGraph)
+
+    let removeAppListener: (() => void) | undefined
+    if (typeof window !== 'undefined') {
+      void import('@capacitor/core').then(({ Capacitor }) => {
+        if (!Capacitor.isNativePlatform()) return
+        void import('@capacitor/app').then(({ App }) => {
+          void App.addListener('appStateChange', ({ isActive }) => {
+            if (isActive) recoverMicGraph()
+          }).then((sub) => {
+            removeAppListener = () => {
+              void sub.remove()
+            }
+          })
+        })
+      })
+    }
+
     return () => {
       cancelled = true
       tryAttachRef.current = null
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', recoverMicGraph)
+      removeAppListener?.()
       if (initTimer !== null) {
         window.clearTimeout(initTimer)
       }

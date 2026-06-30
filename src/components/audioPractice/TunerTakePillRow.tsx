@@ -65,7 +65,7 @@ function TunerTakePill({
           />
         )}
       </div>
-      <div className="audio-tuner-take-pill__play-slot">
+      <div className="audio-tuner-take-pill__trailing">
         <Pressable
           type="button"
           intensity="icon"
@@ -85,8 +85,6 @@ function TunerTakePill({
             <Play className="h-3.5 w-3.5 fill-current" />
           )}
         </Pressable>
-      </div>
-      <div className="audio-tuner-take-pill__trailing">
         {tone === 'current' && hasMedia && (
           <Pressable
             type="button"

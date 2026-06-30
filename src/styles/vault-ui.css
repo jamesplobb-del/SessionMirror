@@ -54,6 +54,9 @@
 .native-bottom-sheet--vault .native-sheet-subtitle {
   color: var(--audio-text-secondary);
   font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .native-bottom-sheet--vault .vault-header-icon-btn {
@@ -391,15 +394,23 @@
   padding-block: 0.08rem;
 }
 
+.native-bottom-sheet--vault .native-sheet-title-block {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .native-bottom-sheet--vault .vault-take-row__title-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.45rem;
+  min-width: 0;
+  padding-right: 0.15rem;
 }
 
 .native-bottom-sheet--vault .vault-take-row__title {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -62,9 +62,9 @@ export default function AudioTunerTab({
         mediaRef={mediaRef}
         enabled
         isPlaying={isRecording}
-        mediaKey={`tuner-tab-${streamGeneration}-${ready ? 'live' : 'warm'}`}
+        mediaKey={`tuner-tab-${streamGeneration}`}
         label="Pitch Analysis"
-        liveMicEnabled
+        liveMicEnabled={ready}
         micStreamRef={streamRef}
         liveMicOnly
         tunerInstrument={tunerInstrument}

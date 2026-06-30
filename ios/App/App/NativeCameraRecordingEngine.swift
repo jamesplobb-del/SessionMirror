@@ -117,6 +117,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                             self.session.startRunning()
                             AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startPreview startRunning.end")
                         }
+                        self.resetVideoZoomIfNeeded(useFrontCamera: useFrontCamera)
                         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
                         DispatchQueue.main.async {
                             if let container = container {
@@ -160,6 +161,27 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         guard connection.isVideoMirroringSupported else { return }
         connection.automaticallyAdjustsVideoMirroring = false
         connection.isVideoMirrored = true
+    }
+
+    private func resetVideoZoomIfNeeded(useFrontCamera: Bool) {
+        let cameraPosition: AVCaptureDevice.Position = useFrontCamera ? .front : .back
+        guard let videoDevice = AVCaptureDevice.default(
+            .builtInWideAngleCamera,
+            for: .video,
+            position: cameraPosition
+        ) else {
+            return
+        }
+
+        do {
+            try videoDevice.lockForConfiguration()
+            if videoDevice.videoZoomFactor > 1.01 {
+                videoDevice.videoZoomFactor = 1.0
+            }
+            videoDevice.unlockForConfiguration()
+        } catch {
+            /* preview may still be usable */
+        }
     }
 
     private func attachPreviewLayer(to container: UIView) {

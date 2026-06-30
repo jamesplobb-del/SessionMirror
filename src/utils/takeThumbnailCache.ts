@@ -163,6 +163,21 @@ export async function persistTakeThumbnail(
   }
 }
 
+/** Re-read a cached thumbnail URI (clears stale miss cache for this path). */
+export async function reResolveCachedTakeThumbnail(
+  takeId: string,
+  recordingOrientation: RecordingOrientation = 'portrait',
+): Promise<string | null> {
+  for (const orientation of ['portrait', 'landscape'] as const) {
+    if (orientation === 'landscape' && recordingOrientation !== 'landscape') continue
+    const path = thumbnailPath(takeId, orientation)
+    missingThumbnailPaths.delete(path)
+    const uri = await readCachedThumbnailUri(path)
+    if (uri) return uri
+  }
+  return null
+}
+
 export async function resolveCachedTakeThumbnail(
   takeId: string,
   recordingOrientation: RecordingOrientation = 'portrait',

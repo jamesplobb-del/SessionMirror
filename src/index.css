@@ -1050,12 +1050,13 @@ body.settings-branch-open * {
 }
 
 .app-ui-overlay--audio-practice-tuner .app-hud-bottom {
-  gap: 0.4rem;
-  padding-top: 0.15rem;
+  gap: 0.55rem;
+  padding-top: 0.2rem;
+  padding-bottom: 0.1rem;
 }
 
 .app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills-wrap {
-  padding: 0 0.6rem 0.15rem;
+  padding: 0 0.75rem 0.2rem;
 }
 
 .app-ui-overlay--audio-practice-tuner .app-pip-row-wrap {
@@ -1068,7 +1069,7 @@ body.settings-branch-open * {
 }
 
 .app-ui-overlay--audio-practice-tuner .control-deck {
-  padding-top: 0.05rem;
+  padding-top: 0.2rem;
 }
 
 .app-ui-overlay--audio-practice-tuner .audio-practice-tuner-layer {
@@ -1582,10 +1583,15 @@ body.settings-branch-open * {
 }
 
 .audio-practice-metronome__beat--accented {
-  border-color: rgba(125, 211, 252, 0.62);
+  border-color: rgba(247, 166, 0, 0.78);
+  background: rgba(247, 166, 0, 0.16);
   box-shadow:
-    0 0 0 1px rgba(56, 189, 248, 0.28),
-    inset 0 0 0 1px rgba(125, 211, 252, 0.12);
+    0 0 0 1px rgba(247, 166, 0, 0.34),
+    inset 0 0 0 1px rgba(247, 166, 0, 0.1);
+}
+
+.audio-practice-metronome__beat--accented .audio-practice-metronome__beat-number {
+  color: #f7a600;
 }
 
 .audio-practice-metronome__beat-tap {

@@ -88,7 +88,12 @@ import {
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
-import { deleteCachedTakeThumbnail, persistTakeThumbnail } from './utils/takeThumbnailCache'
+import {
+  deleteCachedTakeThumbnail,
+  invalidateThumbnailCacheIndex,
+  persistTakeThumbnail,
+  reResolveCachedTakeThumbnail,
+} from './utils/takeThumbnailCache'
 import {
   createProject,
   DEFAULT_PROJECT_NAME,
@@ -1651,6 +1656,32 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   takesRef.current = takes
 
+  const refreshStaleTakeThumbnails = useCallback(() => {
+    void (async () => {
+      invalidateThumbnailCacheIndex()
+      const snapshot = takesRef.current
+      const videoTakes = snapshot.filter((take) => take.filePath && take.mediaType !== 'audio')
+      if (videoTakes.length === 0) return
+
+      const updates = new Map<string, string>()
+      await Promise.all(
+        videoTakes.map(async (take) => {
+          const refreshed = await reResolveCachedTakeThumbnail(
+            take.id,
+            take.recordingOrientation ?? 'portrait',
+          )
+          if (refreshed && refreshed !== take.thumbnailUrl) {
+            updates.set(take.id, refreshed)
+          }
+        }),
+      )
+
+      if (updates.size > 0) {
+        applyTakeThumbnails(updates)
+      }
+    })()
+  }, [applyTakeThumbnails])
+
   const refreshStaleTakePlaybackUrls = useCallback(() => {
     void (async () => {
       const snapshot = takesRef.current
@@ -1688,6 +1719,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       debounceTimer = window.setTimeout(() => {
         debounceTimer = null
         refreshStaleTakePlaybackUrls()
+        refreshStaleTakeThumbnails()
         if (youtubeTimer !== null) {
           window.clearTimeout(youtubeTimer)
         }
@@ -1728,7 +1760,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (debounceTimer !== null) window.clearTimeout(debounceTimer)
       if (youtubeTimer !== null) window.clearTimeout(youtubeTimer)
     }
-  }, [refreshStaleTakePlaybackUrls, resumeYoutubeReference])
+  }, [refreshStaleTakePlaybackUrls, refreshStaleTakeThumbnails, resumeYoutubeReference])
 
   const mainAudioPitchSource = useMemo((): MainAudioPitchSource | null => {
     // Audio mode uses the dedicated Tuner tab — no floating pitch overlay.
