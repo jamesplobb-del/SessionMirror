@@ -5,7 +5,7 @@ const APP_ICON_SRC = '/icons/icon.png'
 export default function AppBootGate() {
   return (
     <div
-      className="app-boot-gate fixed inset-0 z-[500] flex items-center justify-center bg-black"
+      className="app-boot-gate fixed inset-0 z-[500] flex items-center justify-center bg-[#f7f9fd]"
       aria-live="polite"
       aria-busy="true"
       aria-label="Starting BestTake"
@@ -19,12 +19,12 @@ export default function AppBootGate() {
             alt=""
             width={80}
             height={80}
-            className="app-boot-gate__logo h-20 w-20 rounded-[22%] object-cover"
+            className="app-boot-gate__logo h-24 w-24 rounded-[24%] object-cover"
             decoding="async"
             fetchPriority="high"
           />
         </div>
-        <h1 className="app-boot-gate__title mt-5 text-[1.375rem] font-semibold tracking-[-0.03em] text-white">
+        <h1 className="app-boot-gate__title mt-5 text-[1.375rem] font-semibold tracking-[-0.03em] text-slate-950">
           BestTake
         </h1>
       </div>
