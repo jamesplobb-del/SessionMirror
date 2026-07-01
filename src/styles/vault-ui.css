@@ -57,20 +57,18 @@
   color: var(--audio-text-primary);
   font-size: 1.52rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.22;
-  padding-left: 0.04rem;
-  padding-right: 0.35rem;
+  padding-inline: 0.14rem 0.35rem;
 }
 
 .native-bottom-sheet--vault .native-sheet-title-block {
   min-width: 0;
   overflow: hidden;
-  padding-left: 0.04rem;
-  padding-right: 0.5rem;
+  padding-inline: 0.1rem 0.5rem;
 }
 
 .native-bottom-sheet--vault .native-sheet-subtitle {
@@ -462,7 +460,8 @@
   color: var(--audio-text-primary);
   font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
+  padding-inline-start: 0.1rem;
 }
 
 .native-bottom-sheet--vault .vault-take-row__title-input {

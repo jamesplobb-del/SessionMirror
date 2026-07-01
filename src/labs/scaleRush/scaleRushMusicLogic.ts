@@ -1,5 +1,5 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
-import type { ScaleRushConfig } from './types'
+import type { ScaleRushConfig } from './scaleRushTypes'
 
 /** Keys supported in Scale Rush v0.05 */
 export const SCALE_RUSH_KEYS = ['C', 'F', 'Bb', 'Eb', 'G', 'D', 'A'] as const
@@ -112,6 +112,10 @@ export function noteTileColor(pitchClass: number): string {
   return NOTE_TILE_COLORS[normalized] ?? '#94a3b8'
 }
 
+/**
+ * Single source of truth for the note sequence (C D E F G A B C B A G F E D C, transposed by key).
+ * HUD target, glowing tile, obstacle label, and pitch check all derive from getTargetNoteAtStep() / buildCourseRows().
+ */
 export function getTargetNoteAtStep(config: ScaleRushConfig, sequenceStep: number): {
   sequenceIndex: number
   pitchClass: number

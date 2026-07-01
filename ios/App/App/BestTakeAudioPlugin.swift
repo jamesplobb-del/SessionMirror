@@ -254,6 +254,15 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
         CameraSessionGuard.setPreviewActive(previewActive)
         CameraSessionGuard.setRecordingActive(recordingActive)
+
+        if !previewActive && !recordingActive && !CameraSessionGuard.playbackRouteActive {
+            do {
+                try AudioRouteConfigurator.deactivateCaptureSessionIfIdle()
+            } catch {
+                print("[AudioRoute] failed to deactivate idle capture session: \(error.localizedDescription)")
+            }
+        }
+
         call.resolve(CameraSessionGuard.snapshot())
     }
 

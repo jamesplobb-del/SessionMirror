@@ -10,8 +10,8 @@ import {
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
 import {
-  enforceFrontCameraZoom,
   maybeBoostTabletPreviewResolution,
+  resetCameraPreviewZoom,
 } from '../utils/videoCapture'
 import { readRecordingOrientation } from '../utils/takeVideoTransform'
 import {
@@ -40,6 +40,7 @@ import {
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
+import { isAppInForeground } from '../utils/appForeground'
 import type { MicInputPreference } from '../utils/appSettings'
 
 interface UseCameraSessionOptions {
@@ -441,6 +442,7 @@ export function useCameraSession({
   const releaseLiveStream = useCallback(() => {
     stopStreamTracks(streamRef.current)
     streamRef.current = null
+    resetCameraPreviewZoom()
     setReady(false)
     setStreamGeneration((generation) => generation + 1)
     detachAllPreviewTargets()
@@ -550,7 +552,7 @@ export function useCameraSession({
 
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
-          enforceFrontCameraZoom(mediaStream)
+          resetCameraPreviewZoom()
         }
         if (isCaptureSessionStale(epoch, mode, cancelled)) {
           mediaStream.getTracks().forEach((track) => track.stop())
@@ -589,6 +591,7 @@ export function useCameraSession({
   )
 
   const reacquireCaptureStream = useCallback(async () => {
+    if (!isAppInForeground()) return
     if (isRecordingRef.current || resumeInFlightRef.current) return
 
     cancelScheduledRelease()
@@ -654,7 +657,7 @@ export function useCameraSession({
 
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
-          enforceFrontCameraZoom(mediaStream)
+          resetCameraPreviewZoom()
         }
         if (epoch !== captureSessionEpochRef.current) {
           stopStreamTracks(mediaStream)
@@ -689,6 +692,8 @@ export function useCameraSession({
   requestCameraAccessRef.current = requestCameraAccess
 
   const ensureRecordableStream = useCallback(async (): Promise<MediaStream | null> => {
+    if (!isAppInForeground()) return null
+
     const mode = recordingModeRef.current
     const stream = streamRef.current
 
@@ -1405,6 +1410,8 @@ export function useCameraSession({
   }, [startAutoAudioRecording, startRecording])
 
   const warmAutoRecording = useCallback(async () => {
+    if (!isAppInForeground()) return
+
     if (recordingModeRef.current === 'audio') {
       await warmAutoAudioRecorder()
       return
@@ -1496,6 +1503,7 @@ export function useCameraSession({
       cancelAutoPreRollCapture()
     }
     releaseAllLiveMicPitchGraphs()
+    void disarmAutoRecording()
     releaseLiveStream()
     if (nativePreviewActiveRef.current) {
       nativePreviewActiveRef.current = false
@@ -1505,9 +1513,10 @@ export function useCameraSession({
       previewActive: false,
       recordingActive: false,
     })
-  }, [cancelAutoPreRollCapture, cancelScheduledRelease, releaseLiveStream])
+  }, [cancelAutoPreRollCapture, cancelScheduledRelease, disarmAutoRecording, releaseLiveStream])
 
   const restartCameraAfterForeground = useCallback(async () => {
+    if (!isAppInForeground()) return
     if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
       if (import.meta.env.DEV) {
         console.log('[CameraPreview] resume skipped: already starting')
@@ -1613,6 +1622,7 @@ export function useCameraSession({
 
   const requestCameraPreviewResume = useCallback(
     async (reason = 'unknown') => {
+      if (!isAppInForeground()) return
       if (recordingModeRef.current !== 'video') return
 
       if (streamAcquireInFlightRef.current || resumeInFlightRef.current) {
@@ -1655,6 +1665,7 @@ export function useCameraSession({
   )
 
   const refreshCameraSession = useCallback(async () => {
+    if (!isAppInForeground()) return
     if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
       return
     }

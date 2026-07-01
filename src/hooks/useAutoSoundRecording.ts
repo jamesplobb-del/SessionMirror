@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
 import { AUTO_RECORD_MAX_IDLE_PREROLL_MS } from '../utils/autoRecordPlayback'
+import { isAppInForeground, subscribeAppForeground } from '../utils/appForeground'
 import {
   getPlaybackAudioContext,
   isSharedPlaybackContext,
@@ -114,6 +115,7 @@ export function useAutoSoundRecording({
   const lastTickAtRef = useRef(0)
   const [monitorEpoch, setMonitorEpoch] = useState(0)
   const [handsFreeRecording, setHandsFreeRecording] = useState(false)
+  const [appForeground, setAppForeground] = useState(isAppInForeground)
   const suppressStartRef = useRef(suppressStart)
   const isRecordingRef = useRef(isRecording)
   const startRecordingRef = useRef(startRecording)
@@ -154,7 +156,9 @@ export function useAutoSoundRecording({
   )
 
   const shouldMonitor =
-    enabled && monitoringAllowed && ready && !monitoringPaused
+    enabled && monitoringAllowed && ready && !monitoringPaused && appForeground
+
+  useEffect(() => subscribeAppForeground(setAppForeground), [])
 
   const clearStartFailureTimer = () => {
     if (startFailureTimerRef.current !== null) {
@@ -309,6 +313,7 @@ export function useAutoSoundRecording({
       attackSinceRef.current = null
       cooldownUntilRef.current = performance.now() + COOLDOWN_MS
       const warmTimer = window.setTimeout(() => {
+        if (!isAppInForeground()) return
         void warmRecorderRef.current()
       }, 100)
 
@@ -324,12 +329,13 @@ export function useAutoSoundRecording({
   useEffect(() => {
     if (!shouldMonitor) return
     if (isStreamAudioLive(streamRef.current)) return
+    if (!isAppInForeground()) return
 
     onMonitorStalledRef.current?.()
 
     let cancelled = false
     const retryTimer = window.setInterval(() => {
-      if (cancelled) return
+      if (cancelled || !isAppInForeground()) return
       if (isStreamAudioLive(streamRef.current)) {
         window.clearInterval(retryTimer)
         bumpMonitorEpoch()
@@ -408,7 +414,9 @@ export function useAutoSoundRecording({
         }
 
         if (!isStreamAudioLive(streamRef.current)) {
-          onMonitorStalledRef.current?.()
+          if (isAppInForeground()) {
+            onMonitorStalledRef.current?.()
+          }
           return
         }
 
@@ -555,7 +563,9 @@ export function useAutoSoundRecording({
         const streamDead = !isStreamAudioLive(streamRef.current)
 
         if (streamDead) {
-          onMonitorStalledRef.current?.()
+          if (isAppInForeground()) {
+            onMonitorStalledRef.current?.()
+          }
           return
         }
 
@@ -654,6 +664,7 @@ export function useAutoSoundRecording({
   }, [isRecording])
 
   const restartHandsFreeMonitor = () => {
+    if (!isAppInForeground()) return
     bumpMonitorEpoch()
     void warmRecorderRef.current()
   }

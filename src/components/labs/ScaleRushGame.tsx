@@ -7,7 +7,7 @@ import {
   getTranspositionLabel,
   pitchClassLabel,
 } from '../../labs/scaleRush/scaleRushMusicLogic'
-import type { ScaleRushState } from '../../labs/scaleRush/types'
+import type { ScaleRushState } from '../../labs/scaleRush/scaleRushTypes'
 import Pressable from '../ui/Pressable'
 import ScaleRushCourse from './ScaleRushCourse'
 import ScaleRushLiveTuner from './ScaleRushLiveTuner'
@@ -86,6 +86,8 @@ export default function ScaleRushGame({ state, readout, canvasRef, onPause }: Sc
         sequenceStep={state.sequenceStep}
         advanceToken={state.advanceToken}
         missToken={state.missToken}
+        feedback={state.feedback}
+        feedbackToken={state.feedbackToken}
       />
 
       <div className="mt-2 min-h-0 shrink-0">

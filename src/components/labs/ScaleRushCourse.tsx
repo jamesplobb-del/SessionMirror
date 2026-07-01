@@ -1,58 +1,24 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { buildCourseRows, noteTileColor } from '../../labs/scaleRush/scaleRushMusicLogic'
-import type { CourseRow } from '../../labs/scaleRush/scaleRushMusicLogic'
-import type { ScaleRushConfig } from '../../labs/scaleRush/types'
+import { buildCourseRows } from '../../labs/scaleRush/scaleRushMusicLogic'
+import type { ScaleRushFeedback } from '../../labs/scaleRush/scaleRushTypes'
+import type { ScaleRushConfig } from '../../labs/scaleRush/scaleRushTypes'
+import ScaleRushCharacter from './ScaleRushCharacter'
+import ScaleRushTile from './ScaleRushTile'
 
 interface ScaleRushCourseProps {
   config: ScaleRushConfig
   sequenceStep: number
   advanceToken: number
   missToken: number
+  feedback: ScaleRushFeedback
+  feedbackToken: number
 }
 
-function NoteTile({ row }: { row: CourseRow }) {
-  if (row.isStart) {
-    return (
-      <div className="sr-note-tile sr-note-tile--start">
-        <span>GO</span>
-      </div>
-    )
-  }
-
-  const color = noteTileColor(row.pitchClass)
-  return (
-    <div
-      className={`sr-note-tile ${row.isTarget ? 'sr-note-tile--target' : ''}`}
-      style={{ '--sr-tile-color': color } as CSSProperties}
-    >
-      <span>{row.noteLabel}</span>
-    </div>
-  )
-}
-
-function RowDecor({ terrain }: { terrain: CourseRow['terrain'] }) {
-  if (terrain === 'road') {
-    return (
-      <>
-        <div className="sr-decor sr-decor--car sr-decor--left" aria-hidden />
-        <div className="sr-decor sr-decor--car sr-decor--right" aria-hidden />
-      </>
-    )
-  }
-  if (terrain === 'river') {
-    return (
-      <>
-        <div className="sr-decor sr-decor--log sr-decor--left" aria-hidden />
-        <div className="sr-decor sr-decor--log sr-decor--right" aria-hidden />
-      </>
-    )
-  }
-  return (
-    <>
-      <div className="sr-decor sr-decor--tree sr-decor--left" aria-hidden />
-      <div className="sr-decor sr-decor--tree sr-decor--right" aria-hidden />
-    </>
-  )
+const FEEDBACK_LABELS: Record<Exclude<ScaleRushFeedback, null>, string> = {
+  perfect: 'Perfect!',
+  good: 'Good!',
+  wrong: 'Wrong note',
+  timeout: 'Too late',
 }
 
 export default function ScaleRushCourse({
@@ -60,9 +26,13 @@ export default function ScaleRushCourse({
   sequenceStep,
   advanceToken,
   missToken,
+  feedback,
+  feedbackToken,
 }: ScaleRushCourseProps) {
   const [hopping, setHopping] = useState(false)
+  const [landing, setLanding] = useState(false)
   const [shaking, setShaking] = useState(false)
+  const [scrollBump, setScrollBump] = useState(0)
 
   const rows = useMemo(
     () => buildCourseRows(config, sequenceStep, 7),
@@ -75,63 +45,82 @@ export default function ScaleRushCourse({
   useEffect(() => {
     if (advanceToken === 0) return
     setHopping(true)
-    const timer = window.setTimeout(() => setHopping(false), 480)
-    return () => window.clearTimeout(timer)
+    setLanding(false)
+    setScrollBump((value) => value + 1)
+    const hopEnd = window.setTimeout(() => {
+      setHopping(false)
+      setLanding(true)
+    }, 380)
+    const landEnd = window.setTimeout(() => setLanding(false), 620)
+    return () => {
+      window.clearTimeout(hopEnd)
+      window.clearTimeout(landEnd)
+    }
   }, [advanceToken])
 
   useEffect(() => {
     if (missToken === 0) return
     setShaking(true)
-    const timer = window.setTimeout(() => setShaking(false), 420)
+    const timer = window.setTimeout(() => setShaking(false), 450)
     return () => window.clearTimeout(timer)
   }, [missToken])
 
+  const feedbackLabel = feedback ? FEEDBACK_LABELS[feedback] : null
+  const feedbackTone =
+    feedback === 'perfect' || feedback === 'good'
+      ? 'success'
+      : feedback === 'timeout'
+        ? 'timeout'
+        : 'error'
+
   return (
     <div
-      className={`sr-course ${shaking ? 'sr-course--shake' : ''}`}
-      aria-label="Scale Rush course"
+      className={`sr-iso-course ${shaking ? 'sr-iso-course--shake' : ''}`}
+      aria-label="Scale Rush isometric course"
     >
-      <div className="sr-course__sky" />
-      <div className="sr-course__path-glow" />
+      <div className="sr-iso-course__sky" />
+      <div className="sr-iso-course__horizon" />
 
-      <div className="sr-course__lanes">
-        {aheadRows.map((row) => (
-          <div
-            key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
-            className={`sr-course__row sr-course__row--${row.terrain}`}
-          >
-            <div className="sr-course__lane sr-course__lane--side">
-              <RowDecor terrain={row.terrain} />
+      {feedbackLabel && (
+        <p
+          key={feedbackToken}
+          className={`sr-iso-feedback sr-iso-feedback--${feedbackTone}`}
+          role="status"
+        >
+          {feedbackLabel}
+        </p>
+      )}
+
+      <div
+        className="sr-iso-course__world"
+        style={{ '--sr-scroll-bump': scrollBump } as CSSProperties}
+      >
+        <div className="sr-iso-course__rows">
+          {aheadRows.map((row, index) => (
+            <div
+              key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
+              className={`sr-iso-row sr-iso-row--${row.terrain}`}
+              style={{ '--sr-row-depth': aheadRows.length - index } as CSSProperties}
+            >
+              <div className="sr-iso-row__decor sr-iso-row__decor--left" />
+              <div className="sr-iso-row__center">
+                <ScaleRushTile
+                  row={row}
+                  variant={row.isTarget ? 'target' : 'ahead'}
+                  depthIndex={aheadRows.length - index}
+                />
+              </div>
+              <div className="sr-iso-row__decor sr-iso-row__decor--right" />
             </div>
-            <div className="sr-course__lane sr-course__lane--center">
-              <NoteTile row={row} />
-            </div>
-            <div className="sr-course__lane sr-course__lane--side">
-              <RowDecor terrain={row.terrain} />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      <div className="sr-course__player-row">
-        <div className="sr-course__lane sr-course__lane--side" />
-        <div className="sr-course__lane sr-course__lane--center">
-          {playerRow && !playerRow.isStart && (
-            <div
-              className="sr-note-tile sr-note-tile--landed"
-              style={
-                { '--sr-tile-color': noteTileColor(playerRow.pitchClass) } as CSSProperties
-              }
-            >
-              <span>{playerRow.noteLabel}</span>
-            </div>
-          )}
-          <div className={`sr-player ${hopping ? 'sr-player--hop' : ''}`} aria-hidden>
-            <div className="sr-player__body" />
-            <div className="sr-player__shadow" />
-          </div>
-        </div>
-        <div className="sr-course__lane sr-course__lane--side" />
+      <div className="sr-iso-course__player-dock">
+        {playerRow && !playerRow.isStart && (
+          <ScaleRushTile row={playerRow} variant="landed" depthIndex={0} />
+        )}
+        <ScaleRushCharacter hopping={hopping} landing={landing} />
       </div>
     </div>
   )

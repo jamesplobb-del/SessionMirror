@@ -7,12 +7,14 @@ import App from './App.tsx'
 import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
 import { primeWebStatusBarChrome } from './utils/nativeStatusBar'
 import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
+import { registerAppForegroundLifecycle } from './utils/appForeground'
 
 function bootstrap() {
   const rootEl = document.getElementById('root')
   if (!rootEl) return
 
   primeWebStatusBarChrome()
+  registerAppForegroundLifecycle()
   registerKeepAwakeLifecycle()
   initHeadphoneOutputDetection()
 

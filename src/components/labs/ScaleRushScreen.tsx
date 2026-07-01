@@ -78,12 +78,13 @@ export default function ScaleRushScreen({
           </Pressable>
           <div>
             <h1 className="text-2xl font-bold text-stone-900">Scale Rush</h1>
-            <p className="text-xs text-stone-400">v0.05 · Crossy Road style</p>
+            <p className="text-xs text-stone-400">v0.1 · Isometric course</p>
           </div>
         </header>
 
+        <p className="mb-1 text-sm font-medium text-stone-700">Play the scale to cross the course</p>
         <p className="mb-6 text-sm text-stone-500">
-          Cross the course one tile at a time by playing each note on the path ahead. Wrong notes and
+          Hop forward one tile at a time by playing each note on the path ahead. Wrong notes and
           timeouts cost a heart.
         </p>
 

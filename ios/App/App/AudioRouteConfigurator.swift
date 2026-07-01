@@ -499,6 +499,20 @@ enum AudioRouteConfigurator {
         return snapshot
     }
 
+    static func deactivateCaptureSessionIfIdle() throws {
+        guard !CameraSessionGuard.isCameraOrRecordingActive else { return }
+        guard !CameraSessionGuard.playbackRouteActive else { return }
+
+        let session = AVAudioSession.sharedInstance()
+        try debugSetActive(
+            session,
+            active: false,
+            options: .notifyOthersOnDeactivation,
+            caller: "deactivateCaptureSessionIfIdle"
+        )
+        logRoute("capture session deactivated while app backgrounded")
+    }
+
     static func maintainHighQualityInputIfNeeded() {
         // Deferred to JS at explicit safe times — setPreferredInput here interrupts camera/getUserMedia.
         logRoute("route-change event (maintenance deferred)")

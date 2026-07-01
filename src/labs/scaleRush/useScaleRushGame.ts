@@ -8,14 +8,16 @@ import {
   loadBestScore,
   saveBestScore,
 } from './scaleRushMusicLogic'
-import type { ScaleRushConfig, ScaleRushState } from './types'
+import type { ScaleRushConfig, ScaleRushState } from './scaleRushTypes'
 
-const CORRECT_DEBOUNCE_STRICT_MS = 200
+/** v0.1 spec: stable correct ~250ms (strict mode). */
+const CORRECT_DEBOUNCE_STRICT_MS = 250
 const CORRECT_DEBOUNCE_LOOSE_MS = 120
-const WRONG_DEBOUNCE_STRICT_MS = 750
+/** v0.1 spec: stable wrong ~300ms before penalty (strict mode). */
+const WRONG_DEBOUNCE_STRICT_MS = 300
 const WRONG_DEBOUNCE_LOOSE_MS = 600
 const NOTE_TIMEOUT_MS = 12_000
-const POST_ACTION_COOLDOWN_STRICT_MS = 550
+const POST_ACTION_COOLDOWN_STRICT_MS = 500
 const POST_ACTION_COOLDOWN_LOOSE_MS = 380
 
 const INITIAL_HEARTS = 3
@@ -42,6 +44,8 @@ function createInitialState(): ScaleRushState {
     bestScore: loadBestScore(),
     advanceToken: 0,
     missToken: 0,
+    feedback: null,
+    feedbackToken: 0,
     startedAtMs: null,
   }
 }
@@ -74,6 +78,8 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
         bestStreak: Math.max(state.bestStreak, streak),
         correctCount: state.correctCount + 1,
         advanceToken: state.advanceToken + 1,
+        feedback: streak >= 5 ? 'perfect' : 'good',
+        feedbackToken: state.feedbackToken + 1,
       }
     }
 
@@ -82,6 +88,7 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
       const hearts = Math.max(0, state.hearts - 1)
       const nextStep = state.sequenceStep + 1
       const target = getTargetNoteAtStep(state.config, nextStep)
+      const feedback = action.reason === 'timeout' ? 'timeout' : 'wrong'
       if (hearts <= 0) {
         const bestScore = saveBestScore(state.score)
         return {
@@ -92,6 +99,8 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
           missToken: state.missToken + 1,
           phase: 'gameover',
           bestScore,
+          feedback,
+          feedbackToken: state.feedbackToken + 1,
         }
       }
       return {
@@ -102,6 +111,8 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
         missToken: state.missToken + 1,
         sequenceStep: nextStep,
         targetPitchClass: target.pitchClass,
+        feedback,
+        feedbackToken: state.feedbackToken + 1,
       }
     }
 
@@ -118,6 +129,10 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
   }
 }
 
+/**
+ * Gameplay loop — pitch readout is read-only from useLivePitchTracker.
+ * Target notes come only from getTargetNoteAtStep() in scaleRushMusicLogic.
+ */
 export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState)
   const readoutRef = useRef(readout)

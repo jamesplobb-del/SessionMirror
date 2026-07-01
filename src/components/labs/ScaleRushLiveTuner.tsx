@@ -6,7 +6,7 @@ import {
   pitchClassLabel,
   readoutToConcertPitchClass,
 } from '../../labs/scaleRush/scaleRushMusicLogic'
-import type { ScaleRushConfig } from '../../labs/scaleRush/types'
+import type { ScaleRushConfig } from '../../labs/scaleRush/scaleRushTypes'
 
 interface ScaleRushLiveTunerProps {
   readout: PitchReadout

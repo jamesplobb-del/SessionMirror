@@ -147,6 +147,7 @@ import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem } from './utils/filesystemInit'
 import { bootstrapViewport, stabilizeViewportAfterMediaInteraction } from './utils/viewportSync'
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
+import { isAppInForeground } from './utils/appForeground'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
 import { applyAutoPlaybackLeadIn } from './utils/autoRecordPlayback'
 import { tuneMusicRecordingStream, tunePlaybackIsolationStream } from './utils/audioCapture'
@@ -1093,7 +1094,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     restartAutoPreRollCapture,
     refreshCameraSession,
     requestCameraPreviewResume,
-    reacquireCaptureStream,
     reacquireStreamForAudioRoute,
     suspendCameraForBackground,
     suspendMicForPlayback,
@@ -1282,6 +1282,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setAutoRecordStartSuppressed(true)
     },
     onMonitorStalled: () => {
+      if (!isAppInForeground()) return
       void refreshCameraSession()
     },
   })
@@ -1339,11 +1340,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setCameraResumeNonce((nonce) => nonce + 1)
 
       window.setTimeout(() => {
-        const recover =
+        // Camera foreground restart is handled inside useCameraSession lifecycle.
+        // Only refresh here for audio mode or web, and to restart hands-free monitoring.
+        const refresh =
           recordingModeRef.current === 'video' && Capacitor.isNativePlatform()
-            ? reacquireCaptureStream()
+            ? Promise.resolve()
             : refreshCameraSession()
-        void recover.finally(() => {
+        void refresh.finally(() => {
           if (settings.autoSoundRecording) {
             restartHandsFreeMonitor()
           }
@@ -1378,7 +1381,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [reacquireCaptureStream, refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
+  }, [refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
 
   const autoSoundListening =
     settings.autoSoundRecording &&

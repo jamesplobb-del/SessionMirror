@@ -227,51 +227,7 @@ export async function applyCameraZoom(
   return setFrontCameraZoom(stream, zoom)
 }
 
-/** Reset preview zoom to 1× after iOS background resume (WebKit track zoom can stick). */
-export async function resetFrontCameraZoom(stream: MediaStream): Promise<void> {
+/** Reset CSS preview zoom when the live stream is torn down or replaced. */
+export function resetCameraPreviewZoom(): void {
   resetCssPreviewZoom()
-
-  const range = getFrontCameraZoomRange(stream)
-  if (range?.source === 'track') {
-    await setFrontCameraZoom(stream, range.min)
-  }
-
-  try {
-    const track = getZoomTrack(stream)
-    if (!track) return
-    await track.applyConstraints(getPortraitVideoCaptureConstraints())
-  } catch {
-    /* keep current FOV if portrait constraints are rejected */
-  }
-}
-
-/**
- * iOS/WebKit can briefly re-apply a sticky zoom after foregrounding. Enforce the
- * same 1× track constraints across a few frames so the live preview settles at a
- * predictable field of view.
- */
-export function enforceFrontCameraZoom(
-  stream: MediaStream | null | undefined,
-  delaysMs: number[] = [0, 90, 220, 520, 950],
-): () => void {
-  if (!stream) return () => {}
-
-  const timers: number[] = []
-  for (const delay of delaysMs) {
-    const run = () => {
-      void resetFrontCameraZoom(stream)
-    }
-
-    if (delay <= 0) {
-      run()
-    } else if (typeof window !== 'undefined') {
-      timers.push(window.setTimeout(run, delay))
-    }
-  }
-
-  return () => {
-    for (const timer of timers) {
-      window.clearTimeout(timer)
-    }
-  }
 }
