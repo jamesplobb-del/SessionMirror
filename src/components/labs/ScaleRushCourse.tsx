@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { buildCourseRows } from '../../labs/scaleRush/scaleRushMusicLogic'
 import type { CourseRow } from '../../labs/scaleRush/scaleRushMusicLogic'
 import { SCALE_RUSH_ASSETS } from '../../labs/scaleRush/scaleRushAssets'
@@ -22,60 +22,48 @@ const FEEDBACK_LABELS: Record<Exclude<ScaleRushFeedback, null>, string> = {
   timeout: '⚠ Too late',
 }
 
-type LaneVisual = 'field' | 'road' | 'river' | 'tracks'
+/** Crossy Road lane order — visual only, does not affect note logic. */
+const LANE_PATTERN = ['grass', 'road', 'grass', 'river', 'grass', 'tracks', 'grass'] as const
+type LaneVisual = (typeof LANE_PATTERN)[number]
 
-function laneVisual(row: CourseRow): LaneVisual {
-  if (row.terrain === 'road') return row.rowOffset % 2 === 1 ? 'tracks' : 'road'
-  if (row.terrain === 'river') return 'river'
-  return 'field'
+function laneVisualForRow(row: CourseRow): LaneVisual {
+  return LANE_PATTERN[row.rowOffset % LANE_PATTERN.length]!
 }
 
-function laneSurfaceStyle(visual: LaneVisual): CSSProperties | undefined {
-  if (visual === 'river') {
-    return {
-      backgroundImage: `url(${SCALE_RUSH_ASSETS.water})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-    }
-  }
-  if (visual === 'field') {
-    return {
-      backgroundImage: `url(${SCALE_RUSH_ASSETS.grass})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-    }
-  }
-  return undefined
-}
-
-function Scenery({ side, lane, seed }: { side: 'left' | 'right'; lane: LaneVisual; seed: number }) {
-  if (lane === 'road' || lane === 'tracks' || lane === 'river') return null
-  const flip = side === 'right'
-  const kind = (seed + (flip ? 2 : 0)) % 3
+function LaneDecor({ lane, seed }: { lane: LaneVisual; seed: number }) {
+  if (lane !== 'grass') return null
+  const kind = seed % 3
   if (kind === 0) {
     return (
-      <span className={`sr-scenery sr-tree ${flip ? 'sr-tree--tall' : ''}`}>
-        <span className="sr-tree__shadow" />
-        <span className="sr-tree__crown" />
-        <span className="sr-tree__trunk" />
-      </span>
+      <>
+        <span className="sr-decor sr-decor--left sr-tree">
+          <span className="sr-tree__crown" />
+          <span className="sr-tree__trunk" />
+        </span>
+        <span className="sr-decor sr-decor--right sr-tree sr-tree--tall">
+          <span className="sr-tree__crown" />
+          <span className="sr-tree__trunk" />
+        </span>
+      </>
     )
   }
   if (kind === 1) {
     return (
-      <span className="sr-scenery sr-rock">
-        <span className="sr-rock__shadow" />
-        <span className="sr-rock__body" />
-      </span>
+      <>
+        <span className="sr-decor sr-decor--left sr-rock" />
+        <span className="sr-decor sr-decor--right sr-flowers">
+          <span /><span /><span />
+        </span>
+      </>
     )
   }
   return (
-    <span className={`sr-scenery sr-flowers ${flip ? 'sr-flowers--orange' : ''}`}>
-      <span className="sr-flowers__shadow" />
-      <span className="sr-flowers__bloom" />
-      <span className="sr-flowers__bloom" />
-      <span className="sr-flowers__bloom" />
-    </span>
+    <>
+      <span className="sr-decor sr-decor--left sr-flowers sr-flowers--orange">
+        <span /><span /><span />
+      </span>
+      <span className="sr-decor sr-decor--right sr-rock" />
+    </>
   )
 }
 
@@ -84,35 +72,80 @@ function LaneHazards({ lane, seed }: { lane: LaneVisual; seed: number }) {
   if (lane === 'road') {
     const colors = ['orange', 'white', 'purple'] as const
     return (
-      <div className="sr-hazard sr-hazard--road" aria-hidden>
+      <>
         <span
-          className={`sr-car sr-car--${colors[seed % 3]} sr-car--left`}
+          className={`sr-car sr-car--${colors[seed % 3]} sr-car--west`}
           style={{ animationDelay: delay } as CSSProperties}
         />
         <span
-          className={`sr-car sr-car--${colors[(seed + 1) % 3]} sr-car--right`}
+          className={`sr-car sr-car--${colors[(seed + 1) % 3]} sr-car--east`}
           style={{ animationDelay: delay } as CSSProperties}
         />
-      </div>
+      </>
     )
   }
   if (lane === 'tracks') {
     return (
-      <div className="sr-hazard sr-hazard--tracks" aria-hidden>
-        <span className="sr-signal" />
+      <>
+        <span className="sr-signal sr-signal--east" />
         <span className="sr-train" style={{ animationDelay: delay } as CSSProperties} />
-      </div>
+      </>
     )
   }
   if (lane === 'river') {
     return (
-      <div className="sr-hazard sr-hazard--river" aria-hidden>
-        <span className="sr-log sr-log--a" style={{ animationDelay: delay } as CSSProperties} />
-        <span className="sr-log sr-log--b" style={{ animationDelay: delay } as CSSProperties} />
-      </div>
+      <>
+        <span className="sr-log sr-log--west" style={{ animationDelay: delay } as CSSProperties} />
+        <span className="sr-log sr-log--east" style={{ animationDelay: delay } as CSSProperties} />
+      </>
     )
   }
   return null
+}
+
+interface LaneProps {
+  row: CourseRow
+  variant: 'ahead' | 'target' | 'landed' | 'start'
+  depth: number
+  isPlayer?: boolean
+  children?: ReactNode
+}
+
+function Lane({ row, variant, depth, isPlayer = false, children }: LaneProps) {
+  const visual = laneVisualForRow(row)
+  const surfaceUrl =
+    visual === 'river'
+      ? SCALE_RUSH_ASSETS.water
+      : visual === 'grass'
+        ? SCALE_RUSH_ASSETS.grass
+        : null
+
+  return (
+    <div
+      className={[
+        `sr-lane sr-lane--${visual}`,
+        isPlayer && 'sr-lane--player',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={
+        {
+          '--sr-depth': depth,
+          ...(surfaceUrl
+            ? { '--sr-lane-texture': `url(${surfaceUrl})` }
+            : {}),
+        } as CSSProperties
+      }
+    >
+      {surfaceUrl && <div className="sr-lane__texture" aria-hidden />}
+      <LaneHazards lane={visual} seed={row.rowOffset} />
+      <LaneDecor lane={visual} seed={row.rowOffset} />
+      <div className="sr-lane__pad-slot">
+        <ScaleRushTile row={row} variant={variant} />
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export default function ScaleRushCourse({
@@ -131,7 +164,7 @@ export default function ScaleRushCourse({
   const [scorePopToken, setScorePopToken] = useState(0)
 
   const rows = useMemo(
-    () => buildCourseRows(config, sequenceStep, 8),
+    () => buildCourseRows(config, sequenceStep, 9),
     [config, sequenceStep],
   )
 
@@ -181,11 +214,6 @@ export default function ScaleRushCourse({
       aria-label="Scale Rush course"
     >
       <div className="sr-world__sky" />
-      <div className="sr-world__sun" />
-      <div className="sr-world__clouds">
-        <span className="sr-cloud sr-cloud--a" />
-        <span className="sr-cloud sr-cloud--b" />
-      </div>
 
       {feedbackLabel && (
         <p
@@ -197,58 +225,46 @@ export default function ScaleRushCourse({
         </p>
       )}
 
-      <div className={`sr-world__stage ${hopping ? 'sr-world__stage--hop' : ''}`}>
-        <div
-          className="sr-world__track"
-          style={{ '--sr-scroll': scrollBump } as CSSProperties}
-        >
-          {aheadRows.map((row, index) => {
-            const depth = aheadRows.length - index
-            const visual = laneVisual(row)
-            return (
-              <div
-                key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
-                className={`sr-lane sr-lane--${visual}`}
-                style={
-                  {
-                    '--sr-depth': depth,
-                    ...laneSurfaceStyle(visual),
-                  } as CSSProperties
-                }
-              >
-                <LaneHazards lane={visual} seed={row.rowOffset + sequenceStep} />
-                <div className="sr-lane__scenery sr-lane__scenery--left">
-                  <Scenery side="left" lane={visual} seed={row.rowOffset} />
-                </div>
-                <div className="sr-lane__path">
-                  <ScaleRushTile
+      <div className={`sr-world__viewport ${hopping ? 'sr-world__viewport--hop' : ''}`}>
+        <div className="sr-world__ground" />
+
+        <div className="sr-world__scene">
+          <div className="sr-world__tilt">
+            <div
+              className="sr-world__lanes"
+              style={{ '--sr-scroll': scrollBump } as CSSProperties}
+            >
+              {aheadRows.map((row, index) => {
+                const depth = aheadRows.length - index
+                return (
+                  <Lane
+                    key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
                     row={row}
                     variant={row.isTarget ? 'target' : 'ahead'}
-                    depthIndex={depth}
+                    depth={depth}
                   />
-                </div>
-                <div className="sr-lane__scenery sr-lane__scenery--right">
-                  <Scenery side="right" lane={visual} seed={row.rowOffset + 1} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
 
-        <div className="sr-world__player">
-          {playerRow && (
-            <ScaleRushTile
-              row={playerRow}
-              variant={playerRow.isStart ? 'start' : 'landed'}
-              depthIndex={0}
-            />
-          )}
-          <ScaleRushCharacter hopping={hopping} landing={landing} hit={hit} />
-          {scorePopToken > 0 && feedback !== 'wrong' && feedback !== 'timeout' && (
-            <span key={scorePopToken} className="sr-score-pop" aria-hidden>
-              +1
-            </span>
-          )}
+            {playerRow && (
+              <Lane
+                row={playerRow}
+                variant={playerRow.isStart ? 'start' : 'landed'}
+                depth={0}
+                isPlayer
+              >
+                <div className="sr-lane__actor">
+                  <ScaleRushCharacter hopping={hopping} landing={landing} hit={hit} />
+                  {scorePopToken > 0 && feedback !== 'wrong' && feedback !== 'timeout' && (
+                    <span key={scorePopToken} className="sr-score-pop" aria-hidden>
+                      +1
+                    </span>
+                  )}
+                </div>
+              </Lane>
+            )}
+          </div>
         </div>
       </div>
     </div>
