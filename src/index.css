@@ -2581,7 +2581,7 @@ video.camera-preview {
   margin: 0 !important;
   padding: 0 !important;
   opacity: 1;
-  transform: none !important;
+  --camera-preview-zoom: 1;
   object-fit: cover !important;
   object-position: center center !important;
   z-index: 0 !important;
@@ -2594,7 +2594,7 @@ video.camera-preview.camera-preview--live {
 }
 
 video.camera-preview.camera-preview--mirror {
-  transform: scaleX(-1) !important;
+  transform: scaleX(-1) scale(var(--camera-preview-zoom, 1)) !important;
   transform-origin: center center !important;
 }
 
@@ -2839,7 +2839,8 @@ video.camera-preview--embedded {
 }
 
 video.camera-preview--embedded.camera-preview--mirror {
-  transform: scaleX(-1) !important;
+  --camera-preview-zoom: 1;
+  transform: scaleX(-1) scale(var(--camera-preview-zoom, 1)) !important;
   transform-origin: center center !important;
 }
 

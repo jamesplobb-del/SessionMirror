@@ -335,8 +335,6 @@ export function useCameraSession({
 
     syncPreviewTargets(stream, mode)
 
-    enforceFrontCameraZoom(stream)
-
     const videos = [previewRef.current, secondaryPreviewRef?.current ?? null]
     for (const video of videos) {
       if (!video || !stream) continue
@@ -1534,16 +1532,17 @@ export function useCameraSession({
 
       const mode = recordingModeRef.current
       const stream = streamRef.current
-      if (isStreamRecordable(stream, mode)) {
-        if (mode === 'video' && stream) {
-          enforceFrontCameraZoom(stream)
+      const preferFullReacquire = mode === 'video' && Capacitor.isNativePlatform()
+
+      if (
+        !preferFullReacquire &&
+        isStreamRecordable(stream, mode) &&
+        ensureCameraPreviewActive()
+      ) {
+        if (import.meta.env.DEV) {
+          console.log('[CameraPreview] resume skipped: already active')
         }
-        if (ensureCameraPreviewActive()) {
-          if (import.meta.env.DEV) {
-            console.log('[CameraPreview] resume skipped: already active')
-          }
-          return
-        }
+        return
       }
 
       releaseLiveStream()

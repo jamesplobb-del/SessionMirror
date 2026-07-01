@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { buildCourseRows } from '../../labs/scaleRush/scaleRushMusicLogic'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { buildCourseRows, noteTileColor } from '../../labs/scaleRush/scaleRushMusicLogic'
 import type { CourseRow } from '../../labs/scaleRush/scaleRushMusicLogic'
 import type { ScaleRushConfig } from '../../labs/scaleRush/types'
 
@@ -10,41 +10,48 @@ interface ScaleRushCourseProps {
   missToken: number
 }
 
-function RowObstacle({ row }: { row: CourseRow }) {
+function NoteTile({ row }: { row: CourseRow }) {
   if (row.isStart) {
     return (
-      <div className="sr-tile sr-tile--start">
-        <span className="sr-tile__label">GO</span>
+      <div className="sr-note-tile sr-note-tile--start">
+        <span>GO</span>
       </div>
     )
   }
 
-  if (row.terrain === 'road') {
-    return (
-      <div className={`sr-tile sr-tile--road ${row.isTarget ? 'sr-tile--target' : ''}`}>
-        <div className="sr-car">
-          <span className="sr-tile__label sr-tile__label--on-obstacle">{row.noteLabel}</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (row.terrain === 'river') {
-    return (
-      <div className={`sr-tile sr-tile--river ${row.isTarget ? 'sr-tile--target' : ''}`}>
-        <div className="sr-log">
-          <span className="sr-tile__label sr-tile__label--on-obstacle">{row.noteLabel}</span>
-        </div>
-      </div>
-    )
-  }
-
+  const color = noteTileColor(row.pitchClass)
   return (
-    <div className={`sr-tile sr-tile--grass ${row.isTarget ? 'sr-tile--target' : ''}`}>
-      <div className="sr-grass-pad">
-        <span className="sr-tile__label">{row.noteLabel}</span>
-      </div>
+    <div
+      className={`sr-note-tile ${row.isTarget ? 'sr-note-tile--target' : ''}`}
+      style={{ '--sr-tile-color': color } as CSSProperties}
+    >
+      <span>{row.noteLabel}</span>
     </div>
+  )
+}
+
+function RowDecor({ terrain }: { terrain: CourseRow['terrain'] }) {
+  if (terrain === 'road') {
+    return (
+      <>
+        <div className="sr-decor sr-decor--car sr-decor--left" aria-hidden />
+        <div className="sr-decor sr-decor--car sr-decor--right" aria-hidden />
+      </>
+    )
+  }
+  if (terrain === 'river') {
+    return (
+      <>
+        <div className="sr-decor sr-decor--log sr-decor--left" aria-hidden />
+        <div className="sr-decor sr-decor--log sr-decor--right" aria-hidden />
+      </>
+    )
+  }
+  return (
+    <>
+      <div className="sr-decor sr-decor--tree sr-decor--left" aria-hidden />
+      <div className="sr-decor sr-decor--tree sr-decor--right" aria-hidden />
+    </>
   )
 }
 
@@ -63,18 +70,19 @@ export default function ScaleRushCourse({
   )
 
   const aheadRows = rows.filter((row) => !row.isPlayerRow).reverse()
+  const playerRow = rows.find((row) => row.isPlayerRow)
 
   useEffect(() => {
     if (advanceToken === 0) return
     setHopping(true)
-    const timer = window.setTimeout(() => setHopping(false), 420)
+    const timer = window.setTimeout(() => setHopping(false), 480)
     return () => window.clearTimeout(timer)
   }, [advanceToken])
 
   useEffect(() => {
     if (missToken === 0) return
     setShaking(true)
-    const timer = window.setTimeout(() => setShaking(false), 400)
+    const timer = window.setTimeout(() => setShaking(false), 420)
     return () => window.clearTimeout(timer)
   }, [missToken])
 
@@ -84,30 +92,46 @@ export default function ScaleRushCourse({
       aria-label="Scale Rush course"
     >
       <div className="sr-course__sky" />
+      <div className="sr-course__path-glow" />
+
       <div className="sr-course__lanes">
         {aheadRows.map((row) => (
           <div
             key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
             className={`sr-course__row sr-course__row--${row.terrain}`}
           >
-            <div className="sr-course__lane sr-course__lane--left" />
-            <div className="sr-course__lane sr-course__lane--center">
-              <RowObstacle row={row} />
+            <div className="sr-course__lane sr-course__lane--side">
+              <RowDecor terrain={row.terrain} />
             </div>
-            <div className="sr-course__lane sr-course__lane--right" />
+            <div className="sr-course__lane sr-course__lane--center">
+              <NoteTile row={row} />
+            </div>
+            <div className="sr-course__lane sr-course__lane--side">
+              <RowDecor terrain={row.terrain} />
+            </div>
           </div>
         ))}
       </div>
 
       <div className="sr-course__player-row">
-        <div className="sr-course__lane sr-course__lane--left" />
+        <div className="sr-course__lane sr-course__lane--side" />
         <div className="sr-course__lane sr-course__lane--center">
+          {playerRow && !playerRow.isStart && (
+            <div
+              className="sr-note-tile sr-note-tile--landed"
+              style={
+                { '--sr-tile-color': noteTileColor(playerRow.pitchClass) } as CSSProperties
+              }
+            >
+              <span>{playerRow.noteLabel}</span>
+            </div>
+          )}
           <div className={`sr-player ${hopping ? 'sr-player--hop' : ''}`} aria-hidden>
             <div className="sr-player__body" />
             <div className="sr-player__shadow" />
           </div>
         </div>
-        <div className="sr-course__lane sr-course__lane--right" />
+        <div className="sr-course__lane sr-course__lane--side" />
       </div>
     </div>
   )

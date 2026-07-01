@@ -1,4 +1,5 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
+import { TUNING_GREEN_CENTS } from '../../utils/pitchUtils'
 import type { ScaleRushConfig } from './types'
 
 /** Keys supported in Scale Rush v0.05 */
@@ -41,11 +42,25 @@ export const SCALE_DEGREE_PATH = [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0] a
 
 export const SCALE_RUSH_BEST_SCORE_KEY = 'sessionmirror:scale-rush-best'
 
+/** Crossy-style tile accent colors by pitch class. */
+export const NOTE_TILE_COLORS: Record<number, string> = {
+  0: '#ef5350',
+  1: '#ff7043',
+  2: '#ffa726',
+  3: '#ffca28',
+  4: '#ffee58',
+  5: '#9ccc65',
+  6: '#26a69a',
+  7: '#29b6f6',
+  8: '#42a5f5',
+  9: '#7e57c2',
+  10: '#ab47bc',
+  11: '#ec407a',
+}
+
 export type RowTerrain = 'grass' | 'road' | 'river'
 
-/** One row in the top-down course — labels come from the shared sequence only. */
 export interface CourseRow {
-  /** 0 = player row, 1 = next target, 2+ = upcoming */
   rowOffset: number
   sequenceIndex: number
   pitchClass: number
@@ -55,10 +70,6 @@ export interface CourseRow {
   isPlayerRow: boolean
   isStart: boolean
 }
-
-// ---------------------------------------------------------------------------
-// Single source of truth for note sequence (HUD + tiles + pitch check)
-// ---------------------------------------------------------------------------
 
 export function pitchClassForSequenceStep(key: ScaleRushKey, stepIndex: number): number {
   const degreeIndex = SCALE_DEGREE_PATH[stepIndex % SCALE_DEGREE_PATH.length]!
@@ -71,7 +82,11 @@ export function pitchClassLabel(pitchClass: number, key: ScaleRushKey): string {
   return FLAT_KEYS.has(key) ? FLAT_LABELS[normalized]! : SHARP_LABELS[normalized]!
 }
 
-/** Target note for gameplay at a given sequence step — feeds HUD and course row 1. */
+export function noteTileColor(pitchClass: number): string {
+  const normalized = ((pitchClass % 12) + 12) % 12
+  return NOTE_TILE_COLORS[normalized] ?? '#94a3b8'
+}
+
 export function getTargetNoteAtStep(config: ScaleRushConfig, sequenceStep: number): {
   sequenceIndex: number
   pitchClass: number
@@ -92,10 +107,6 @@ function terrainForRow(rowOffset: number): RowTerrain {
   return 'grass'
 }
 
-/**
- * Build visible course rows from the shared sequence.
- * rowOffset 1 is always the active target and matches getTargetNoteAtStep(sequenceStep).
- */
 export function buildCourseRows(
   config: ScaleRushConfig,
   sequenceStep: number,
@@ -103,7 +114,6 @@ export function buildCourseRows(
 ): CourseRow[] {
   const rows: CourseRow[] = []
 
-  // Player row (bottom)
   if (sequenceStep === 0) {
     rows.push({
       rowOffset: 0,
@@ -146,23 +156,39 @@ export function buildCourseRows(
   return rows
 }
 
-/** Pitch-class match — octave ignored for v0.05. */
 export function pitchClassesMatch(detected: number, target: number): boolean {
   return ((detected % 12) + 12) % 12 === ((target % 12) + 12) % 12
 }
 
-const MIN_SIGNAL_HZ = 55
+/** Gameplay-only pitch gates — stricter than casual tuner display to reject room noise. */
+const MIN_GAMEPLAY_HZ = 90
+const MAX_GAMEPLAY_HZ = 1400
+const GAMEPLAY_CORRECT_CENTS = TUNING_GREEN_CENTS + 8
+const GAMEPLAY_WRONG_CENTS = TUNING_GREEN_CENTS + 4
 
-/** Map live pitch readout to pitch class (0–11). */
 export function readoutToPitchClass(readout: PitchReadout): number | null {
-  if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < MIN_SIGNAL_HZ) return null
+  if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < MIN_GAMEPLAY_HZ) return null
+  if (readout.frequencyHz > MAX_GAMEPLAY_HZ) return null
   if (!readout.noteName || readout.noteName === '—') return null
   return ((Math.round(readout.midi) % 12) + 12) % 12
 }
 
-export function isReadoutStableEnough(readout: PitchReadout, toleranceCents = 40): boolean {
-  if (readoutToPitchClass(readout) == null) return false
-  return Math.abs(readout.cents) <= toleranceCents
+/** True when the mic signal looks like intentional playing, not ambient noise. */
+export function isGameplayPitchSignal(readout: PitchReadout): boolean {
+  return readoutToPitchClass(readout) != null
+}
+
+export function isReadoutCorrectPitch(readout: PitchReadout): boolean {
+  if (!isGameplayPitchSignal(readout)) return false
+  return Math.abs(readout.cents) <= GAMEPLAY_CORRECT_CENTS
+}
+
+/** Wrong-note penalty only when the player is clearly holding a different in-tune pitch. */
+export function isReadoutWrongPitch(readout: PitchReadout, targetPitchClass: number): boolean {
+  const detected = readoutToPitchClass(readout)
+  if (detected == null) return false
+  if (pitchClassesMatch(detected, targetPitchClass)) return false
+  return Math.abs(readout.cents) <= GAMEPLAY_WRONG_CENTS
 }
 
 export function loadBestScore(): number {

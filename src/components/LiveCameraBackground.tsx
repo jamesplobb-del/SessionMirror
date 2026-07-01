@@ -3,7 +3,7 @@ import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
 import { iosBulletproofVideoProps } from '../utils/mobileVideo'
-import { getFrontCameraZoomRange, setFrontCameraZoom } from '../utils/videoCapture'
+import { getFrontCameraZoomRange, getCssPreviewZoom, setFrontCameraZoom } from '../utils/videoCapture'
 import {
   assignMediaPlaybackSrc,
   waitForMediaReadyWithRetry,
@@ -60,6 +60,7 @@ function LiveCameraBackground({
 }: LiveCameraBackgroundProps) {
   const handsFreePlaybackVideoRef = useRef<HTMLVideoElement>(null)
   const handsFreePlaybackSessionRef = useRef(false)
+  const shellRef = useRef<HTMLDivElement>(null)
   const pinchPointersRef = useRef(new Map<number, { x: number; y: number }>())
   const pinchStartDistanceRef = useRef(0)
   const pinchStartZoomRef = useRef(1)
@@ -287,9 +288,34 @@ function LiveCameraBackground({
     [streamRef],
   )
 
+  const beginPinchGesture = useCallback(() => {
+    const range = getFrontCameraZoomRange(streamRef.current)
+    if (!range) return false
+
+    const distance = getPinchDistance()
+    if (distance <= 0) return false
+
+    pinchStartDistanceRef.current = distance
+    pinchStartZoomRef.current = range.current
+    return true
+  }, [getPinchDistance, streamRef])
+
+  const updatePinchGesture = useCallback(() => {
+    const range = getFrontCameraZoomRange(streamRef.current)
+    const startDistance = pinchStartDistanceRef.current
+    if (!range || startDistance <= 0) return false
+
+    const distance = getPinchDistance()
+    if (distance <= 0) return false
+
+    scheduleZoom(pinchStartZoomRef.current * (distance / startDistance))
+    return true
+  }, [getPinchDistance, scheduleZoom, streamRef])
+
   const handleCameraPinchPointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
-      if (!pinchZoomEnabled || event.pointerType !== 'touch') return
+      if (!pinchZoomEnabled) return
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return
 
       pinchPointersRef.current.set(event.pointerId, {
         x: event.clientX,
@@ -297,22 +323,17 @@ function LiveCameraBackground({
       })
       event.currentTarget.setPointerCapture?.(event.pointerId)
 
-      if (pinchPointersRef.current.size === 2) {
-        const range = getFrontCameraZoomRange(streamRef.current)
-        if (!range) {
-          pinchPointersRef.current.clear()
-          return
-        }
-        pinchStartDistanceRef.current = getPinchDistance()
-        pinchStartZoomRef.current = range.current
+      if (pinchPointersRef.current.size === 2 && !beginPinchGesture()) {
+        pinchPointersRef.current.clear()
       }
     },
-    [getPinchDistance, pinchZoomEnabled, streamRef],
+    [beginPinchGesture, pinchZoomEnabled],
   )
 
   const handleCameraPinchPointerMove = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
-      if (!pinchZoomEnabled || event.pointerType !== 'touch') return
+      if (!pinchZoomEnabled) return
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return
       if (!pinchPointersRef.current.has(event.pointerId)) return
 
       pinchPointersRef.current.set(event.pointerId, {
@@ -321,16 +342,11 @@ function LiveCameraBackground({
       })
 
       if (pinchPointersRef.current.size < 2) return
-
-      const range = getFrontCameraZoomRange(streamRef.current)
-      const startDistance = pinchStartDistanceRef.current
-      if (!range || startDistance <= 0) return
-
-      event.preventDefault()
-      const ratio = getPinchDistance() / startDistance
-      scheduleZoom(pinchStartZoomRef.current * ratio)
+      if (updatePinchGesture()) {
+        event.preventDefault()
+      }
     },
-    [getPinchDistance, pinchZoomEnabled, scheduleZoom, streamRef],
+    [pinchZoomEnabled, updatePinchGesture],
   )
 
   const handleCameraPinchPointerEnd = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -348,6 +364,80 @@ function LiveCameraBackground({
     pinchPointersRef.current.clear()
     pinchStartDistanceRef.current = 0
   }, [pinchZoomEnabled])
+
+  useEffect(() => {
+    if (!pinchZoomEnabled) return
+    const video = previewRef.current
+    if (!video) return
+    video.style.setProperty('--camera-preview-zoom', String(getCssPreviewZoom()))
+  }, [pinchZoomEnabled, previewRef, streamGeneration])
+
+  useEffect(() => {
+    if (!pinchZoomEnabled) return
+    const el = shellRef.current
+    if (!el) return
+
+    const touchPoints = new Map<number, { x: number; y: number }>()
+
+    const syncTouchToPinchRefs = () => {
+      pinchPointersRef.current.clear()
+      for (const [id, point] of touchPoints) {
+        pinchPointersRef.current.set(id, point)
+      }
+    }
+
+    const onTouchStart = (event: TouchEvent) => {
+      for (let index = 0; index < event.changedTouches.length; index += 1) {
+        const touch = event.changedTouches[index]
+        touchPoints.set(touch.identifier, { x: touch.clientX, y: touch.clientY })
+      }
+
+      if (touchPoints.size === 2) {
+        syncTouchToPinchRefs()
+        if (!beginPinchGesture()) {
+          touchPoints.clear()
+          pinchPointersRef.current.clear()
+        }
+      }
+    }
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (touchPoints.size < 2) return
+
+      for (let index = 0; index < event.changedTouches.length; index += 1) {
+        const touch = event.changedTouches[index]
+        if (!touchPoints.has(touch.identifier)) continue
+        touchPoints.set(touch.identifier, { x: touch.clientX, y: touch.clientY })
+      }
+
+      syncTouchToPinchRefs()
+      if (updatePinchGesture()) {
+        event.preventDefault()
+      }
+    }
+
+    const onTouchEnd = (event: TouchEvent) => {
+      for (let index = 0; index < event.changedTouches.length; index += 1) {
+        touchPoints.delete(event.changedTouches[index].identifier)
+      }
+      syncTouchToPinchRefs()
+      if (touchPoints.size < 2) {
+        pinchStartDistanceRef.current = 0
+      }
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true })
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [beginPinchGesture, pinchZoomEnabled, updatePinchGesture])
 
   useEffect(
     () => () => {
@@ -385,6 +475,7 @@ function LiveCameraBackground({
 
   return (
     <div
+      ref={shellRef}
       className={shellClass}
       aria-hidden={!isEmbedded && !visuallySuppressed}
       onPointerDown={handleCameraPinchPointerDown}

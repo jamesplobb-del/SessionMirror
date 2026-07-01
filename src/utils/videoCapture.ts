@@ -94,6 +94,42 @@ export interface CameraZoomRange {
   max: number
   step: number
   current: number
+  source: 'track' | 'css'
+}
+
+const CSS_PREVIEW_ZOOM_MIN = 1
+const CSS_PREVIEW_ZOOM_MAX = 3
+const CSS_PREVIEW_ZOOM_STEP = 0.04
+
+let cssPreviewZoom = 1
+
+function clampCssPreviewZoom(zoom: number): number {
+  return Math.max(CSS_PREVIEW_ZOOM_MIN, Math.min(CSS_PREVIEW_ZOOM_MAX, zoom))
+}
+
+function syncCssPreviewZoomToVideos(): void {
+  if (typeof document === 'undefined') return
+  const value = String(cssPreviewZoom)
+  for (const element of document.querySelectorAll('video.camera-preview--mirror')) {
+    if (element instanceof HTMLElement) {
+      element.style.setProperty('--camera-preview-zoom', value)
+    }
+  }
+}
+
+export function getCssPreviewZoom(): number {
+  return cssPreviewZoom
+}
+
+export function setCssPreviewZoom(zoom: number): number {
+  cssPreviewZoom = clampCssPreviewZoom(zoom)
+  syncCssPreviewZoomToVideos()
+  return cssPreviewZoom
+}
+
+export function resetCssPreviewZoom(): void {
+  cssPreviewZoom = 1
+  syncCssPreviewZoomToVideos()
 }
 
 function getZoomTrack(stream: MediaStream | null | undefined): ZoomCapableTrack | null {
@@ -111,21 +147,30 @@ export function getFrontCameraZoomRange(
   try {
     const capabilities = track.getCapabilities?.() as ZoomCapableCapabilities | undefined
     const zoom = capabilities?.zoom
-    if (!zoom) return null
-
-    const min = zoom.min ?? 1
-    const max = zoom.max ?? min
-    if (max <= min) return null
-
-    const settings = track.getSettings?.() as ZoomCapableSettings | undefined
-    return {
-      min,
-      max,
-      step: zoom.step ?? 0.05,
-      current: settings?.zoom ?? min,
+    if (zoom) {
+      const min = zoom.min ?? 1
+      const max = zoom.max ?? min
+      if (max > min) {
+        const settings = track.getSettings?.() as ZoomCapableSettings | undefined
+        return {
+          min,
+          max,
+          step: zoom.step ?? 0.05,
+          current: settings?.zoom ?? min,
+          source: 'track',
+        }
+      }
     }
   } catch {
-    return null
+    /* fall through to CSS preview zoom */
+  }
+
+  return {
+    min: CSS_PREVIEW_ZOOM_MIN,
+    max: CSS_PREVIEW_ZOOM_MAX,
+    step: CSS_PREVIEW_ZOOM_STEP,
+    current: cssPreviewZoom,
+    source: 'css',
   }
 }
 
@@ -133,9 +178,6 @@ export async function setFrontCameraZoom(
   stream: MediaStream | null | undefined,
   zoom: number,
 ): Promise<CameraZoomRange | null> {
-  const track = getZoomTrack(stream)
-  if (!track) return null
-
   const range = getFrontCameraZoomRange(stream)
   if (!range) return null
 
@@ -145,23 +187,54 @@ export async function setFrontCameraZoom(
       : zoom
   const nextZoom = Math.max(range.min, Math.min(range.max, stepped))
 
-  try {
-    await track.applyConstraints({
-      advanced: [{ zoom: nextZoom } as MediaTrackConstraintSet],
-    })
+  if (range.source === 'css') {
     return {
       ...range,
-      current: nextZoom,
+      current: setCssPreviewZoom(nextZoom),
+    }
+  }
+
+  const track = getZoomTrack(stream)
+  if (!track) return null
+
+  try {
+    try {
+      await track.applyConstraints({ zoom: nextZoom } as MediaTrackConstraints)
+    } catch {
+      await track.applyConstraints({
+        advanced: [{ zoom: nextZoom } as MediaTrackConstraintSet],
+      })
+    }
+    resetCssPreviewZoom()
+    const settings = track.getSettings?.() as ZoomCapableSettings | undefined
+    return {
+      ...range,
+      current: settings?.zoom ?? nextZoom,
     }
   } catch {
-    return null
+    return {
+      ...range,
+      current: setCssPreviewZoom(nextZoom),
+    }
   }
 }
 
-/** Keep front camera at 1× after iOS background resume (WebKit track zoom can stick). */
+/** Apply zoom via track constraints when supported, otherwise CSS preview scale. */
+export async function applyCameraZoom(
+  stream: MediaStream | null | undefined,
+  zoom: number,
+): Promise<CameraZoomRange | null> {
+  return setFrontCameraZoom(stream, zoom)
+}
+
+/** Reset preview zoom to 1× after iOS background resume (WebKit track zoom can stick). */
 export async function resetFrontCameraZoom(stream: MediaStream): Promise<void> {
+  resetCssPreviewZoom()
+
   const range = getFrontCameraZoomRange(stream)
-  if (range) await setFrontCameraZoom(stream, range.min)
+  if (range?.source === 'track') {
+    await setFrontCameraZoom(stream, range.min)
+  }
 
   try {
     const track = getZoomTrack(stream)

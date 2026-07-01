@@ -1093,6 +1093,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     restartAutoPreRollCapture,
     refreshCameraSession,
     requestCameraPreviewResume,
+    reacquireCaptureStream,
     reacquireStreamForAudioRoute,
     suspendCameraForBackground,
     suspendMicForPlayback,
@@ -1338,7 +1339,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setCameraResumeNonce((nonce) => nonce + 1)
 
       window.setTimeout(() => {
-        void refreshCameraSession().finally(() => {
+        const recover =
+          recordingModeRef.current === 'video' && Capacitor.isNativePlatform()
+            ? reacquireCaptureStream()
+            : refreshCameraSession()
+        void recover.finally(() => {
           if (settings.autoSoundRecording) {
             restartHandsFreeMonitor()
           }
@@ -1373,7 +1378,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
+  }, [reacquireCaptureStream, refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
 
   const autoSoundListening =
     settings.autoSoundRecording &&
