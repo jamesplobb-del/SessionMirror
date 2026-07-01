@@ -1,199 +1,43 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
-  AudioWaveform,
-  CircleCheck,
-  Clapperboard,
+  Camera,
+  CheckCircle2,
+  ChevronLeft,
+  CircleDot,
   FolderOpen,
+  Gauge,
   Maximize2,
+  Mic2,
+  Music2,
+  Play,
+  Settings2,
+  SlidersHorizontal,
   Sparkles,
+  Upload,
   Video,
+  WandSparkles,
   Youtube,
   type LucideIcon,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { useTutorial } from '../context/TutorialContext'
-import {
-  getTutorialTargetSelector,
-  markOnboardingComplete,
-  type TutorialIconId,
-  type TutorialPanelDock,
-  type TutorialTargetId,
-} from '../utils/onboardingTutorial'
-import { iosFade } from '../utils/motionPresets'
+import { markOnboardingComplete, type TutorialIconId } from '../utils/onboardingTutorial'
+import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { triggerLightHaptic } from '../utils/haptics'
 
 const ICONS: Record<TutorialIconId, LucideIcon> = {
   welcome: Sparkles,
-  record: Video,
-  review: Clapperboard,
-  vault: FolderOpen,
-  auto: AudioWaveform,
+  camera: Camera,
+  takes: FolderOpen,
   expand: Maximize2,
-  youtube: Youtube,
-  done: CircleCheck,
-}
-
-const SPOTLIGHT_PAD = 10
-const PANEL_GAP = 12
-const MIN_PANEL_SPACE = 148
-
-interface SpotlightRect {
-  top: number
-  left: number
-  width: number
-  height: number
-}
-
-function readTargetRect(target: TutorialTargetId | null): SpotlightRect | null {
-  if (!target || typeof document === 'undefined') return null
-  const node = document.querySelector(getTutorialTargetSelector(target))
-  if (!node) return null
-  const rect = node.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0) return null
-
-  const margin = 10
-  const vpH = window.visualViewport?.height ?? window.innerHeight
-  const vpW = window.visualViewport?.width ?? window.innerWidth
-  const offsetTop = window.visualViewport?.offsetTop ?? 0
-  const offsetLeft = window.visualViewport?.offsetLeft ?? 0
-
-  const top = Math.max(offsetTop + margin, rect.top - SPOTLIGHT_PAD)
-  const left = Math.max(offsetLeft + margin, rect.left - SPOTLIGHT_PAD)
-  const right = Math.min(offsetLeft + vpW - margin, rect.right + SPOTLIGHT_PAD)
-  const bottom = Math.min(offsetTop + vpH - margin, rect.bottom + SPOTLIGHT_PAD)
-
-  return {
-    top,
-    left,
-    width: Math.max(0, right - left),
-    height: Math.max(0, bottom - top),
-  }
-}
-
-function resolvePanelDock(
-  preferred: TutorialPanelDock,
-  spotlight: SpotlightRect | null,
-): TutorialPanelDock {
-  if (preferred === 'center' || !spotlight) return preferred
-
-  const vpH = window.visualViewport?.height ?? window.innerHeight
-  const offsetTop = window.visualViewport?.offsetTop ?? 0
-  const safeTop = 56
-  const safeBottom = 56
-
-  const spaceAbove = spotlight.top - offsetTop - safeTop
-  const spaceBelow =
-    vpH - (spotlight.top + spotlight.height - offsetTop) - safeBottom
-
-  if (preferred === 'top' && spaceAbove < MIN_PANEL_SPACE && spaceBelow > spaceAbove) {
-    return 'bottom'
-  }
-  if (preferred === 'bottom' && spaceBelow < MIN_PANEL_SPACE && spaceAbove > spaceBelow) {
-    return 'top'
-  }
-
-  return preferred
-}
-
-function panelLayoutStyle(
-  dock: TutorialPanelDock,
-  spotlight: SpotlightRect | null,
-): React.CSSProperties {
-  const safeTop = 'max(0.75rem, env(safe-area-inset-top, 0px))'
-  const safeBottom = 'max(0.75rem, env(safe-area-inset-bottom, 0px))'
-  const horizontal = 'max(1rem, env(safe-area-inset-left, 0px))'
-
-  const base: React.CSSProperties = {
-    position: 'fixed',
-    left: horizontal,
-    right: horizontal,
-    marginLeft: 'auto',
-    marginRight: 'auto',
-    width: '100%',
-    maxWidth: '24rem',
-    zIndex: 44,
-    boxSizing: 'border-box',
-  }
-
-  if (dock === 'center' || !spotlight) {
-    return {
-      ...base,
-      top: safeTop,
-      bottom: safeBottom,
-      marginTop: 'auto',
-      marginBottom: 'auto',
-      maxHeight: `calc(100dvh - ${safeTop} - ${safeBottom} - 1.5rem)`,
-    }
-  }
-
-  if (dock === 'top') {
-    const maxHeight = Math.max(120, spotlight.top - PANEL_GAP - 16)
-    return {
-      ...base,
-      top: safeTop,
-      maxHeight: `${maxHeight}px`,
-    }
-  }
-
-  const spotlightBottom = spotlight.top + spotlight.height
-  const vpH = window.visualViewport?.height ?? window.innerHeight
-  const maxHeight = Math.max(120, vpH - spotlightBottom - PANEL_GAP - 16)
-  return {
-    ...base,
-    bottom: safeBottom,
-    maxHeight: `${maxHeight}px`,
-  }
-}
-
-function SpotlightShade({ rect }: { rect: SpotlightRect | null }) {
-  if (!rect) {
-    return (
-      <div className="tutorial-spotlight__shade pointer-events-auto absolute inset-0 bg-black/70 backdrop-blur-[1px]" />
-    )
-  }
-
-  const { top, left, width, height } = rect
-  const bottom = top + height
-  const right = left + width
-
-  return (
-    <>
-      <div
-        className="tutorial-spotlight__shade pointer-events-auto absolute left-0 right-0 top-0 bg-black/70 backdrop-blur-[1px]"
-        style={{ height: top }}
-      />
-      <div
-        className="tutorial-spotlight__shade pointer-events-auto absolute left-0 bg-black/70 backdrop-blur-[1px]"
-        style={{ top, width: left, height }}
-      />
-      <div
-        className="tutorial-spotlight__shade pointer-events-auto absolute bg-black/70 backdrop-blur-[1px]"
-        style={{ top, left: right, right: 0, height }}
-      />
-      <div
-        className="tutorial-spotlight__shade pointer-events-auto absolute left-0 right-0 bg-black/70 backdrop-blur-[1px]"
-        style={{ top: bottom, bottom: 0 }}
-      />
-    </>
-  )
-}
-
-function SpotlightRing({ rect }: { rect: SpotlightRect }) {
-  return (
-    <div
-      className="tutorial-spotlight__ring pointer-events-none fixed rounded-2xl border-2 border-sky-400/85 shadow-[0_0_0_1px_rgba(56,189,248,0.28),0_0_24px_rgba(56,189,248,0.24)]"
-      style={{
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-        zIndex: 52,
-      }}
-      aria-hidden
-    />
-  )
+  media: Upload,
+  handsfree: WandSparkles,
+  audio: Mic2,
+  tools: Gauge,
+  settings: Settings2,
+  done: CheckCircle2,
 }
 
 interface OnboardingTutorialProps {
@@ -201,25 +45,180 @@ interface OnboardingTutorialProps {
   hapticFeedback?: boolean
 }
 
+function MiniTakeCard({
+  tone,
+  label,
+  title,
+}: {
+  tone: 'gold' | 'blue'
+  label: string
+  title: string
+}) {
+  const isGold = tone === 'gold'
+  return (
+    <div className={`tutorial-mini-card tutorial-mini-card--${tone}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className={`tutorial-mini-badge ${isGold ? 'bg-amber-400 text-white' : 'bg-sky-500 text-white'}`}>
+          {label}
+        </span>
+        <span className="tutorial-mini-dot">•••</span>
+      </div>
+      <p className="mt-3 text-[1.05rem] font-semibold text-slate-950">{title}</p>
+      <div className={`tutorial-wave tutorial-wave--${tone}`} aria-hidden>
+        {Array.from({ length: 18 }, (_, index) => (
+          <span key={index} style={{ height: `${20 + ((index * 17) % 34)}%` }} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CameraVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--camera">
+      <div className="tutorial-phone-top">
+        <span>BestTake</span>
+        <span className="tutorial-pill-icon"><Camera className="h-4 w-4" /></span>
+      </div>
+      <div className="mt-auto grid grid-cols-2 gap-3">
+        <MiniTakeCard tone="gold" label="BEST TAKE" title="Reference" />
+        <MiniTakeCard tone="blue" label="CURRENT" title="New take" />
+      </div>
+      <div className="tutorial-record-row">
+        <span><Music2 className="h-4 w-4" /></span>
+        <span><Camera className="h-4 w-4" /></span>
+        <span className="tutorial-record-button"><Video className="h-5 w-5" /></span>
+        <span><Mic2 className="h-4 w-4" /></span>
+        <span><SlidersHorizontal className="h-4 w-4" /></span>
+      </div>
+    </div>
+  )
+}
+
+function SplitVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--light">
+      <div className="grid h-full gap-3">
+        <MiniTakeCard tone="gold" label="BEST TAKE" title="Top comparison" />
+        <MiniTakeCard tone="blue" label="CURRENT" title="Bottom comparison" />
+      </div>
+      <div className="tutorial-expand-chip">
+        <Maximize2 className="h-4 w-4" />
+        Expand Mode
+      </div>
+    </div>
+  )
+}
+
+function MediaVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--light">
+      <div className="tutorial-media-card">
+        <span className="tutorial-mini-badge bg-amber-400 text-white">BEST TAKE</span>
+        <p>Add a reference</p>
+        <div className="grid grid-cols-2 gap-2">
+          <span><Upload className="h-4 w-4" /> Upload</span>
+          <span><Youtube className="h-4 w-4 text-red-500" /> YouTube</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HandsFreeVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--dark">
+      <div className="tutorial-handsfree-ring">
+        <WandSparkles className="h-10 w-10" />
+      </div>
+      <p className="text-center text-xl font-semibold text-white">Hands-free Practice</p>
+      <div className="tutorial-handsfree-flow">
+        <span>Listen</span>
+        <span>Record</span>
+        <span>Playback</span>
+      </div>
+    </div>
+  )
+}
+
+function AudioVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--audio">
+      <div className="tutorial-audio-ring">
+        <Mic2 className="h-12 w-12" />
+      </div>
+      <p className="text-center text-xl font-semibold text-slate-950">Ready to record</p>
+      <div className="grid gap-3">
+        <MiniTakeCard tone="gold" label="BEST TAKE" title="Best audio" />
+        <MiniTakeCard tone="blue" label="CURRENT" title="Current audio" />
+      </div>
+    </div>
+  )
+}
+
+function ToolsVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--tools">
+      <div className="tutorial-tabs">
+        <span>Audio</span>
+        <span className="active">Metronome</span>
+        <span>Tuner</span>
+      </div>
+      <div className="tutorial-tempo-wheel">
+        <span>100</span>
+        <small>BPM</small>
+      </div>
+      <div className="tutorial-tool-row">
+        <span><Play className="h-4 w-4" /> Tap Tempo</span>
+        <span><CircleDot className="h-4 w-4" /> Drone</span>
+      </div>
+    </div>
+  )
+}
+
+function SettingsVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--light">
+      {['Enhanced Audio', 'iPhone Mic', 'Dark Mode', 'Take Cards'].map((label) => (
+        <div key={label} className="tutorial-setting-row">
+          <span>{label}</span>
+          <span className="tutorial-switch" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DoneVisual() {
+  return (
+    <div className="tutorial-visual tutorial-visual--done">
+      <div className="tutorial-done-mark">
+        <CheckCircle2 className="h-14 w-14" />
+      </div>
+      <p className="text-center text-xl font-semibold text-slate-950">Practice flow ready</p>
+    </div>
+  )
+}
+
+function TutorialVisual({ visual }: { visual: string }) {
+  if (visual === 'split') return <SplitVisual />
+  if (visual === 'media') return <MediaVisual />
+  if (visual === 'handsfree') return <HandsFreeVisual />
+  if (visual === 'audio') return <AudioVisual />
+  if (visual === 'tools') return <ToolsVisual />
+  if (visual === 'settings') return <SettingsVisual />
+  if (visual === 'done') return <DoneVisual />
+  return <CameraVisual />
+}
+
 export default function OnboardingTutorial({
   onClose,
   hapticFeedback = true,
 }: OnboardingTutorialProps) {
   const tutorial = useTutorial()
-  const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null)
-
   const step = tutorial?.step
   const stepIndex = tutorial?.stepIndex ?? 0
   const stepCount = tutorial?.stepCount ?? 1
-
-  const syncSpotlight = useCallback(() => {
-    if (!step) return
-    setSpotlightRect(readTargetRect(step.target))
-  }, [step])
-
-  useLayoutEffect(() => {
-    syncSpotlight()
-  }, [syncSpotlight, step?.id, step?.target])
 
   useEffect(() => {
     document.body.classList.add('tutorial-active')
@@ -227,30 +226,6 @@ export default function OnboardingTutorial({
       document.body.classList.remove('tutorial-active')
     }
   }, [])
-
-  useEffect(() => {
-    syncSpotlight()
-    window.addEventListener('resize', syncSpotlight)
-    window.visualViewport?.addEventListener('resize', syncSpotlight)
-    window.visualViewport?.addEventListener('scroll', syncSpotlight)
-    const intervalId = window.setInterval(syncSpotlight, 250)
-    return () => {
-      window.removeEventListener('resize', syncSpotlight)
-      window.visualViewport?.removeEventListener('resize', syncSpotlight)
-      window.visualViewport?.removeEventListener('scroll', syncSpotlight)
-      window.clearInterval(intervalId)
-    }
-  }, [syncSpotlight])
-
-  useEffect(() => {
-    if (!step?.target) return
-    const node = document.querySelector(getTutorialTargetSelector(step.target))
-    if (!node) return
-    node.classList.add('tutorial-spotlight-target')
-    return () => {
-      node.classList.remove('tutorial-spotlight-target')
-    }
-  }, [step?.id, step?.target])
 
   const finish = useCallback(() => {
     markOnboardingComplete()
@@ -262,123 +237,130 @@ export default function OnboardingTutorial({
     finish()
   }, [finish, hapticFeedback])
 
-  const handlePrimary = useCallback(() => {
+  const handleNext = useCallback(() => {
     if (!tutorial || !step) return
     void triggerLightHaptic(hapticFeedback)
-
-    if (step.completeOn === 'finish') {
+    if (step.completeOn === 'finish' || stepIndex >= stepCount - 1) {
       finish()
       return
     }
-
     tutorial.advanceStep()
-  }, [finish, hapticFeedback, step, tutorial])
+  }, [finish, hapticFeedback, step, stepCount, stepIndex, tutorial])
 
-  const resolvedDock = useMemo(
-    () => resolvePanelDock(step?.panelDock ?? 'center', spotlightRect),
-    [spotlightRect, step?.panelDock],
-  )
+  const handleBack = useCallback(() => {
+    if (!tutorial || stepIndex === 0) return
+    void triggerLightHaptic(hapticFeedback)
+    tutorial.previousStep()
+  }, [hapticFeedback, stepIndex, tutorial])
 
-  const panelStyle = useMemo(
-    () => panelLayoutStyle(resolvedDock, spotlightRect),
-    [resolvedDock, spotlightRect],
-  )
-
-  if (!tutorial || !step) return null
+  if (!tutorial || !step || typeof document === 'undefined') return null
 
   const Icon = ICONS[step.icon]
-  const showSpotlight = Boolean(step.target && spotlightRect)
-  const isCenterStep = resolvedDock === 'center' || !step.target
 
   const content = (
-    <>
-      <div
-        className="tutorial-spotlight-backdrop pointer-events-none fixed inset-0 z-[38]"
-        aria-hidden
+    <div className="native-tutorial fixed inset-0 z-[145]" role="dialog" aria-modal="true" aria-label="BestTake guide">
+      <motion.div
+        className="native-tutorial__backdrop absolute inset-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      />
+      <motion.div
+        className="native-tutorial__sheet"
+        initial={{ opacity: 0, y: 34, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.98 }}
+        transition={iosSpringSnappy}
+        style={motionGpuLayer}
       >
-        <SpotlightShade rect={showSpotlight ? spotlightRect : isCenterStep ? null : spotlightRect} />
-      </div>
+        <div className="native-tutorial__grabber" aria-hidden />
 
-      {showSpotlight && spotlightRect && <SpotlightRing rect={spotlightRect} />}
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={step.id}
-          className="onboarding-tutorial__panel pointer-events-auto flex min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/12 bg-stone-950/94 shadow-[0_20px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl"
-          style={panelStyle}
-          role="dialog"
-          aria-modal="true"
-          aria-label="BestTake tutorial"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 8 }}
-          transition={iosFade}
-        >
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/8 px-4 pb-3 pt-[max(0.875rem,env(safe-area-inset-top,0px))]">
-            <div className="flex min-w-0 items-center gap-2" aria-hidden>
-              {Array.from({ length: stepCount }, (_, index) => (
-                <span
-                  key={index}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    index === stepIndex
-                      ? 'w-5 bg-white'
-                      : index < stepIndex
-                        ? 'w-1.5 bg-white/55'
-                        : 'w-1.5 bg-white/20'
-                  }`}
-                />
-              ))}
-            </div>
-            <Pressable
-              type="button"
-              intensity="soft"
-              squish={false}
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              onClick={handleSkip}
-              className="shrink-0 rounded-full px-2.5 py-1 text-[0.8125rem] font-medium text-white/55 hover:bg-white/8 hover:text-white/85"
-            >
-              Skip
-            </Pressable>
+        <header className="native-tutorial__header">
+          <Pressable
+            type="button"
+            intensity="soft"
+            haptic="light"
+            hapticFeedback={hapticFeedback}
+            onClick={handleBack}
+            disabled={stepIndex === 0}
+            className="native-tutorial__nav-button"
+            aria-label="Previous tutorial step"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Pressable>
+          <div className="min-w-0 text-center">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              {step.eyebrow}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-950">
+              {stepIndex + 1} of {stepCount}
+            </p>
           </div>
+          <Pressable
+            type="button"
+            intensity="soft"
+            haptic="light"
+            hapticFeedback={hapticFeedback}
+            onClick={handleSkip}
+            className="native-tutorial__skip"
+          >
+            Skip
+          </Pressable>
+        </header>
 
-          <div className="tutorial-panel__body min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/6 text-white/92">
-                <Icon className="h-[1.125rem] w-[1.125rem]" strokeWidth={1.65} aria-hidden />
+        <div className="native-tutorial__progress" aria-hidden>
+          {Array.from({ length: stepCount }, (_, index) => (
+            <span
+              key={index}
+              className={index <= stepIndex ? 'native-tutorial__progress-dot--active' : ''}
+            />
+          ))}
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step.id}
+            className="native-tutorial__content"
+            initial={{ opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -18 }}
+            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+          >
+            <TutorialVisual visual={step.visual} />
+
+            <section className="native-tutorial__copy">
+              <div className="native-tutorial__icon">
+                <Icon className="h-5 w-5" strokeWidth={1.8} />
               </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="tutorial-panel__title text-[1.0625rem] font-semibold leading-tight tracking-[-0.02em] text-white">
-                  {step.title}
-                </h2>
-                <p className="tutorial-panel__body-text mt-2 text-[0.9375rem] leading-[1.45] text-white/72">
-                  {step.body}
-                </p>
-                {step.hint && step.target && (
-                  <p className="mt-3 text-[0.8125rem] leading-snug text-sky-200/78">{step.hint}</p>
-                )}
+              <h1>{step.title}</h1>
+              <p>{step.body}</p>
+              <div className="native-tutorial__bullets">
+                {step.bullets.map((item) => (
+                  <div key={item} className="native-tutorial__bullet">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{item}</span>
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
+            </section>
+          </motion.div>
+        </AnimatePresence>
 
-          <div className="shrink-0 border-t border-white/8 px-4 py-3 pb-[max(0.875rem,env(safe-area-inset-bottom,0px))]">
-            <Pressable
-              type="button"
-              intensity="soft"
-              squish={false}
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              onClick={handlePrimary}
-              className="flex h-11 w-full items-center justify-center rounded-full bg-white text-[0.9375rem] font-semibold text-stone-950 shadow-[0_8px_24px_rgba(255,255,255,0.14)] hover:bg-white/94"
-            >
-              {step.primaryCta ?? 'Next'}
-            </Pressable>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-    </>
+        <footer className="native-tutorial__footer">
+          <Pressable
+            type="button"
+            intensity="soft"
+            haptic="light"
+            hapticFeedback={hapticFeedback}
+            onClick={handleNext}
+            className="native-tutorial__primary"
+          >
+            {step.primaryCta ?? 'Next'}
+          </Pressable>
+        </footer>
+      </motion.div>
+    </div>
   )
 
-  if (typeof document === 'undefined') return null
   return createPortal(content, document.body)
 }

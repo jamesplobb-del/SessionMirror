@@ -514,7 +514,7 @@ export default function SettingsDrawer({
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
             >
               <GraduationCap className="h-3.5 w-3.5" />
-              Replay Quick Tour
+              Open BestTake Guide
             </Pressable>
           )}
 

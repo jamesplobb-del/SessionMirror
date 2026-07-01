@@ -19,6 +19,7 @@ interface TutorialContextValue {
   stepIndex: number
   stepCount: number
   advanceStep: () => void
+  previousStep: () => void
   notifyAction: (action: TutorialActionId) => void
 }
 
@@ -59,6 +60,10 @@ export function TutorialProvider({
     }
     onStepIndexChange(stepIndex + 1)
   }, [onComplete, onStepIndexChange, stepIndex])
+
+  const previousStep = useCallback(() => {
+    onStepIndexChange(Math.max(0, stepIndex - 1))
+  }, [onStepIndexChange, stepIndex])
 
   const notifyAction = useCallback(
     (action: TutorialActionId) => {
@@ -101,9 +106,10 @@ export function TutorialProvider({
       stepIndex,
       stepCount: INTERACTIVE_TUTORIAL_STEPS.length,
       advanceStep,
+      previousStep,
       notifyAction,
     }),
-    [active, advanceStep, notifyAction, step, stepIndex],
+    [active, advanceStep, notifyAction, previousStep, step, stepIndex],
   )
 
   return <TutorialContext.Provider value={value}>{children}</TutorialContext.Provider>

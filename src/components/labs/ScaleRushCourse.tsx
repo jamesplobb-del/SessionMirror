@@ -79,8 +79,11 @@ export default function ScaleRushCourse({
     >
       <div className="sr-course__backdrop">
         <div className="sr-course__sky" />
+        <div className="sr-course__cloud sr-course__cloud--a" />
+        <div className="sr-course__cloud sr-course__cloud--b" />
         <div className="sr-course__ground" />
         <div className="sr-course__path-glow" />
+        <div className="sr-course__ambient-shadow" />
       </div>
 
       {feedbackLabel && (
@@ -107,7 +110,13 @@ export default function ScaleRushCourse({
                 style={{ '--sr-lane-depth': depth } as CSSProperties}
               >
                 <div className="sr-lane__side sr-lane__side--left">
-                  {row.terrain === 'grass' && <span className="sr-tree" />}
+                  {row.terrain === 'grass' && (
+                    <span className="sr-tree">
+                      <span className="sr-tree__shadow" />
+                      <span className="sr-tree__trunk" />
+                      <span className="sr-tree__leaves" />
+                    </span>
+                  )}
                 </div>
                 <div className="sr-lane__slot">
                   <ScaleRushTile
@@ -117,7 +126,13 @@ export default function ScaleRushCourse({
                   />
                 </div>
                 <div className="sr-lane__side sr-lane__side--right">
-                  {row.terrain === 'grass' && <span className="sr-tree" />}
+                  {row.terrain === 'grass' && (
+                    <span className="sr-tree">
+                      <span className="sr-tree__shadow" />
+                      <span className="sr-tree__trunk" />
+                      <span className="sr-tree__leaves" />
+                    </span>
+                  )}
                 </div>
               </div>
             )

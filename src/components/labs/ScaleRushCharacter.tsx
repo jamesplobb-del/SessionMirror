@@ -15,14 +15,21 @@ export default function ScaleRushCharacter({ hopping, landing }: ScaleRushCharac
         .join(' ')}
       aria-hidden
     >
-      <div className="sr-char__shadow" />
+      <div className="sr-char__cast-shadow" />
       <div className="sr-char__sprite">
         <div className="sr-char__head">
           <span className="sr-char__eye sr-char__eye--left" />
           <span className="sr-char__eye sr-char__eye--right" />
+          <span className="sr-char__head-face sr-char__head-face--south" />
+          <span className="sr-char__head-face sr-char__head-face--east" />
         </div>
-        <div className="sr-char__body" />
-        <div className="sr-char__feet" />
+        <div className="sr-char__body">
+          <span className="sr-char__body-face sr-char__body-face--south" />
+          <span className="sr-char__body-face sr-char__body-face--east" />
+        </div>
+        <div className="sr-char__feet">
+          <span className="sr-char__feet-face sr-char__feet-face--south" />
+        </div>
       </div>
     </div>
   )

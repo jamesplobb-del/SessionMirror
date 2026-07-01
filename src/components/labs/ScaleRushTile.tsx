@@ -43,15 +43,20 @@ export default function ScaleRushTile({ row, variant, depthIndex = 0 }: ScaleRus
         } as CSSProperties
       }
     >
+      <div className="sr-block__cast-shadow" aria-hidden />
       {obstacle && !isStart && (
-        <div className={`sr-block__obstacle sr-block__obstacle--${obstacle}`} aria-hidden />
+        <div className={`sr-block__obstacle sr-block__obstacle--${obstacle}`} aria-hidden>
+          <div className="sr-block__obstacle-shadow" />
+        </div>
       )}
-      <div className="sr-block__cap">
-        <span className="sr-block__label">{isStart ? 'GO' : row.noteLabel}</span>
+      <div className="sr-block__voxel">
+        <div className="sr-block__cap">
+          <span className="sr-block__label">{isStart ? 'GO' : row.noteLabel}</span>
+          <span className="sr-block__highlight" aria-hidden />
+        </div>
+        <div className="sr-block__face sr-block__face--south" />
+        <div className="sr-block__face sr-block__face--east" />
       </div>
-      <div className="sr-block__edge sr-block__edge--front" />
-      <div className="sr-block__edge sr-block__edge--side" />
-      <div className="sr-block__shadow" />
     </div>
   )
 }
