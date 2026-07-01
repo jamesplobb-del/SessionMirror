@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { buildCourseRows } from '../../labs/scaleRush/scaleRushMusicLogic'
 import type { CourseRow } from '../../labs/scaleRush/scaleRushMusicLogic'
+import { SCALE_RUSH_ASSETS } from '../../labs/scaleRush/scaleRushAssets'
 import type { ScaleRushConfig, ScaleRushFeedback } from '../../labs/scaleRush/scaleRushTypes'
 import ScaleRushCharacter from './ScaleRushCharacter'
 import ScaleRushTile from './ScaleRushTile'
@@ -27,6 +28,24 @@ function laneVisual(row: CourseRow): LaneVisual {
   if (row.terrain === 'road') return row.rowOffset % 2 === 1 ? 'tracks' : 'road'
   if (row.terrain === 'river') return 'river'
   return 'field'
+}
+
+function laneSurfaceStyle(visual: LaneVisual): CSSProperties | undefined {
+  if (visual === 'river') {
+    return {
+      backgroundImage: `url(${SCALE_RUSH_ASSETS.water})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
+  }
+  if (visual === 'field') {
+    return {
+      backgroundImage: `url(${SCALE_RUSH_ASSETS.grass})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
+  }
+  return undefined
 }
 
 function Scenery({ side, lane, seed }: { side: 'left' | 'right'; lane: LaneVisual; seed: number }) {
@@ -190,7 +209,12 @@ export default function ScaleRushCourse({
               <div
                 key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
                 className={`sr-lane sr-lane--${visual}`}
-                style={{ '--sr-depth': depth } as CSSProperties}
+                style={
+                  {
+                    '--sr-depth': depth,
+                    ...laneSurfaceStyle(visual),
+                  } as CSSProperties
+                }
               >
                 <LaneHazards lane={visual} seed={row.rowOffset + sequenceStep} />
                 <div className="sr-lane__scenery sr-lane__scenery--left">

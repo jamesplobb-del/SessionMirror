@@ -4,15 +4,15 @@ import '../../styles/scale-rush.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import {
   computeAccuracy,
+  keysForScaleMode,
   RANGE_LABELS,
-  SCALE_LABELS,
-  SCALE_RUSH_KEYS,
+  SCALE_MODE_LABELS,
   SCALE_RUSH_RANGES,
-  SCALE_RUSH_SCALES,
   SCALE_RUSH_TRANSPOSITIONS,
+  scaleDisplayName,
   type ScaleRushKey,
   type ScaleRushRange,
-  type ScaleRushScale,
+  type ScaleRushScaleMode,
   type ScaleRushTransposition,
 } from '../../labs/scaleRush/scaleRushMusicLogic'
 import { useScaleRushGame } from '../../labs/scaleRush/useScaleRushGame'
@@ -38,11 +38,20 @@ export default function ScaleRushScreen({
 }: ScaleRushScreenProps) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [draftScaleMode, setDraftScaleMode] = useState<ScaleRushScaleMode>('major')
   const [draftKey, setDraftKey] = useState<ScaleRushKey>('C')
-  const [draftScale] = useState<ScaleRushScale>('major')
-  const [draftRange] = useState<ScaleRushRange>('1-octave')
+  const [draftRange, setDraftRange] = useState<ScaleRushRange>('1-octave')
+  const [draftEndless, setDraftEndless] = useState(false)
   const [draftTransposition, setDraftTransposition] = useState<ScaleRushTransposition>('concert')
-  const [pitchAccuracyStrict, setPitchAccuracyStrict] = useState(true)
+  const [pitchAccuracyStrict, setPitchAccuracyStrict] = useState(false)
+
+  const availableKeys = keysForScaleMode(draftScaleMode)
+
+  useEffect(() => {
+    if (!availableKeys.includes(draftKey)) {
+      setDraftKey(availableKeys[0]!)
+    }
+  }, [availableKeys, draftKey])
 
   useEffect(() => {
     onRequestMicStream()
@@ -78,71 +87,22 @@ export default function ScaleRushScreen({
           </Pressable>
           <div>
             <h1 className="text-2xl font-bold text-stone-900">Scale Rush</h1>
-            <p className="text-xs text-stone-400">v0.1 · Isometric course</p>
+            <p className="text-xs text-stone-400">v0.1 · Crossy Road for musicians</p>
           </div>
         </header>
 
-        <p className="mb-1 text-sm font-medium text-stone-700">Play the scale to cross the course</p>
+        <p className="mb-1 text-sm font-medium text-stone-700">Play your scale to cross the course.</p>
         <p className="mb-6 text-sm text-stone-500">
-          Hop forward one tile at a time by playing each note on the path ahead. Wrong notes and
-          timeouts cost a heart.
+          Hop one tile per correct note. Wrong notes and timeouts cost a heart. Any octave of the
+          target note counts in v0.1.
         </p>
 
         <div className="space-y-5">
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Key</p>
-            <div className="flex flex-wrap gap-2">
-              {SCALE_RUSH_KEYS.map((key) => (
-                <Pressable
-                  key={key}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftKey(key)}
-                  className={`min-w-[2.75rem] rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftKey === key
-                      ? 'border-sky-600 bg-sky-600 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {key}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Scale</p>
-            <div className="flex flex-wrap gap-2">
-              {SCALE_RUSH_SCALES.map((scale) => (
-                <span
-                  key={scale}
-                  className="rounded-xl border border-sky-600 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800"
-                >
-                  {SCALE_LABELS[scale]}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Range</p>
-            <div className="flex flex-wrap gap-2">
-              {SCALE_RUSH_RANGES.map((range) => (
-                <span
-                  key={range}
-                  className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700"
-                >
-                  {RANGE_LABELS[range]}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="scale-rush-transposition"
-              className="mb-2 block text-xs font-semibold uppercase tracking-wider text-stone-400"
-            >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Instrument
+            </p>
+            <label htmlFor="scale-rush-transposition" className="sr-only">
               Transposing instrument
             </label>
             <select
@@ -160,17 +120,88 @@ export default function ScaleRushScreen({
               ))}
             </select>
             <p className="mt-1 text-xs text-stone-500">
-              Tiles and detection use written pitch for your instrument — no mental transposing.
+              Mic profile: {instrumentProfile.label} · change in Settings → Pitch &amp; Tuning
             </p>
           </div>
 
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Mic profile
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Scale
             </p>
-            <p className="text-sm font-medium text-stone-800">{instrumentProfile.label}</p>
-            <p className="mt-0.5 text-xs text-stone-500">Change in Settings → Pitch &amp; Tuning</p>
+            <div className="flex flex-wrap gap-2">
+              {(['major', 'minor'] as const).map((mode) => (
+                <Pressable
+                  key={mode}
+                  type="button"
+                  intensity="soft"
+                  onClick={() => setDraftScaleMode(mode)}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                    draftScaleMode === mode
+                      ? 'border-sky-600 bg-sky-600 text-white'
+                      : 'border-stone-200 bg-white text-stone-700'
+                  }`}
+                >
+                  {SCALE_MODE_LABELS[mode]}
+                </Pressable>
+              ))}
+            </div>
           </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Key</p>
+            <div className="flex flex-wrap gap-2">
+              {availableKeys.map((key) => (
+                <Pressable
+                  key={key}
+                  type="button"
+                  intensity="soft"
+                  onClick={() => setDraftKey(key)}
+                  className={`min-w-[2.75rem] rounded-xl border px-3 py-2 text-sm font-semibold ${
+                    draftKey === key
+                      ? 'border-sky-600 bg-sky-600 text-white'
+                      : 'border-stone-200 bg-white text-stone-700'
+                  }`}
+                >
+                  {scaleDisplayName(key, draftScaleMode)}
+                </Pressable>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Range</p>
+            <div className="flex flex-wrap gap-2">
+              {SCALE_RUSH_RANGES.map((range) => (
+                <Pressable
+                  key={range}
+                  type="button"
+                  intensity="soft"
+                  onClick={() => setDraftRange(range)}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                    draftRange === range
+                      ? 'border-sky-600 bg-sky-600 text-white'
+                      : 'border-stone-200 bg-white text-stone-700'
+                  }`}
+                >
+                  {RANGE_LABELS[range]}
+                </Pressable>
+              ))}
+            </div>
+          </div>
+
+          <label className="flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-stone-900">Endless mode</p>
+              <p className="mt-0.5 text-xs text-stone-500">
+                Ascend the scale continuously without turning back
+              </p>
+            </div>
+            <IOSSwitch
+              checked={draftEndless}
+              onChange={setDraftEndless}
+              ariaLabel="Enable endless mode"
+            />
+          </label>
 
           <label className="flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3">
             <div>
@@ -178,7 +209,7 @@ export default function ScaleRushScreen({
               <p className="mt-0.5 text-xs text-stone-500">
                 {pitchAccuracyStrict
                   ? 'Must be within ±15¢ of the target note'
-                  : 'Any detected note name match advances'}
+                  : 'Note name match only (recommended for v0.1)'}
               </p>
             </div>
             <IOSSwitch
@@ -199,8 +230,9 @@ export default function ScaleRushScreen({
             onClick={() =>
               start({
                 key: draftKey,
-                scale: draftScale,
+                scaleMode: draftScaleMode,
                 range: draftRange,
+                endless: draftEndless,
                 tunerInstrument,
                 transposition: draftTransposition,
                 pitchAccuracyStrict,
@@ -217,9 +249,11 @@ export default function ScaleRushScreen({
 
   if (state.phase === 'gameover' && state.config) {
     const accuracy = computeAccuracy(state.correctCount, state.missCount)
+    const scaleName = scaleDisplayName(state.config.key, state.config.scaleMode)
     return (
       <div className="scale-rush-screen scale-rush-screen--gameover">
-        <h1 className="mb-6 text-2xl font-bold text-stone-900">Game Over</h1>
+        <h1 className="mb-2 text-2xl font-bold text-stone-900">Game Over</h1>
+        <p className="mb-6 text-sm text-stone-500">{scaleName} · {RANGE_LABELS[state.config.range]}</p>
         <dl className="space-y-3 text-sm text-stone-700">
           <div className="flex justify-between">
             <dt>Final score</dt>

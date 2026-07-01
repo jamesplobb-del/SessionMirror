@@ -1,10 +1,11 @@
+import { SCALE_RUSH_ASSETS } from '../../labs/scaleRush/scaleRushAssets'
+
 interface ScaleRushCharacterProps {
   hopping: boolean
   landing: boolean
   hit: boolean
 }
 
-/** Cute big-headed Crossy Road style character, seen from behind. */
 export default function ScaleRushCharacter({ hopping, landing, hit }: ScaleRushCharacterProps) {
   return (
     <div
@@ -19,13 +20,12 @@ export default function ScaleRushCharacter({ hopping, landing, hit }: ScaleRushC
       aria-hidden
     >
       <div className="sr-char__shadow" />
-      <div className="sr-char__body">
-        <div className="sr-char__head">
-          <span className="sr-char__hair" />
-        </div>
-        <div className="sr-char__shirt" />
-        <div className="sr-char__pants" />
-      </div>
+      <img
+        className="sr-char__sprite"
+        src={SCALE_RUSH_ASSETS.trumpetPlayer}
+        alt=""
+        draggable={false}
+      />
       <div className="sr-char__flash" />
     </div>
   )

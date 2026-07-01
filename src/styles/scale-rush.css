@@ -384,7 +384,9 @@
 }
 
 .sr-lane--field {
-  background: linear-gradient(180deg, #4ade80, #22c55e);
+  background-color: #22c55e;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .sr-lane--road {
@@ -401,15 +403,9 @@
 }
 
 .sr-lane--river {
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.14) 0,
-      rgba(255, 255, 255, 0.14) 14px,
-      transparent 14px,
-      transparent 32px
-    ),
-    linear-gradient(180deg, #38bdf8, #0284c7);
+  background-color: #0284c7;
+  background-repeat: no-repeat;
+  background-size: cover;
   box-shadow: inset 0 -4px 0 rgba(8, 78, 110, 0.35);
 }
 
@@ -444,20 +440,20 @@
   padding-bottom: 0.2rem;
 }
 
-/* Grass note tiles */
+/* Grass note tiles (asset-based) */
 
 .sr-tile {
   position: relative;
-  width: 3.1rem;
-  height: 3.45rem;
+  width: 3.4rem;
+  height: 3.6rem;
 }
 
 .sr-tile__shadow {
   position: absolute;
   left: 58%;
   bottom: 0.05rem;
-  width: 2.5rem;
-  height: 0.7rem;
+  width: 2.6rem;
+  height: 0.75rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.34);
   transform: skewX(-18deg);
@@ -465,72 +461,41 @@
   z-index: 0;
 }
 
-.sr-tile__voxel {
+.sr-tile__block {
   position: relative;
   z-index: 2;
-  width: 2.95rem;
-  height: 2.95rem;
+  width: 3.2rem;
+  height: 3.2rem;
   margin: 0 auto;
-}
-
-.sr-tile__top {
-  position: relative;
-  z-index: 3;
-  width: 2.95rem;
-  height: 2.95rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.35rem;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  background:
-    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.35), transparent 40%),
-    linear-gradient(145deg, #6ee7a0, #22c55e 55%, #16a34a);
-  box-shadow:
-    inset 0 3px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.sr-tile__grass-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.28));
 }
 
 .sr-tile__label {
-  font-size: 1.35rem;
+  position: relative;
+  z-index: 1;
+  margin-top: -0.35rem;
+  font-size: 1.4rem;
   font-weight: 900;
   color: #fff;
   text-shadow:
-    0 2px 0 rgba(0, 0, 0, 0.22),
-    0 3px 8px rgba(0, 0, 0, 0.28);
+    0 2px 0 rgba(0, 0, 0, 0.35),
+    0 3px 8px rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(0, 0, 0, 0.25);
   line-height: 1;
-}
-
-.sr-tile__side {
-  position: absolute;
-  z-index: 1;
-}
-
-.sr-tile__side--front {
-  left: 0.1rem;
-  bottom: -0.62rem;
-  width: 2.95rem;
-  height: 0.65rem;
-  border-radius: 0 0 0.3rem 0.3rem;
-  background: linear-gradient(180deg, #15803d, #14532d);
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.22);
-  transform: skewX(-12deg);
-}
-
-.sr-tile__side--right {
-  right: -0.42rem;
-  bottom: 0.1rem;
-  width: 0.5rem;
-  height: 2.4rem;
-  border-radius: 0 0.28rem 0.28rem 0;
-  background: linear-gradient(90deg, #166534, #0f3d25);
-  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.18);
-}
-
-.sr-tile--start .sr-tile__top {
-  background:
-    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.25), transparent 40%),
-    linear-gradient(145deg, #94a3b8, #64748b);
 }
 
 .sr-tile--start .sr-tile__label {
@@ -538,47 +503,49 @@
   letter-spacing: 0.1em;
 }
 
-.sr-tile--target .sr-tile__top {
-  border-color: #fde047;
-  box-shadow:
-    0 0 0 3px rgba(253, 224, 71, 0.85),
-    0 0 28px rgba(253, 224, 71, 0.55),
-    inset 0 3px 0 rgba(255, 255, 255, 0.4);
+.sr-tile--target .sr-tile__block::after {
+  content: '';
+  position: absolute;
+  inset: -0.2rem;
+  border-radius: 0.45rem;
+  border: 3px solid #fde047;
+  box-shadow: 0 0 24px rgba(253, 224, 71, 0.65);
   animation: sr-tile-glow 1.1s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes sr-tile-glow {
   0%,
   100% {
-    filter: brightness(1);
+    opacity: 0.85;
   }
   50% {
-    filter: brightness(1.1);
+    opacity: 1;
   }
 }
 
-.sr-tile--landed .sr-tile__top {
-  filter: saturate(0.88) brightness(0.94);
+.sr-tile--landed .sr-tile__grass-img {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2)) saturate(0.88) brightness(0.94);
 }
 
 .sr-world__player .sr-char {
-  margin-top: -2.55rem;
+  margin-top: -2.75rem;
 }
 
-/* Character (cute, big-headed, seen from behind) */
+/* Character (trumpet player asset) */
 
 .sr-char {
   position: relative;
   z-index: 8;
-  width: 2.2rem;
-  height: 2.85rem;
+  width: 2.6rem;
+  height: 3.1rem;
 }
 
 .sr-char__shadow {
   position: absolute;
   left: 62%;
   bottom: 0;
-  width: 1.75rem;
+  width: 1.85rem;
   height: 0.55rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.36);
@@ -587,61 +554,19 @@
   transition: transform 0.12s ease, opacity 0.12s ease;
 }
 
-.sr-char__body {
+.sr-char__sprite {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0 auto;
-  width: 1.85rem;
-  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.3));
-}
-
-.sr-char__head {
-  position: relative;
-  width: 1.55rem;
-  height: 1.35rem;
-  border-radius: 0.32rem;
-  background: linear-gradient(180deg, #fed7aa, #fdba74);
-  border: 2px solid #fff;
-  box-shadow: 0 3px 0 #c2410c;
-  z-index: 3;
-}
-
-.sr-char__hair {
-  position: absolute;
-  top: -0.32rem;
-  left: -0.02rem;
-  width: 1.6rem;
-  height: 0.85rem;
-  border-radius: 0.32rem 0.32rem 0 0;
-  background: linear-gradient(180deg, #92400e, #6b3410);
-  border: 2px solid #fff;
-  border-bottom: none;
-  box-shadow: 0 2px 0 #4a2409;
-}
-
-.sr-char__shirt {
-  width: 1.55rem;
-  height: 0.95rem;
-  margin-top: -0.05rem;
-  border-radius: 0.16rem;
-  background: linear-gradient(180deg, #38bdf8, #0284c7);
-  border: 2px solid #fff;
-  box-shadow: 0 3px 0 #075985;
-  z-index: 2;
-}
-
-.sr-char__pants {
-  width: 1.3rem;
-  height: 0.42rem;
-  margin-top: -0.04rem;
-  border-radius: 0 0 0.16rem 0.16rem;
-  background: linear-gradient(180deg, #334155, #1e293b);
-  border: 2px solid #fff;
-  border-top: none;
-  box-shadow: 0 3px 0 #0f172a;
   z-index: 1;
+  display: block;
+  width: 2.5rem;
+  height: auto;
+  margin: 0 auto;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.32));
+  transform-origin: center bottom;
 }
 
 .sr-char__flash {
@@ -676,7 +601,7 @@
   opacity: 0.5;
 }
 
-.sr-char--land .sr-char__body {
+.sr-char--land .sr-char__sprite {
   animation: sr-char-land 0.16s ease;
 }
 

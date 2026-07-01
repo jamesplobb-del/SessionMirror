@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { CourseRow } from '../../labs/scaleRush/scaleRushMusicLogic'
+import { SCALE_RUSH_ASSETS } from '../../labs/scaleRush/scaleRushAssets'
 
 export type ScaleRushTileVariant = 'ahead' | 'target' | 'landed' | 'start'
 
@@ -30,12 +31,14 @@ export default function ScaleRushTile({ row, variant, depthIndex = 0 }: ScaleRus
       style={{ '--sr-depth': depthIndex } as CSSProperties}
     >
       <div className="sr-tile__shadow" aria-hidden />
-      <div className="sr-tile__voxel">
-        <div className="sr-tile__top">
-          <span className="sr-tile__label">{isStart ? 'GO' : row.noteLabel}</span>
-        </div>
-        <div className="sr-tile__side sr-tile__side--front" />
-        <div className="sr-tile__side sr-tile__side--right" />
+      <div className="sr-tile__block">
+        <img
+          className="sr-tile__grass-img"
+          src={SCALE_RUSH_ASSETS.grass}
+          alt=""
+          draggable={false}
+        />
+        <span className="sr-tile__label">{isStart ? 'GO' : row.noteLabel}</span>
       </div>
     </div>
   )

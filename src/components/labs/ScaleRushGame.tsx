@@ -88,12 +88,6 @@ export default function ScaleRushGame({ state, readout, onPause }: ScaleRushGame
                 {state.streak}
               </p>
             </div>
-            <div className="sr-hud-panel">
-              <p className="sr-hud-panel__label">Accuracy</p>
-              <p className="sr-hud-panel__value sr-hud-panel__value--accuracy tabular-nums">
-                {accuracy}%
-              </p>
-            </div>
           </div>
 
           <div className="sr-hud-side sr-hud-side--right">
@@ -110,6 +104,12 @@ export default function ScaleRushGame({ state, readout, onPause }: ScaleRushGame
                 {detectedOctave != null && (
                   <span className="sr-hud-detected-octave">{detectedOctave}</span>
                 )}
+              </p>
+            </div>
+            <div className="sr-hud-panel">
+              <p className="sr-hud-panel__label">Accuracy</p>
+              <p className="sr-hud-panel__value sr-hud-panel__value--accuracy tabular-nums">
+                {accuracy}%
               </p>
             </div>
           </div>

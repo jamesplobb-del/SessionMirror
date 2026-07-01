@@ -1,23 +1,64 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
 import type { ScaleRushConfig } from './scaleRushTypes'
 
-/** Keys supported in Scale Rush v0.05 */
-export const SCALE_RUSH_KEYS = ['C', 'F', 'Bb', 'Eb', 'G', 'D', 'A'] as const
-export type ScaleRushKey = (typeof SCALE_RUSH_KEYS)[number]
+/** All major scale key centers. */
+export const SCALE_RUSH_MAJOR_KEYS = [
+  'C',
+  'Db',
+  'D',
+  'Eb',
+  'E',
+  'F',
+  'Gb',
+  'G',
+  'Ab',
+  'A',
+  'Bb',
+  'B',
+] as const
 
-export const SCALE_RUSH_SCALES = ['major'] as const
-export type ScaleRushScale = (typeof SCALE_RUSH_SCALES)[number]
+/** All natural minor scale key centers. */
+export const SCALE_RUSH_MINOR_KEYS = [
+  'A',
+  'Bb',
+  'B',
+  'C',
+  'C#',
+  'D',
+  'Eb',
+  'E',
+  'F',
+  'F#',
+  'G',
+  'G#',
+] as const
 
-export const SCALE_RUSH_RANGES = ['1-octave'] as const
+export type ScaleRushMajorKey = (typeof SCALE_RUSH_MAJOR_KEYS)[number]
+export type ScaleRushMinorKey = (typeof SCALE_RUSH_MINOR_KEYS)[number]
+export type ScaleRushKey = ScaleRushMajorKey | ScaleRushMinorKey
+
+export type ScaleRushScaleMode = 'major' | 'minor'
+
+export const SCALE_RUSH_RANGES = ['1-octave', '2-octaves'] as const
 export type ScaleRushRange = (typeof SCALE_RUSH_RANGES)[number]
 
-export const SCALE_LABELS: Record<ScaleRushScale, string> = {
+export const SCALE_MODE_LABELS: Record<ScaleRushScaleMode, string> = {
   major: 'Major',
+  minor: 'Natural Minor',
 }
 
 export const RANGE_LABELS: Record<ScaleRushRange, string> = {
   '1-octave': '1 Octave',
+  '2-octaves': '2 Octaves',
 }
+
+/** @deprecated Use SCALE_RUSH_MAJOR_KEYS / scaleMode */
+export const SCALE_RUSH_KEYS = SCALE_RUSH_MAJOR_KEYS
+/** @deprecated Use scaleMode */
+export const SCALE_RUSH_SCALES = ['major', 'minor'] as const
+export type ScaleRushScale = ScaleRushScaleMode
+/** @deprecated Use SCALE_MODE_LABELS */
+export const SCALE_LABELS = SCALE_MODE_LABELS
 
 /** Written-pitch transposition: concert mic → note name shown on your instrument. */
 export const SCALE_RUSH_TRANSPOSITIONS = [
@@ -37,51 +78,33 @@ const TRANSPOSITION_MAP = Object.fromEntries(
   SCALE_RUSH_TRANSPOSITIONS.map((item) => [item.id, item.semitonesToWritten]),
 ) as Record<ScaleRushTransposition, number>
 
-export function getTranspositionLabel(id: ScaleRushTransposition): string {
-  return SCALE_RUSH_TRANSPOSITIONS.find((item) => item.id === id)?.label ?? 'Concert Pitch'
-}
-
-export function transpositionSemitones(id: ScaleRushTransposition): number {
-  return TRANSPOSITION_MAP[id] ?? 0
-}
-
-const KEY_TO_PITCH_CLASS: Record<ScaleRushKey, number> = {
+const KEY_TO_PITCH_CLASS: Record<string, number> = {
   C: 0,
-  F: 5,
-  Bb: 10,
-  Eb: 3,
-  G: 7,
+  'C#': 1,
+  Db: 1,
   D: 2,
+  'D#': 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  'F#': 6,
+  Gb: 6,
+  G: 7,
+  'G#': 8,
+  Ab: 8,
   A: 9,
+  'A#': 10,
+  Bb: 10,
+  B: 11,
 }
 
 const FLAT_LABELS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'] as const
 const SHARP_LABELS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const
-const FLAT_KEYS = new Set<ScaleRushKey>(['F', 'Bb', 'Eb'])
 
-/** Major scale semitone offsets for degrees 1–7; degree 8 = octave (+12). */
-const MAJOR_DEGREE_SEMITONES = [0, 2, 4, 5, 7, 9, 11, 12] as const
-
-/** Stepwise path: C D E F G A B C B A G F E D C (1–8–1). */
-export const SCALE_DEGREE_PATH = [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0] as const
+const MAJOR_PATTERN = [0, 2, 4, 5, 7, 9, 11] as const
+const MINOR_PATTERN = [0, 2, 3, 5, 7, 8, 10] as const
 
 export const SCALE_RUSH_BEST_SCORE_KEY = 'sessionmirror:scale-rush-best'
-
-/** Crossy-style tile accent colors by pitch class. */
-export const NOTE_TILE_COLORS: Record<number, string> = {
-  0: '#ef5350',
-  1: '#ff7043',
-  2: '#ffa726',
-  3: '#ffca28',
-  4: '#ffee58',
-  5: '#9ccc65',
-  6: '#26a69a',
-  7: '#29b6f6',
-  8: '#42a5f5',
-  9: '#7e57c2',
-  10: '#ab47bc',
-  11: '#ec407a',
-}
 
 export type RowTerrain = 'grass' | 'road' | 'river'
 
@@ -96,32 +119,79 @@ export interface CourseRow {
   isStart: boolean
 }
 
-export function pitchClassForSequenceStep(key: ScaleRushKey, stepIndex: number): number {
-  const degreeIndex = SCALE_DEGREE_PATH[stepIndex % SCALE_DEGREE_PATH.length]!
-  const semitones = MAJOR_DEGREE_SEMITONES[degreeIndex]!
-  return (KEY_TO_PITCH_CLASS[key] + semitones) % 12
+export function getTranspositionLabel(id: ScaleRushTransposition): string {
+  return SCALE_RUSH_TRANSPOSITIONS.find((item) => item.id === id)?.label ?? 'Concert Pitch'
+}
+
+export function transpositionSemitones(id: ScaleRushTransposition): number {
+  return TRANSPOSITION_MAP[id] ?? 0
+}
+
+export function keysForScaleMode(scaleMode: ScaleRushScaleMode): readonly ScaleRushKey[] {
+  return scaleMode === 'major' ? SCALE_RUSH_MAJOR_KEYS : SCALE_RUSH_MINOR_KEYS
+}
+
+export function scaleDisplayName(key: ScaleRushKey, scaleMode: ScaleRushScaleMode): string {
+  return `${key} ${SCALE_MODE_LABELS[scaleMode]}`
+}
+
+function scalePattern(scaleMode: ScaleRushScaleMode): readonly number[] {
+  return scaleMode === 'major' ? MAJOR_PATTERN : MINOR_PATTERN
+}
+
+function prefersFlatSpelling(key: ScaleRushKey): boolean {
+  return key.includes('b') || key === 'F' || key === 'Db' || key === 'Gb' || key === 'Ab' || key === 'Eb'
+}
+
+function keyPitchClass(key: ScaleRushKey): number {
+  const pc = KEY_TO_PITCH_CLASS[key]
+  if (pc == null) return 0
+  return pc
+}
+
+/** Build ascending + descending degree indices for the configured range/mode. */
+export function buildScaleDegreePath(config: Pick<ScaleRushConfig, 'range' | 'endless' | 'scaleMode'>): number[] {
+  const octaves = config.range === '1-octave' ? 1 : 2
+  const topDegree = octaves * 7
+  const ascending = Array.from({ length: topDegree + 1 }, (_, index) => index)
+
+  if (config.endless) {
+    return ascending
+  }
+
+  const descending = Array.from({ length: topDegree }, (_, index) => topDegree - 1 - index)
+  return [...ascending, ...descending]
+}
+
+function pitchClassForDegree(key: ScaleRushKey, scaleMode: ScaleRushScaleMode, degreeIndex: number): number {
+  const pattern = scalePattern(scaleMode)
+  const octave = Math.floor(degreeIndex / 7)
+  const degreeInOctave = degreeIndex % 7
+  const semitone = pattern[degreeInOctave]! + octave * 12
+  return (keyPitchClass(key) + semitone) % 12
+}
+
+export function pitchClassForSequenceStep(config: ScaleRushConfig, stepIndex: number): number {
+  const path = buildScaleDegreePath(config)
+  const degreeIndex = path[stepIndex % path.length]!
+  return pitchClassForDegree(config.key, config.scaleMode, degreeIndex)
 }
 
 export function pitchClassLabel(pitchClass: number, key: ScaleRushKey): string {
   const normalized = ((pitchClass % 12) + 12) % 12
-  return FLAT_KEYS.has(key) ? FLAT_LABELS[normalized]! : SHARP_LABELS[normalized]!
-}
-
-export function noteTileColor(pitchClass: number): string {
-  const normalized = ((pitchClass % 12) + 12) % 12
-  return NOTE_TILE_COLORS[normalized] ?? '#94a3b8'
+  return prefersFlatSpelling(key) ? FLAT_LABELS[normalized]! : SHARP_LABELS[normalized]!
 }
 
 /**
- * Single source of truth for the note sequence (C D E F G A B C B A G F E D C, transposed by key).
- * HUD target, glowing tile, obstacle label, and pitch check all derive from getTargetNoteAtStep() / buildCourseRows().
+ * Single source of truth for the note sequence.
+ * HUD target, tile labels, obstacle labels, and pitch check all derive from here.
  */
 export function getTargetNoteAtStep(config: ScaleRushConfig, sequenceStep: number): {
   sequenceIndex: number
   pitchClass: number
   noteLabel: string
 } {
-  const pitchClass = pitchClassForSequenceStep(config.key, sequenceStep)
+  const pitchClass = pitchClassForSequenceStep(config, sequenceStep)
   return {
     sequenceIndex: sequenceStep,
     pitchClass,
@@ -130,16 +200,17 @@ export function getTargetNoteAtStep(config: ScaleRushConfig, sequenceStep: numbe
 }
 
 function terrainForRow(rowOffset: number): RowTerrain {
-  const mod = rowOffset % 3
+  const mod = rowOffset % 4
   if (mod === 1) return 'road'
   if (mod === 2) return 'river'
+  if (mod === 3) return 'grass'
   return 'grass'
 }
 
 export function buildCourseRows(
   config: ScaleRushConfig,
   sequenceStep: number,
-  visibleAhead = 6,
+  visibleAhead = 8,
 ): CourseRow[] {
   const rows: CourseRow[] = []
 
@@ -189,7 +260,6 @@ export function pitchClassesMatch(detected: number, target: number): boolean {
   return ((detected % 12) + 12) % 12 === ((target % 12) + 12) % 12
 }
 
-/** Gameplay-only pitch gates — stricter than casual tuner display to reject room noise. */
 const MIN_GAMEPLAY_HZ = 80
 const MAX_GAMEPLAY_HZ = 1400
 const LOOSE_MIN_GAMEPLAY_HZ = 70
@@ -208,7 +278,6 @@ function hasGameplaySignal(readout: PitchReadout, strict: boolean): boolean {
   return Boolean(readout.noteName && readout.noteName !== '—')
 }
 
-/** Concert pitch class → written pitch for the selected transposing instrument. */
 export function concertToWrittenPitchClass(
   concertPitchClass: number,
   transposition: ScaleRushTransposition,
@@ -217,7 +286,6 @@ export function concertToWrittenPitchClass(
   return ((concertPitchClass + shift) % 12 + 12) % 12
 }
 
-/** Detected note in written pitch — used for HUD, tiles, and gameplay match. */
 export function getDetectedWrittenPitchClass(
   readout: PitchReadout,
   config: ScaleRushConfig,
@@ -254,11 +322,6 @@ export function isReadoutWrongPitch(
   if (pitchClassesMatch(detected, targetWrittenPitchClass)) return false
   if (!config.pitchAccuracyStrict) return true
   return Math.abs(readout.cents) <= STRICT_PITCH_CENTS
-}
-
-/** @deprecated Use readoutToConcertPitchClass — kept for tuner raw display. */
-export function readoutToPitchClass(readout: PitchReadout): number | null {
-  return readoutToConcertPitchClass(readout)
 }
 
 export function loadBestScore(): number {

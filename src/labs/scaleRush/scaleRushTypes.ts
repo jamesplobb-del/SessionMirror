@@ -1,7 +1,7 @@
 import type {
   ScaleRushKey,
   ScaleRushRange,
-  ScaleRushScale,
+  ScaleRushScaleMode,
   ScaleRushTransposition,
 } from './scaleRushMusicLogic'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -12,10 +12,12 @@ export type ScaleRushFeedback = 'perfect' | 'good' | 'wrong' | 'timeout' | null
 
 export interface ScaleRushConfig {
   key: ScaleRushKey
-  scale: ScaleRushScale
+  scaleMode: ScaleRushScaleMode
   range: ScaleRushRange
+  endless: boolean
   tunerInstrument: TunerInstrument
   transposition: ScaleRushTransposition
+  /** v0.1 default: pitch-class match only (octave ignored). */
   pitchAccuracyStrict: boolean
 }
 
