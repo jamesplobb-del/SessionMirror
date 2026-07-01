@@ -1630,6 +1630,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setLabsRoute(route)
   }, [])
 
+  const handleRequestLabsMicStream = useCallback(() => {
+    requestCameraAccess('audio')
+  }, [requestCameraAccess])
+
   const schedulePitchTrackerCommit = useCallback(
     (enabled: boolean) => {
       if (pitchCommitTimerRef.current !== null) {
@@ -3188,6 +3192,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     tunerInstrument={settings.tunerInstrument}
                     onClose={handleCloseLabs}
                     onNavigate={handleLabsNavigate}
+                    onRequestMicStream={handleRequestLabsMicStream}
                   />
                 </Suspense>
 

@@ -6,7 +6,7 @@ import type { TunerInstrument } from '../../utils/pitchConfig'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import Pressable from '../ui/Pressable'
 import LabsMenu from './LabsMenu'
-import ScaleRushGame from './ScaleRushGame'
+import ScaleRushScreen from './ScaleRushScreen'
 
 export type LabsRoute = 'menu' | 'scale-rush'
 
@@ -18,6 +18,7 @@ interface LabsOverlayProps {
   tunerInstrument: TunerInstrument
   onClose: () => void
   onNavigate: (route: LabsRoute) => void
+  onRequestMicStream: () => void
 }
 
 export default function LabsOverlay({
@@ -28,13 +29,14 @@ export default function LabsOverlay({
   tunerInstrument,
   onClose,
   onNavigate,
+  onRequestMicStream,
 }: LabsOverlayProps) {
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
           key="labs-overlay"
-          className="fixed inset-0 z-[135] flex flex-col bg-stone-50"
+          className="labs-overlay fixed inset-0 z-[135] flex flex-col bg-stone-50"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
@@ -61,10 +63,11 @@ export default function LabsOverlay({
           {route === 'menu' ? (
             <LabsMenu onOpenScaleRush={() => onNavigate('scale-rush')} onBack={onClose} />
           ) : (
-            <ScaleRushGame
+            <ScaleRushScreen
               streamRef={streamRef}
               streamGeneration={streamGeneration}
               tunerInstrument={tunerInstrument}
+              onRequestMicStream={onRequestMicStream}
               onBack={() => onNavigate('menu')}
             />
           )}

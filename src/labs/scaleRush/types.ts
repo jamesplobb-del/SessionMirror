@@ -1,41 +1,28 @@
-import type { GamePhase } from '../engine/types'
-import type { KeyRoot, ScaleType } from '../musicTheory/scales'
+import type { ScaleRushKey } from './scaleRushMusicLogic'
+import type { TunerInstrument } from '../../utils/pitchConfig'
 
-export type ScaleRushMode = 'practice' | 'survival'
-
-export const SCALE_RUSH_MODE_LABELS: Record<ScaleRushMode, string> = {
-  practice: 'Practice',
-  survival: 'Survival',
-}
-
-/** Lives per mode — Hardcore (1 life) can be added here later. */
-export const SCALE_RUSH_LIVES: Record<ScaleRushMode, number | null> = {
-  practice: null,
-  survival: 3,
-}
+export type ScaleRushPhase = 'setup' | 'playing' | 'gameover'
 
 export interface ScaleRushConfig {
-  key: KeyRoot
-  scaleType: ScaleType
-  mode: ScaleRushMode
+  key: ScaleRushKey
+  tunerInstrument: TunerInstrument
 }
 
-export interface ScaleRushRuntimeState {
-  phase: GamePhase
+export interface ScaleRushState {
+  phase: ScaleRushPhase
   config: ScaleRushConfig | null
-  targetMidi: number | null
-  notePool: number[]
-  lives: number
-  scoring: import('../engine/scoring').ScoringState
+  sequenceStep: number
+  targetPitchClass: number
+  score: number
+  streak: number
+  bestStreak: number
+  hearts: number
+  correctCount: number
+  missCount: number
+  bestScore: number
+  /** Increments on each successful jump — drives runner animation. */
+  advanceToken: number
+  /** Brief miss feedback for runner shake. */
+  missToken: number
   startedAtMs: number | null
-  endedAtMs: number | null
 }
-
-export type ScaleRushAction =
-  | { type: 'CONFIGURE'; config: ScaleRushConfig }
-  | { type: 'START_WITH_CONFIG'; config: ScaleRushConfig }
-  | { type: 'START' }
-  | { type: 'CORRECT_NOTE' }
-  | { type: 'WRONG_NOTE' }
-  | { type: 'RESTART' }
-  | { type: 'BACK_TO_SETUP' }
