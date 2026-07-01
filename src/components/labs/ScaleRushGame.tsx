@@ -1,16 +1,16 @@
 import type { RefObject } from 'react'
+import { Pause } from 'lucide-react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
   computeAccuracy,
   getDetectedWrittenPitchClass,
   getTargetNoteAtStep,
-  getTranspositionLabel,
   pitchClassLabel,
+  pitchClassesMatch,
 } from '../../labs/scaleRush/scaleRushMusicLogic'
 import type { ScaleRushState } from '../../labs/scaleRush/scaleRushTypes'
 import Pressable from '../ui/Pressable'
 import ScaleRushCourse from './ScaleRushCourse'
-import ScaleRushLiveTuner from './ScaleRushLiveTuner'
 
 interface ScaleRushGameProps {
   state: ScaleRushState
@@ -21,77 +21,99 @@ interface ScaleRushGameProps {
 
 function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   return (
-    <span className="inline-flex gap-0.5" aria-label={`${count} hearts remaining`}>
+    <div className="sr-hud-hearts" aria-label={`${count} hearts remaining`}>
       {Array.from({ length: max }, (_, index) => (
         <span
           key={index}
-          className={`scale-rush-heart ${index < count ? '' : 'scale-rush-heart--empty'}`}
+          className={`sr-hud-heart ${index < count ? 'sr-hud-heart--full' : 'sr-hud-heart--empty'}`}
           aria-hidden
         >
           ♥
         </span>
       ))}
-    </span>
+    </div>
   )
 }
 
-export default function ScaleRushGame({ state, readout, canvasRef, onPause }: ScaleRushGameProps) {
+export default function ScaleRushGame({ state, readout, onPause }: ScaleRushGameProps) {
   const config = state.config!
   const target = getTargetNoteAtStep(config, state.sequenceStep)
   const detectedPc = getDetectedWrittenPitchClass(readout, config)
-  const detectedLabel =
+  const detectedNote =
     detectedPc != null ? pitchClassLabel(detectedPc, config.key) : '—'
+  const detectedOctave =
+    detectedPc != null && Number.isFinite(readout.midi)
+      ? Math.floor(readout.midi / 12) - 1
+      : null
+  const isMatch =
+    detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
 
   return (
     <div className="scale-rush-screen scale-rush-screen--playing">
-      <header className="scale-rush-play-header flex items-center justify-between gap-2 text-xs">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex items-center gap-2">
+      <div className="sr-playfield">
+        <ScaleRushCourse
+          config={config}
+          sequenceStep={state.sequenceStep}
+          advanceToken={state.advanceToken}
+          missToken={state.missToken}
+          feedback={state.feedback}
+          feedbackToken={state.feedbackToken}
+        />
+
+        <div className="sr-hud-overlay">
+          <div className="sr-hud-top">
             <Hearts count={state.hearts} />
-            <span className="truncate text-stone-400">
-              {config.key} Major · {getTranspositionLabel(config.transposition)}
-            </span>
+            <Pressable
+              type="button"
+              intensity="soft"
+              onClick={onPause}
+              className="sr-hud-pause"
+              aria-label="Pause"
+            >
+              <Pause className="h-4 w-4" strokeWidth={3} />
+            </Pressable>
+          </div>
+
+          <div className="sr-hud-side sr-hud-side--left">
+            <div className="sr-hud-panel">
+              <p className="sr-hud-panel__label">Score</p>
+              <p className="sr-hud-panel__value sr-hud-panel__value--score tabular-nums">
+                {state.score}
+              </p>
+            </div>
+            <div className="sr-hud-panel">
+              <p className="sr-hud-panel__label">Streak</p>
+              <p className="sr-hud-panel__value sr-hud-panel__value--streak tabular-nums">
+                {state.streak}
+              </p>
+            </div>
+            <div className="sr-hud-panel">
+              <p className="sr-hud-panel__label">Accuracy</p>
+              <p className="sr-hud-panel__value sr-hud-panel__value--accuracy tabular-nums">
+                {accuracy}%
+              </p>
+            </div>
+          </div>
+
+          <div className="sr-hud-side sr-hud-side--right">
+            <div className="sr-hud-panel sr-hud-panel--target">
+              <p className="sr-hud-panel__label">Target Note</p>
+              <p className="sr-hud-panel__value sr-hud-panel__value--target">
+                {target.noteLabel}
+              </p>
+            </div>
+            <div className="sr-hud-panel sr-hud-panel--detected">
+              <p className="sr-hud-panel__label">Detected</p>
+              <p className="sr-hud-panel__value sr-hud-panel__value--detected">
+                <span className={isMatch ? 'sr-hud-detected--match' : ''}>{detectedNote}</span>
+                {detectedOctave != null && (
+                  <span className="sr-hud-detected-octave">{detectedOctave}</span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
-        <Pressable type="button" intensity="soft" onClick={onPause} className="shrink-0 text-stone-400">
-          Pause
-        </Pressable>
-      </header>
-
-      <div className="sr-hud-stats">
-        <span>
-          Score <strong className="tabular-nums">{state.score}</strong>
-        </span>
-        <span>
-          Streak <strong className="tabular-nums">×{state.streak}</strong>
-        </span>
-        <span>
-          Acc <strong className="tabular-nums">{accuracy}%</strong>
-        </span>
-      </div>
-
-      <div className="sr-target-hud">
-        <p className="sr-target-hud__eyebrow">
-          Play this note{config.pitchAccuracyStrict ? ' (±15¢)' : ''}
-        </p>
-        <p className="sr-target-hud__note">{target.noteLabel}</p>
-        <p className="sr-target-hud__detected">
-          Heard: <strong>{detectedLabel}</strong>
-        </p>
-      </div>
-
-      <ScaleRushCourse
-        config={config}
-        sequenceStep={state.sequenceStep}
-        advanceToken={state.advanceToken}
-        missToken={state.missToken}
-        feedback={state.feedback}
-        feedbackToken={state.feedbackToken}
-      />
-
-      <div className="mt-2 min-h-0 shrink-0">
-        <ScaleRushLiveTuner readout={readout} canvasRef={canvasRef} config={config} />
       </div>
     </div>
   )

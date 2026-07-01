@@ -55,7 +55,7 @@ interface UseCameraSessionOptions {
 
 const CAMERA_RELEASE_DELAY_MS = 700
 const FOREGROUND_RESTART_DELAY_MS = 250
-const IOS_CAMERA_RELEASE_DELAY_MS = 450
+const IOS_CAMERA_RELEASE_DELAY_MS = 700
 const IOS_AUDIO_TO_VIDEO_DELAY_MS = 200
 const IOS_VIDEO_TO_AUDIO_DELAY_MS = 280
 const BACKGROUND_SUSPEND_DELAY_MS = 0
@@ -66,6 +66,8 @@ function detachPreviewStream(video: HTMLVideoElement | null) {
   try {
     video.pause()
     video.srcObject = null
+    video.removeAttribute('src')
+    video.load()
   } catch {
     /* ignore */
   }
@@ -303,6 +305,7 @@ export function useCameraSession({
   const [elapsed, setElapsed] = useState(0)
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('video')
   const [streamGeneration, setStreamGeneration] = useState(0)
+  const [isPreviewRecovering, setIsPreviewRecovering] = useState(false)
 
   recordingModeRef.current = recordingMode
   isRecordingRef.current = isRecording
@@ -701,6 +704,7 @@ export function useCameraSession({
 
   const ensureRecordableStream = useCallback(async (): Promise<MediaStream | null> => {
     if (!isAppInForeground()) return null
+    if (resumeInFlightRef.current) return streamRef.current
 
     const mode = recordingModeRef.current
     const stream = streamRef.current
@@ -1506,6 +1510,7 @@ export function useCameraSession({
 
   const suspendCameraForBackground = useCallback(() => {
     if (isRecordingRef.current) return
+    captureSessionEpochRef.current += 1
     cancelScheduledRelease()
     if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
       cancelAutoPreRollCapture()
@@ -1535,19 +1540,22 @@ export function useCameraSession({
 
     const restartToken = ++foregroundRestartTokenRef.current
     resumeInFlightRef.current = true
+    setIsPreviewRecovering(true)
+    setReady(false)
     cancelScheduledRelease()
 
     const resumeTimeoutId = window.setTimeout(() => {
       if (restartToken === foregroundRestartTokenRef.current) {
         resumeInFlightRef.current = false
+        setIsPreviewRecovering(false)
       }
     }, RESUME_IN_FLIGHT_TIMEOUT_MS)
-
-    onBeforeForegroundRestartRef.current?.()
 
     try {
       applyViewportCssVarsOnResume()
       resetCameraPreviewZoom()
+      captureSessionEpochRef.current += 1
+      releaseLiveStream()
 
       const mode = recordingModeRef.current
       const preferFullReacquire = mode === 'video' && Capacitor.isNativePlatform()
@@ -1560,15 +1568,16 @@ export function useCameraSession({
         if (import.meta.env.DEV) {
           console.log('[CameraPreview] resume skipped: already active')
         }
+        onBeforeForegroundRestartRef.current?.()
         return
       }
-
-      releaseLiveStream()
 
       if (Capacitor.isNativePlatform()) {
         await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
       }
       if (restartToken !== foregroundRestartTokenRef.current) return
+
+      onBeforeForegroundRestartRef.current?.()
 
       const stream = await acquireStream(recordingModeRef.current, undefined, {
         forceNew: true,
@@ -1576,6 +1585,7 @@ export function useCameraSession({
       if (restartToken !== foregroundRestartTokenRef.current) return
       if (recordingModeRef.current === 'video' && stream) {
         await normalizeVideoPreviewAfterWake(stream)
+        syncPreviewTargets(stream, 'video')
       }
     } catch (err) {
       console.warn('Camera interrupted during foreground restart', err)
@@ -1585,10 +1595,17 @@ export function useCameraSession({
       window.clearTimeout(resumeTimeoutId)
       if (restartToken === foregroundRestartTokenRef.current) {
         resumeInFlightRef.current = false
+        setIsPreviewRecovering(false)
       }
       onAfterForegroundRestartRef.current?.()
     }
-  }, [acquireStream, cancelScheduledRelease, ensureCameraPreviewActive, releaseLiveStream])
+  }, [
+    acquireStream,
+    cancelScheduledRelease,
+    ensureCameraPreviewActive,
+    releaseLiveStream,
+    syncPreviewTargets,
+  ])
 
   const scheduleForegroundRecovery = useCallback(() => {
     if (backgroundSuspendTimerRef.current !== null) {
@@ -1598,12 +1615,26 @@ export function useCameraSession({
 
     if (foregroundRestartTimerRef.current !== null) {
       window.clearTimeout(foregroundRestartTimerRef.current)
+      foregroundRestartTimerRef.current = null
     }
 
-    foregroundRestartTimerRef.current = window.setTimeout(() => {
+    const runRecovery = () => {
       foregroundRestartTimerRef.current = null
       void restartCameraAfterForeground()
-    }, FOREGROUND_RESTART_DELAY_MS)
+    }
+
+    const nativeVideoWake =
+      Capacitor.isNativePlatform() && recordingModeRef.current === 'video'
+
+    if (nativeVideoWake) {
+      runRecovery()
+      return
+    }
+
+    foregroundRestartTimerRef.current = window.setTimeout(
+      runRecovery,
+      FOREGROUND_RESTART_DELAY_MS,
+    )
   }, [restartCameraAfterForeground])
 
   const scheduleBackgroundSuspend = useCallback(() => {
@@ -1743,6 +1774,10 @@ export function useCameraSession({
   }, [])
 
   useEffect(() => {
+    const suspendForPageHide = () => {
+      scheduleBackgroundSuspend()
+    }
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         scheduleBackgroundSuspend()
@@ -1755,6 +1790,7 @@ export function useCameraSession({
 
     const bindAppLifecycle = async () => {
       document.addEventListener('visibilitychange', onVisibilityChange)
+      window.addEventListener('pagehide', suspendForPageHide)
 
       if (Capacitor.isNativePlatform()) {
         const { App } = await import('@capacitor/app')
@@ -1769,6 +1805,7 @@ export function useCameraSession({
         return {
           remove: async () => {
             document.removeEventListener('visibilitychange', onVisibilityChange)
+            window.removeEventListener('pagehide', suspendForPageHide)
             await appHandle.remove()
           },
         }
@@ -1777,6 +1814,7 @@ export function useCameraSession({
       return {
         remove: async () => {
           document.removeEventListener('visibilitychange', onVisibilityChange)
+          window.removeEventListener('pagehide', suspendForPageHide)
         },
       }
     }
@@ -1807,6 +1845,7 @@ export function useCameraSession({
     if (recordingMode !== 'video') return
 
     const revivePreview = () => {
+      if (resumeInFlightRef.current || !readyRef.current) return
       const stream = streamRef.current
       if (!stream || recordingModeRef.current !== 'video') return
 
@@ -1865,5 +1904,6 @@ export function useCameraSession({
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
+    isPreviewRecovering,
   }
 }

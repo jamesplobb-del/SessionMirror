@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { Capacitor } from '@capacitor/core'
 import type { RecordingMode } from '../types'
 import { resetCameraPreviewZoom } from '../utils/videoCapture'
 
@@ -86,6 +87,7 @@ export function useCameraPreviewResume({
 
   const beginResume = useCallback(() => {
     if (recordingMode !== 'video') return
+    if (Capacitor.isNativePlatform()) return
     if (resumeActiveRef.current) return
 
     const frame = captureFrame() ?? lastFrameRef.current

@@ -87,6 +87,7 @@ function LiveCameraBackground({
   useEffect(() => {
     if (nativePreviewActive) return
     if (handsFreePlaybackTakeId) return
+    if (modePreparing) return
     const video = previewRef.current
     if (!video || isAudioMode) {
       if (video?.srcObject) {
@@ -104,7 +105,7 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive, handsFreePlaybackTakeId])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive, handsFreePlaybackTakeId, modePreparing])
 
   useEffect(() => {
     if (nativePreviewActive) return

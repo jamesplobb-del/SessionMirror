@@ -1,36 +1,32 @@
 interface ScaleRushCharacterProps {
   hopping: boolean
   landing: boolean
+  hit: boolean
 }
 
-export default function ScaleRushCharacter({ hopping, landing }: ScaleRushCharacterProps) {
+/** Cute big-headed Crossy Road style character, seen from behind. */
+export default function ScaleRushCharacter({ hopping, landing, hit }: ScaleRushCharacterProps) {
   return (
     <div
       className={[
         'sr-char',
         hopping && 'sr-char--hop',
         landing && 'sr-char--land',
+        hit && 'sr-char--hit',
       ]
         .filter(Boolean)
         .join(' ')}
       aria-hidden
     >
-      <div className="sr-char__cast-shadow" />
-      <div className="sr-char__sprite">
+      <div className="sr-char__shadow" />
+      <div className="sr-char__body">
         <div className="sr-char__head">
-          <span className="sr-char__eye sr-char__eye--left" />
-          <span className="sr-char__eye sr-char__eye--right" />
-          <span className="sr-char__head-face sr-char__head-face--south" />
-          <span className="sr-char__head-face sr-char__head-face--east" />
+          <span className="sr-char__hair" />
         </div>
-        <div className="sr-char__body">
-          <span className="sr-char__body-face sr-char__body-face--south" />
-          <span className="sr-char__body-face sr-char__body-face--east" />
-        </div>
-        <div className="sr-char__feet">
-          <span className="sr-char__feet-face sr-char__feet-face--south" />
-        </div>
+        <div className="sr-char__shirt" />
+        <div className="sr-char__pants" />
       </div>
+      <div className="sr-char__flash" />
     </div>
   )
 }

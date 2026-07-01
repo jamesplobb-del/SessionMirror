@@ -1068,7 +1068,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleBeforeForegroundRestart = useCallback(() => {
     pauseYoutubeReference()
-    setCameraResumeNonce((nonce) => nonce + 1)
+    if (!(Capacitor.isNativePlatform() && recordingModeRef.current === 'video')) {
+      setCameraResumeNonce((nonce) => nonce + 1)
+    }
   }, [pauseYoutubeReference])
 
   const {
@@ -1098,6 +1100,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
+    isPreviewRecovering,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     secondaryPreviewRef: splitPreviewRef,
@@ -1256,7 +1259,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       handsFreePlaybackPending ||
       autoPlaybackPlaying ||
       benchmarkPipPlaying ||
-      challengerPipPlaying,
+      challengerPipPlaying ||
+      isPreviewRecovering,
     ready,
     isRecording,
     streamRef,
@@ -1337,7 +1341,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (document.visibilityState !== 'visible') return
 
       void resumePlaybackAudioContext()
-      setCameraResumeNonce((nonce) => nonce + 1)
+      if (!(Capacitor.isNativePlatform() && recordingModeRef.current === 'video')) {
+        setCameraResumeNonce((nonce) => nonce + 1)
+      }
 
       window.setTimeout(() => {
         // Camera foreground restart is handled inside useCameraSession lifecycle.
@@ -2664,7 +2670,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 recordingMode={recordingMode}
                 isRecording={isRecording}
                 resumeNonce={cameraResumeNonce}
-                modePreparing={!ready && !isRecording && !cameraNeedsPermission}
+                modePreparing={
+                  isPreviewRecovering ||
+                  (!ready && !isRecording && !cameraNeedsPermission)
+                }
                 pitchStageActive={
                   isAudioPracticeTunerTab || (showPitch && mainVideoPitchSource !== null)
                 }

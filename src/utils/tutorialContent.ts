@@ -19,6 +19,7 @@ export type CoachMarkId =
   | 'drag-to-best-take'
   | 'vault-expand-mode'
   | 'vault-settings'
+  | 'youtube-opened'
 
 export type HelpTopicId =
   | 'recording-modes'

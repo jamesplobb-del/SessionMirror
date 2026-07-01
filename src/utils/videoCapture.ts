@@ -244,24 +244,17 @@ export async function normalizeVideoPreviewAfterWake(
   try {
     const capabilities = track.getCapabilities?.() as ZoomCapableCapabilities | undefined
     const zoom = capabilities?.zoom
-    if (zoom) {
-      const min = zoom.min ?? 1
-      try {
-        await track.applyConstraints({ zoom: min } as MediaTrackConstraints)
-      } catch {
-        await track.applyConstraints({
-          advanced: [{ zoom: min } as MediaTrackConstraintSet],
-        })
-      }
-      return
+    if (!zoom) return
+
+    const min = zoom.min ?? 1
+    try {
+      await track.applyConstraints({ zoom: min } as MediaTrackConstraints)
+    } catch {
+      await track.applyConstraints({
+        advanced: [{ zoom: min } as MediaTrackConstraintSet],
+      })
     }
   } catch {
-    /* fall through */
-  }
-
-  try {
-    await track.applyConstraints({ facingMode: 'user' })
-  } catch {
-    /* keep current FOV if facingMode is rejected */
+    /* never re-apply facingMode/resolution here — iOS can crop on wake */
   }
 }
