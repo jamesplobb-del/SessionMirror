@@ -108,6 +108,24 @@
   background: #ffffff;
 }
 
+.native-bottom-sheet--vault .vault-header-command-row {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  padding-top: 0.12rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.native-bottom-sheet--vault .vault-header-command-row::-webkit-scrollbar {
+  display: none;
+}
+
 .native-bottom-sheet--vault .vault-header-action-btn:disabled {
   opacity: 0.42;
   cursor: not-allowed;

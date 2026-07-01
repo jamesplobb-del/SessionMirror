@@ -15,15 +15,17 @@
 
 .drone-sound-wheel__guide {
   position: absolute;
-  inset: 9.5%;
+  inset: 7.5%;
   z-index: 0;
   border-radius: 50%;
-  border: 1px solid rgba(23, 26, 34, 0.07);
+  border: 1px solid rgba(21, 152, 255, 0.16);
   background:
-    radial-gradient(circle at center, transparent 61%, rgba(59, 130, 246, 0.045) 62%, transparent 68%),
-    radial-gradient(circle at center, transparent 72%, rgba(247, 166, 0, 0.05) 73%, transparent 78%);
+    radial-gradient(circle at center, transparent 53%, rgba(255, 255, 255, 0.62) 54%, transparent 58%),
+    radial-gradient(circle at center, transparent 66%, rgba(21, 152, 255, 0.075) 67%, transparent 71%),
+    conic-gradient(from -90deg, rgba(247, 166, 0, 0.12), rgba(21, 152, 255, 0.14), rgba(247, 166, 0, 0.12));
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.68),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.86),
+    inset 0 0 36px rgba(21, 152, 255, 0.045),
     0 10px 28px rgba(23, 26, 34, 0.045);
   pointer-events: none;
 }
@@ -68,20 +70,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.15rem;
-  height: 1.35rem;
-  padding: 0.18rem 0.42rem;
+  width: 1.95rem;
+  height: 1.95rem;
+  padding: 0;
   border-radius: 999px;
-  border: 1px solid rgba(23, 26, 34, 0.09);
-  background: rgba(255, 255, 255, 0.72);
-  color: rgba(23, 26, 34, 0.56);
+  border: 1px solid rgba(21, 152, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 250, 255, 0.62)),
+    rgba(255, 255, 255, 0.74);
+  color: rgba(23, 26, 34, 0.58);
   font-size: 0.62rem;
-  font-weight: 750;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
   box-shadow:
-    0 2px 6px rgba(23, 26, 34, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    0 4px 12px rgba(21, 152, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
   transform: translate(-50%, -50%);
   pointer-events: none;
   transition:
@@ -93,17 +97,22 @@
 }
 
 .drone-sound-wheel__note--active {
-  border-color: rgba(59, 130, 246, 0.34);
-  background: rgba(59, 130, 246, 0.13);
-  color: #1d4ed8;
+  border-color: rgba(21, 152, 255, 0.62);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.82), rgba(21, 152, 255, 0.22) 72%),
+    rgba(21, 152, 255, 0.2);
+  color: #075985;
   box-shadow:
-    0 0 0 1px rgba(59, 130, 246, 0.12),
-    0 3px 10px rgba(59, 130, 246, 0.12);
+    0 0 0 1px rgba(21, 152, 255, 0.2),
+    0 0 18px rgba(21, 152, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .drone-sound-wheel__note--glissando {
   border-color: rgba(247, 166, 0, 0.55);
-  background: rgba(247, 166, 0, 0.14);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.86), rgba(247, 166, 0, 0.24) 72%),
+    rgba(247, 166, 0, 0.16);
   color: #b45309;
   transform: translate(-50%, -50%) scale(1.08);
   box-shadow:
@@ -170,20 +179,34 @@
 }
 
 html.app-dark-mode .drone-sound-wheel__guide {
-  border-color: rgba(226, 232, 240, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  border-color: rgba(56, 189, 248, 0.2);
+  background:
+    radial-gradient(circle at center, transparent 53%, rgba(15, 23, 42, 0.76) 54%, transparent 58%),
+    radial-gradient(circle at center, transparent 66%, rgba(56, 189, 248, 0.12) 67%, transparent 71%),
+    conic-gradient(from -90deg, rgba(247, 166, 0, 0.12), rgba(56, 189, 248, 0.14), rgba(247, 166, 0, 0.12));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 0 38px rgba(56, 189, 248, 0.08);
 }
 
 html.app-dark-mode .drone-sound-wheel__note {
-  border-color: rgba(226, 232, 240, 0.12);
-  background: rgba(15, 23, 42, 0.88);
+  border-color: rgba(56, 189, 248, 0.18);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 13, 25, 0.78)),
+    rgba(15, 23, 42, 0.88);
   color: rgba(248, 250, 252, 0.78);
 }
 
 html.app-dark-mode .drone-sound-wheel__note--active {
-  border-color: rgba(52, 211, 153, 0.45);
-  background: rgba(52, 211, 153, 0.16);
-  color: #a7f3d0;
+  border-color: rgba(56, 189, 248, 0.56);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(56, 189, 248, 0.22), rgba(14, 116, 144, 0.18) 72%),
+    rgba(15, 23, 42, 0.92);
+  color: #bae6fd;
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.18),
+    0 0 16px rgba(56, 189, 248, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 html.app-dark-mode .drone-sound-wheel__note--glissando {

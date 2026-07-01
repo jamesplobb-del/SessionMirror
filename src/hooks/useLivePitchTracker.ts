@@ -1469,7 +1469,9 @@ export function useLivePitchTracker(
         const sharedStream = micStreamRefStable.current?.current
         const graphStreamLive = micStreamIsLive(micGraph.stream)
         const graphMatchesShared =
-          !micStreamRefStable.current || micGraph.stream === sharedStream
+          !micStreamRefStable.current ||
+          !micStreamIsLive(sharedStream) ||
+          micGraph.stream === sharedStream
 
         if (
           graphStreamLive &&
@@ -1492,18 +1494,13 @@ export function useLivePitchTracker(
 
       try {
         if (source === 'microphone') {
-          const requireSharedMic = Boolean(micStreamRef)
           const sharedStream = micStreamRef?.current
-
-          if (requireSharedMic && !micStreamIsLive(sharedStream)) {
-            scheduleRetry(100)
-            return
-          }
+          const sharedStreamLive = micStreamIsLive(sharedStream)
 
           const graph = await createMicPitchGraph(
             profileRef.current,
-            sharedStream,
-            requireSharedMic,
+            sharedStreamLive ? sharedStream : null,
+            sharedStreamLive,
             realtimeModeRef.current ? REALTIME_MIC_FRAME_SIZE : undefined,
           )
           if (cancelled) {
@@ -1571,7 +1568,9 @@ export function useLivePitchTracker(
         const sharedStream = micStreamRefStable.current?.current
         const graphStreamLive = micStreamIsLive(graph.stream)
         const graphMatchesShared =
-          !micStreamRefStable.current || graph.stream === sharedStream
+          !micStreamRefStable.current ||
+          !micStreamIsLive(sharedStream) ||
+          graph.stream === sharedStream
 
         if (graph.context.state === 'suspended') {
           void graph.context.resume().catch(() => {})

@@ -198,6 +198,7 @@ const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetron
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
+const CreatorStudio = lazy(() => import('./components/creatorStudio/CreatorStudio'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -356,6 +357,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
+  const [creatorStudioTake, setCreatorStudioTake] = useState<Take | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
@@ -3000,6 +3002,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onDeleteTakes={handleDeleteTakes}
                     onClearAllTakes={handleClearAllTakes}
                     onOpenTake={handleOpenVaultTake}
+                    onCreateTake={setCreatorStudioTake}
                     onBeforeExport={() => {
                       stopAutoPlaybackAudio()
                       pausePipVideos()
@@ -3007,6 +3010,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     preferredMediaFilter={recordingMode === 'audio' ? 'audio' : 'all'}
                     recordingMode={recordingMode}
                     onEnterComplete={handleVaultEnterComplete}
+                  />
+
+                  <CreatorStudio
+                    isOpen={creatorStudioTake !== null}
+                    take={creatorStudioTake}
+                    projectName={activeProject?.name ?? null}
+                    onClose={() => setCreatorStudioTake(null)}
                   />
 
                   <SettingsDrawer

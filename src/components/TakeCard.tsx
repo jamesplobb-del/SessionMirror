@@ -6,6 +6,7 @@ import {
   Mic2,
   Pin,
   Play,
+  Sparkles,
   StickyNote,
   Trash2,
   Video,
@@ -38,6 +39,7 @@ interface TakeCardProps {
   onPinBenchmark: () => void
   onPinChallenger: () => void
   onExport?: () => void
+  onCreate?: () => void
   onUpdate: (updates: TakeUpdate) => void
   onDelete: () => void
   selectionMode?: boolean
@@ -57,6 +59,7 @@ function TakeCard({
   onPinBenchmark,
   onPinChallenger,
   onExport,
+  onCreate,
   onUpdate,
   onDelete,
   selectionMode = false,
@@ -363,6 +366,12 @@ function TakeCard({
               <Pin className="h-3.5 w-3.5" />
               Load Take
             </button>
+            {onCreate && mediaType === 'video' && (
+              <button type="button" className="vault-take-row__detail-btn" onClick={onCreate}>
+                <Sparkles className="h-3.5 w-3.5" />
+                Create
+              </button>
+            )}
             {onExport && (
               <button
                 type="button"
@@ -402,5 +411,6 @@ export default memo(TakeCard, (previous, next) =>
   previous.detailOpen === next.detailOpen &&
   previous.selectionMode === next.selectionMode &&
   previous.selected === next.selected &&
+  previous.onCreate === next.onCreate &&
   previous.exportBusy === next.exportBusy,
 )

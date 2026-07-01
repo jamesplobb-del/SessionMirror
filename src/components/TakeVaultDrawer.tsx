@@ -49,6 +49,7 @@ interface TakeVaultDrawerProps {
   onDeleteTakes: (ids: string[]) => void
   onClearAllTakes: () => void
   onOpenTake: (take: Take) => void
+  onCreateTake?: (take: Take) => void
   onBeforeExport?: () => void
   preferredMediaFilter?: VaultMediaFilter
   recordingMode?: 'video' | 'audio'
@@ -84,6 +85,7 @@ export default function TakeVaultDrawer({
   onDeleteTakes,
   onClearAllTakes,
   onOpenTake,
+  onCreateTake,
   onBeforeExport,
   preferredMediaFilter = 'all',
   recordingMode: _recordingMode = 'video',
@@ -347,45 +349,6 @@ export default function TakeVaultDrawer({
               >
                 <Search className="h-4 w-4" />
               </Pressable>
-              {contentReady && vaultSection === 'takes' && (
-                <>
-                  <Pressable
-                    type="button"
-                    intensity="soft"
-                    onClick={() => {
-                      if (selectionMode) exitSelectionMode()
-                      else setSelectionMode(true)
-                    }}
-                    haptic="light"
-                    className={`vault-header-action-btn ${selectionMode ? 'vault-header-action-btn--active' : ''}`}
-                    aria-pressed={selectionMode}
-                  >
-                    {selectionMode ? 'Cancel' : 'Select'}
-                  </Pressable>
-                  <Pressable
-                    type="button"
-                    intensity="soft"
-                    disabled={!selectionMode || selectedCount === 0}
-                    onClick={handleBulkDelete}
-                    haptic="light"
-                    className="vault-header-action-btn vault-header-action-btn--danger"
-                    aria-label="Delete selected takes"
-                  >
-                    Delete
-                  </Pressable>
-                  <Pressable
-                    type="button"
-                    intensity="soft"
-                    disabled={takes.length === 0}
-                    onClick={handleClearAll}
-                    haptic="light"
-                    className="vault-header-action-btn vault-header-action-btn--danger"
-                    aria-label="Clear all takes"
-                  >
-                    Clear all
-                  </Pressable>
-                </>
-              )}
               <Pressable
                 type="button"
                 intensity="icon"
@@ -399,6 +362,45 @@ export default function TakeVaultDrawer({
               </Pressable>
             </div>
           </div>
+          {contentReady && vaultSection === 'takes' && (
+            <div className="vault-header-command-row">
+              <Pressable
+                type="button"
+                intensity="soft"
+                onClick={() => {
+                  if (selectionMode) exitSelectionMode()
+                  else setSelectionMode(true)
+                }}
+                haptic="light"
+                className={`vault-header-action-btn ${selectionMode ? 'vault-header-action-btn--active' : ''}`}
+                aria-pressed={selectionMode}
+              >
+                {selectionMode ? 'Cancel' : 'Select'}
+              </Pressable>
+              <Pressable
+                type="button"
+                intensity="soft"
+                disabled={!selectionMode || selectedCount === 0}
+                onClick={handleBulkDelete}
+                haptic="light"
+                className="vault-header-action-btn vault-header-action-btn--danger"
+                aria-label="Delete selected takes"
+              >
+                Delete
+              </Pressable>
+              <Pressable
+                type="button"
+                intensity="soft"
+                disabled={takes.length === 0}
+                onClick={handleClearAll}
+                haptic="light"
+                className="vault-header-action-btn vault-header-action-btn--danger"
+                aria-label="Clear all takes"
+              >
+                Clear all
+              </Pressable>
+            </div>
+          )}
           {searchOpen && (
             <input
               type="search"
@@ -543,6 +545,15 @@ export default function TakeVaultDrawer({
                                       current === take.id ? null : current,
                                     )
                                   })
+                              }
+                            : undefined
+                        }
+                        onCreate={
+                          !selectionMode && getTakeMediaType(take) === 'video' && onCreateTake
+                            ? () => {
+                                silenceAllVaultVideos()
+                                onBeforeExport?.()
+                                onCreateTake(take)
                               }
                             : undefined
                         }
