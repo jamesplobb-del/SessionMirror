@@ -742,12 +742,28 @@ html.app-dark-mode .creator-studio__trim-dim {
 }
 
 .creator-studio__recording-frame {
+  position: relative;
   width: 100%;
+  min-height: 6rem;
   aspect-ratio: 9 / 16;
   overflow: hidden;
   border-radius: 1rem;
   background: #020617;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.creator-studio__media-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(248, 250, 252, 0.72);
+  background: #020617;
+}
+
+.creator-studio__recording-frame .creator-studio__preview-play {
+  width: 3.2rem;
+  height: 3.2rem;
 }
 
 .creator-studio__recording-frame .creator-studio__media {

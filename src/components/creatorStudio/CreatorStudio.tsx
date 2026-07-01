@@ -157,6 +157,7 @@ export default function CreatorStudio({
 
   const {
     mediaRef,
+    bindMediaRef,
     resolvedSrc,
     duration,
     currentTime,
@@ -377,7 +378,7 @@ export default function CreatorStudio({
               selectedObjectId={selectedObjectId}
               isVideo={isVideo}
               resolvedSrc={resolvedSrc}
-              mediaRef={mediaRef}
+              bindMediaRef={bindMediaRef}
               isPlaying={isPlaying}
               duration={duration}
               currentTime={currentTime}

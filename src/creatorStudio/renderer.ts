@@ -3,18 +3,23 @@ import type {
   CreatorStudioExportResult,
   CreatorStudioPreviewModel,
 } from './types'
-import { sortCanvasObjects } from './canvasObjects'
+import { createDefaultRecordingObject, sortCanvasObjects } from './canvasObjects'
 
 export function renderCreatorStudioPreviewModel(
   state: CreatorStudioEditorState,
 ): CreatorStudioPreviewModel {
+  const hasRecording = state.objects.some((object) => object.kind === 'recording')
+  const objects = sortCanvasObjects(
+    hasRecording ? state.objects : [createDefaultRecordingObject(), ...state.objects],
+  ).filter((object) => {
+    if (object.kind === 'watermark') return object.visible
+    return true
+  })
+
   return {
     aspectRatio: state.aspectRatio,
     trim: state.trim,
-    objects: sortCanvasObjects(state.objects).filter((object) => {
-      if (object.kind === 'watermark') return object.visible
-      return true
-    }),
+    objects,
     audio: state.audio,
   }
 }

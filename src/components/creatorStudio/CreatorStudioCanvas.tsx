@@ -19,7 +19,7 @@ interface CreatorStudioCanvasProps {
   selectedObjectId: string | null
   isVideo: boolean
   resolvedSrc: string | null
-  mediaRef: RefObject<HTMLVideoElement | HTMLAudioElement | null>
+  bindMediaRef: (node: HTMLVideoElement | HTMLAudioElement | null) => void
   isPlaying: boolean
   duration: number
   currentTime: number
@@ -114,7 +114,7 @@ export default function CreatorStudioCanvas({
   selectedObjectId,
   isVideo,
   resolvedSrc,
-  mediaRef,
+  bindMediaRef,
   isPlaying,
   duration,
   currentTime,
@@ -191,10 +191,10 @@ export default function CreatorStudioCanvas({
   )
 
   const renderRecordingMedia = () =>
-    isVideo && resolvedSrc ? (
+    isVideo ? (
       <>
         <video
-          ref={mediaRef as RefObject<HTMLVideoElement>}
+          ref={bindMediaRef}
           className="creator-studio__media"
           playsInline
           preload="metadata"
@@ -203,12 +203,18 @@ export default function CreatorStudioCanvas({
             onTogglePlayback()
           }}
         />
+        {!resolvedSrc && (
+          <div className="creator-studio__media-loading" aria-hidden>
+            <Music2 className="h-8 w-8 animate-pulse" />
+          </div>
+        )}
         <Pressable
           type="button"
           intensity="icon"
           haptic="medium"
           className={`creator-studio__preview-play ${isPlaying ? 'is-playing' : ''}`}
           aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+          disabled={!resolvedSrc}
           onClick={(event) => {
             event.stopPropagation()
             onTogglePlayback()
@@ -217,9 +223,9 @@ export default function CreatorStudioCanvas({
           {isPlaying ? <Pause className="h-6 w-6 fill-current" /> : <Play className="h-6 w-6 fill-current" />}
         </Pressable>
       </>
-    ) : !isVideo && resolvedSrc ? (
+    ) : resolvedSrc ? (
       <>
-        <audio ref={mediaRef as RefObject<HTMLAudioElement>} className="creator-studio__media-audio" preload="metadata" />
+        <audio ref={bindMediaRef} className="creator-studio__media-audio" preload="metadata" />
         <div className="creator-studio__audio-chip">
           <Music2 className="h-5 w-5" />
           <Pressable type="button" intensity="icon" haptic="medium" className="creator-studio__audio-play" onClick={onTogglePlayback}>
@@ -227,7 +233,11 @@ export default function CreatorStudioCanvas({
           </Pressable>
         </div>
       </>
-    ) : null
+    ) : (
+      <div className="creator-studio__media-loading" aria-hidden>
+        <Music2 className="h-8 w-8 animate-pulse" />
+      </div>
+    )
 
   const renderObject = (object: StudioCanvasObject) => {
     if (object.kind === 'watermark' && !object.visible) return null

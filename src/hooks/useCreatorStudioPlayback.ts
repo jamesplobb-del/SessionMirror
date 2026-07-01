@@ -41,6 +41,7 @@ export function useCreatorStudioPlayback(
   audio: CreatorStudioAudioMix,
 ) {
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null)
+  const [mediaNode, setMediaNode] = useState<HTMLVideoElement | HTMLAudioElement | null>(null)
   const trimRef = useRef(trim)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -50,36 +51,39 @@ export function useCreatorStudioPlayback(
 
   trimRef.current = trim
 
-  useEffect(() => {
-    if (!isOpen || !take || !resolvedSrc) return
-    const media = mediaRef.current
-    if (!media) return
+  const bindMediaRef = useCallback((node: HTMLVideoElement | HTMLAudioElement | null) => {
+    mediaRef.current = node
+    setMediaNode(node)
+  }, [])
 
-    prepareInlineMediaElement(media)
-    assignMediaPlaybackSrc(media, resolvedSrc)
-    primeTakePlaybackForUserGesture(media)
-    routeTakePlaybackToSpeaker(media, 1, false)
+  useEffect(() => {
+    if (!isOpen || !take || !resolvedSrc || !mediaNode) return
+
+    prepareInlineMediaElement(mediaNode)
+    assignMediaPlaybackSrc(mediaNode, resolvedSrc)
+    primeTakePlaybackForUserGesture(mediaNode)
+    routeTakePlaybackToSpeaker(mediaNode, 1, false)
 
     const syncDuration = () => {
-      const next = media.duration
+      const next = mediaNode.duration
       if (next && Number.isFinite(next)) {
         setDuration(next)
       }
     }
 
     const onTimeUpdate = () => {
-      const time = media.currentTime
+      const time = mediaNode.currentTime
       setCurrentTime(time)
 
-      const mediaDuration = media.duration
+      const mediaDuration = mediaNode.duration
       if (!mediaDuration || !Number.isFinite(mediaDuration)) return
 
       const { start, end } = getTrimBounds(trimRef.current, mediaDuration)
       if (time < start - 0.04) {
-        media.currentTime = start
-      } else if (time >= end - 0.03 && !media.paused) {
-        media.pause()
-        media.currentTime = start
+        mediaNode.currentTime = start
+      } else if (time >= end - 0.03 && !mediaNode.paused) {
+        mediaNode.pause()
+        mediaNode.currentTime = start
         setIsPlaying(false)
       }
     }
@@ -88,28 +92,28 @@ export function useCreatorStudioPlayback(
     const onPause = () => setIsPlaying(false)
     const onEnded = () => {
       setIsPlaying(false)
-      const mediaDuration = media.duration
+      const mediaDuration = mediaNode.duration
       if (!mediaDuration) return
-      media.currentTime = getTrimBounds(trimRef.current, mediaDuration).start
+      mediaNode.currentTime = getTrimBounds(trimRef.current, mediaDuration).start
     }
 
-    media.addEventListener('loadedmetadata', syncDuration)
-    media.addEventListener('durationchange', syncDuration)
-    media.addEventListener('timeupdate', onTimeUpdate)
-    media.addEventListener('play', onPlay)
-    media.addEventListener('pause', onPause)
-    media.addEventListener('ended', onEnded)
+    mediaNode.addEventListener('loadedmetadata', syncDuration)
+    mediaNode.addEventListener('durationchange', syncDuration)
+    mediaNode.addEventListener('timeupdate', onTimeUpdate)
+    mediaNode.addEventListener('play', onPlay)
+    mediaNode.addEventListener('pause', onPause)
+    mediaNode.addEventListener('ended', onEnded)
     syncDuration()
 
     return () => {
-      media.removeEventListener('loadedmetadata', syncDuration)
-      media.removeEventListener('durationchange', syncDuration)
-      media.removeEventListener('timeupdate', onTimeUpdate)
-      media.removeEventListener('play', onPlay)
-      media.removeEventListener('pause', onPause)
-      media.removeEventListener('ended', onEnded)
+      mediaNode.removeEventListener('loadedmetadata', syncDuration)
+      mediaNode.removeEventListener('durationchange', syncDuration)
+      mediaNode.removeEventListener('timeupdate', onTimeUpdate)
+      mediaNode.removeEventListener('play', onPlay)
+      mediaNode.removeEventListener('pause', onPause)
+      mediaNode.removeEventListener('ended', onEnded)
     }
-  }, [isOpen, take, resolvedSrc])
+  }, [isOpen, take, resolvedSrc, mediaNode])
 
   useEffect(() => {
     if (!isOpen) {
@@ -117,6 +121,7 @@ export function useCreatorStudioPlayback(
       setDuration(0)
       setCurrentTime(0)
       setIsPlaying(false)
+      setMediaNode(null)
     }
   }, [isOpen])
 
@@ -128,7 +133,7 @@ export function useCreatorStudioPlayback(
     const volume = audio.instrumentVolume / 100
     routeTakePlaybackToSpeaker(media, volume, muted)
     updateTakePlaybackSpeakerGain(media, volume, muted)
-  }, [audio.instrumentVolume, audio.source])
+  }, [audio.instrumentVolume, audio.source, mediaNode])
 
   const togglePlayback = useCallback(() => {
     const media = mediaRef.current
@@ -166,6 +171,7 @@ export function useCreatorStudioPlayback(
 
   return {
     mediaRef,
+    bindMediaRef,
     resolvedSrc,
     duration,
     currentTime,
