@@ -1613,39 +1613,10 @@ body.settings-branch-open * {
   border-color: rgba(255, 255, 255, 0.9);
 }
 
-.audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat,
-.audio-practice-metronome__beat--active.audio-practice-metronome__beat--accent-strong {
-  background: #f7a600;
-  border-color: #fbbf24;
-  box-shadow: 0 0 22px rgba(247, 166, 0, 0.5);
-}
-
-.audio-practice-metronome__beat--accent-medium {
-  border-color: rgba(247, 166, 0, 0.55);
-  background: rgba(247, 166, 0, 0.1);
-}
-
-.audio-practice-metronome__beat--medium-accent {
-  width: clamp(2.1rem, 9.2vw, 2.65rem);
-  height: clamp(2.1rem, 9.2vw, 2.65rem);
-}
-
-.audio-practice-metronome__beat--active.audio-practice-metronome__beat--medium-accent {
-  background: rgba(247, 166, 0, 0.82);
-  border-color: #f7a600;
-  box-shadow: 0 0 14px rgba(247, 166, 0, 0.34);
-}
-
-.audio-practice-metronome__beat--active.audio-practice-metronome__beat--medium-accent
-  .audio-practice-metronome__beat-number {
-  color: #0f172a;
-}
-
-.audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat
-  .audio-practice-metronome__beat-number,
-.audio-practice-metronome__beat--active.audio-practice-metronome__beat--accent-strong
-  .audio-practice-metronome__beat-number {
-  color: #0f172a;
+.audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat {
+  background: #38bdf8;
+  border-color: #7dd3fc;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.45);
 }
 
 .audio-practice-metronome__beat-number {
@@ -1662,28 +1633,6 @@ body.settings-branch-open * {
 .audio-practice-metronome__beat--active.audio-practice-metronome__beat--downbeat
   .audio-practice-metronome__beat-number {
   color: #0f172a;
-}
-
-.audio-practice-metronome__beat-row--grouped {
-  gap: clamp(0.65rem, 3.5vw, 1.35rem);
-}
-
-.audio-practice-metronome__beat-group {
-  display: flex;
-  align-items: flex-start;
-  gap: clamp(0.35rem, 2vw, 0.65rem);
-  padding: 0.2rem 0.35rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.audio-practice-metronome__pulse--medium {
-  background: radial-gradient(circle, rgba(247, 166, 0, 0.42) 0%, rgba(247, 166, 0, 0) 68%);
-}
-
-.metronome-audio-stage__beat-row--playing .audio-practice-metronome__beat--pulse-medium {
-  animation: metronome-beat-pulse-soft 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .audio-practice-metronome__select-row--quad {
@@ -4535,25 +4484,10 @@ html.physical-landscape-right .control-deck__vault-btn {
   border-color: rgba(255, 255, 255, 0.92);
 }
 
-.metronome-audio-stage__beat-dot--accented {
-  border-color: rgba(247, 166, 0, 0.65);
-}
-
-.metronome-audio-stage__beat-dot--medium {
-  width: clamp(0.8rem, 3.6vw, 1rem);
-  height: clamp(0.8rem, 3.6vw, 1rem);
-}
-
 .metronome-audio-stage__beat-dot--active.metronome-audio-stage__beat-dot--downbeat {
-  background: #f7a600;
-  border-color: #fbbf24;
-  box-shadow: 0 0 20px rgba(247, 166, 0, 0.45);
-}
-
-.metronome-audio-stage__beat-dot--active.metronome-audio-stage__beat-dot--medium {
-  background: rgba(247, 166, 0, 0.78);
-  border-color: #f7a600;
-  box-shadow: 0 0 12px rgba(247, 166, 0, 0.3);
+  background: #38bdf8;
+  border-color: #7dd3fc;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.45);
 }
 
 .metronome-audio-stage__beat-row--playing .metronome-audio-stage__beat-dot--pulse {

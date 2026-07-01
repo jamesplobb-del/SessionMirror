@@ -67,7 +67,6 @@ export default function LiveMetronomeStage({
     bpm,
     meter,
     subdivision,
-    accentLevels,
     accentFirstBeat,
     playing,
     beatIndex,
@@ -212,21 +211,16 @@ export default function LiveMetronomeStage({
         >
           {Array.from({ length: beatsPerBar }, (_, index) => {
             const isActive = playing && beatIndex === index
-            const accentLevel = accentLevels[index] ?? 'weak'
-            const isDownbeat = index === 0 && accentLevel === 'strong'
-            const isMedium = accentLevel === 'medium'
+            const isDownbeat = index === 0 && accentFirstBeat
             return (
               <span
                 key={index}
                 className={[
                   'metronome-audio-stage__beat-dot',
                   isActive ? 'metronome-audio-stage__beat-dot--active' : '',
-                  accentLevel !== 'weak' ? 'metronome-audio-stage__beat-dot--accented' : '',
                   isDownbeat ? 'metronome-audio-stage__beat-dot--downbeat' : '',
-                  isMedium ? 'metronome-audio-stage__beat-dot--medium' : '',
                   isActive && isDownbeat ? 'metronome-audio-stage__beat-dot--pulse' : '',
-                  isActive && isMedium ? 'metronome-audio-stage__beat-dot--pulse-soft' : '',
-                  isActive && accentLevel === 'weak' ? 'metronome-audio-stage__beat-dot--pulse-soft' : '',
+                  isActive && !isDownbeat ? 'metronome-audio-stage__beat-dot--pulse-soft' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
