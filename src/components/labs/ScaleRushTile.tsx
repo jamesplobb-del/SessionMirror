@@ -10,7 +10,7 @@ interface ScaleRushTileProps {
   depthIndex?: number
 }
 
-function obstacleClass(terrain: CourseRow['terrain']): string | null {
+function obstacleKind(terrain: CourseRow['terrain']): 'vehicle' | 'log' | null {
   if (terrain === 'road') return 'vehicle'
   if (terrain === 'river') return 'log'
   return null
@@ -20,29 +20,22 @@ function obstacleClass(terrain: CourseRow['terrain']): string | null {
  * Isometric note block — label comes from buildCourseRows() (single source of truth).
  */
 export default function ScaleRushTile({ row, variant, depthIndex = 0 }: ScaleRushTileProps) {
-  if (variant === 'start' || row.isStart) {
-    return (
-      <div className="sr-iso-tile sr-iso-tile--start" style={{ '--sr-depth': depthIndex } as CSSProperties}>
-        <div className="sr-iso-tile__cube">
-          <div className="sr-iso-tile__top">
-            <span>GO</span>
-          </div>
-          <div className="sr-iso-tile__left" />
-          <div className="sr-iso-tile__right" />
-        </div>
-        <div className="sr-iso-tile__shadow" />
-      </div>
-    )
-  }
-
-  const color = noteTileColor(row.pitchClass)
-  const obstacle = obstacleClass(row.terrain)
-  const isTarget = variant === 'target' || row.isTarget
+  const isStart = variant === 'start' || row.isStart
+  const isTarget = !isStart && (variant === 'target' || row.isTarget)
   const isLanded = variant === 'landed'
+  const color = isStart ? '#64748b' : noteTileColor(row.pitchClass)
+  const obstacle = obstacleKind(row.terrain)
 
   return (
     <div
-      className={`sr-iso-tile ${isTarget ? 'sr-iso-tile--target' : ''} ${isLanded ? 'sr-iso-tile--landed' : ''}`}
+      className={[
+        'sr-block',
+        isStart && 'sr-block--start',
+        isTarget && 'sr-block--target',
+        isLanded && 'sr-block--landed',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={
         {
           '--sr-tile-color': color,
@@ -50,19 +43,15 @@ export default function ScaleRushTile({ row, variant, depthIndex = 0 }: ScaleRus
         } as CSSProperties
       }
     >
-      {obstacle && row.terrain !== 'grass' && (
-        <div className={`sr-iso-obstacle sr-iso-obstacle--${row.terrain}`} aria-hidden>
-          <span className={`sr-iso-obstacle__shape sr-iso-obstacle__shape--${obstacle}`} />
-        </div>
+      {obstacle && !isStart && (
+        <div className={`sr-block__obstacle sr-block__obstacle--${obstacle}`} aria-hidden />
       )}
-      <div className="sr-iso-tile__cube">
-        <div className="sr-iso-tile__top">
-          <span>{row.noteLabel}</span>
-        </div>
-        <div className="sr-iso-tile__left" />
-        <div className="sr-iso-tile__right" />
+      <div className="sr-block__cap">
+        <span className="sr-block__label">{isStart ? 'GO' : row.noteLabel}</span>
       </div>
-      <div className="sr-iso-tile__shadow" />
+      <div className="sr-block__edge sr-block__edge--front" />
+      <div className="sr-block__edge sr-block__edge--side" />
+      <div className="sr-block__shadow" />
     </div>
   )
 }

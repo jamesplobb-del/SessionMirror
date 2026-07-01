@@ -6,13 +6,23 @@ interface ScaleRushCharacterProps {
 export default function ScaleRushCharacter({ hopping, landing }: ScaleRushCharacterProps) {
   return (
     <div
-      className={`sr-iso-char ${hopping ? 'sr-iso-char--hop' : ''} ${landing ? 'sr-iso-char--land' : ''}`}
+      className={[
+        'sr-char',
+        hopping && 'sr-char--hop',
+        landing && 'sr-char--land',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       aria-hidden
     >
-      <div className="sr-iso-char__shadow" />
-      <div className="sr-iso-char__body">
-        <div className="sr-iso-char__head" />
-        <div className="sr-iso-char__torso" />
+      <div className="sr-char__shadow" />
+      <div className="sr-char__sprite">
+        <div className="sr-char__head">
+          <span className="sr-char__eye sr-char__eye--left" />
+          <span className="sr-char__eye sr-char__eye--right" />
+        </div>
+        <div className="sr-char__body" />
+        <div className="sr-char__feet" />
       </div>
     </div>
   )

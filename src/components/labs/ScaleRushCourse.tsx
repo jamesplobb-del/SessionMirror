@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { buildCourseRows } from '../../labs/scaleRush/scaleRushMusicLogic'
-import type { ScaleRushFeedback } from '../../labs/scaleRush/scaleRushTypes'
-import type { ScaleRushConfig } from '../../labs/scaleRush/scaleRushTypes'
+import type { ScaleRushConfig, ScaleRushFeedback } from '../../labs/scaleRush/scaleRushTypes'
 import ScaleRushCharacter from './ScaleRushCharacter'
 import ScaleRushTile from './ScaleRushTile'
 
@@ -75,52 +74,66 @@ export default function ScaleRushCourse({
 
   return (
     <div
-      className={`sr-iso-course ${shaking ? 'sr-iso-course--shake' : ''}`}
-      aria-label="Scale Rush isometric course"
+      className={`sr-course ${shaking ? 'sr-course--shake' : ''}`}
+      aria-label="Scale Rush course"
     >
-      <div className="sr-iso-course__sky" />
-      <div className="sr-iso-course__horizon" />
+      <div className="sr-course__backdrop">
+        <div className="sr-course__sky" />
+        <div className="sr-course__ground" />
+        <div className="sr-course__path-glow" />
+      </div>
 
       {feedbackLabel && (
         <p
           key={feedbackToken}
-          className={`sr-iso-feedback sr-iso-feedback--${feedbackTone}`}
+          className={`sr-course__feedback sr-course__feedback--${feedbackTone}`}
           role="status"
         >
           {feedbackLabel}
         </p>
       )}
 
-      <div
-        className="sr-iso-course__world"
-        style={{ '--sr-scroll-bump': scrollBump } as CSSProperties}
-      >
-        <div className="sr-iso-course__rows">
-          {aheadRows.map((row, index) => (
-            <div
-              key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
-              className={`sr-iso-row sr-iso-row--${row.terrain}`}
-              style={{ '--sr-row-depth': aheadRows.length - index } as CSSProperties}
-            >
-              <div className="sr-iso-row__decor sr-iso-row__decor--left" />
-              <div className="sr-iso-row__center">
-                <ScaleRushTile
-                  row={row}
-                  variant={row.isTarget ? 'target' : 'ahead'}
-                  depthIndex={aheadRows.length - index}
-                />
+      <div className="sr-course__scene">
+        <div
+          className="sr-course__track"
+          style={{ '--sr-scroll-bump': scrollBump } as CSSProperties}
+        >
+          {aheadRows.map((row, index) => {
+            const depth = aheadRows.length - index
+            return (
+              <div
+                key={`${sequenceStep}-${row.rowOffset}-${row.sequenceIndex}`}
+                className={`sr-lane sr-lane--${row.terrain}`}
+                style={{ '--sr-lane-depth': depth } as CSSProperties}
+              >
+                <div className="sr-lane__side sr-lane__side--left">
+                  {row.terrain === 'grass' && <span className="sr-tree" />}
+                </div>
+                <div className="sr-lane__slot">
+                  <ScaleRushTile
+                    row={row}
+                    variant={row.isTarget ? 'target' : 'ahead'}
+                    depthIndex={depth}
+                  />
+                </div>
+                <div className="sr-lane__side sr-lane__side--right">
+                  {row.terrain === 'grass' && <span className="sr-tree" />}
+                </div>
               </div>
-              <div className="sr-iso-row__decor sr-iso-row__decor--right" />
-            </div>
-          ))}
+            )
+          })}
         </div>
-      </div>
 
-      <div className="sr-iso-course__player-dock">
-        {playerRow && !playerRow.isStart && (
-          <ScaleRushTile row={playerRow} variant="landed" depthIndex={0} />
-        )}
-        <ScaleRushCharacter hopping={hopping} landing={landing} />
+        <div className="sr-course__player">
+          {playerRow && (
+            <ScaleRushTile
+              row={playerRow}
+              variant={playerRow.isStart ? 'start' : 'landed'}
+              depthIndex={0}
+            />
+          )}
+          <ScaleRushCharacter hopping={hopping} landing={landing} />
+        </div>
       </div>
     </div>
   )
