@@ -1,8 +1,14 @@
-import { memo, useEffect, type RefObject } from 'react'
+import { memo, useEffect, useRef, type RefObject } from 'react'
 import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
 import { iosBulletproofVideoProps } from '../utils/mobileVideo'
+import {
+  assignMediaPlaybackSrc,
+  waitForMediaReadyWithRetry,
+} from '../utils/mediaPlayback'
+import { resetVideoPlayback } from '../utils/videoPlayback'
+import { playTakeMediaAudible } from '../utils/takePlaybackAudio'
 
 interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
@@ -25,6 +31,11 @@ interface LiveCameraBackgroundProps {
   visuallySuppressed?: boolean
   /** Native iOS preview is rendered below the transparent WebView. */
   nativePreviewActive?: boolean
+  /** Hands-free video take replaces the live camera fullscreen during playback. */
+  handsFreePlaybackTakeId?: string | null
+  handsFreePlaybackSrc?: string | null
+  onHandsFreePlaybackPlayingChange?: (playing: boolean) => void
+  onHandsFreePlaybackComplete?: () => void
 }
 
 function LiveCameraBackground({
@@ -41,7 +52,13 @@ function LiveCameraBackground({
   variant = 'fullscreen',
   visuallySuppressed = false,
   nativePreviewActive = false,
+  handsFreePlaybackTakeId = null,
+  handsFreePlaybackSrc = null,
+  onHandsFreePlaybackPlayingChange,
+  onHandsFreePlaybackComplete,
 }: LiveCameraBackgroundProps) {
+  const handsFreePlaybackVideoRef = useRef<HTMLVideoElement>(null)
+  const handsFreePlaybackSessionRef = useRef(false)
   const isAudioMode = recordingMode === 'audio'
   const showAudioIdle =
     isAudioMode && !pitchStageActive && !metronomeStageActive && !audioPracticeOverlayActive
@@ -62,6 +79,7 @@ function LiveCameraBackground({
 
   useEffect(() => {
     if (nativePreviewActive) return
+    if (handsFreePlaybackTakeId) return
     const video = previewRef.current
     if (!video || isAudioMode) {
       if (video?.srcObject) {
@@ -79,10 +97,11 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive, handsFreePlaybackTakeId])
 
   useEffect(() => {
     if (nativePreviewActive) return
+    if (handsFreePlaybackTakeId) return
     if (isAudioMode || modePreparing || resumingPreview) return
 
     let reviveTimer: number | null = null
@@ -125,10 +144,11 @@ function LiveCameraBackground({
       video?.removeEventListener('stalled', scheduleRevive)
       video?.removeEventListener('suspend', scheduleRevive)
     }
-  }, [isAudioMode, modePreparing, nativePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, isAudioMode, modePreparing, nativePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
 
   useEffect(() => {
     if (nativePreviewActive) return
+    if (handsFreePlaybackTakeId) return
     if (visuallySuppressed || isAudioMode || modePreparing) return
     const video = previewRef.current
     const stream = streamRef.current
@@ -139,7 +159,97 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [isAudioMode, modePreparing, nativePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, isAudioMode, modePreparing, nativePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
+
+  useEffect(() => {
+    const wantsPlayback =
+      recordingMode === 'video' &&
+      Boolean(handsFreePlaybackTakeId) &&
+      Boolean(handsFreePlaybackSrc) &&
+      !isAudioMode &&
+      !visuallySuppressed
+
+    if (!wantsPlayback) {
+      handsFreePlaybackSessionRef.current = false
+      return
+    }
+
+    handsFreePlaybackSessionRef.current = true
+    let cancelled = false
+
+    void (async () => {
+      const media = handsFreePlaybackVideoRef.current
+      if (!media) {
+        onHandsFreePlaybackComplete?.()
+        return
+      }
+
+      resetVideoPlayback(media)
+      assignMediaPlaybackSrc(media, handsFreePlaybackSrc!)
+      media.load()
+
+      const ready = await waitForMediaReadyWithRetry(media)
+      if (cancelled || !handsFreePlaybackSessionRef.current) return
+
+      if (!ready) {
+        console.warn('Hands-free background playback media not ready', {
+          takeId: handsFreePlaybackTakeId,
+          readyState: media.readyState,
+        })
+        onHandsFreePlaybackComplete?.()
+        return
+      }
+
+      const onEnded = () => {
+        if (!handsFreePlaybackSessionRef.current) return
+        handsFreePlaybackSessionRef.current = false
+        onHandsFreePlaybackPlayingChange?.(false)
+        onHandsFreePlaybackComplete?.()
+      }
+
+      media.addEventListener('ended', onEnded, { once: true })
+
+      const started = await playTakeMediaAudible(media, {
+        onFailure: () => onHandsFreePlaybackPlayingChange?.(false),
+      })
+      if (cancelled || !handsFreePlaybackSessionRef.current) {
+        media.removeEventListener('ended', onEnded)
+        return
+      }
+
+      if (started) {
+        onHandsFreePlaybackPlayingChange?.(true)
+      } else {
+        media.removeEventListener('ended', onEnded)
+        handsFreePlaybackSessionRef.current = false
+        onHandsFreePlaybackComplete?.()
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      handsFreePlaybackSessionRef.current = false
+      const media = handsFreePlaybackVideoRef.current
+      if (media) {
+        resetVideoPlayback(media)
+      }
+    }
+  }, [
+    handsFreePlaybackSrc,
+    handsFreePlaybackTakeId,
+    isAudioMode,
+    onHandsFreePlaybackComplete,
+    onHandsFreePlaybackPlayingChange,
+    recordingMode,
+    visuallySuppressed,
+  ])
+
+  const showHandsFreeTakePlayback =
+    recordingMode === 'video' &&
+    Boolean(handsFreePlaybackTakeId) &&
+    Boolean(handsFreePlaybackSrc) &&
+    !isAudioMode &&
+    !visuallySuppressed
 
   const shellClass = isEmbedded
     ? 'camera-background camera-background--embedded'
@@ -153,7 +263,7 @@ function LiveCameraBackground({
     isEmbedded ? 'camera-preview--embedded' : 'camera-preview',
     'camera-preview--mirror',
     'camera-preview--live',
-    isAudioMode || nativePreviewActive ? 'camera-preview--hidden' : '',
+    isAudioMode || nativePreviewActive || showHandsFreeTakePlayback ? 'camera-preview--hidden' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -192,6 +302,16 @@ function LiveCameraBackground({
         {...iosBulletproofVideoProps}
         className={previewClassName}
       />
+
+      {showHandsFreeTakePlayback && (
+        <video
+          ref={handsFreePlaybackVideoRef}
+          autoPlay
+          playsInline
+          {...iosBulletproofVideoProps}
+          className={`${isEmbedded ? 'camera-preview--embedded' : 'camera-preview'} camera-preview--take-playback camera-preview--live`}
+        />
+      )}
 
       {isAudioMode && pitchStageActive && (
         <div className="pitch-stage-ambient pitch-stage-ambient--live-tuner" aria-hidden />
@@ -245,5 +365,7 @@ export default memo(
     prev.audioPracticeOverlayActive === next.audioPracticeOverlayActive &&
     prev.variant === next.variant &&
     prev.visuallySuppressed === next.visuallySuppressed &&
-    prev.nativePreviewActive === next.nativePreviewActive,
+    prev.nativePreviewActive === next.nativePreviewActive &&
+    prev.handsFreePlaybackTakeId === next.handsFreePlaybackTakeId &&
+    prev.handsFreePlaybackSrc === next.handsFreePlaybackSrc,
 )

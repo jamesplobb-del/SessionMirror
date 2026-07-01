@@ -28,6 +28,8 @@ interface SettingsDrawerProps {
   onAudioEnhancerChange: (enabled: boolean) => void
   onReset: () => void
   onReplayTutorial?: () => void
+  onOpenLabs?: () => void
+  onOpenCreatorStudio?: () => void
   recordingMode: 'video' | 'audio'
 }
 
@@ -168,6 +170,8 @@ export default function SettingsDrawer({
   onAudioEnhancerChange,
   onReset,
   onReplayTutorial,
+  onOpenLabs,
+  onOpenCreatorStudio,
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
@@ -461,6 +465,46 @@ export default function SettingsDrawer({
               onChange={(checked) => onUpdate({ excludeYoutubeFromRecording: checked })}
             />
           </section>
+
+          {(onOpenLabs || onOpenCreatorStudio) && (
+            <section className="settings-group space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+                Experimental (In Development)
+              </h3>
+
+              {onOpenLabs && (
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={onOpenLabs}
+                  className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-stone-900">🧪 Labs</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                      Prototype games like Scale Rush. Does not affect recording or playback.
+                    </p>
+                  </div>
+                </Pressable>
+              )}
+
+              {onOpenCreatorStudio && (
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={onOpenCreatorStudio}
+                  className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-stone-900">Creator Studio</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                      Trim, crop, and export a video take.
+                    </p>
+                  </div>
+                </Pressable>
+              )}
+            </section>
+          )}
 
           {onReplayTutorial && (
             <Pressable

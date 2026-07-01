@@ -21,6 +21,7 @@ import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
+import type { LabsRoute } from './components/labs/LabsOverlay'
 import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
@@ -199,6 +200,8 @@ const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
 const CreatorStudio = lazy(() => import('./components/creatorStudio/CreatorStudio'))
+const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
+const CreatorStudioTakePicker = lazy(() => import('./components/labs/CreatorStudioTakePicker'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -360,6 +363,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [creatorStudioTake, setCreatorStudioTake] = useState<Take | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [labsRoute, setLabsRoute] = useState<LabsRoute | null>(null)
+  const [isCreatorStudioPickerOpen, setIsCreatorStudioPickerOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
     isDragging: false,
     isArming: false,
@@ -421,11 +426,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const pitchUserDismissedRef = useRef(false)
 
   const isReviewOpen = reviewSlot !== null
+  const isLabsOpen = labsRoute !== null
+  const isExperimentalOpen = isLabsOpen || isCreatorStudioPickerOpen || creatorStudioTake !== null
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
     ? 'review'
-    : isVaultOpen || isSettingsOpen
+    : isVaultOpen || isSettingsOpen || isExperimentalOpen
     ? 'sheet'
     : 'idle'
+
+  useEffect(() => {
+    if (!isExperimentalOpen) return
+    setIsVaultOpen(false)
+    setIsSettingsOpen(false)
+  }, [isExperimentalOpen])
 
   useLayoutEffect(() => {
     return scheduleViewportSync(() => {})
@@ -1232,7 +1245,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [])
 
-  const autoMonitoringAllowed = !isVaultOpen && !isSettingsOpen && !isReviewOpen && ready
+  const autoMonitoringAllowed = !isVaultOpen && !isSettingsOpen && !isReviewOpen && !isExperimentalOpen && ready
 
   const { handsFreeRecording, restartHandsFreeMonitor } = useAutoSoundRecording({
     enabled: settings.autoSoundRecording,
@@ -1475,13 +1488,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [markOverlayClosed, settings.hapticFeedback])
 
   const handleOpenVault = useCallback(() => {
-    if (!canOpenOverlaySheet()) return
+    if (!canOpenOverlaySheet() || isExperimentalOpen) return
     triggerLightHaptic(settings.hapticFeedback)
     setShowPitch(false)
     setIsSettingsOpen(false)
     setIsVaultOpen(true)
     deferHudMediaPause()
-  }, [canOpenOverlaySheet, deferHudMediaPause, settings.hapticFeedback])
+  }, [canOpenOverlaySheet, deferHudMediaPause, isExperimentalOpen, settings.hapticFeedback])
 
   const handleToggleVault = useCallback(() => {
     if (isVaultOpen) {
@@ -1502,13 +1515,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
-    if (!canOpenOverlaySheet()) return
+    if (!canOpenOverlaySheet() || isExperimentalOpen) return
     triggerLightHaptic(settings.hapticFeedback)
     setShowPitch(false)
     setIsVaultOpen(false)
     setIsSettingsOpen(true)
     deferHudMediaPause()
-  }, [canOpenOverlaySheet, deferHudMediaPause, settings.hapticFeedback])
+  }, [canOpenOverlaySheet, deferHudMediaPause, isExperimentalOpen, settings.hapticFeedback])
 
   const handleRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
@@ -1550,6 +1563,53 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       console.log('[OverlayState] settingsOpen=false')
     }
   }, [markOverlayClosed, settings.hapticFeedback])
+
+  const handleOpenLabs = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    markOverlayClosed()
+    setIsSettingsOpen(false)
+    setIsVaultOpen(false)
+    setIsCreatorStudioPickerOpen(false)
+    setCreatorStudioTake(null)
+    setShowPitch(false)
+    setLabsRoute('menu')
+    deferHudMediaPause()
+  }, [deferHudMediaPause, markOverlayClosed, settings.hapticFeedback])
+
+  const handleOpenCreatorStudioPicker = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    markOverlayClosed()
+    setIsSettingsOpen(false)
+    setIsVaultOpen(false)
+    setLabsRoute(null)
+    setShowPitch(false)
+    pauseYoutubeReference()
+    pausePipVideos()
+    setIsCreatorStudioPickerOpen(true)
+    deferHudMediaPause()
+  }, [
+    deferHudMediaPause,
+    markOverlayClosed,
+    pausePipVideos,
+    pauseYoutubeReference,
+    settings.hapticFeedback,
+  ])
+
+  const handleCloseCreatorStudioPicker = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    setIsCreatorStudioPickerOpen(false)
+    refreshCameraSession()
+  }, [refreshCameraSession, settings.hapticFeedback])
+
+  const handleCloseLabs = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    setLabsRoute(null)
+    refreshCameraSession()
+  }, [refreshCameraSession, settings.hapticFeedback])
+
+  const handleLabsNavigate = useCallback((route: LabsRoute) => {
+    setLabsRoute(route)
+  }, [])
 
   const schedulePitchTrackerCommit = useCallback(
     (enabled: boolean) => {
@@ -1654,10 +1714,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
   }, [])
 
-  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen
+  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen || isExperimentalOpen
 
-  /** Audio-mode hands-free plays through hidden `<audio>` — PiP must not auto-play the same take. */
-  const challengerHandsFreeAutoPlayRequestId = recordingMode === 'audio' ? null : autoPlaybackTakeId
+  const handsFreeBackgroundTake = useMemo(() => {
+    if (!autoPlaybackTakeId || recordingMode !== 'video') return null
+    return takes.find((take) => take.id === autoPlaybackTakeId) ?? null
+  }, [autoPlaybackTakeId, recordingMode, takes])
+
+  const handsFreeBackgroundPlaybackSrc = useMemo(() => {
+    if (!handsFreeBackgroundTake?.videoUrl) return null
+    return resolveMediaPlaybackSrc(handsFreeBackgroundTake.videoUrl)
+  }, [handsFreeBackgroundTake])
 
   const resolvedBenchmark = useMemo(
     () => resolveBenchmarkPlayback(benchmarkBinding, benchmarkId, takes, libraryItems),
@@ -1796,13 +1863,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [pitchTrackerActive, recordingMode, ready, isRecording])
 
-  const pitchHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen
+  const pitchHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen
 
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
 
   const showMetronomeWidget = settings.showMetronome
 
-  const metronomeHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen
+  const metronomeHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen
 
   const metronomeWidgetInteractive = showMetronomeWidget && !metronomeHudSuspended
 
@@ -1859,7 +1926,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setActiveCaptureProfile('natural')
   }, [])
 
-  const audioPracticeSheetOpen = isVaultOpen || isSettingsOpen
+  const audioPracticeSheetOpen = isVaultOpen || isSettingsOpen || isExperimentalOpen
 
   const isAudioPracticeMetronomeTab = recordingMode === 'audio' && audioPracticeTab === 'metronome'
 
@@ -2110,6 +2177,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       pauseYoutubeReference()
       pausePipVideos()
       setIsVaultOpen(false)
+      setIsSettingsOpen(false)
+      setIsCreatorStudioPickerOpen(false)
+      setLabsRoute(null)
       setCreatorStudioTake(take)
     },
     [pausePipVideos, pauseYoutubeReference]
@@ -2118,7 +2188,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleCloseCreatorStudio = useCallback(() => {
     pauseYoutubeReference()
     setCreatorStudioTake(null)
-  }, [pauseYoutubeReference])
+    refreshCameraSession()
+  }, [pauseYoutubeReference, refreshCameraSession])
 
   const handleOpenCompareReview = useCallback(
     (slot: ReviewSlot) => {
@@ -2419,21 +2490,27 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [autoPlaybackTakeId, benchmarkId, challengerId])
 
+  const handleHandsFreeBackgroundPlaybackChange = useCallback(
+    (playing: boolean) => {
+      if (!autoPlaybackTakeId) return
+      if (playing) {
+        pendingAutoPlaybackRef.current = false
+        setHandsFreePlaybackPending(false)
+        setAutoPlaybackPlaying(true)
+      } else {
+        setAutoPlaybackPlaying(false)
+      }
+    },
+    [autoPlaybackTakeId],
+  )
+
   const handleChallengerAutoPlayComplete = useCallback(() => {
     finishAutoPlayback()
   }, [finishAutoPlayback])
 
-  const handleChallengerPlaybackChange = useCallback(
-    (playing: boolean) => {
-      setChallengerPipPlaying(playing)
-      if (playing && autoPlaybackTakeId) {
-        pendingAutoPlaybackRef.current = false
-        setHandsFreePlaybackPending(false)
-        setAutoPlaybackPlaying(true)
-      }
-    },
-    [autoPlaybackTakeId]
-  )
+  const handleChallengerPlaybackChange = useCallback((playing: boolean) => {
+    setChallengerPipPlaying(playing)
+  }, [])
 
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     prepareNewYoutubeReference()
@@ -2569,6 +2646,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 visuallySuppressed={isSplitView}
                 nativePreviewActive={false}
+                handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
+                handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
+                onHandsFreePlaybackPlayingChange={handleHandsFreeBackgroundPlaybackChange}
+                onHandsFreePlaybackComplete={handleChallengerAutoPlayComplete}
               />
 
               {cameraNeedsPermission && (
@@ -2816,7 +2897,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           onExpandChallenger={handleExpandChallenger}
                           onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
                           onChallengerPlaybackChange={handleChallengerPlaybackChange}
-                          challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
                           onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                           showPinCurrentAsBest={showPinCurrentAsBest}
                           onPinCurrentAsBest={handlePinCurrentAsBest}
@@ -2892,7 +2972,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             onDragStateChange={handlePipDragStateChange}
                             onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
                             onChallengerPlaybackChange={handleChallengerPlaybackChange}
-                            challengerAutoPlayRequestId={challengerHandsFreeAutoPlayRequestId}
                             onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                             showPinCurrentAsBest={showPinCurrentAsBest}
                             onPinCurrentAsBest={handlePinCurrentAsBest}
@@ -2934,7 +3013,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       onShowMetronomeChange={handleShowMetronomeSettingChange}
                       audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                       onAudioEnhancerChange={handleAudioEnhancerSettingChange}
-                      settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen}
+                      settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen}
                       onBranchOpenChange={handleQuickSettingsOpenChange}
                       hapticFeedback={settings.hapticFeedback}
                     />
@@ -3033,7 +3112,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onDeleteTakes={handleDeleteTakes}
                     onClearAllTakes={handleClearAllTakes}
                     onOpenTake={handleOpenVaultTake}
-                    onCreateTake={handleOpenCreatorStudio}
                     onBeforeExport={() => {
                       stopAutoPlaybackAudio()
                       pausePipVideos()
@@ -3041,6 +3119,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     preferredMediaFilter={recordingMode === 'audio' ? 'audio' : 'all'}
                     recordingMode={recordingMode}
                     onEnterComplete={handleVaultEnterComplete}
+                  />
+
+                  <CreatorStudioTakePicker
+                    isOpen={isCreatorStudioPickerOpen}
+                    takes={sortedTakes}
+                    onClose={handleCloseCreatorStudioPicker}
+                    onSelectTake={handleOpenCreatorStudio}
                   />
 
                   <CreatorStudio
@@ -3062,7 +3147,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                     onReset={handleResetSettings}
                     onReplayTutorial={handleReplayOnboardingTutorial}
+                    onOpenLabs={handleOpenLabs}
+                    onOpenCreatorStudio={handleOpenCreatorStudioPicker}
                     recordingMode={recordingMode}
+                  />
+
+                  <LabsOverlay
+                    isOpen={isLabsOpen}
+                    route={labsRoute ?? 'menu'}
+                    streamRef={streamRef}
+                    streamGeneration={streamGeneration}
+                    tunerInstrument={settings.tunerInstrument}
+                    onClose={handleCloseLabs}
+                    onNavigate={handleLabsNavigate}
                   />
                 </Suspense>
 
