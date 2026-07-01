@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -13,8 +14,11 @@ import {
   Crop,
   FileImage,
   Music2,
+  Pause,
+  Play,
   Scissors,
   Share2,
+  Sparkles,
   Type,
   Upload,
   Volume2,
@@ -26,6 +30,9 @@ import { getTakeMediaType } from '../../utils/mediaType'
 import { createInitialCreatorStudioState } from '../../creatorStudio/state'
 import { renderCreatorStudioPreviewModel } from '../../creatorStudio/renderer'
 import { exportCreatorStudioTake } from '../../creatorStudio/exporter'
+import { useCreatorStudioPlayback } from '../../hooks/useCreatorStudioPlayback'
+import { useMediaWaveform } from '../../hooks/useMediaWaveform'
+import { formatTime } from '../../hooks/useVideoPlayback'
 import type { Take } from '../../types'
 import type {
   CreatorStudioAspectRatio,
@@ -53,8 +60,6 @@ const ASPECT_RATIOS: CreatorStudioAspectRatio[] = ['9:16', '1:1', '16:9']
 
 const AUDIO_SOURCES: Array<{ id: CreatorStudioAudioSource; label: string }> = [
   { id: 'original', label: 'Original audio' },
-  { id: 'practice_mix', label: 'Practice mix' },
-  { id: 'accompaniment', label: 'Accompaniment' },
   { id: 'mute', label: 'Mute' },
 ]
 
@@ -80,6 +85,7 @@ export default function CreatorStudio({
   const { showAlert } = useActionSheet()
   const [editorState, setEditorState] = useState<CreatorStudioEditorState | null>(null)
   const [exporting, setExporting] = useState(false)
+  const trimRailRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const objectUrlsRef = useRef<string[]>([])
 
@@ -101,9 +107,133 @@ export default function CreatorStudio({
     [editorState],
   )
 
+  const {
+    mediaRef,
+    resolvedSrc,
+    duration,
+    currentTime,
+    isPlaying,
+    playheadPercent,
+    togglePlayback,
+    seekToPercent,
+    formatTrimLabel,
+  } = useCreatorStudioPlayback(
+    take,
+    isOpen,
+    editorState?.trim ?? { start: 0, end: null },
+    editorState?.audio ?? {
+      source: 'original',
+      instrumentVolume: 100,
+      backingTrackVolume: 80,
+      hasPracticeMix: false,
+      hasAccompaniment: false,
+    },
+  )
+
+  const waveformPeaks = useMediaWaveform({
+    filePath: take?.filePath ?? '',
+    mediaUrl: take?.videoUrl ?? '',
+    barCount: 48,
+  })
+
   const setSelectedTool = useCallback((selectedTool: CreatorStudioTool) => {
     updateCreatorStudioState(setEditorState, (state) => ({ ...state, selectedTool }))
   }, [])
+
+  const updateTrimEdgeFromClientX = useCallback(
+    (edge: 'start' | 'end', clientX: number) => {
+      const rail = trimRailRef.current
+      if (!rail) return
+
+      const rect = rail.getBoundingClientRect()
+      const percent = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100))
+      let seekPercent = percent
+
+      updateCreatorStudioState(setEditorState, (state) => {
+        const currentEnd = state.trim.end ?? 100
+        if (edge === 'start') {
+          const start = Math.min(percent, currentEnd - 2)
+          seekPercent = Math.max(0, start)
+          return { ...state, trim: { ...state.trim, start: seekPercent } }
+        }
+
+        const end = Math.max(percent, state.trim.start + 2)
+        seekPercent = Math.min(100, end)
+        return {
+          ...state,
+          trim: {
+            ...state.trim,
+            end: seekPercent >= 99.5 ? null : seekPercent,
+          },
+        }
+      })
+
+      seekToPercent(seekPercent)
+    },
+    [seekToPercent],
+  )
+
+  const handleTrimHandlePointerDown = useCallback(
+    (edge: 'start' | 'end', event: ReactPointerEvent<HTMLButtonElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const handle = event.currentTarget
+      handle.setPointerCapture(event.pointerId)
+      updateTrimEdgeFromClientX(edge, event.clientX)
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        if (!handle.hasPointerCapture(moveEvent.pointerId)) return
+        updateTrimEdgeFromClientX(edge, moveEvent.clientX)
+      }
+      const handlePointerUp = (upEvent: PointerEvent) => {
+        if (handle.hasPointerCapture(upEvent.pointerId)) {
+          handle.releasePointerCapture(upEvent.pointerId)
+        }
+        handle.removeEventListener('pointermove', handlePointerMove)
+        handle.removeEventListener('pointerup', handlePointerUp)
+      }
+
+      handle.addEventListener('pointermove', handlePointerMove)
+      handle.addEventListener('pointerup', handlePointerUp)
+    },
+    [updateTrimEdgeFromClientX],
+  )
+
+  const handleTrimRailScrub = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if ((event.target as HTMLElement).closest('.creator-studio__trim-handle')) return
+
+      const rail = trimRailRef.current
+      if (!rail) return
+
+      const scrub = (clientX: number) => {
+        const rect = rail.getBoundingClientRect()
+        const percent = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100))
+        seekToPercent(percent)
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      scrub(event.clientX)
+      event.currentTarget.setPointerCapture(event.pointerId)
+
+      const onMove = (moveEvent: PointerEvent) => {
+        if (!event.currentTarget.hasPointerCapture(moveEvent.pointerId)) return
+        scrub(moveEvent.clientX)
+      }
+      const onUp = (upEvent: PointerEvent) => {
+        if (event.currentTarget.hasPointerCapture(upEvent.pointerId)) {
+          event.currentTarget.releasePointerCapture(upEvent.pointerId)
+        }
+        event.currentTarget.removeEventListener('pointermove', onMove)
+        event.currentTarget.removeEventListener('pointerup', onUp)
+      }
+
+      event.currentTarget.addEventListener('pointermove', onMove)
+      event.currentTarget.addEventListener('pointerup', onUp)
+    },
+    [seekToPercent],
+  )
 
   const handleExport = useCallback(() => {
     if (!take || !editorState || exporting) return
@@ -147,15 +277,17 @@ export default function CreatorStudio({
   }
 
   const isVideo = getTakeMediaType(take) === 'video'
+  const trimStart = editorState.trim.start
+  const trimEnd = editorState.trim.end ?? 100
 
   return (
     <AnimatePresence>
       <motion.div
         className="creator-studio"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 8 }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="creator-studio__chrome">
           <header className="creator-studio__header">
@@ -170,7 +302,10 @@ export default function CreatorStudio({
               <ChevronLeft className="h-5 w-5" />
             </Pressable>
             <div className="creator-studio__title-block">
-              <p className="creator-studio__eyebrow">Creator Studio</p>
+              <p className="creator-studio__eyebrow">
+                <Sparkles className="creator-studio__eyebrow-icon" aria-hidden />
+                Creator Studio
+              </p>
               <h2>{take.name}</h2>
               <p>{projectName || 'Current session'}</p>
             </div>
@@ -193,14 +328,61 @@ export default function CreatorStudio({
               aria-label="Creator Studio live preview"
             >
               <div className="creator-studio__preview-stage">
-                {isVideo ? (
-                  <video
-                    className="creator-studio__media"
-                    src={take.videoUrl}
-                    playsInline
-                    controls
-                    muted={previewModel.audio.source === 'mute'}
-                  />
+                {isVideo && resolvedSrc ? (
+                  <>
+                    <video
+                      ref={mediaRef as React.RefObject<HTMLVideoElement>}
+                      className="creator-studio__media"
+                      playsInline
+                      preload="metadata"
+                      onClick={togglePlayback}
+                    />
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      haptic="medium"
+                      className={`creator-studio__preview-play ${isPlaying ? 'is-playing' : ''}`}
+                      aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        togglePlayback()
+                      }}
+                    >
+                      {isPlaying ? (
+                        <Pause className="h-7 w-7 fill-current" />
+                      ) : (
+                        <Play className="h-7 w-7 fill-current" />
+                      )}
+                    </Pressable>
+                  </>
+                ) : !isVideo && resolvedSrc ? (
+                  <>
+                    <audio
+                      ref={mediaRef as React.RefObject<HTMLAudioElement>}
+                      className="creator-studio__media-audio"
+                      preload="metadata"
+                    />
+                    <div className="creator-studio__audio-preview">
+                      <div className="creator-studio__audio-ring" aria-hidden>
+                        <Music2 className="h-10 w-10" />
+                      </div>
+                      <p>{take.name}</p>
+                      <Pressable
+                        type="button"
+                        intensity="icon"
+                        haptic="medium"
+                        className="creator-studio__audio-play"
+                        aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+                        onClick={togglePlayback}
+                      >
+                        {isPlaying ? (
+                          <Pause className="h-5 w-5 fill-current" />
+                        ) : (
+                          <Play className="h-5 w-5 fill-current" />
+                        )}
+                      </Pressable>
+                    </div>
+                  </>
                 ) : (
                   <div className="creator-studio__audio-preview">
                     <Music2 className="h-12 w-12" />
@@ -237,51 +419,82 @@ export default function CreatorStudio({
                   </div>
                 ))}
               </div>
+              {duration > 0 && (
+                <p className="creator-studio__preview-time" aria-live="polite">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </p>
+              )}
             </section>
 
             <section className="creator-studio__panel" aria-label={`${editorState.selectedTool} tools`}>
               {editorState.selectedTool === 'trim' && (
                 <div className="creator-studio__panel-content">
                   <div className="creator-studio__panel-heading">
-                    <Scissors className="h-4 w-4" />
+                    <div className="creator-studio__panel-icon creator-studio__panel-icon--gold">
+                      <Scissors className="h-4 w-4" />
+                    </div>
                     <div>
                       <h3>Trim</h3>
-                      <p>Non-destructive start and end points.</p>
+                      <p>Set start and end points. Playback stays within your selection.</p>
                     </div>
                   </div>
-                  <div className="creator-studio__range-row">
-                    <label>
-                      Start
-                      <input
-                        type="range"
-                        min={0}
-                        max={95}
-                        value={editorState.trim.start}
-                        onChange={(event) => {
-                          const start = Number(event.target.value)
-                          updateCreatorStudioState(setEditorState, (state) => ({
-                            ...state,
-                            trim: { ...state.trim, start },
-                          }))
-                        }}
+                  <div className="creator-studio__trim-editor">
+                    <div
+                      ref={trimRailRef}
+                      className="creator-studio__trim-rail"
+                      onPointerDown={handleTrimRailScrub}
+                    >
+                      <div className="creator-studio__trim-waveform" aria-hidden>
+                        {waveformPeaks.map((peak, index) => (
+                          <span
+                            key={index}
+                            style={{ height: `${Math.round(peak * 100)}%` }}
+                          />
+                        ))}
+                      </div>
+                      <div
+                        className="creator-studio__trim-dim creator-studio__trim-dim--left"
+                        style={{ width: `${trimStart}%` }}
                       />
-                    </label>
-                    <label>
-                      End
-                      <input
-                        type="range"
-                        min={5}
-                        max={100}
-                        value={editorState.trim.end ?? 100}
-                        onChange={(event) => {
-                          const end = Number(event.target.value)
-                          updateCreatorStudioState(setEditorState, (state) => ({
-                            ...state,
-                            trim: { ...state.trim, end: end >= 100 ? null : end },
-                          }))
-                        }}
+                      <div
+                        className="creator-studio__trim-dim creator-studio__trim-dim--right"
+                        style={{ width: `${100 - trimEnd}%` }}
                       />
-                    </label>
+                      <div
+                        className="creator-studio__trim-selection"
+                        style={{ left: `${trimStart}%`, width: `${trimEnd - trimStart}%` }}
+                      />
+                      <div
+                        className="creator-studio__trim-playhead"
+                        style={{ left: `${playheadPercent}%` }}
+                      />
+                      <button
+                        type="button"
+                        className="creator-studio__trim-handle creator-studio__trim-handle--start"
+                        style={{ left: `${trimStart}%` }}
+                        aria-label="Trim start"
+                        onPointerDown={(event) => handleTrimHandlePointerDown('start', event)}
+                      />
+                      <button
+                        type="button"
+                        className="creator-studio__trim-handle creator-studio__trim-handle--end"
+                        style={{ left: `${trimEnd}%` }}
+                        aria-label="Trim end"
+                        onPointerDown={(event) => handleTrimHandlePointerDown('end', event)}
+                      />
+                    </div>
+                    <div className="creator-studio__trim-meta">
+                      <span>
+                        <strong>Start</strong> {formatTrimLabel(trimStart)}
+                      </span>
+                      <span className="creator-studio__trim-duration">
+                        {formatTime(Math.max(0, (duration * (trimEnd - trimStart)) / 100))} selected
+                      </span>
+                      <span>
+                        <strong>End</strong>{' '}
+                        {editorState.trim.end === null ? formatTime(duration) : formatTrimLabel(trimEnd)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -289,7 +502,9 @@ export default function CreatorStudio({
               {editorState.selectedTool === 'crop' && (
                 <div className="creator-studio__panel-content">
                   <div className="creator-studio__panel-heading">
-                    <Crop className="h-4 w-4" />
+                    <div className="creator-studio__panel-icon creator-studio__panel-icon--blue">
+                      <Crop className="h-4 w-4" />
+                    </div>
                     <div>
                       <h3>Aspect Ratio</h3>
                       <p>Social-ready crops for musicians.</p>
@@ -320,47 +535,44 @@ export default function CreatorStudio({
               {editorState.selectedTool === 'audio' && (
                 <div className="creator-studio__panel-content">
                   <div className="creator-studio__panel-heading">
-                    <Volume2 className="h-4 w-4" />
+                    <div className="creator-studio__panel-icon creator-studio__panel-icon--blue">
+                      <Volume2 className="h-4 w-4" />
+                    </div>
                     <div>
                       <h3>Audio</h3>
-                      <p>Simple session-aware mix controls.</p>
+                      <p>Volume and mute for preview playback.</p>
                     </div>
                   </div>
                   <div className="creator-studio__choice-list">
-                    {AUDIO_SOURCES.map((source) => {
-                      const disabled =
-                        (source.id === 'practice_mix' && !editorState.audio.hasPracticeMix) ||
-                        (source.id === 'accompaniment' && !editorState.audio.hasAccompaniment)
-                      return (
-                        <Pressable
-                          key={source.id}
-                          type="button"
-                          intensity="soft"
-                          haptic="light"
-                          disabled={disabled}
-                          className={`creator-studio__choice creator-studio__choice--wide ${
-                            editorState.audio.source === source.id ? 'is-selected' : ''
-                          }`}
-                          onClick={() =>
-                            updateCreatorStudioState(setEditorState, (state) => ({
-                              ...state,
-                              audio: { ...state.audio, source: source.id },
-                            }))
-                          }
-                        >
-                          {source.label}
-                        </Pressable>
-                      )
-                    })}
+                    {AUDIO_SOURCES.map((source) => (
+                      <Pressable
+                        key={source.id}
+                        type="button"
+                        intensity="soft"
+                        haptic="light"
+                        className={`creator-studio__choice creator-studio__choice--wide ${
+                          editorState.audio.source === source.id ? 'is-selected' : ''
+                        }`}
+                        onClick={() =>
+                          updateCreatorStudioState(setEditorState, (state) => ({
+                            ...state,
+                            audio: { ...state.audio, source: source.id },
+                          }))
+                        }
+                      >
+                        {source.label}
+                      </Pressable>
+                    ))}
                   </div>
                   <div className="creator-studio__range-row">
                     <label>
-                      Instrument Volume
+                      <span>Volume</span>
                       <input
                         type="range"
                         min={0}
                         max={100}
                         value={editorState.audio.instrumentVolume}
+                        disabled={editorState.audio.source === 'mute'}
                         onChange={(event) =>
                           updateCreatorStudioState(setEditorState, (state) => ({
                             ...state,
@@ -371,24 +583,7 @@ export default function CreatorStudio({
                           }))
                         }
                       />
-                    </label>
-                    <label>
-                      Backing Track Volume
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={editorState.audio.backingTrackVolume}
-                        onChange={(event) =>
-                          updateCreatorStudioState(setEditorState, (state) => ({
-                            ...state,
-                            audio: {
-                              ...state.audio,
-                              backingTrackVolume: Number(event.target.value),
-                            },
-                          }))
-                        }
-                      />
+                      <em>{editorState.audio.instrumentVolume}%</em>
                     </label>
                   </div>
                 </div>
@@ -397,7 +592,9 @@ export default function CreatorStudio({
               {editorState.selectedTool === 'overlay' && (
                 <div className="creator-studio__panel-content">
                   <div className="creator-studio__panel-heading">
-                    <Type className="h-4 w-4" />
+                    <div className="creator-studio__panel-icon creator-studio__panel-icon--gold">
+                      <Type className="h-4 w-4" />
+                    </div>
                     <div>
                       <h3>Overlays</h3>
                       <p>Title, date, instrument, watermark, and sheet music.</p>
@@ -405,23 +602,40 @@ export default function CreatorStudio({
                   </div>
                   <div className="creator-studio__overlay-list">
                     {editorState.overlays.map((overlay) => (
-                      <label key={overlay.id} className="creator-studio__overlay-control">
+                      <div key={overlay.id} className="creator-studio__overlay-control">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={overlay.enabled}
+                            onChange={(event) =>
+                              updateCreatorStudioState(setEditorState, (state) => ({
+                                ...state,
+                                overlays: state.overlays.map((item) =>
+                                  item.id === overlay.id
+                                    ? { ...item, enabled: event.target.checked }
+                                    : item,
+                                ),
+                              }))
+                            }
+                          />
+                          <span>{overlay.label}</span>
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={overlay.enabled}
+                          type="text"
+                          value={overlay.text}
+                          aria-label={`${overlay.label} text`}
                           onChange={(event) =>
                             updateCreatorStudioState(setEditorState, (state) => ({
                               ...state,
                               overlays: state.overlays.map((item) =>
                                 item.id === overlay.id
-                                  ? { ...item, enabled: event.target.checked }
+                                  ? { ...item, text: event.target.value }
                                   : item,
                               ),
                             }))
                           }
                         />
-                        <span>{overlay.label}</span>
-                      </label>
+                      </div>
                     ))}
                   </div>
                   <input
@@ -451,10 +665,12 @@ export default function CreatorStudio({
               {editorState.selectedTool === 'export' && (
                 <div className="creator-studio__panel-content">
                   <div className="creator-studio__panel-heading">
-                    <Share2 className="h-4 w-4" />
+                    <div className="creator-studio__panel-icon creator-studio__panel-icon--blue">
+                      <Share2 className="h-4 w-4" />
+                    </div>
                     <div>
                       <h3>Export</h3>
-                      <p>Use the native iOS share sheet for Reels, Shorts, Messages, Files, and AirDrop.</p>
+                      <p>Share to Reels, Shorts, Messages, Files, or AirDrop.</p>
                     </div>
                   </div>
                   <Pressable
