@@ -1,8 +1,12 @@
 import type { Take } from '../types'
 
-export type CreatorStudioTool = 'trim' | 'crop' | 'audio' | 'overlay' | 'export'
+export type CreatorStudioTool = 'trim' | 'crop' | 'audio' | 'export'
 
 export type CreatorStudioAspectRatio = '9:16' | '1:1' | '16:9'
+
+export type StudioObjectKind = 'recording' | 'sheetMusic' | 'text' | 'watermark'
+
+export type SheetMusicDisplayMode = 'overlay' | 'separate'
 
 export type CreatorStudioAudioSource =
   | 'original'
@@ -10,40 +14,70 @@ export type CreatorStudioAudioSource =
   | 'accompaniment'
   | 'mute'
 
-export type CreatorStudioOverlayKind =
-  | 'title'
-  | 'subtitle'
-  | 'watermark'
-  | 'instrument'
-  | 'practiceDate'
-
-export interface CreatorStudioPosition {
-  x: number
-  y: number
-}
-
 export interface CreatorStudioTrimRange {
   start: number
   end: number | null
 }
 
-export interface CreatorStudioOverlayModule {
-  id: string
-  kind: CreatorStudioOverlayKind
-  label: string
-  text: string
-  enabled: boolean
-  position: CreatorStudioPosition
+export interface StudioTransform {
+  /** Center X as percent of stage width */
+  x: number
+  /** Center Y as percent of stage height */
+  y: number
+  scale: number
+  rotation: number
+  zIndex: number
+  /** Bounding width as percent of stage */
+  width: number
 }
 
-export interface CreatorStudioSheetMusicLayer {
+export interface StudioRecordingObject {
+  id: 'recording'
+  kind: 'recording'
+  transform: StudioTransform
+}
+
+export interface StudioSheetMusicObject {
   id: string
+  kind: 'sheetMusic'
   name: string
   fileType: 'image' | 'pdf'
   sourceUrl: string
-  enabled: boolean
-  position: CreatorStudioPosition
-  scale: number
+  storageKey: string
+  displayMode: SheetMusicDisplayMode
+  /** Video share when displayMode is separate (30–70). */
+  separateRatio: number
+  transform: StudioTransform
+}
+
+export interface StudioTextObject {
+  id: string
+  kind: 'text'
+  text: string
+  transform: StudioTransform
+}
+
+export interface StudioWatermarkObject {
+  id: 'watermark'
+  kind: 'watermark'
+  text: string
+  visible: boolean
+  transform: StudioTransform
+}
+
+export type StudioCanvasObject =
+  | StudioRecordingObject
+  | StudioSheetMusicObject
+  | StudioTextObject
+  | StudioWatermarkObject
+
+export interface CreatorStudioBackingTrack {
+  name: string
+  mimeType: string
+  storageKey: string
+  trim: CreatorStudioTrimRange
+  syncOffsetMs: number
+  volume: number
 }
 
 export interface CreatorStudioAudioMix {
@@ -52,6 +86,7 @@ export interface CreatorStudioAudioMix {
   backingTrackVolume: number
   hasPracticeMix: boolean
   hasAccompaniment: boolean
+  backingTrack: CreatorStudioBackingTrack | null
 }
 
 export interface CreatorStudioEditorState {
@@ -60,8 +95,7 @@ export interface CreatorStudioEditorState {
   selectedTool: CreatorStudioTool
   aspectRatio: CreatorStudioAspectRatio
   trim: CreatorStudioTrimRange
-  overlays: CreatorStudioOverlayModule[]
-  sheetMusicLayers: CreatorStudioSheetMusicLayer[]
+  objects: StudioCanvasObject[]
   audio: CreatorStudioAudioMix
 }
 
@@ -73,11 +107,20 @@ export interface CreatorStudioSessionContext {
 export interface CreatorStudioPreviewModel {
   aspectRatio: CreatorStudioAspectRatio
   trim: CreatorStudioTrimRange
-  overlays: CreatorStudioOverlayModule[]
-  sheetMusicLayers: CreatorStudioSheetMusicLayer[]
+  objects: StudioCanvasObject[]
   audio: CreatorStudioAudioMix
 }
 
 export type CreatorStudioExportResult =
   | { ok: true }
   | { ok: false; reason: 'missing_file' | 'share_failed' | 'unsupported' }
+
+export type CreatorStudioPersistedState = Omit<
+  CreatorStudioEditorState,
+  'takeName' | 'selectedTool'
+>
+
+export interface StudioGuideLine {
+  orientation: 'horizontal' | 'vertical'
+  position: number
+}

@@ -352,6 +352,13 @@
   min-width: 0;
   flex: 1;
   gap: 0.72rem;
+  cursor: pointer;
+  outline: none;
+  border-radius: 1.35rem;
+}
+
+.native-bottom-sheet--vault .vault-take-row__main:focus-visible {
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.22);
 }
 
 .native-bottom-sheet--vault .vault-take-row--benchmark {

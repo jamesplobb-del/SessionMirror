@@ -3,6 +3,7 @@ import type {
   CreatorStudioExportResult,
   CreatorStudioPreviewModel,
 } from './types'
+import { sortCanvasObjects } from './canvasObjects'
 
 export function renderCreatorStudioPreviewModel(
   state: CreatorStudioEditorState,
@@ -10,8 +11,10 @@ export function renderCreatorStudioPreviewModel(
   return {
     aspectRatio: state.aspectRatio,
     trim: state.trim,
-    overlays: state.overlays.filter((overlay) => overlay.enabled),
-    sheetMusicLayers: state.sheetMusicLayers.filter((layer) => layer.enabled),
+    objects: sortCanvasObjects(state.objects).filter((object) => {
+      if (object.kind === 'watermark') return object.visible
+      return true
+    }),
     audio: state.audio,
   }
 }
@@ -20,6 +23,5 @@ export function validateCreatorStudioExport(state: CreatorStudioEditorState): Cr
   if (state.trim.end !== null && state.trim.end <= state.trim.start) {
     return { ok: false, reason: 'unsupported' }
   }
-
   return { ok: true }
 }

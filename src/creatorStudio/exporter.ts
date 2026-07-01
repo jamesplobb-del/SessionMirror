@@ -14,8 +14,8 @@ export async function exportCreatorStudioTake(
   console.log('[CreatorStudio] export requested', {
     takeId: take.id,
     aspectRatio: previewModel.aspectRatio,
-    overlays: previewModel.overlays.map((overlay) => overlay.kind),
-    sheetMusicLayers: previewModel.sheetMusicLayers.length,
+    objectCount: previewModel.objects.length,
+    sheetMusicLayers: previewModel.objects.filter((object) => object.kind === 'sheetMusic').length,
     audioSource: previewModel.audio.source,
   })
 

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import {
   Check,
   Clapperboard,
@@ -163,12 +163,18 @@ function TakeCard({
     handleRowActivate()
   }
 
-  const handlePlay = () => {
+  const stopNestedClick = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation()
+  }
+
+  const handlePlay = (event?: MouseEvent<HTMLElement>) => {
+    event?.stopPropagation()
     triggerLightHaptic()
     onOpenTake?.()
   }
 
-  const handleDelete = () => {
+  const handleDelete = (event?: MouseEvent<HTMLElement>) => {
+    event?.stopPropagation()
     void (async () => {
       const confirmed = await showConfirm({
         message: `Delete "${take.name}"? This cannot be undone.`,
@@ -203,19 +209,21 @@ function TakeCard({
 
   return (
     <article className={rowClass}>
-      <div className="vault-take-row__main">
+      <div
+        className="vault-take-row__main"
+        role="button"
+        tabIndex={0}
+        aria-label={
+          selectionMode
+            ? `${selected ? 'Deselect' : 'Select'} ${take.name}`
+            : `${detailOpen ? 'Hide' : 'Show'} actions for ${take.name}`
+        }
+        aria-expanded={detailOpen}
+        onClick={handleRowActivate}
+        onKeyDown={handleKeyActivate}
+      >
         <div
           className="vault-take-row__thumb cursor-pointer"
-          role="button"
-          tabIndex={0}
-          aria-label={
-            selectionMode
-              ? `${selected ? 'Deselect' : 'Select'} ${take.name}`
-              : `Open details for ${take.name}`
-          }
-          aria-expanded={detailOpen}
-          onClick={handleRowActivate}
-          onKeyDown={handleKeyActivate}
         >
           {showThumbnailImage ? (
             <img
@@ -261,6 +269,7 @@ function TakeCard({
                   value={nameDraft}
                   onChange={(event) => setNameDraft(event.target.value)}
                   onBlur={commitName}
+                  onClick={stopNestedClick}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') commitName()
                     if (event.key === 'Escape') {
@@ -276,7 +285,11 @@ function TakeCard({
                   type="button"
                   intensity="soft"
                   haptic="light"
-                  onClick={() => (detailOpen ? setIsEditingName(true) : handleRowActivate())}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (detailOpen) setIsEditingName(true)
+                    else handleRowActivate()
+                  }}
                   className="vault-take-row__title min-w-0 flex-1 truncate text-left"
                   title={detailOpen ? 'Click to rename' : 'Tap for take details'}
                 >
@@ -321,12 +334,12 @@ function TakeCard({
 
       {detailOpen && !selectionMode && (
         <div className="vault-take-row__detail">
-          <div className="vault-take-row__detail-section">
+          <div className="vault-take-row__detail-section" onClick={stopNestedClick}>
             <p className="vault-take-row__detail-label">Rating</p>
             <StarRating rating={take.rating} onChange={(rating) => onUpdate({ rating })} />
           </div>
 
-          <div className="vault-take-row__detail-section">
+          <div className="vault-take-row__detail-section" onClick={stopNestedClick}>
             <label className="vault-take-row__detail-label" htmlFor={`take-notes-${take.id}`}>
               <StickyNote className="h-3.5 w-3.5" aria-hidden />
               Notes
@@ -358,16 +371,37 @@ function TakeCard({
                 Play
               </button>
             )}
-            <button type="button" className="vault-take-row__detail-btn" onClick={onPinBenchmark}>
+            <button
+              type="button"
+              className="vault-take-row__detail-btn"
+              onClick={(event) => {
+                event.stopPropagation()
+                onPinBenchmark()
+              }}
+            >
               <Pin className="h-3.5 w-3.5" />
               {isBenchmark ? 'Best Take' : 'Make Best'}
             </button>
-            <button type="button" className="vault-take-row__detail-btn" onClick={onPinChallenger}>
+            <button
+              type="button"
+              className="vault-take-row__detail-btn"
+              onClick={(event) => {
+                event.stopPropagation()
+                onPinChallenger()
+              }}
+            >
               <Pin className="h-3.5 w-3.5" />
               Load Take
             </button>
             {onCreate && mediaType === 'video' && (
-              <button type="button" className="vault-take-row__detail-btn" onClick={onCreate}>
+              <button
+                type="button"
+                className="vault-take-row__detail-btn"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onCreate()
+                }}
+              >
                 <Sparkles className="h-3.5 w-3.5" />
                 Create
               </button>
@@ -377,7 +411,10 @@ function TakeCard({
                 type="button"
                 className="vault-take-row__detail-btn"
                 disabled={exportBusy}
-                onClick={onExport}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onExport()
+                }}
               >
                 <Download className="h-3.5 w-3.5" />
                 {exportBusy ? 'Saving…' : 'Save Video'}
