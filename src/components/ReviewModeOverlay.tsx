@@ -130,6 +130,9 @@ function ReviewTakeLayer({
             manualPlayOnly
           />
         )}
+        {useSharedAudioPlayer && (
+          <div className="review-video-bleed__shared-audio take-audio-surface absolute inset-0 h-full w-full" />
+        )}
       </div>
     )
   }
@@ -495,13 +498,13 @@ export default function ReviewModeOverlay({
   const handleCloseClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
+      event.preventDefault()
       reviewAutoplayEnabledRef.current = false
       stopProgressLoop()
       if (activeAudioPlaybackItem) {
+        audioPlayback.pause()
         audioPlayback.closeFullscreen()
-        window.requestAnimationFrame(() => {
-          onClose()
-        })
+        onClose()
         return
       }
       pausePitchGraphsForMedia(
@@ -511,9 +514,7 @@ export default function ReviewModeOverlay({
       )
       void finalizeTakePlaybackCleanup()
       pauseAllReviewVideosSafe()
-      window.requestAnimationFrame(() => {
-        onClose()
-      })
+      onClose()
     },
     [activeAudioPlaybackItem, audioPlayback, onClose, pauseAllReviewVideosSafe, stopProgressLoop],
   )
@@ -1084,23 +1085,22 @@ export default function ReviewModeOverlay({
                 </AnimatePresence>
               </div>
             </div>
+            {isOpen && !isVault && (canSwipeLeft || canSwipeRight) && (
+              <div className="review-swipe-hint pointer-events-none flex justify-center">
+                <p className="rounded-full border border-[rgba(23,26,34,0.08)] bg-white/90 px-3 py-1 text-[10px] text-[#6c7077] shadow-sm backdrop-blur-sm">
+                  {canSwipeLeft && canSwipeRight
+                    ? 'Swipe to compare takes'
+                    : canSwipeLeft
+                      ? `Swipe left for ${dynamicTakeLabel}`
+                      : 'Swipe right for Best Take'}
+                </p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="review-video-stage relative min-h-0 flex-1 overflow-hidden">
-        {isOpen && !isVault && (canSwipeLeft || canSwipeRight) && (
-          <div className="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center">
-            <p className="rounded-full border border-[rgba(23,26,34,0.08)] bg-white/90 px-3 py-1 text-[10px] text-[#6c7077] shadow-sm backdrop-blur-sm">
-              {canSwipeLeft && canSwipeRight
-                ? 'Swipe to compare takes'
-                : canSwipeLeft
-                  ? `Swipe left for ${dynamicTakeLabel}`
-                  : 'Swipe right for Best Take'}
-            </p>
-          </div>
-        )}
-
         {isOpen && isVault && vaultTake ? (
           <ReviewTakeLayer
             takeKey={`vault-${vaultTake.id}`}

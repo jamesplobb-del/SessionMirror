@@ -2648,7 +2648,7 @@ video.camera-preview.camera-preview--hidden {
   object-fit: cover;
   object-position: center center;
   filter: blur(2px) saturate(0.92);
-  transform: scaleX(-1) scale(1.02);
+  transform: scaleX(-1);
   transform-origin: center center;
 }
 
@@ -3296,6 +3296,13 @@ video.camera-preview--embedded.camera-preview--mirror {
   background: transparent;
 }
 
+.review-video-bleed__shared-audio {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(21, 152, 255, 0.16), transparent 34%),
+    radial-gradient(circle at 44% 48%, rgba(247, 166, 0, 0.13), transparent 30%),
+    var(--audio-bg-base, #f7f8fa);
+}
+
 .review-overlay-header {
   position: absolute;
   top: 0;
@@ -3313,6 +3320,11 @@ video.camera-preview--embedded.camera-preview--mirror {
 
 .review-native-nav {
   min-height: 52px;
+}
+
+.review-swipe-hint {
+  margin-top: 0.35rem;
+  padding-bottom: 0.45rem;
 }
 
 .review-nav-button {

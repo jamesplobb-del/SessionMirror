@@ -9,7 +9,10 @@ import {
   RECORDING_TIMESLICE_MS,
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
-import { maybeBoostTabletPreviewResolution, resetFrontCameraZoom } from '../utils/videoCapture'
+import {
+  enforceFrontCameraZoom,
+  maybeBoostTabletPreviewResolution,
+} from '../utils/videoCapture'
 import { readRecordingOrientation } from '../utils/takeVideoTransform'
 import {
   normalizeBlobMime,
@@ -332,7 +335,7 @@ export function useCameraSession({
 
     syncPreviewTargets(stream, mode)
 
-    void resetFrontCameraZoom(stream)
+    enforceFrontCameraZoom(stream)
 
     const videos = [previewRef.current, secondaryPreviewRef?.current ?? null]
     for (const video of videos) {
@@ -549,7 +552,7 @@ export function useCameraSession({
 
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
-          await resetFrontCameraZoom(mediaStream)
+          enforceFrontCameraZoom(mediaStream)
         }
         if (isCaptureSessionStale(epoch, mode, cancelled)) {
           mediaStream.getTracks().forEach((track) => track.stop())
@@ -653,7 +656,7 @@ export function useCameraSession({
 
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
-          await resetFrontCameraZoom(mediaStream)
+          enforceFrontCameraZoom(mediaStream)
         }
         if (epoch !== captureSessionEpochRef.current) {
           stopStreamTracks(mediaStream)
@@ -1533,7 +1536,7 @@ export function useCameraSession({
       const stream = streamRef.current
       if (isStreamRecordable(stream, mode)) {
         if (mode === 'video' && stream) {
-          await resetFrontCameraZoom(stream)
+          enforceFrontCameraZoom(stream)
         }
         if (ensureCameraPreviewActive()) {
           if (import.meta.env.DEV) {

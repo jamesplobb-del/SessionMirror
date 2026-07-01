@@ -43,6 +43,8 @@
 .native-bottom-sheet--vault .vault-sheet-header {
   border-bottom-color: var(--audio-divider) !important;
   padding-top: max(1.35rem, env(safe-area-inset-top, 0px) * 0.35 + 0.9rem) !important;
+  padding-left: max(1.4rem, env(safe-area-inset-left, 0px) + 1.15rem) !important;
+  padding-right: max(1.25rem, env(safe-area-inset-right, 0px) + 1rem) !important;
   gap: 0.8rem;
 }
 
@@ -59,13 +61,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.16;
+  line-height: 1.22;
+  padding-left: 0.04rem;
   padding-right: 0.35rem;
 }
 
 .native-bottom-sheet--vault .native-sheet-title-block {
   min-width: 0;
   overflow: hidden;
+  padding-left: 0.04rem;
   padding-right: 0.5rem;
 }
 

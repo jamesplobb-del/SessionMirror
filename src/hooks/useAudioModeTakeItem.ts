@@ -36,7 +36,10 @@ export function useAudioModeTakeItem({
     (onOpen?: () => void) => {
       if (!playbackItem) return
       audioPlayback.select(playbackItem)
-      onOpen?.()
+      if (!onOpen) return
+      window.requestAnimationFrame(() => {
+        onOpen()
+      })
     },
     [audioPlayback, playbackItem]
   )
