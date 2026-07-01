@@ -250,6 +250,7 @@ export function useCameraSession({
   const readyRef = useRef(false)
   const resumeInFlightRef = useRef(false)
   const streamAcquireInFlightRef = useRef(false)
+  const queuedCaptureRequestModeRef = useRef<RecordingMode | null>(null)
   const previewHealthyRef = useRef(false)
   const foregroundRestartTokenRef = useRef(0)
   const foregroundRestartTimerRef = useRef<number | null>(null)
@@ -265,6 +266,7 @@ export function useCameraSession({
   const nativeExperimentalRecordingRef = useRef(false)
   const nativePreviewActiveRef = useRef(false)
   const ensureRecordableStreamRef = useRef<(() => Promise<MediaStream | null>) | null>(null)
+  const requestCameraAccessRef = useRef<((requestedMode?: RecordingMode) => void) | null>(null)
   const armedAutoAudioRef = useRef<{
     recorder: MediaRecorder
     writer: StreamingTakeWriter
@@ -484,7 +486,7 @@ export function useCameraSession({
       setError(null)
 
       const existing = streamRef.current
-      if (existing && isStreamRecordable(existing, mode)) {
+      if (existing && isStreamCompatibleForMode(existing, mode)) {
         syncPreviewTargets(existing, mode)
         setNeedsPermission(false)
         setReady(true)
@@ -536,6 +538,11 @@ export function useCameraSession({
         return null
       } finally {
         streamAcquireInFlightRef.current = false
+        const queuedMode = queuedCaptureRequestModeRef.current
+        queuedCaptureRequestModeRef.current = null
+        if (queuedMode && !isRecordingRef.current) {
+          window.setTimeout(() => requestCameraAccessRef.current?.(queuedMode), 0)
+        }
       }
     },
     [applyQueuedMicPreferenceBeforeAcquire, detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets],
@@ -554,12 +561,16 @@ export function useCameraSession({
     await acquireStream(recordingModeRef.current)
   }, [acquireStream, cancelScheduledRelease, releaseLiveStream])
 
-  const requestCameraAccess = useCallback(() => {
-    if (isRecordingRef.current || permissionRequestInFlightRef.current) return
+  const requestCameraAccess = useCallback((requestedMode?: RecordingMode) => {
+    const mode = requestedMode ?? recordingModeRef.current
+    if (isRecordingRef.current) return
+    if (permissionRequestInFlightRef.current || streamAcquireInFlightRef.current) {
+      queuedCaptureRequestModeRef.current = mode
+      return
+    }
 
-    const mode = recordingModeRef.current
     const existing = streamRef.current
-    if (existing && isStreamRecordable(existing, mode)) {
+    if (existing && isStreamCompatibleForMode(existing, mode)) {
       syncPreviewTargets(existing, mode)
       setNeedsPermission(false)
       setReady(true)
@@ -607,14 +618,21 @@ export function useCameraSession({
       .finally(() => {
         permissionRequestInFlightRef.current = false
         setPermissionRequestInFlight(false)
+        const queuedMode = queuedCaptureRequestModeRef.current
+        queuedCaptureRequestModeRef.current = null
+        if (queuedMode && !isRecordingRef.current) {
+          window.setTimeout(() => requestCameraAccessRef.current?.(queuedMode), 0)
+        }
       })
   }, [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets])
+
+  requestCameraAccessRef.current = requestCameraAccess
 
   const ensureRecordableStream = useCallback(async (): Promise<MediaStream | null> => {
     const mode = recordingModeRef.current
     const stream = streamRef.current
 
-    if (isStreamRecordable(stream, mode)) {
+    if (isStreamCompatibleForMode(stream, mode)) {
       if (!readyRef.current) {
         setReady(true)
       }
@@ -1380,6 +1398,7 @@ export function useCameraSession({
 
       cancelScheduledRelease()
       setError(null)
+      recordingModeRef.current = mode
 
       const softAudioHandoff =
         mode === 'audio' && canSoftHandoffToAudio(streamRef.current)

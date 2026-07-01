@@ -55,7 +55,7 @@ function ModeSlot({
 }: ModeSlotProps) {
   const isCenter = position === 'center'
   const isVideo = mode === 'video'
-  const slotDisabled = isCenter ? !ready && !isRecording : modeSwitchLocked
+  const slotDisabled = isCenter ? isVideo && !ready && !isRecording : modeSwitchLocked
 
   const ariaLabel = isCenter
     ? isRecording

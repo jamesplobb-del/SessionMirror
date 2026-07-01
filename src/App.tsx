@@ -1094,7 +1094,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     refreshCameraSession,
     requestCameraPreviewResume,
     reacquireStreamForAudioRoute,
-    ensureRecordableStream,
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
@@ -1540,6 +1539,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (mode === 'audio' && !showTakeCardsRef.current) {
         updateSettings({ showTakeCards: true })
       }
+      if (mode === 'audio') {
+        requestCameraAccess('audio')
+      }
       if (mode === 'video') {
         scheduleAfterPaint(() => {
           void requestCameraPreviewResume('mode-switch')
@@ -1550,8 +1552,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         }, 360)
       }
     },
-    [changeRecordingMode, isRecording, requestCameraPreviewResume, resetToAudioTab, updateSettings]
+    [
+      changeRecordingMode,
+      isRecording,
+      requestCameraAccess,
+      requestCameraPreviewResume,
+      resetToAudioTab,
+      updateSettings,
+    ]
   )
+
+  const handleToggleRecord = useCallback(() => {
+    if (recordingModeRef.current === 'audio' && !ready && !isRecording) {
+      requestCameraAccess('audio')
+      return
+    }
+
+    toggleRecording()
+  }, [isRecording, ready, requestCameraAccess, toggleRecording])
 
   const handleCloseSettings = useCallback(() => {
     if (import.meta.env.DEV) {
@@ -1938,8 +1956,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     if (!isAudioPracticeTunerTab || quickSettingsOpen || isRecording) return
 
-    void ensureRecordableStream()
-  }, [ensureRecordableStream, isAudioPracticeTunerTab, isRecording, quickSettingsOpen, streamGeneration])
+    requestCameraAccess('audio')
+  }, [isAudioPracticeTunerTab, isRecording, quickSettingsOpen, requestCameraAccess, streamGeneration])
 
   const pitchAudioHudLock =
     showPitch &&
@@ -2838,7 +2856,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         droneWaveform={settings.droneWaveform}
                         hapticFeedback={settings.hapticFeedback}
                         onRequestMicStream={() => {
-                          void ensureRecordableStream()
+                          requestCameraAccess('audio')
                         }}
                       />
                     </div>
@@ -2998,7 +3016,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       ready={ready}
                       recordingMode={recordingMode}
                       onRecordingModeChange={handleRecordingModeChange}
-                      onToggleRecord={toggleRecording}
+                      onToggleRecord={handleToggleRecord}
                       onOpenVault={recordingMode === 'audio' ? handleToggleVault : handleOpenVault}
                       isVaultOpen={isVaultOpen}
                       vaultToggleEnabled={recordingMode === 'audio'}
