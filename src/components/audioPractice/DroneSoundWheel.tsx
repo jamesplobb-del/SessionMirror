@@ -1,12 +1,16 @@
-import { useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
+import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DRONE_NOTE_STRIP } from '../../utils/droneEngine'
 
 const WHEEL_NOTE_COUNT = 12
-const WHEEL_RADIUS_PERCENT = 37.2
+const DIAL_SIZE = 200
+const DIAL_CENTER = DIAL_SIZE / 2
+const DIAL_OUTER_RADIUS = 92
+const DIAL_TICK_INNER_RADIUS = 74
+const DIAL_LABEL_RADIUS = 82
 const GLISSANDO_THRESHOLD_PX = 10
-const INNER_DEAD_ZONE_RATIO = 0.25
-const OUTER_EDGE_RATIO = 0.56
+const INNER_DEAD_ZONE_RATIO = 0.36
+const OUTER_EDGE_RATIO = 0.94
 
 export interface DroneSoundWheelProps {
   activeNotes: number[]
@@ -23,12 +27,14 @@ function shortNoteLabel(label: string): string {
   return label.split('/')[0] ?? label
 }
 
-function notePosition(index: number): CSSProperties & { '--drone-note-angle': string } {
-  const angle = (index / WHEEL_NOTE_COUNT) * Math.PI * 2 - Math.PI / 2
+function noteAngle(index: number): number {
+  return (index / WHEEL_NOTE_COUNT) * Math.PI * 2 - Math.PI / 2
+}
+
+function polarPoint(radius: number, angle: number): { x: number; y: number } {
   return {
-    left: `${50 + WHEEL_RADIUS_PERCENT * Math.cos(angle)}%`,
-    top: `${50 + WHEEL_RADIUS_PERCENT * Math.sin(angle)}%`,
-    '--drone-note-angle': `${(angle * 180) / Math.PI + 90}deg`,
+    x: DIAL_CENTER + radius * Math.cos(angle),
+    y: DIAL_CENTER + radius * Math.sin(angle),
   }
 }
 
@@ -153,8 +159,40 @@ export default function DroneSoundWheel({
   return (
     <div className="drone-sound-wheel pointer-events-auto">
       <div className="drone-sound-wheel__stage">
-        <div className="drone-sound-wheel__guide" aria-hidden />
+        <svg
+          className="drone-sound-wheel__dial"
+          viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`}
+          aria-hidden
+        >
+          <circle
+            className="drone-sound-wheel__ring-circle"
+            cx={DIAL_CENTER}
+            cy={DIAL_CENTER}
+            r={DIAL_OUTER_RADIUS}
+          />
+          {DRONE_NOTE_STRIP.map(({ pitchClass }, index) => {
+            const angle = noteAngle(index)
+            const tickStart = polarPoint(DIAL_TICK_INNER_RADIUS, angle)
+            const tickEnd = polarPoint(DIAL_OUTER_RADIUS, angle)
+            const active = activeNotes.includes(pitchClass)
+            const glissando = glissandoPitch === pitchClass
+            return (
+              <line
+                key={`tick-${pitchClass}`}
+                className={`drone-sound-wheel__tick ${
+                  active ? 'drone-sound-wheel__tick--active' : ''
+                } ${glissando ? 'drone-sound-wheel__tick--glissando' : ''}`}
+                x1={tickStart.x}
+                y1={tickStart.y}
+                x2={tickEnd.x}
+                y2={tickEnd.y}
+              />
+            )
+          })}
+        </svg>
+
         <div className="drone-sound-wheel__center">{children}</div>
+
         <div
           ref={ringRef}
           className="drone-sound-wheel__ring"
@@ -168,7 +206,10 @@ export default function DroneSoundWheel({
           {DRONE_NOTE_STRIP.map(({ pitchClass, label }, index) => {
             const active = activeNotes.includes(pitchClass)
             const glissando = glissandoPitch === pitchClass
-            const position = notePosition(index)
+            const angle = noteAngle(index)
+            const labelPoint = polarPoint(DIAL_LABEL_RADIUS, angle)
+            const leftPercent = (labelPoint.x / DIAL_SIZE) * 100
+            const topPercent = (labelPoint.y / DIAL_SIZE) * 100
             return (
               <span
                 key={pitchClass}
@@ -177,10 +218,13 @@ export default function DroneSoundWheel({
                 className={`drone-sound-wheel__note ${
                   active ? 'drone-sound-wheel__note--active' : ''
                 } ${glissando ? 'drone-sound-wheel__note--glissando' : ''}`}
-                style={position}
+                style={{
+                  left: `${leftPercent}%`,
+                  top: `${topPercent}%`,
+                }}
                 aria-hidden
               >
-                <span className="drone-sound-wheel__note-label">{shortNoteLabel(label)}</span>
+                {shortNoteLabel(label)}
               </span>
             )
           })}

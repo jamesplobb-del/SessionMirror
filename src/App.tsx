@@ -1938,24 +1938,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     if (!isAudioPracticeTunerTab || quickSettingsOpen || isRecording) return
 
-    const stream = streamRef.current
-    const hasLiveAudio =
-      stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled) ??
-      false
-
-    if (ready && hasLiveAudio) return
-
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      if (cancelled) return
-      void ensureRecordableStream()
-    }, 80)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [ensureRecordableStream, isAudioPracticeTunerTab, isRecording, quickSettingsOpen, ready, streamGeneration])
+    void ensureRecordableStream()
+  }, [ensureRecordableStream, isAudioPracticeTunerTab, isRecording, quickSettingsOpen, streamGeneration])
 
   const pitchAudioHudLock =
     showPitch &&
@@ -2853,6 +2837,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         droneVolume={settings.droneVolume}
                         droneWaveform={settings.droneWaveform}
                         hapticFeedback={settings.hapticFeedback}
+                        onRequestMicStream={() => {
+                          void ensureRecordableStream()
+                        }}
                       />
                     </div>
                   )}

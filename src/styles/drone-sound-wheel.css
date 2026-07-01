@@ -13,21 +13,38 @@
   margin-inline: auto;
 }
 
-.drone-sound-wheel__guide {
+.drone-sound-wheel__dial {
   position: absolute;
-  inset: 9.2%;
+  inset: 0;
   z-index: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(21, 152, 255, 0.16);
-  background:
-    radial-gradient(circle at center, transparent 53%, rgba(255, 255, 255, 0.62) 54%, transparent 58%),
-    radial-gradient(circle at center, transparent 66%, rgba(21, 152, 255, 0.075) 67%, transparent 71%),
-    conic-gradient(from -90deg, rgba(247, 166, 0, 0.12), rgba(21, 152, 255, 0.14), rgba(247, 166, 0, 0.12));
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.86),
-    inset 0 0 36px rgba(21, 152, 255, 0.045),
-    0 10px 28px rgba(23, 26, 34, 0.045);
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+}
+
+.drone-sound-wheel__ring-circle {
+  fill: none;
+  stroke: rgba(21, 152, 255, 0.28);
+  stroke-width: 1.6;
+}
+
+.drone-sound-wheel__tick {
+  stroke: rgba(21, 152, 255, 0.22);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  transition:
+    stroke 0.12s ease,
+    stroke-width 0.12s ease;
+}
+
+.drone-sound-wheel__tick--active {
+  stroke: rgba(21, 152, 255, 0.72);
+  stroke-width: 1.8;
+}
+
+.drone-sound-wheel__tick--glissando {
+  stroke: rgba(247, 166, 0, 0.88);
+  stroke-width: 2.1;
 }
 
 .drone-sound-wheel__center {
@@ -70,59 +87,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3.5rem;
-  height: 1.76rem;
+  min-width: 1.5rem;
   padding: 0;
-  border-radius: 999px;
-  border: 1px solid rgba(21, 152, 255, 0.24);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 250, 255, 0.66)),
-    rgba(255, 255, 255, 0.7);
   color: rgba(23, 26, 34, 0.58);
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
-  box-shadow:
-    0 2px 7px rgba(21, 152, 255, 0.035),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
-  transform: translate(-50%, -50%) rotate(var(--drone-note-angle, 0deg));
+  transform: translate(-50%, -50%);
   pointer-events: none;
   transition:
-    background-color 0.12s ease,
-    border-color 0.12s ease,
     color 0.12s ease,
-    box-shadow 0.12s ease,
     transform 0.12s ease;
 }
 
-.drone-sound-wheel__note-label {
-  display: block;
-  transform: rotate(calc(-1 * var(--drone-note-angle, 0deg)));
-}
-
 .drone-sound-wheel__note--active {
-  border-color: rgba(21, 152, 255, 0.62);
-  background:
-    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.82), rgba(21, 152, 255, 0.22) 72%),
-    rgba(21, 152, 255, 0.2);
   color: #075985;
-  box-shadow:
-    0 0 0 1px rgba(21, 152, 255, 0.18),
-    0 0 14px rgba(21, 152, 255, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .drone-sound-wheel__note--glissando {
-  border-color: rgba(247, 166, 0, 0.55);
-  background:
-    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.86), rgba(247, 166, 0, 0.24) 72%),
-    rgba(247, 166, 0, 0.16);
   color: #b45309;
-  transform: translate(-50%, -50%) rotate(var(--drone-note-angle, 0deg)) scale(1.08);
-  box-shadow:
-    0 0 0 2px rgba(247, 166, 0, 0.2),
-    0 4px 12px rgba(247, 166, 0, 0.18);
+  transform: translate(-50%, -50%) scale(1.12);
 }
 
 .drone-sound-wheel__octave {
@@ -183,40 +168,31 @@
   line-height: 1;
 }
 
-html.app-dark-mode .drone-sound-wheel__guide {
-  border-color: rgba(56, 189, 248, 0.2);
-  background:
-    radial-gradient(circle at center, transparent 53%, rgba(15, 23, 42, 0.76) 54%, transparent 58%),
-    radial-gradient(circle at center, transparent 66%, rgba(56, 189, 248, 0.12) 67%, transparent 71%),
-    conic-gradient(from -90deg, rgba(247, 166, 0, 0.12), rgba(56, 189, 248, 0.14), rgba(247, 166, 0, 0.12));
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-    inset 0 0 38px rgba(56, 189, 248, 0.08);
+html.app-dark-mode .drone-sound-wheel__ring-circle {
+  stroke: rgba(56, 189, 248, 0.34);
+}
+
+html.app-dark-mode .drone-sound-wheel__tick {
+  stroke: rgba(56, 189, 248, 0.24);
+}
+
+html.app-dark-mode .drone-sound-wheel__tick--active {
+  stroke: rgba(56, 189, 248, 0.78);
+}
+
+html.app-dark-mode .drone-sound-wheel__tick--glissando {
+  stroke: rgba(247, 166, 0, 0.9);
 }
 
 html.app-dark-mode .drone-sound-wheel__note {
-  border-color: rgba(56, 189, 248, 0.18);
-  background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(8, 13, 25, 0.78)),
-    rgba(15, 23, 42, 0.88);
   color: rgba(248, 250, 252, 0.78);
 }
 
 html.app-dark-mode .drone-sound-wheel__note--active {
-  border-color: rgba(56, 189, 248, 0.56);
-  background:
-    radial-gradient(circle at 50% 28%, rgba(56, 189, 248, 0.22), rgba(14, 116, 144, 0.18) 72%),
-    rgba(15, 23, 42, 0.92);
   color: #bae6fd;
-  box-shadow:
-    0 0 0 1px rgba(56, 189, 248, 0.18),
-    0 0 16px rgba(56, 189, 248, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 html.app-dark-mode .drone-sound-wheel__note--glissando {
-  border-color: rgba(247, 166, 0, 0.5);
-  background: rgba(247, 166, 0, 0.12);
   color: #fcd34d;
 }
 

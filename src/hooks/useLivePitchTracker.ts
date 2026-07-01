@@ -1496,11 +1496,17 @@ export function useLivePitchTracker(
         if (source === 'microphone') {
           const sharedStream = micStreamRef?.current
           const sharedStreamLive = micStreamIsLive(sharedStream)
+          const requireSharedStream = Boolean(micStreamRef)
+
+          if (requireSharedStream && !sharedStreamLive) {
+            scheduleRetry(80)
+            return
+          }
 
           const graph = await createMicPitchGraph(
             profileRef.current,
             sharedStreamLive ? sharedStream : null,
-            sharedStreamLive,
+            requireSharedStream && sharedStreamLive,
             realtimeModeRef.current ? REALTIME_MIC_FRAME_SIZE : undefined,
           )
           if (cancelled) {
