@@ -378,7 +378,7 @@ function BestTakeBox({
   }
 
   return (
-    <div className={shellClass}>
+    <div className={shellClass} data-tutorial="best-take-box">
       {onUpload && (
         <input
           type="file"
@@ -496,7 +496,11 @@ function BestTakeBox({
               </div>
               <div className="pip-empty-state__actions flex shrink-0">
                 {onUpload && (
-                  <label htmlFor="benchmark-upload" className={`${emptyActionClass} pip-empty-action--upload`}>
+                  <label
+                    htmlFor="benchmark-upload"
+                    data-tutorial="best-take-youtube"
+                    className={`${emptyActionClass} pip-empty-action--upload`}
+                  >
                     <Upload className="h-3 w-3" />
                     Upload
                   </label>

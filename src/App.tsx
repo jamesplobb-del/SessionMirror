@@ -82,7 +82,6 @@ import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import {
-  INTERACTIVE_TUTORIAL_STEPS,
   isOnboardingComplete,
   markOnboardingComplete,
 } from './utils/onboardingTutorial'
@@ -200,6 +199,7 @@ const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetron
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
+const CoachMark = lazy(() => import('./components/CoachMark'))
 const CreatorStudio = lazy(() => import('./components/creatorStudio/CreatorStudio'))
 const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
 const CreatorStudioTakePicker = lazy(() => import('./components/labs/CreatorStudioTakePicker'))
@@ -2615,14 +2615,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [isRecording, isReviewOpen, isSplitView, isVaultOpen, settings.autoSoundRecording]
   )
 
-  useEffect(() => {
-    if (!showOnboardingTutorial) return
-    const step = INTERACTIVE_TUTORIAL_STEPS[tutorialStepIndex]
-    if (step?.id === 'auto-record' && recordingMode !== 'audio' && !isRecording) {
-      changeRecordingMode('audio')
-    }
-  }, [changeRecordingMode, isRecording, recordingMode, showOnboardingTutorial, tutorialStepIndex])
-
   return (
     <TutorialProvider
       active={showOnboardingTutorial}
@@ -2835,10 +2827,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   )}
 
                   {recordingMode === 'audio' && !quickSettingsOpen && (
-                    <AudioPracticeTopTabs
-                      activeTab={audioPracticeTab}
-                      onTabChange={setAudioPracticeTab}
-                    />
+                    <div data-tutorial="audio-mode-tabs">
+                      <AudioPracticeTopTabs
+                        activeTab={audioPracticeTab}
+                        onTabChange={setAudioPracticeTab}
+                      />
+                    </div>
                   )}
 
                   {recordingMode === 'audio' &&
@@ -2847,6 +2841,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       <div
                         key="audio-practice-metronome-layer"
                         className="audio-practice-metronome-layer flex min-h-0 flex-1 flex-col"
+                        data-tutorial="audio-metronome-tab"
                       >
                         <AudioMetronomeTab key="audio-metronome-tab" />
                       </div>
@@ -2856,6 +2851,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     <div
                       key="audio-practice-tuner-layer"
                       className="audio-practice-tuner-layer flex min-h-0 flex-1 flex-col"
+                      data-tutorial="audio-tuner-tab"
                     >
                       <AudioTunerTab
                         streamRef={streamRef}
@@ -2880,18 +2876,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     settings.showTakeCards &&
                     !isSplitView && (
                       <div className="audio-mode-home-layer min-h-0 flex-1">
-                        <AudioModeHome
-                          isRecording={isRecording}
-                          ready={ready}
-                          benchmarkTake={benchmarkTake}
-                          libraryBenchmarkPlayback={libraryBenchmarkPlayback}
-                          challengerTake={challengerTake}
-                          onExpandBenchmark={handleExpandBenchmark}
-                          onExpandChallenger={handleExpandChallenger}
-                          onPinCurrentAsBest={handlePinCurrentAsBest}
-                          onClearBenchmark={handleClearAudioBenchmark}
-                          onClearChallenger={handleClearAudioChallenger}
-                        />
+                        <div data-tutorial="audio-take-cards">
+                          <AudioModeHome
+                            isRecording={isRecording}
+                            ready={ready}
+                            benchmarkTake={benchmarkTake}
+                            libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                            challengerTake={challengerTake}
+                            onExpandBenchmark={handleExpandBenchmark}
+                            onExpandChallenger={handleExpandChallenger}
+                            onPinCurrentAsBest={handlePinCurrentAsBest}
+                            onClearBenchmark={handleClearAudioBenchmark}
+                            onClearChallenger={handleClearAudioChallenger}
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -3214,6 +3212,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       />
                     )}
                   </AnimatePresence>
+                  <CoachMark />
                 </Suspense>
               </div>
             </div>

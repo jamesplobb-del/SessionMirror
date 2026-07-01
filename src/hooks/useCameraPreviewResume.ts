@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { RecordingMode } from '../types'
+import { resetCameraPreviewZoom } from '../utils/videoCapture'
 
 const SLOW_RESUME_MS = 400
 const FRAME_CACHE_INTERVAL_MS = 700
@@ -196,6 +197,7 @@ export function useCameraPreviewResume({
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
+        resetCameraPreviewZoom()
         captureFrame()
         return
       }

@@ -4,23 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
+  useState,
   type ReactNode,
 } from 'react'
-import {
-  INTERACTIVE_TUTORIAL_STEPS,
-  type InteractiveTutorialStep,
-  type TutorialActionId,
-} from '../utils/onboardingTutorial'
+import { COACH_MARKS, type CoachMarkContent, type CoachMarkId } from '../utils/tutorialContent'
+import { hasSeenCoachMark, markCoachMarkSeen } from '../utils/onboardingTutorial'
 
 interface TutorialContextValue {
-  active: boolean
-  step: InteractiveTutorialStep
-  stepIndex: number
-  stepCount: number
-  advanceStep: () => void
-  previousStep: () => void
-  notifyAction: (action: TutorialActionId) => void
+  activeCoachMark: CoachMarkContent | null
+  activeTargetRect: DOMRect | null
+  dismissCoachMark: () => void
+  markCoachMark: (id: CoachMarkId) => void
 }
 
 const TutorialContext = createContext<TutorialContextValue | null>(null)
@@ -35,81 +29,95 @@ export interface TutorialSignals {
 
 interface TutorialProviderProps {
   active: boolean
-  stepIndex: number
-  onStepIndexChange: (index: number) => void
-  onComplete: () => void
-  signals: TutorialSignals
+  stepIndex?: number
+  onStepIndexChange?: (index: number) => void
+  onComplete?: () => void
+  signals?: TutorialSignals
   children: ReactNode
 }
 
-export function TutorialProvider({
-  active,
-  stepIndex,
-  onStepIndexChange,
-  onComplete,
-  signals,
-  children,
-}: TutorialProviderProps) {
-  const step = INTERACTIVE_TUTORIAL_STEPS[stepIndex] ?? INTERACTIVE_TUTORIAL_STEPS[0]
-  const prevSignalsRef = useRef(signals)
-
-  const advanceStep = useCallback(() => {
-    if (stepIndex >= INTERACTIVE_TUTORIAL_STEPS.length - 1) {
-      onComplete()
-      return
-    }
-    onStepIndexChange(stepIndex + 1)
-  }, [onComplete, onStepIndexChange, stepIndex])
-
-  const previousStep = useCallback(() => {
-    onStepIndexChange(Math.max(0, stepIndex - 1))
-  }, [onStepIndexChange, stepIndex])
-
-  const notifyAction = useCallback(
-    (action: TutorialActionId) => {
-      if (!active) return
-      if (step.completeOn !== action) return
-      advanceStep()
-    },
-    [active, advanceStep, step.completeOn],
+function findVisibleTarget(selector: string): Element | null {
+  const candidates = Array.from(document.querySelectorAll(selector))
+  return (
+    candidates.find((candidate) => {
+      const rect = candidate.getBoundingClientRect()
+      return rect.width > 12 && rect.height > 12 && rect.bottom > 0 && rect.top < window.innerHeight
+    }) ?? null
   )
+}
+
+export function TutorialProvider({ active, children }: TutorialProviderProps) {
+  const [activeCoachMark, setActiveCoachMark] = useState<CoachMarkContent | null>(null)
+  const [activeTargetRect, setActiveTargetRect] = useState<DOMRect | null>(null)
+
+  const dismissCoachMark = useCallback(() => {
+    setActiveCoachMark((current) => {
+      if (current) markCoachMarkSeen(current.id)
+      return null
+    })
+    setActiveTargetRect(null)
+  }, [])
+
+  const markCoachMark = useCallback((id: CoachMarkId) => {
+    markCoachMarkSeen(id)
+    setActiveCoachMark((current) => (current?.id === id ? null : current))
+  }, [])
 
   useEffect(() => {
-    if (!active) return
+    if (active || activeCoachMark || typeof document === 'undefined') return
 
-    const prev = prevSignalsRef.current
-    const action = step.completeOn
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      if (cancelled) return
 
-    if (action === 'recording-started' && !prev.isRecording && signals.isRecording) {
-      notifyAction('recording-started')
-    } else if (action === 'review-opened' && !prev.isReviewOpen && signals.isReviewOpen) {
-      notifyAction('review-opened')
-    } else if (action === 'vault-opened' && !prev.isVaultOpen && signals.isVaultOpen) {
-      notifyAction('vault-opened')
-    } else if (
-      action === 'auto-record-enabled' &&
-      !prev.autoSoundRecording &&
-      signals.autoSoundRecording
-    ) {
-      notifyAction('auto-record-enabled')
-    } else if (action === 'split-opened' && !prev.isSplitView && signals.isSplitView) {
-      notifyAction('split-opened')
+      for (const coachMark of COACH_MARKS) {
+        if (hasSeenCoachMark(coachMark.id)) continue
+        const target = findVisibleTarget(coachMark.selector)
+        if (!target) continue
+        setActiveCoachMark(coachMark)
+        setActiveTargetRect(target.getBoundingClientRect())
+        return
+      }
+    }, 900)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [active, activeCoachMark])
+
+  useEffect(() => {
+    if (!activeCoachMark || typeof window === 'undefined') return
+
+    const updateRect = () => {
+      const target = findVisibleTarget(activeCoachMark.selector)
+      if (!target) {
+        dismissCoachMark()
+        return
+      }
+      setActiveTargetRect(target.getBoundingClientRect())
     }
 
-    prevSignalsRef.current = signals
-  }, [active, notifyAction, signals, step.completeOn])
+    window.addEventListener('resize', updateRect)
+    window.visualViewport?.addEventListener('resize', updateRect)
+    window.addEventListener('scroll', updateRect, true)
+    const interval = window.setInterval(updateRect, 450)
+    return () => {
+      window.removeEventListener('resize', updateRect)
+      window.visualViewport?.removeEventListener('resize', updateRect)
+      window.removeEventListener('scroll', updateRect, true)
+      window.clearInterval(interval)
+    }
+  }, [activeCoachMark, dismissCoachMark])
 
   const value = useMemo(
     () => ({
-      active,
-      step,
-      stepIndex,
-      stepCount: INTERACTIVE_TUTORIAL_STEPS.length,
-      advanceStep,
-      previousStep,
-      notifyAction,
+      activeCoachMark,
+      activeTargetRect,
+      dismissCoachMark,
+      markCoachMark,
     }),
-    [active, advanceStep, notifyAction, previousStep, step, stepIndex],
+    [activeCoachMark, activeTargetRect, dismissCoachMark, markCoachMark],
   )
 
   return <TutorialContext.Provider value={value}>{children}</TutorialContext.Provider>
@@ -119,6 +127,6 @@ export function useTutorial(): TutorialContextValue | null {
   return useContext(TutorialContext)
 }
 
-export function useTutorialAction(): ((action: TutorialActionId) => void) | undefined {
-  return useContext(TutorialContext)?.notifyAction
+export function useTutorialAction(): ((id: CoachMarkId) => void) | undefined {
+  return useContext(TutorialContext)?.markCoachMark
 }

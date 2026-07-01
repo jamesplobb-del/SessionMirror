@@ -1,5 +1,5 @@
-import { useCallback, type MouseEvent } from 'react'
-import { RotateCcw, X, GraduationCap } from 'lucide-react'
+import { useCallback, useMemo, useState, type MouseEvent } from 'react'
+import { ChevronRight, RotateCcw, X, GraduationCap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
@@ -14,6 +14,9 @@ import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
+import HelpSheet from './HelpSheet'
+import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorialContent'
+import { resetTutorials } from '../utils/onboardingTutorial'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -175,6 +178,14 @@ export default function SettingsDrawer({
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
+  const [activeHelpTopicId, setActiveHelpTopicId] = useState<HelpTopicId | null>(null)
+  const helpTopicById = useMemo(
+    () => new Map(HELP_TOPICS.map((topic) => [topic.id, topic] as const)),
+    [],
+  )
+  const activeHelpTopic: HelpTopic | null = activeHelpTopicId
+    ? helpTopicById.get(activeHelpTopicId) ?? null
+    : null
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -199,16 +210,23 @@ export default function SettingsDrawer({
     [onClose],
   )
 
+  const handleResetTutorials = useCallback(() => {
+    resetTutorials()
+    setActiveHelpTopicId(null)
+    onReplayTutorial?.()
+  }, [onReplayTutorial])
+
   return (
-    <AnimatedBottomSheet
-      isOpen={isOpen}
-      onClose={onClose}
-      ariaLabel="Settings"
-      motionPreset="premium"
-      elevated
-      elevatedLight={recordingMode === 'audio'}
-      onEnterComplete={handleSheetEnterComplete}
-    >
+    <>
+      <AnimatedBottomSheet
+        isOpen={isOpen}
+        onClose={onClose}
+        ariaLabel="Settings"
+        motionPreset="premium"
+        elevated
+        elevatedLight={recordingMode === 'audio'}
+        onEnterComplete={handleSheetEnterComplete}
+      >
       <div className="native-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
         <div className="native-sheet-title-block min-w-0 flex-1">
           <span className="native-sheet-kicker">BestTake</span>
@@ -506,6 +524,47 @@ export default function SettingsDrawer({
             </section>
           )}
 
+          <section className="settings-group space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Learn the App
+            </h3>
+
+            <div className="settings-learn-list">
+              {[
+                ['recording-modes', 'Recording Modes'],
+                ['hands-free-recording', 'Hands-Free Recording'],
+                ['take-vault', 'Take Vault'],
+                ['pinning-best-takes', 'Best Take Pinning'],
+                ['media-youtube', 'Media & YouTube'],
+                ['expand-mode', 'Expand Mode'],
+                ['metronome', 'Metronome'],
+                ['tuner-drones', 'Tuner & Drones'],
+              ].map(([id, label]) => (
+                <Pressable
+                  key={id}
+                  type="button"
+                  intensity="soft"
+                  haptic="light"
+                  onClick={() => setActiveHelpTopicId(id as HelpTopicId)}
+                  className="settings-learn-row"
+                >
+                  <span>{label}</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Pressable>
+              ))}
+              <Pressable
+                type="button"
+                intensity="soft"
+                haptic="light"
+                onClick={handleResetTutorials}
+                className="settings-learn-row settings-learn-row--reset"
+              >
+                <span>Reset Tutorials</span>
+                <RotateCcw className="h-4 w-4" />
+              </Pressable>
+            </div>
+          </section>
+
           {onReplayTutorial && (
             <Pressable
               type="button"
@@ -530,6 +589,8 @@ export default function SettingsDrawer({
         </div>
         )}
       </div>
-    </AnimatedBottomSheet>
+      </AnimatedBottomSheet>
+      <HelpSheet topic={activeHelpTopic} onClose={() => setActiveHelpTopicId(null)} />
+    </>
   )
 }

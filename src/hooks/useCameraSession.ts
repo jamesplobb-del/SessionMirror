@@ -12,6 +12,7 @@ import {
 import {
   maybeBoostTabletPreviewResolution,
   resetCameraPreviewZoom,
+  normalizeVideoPreviewAfterWake,
 } from '../utils/videoCapture'
 import { readRecordingOrientation } from '../utils/takeVideoTransform'
 import {
@@ -54,7 +55,7 @@ interface UseCameraSessionOptions {
 
 const CAMERA_RELEASE_DELAY_MS = 700
 const FOREGROUND_RESTART_DELAY_MS = 250
-const IOS_CAMERA_RELEASE_DELAY_MS = 250
+const IOS_CAMERA_RELEASE_DELAY_MS = 450
 const IOS_AUDIO_TO_VIDEO_DELAY_MS = 200
 const IOS_VIDEO_TO_AUDIO_DELAY_MS = 280
 const BACKGROUND_SUSPEND_DELAY_MS = 0
@@ -497,12 +498,17 @@ export function useCameraSession({
   }, [applyQueuedMicPreferenceBeforeAcquire, micInputPreference])
 
   const acquireStream = useCallback(
-    async (mode: RecordingMode, cancelled?: () => boolean) => {
+    async (
+      mode: RecordingMode,
+      cancelled?: () => boolean,
+      options?: { forceNew?: boolean },
+    ) => {
       const epoch = captureSessionEpochRef.current
       setError(null)
 
       const existing = streamRef.current
       if (
+        !options?.forceNew &&
         existing &&
         isStreamCompatibleForMode(existing, mode) &&
         !isCaptureSessionStale(epoch, mode, cancelled)
@@ -553,6 +559,7 @@ export function useCameraSession({
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
           resetCameraPreviewZoom()
+          await normalizeVideoPreviewAfterWake(mediaStream)
         }
         if (isCaptureSessionStale(epoch, mode, cancelled)) {
           mediaStream.getTracks().forEach((track) => track.stop())
@@ -658,6 +665,7 @@ export function useCameraSession({
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
           resetCameraPreviewZoom()
+          await normalizeVideoPreviewAfterWake(mediaStream)
         }
         if (epoch !== captureSessionEpochRef.current) {
           stopStreamTracks(mediaStream)
@@ -1504,6 +1512,7 @@ export function useCameraSession({
     }
     releaseAllLiveMicPitchGraphs()
     void disarmAutoRecording()
+    resetCameraPreviewZoom()
     releaseLiveStream()
     if (nativePreviewActiveRef.current) {
       nativePreviewActiveRef.current = false
@@ -1516,7 +1525,7 @@ export function useCameraSession({
   }, [cancelAutoPreRollCapture, cancelScheduledRelease, disarmAutoRecording, releaseLiveStream])
 
   const restartCameraAfterForeground = useCallback(async () => {
-    if (!isAppInForeground()) return
+    if (document.visibilityState === 'hidden' && !isAppInForeground()) return
     if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
       if (import.meta.env.DEV) {
         console.log('[CameraPreview] resume skipped: already starting')
@@ -1538,14 +1547,14 @@ export function useCameraSession({
 
     try {
       applyViewportCssVarsOnResume()
+      resetCameraPreviewZoom()
 
       const mode = recordingModeRef.current
-      const stream = streamRef.current
       const preferFullReacquire = mode === 'video' && Capacitor.isNativePlatform()
 
       if (
         !preferFullReacquire &&
-        isStreamRecordable(stream, mode) &&
+        isStreamRecordable(streamRef.current, mode) &&
         ensureCameraPreviewActive()
       ) {
         if (import.meta.env.DEV) {
@@ -1561,8 +1570,13 @@ export function useCameraSession({
       }
       if (restartToken !== foregroundRestartTokenRef.current) return
 
-      await acquireStream(recordingModeRef.current)
+      const stream = await acquireStream(recordingModeRef.current, undefined, {
+        forceNew: true,
+      })
       if (restartToken !== foregroundRestartTokenRef.current) return
+      if (recordingModeRef.current === 'video' && stream) {
+        await normalizeVideoPreviewAfterWake(stream)
+      }
     } catch (err) {
       console.warn('Camera interrupted during foreground restart', err)
       setNeedsPermission(true)
@@ -1729,27 +1743,37 @@ export function useCameraSession({
   }, [])
 
   useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        scheduleBackgroundSuspend()
+        return
+      }
+      if (document.visibilityState === 'visible') {
+        scheduleForegroundRecovery()
+      }
+    }
+
     const bindAppLifecycle = async () => {
+      document.addEventListener('visibilitychange', onVisibilityChange)
+
       if (Capacitor.isNativePlatform()) {
         const { App } = await import('@capacitor/app')
-        return App.addListener('appStateChange', ({ isActive }) => {
+        const appHandle = await App.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
             scheduleForegroundRecovery()
             return
           }
           scheduleBackgroundSuspend()
         })
-      }
 
-      const onVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-          scheduleForegroundRecovery()
-          return
+        return {
+          remove: async () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange)
+            await appHandle.remove()
+          },
         }
-        scheduleBackgroundSuspend()
       }
 
-      document.addEventListener('visibilitychange', onVisibilityChange)
       return {
         remove: async () => {
           document.removeEventListener('visibilitychange', onVisibilityChange)

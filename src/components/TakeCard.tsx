@@ -219,7 +219,7 @@ function TakeCard({
   })
 
   return (
-    <article className={rowClass}>
+    <article className={rowClass} data-tutorial="vault-take-card">
       <div
         className="vault-take-row__main"
         role="button"
@@ -405,6 +405,7 @@ function TakeCard({
             <button
               type="button"
               className="vault-take-row__detail-btn"
+              data-tutorial="vault-pin-best"
               onClick={(event) => {
                 event.stopPropagation()
                 onPinBenchmark()
@@ -428,6 +429,7 @@ function TakeCard({
               <button
                 type="button"
                 className="vault-take-row__detail-btn"
+                data-tutorial="vault-expand"
                 onClick={(event) => {
                   event.stopPropagation()
                   onCreate()

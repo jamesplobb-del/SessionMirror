@@ -231,3 +231,37 @@ export async function applyCameraZoom(
 export function resetCameraPreviewZoom(): void {
   resetCssPreviewZoom()
 }
+
+/** Clear pinch/CSS zoom and reset optical zoom after sleep or lock-screen resume. */
+export async function normalizeVideoPreviewAfterWake(
+  stream: MediaStream,
+): Promise<void> {
+  resetCssPreviewZoom()
+
+  const track = stream.getVideoTracks()[0] as ZoomCapableTrack | undefined
+  if (!track || track.readyState !== 'live') return
+
+  try {
+    const capabilities = track.getCapabilities?.() as ZoomCapableCapabilities | undefined
+    const zoom = capabilities?.zoom
+    if (zoom) {
+      const min = zoom.min ?? 1
+      try {
+        await track.applyConstraints({ zoom: min } as MediaTrackConstraints)
+      } catch {
+        await track.applyConstraints({
+          advanced: [{ zoom: min } as MediaTrackConstraintSet],
+        })
+      }
+      return
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    await track.applyConstraints({ facingMode: 'user' })
+  } catch {
+    /* keep current FOV if facingMode is rejected */
+  }
+}

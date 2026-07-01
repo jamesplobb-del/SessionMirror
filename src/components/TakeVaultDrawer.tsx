@@ -335,7 +335,7 @@ export default function TakeVaultDrawer({
                     : `${takeCountLabel} • Current session`}
               </p>
             </div>
-            <div className="native-sheet-actions relative z-30 flex shrink-0 items-center gap-1">
+            <div className="native-sheet-actions relative z-30 flex shrink-0 items-center gap-1" data-tutorial="vault-settings">
               <Pressable
                 type="button"
                 intensity="icon"

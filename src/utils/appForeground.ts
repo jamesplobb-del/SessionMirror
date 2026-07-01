@@ -30,6 +30,12 @@ export function registerAppForegroundLifecycle(): void {
   lifecycleRegistered = true
 
   if (Capacitor.isNativePlatform()) {
+    const onVisibilityChange = () => {
+      setAppInForeground(document.visibilityState === 'visible')
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     void import('@capacitor/app').then(({ App }) => {
       void App.addListener('appStateChange', ({ isActive }) => {
         setAppInForeground(isActive)

@@ -1,0 +1,78 @@
+import { motion } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import Pressable from './ui/Pressable'
+import { useTutorial } from '../context/TutorialContext'
+import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
+
+export default function CoachMark() {
+  const tutorial = useTutorial()
+  const coachMark = tutorial?.activeCoachMark
+  const targetRect = tutorial?.activeTargetRect
+
+  if (!coachMark || !targetRect || typeof document === 'undefined') return null
+
+  const width = Math.min(280, window.innerWidth - 28)
+  const targetCenter = targetRect.left + targetRect.width / 2
+  const left = Math.max(14, Math.min(window.innerWidth - width - 14, targetCenter - width / 2))
+  const shouldShowBelow =
+    coachMark.placement === 'bottom' || targetRect.top < 170
+  const top = shouldShowBelow
+    ? Math.min(window.innerHeight - 148, targetRect.bottom + 12)
+    : Math.max(14, targetRect.top - 142)
+  const arrowLeft = Math.max(18, Math.min(width - 18, targetCenter - left))
+
+  return createPortal(
+    <div className="coach-mark-layer fixed inset-0 z-[140] pointer-events-none" aria-live="polite">
+      <motion.div
+        className="coach-mark-target"
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{
+          opacity: 1,
+          scale: 1,
+          x: targetRect.left - 6,
+          y: targetRect.top - 6,
+          width: targetRect.width + 12,
+          height: targetRect.height + 12,
+        }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={iosSpringSnappy}
+        style={motionGpuLayer}
+      />
+      <motion.div
+        className={`coach-mark-card pointer-events-auto ${shouldShowBelow ? 'coach-mark-card--below' : 'coach-mark-card--above'}`}
+        role="dialog"
+        aria-label={coachMark.title}
+        initial={{ opacity: 0, y: shouldShowBelow ? -8 : 8, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: shouldShowBelow ? -8 : 8, scale: 0.98 }}
+        transition={iosSpringSnappy}
+        style={{
+          ...motionGpuLayer,
+          left,
+          top,
+          width,
+          '--coach-arrow-left': `${arrowLeft}px`,
+        } as CSSProperties}
+      >
+        <div className="coach-mark-card__arrow" aria-hidden />
+        <div className="coach-mark-card__copy">
+          <h2>{coachMark.title}</h2>
+          <p>{coachMark.body}</p>
+        </div>
+        <Pressable
+          type="button"
+          intensity="icon"
+          haptic="light"
+          onClick={tutorial.dismissCoachMark}
+          className="coach-mark-card__close"
+          aria-label="Dismiss tip"
+        >
+          <X className="h-3.5 w-3.5" />
+        </Pressable>
+      </motion.div>
+    </div>,
+    document.body,
+  )
+}
