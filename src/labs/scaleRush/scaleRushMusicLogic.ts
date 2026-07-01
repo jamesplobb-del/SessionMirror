@@ -1,5 +1,4 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
-import { TUNING_GREEN_CENTS } from '../../utils/pitchUtils'
 import type { ScaleRushConfig } from './types'
 
 /** Keys supported in Scale Rush v0.05 */
@@ -18,6 +17,32 @@ export const SCALE_LABELS: Record<ScaleRushScale, string> = {
 
 export const RANGE_LABELS: Record<ScaleRushRange, string> = {
   '1-octave': '1 Octave',
+}
+
+/** Written-pitch transposition: concert mic → note name shown on your instrument. */
+export const SCALE_RUSH_TRANSPOSITIONS = [
+  { id: 'concert', label: 'Concert Pitch (C)', semitonesToWritten: 0 },
+  { id: 'bb', label: 'Bb — Trumpet, Clarinet, Tenor Sax', semitonesToWritten: 2 },
+  { id: 'eb', label: 'Eb — Alto Sax, Baritone Sax', semitonesToWritten: 9 },
+  { id: 'f', label: 'F — French Horn', semitonesToWritten: 7 },
+  { id: 'g', label: 'G — Alto Flute', semitonesToWritten: 5 },
+  { id: 'a', label: 'A — Clarinet in A', semitonesToWritten: 3 },
+] as const
+
+export type ScaleRushTransposition = (typeof SCALE_RUSH_TRANSPOSITIONS)[number]['id']
+
+export const STRICT_PITCH_CENTS = 15
+
+const TRANSPOSITION_MAP = Object.fromEntries(
+  SCALE_RUSH_TRANSPOSITIONS.map((item) => [item.id, item.semitonesToWritten]),
+) as Record<ScaleRushTransposition, number>
+
+export function getTranspositionLabel(id: ScaleRushTransposition): string {
+  return SCALE_RUSH_TRANSPOSITIONS.find((item) => item.id === id)?.label ?? 'Concert Pitch'
+}
+
+export function transpositionSemitones(id: ScaleRushTransposition): number {
+  return TRANSPOSITION_MAP[id] ?? 0
 }
 
 const KEY_TO_PITCH_CLASS: Record<ScaleRushKey, number> = {
@@ -161,34 +186,75 @@ export function pitchClassesMatch(detected: number, target: number): boolean {
 }
 
 /** Gameplay-only pitch gates — stricter than casual tuner display to reject room noise. */
-const MIN_GAMEPLAY_HZ = 90
+const MIN_GAMEPLAY_HZ = 80
 const MAX_GAMEPLAY_HZ = 1400
-const GAMEPLAY_CORRECT_CENTS = TUNING_GREEN_CENTS + 8
-const GAMEPLAY_WRONG_CENTS = TUNING_GREEN_CENTS + 4
+const LOOSE_MIN_GAMEPLAY_HZ = 70
 
-export function readoutToPitchClass(readout: PitchReadout): number | null {
-  if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < MIN_GAMEPLAY_HZ) return null
+export function readoutToConcertPitchClass(readout: PitchReadout): number | null {
+  if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < LOOSE_MIN_GAMEPLAY_HZ) return null
   if (readout.frequencyHz > MAX_GAMEPLAY_HZ) return null
   if (!readout.noteName || readout.noteName === '—') return null
   return ((Math.round(readout.midi) % 12) + 12) % 12
 }
 
-/** True when the mic signal looks like intentional playing, not ambient noise. */
-export function isGameplayPitchSignal(readout: PitchReadout): boolean {
-  return readoutToPitchClass(readout) != null
+function hasGameplaySignal(readout: PitchReadout, strict: boolean): boolean {
+  const minHz = strict ? MIN_GAMEPLAY_HZ : LOOSE_MIN_GAMEPLAY_HZ
+  if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < minHz) return false
+  if (readout.frequencyHz > MAX_GAMEPLAY_HZ) return false
+  return Boolean(readout.noteName && readout.noteName !== '—')
 }
 
-export function isReadoutCorrectPitch(readout: PitchReadout): boolean {
-  if (!isGameplayPitchSignal(readout)) return false
-  return Math.abs(readout.cents) <= GAMEPLAY_CORRECT_CENTS
+/** Concert pitch class → written pitch for the selected transposing instrument. */
+export function concertToWrittenPitchClass(
+  concertPitchClass: number,
+  transposition: ScaleRushTransposition,
+): number {
+  const shift = transpositionSemitones(transposition)
+  return ((concertPitchClass + shift) % 12 + 12) % 12
 }
 
-/** Wrong-note penalty only when the player is clearly holding a different in-tune pitch. */
-export function isReadoutWrongPitch(readout: PitchReadout, targetPitchClass: number): boolean {
-  const detected = readoutToPitchClass(readout)
+/** Detected note in written pitch — used for HUD, tiles, and gameplay match. */
+export function getDetectedWrittenPitchClass(
+  readout: PitchReadout,
+  config: ScaleRushConfig,
+): number | null {
+  const concert = readoutToConcertPitchClass(readout)
+  if (concert == null) return null
+  if (!hasGameplaySignal(readout, config.pitchAccuracyStrict)) return null
+  return concertToWrittenPitchClass(concert, config.transposition)
+}
+
+export function isGameplayPitchSignal(readout: PitchReadout, config: ScaleRushConfig): boolean {
+  return getDetectedWrittenPitchClass(readout, config) != null
+}
+
+export function isReadoutCorrectPitch(
+  readout: PitchReadout,
+  targetWrittenPitchClass: number,
+  config: ScaleRushConfig,
+): boolean {
+  const detected = getDetectedWrittenPitchClass(readout, config)
   if (detected == null) return false
-  if (pitchClassesMatch(detected, targetPitchClass)) return false
-  return Math.abs(readout.cents) <= GAMEPLAY_WRONG_CENTS
+  if (!pitchClassesMatch(detected, targetWrittenPitchClass)) return false
+  if (!config.pitchAccuracyStrict) return true
+  return Math.abs(readout.cents) <= STRICT_PITCH_CENTS
+}
+
+export function isReadoutWrongPitch(
+  readout: PitchReadout,
+  targetWrittenPitchClass: number,
+  config: ScaleRushConfig,
+): boolean {
+  const detected = getDetectedWrittenPitchClass(readout, config)
+  if (detected == null) return false
+  if (pitchClassesMatch(detected, targetWrittenPitchClass)) return false
+  if (!config.pitchAccuracyStrict) return true
+  return Math.abs(readout.cents) <= STRICT_PITCH_CENTS
+}
+
+/** @deprecated Use readoutToConcertPitchClass — kept for tuner raw display. */
+export function readoutToPitchClass(readout: PitchReadout): number | null {
+  return readoutToConcertPitchClass(readout)
 }
 
 export function loadBestScore(): number {

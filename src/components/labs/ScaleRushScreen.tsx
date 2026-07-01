@@ -9,12 +9,15 @@ import {
   SCALE_RUSH_KEYS,
   SCALE_RUSH_RANGES,
   SCALE_RUSH_SCALES,
+  SCALE_RUSH_TRANSPOSITIONS,
   type ScaleRushKey,
   type ScaleRushRange,
   type ScaleRushScale,
+  type ScaleRushTransposition,
 } from '../../labs/scaleRush/scaleRushMusicLogic'
 import { useScaleRushGame } from '../../labs/scaleRush/useScaleRushGame'
 import { getTunerProfile, type TunerInstrument } from '../../utils/pitchConfig'
+import IOSSwitch from '../ui/IOSSwitch'
 import Pressable from '../ui/Pressable'
 import ScaleRushGame from './ScaleRushGame'
 
@@ -38,12 +41,13 @@ export default function ScaleRushScreen({
   const [draftKey, setDraftKey] = useState<ScaleRushKey>('C')
   const [draftScale] = useState<ScaleRushScale>('major')
   const [draftRange] = useState<ScaleRushRange>('1-octave')
+  const [draftTransposition, setDraftTransposition] = useState<ScaleRushTransposition>('concert')
+  const [pitchAccuracyStrict, setPitchAccuracyStrict] = useState(true)
 
   useEffect(() => {
     onRequestMicStream()
   }, [onRequestMicStream, streamGeneration])
 
-  // Pitch integration: read-only mic tracker — shared by gameplay + live tuner HUD.
   const pitchEnabled = true
   const { readout } = useLivePitchTracker(
     mediaRef,
@@ -134,12 +138,54 @@ export default function ScaleRushScreen({
           </div>
 
           <div>
+            <label
+              htmlFor="scale-rush-transposition"
+              className="mb-2 block text-xs font-semibold uppercase tracking-wider text-stone-400"
+            >
+              Transposing instrument
+            </label>
+            <select
+              id="scale-rush-transposition"
+              value={draftTransposition}
+              onChange={(event) =>
+                setDraftTransposition(event.target.value as ScaleRushTransposition)
+              }
+              className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-medium text-stone-800"
+            >
+              {SCALE_RUSH_TRANSPOSITIONS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-stone-500">
+              Tiles and detection use written pitch for your instrument — no mental transposing.
+            </p>
+          </div>
+
+          <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Instrument
+              Mic profile
             </p>
             <p className="text-sm font-medium text-stone-800">{instrumentProfile.label}</p>
-            <p className="mt-0.5 text-xs text-stone-500">Concert pitch · Settings → Pitch &amp; Tuning</p>
+            <p className="mt-0.5 text-xs text-stone-500">Change in Settings → Pitch &amp; Tuning</p>
           </div>
+
+          <label className="flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-stone-900">Pitch accuracy</p>
+              <p className="mt-0.5 text-xs text-stone-500">
+                {pitchAccuracyStrict
+                  ? 'Must be within ±15¢ of the target note'
+                  : 'Any detected note name match advances'}
+              </p>
+            </div>
+            <IOSSwitch
+              checked={pitchAccuracyStrict}
+              onChange={setPitchAccuracyStrict}
+              ariaLabel="Require pitch accuracy within 15 cents"
+            />
+          </label>
         </div>
 
         <div className="mt-auto space-y-3 pt-8">
@@ -155,6 +201,8 @@ export default function ScaleRushScreen({
                 scale: draftScale,
                 range: draftRange,
                 tunerInstrument,
+                transposition: draftTransposition,
+                pitchAccuracyStrict,
               })
             }
             className="w-full rounded-2xl bg-stone-900 py-4 text-lg font-semibold text-white"

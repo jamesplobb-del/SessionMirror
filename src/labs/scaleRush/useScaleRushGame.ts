@@ -1,24 +1,22 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
+  getDetectedWrittenPitchClass,
   getTargetNoteAtStep,
   isReadoutCorrectPitch,
   isReadoutWrongPitch,
   loadBestScore,
-  pitchClassesMatch,
-  readoutToPitchClass,
   saveBestScore,
 } from './scaleRushMusicLogic'
 import type { ScaleRushConfig, ScaleRushState } from './types'
 
-/** Stable correct note before advancing. */
-const CORRECT_DEBOUNCE_MS = 400
-/** Stable wrong note before miss — long enough to ignore flickery noise. */
-const WRONG_DEBOUNCE_MS = 900
-/** Per-note timeout. */
+const CORRECT_DEBOUNCE_STRICT_MS = 200
+const CORRECT_DEBOUNCE_LOOSE_MS = 120
+const WRONG_DEBOUNCE_STRICT_MS = 750
+const WRONG_DEBOUNCE_LOOSE_MS = 600
 const NOTE_TIMEOUT_MS = 12_000
-/** Minimum gap after any success/miss before listening again (prevents noise bursts). */
-const POST_ACTION_COOLDOWN_MS = 1_200
+const POST_ACTION_COOLDOWN_STRICT_MS = 550
+const POST_ACTION_COOLDOWN_LOOSE_MS = 380
 
 const INITIAL_HEARTS = 3
 
@@ -120,11 +118,6 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
   }
 }
 
-/**
- * Scale Rush gameplay loop.
- * Pitch: read-only readout from useLivePitchTracker. Ambient noise is rejected via
- * gameplay-specific gates in scaleRushMusicLogic (not global pitch engine changes).
- */
 export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState)
   const readoutRef = useRef(readout)
@@ -133,7 +126,6 @@ export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
   const stateRef = useRef(state)
   stateRef.current = state
 
-  /** Persists across sequence-step effect re-runs — stops burst advances from noise. */
   const actionLockUntilRef = useRef(0)
   const wrongPitchClassRef = useRef<number | null>(null)
 
@@ -155,11 +147,6 @@ export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
     dispatch({ type: 'BACK_TO_SETUP' })
   }, [])
 
-  const lockActions = useCallback((now: number) => {
-    actionLockUntilRef.current = now + POST_ACTION_COOLDOWN_MS
-    wrongPitchClassRef.current = null
-  }, [])
-
   useEffect(() => {
     if (!enabled || state.phase !== 'playing') return
 
@@ -171,10 +158,16 @@ export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
 
     const tick = (now: number) => {
       const current = stateRef.current
-      if (current.phase !== 'playing') return
+      const config = current.config
+      if (current.phase !== 'playing' || !config) return
 
       const dt = Math.min(now - lastTs, 50)
       lastTs = now
+
+      const strict = config.pitchAccuracyStrict
+      const correctDebounce = strict ? CORRECT_DEBOUNCE_STRICT_MS : CORRECT_DEBOUNCE_LOOSE_MS
+      const wrongDebounce = strict ? WRONG_DEBOUNCE_STRICT_MS : WRONG_DEBOUNCE_LOOSE_MS
+      const postCooldown = strict ? POST_ACTION_COOLDOWN_STRICT_MS : POST_ACTION_COOLDOWN_LOOSE_MS
 
       if (now < actionLockUntilRef.current) {
         rafId = requestAnimationFrame(tick)
@@ -183,30 +176,31 @@ export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
 
       const readoutNow = readoutRef.current
       const target = current.targetPitchClass
-      const detected = readoutToPitchClass(readoutNow)
 
-      if (detected != null && isReadoutCorrectPitch(readoutNow) && pitchClassesMatch(detected, target)) {
+      if (isReadoutCorrectPitch(readoutNow, target, config)) {
         wrongStableMs = 0
         wrongPitchClassRef.current = null
         correctStableMs += dt
-        if (correctStableMs >= CORRECT_DEBOUNCE_MS) {
+        if (correctStableMs >= correctDebounce) {
           correctStableMs = 0
           targetSince = now
-          lockActions(now)
+          actionLockUntilRef.current = now + postCooldown
+          wrongPitchClassRef.current = null
           dispatch({ type: 'SUCCESS' })
         }
-      } else if (isReadoutWrongPitch(readoutNow, target)) {
+      } else if (isReadoutWrongPitch(readoutNow, target, config)) {
         correctStableMs = 0
-        const wrongPc = readoutToPitchClass(readoutNow)!
+        const wrongPc = getDetectedWrittenPitchClass(readoutNow, config)!
         if (wrongPitchClassRef.current !== wrongPc) {
           wrongPitchClassRef.current = wrongPc
           wrongStableMs = 0
         }
         wrongStableMs += dt
-        if (wrongStableMs >= WRONG_DEBOUNCE_MS) {
+        if (wrongStableMs >= wrongDebounce) {
           wrongStableMs = 0
           targetSince = now
-          lockActions(now)
+          actionLockUntilRef.current = now + postCooldown
+          wrongPitchClassRef.current = null
           dispatch({ type: 'MISS', reason: 'wrong' })
         }
       } else {
@@ -219,7 +213,8 @@ export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
         targetSince = now
         correctStableMs = 0
         wrongStableMs = 0
-        lockActions(now)
+        actionLockUntilRef.current = now + postCooldown
+        wrongPitchClassRef.current = null
         dispatch({ type: 'MISS', reason: 'timeout' })
       }
 
@@ -229,7 +224,7 @@ export function useScaleRushGame(readout: PitchReadout, enabled: boolean) {
     targetSince = performance.now()
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
-  }, [enabled, lockActions, state.phase, state.sequenceStep])
+  }, [enabled, state.phase, state.sequenceStep])
 
   return { state, start, restart, backToSetup }
 }
