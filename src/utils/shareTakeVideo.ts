@@ -68,7 +68,7 @@ async function copyTakeToExportCache(relativeFilePath: string): Promise<string> 
 }
 
 /** Native file:// URI for Media.saveVideo — never pass capacitor:// playback URLs. */
-async function resolveNativeFileUri(take: Take): Promise<string | null> {
+export async function resolveNativeFileUri(take: Take): Promise<string | null> {
   if (take.filePath) {
     try {
       await Filesystem.stat({
@@ -106,7 +106,7 @@ function downloadTakeOnWeb(take: Take, url: string): SaveTakeResult {
   return { ok: true }
 }
 
-function resolveNativeExportAudioGain(take: Take): number {
+export function resolveNativeExportAudioGain(take: Take): number {
   const suggestedGainDb = take.playbackGainMetadata?.suggestedGainDb
   if (typeof suggestedGainDb === 'number' && Number.isFinite(suggestedGainDb) && suggestedGainDb > 0) {
     return Math.min(MAX_NATIVE_EXPORT_AUDIO_GAIN, Math.max(1, 10 ** (suggestedGainDb / 20)))

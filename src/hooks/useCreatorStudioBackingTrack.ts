@@ -25,6 +25,12 @@ export function useCreatorStudioBackingTrack(
 
   useEffect(() => {
     if (!isOpen || !backingTrack) {
+      const backing = backingRef.current
+      if (backing) {
+        backing.pause()
+        backing.removeAttribute('src')
+        backing.load()
+      }
       setBackingSrc(null)
       return
     }
@@ -40,6 +46,12 @@ export function useCreatorStudioBackingTrack(
 
     return () => {
       cancelled = true
+      const backing = backingRef.current
+      if (backing) {
+        backing.pause()
+        backing.removeAttribute('src')
+        backing.load()
+      }
       if (objectUrl) URL.revokeObjectURL(objectUrl)
       setBackingSrc(null)
     }
@@ -70,6 +82,7 @@ export function useCreatorStudioBackingTrack(
     updateTakePlaybackSpeakerGain(backing, volume, isMuted)
 
     return () => {
+      backing.pause()
       backing.removeEventListener('loadedmetadata', syncDuration)
       backing.removeEventListener('durationchange', syncDuration)
       backing.removeEventListener('timeupdate', onTimeUpdate)
@@ -111,6 +124,7 @@ export function useCreatorStudioBackingTrack(
     instrument.addEventListener('seeking', syncBacking)
 
     return () => {
+      if (!backing.paused) backing.pause()
       instrument.removeEventListener('timeupdate', syncBacking)
       instrument.removeEventListener('play', syncBacking)
       instrument.removeEventListener('pause', syncBacking)

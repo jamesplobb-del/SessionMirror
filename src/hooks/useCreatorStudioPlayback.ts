@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCapacitorVideoSrc } from './useCapacitorVideoSrc'
 import { formatTime } from './useVideoPlayback'
-import { assignMediaPlaybackSrc, prepareInlineMediaElement } from '../utils/mediaPlayback'
+import {
+  assignMediaPlaybackSrc,
+  prepareInlineMediaElement,
+  resolveMediaPlaybackSrc,
+} from '../utils/mediaPlayback'
 import {
   finalizeTakePlaybackCleanup,
   playTakeMediaFromUserGesture,
@@ -47,7 +51,9 @@ export function useCreatorStudioPlayback(
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  const resolvedSrc = useCapacitorVideoSrc(take?.filePath ?? '', take?.videoUrl ?? '')
+  const nativeResolvedSrc = useCapacitorVideoSrc(take?.filePath ?? '', take?.videoUrl ?? '')
+  const fallbackSrc = take?.videoUrl ? resolveMediaPlaybackSrc(take.videoUrl) : null
+  const resolvedSrc = nativeResolvedSrc || fallbackSrc
 
   trimRef.current = trim
 
@@ -106,6 +112,7 @@ export function useCreatorStudioPlayback(
     syncDuration()
 
     return () => {
+      mediaNode.pause()
       mediaNode.removeEventListener('loadedmetadata', syncDuration)
       mediaNode.removeEventListener('durationchange', syncDuration)
       mediaNode.removeEventListener('timeupdate', onTimeUpdate)
@@ -117,6 +124,12 @@ export function useCreatorStudioPlayback(
 
   useEffect(() => {
     if (!isOpen) {
+      const media = mediaRef.current
+      if (media) {
+        media.pause()
+        media.removeAttribute('src')
+        media.load()
+      }
       void finalizeTakePlaybackCleanup()
       setDuration(0)
       setCurrentTime(0)

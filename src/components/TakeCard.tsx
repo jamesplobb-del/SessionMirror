@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import {
+  ChevronDown,
   Check,
   Clapperboard,
   Download,
@@ -157,10 +158,20 @@ function TakeCard({
     onToggleDetail?.()
   }
 
+  const handlePrimaryOpen = () => {
+    if (selectionMode) {
+      triggerLightHaptic()
+      onToggleSelect?.()
+      return
+    }
+    triggerLightHaptic()
+    onOpenTake?.()
+  }
+
   const handleKeyActivate = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
-    handleRowActivate()
+    handlePrimaryOpen()
   }
 
   const stopNestedClick = (event: MouseEvent<HTMLElement>) => {
@@ -216,10 +227,9 @@ function TakeCard({
         aria-label={
           selectionMode
             ? `${selected ? 'Deselect' : 'Select'} ${take.name}`
-            : `${detailOpen ? 'Hide' : 'Show'} actions for ${take.name}`
+            : `Open ${take.name} full screen`
         }
-        aria-expanded={detailOpen}
-        onClick={handleRowActivate}
+        onClick={handlePrimaryOpen}
         onKeyDown={handleKeyActivate}
       >
         <div
@@ -287,11 +297,14 @@ function TakeCard({
                   haptic="light"
                   onClick={(event) => {
                     event.stopPropagation()
-                    if (detailOpen) setIsEditingName(true)
-                    else handleRowActivate()
+                    if (detailOpen) {
+                      setIsEditingName(true)
+                    } else {
+                      handlePrimaryOpen()
+                    }
                   }}
                   className="vault-take-row__title min-w-0 flex-1 truncate text-left"
-                  title={detailOpen ? 'Click to rename' : 'Tap for take details'}
+                  title={detailOpen ? 'Click to rename' : 'Open full screen'}
                 >
                   {take.name}
                 </Pressable>
@@ -315,6 +328,24 @@ function TakeCard({
               {mediaType}
             </span>
             <div className="vault-take-row__actions">
+              {!selectionMode && onToggleDetail && (
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  haptic="light"
+                  className={`vault-take-row__icon-btn vault-take-row__dropdown-btn ${
+                    detailOpen ? 'vault-take-row__dropdown-btn--open' : ''
+                  }`}
+                  aria-label={`${detailOpen ? 'Hide' : 'Show'} take actions`}
+                  aria-expanded={detailOpen}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleRowActivate()
+                  }}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Pressable>
+              )}
               {!selectionMode && onOpenTake && (
                 <Pressable
                   type="button"

@@ -116,6 +116,11 @@ export interface NativeShareResult {
   completed?: boolean
 }
 
+export interface NativeCreatorStudioRenderResult {
+  success: boolean
+  path: string
+}
+
 export interface NativeExperimentalAudioSnapshot extends AudioRouteSnapshot {
   selectedAudioEngine: string
   enabled: boolean
@@ -161,6 +166,14 @@ export interface BestTakeAudioPluginType {
   restoreRecordingRouteAfterPlayback(): Promise<AudioRouteSnapshot>
   shareMediaFile(options: { path: string; title?: string; audioGain?: number }): Promise<NativeShareResult>
   saveVideoToPhotos(options: { path: string; audioGain?: number }): Promise<{ success: boolean }>
+  renderCreatorStudioVideo(options: {
+    sourcePath: string
+    aspectRatio: string
+    trimStartPercent?: number
+    trimEndPercent?: number | null
+    audioGain?: number
+    objects: Array<Record<string, unknown>>
+  }): Promise<NativeCreatorStudioRenderResult>
   setNativeExperimentalAudioMode(options: {
     enabled: boolean
     selectedAudioEngine: string

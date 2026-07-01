@@ -1,5 +1,6 @@
 ﻿import AVFoundation
 import Capacitor
+import PDFKit
 import Photos
 import UIKit
 
@@ -24,6 +25,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restoreRecordingRouteAfterPlayback", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareMediaFile", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveVideoToPhotos", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "renderCreatorStudioVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraPreview", returnType: CAPPluginReturnPromise),
@@ -373,6 +375,293 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         } catch {
             completion(.failure(error))
+        }
+    }
+
+    private func creatorStudioRenderSize(for aspectRatio: String) -> CGSize {
+        switch aspectRatio {
+        case "1:1":
+            return CGSize(width: 1080, height: 1080)
+        case "16:9":
+            return CGSize(width: 1920, height: 1080)
+        default:
+            return CGSize(width: 1080, height: 1920)
+        }
+    }
+
+    private func transformDictionary(_ object: [String: Any]) -> [String: Any] {
+        return object["transform"] as? [String: Any] ?? [:]
+    }
+
+    private func percentValue(_ value: Any?, fallback: CGFloat) -> CGFloat {
+        if let value = value as? Double { return CGFloat(value) }
+        if let value = value as? NSNumber { return CGFloat(truncating: value) }
+        return fallback
+    }
+
+    private func creatorStudioLayerFrame(
+        object: [String: Any],
+        renderSize: CGSize,
+        defaultHeightRatio: CGFloat
+    ) -> CGRect {
+        let transform = transformDictionary(object)
+        let widthPercent = percentValue(transform["width"], fallback: 70)
+        let xPercent = percentValue(transform["x"], fallback: 50)
+        let yPercent = percentValue(transform["y"], fallback: 50)
+        let scale = max(0.1, percentValue(transform["scale"], fallback: 1))
+
+        let width = renderSize.width * (widthPercent / 100) * scale
+        let height = width * defaultHeightRatio
+        let centerX = renderSize.width * (xPercent / 100)
+        let centerY = renderSize.height * (yPercent / 100)
+        return CGRect(x: centerX - width / 2, y: centerY - height / 2, width: width, height: height)
+    }
+
+    private func applyLayerRotation(_ layer: CALayer, object: [String: Any]) {
+        let transform = transformDictionary(object)
+        let degrees = percentValue(transform["rotation"], fallback: 0)
+        guard abs(degrees) > 0.01 else { return }
+        layer.setAffineTransform(CGAffineTransform(rotationAngle: degrees * .pi / 180))
+    }
+
+    private func imageForCreatorStudioAsset(path: String, fileType: String) -> UIImage? {
+        guard let url = fileURL(from: path) else { return nil }
+        if fileType == "pdf" {
+            guard let document = PDFDocument(url: url), let page = document.page(at: 0) else {
+                return nil
+            }
+            let bounds = page.bounds(for: .mediaBox)
+            let scale: CGFloat = 2
+            let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+            let renderer = UIGraphicsImageRenderer(size: size)
+            return renderer.image { context in
+                UIColor.white.set()
+                context.fill(CGRect(origin: .zero, size: size))
+                context.cgContext.saveGState()
+                context.cgContext.translateBy(x: 0, y: size.height)
+                context.cgContext.scaleBy(x: scale, y: -scale)
+                page.draw(with: .mediaBox, to: context.cgContext)
+                context.cgContext.restoreGState()
+            }
+        }
+        return UIImage(contentsOfFile: url.path)
+    }
+
+    private func creatorStudioVideoTransform(
+        track: AVAssetTrack,
+        renderSize: CGSize
+    ) -> CGAffineTransform {
+        let preferred = track.preferredTransform
+        let naturalRect = CGRect(origin: .zero, size: track.naturalSize).applying(preferred)
+        let orientedSize = CGSize(width: abs(naturalRect.width), height: abs(naturalRect.height))
+        let scale = max(renderSize.width / max(orientedSize.width, 1), renderSize.height / max(orientedSize.height, 1))
+        let scaledSize = CGSize(width: orientedSize.width * scale, height: orientedSize.height * scale)
+        let translate = CGAffineTransform(
+            translationX: (renderSize.width - scaledSize.width) / 2,
+            y: (renderSize.height - scaledSize.height) / 2
+        )
+        let normalize = preferred.concatenating(
+            CGAffineTransform(translationX: -naturalRect.origin.x, y: -naturalRect.origin.y)
+        )
+        return normalize
+            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+            .concatenating(translate)
+    }
+
+    private func addCreatorStudioObjectLayer(
+        _ object: [String: Any],
+        to overlayLayer: CALayer,
+        renderSize: CGSize
+    ) {
+        guard let kind = object["kind"] as? String else { return }
+
+        if kind == "sheetMusic" {
+            guard
+                let path = object["path"] as? String,
+                let image = imageForCreatorStudioAsset(
+                    path: path,
+                    fileType: object["fileType"] as? String ?? "image"
+                )
+            else { return }
+            let imageRatio = image.size.height / max(image.size.width, 1)
+            let layer = CALayer()
+            layer.contents = image.cgImage
+            layer.contentsGravity = .resizeAspect
+            layer.masksToBounds = true
+            layer.cornerRadius = 18
+            layer.borderColor = UIColor.white.withAlphaComponent(0.55).cgColor
+            layer.borderWidth = 2
+            layer.frame = creatorStudioLayerFrame(
+                object: object,
+                renderSize: renderSize,
+                defaultHeightRatio: imageRatio
+            )
+            applyLayerRotation(layer, object: object)
+            overlayLayer.addSublayer(layer)
+            return
+        }
+
+        if kind == "text" || kind == "watermark" {
+            guard let text = object["text"] as? String, !text.isEmpty else { return }
+            let frame = creatorStudioLayerFrame(
+                object: object,
+                renderSize: renderSize,
+                defaultHeightRatio: kind == "watermark" ? 0.28 : 0.22
+            )
+            let textLayer = CATextLayer()
+            textLayer.frame = frame
+            textLayer.string = text
+            textLayer.alignmentMode = .center
+            textLayer.contentsScale = UIScreen.main.scale
+            textLayer.isWrapped = true
+            textLayer.foregroundColor = UIColor.white.cgColor
+            textLayer.shadowColor = UIColor.black.cgColor
+            textLayer.shadowOpacity = 0.55
+            textLayer.shadowRadius = 8
+            textLayer.shadowOffset = CGSize(width: 0, height: 2)
+            let fontSize = max(28, min(78, frame.height * 0.48))
+            textLayer.font = UIFont.systemFont(ofSize: fontSize, weight: kind == "watermark" ? .bold : .heavy)
+            textLayer.fontSize = fontSize
+
+            if kind == "watermark" {
+                textLayer.backgroundColor = UIColor.black.withAlphaComponent(0.34).cgColor
+                textLayer.cornerRadius = frame.height / 2
+                textLayer.masksToBounds = true
+            }
+
+            applyLayerRotation(textLayer, object: object)
+            overlayLayer.addSublayer(textLayer)
+        }
+    }
+
+    @objc func renderCreatorStudioVideo(_ call: CAPPluginCall) {
+        guard let sourceURL = fileURL(from: call.getString("sourcePath")) else {
+            call.reject("Missing source video")
+            return
+        }
+
+        let aspectRatio = call.getString("aspectRatio") ?? "9:16"
+        let renderSize = creatorStudioRenderSize(for: aspectRatio)
+        let trimStartPercent = max(0, min(100, call.getDouble("trimStartPercent") ?? 0))
+        let trimEndPercentRaw = call.getDouble("trimEndPercent")
+        let trimEndPercent = trimEndPercentRaw == nil ? 100 : max(0, min(100, trimEndPercentRaw ?? 100))
+        let audioGain = Float(call.getDouble("audioGain") ?? 1.0)
+        let objects = call.getArray("objects", JSObject.self) ?? []
+
+        let asset = AVURLAsset(url: sourceURL)
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            call.reject("Source video has no video track")
+            return
+        }
+
+        let durationSeconds = max(CMTimeGetSeconds(asset.duration), 0.01)
+        let startSeconds = durationSeconds * trimStartPercent / 100
+        let endSeconds = max(startSeconds + 0.05, durationSeconds * trimEndPercent / 100)
+        let timeRange = CMTimeRange(
+            start: CMTime(seconds: startSeconds, preferredTimescale: 600),
+            end: CMTime(seconds: min(endSeconds, durationSeconds), preferredTimescale: 600)
+        )
+
+        let composition = AVMutableComposition()
+        do {
+            guard let compositionVideo = composition.addMutableTrack(
+                withMediaType: .video,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+            ) else {
+                call.reject("Could not create video composition track")
+                return
+            }
+            try compositionVideo.insertTimeRange(timeRange, of: videoTrack, at: .zero)
+
+            var audioParameters: [AVMutableAudioMixInputParameters] = []
+            for audioTrack in asset.tracks(withMediaType: .audio) {
+                guard let compositionAudio = composition.addMutableTrack(
+                    withMediaType: .audio,
+                    preferredTrackID: kCMPersistentTrackID_Invalid
+                ) else { continue }
+                try compositionAudio.insertTimeRange(timeRange, of: audioTrack, at: .zero)
+                let parameters = AVMutableAudioMixInputParameters(track: compositionAudio)
+                parameters.setVolume(min(max(audioGain, 1.0), 4.5), at: .zero)
+                audioParameters.append(parameters)
+            }
+
+            let instruction = AVMutableVideoCompositionInstruction()
+            instruction.timeRange = CMTimeRange(start: .zero, duration: timeRange.duration)
+            let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideo)
+            layerInstruction.setTransform(
+                creatorStudioVideoTransform(track: videoTrack, renderSize: renderSize),
+                at: .zero
+            )
+            instruction.layerInstructions = [layerInstruction]
+
+            let videoComposition = AVMutableVideoComposition()
+            videoComposition.renderSize = renderSize
+            videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+            videoComposition.instructions = [instruction]
+
+            let parentLayer = CALayer()
+            parentLayer.frame = CGRect(origin: .zero, size: renderSize)
+            parentLayer.isGeometryFlipped = true
+            parentLayer.backgroundColor = UIColor.black.cgColor
+
+            let videoLayer = CALayer()
+            videoLayer.frame = parentLayer.bounds
+            parentLayer.addSublayer(videoLayer)
+
+            let overlayLayer = CALayer()
+            overlayLayer.frame = parentLayer.bounds
+            parentLayer.addSublayer(overlayLayer)
+
+            for object in objects {
+                let nativeObject = object as [String: Any]
+                if nativeObject["kind"] as? String == "recording" { continue }
+                addCreatorStudioObjectLayer(nativeObject, to: overlayLayer, renderSize: renderSize)
+            }
+
+            videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
+                postProcessingAsVideoLayer: videoLayer,
+                in: parentLayer
+            )
+
+            guard let exportSession = AVAssetExportSession(
+                asset: composition,
+                presetName: AVAssetExportPresetHighestQuality
+            ) else {
+                call.reject("Could not create export session")
+                return
+            }
+
+            let audioMix = AVMutableAudioMix()
+            audioMix.inputParameters = audioParameters
+            exportSession.audioMix = audioMix
+            exportSession.videoComposition = videoComposition
+            exportSession.outputFileType = .mp4
+            exportSession.shouldOptimizeForNetworkUse = true
+
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("besttake-creator-studio-\(UUID().uuidString).mp4")
+            try? FileManager.default.removeItem(at: outputURL)
+            exportSession.outputURL = outputURL
+
+            print("[CreatorStudio] native render start objects=\(objects.count) aspect=\(aspectRatio) source=\(sourceURL.lastPathComponent)")
+            exportSession.exportAsynchronously {
+                DispatchQueue.main.async {
+                    if exportSession.status == .completed {
+                        print("[CreatorStudio] native render complete path=\(outputURL.path)")
+                        call.resolve([
+                            "success": true,
+                            "path": outputURL.absoluteString
+                        ])
+                    } else if let error = exportSession.error {
+                        print("[CreatorStudio] native render failed: \(error.localizedDescription)")
+                        call.reject("Creator Studio render failed", error.localizedDescription)
+                    } else {
+                        call.reject("Creator Studio render failed")
+                    }
+                }
+            }
+        } catch {
+            call.reject("Creator Studio render failed", error.localizedDescription)
         }
     }
 

@@ -378,6 +378,7 @@ export default function CreatorStudio({
               selectedObjectId={selectedObjectId}
               isVideo={isVideo}
               resolvedSrc={resolvedSrc}
+              fallbackSrc={take.videoUrl}
               bindMediaRef={bindMediaRef}
               isPlaying={isPlaying}
               duration={duration}

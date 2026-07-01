@@ -2089,6 +2089,21 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [deferHudMediaPause, markOverlayClosed, sortedTakes]
   )
 
+  const handleOpenCreatorStudio = useCallback(
+    (take: Take) => {
+      pauseYoutubeReference()
+      pausePipVideos()
+      setIsVaultOpen(false)
+      setCreatorStudioTake(take)
+    },
+    [pausePipVideos, pauseYoutubeReference]
+  )
+
+  const handleCloseCreatorStudio = useCallback(() => {
+    pauseYoutubeReference()
+    setCreatorStudioTake(null)
+  }, [pauseYoutubeReference])
+
   const handleOpenCompareReview = useCallback(
     (slot: ReviewSlot) => {
       setReviewContext('compare')
@@ -3002,7 +3017,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onDeleteTakes={handleDeleteTakes}
                     onClearAllTakes={handleClearAllTakes}
                     onOpenTake={handleOpenVaultTake}
-                    onCreateTake={setCreatorStudioTake}
+                    onCreateTake={handleOpenCreatorStudio}
                     onBeforeExport={() => {
                       stopAutoPlaybackAudio()
                       pausePipVideos()
@@ -3016,7 +3031,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     isOpen={creatorStudioTake !== null}
                     take={creatorStudioTake}
                     projectName={activeProject?.name ?? null}
-                    onClose={() => setCreatorStudioTake(null)}
+                    onClose={handleCloseCreatorStudio}
                   />
 
                   <SettingsDrawer

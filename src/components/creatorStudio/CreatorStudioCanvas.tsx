@@ -19,6 +19,7 @@ interface CreatorStudioCanvasProps {
   selectedObjectId: string | null
   isVideo: boolean
   resolvedSrc: string | null
+  fallbackSrc: string
   bindMediaRef: (node: HTMLVideoElement | HTMLAudioElement | null) => void
   isPlaying: boolean
   duration: number
@@ -114,6 +115,7 @@ export default function CreatorStudioCanvas({
   selectedObjectId,
   isVideo,
   resolvedSrc,
+  fallbackSrc,
   bindMediaRef,
   isPlaying,
   duration,
@@ -156,6 +158,17 @@ export default function CreatorStudioCanvas({
   )
 
   const overlayGuides: StudioGuideLine[] = []
+  const mediaSrc = resolvedSrc || fallbackSrc
+
+  const bindRecordingMediaRef = useCallback(
+    (node: HTMLVideoElement | HTMLAudioElement | null) => {
+      bindMediaRef(node)
+      if (node && mediaSrc && node.src !== mediaSrc) {
+        node.src = mediaSrc
+      }
+    },
+    [bindMediaRef, mediaSrc],
+  )
 
   const handleDividerPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -194,16 +207,24 @@ export default function CreatorStudioCanvas({
     isVideo ? (
       <>
         <video
-          ref={bindMediaRef}
+          ref={bindRecordingMediaRef}
           className="creator-studio__media"
+          src={mediaSrc || undefined}
           playsInline
           preload="metadata"
+          onLoadedMetadata={() => console.info('[CreatorStudio] video loaded', { src: mediaSrc })}
+          onError={(event) =>
+            console.warn('[CreatorStudio] video failed to load', {
+              src: mediaSrc,
+              error: event.currentTarget.error?.message ?? event.currentTarget.error?.code,
+            })
+          }
           onClick={(event) => {
             event.stopPropagation()
             onTogglePlayback()
           }}
         />
-        {!resolvedSrc && (
+        {!mediaSrc && (
           <div className="creator-studio__media-loading" aria-hidden>
             <Music2 className="h-8 w-8 animate-pulse" />
           </div>
@@ -214,7 +235,7 @@ export default function CreatorStudioCanvas({
           haptic="medium"
           className={`creator-studio__preview-play ${isPlaying ? 'is-playing' : ''}`}
           aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
-          disabled={!resolvedSrc}
+          disabled={!mediaSrc}
           onClick={(event) => {
             event.stopPropagation()
             onTogglePlayback()
@@ -225,7 +246,12 @@ export default function CreatorStudioCanvas({
       </>
     ) : resolvedSrc ? (
       <>
-        <audio ref={bindMediaRef} className="creator-studio__media-audio" preload="metadata" />
+        <audio
+          ref={bindRecordingMediaRef}
+          className="creator-studio__media-audio"
+          src={mediaSrc}
+          preload="metadata"
+        />
         <div className="creator-studio__audio-chip">
           <Music2 className="h-5 w-5" />
           <Pressable type="button" intensity="icon" haptic="medium" className="creator-studio__audio-play" onClick={onTogglePlayback}>

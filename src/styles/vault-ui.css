@@ -596,6 +596,30 @@
   box-shadow: var(--audio-shadow-fab);
 }
 
+.native-bottom-sheet--vault .vault-take-row__dropdown-btn {
+  border: 1px solid var(--audio-divider);
+  color: var(--audio-text-secondary);
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 180ms ease,
+    color 180ms ease,
+    background 180ms ease;
+}
+
+.native-bottom-sheet--vault .vault-take-row__dropdown-btn svg {
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.native-bottom-sheet--vault .vault-take-row__dropdown-btn--open {
+  border-color: var(--audio-blue-border);
+  background: var(--audio-blue-soft);
+  color: var(--audio-blue);
+}
+
+.native-bottom-sheet--vault .vault-take-row__dropdown-btn--open svg {
+  transform: rotate(180deg);
+}
+
 .native-bottom-sheet--vault .vault-take-row__play-btn {
   display: flex;
   height: 2.15rem;
