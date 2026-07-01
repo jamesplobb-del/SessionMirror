@@ -1,8 +1,9 @@
-import { memo, useEffect, useRef, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useRef, type PointerEvent, type RefObject } from 'react'
 import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
 import { iosBulletproofVideoProps } from '../utils/mobileVideo'
+import { getFrontCameraZoomRange, setFrontCameraZoom } from '../utils/videoCapture'
 import {
   assignMediaPlaybackSrc,
   waitForMediaReadyWithRetry,
@@ -59,6 +60,11 @@ function LiveCameraBackground({
 }: LiveCameraBackgroundProps) {
   const handsFreePlaybackVideoRef = useRef<HTMLVideoElement>(null)
   const handsFreePlaybackSessionRef = useRef(false)
+  const pinchPointersRef = useRef(new Map<number, { x: number; y: number }>())
+  const pinchStartDistanceRef = useRef(0)
+  const pinchStartZoomRef = useRef(1)
+  const zoomRequestFrameRef = useRef<number | null>(null)
+  const pendingZoomRef = useRef<number | null>(null)
   const isAudioMode = recordingMode === 'audio'
   const showAudioIdle =
     isAudioMode && !pitchStageActive && !metronomeStageActive && !audioPracticeOverlayActive
@@ -251,13 +257,119 @@ function LiveCameraBackground({
     !isAudioMode &&
     !visuallySuppressed
 
-  const shellClass = isEmbedded
-    ? 'camera-background camera-background--embedded'
-    : visuallySuppressed
-      ? 'camera-background camera-background--visually-suppressed'
-      : nativePreviewActive
-        ? 'camera-background camera-background--native-preview'
-        : 'camera-background'
+  const pinchZoomEnabled =
+    !isEmbedded &&
+    !isAudioMode &&
+    !nativePreviewActive &&
+    !visuallySuppressed &&
+    !showHandsFreeTakePlayback
+
+  const getPinchDistance = useCallback(() => {
+    const points = Array.from(pinchPointersRef.current.values())
+    if (points.length < 2) return 0
+    const [first, second] = points
+    return Math.hypot(second.x - first.x, second.y - first.y)
+  }, [])
+
+  const scheduleZoom = useCallback(
+    (zoom: number) => {
+      pendingZoomRef.current = zoom
+      if (zoomRequestFrameRef.current !== null) return
+
+      zoomRequestFrameRef.current = window.requestAnimationFrame(() => {
+        zoomRequestFrameRef.current = null
+        const nextZoom = pendingZoomRef.current
+        pendingZoomRef.current = null
+        if (nextZoom === null) return
+        void setFrontCameraZoom(streamRef.current, nextZoom)
+      })
+    },
+    [streamRef],
+  )
+
+  const handleCameraPinchPointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (!pinchZoomEnabled || event.pointerType !== 'touch') return
+
+      pinchPointersRef.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      })
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+
+      if (pinchPointersRef.current.size === 2) {
+        const range = getFrontCameraZoomRange(streamRef.current)
+        if (!range) {
+          pinchPointersRef.current.clear()
+          return
+        }
+        pinchStartDistanceRef.current = getPinchDistance()
+        pinchStartZoomRef.current = range.current
+      }
+    },
+    [getPinchDistance, pinchZoomEnabled, streamRef],
+  )
+
+  const handleCameraPinchPointerMove = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (!pinchZoomEnabled || event.pointerType !== 'touch') return
+      if (!pinchPointersRef.current.has(event.pointerId)) return
+
+      pinchPointersRef.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      })
+
+      if (pinchPointersRef.current.size < 2) return
+
+      const range = getFrontCameraZoomRange(streamRef.current)
+      const startDistance = pinchStartDistanceRef.current
+      if (!range || startDistance <= 0) return
+
+      event.preventDefault()
+      const ratio = getPinchDistance() / startDistance
+      scheduleZoom(pinchStartZoomRef.current * ratio)
+    },
+    [getPinchDistance, pinchZoomEnabled, scheduleZoom, streamRef],
+  )
+
+  const handleCameraPinchPointerEnd = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    pinchPointersRef.current.delete(event.pointerId)
+    if (pinchPointersRef.current.size < 2) {
+      pinchStartDistanceRef.current = 0
+    }
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (pinchZoomEnabled) return
+    pinchPointersRef.current.clear()
+    pinchStartDistanceRef.current = 0
+  }, [pinchZoomEnabled])
+
+  useEffect(
+    () => () => {
+      if (zoomRequestFrameRef.current !== null) {
+        window.cancelAnimationFrame(zoomRequestFrameRef.current)
+      }
+    },
+    [],
+  )
+
+  const shellClass = [
+    isEmbedded
+      ? 'camera-background camera-background--embedded'
+      : visuallySuppressed
+        ? 'camera-background camera-background--visually-suppressed'
+        : nativePreviewActive
+          ? 'camera-background camera-background--native-preview'
+          : 'camera-background',
+    pinchZoomEnabled ? 'camera-background--pinch-zoom' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const previewClassName = [
     isEmbedded ? 'camera-preview--embedded' : 'camera-preview',
@@ -272,7 +384,15 @@ function LiveCameraBackground({
   const showPlaceholder = !nativePreviewActive && resumingPreview && Boolean(placeholderUrl)
 
   return (
-    <div className={shellClass} aria-hidden={!isEmbedded && !visuallySuppressed}>
+    <div
+      className={shellClass}
+      aria-hidden={!isEmbedded && !visuallySuppressed}
+      onPointerDown={handleCameraPinchPointerDown}
+      onPointerMove={handleCameraPinchPointerMove}
+      onPointerUp={handleCameraPinchPointerEnd}
+      onPointerCancel={handleCameraPinchPointerEnd}
+      onPointerLeave={handleCameraPinchPointerEnd}
+    >
       {showPlaceholder && (
         <div
           className={`camera-preview-placeholder ${

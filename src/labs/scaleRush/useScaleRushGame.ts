@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
+  getTargetNoteAtStep,
   loadBestScore,
-  pitchClassForSequenceStep,
   pitchClassesMatch,
   readoutToPitchClass,
   isReadoutStableEnough,
@@ -11,9 +11,9 @@ import {
 import type { ScaleRushConfig, ScaleRushState } from './types'
 
 /** Stable correct note before advancing. */
-const CORRECT_DEBOUNCE_MS = 280
+const CORRECT_DEBOUNCE_MS = 250
 /** Stable wrong note before miss. */
-const WRONG_DEBOUNCE_MS = 520
+const WRONG_DEBOUNCE_MS = 300
 /** Per-note timeout. */
 const NOTE_TIMEOUT_MS = 10_000
 /** Ignore pitch after success so sustained notes do not double-trigger. */
@@ -50,12 +50,12 @@ function createInitialState(): ScaleRushState {
 function reducer(state: ScaleRushState, action: Action): ScaleRushState {
   switch (action.type) {
     case 'START': {
-      const targetPitchClass = pitchClassForSequenceStep(action.config.key, 0)
+      const target = getTargetNoteAtStep(action.config, 0)
       return {
         ...createInitialState(),
         phase: 'playing',
         config: action.config,
-        targetPitchClass,
+        targetPitchClass: target.pitchClass,
         bestScore: loadBestScore(),
         startedAtMs: Date.now(),
       }
@@ -64,11 +64,12 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
     case 'SUCCESS': {
       if (state.phase !== 'playing' || !state.config) return state
       const nextStep = state.sequenceStep + 1
+      const target = getTargetNoteAtStep(state.config, nextStep)
       const streak = state.streak + 1
       return {
         ...state,
         sequenceStep: nextStep,
-        targetPitchClass: pitchClassForSequenceStep(state.config.key, nextStep),
+        targetPitchClass: target.pitchClass,
         score: state.score + 1,
         streak,
         bestStreak: Math.max(state.bestStreak, streak),
@@ -81,6 +82,7 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
       if (state.phase !== 'playing' || !state.config) return state
       const hearts = Math.max(0, state.hearts - 1)
       const nextStep = state.sequenceStep + 1
+      const target = getTargetNoteAtStep(state.config, nextStep)
       if (hearts <= 0) {
         const bestScore = saveBestScore(state.score)
         return {
@@ -100,7 +102,7 @@ function reducer(state: ScaleRushState, action: Action): ScaleRushState {
         missCount: state.missCount + 1,
         missToken: state.missToken + 1,
         sequenceStep: nextStep,
-        targetPitchClass: pitchClassForSequenceStep(state.config.key, nextStep),
+        targetPitchClass: target.pitchClass,
       }
     }
 

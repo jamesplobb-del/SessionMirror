@@ -2,13 +2,21 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import '../../styles/scale-rush.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
-import { computeAccuracy, pitchClassLabel } from '../../labs/scaleRush/scaleRushMusicLogic'
-import { SCALE_RUSH_KEYS, type ScaleRushKey } from '../../labs/scaleRush/scaleRushMusicLogic'
+import {
+  computeAccuracy,
+  RANGE_LABELS,
+  SCALE_LABELS,
+  SCALE_RUSH_KEYS,
+  SCALE_RUSH_RANGES,
+  SCALE_RUSH_SCALES,
+  type ScaleRushKey,
+  type ScaleRushRange,
+  type ScaleRushScale,
+} from '../../labs/scaleRush/scaleRushMusicLogic'
 import { useScaleRushGame } from '../../labs/scaleRush/useScaleRushGame'
 import { getTunerProfile, type TunerInstrument } from '../../utils/pitchConfig'
 import Pressable from '../ui/Pressable'
-import ScaleRushLiveTuner from './ScaleRushLiveTuner'
-import ScaleRushRunner from './ScaleRushRunner'
+import ScaleRushGame from './ScaleRushGame'
 
 interface ScaleRushScreenProps {
   streamRef: RefObject<MediaStream | null>
@@ -16,22 +24,6 @@ interface ScaleRushScreenProps {
   tunerInstrument: TunerInstrument
   onRequestMicStream: () => void
   onBack: () => void
-}
-
-function Hearts({ count, max = 3 }: { count: number; max?: number }) {
-  return (
-    <span className="inline-flex gap-0.5" aria-label={`${count} hearts remaining`}>
-      {Array.from({ length: max }, (_, index) => (
-        <span
-          key={index}
-          className={`scale-rush-heart ${index < count ? '' : 'scale-rush-heart--empty'}`}
-          aria-hidden
-        >
-          ♥
-        </span>
-      ))}
-    </span>
-  )
 }
 
 export default function ScaleRushScreen({
@@ -44,12 +36,14 @@ export default function ScaleRushScreen({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [draftKey, setDraftKey] = useState<ScaleRushKey>('C')
+  const [draftScale] = useState<ScaleRushScale>('major')
+  const [draftRange] = useState<ScaleRushRange>('1-octave')
 
   useEffect(() => {
     onRequestMicStream()
   }, [onRequestMicStream, streamGeneration])
 
-  // Pitch integration: single mic-backed tracker shared by gameplay + live tuner panel.
+  // Pitch integration: read-only mic tracker — shared by gameplay + live tuner HUD.
   const pitchEnabled = true
   const { readout } = useLivePitchTracker(
     mediaRef,
@@ -69,7 +63,6 @@ export default function ScaleRushScreen({
   )
 
   const { state, start, restart, backToSetup } = useScaleRushGame(readout, pitchEnabled)
-
   const instrumentProfile = getTunerProfile(tunerInstrument)
 
   if (state.phase === 'setup') {
@@ -79,15 +72,18 @@ export default function ScaleRushScreen({
           <Pressable type="button" intensity="soft" onClick={onBack} aria-label="Back to Labs">
             <ChevronLeft className="h-6 w-6 text-stone-600" />
           </Pressable>
-          <h1 className="text-2xl font-bold text-stone-900">Scale Rush</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-stone-900">Scale Rush</h1>
+            <p className="text-xs text-stone-400">v0.05 · Crossy Road style</p>
+          </div>
         </header>
 
         <p className="mb-6 text-sm text-stone-500">
-          Run the course by playing each target note in the scale. Wrong notes and timeouts cost a
-          heart.
+          Cross the course one tile at a time by playing each note on the path ahead. Wrong notes and
+          timeouts cost a heart.
         </p>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Key</p>
             <div className="flex flex-wrap gap-2">
@@ -110,18 +106,39 @@ export default function ScaleRushScreen({
           </div>
 
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-stone-400">Scale</p>
-            <p className="text-sm font-medium text-stone-800">Major</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Scale</p>
+            <div className="flex flex-wrap gap-2">
+              {SCALE_RUSH_SCALES.map((scale) => (
+                <span
+                  key={scale}
+                  className="rounded-xl border border-sky-600 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800"
+                >
+                  {SCALE_LABELS[scale]}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Range</p>
+            <div className="flex flex-wrap gap-2">
+              {SCALE_RUSH_RANGES.map((range) => (
+                <span
+                  key={range}
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700"
+                >
+                  {RANGE_LABELS[range]}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Instrument profile
+              Instrument
             </p>
             <p className="text-sm font-medium text-stone-800">{instrumentProfile.label}</p>
-            <p className="mt-0.5 text-xs text-stone-500">
-              Concert pitch · change in Settings → Pitch &amp; Tuning
-            </p>
+            <p className="mt-0.5 text-xs text-stone-500">Concert pitch · Settings → Pitch &amp; Tuning</p>
           </div>
         </div>
 
@@ -132,7 +149,14 @@ export default function ScaleRushScreen({
           <Pressable
             type="button"
             intensity="soft"
-            onClick={() => start({ key: draftKey, tunerInstrument })}
+            onClick={() =>
+              start({
+                key: draftKey,
+                scale: draftScale,
+                range: draftRange,
+                tunerInstrument,
+              })
+            }
             className="w-full rounded-2xl bg-stone-900 py-4 text-lg font-semibold text-white"
           >
             Start
@@ -157,7 +181,7 @@ export default function ScaleRushScreen({
             <dd className="font-semibold tabular-nums">{state.bestScore}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>Best streak</dt>
+            <dt>Longest streak</dt>
             <dd className="font-semibold tabular-nums">{state.bestStreak}</dd>
           </div>
           <div className="flex justify-between">
@@ -180,7 +204,7 @@ export default function ScaleRushScreen({
             onClick={backToSetup}
             className="w-full rounded-2xl border border-stone-200 py-3 text-sm font-semibold text-stone-700"
           >
-            Change key
+            Home
           </Pressable>
           <Pressable
             type="button"
@@ -195,52 +219,12 @@ export default function ScaleRushScreen({
     )
   }
 
-  const config = state.config!
-  const targetLabel = pitchClassLabel(state.targetPitchClass, config.key)
-
   return (
-    <div className="scale-rush-screen scale-rush-screen--playing">
-      <header className="scale-rush-play-header mb-3 flex items-center justify-between gap-2 text-sm">
-        <div className="flex items-center gap-2">
-          <Hearts count={state.hearts} />
-          <span className="text-stone-500">
-            {config.key} Major
-          </span>
-        </div>
-        <div className="text-right text-stone-600">
-          <span className="font-semibold tabular-nums">{state.score}</span>
-          <span className="mx-1 text-stone-300">·</span>
-          <span className="tabular-nums">×{state.streak}</span>
-        </div>
-      </header>
-
-      <ScaleRushRunner
-        keyRoot={config.key}
-        sequenceStep={state.sequenceStep}
-        targetPitchClass={state.targetPitchClass}
-        advanceToken={state.advanceToken}
-        missToken={state.missToken}
-      />
-
-      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700">
-          Play this note
-        </p>
-        <p className="text-5xl font-bold text-amber-950">{targetLabel}</p>
-      </div>
-
-      <div className="mt-3 min-h-0 flex-1">
-        <ScaleRushLiveTuner readout={readout} canvasRef={canvasRef} keyRoot={config.key} />
-      </div>
-
-      <Pressable
-        type="button"
-        intensity="soft"
-        onClick={backToSetup}
-        className="mt-3 py-2 text-center text-xs font-medium text-stone-400"
-      >
-        Quit run
-      </Pressable>
-    </div>
+    <ScaleRushGame
+      state={state}
+      readout={readout}
+      canvasRef={canvasRef}
+      onPause={backToSetup}
+    />
   )
 }

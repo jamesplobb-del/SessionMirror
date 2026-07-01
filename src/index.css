@@ -2566,6 +2566,10 @@ html.physical-landscape-right .ui-orient-spin {
   background: transparent !important;
 }
 
+.camera-background--pinch-zoom {
+  touch-action: none;
+}
+
 /* Portrait-locked app — camera fills the fixed portrait viewport. */
 video.camera-preview {
   position: fixed !important;

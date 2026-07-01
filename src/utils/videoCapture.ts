@@ -77,31 +77,95 @@ export async function tuneVideoRecordingStream(
 }
 
 type ZoomCapableCapabilities = MediaTrackCapabilities & {
-  zoom?: { min?: number; max?: number }
+  zoom?: { min?: number; max?: number; step?: number }
+}
+
+type ZoomCapableSettings = MediaTrackSettings & {
+  zoom?: number
 }
 
 type ZoomCapableTrack = MediaStreamTrack & {
   getCapabilities?: () => ZoomCapableCapabilities
+  getSettings?: () => ZoomCapableSettings
+}
+
+export interface CameraZoomRange {
+  min: number
+  max: number
+  step: number
+  current: number
+}
+
+function getZoomTrack(stream: MediaStream | null | undefined): ZoomCapableTrack | null {
+  const track = stream?.getVideoTracks()[0] as ZoomCapableTrack | undefined
+  if (!track || track.readyState !== 'live') return null
+  return track
+}
+
+export function getFrontCameraZoomRange(
+  stream: MediaStream | null | undefined,
+): CameraZoomRange | null {
+  const track = getZoomTrack(stream)
+  if (!track) return null
+
+  try {
+    const capabilities = track.getCapabilities?.() as ZoomCapableCapabilities | undefined
+    const zoom = capabilities?.zoom
+    if (!zoom) return null
+
+    const min = zoom.min ?? 1
+    const max = zoom.max ?? min
+    if (max <= min) return null
+
+    const settings = track.getSettings?.() as ZoomCapableSettings | undefined
+    return {
+      min,
+      max,
+      step: zoom.step ?? 0.05,
+      current: settings?.zoom ?? min,
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function setFrontCameraZoom(
+  stream: MediaStream | null | undefined,
+  zoom: number,
+): Promise<CameraZoomRange | null> {
+  const track = getZoomTrack(stream)
+  if (!track) return null
+
+  const range = getFrontCameraZoomRange(stream)
+  if (!range) return null
+
+  const stepped =
+    range.step > 0
+      ? Math.round((zoom - range.min) / range.step) * range.step + range.min
+      : zoom
+  const nextZoom = Math.max(range.min, Math.min(range.max, stepped))
+
+  try {
+    await track.applyConstraints({
+      advanced: [{ zoom: nextZoom } as MediaTrackConstraintSet],
+    })
+    return {
+      ...range,
+      current: nextZoom,
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Keep front camera at 1× after iOS background resume (WebKit track zoom can stick). */
 export async function resetFrontCameraZoom(stream: MediaStream): Promise<void> {
-  const track = stream.getVideoTracks()[0] as ZoomCapableTrack | undefined
-  if (!track || track.readyState !== 'live') return
+  const range = getFrontCameraZoomRange(stream)
+  if (range) await setFrontCameraZoom(stream, range.min)
 
   try {
-    const capabilities = track.getCapabilities?.() as ZoomCapableCapabilities | undefined
-    if (capabilities?.zoom) {
-      const minZoom = capabilities.zoom.min ?? 1
-      await track.applyConstraints({
-        advanced: [{ zoom: minZoom } as MediaTrackConstraintSet],
-      })
-    }
-  } catch {
-    /* zoom constraint unsupported or rejected */
-  }
-
-  try {
+    const track = getZoomTrack(stream)
+    if (!track) return
     await track.applyConstraints(getPortraitVideoCaptureConstraints())
   } catch {
     /* keep current FOV if portrait constraints are rejected */
