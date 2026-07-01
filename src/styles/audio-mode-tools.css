@@ -650,7 +650,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-
 
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
   gap: 0.2rem;
-  padding: 0.25rem 0.5rem 1rem;
+  padding: 0.2rem 0.5rem 0.75rem;
   background: transparent;
 }
 
@@ -730,9 +730,13 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__chart {
-  min-height: min(36vh, 15.5rem);
-  margin-bottom: 0.7rem;
-  transform: translateY(-0.25rem);
+  min-height: min(40vh, 17rem);
+  margin-bottom: 0.55rem;
+  transform: translateY(-0.15rem);
+}
+
+.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills-wrap {
+  padding-top: 0.32rem;
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished {

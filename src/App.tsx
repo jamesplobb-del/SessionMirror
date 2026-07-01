@@ -1094,6 +1094,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     refreshCameraSession,
     requestCameraPreviewResume,
     reacquireStreamForAudioRoute,
+    ensureRecordableStream,
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
@@ -1933,6 +1934,28 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const isAudioPracticeTunerTab = recordingMode === 'audio' && audioPracticeTab === 'tuner'
 
   const isAudioPracticeToolTab = isAudioPracticeMetronomeTab || isAudioPracticeTunerTab
+
+  useEffect(() => {
+    if (!isAudioPracticeTunerTab || quickSettingsOpen || isRecording) return
+
+    const stream = streamRef.current
+    const hasLiveAudio =
+      stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled) ??
+      false
+
+    if (ready && hasLiveAudio) return
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      if (cancelled) return
+      void ensureRecordableStream()
+    }, 80)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [ensureRecordableStream, isAudioPracticeTunerTab, isRecording, quickSettingsOpen, ready, streamGeneration])
 
   const pitchAudioHudLock =
     showPitch &&

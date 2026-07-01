@@ -1,12 +1,12 @@
-import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DRONE_NOTE_STRIP } from '../../utils/droneEngine'
 
 const WHEEL_NOTE_COUNT = 12
-const WHEEL_RADIUS_PERCENT = 42.5
+const WHEEL_RADIUS_PERCENT = 37.2
 const GLISSANDO_THRESHOLD_PX = 10
-const INNER_DEAD_ZONE_RATIO = 0.31
-const OUTER_EDGE_RATIO = 0.64
+const INNER_DEAD_ZONE_RATIO = 0.25
+const OUTER_EDGE_RATIO = 0.56
 
 export interface DroneSoundWheelProps {
   activeNotes: number[]
@@ -23,11 +23,12 @@ function shortNoteLabel(label: string): string {
   return label.split('/')[0] ?? label
 }
 
-function notePosition(index: number): { left: string; top: string } {
+function notePosition(index: number): CSSProperties & { '--drone-note-angle': string } {
   const angle = (index / WHEEL_NOTE_COUNT) * Math.PI * 2 - Math.PI / 2
   return {
     left: `${50 + WHEEL_RADIUS_PERCENT * Math.cos(angle)}%`,
     top: `${50 + WHEEL_RADIUS_PERCENT * Math.sin(angle)}%`,
+    '--drone-note-angle': `${(angle * 180) / Math.PI + 90}deg`,
   }
 }
 
@@ -179,7 +180,7 @@ export default function DroneSoundWheel({
                 style={position}
                 aria-hidden
               >
-                {shortNoteLabel(label)}
+                <span className="drone-sound-wheel__note-label">{shortNoteLabel(label)}</span>
               </span>
             )
           })}
