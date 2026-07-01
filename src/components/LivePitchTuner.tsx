@@ -405,8 +405,9 @@ function LivePitchTunerAudio({
       tunerInstrument,
       realtimeMode: true,
       suppressUntilRef: droneAnalysisSuppressUntilRef,
+      allowStandaloneMicFallback: liveMicOnly,
     }),
-    [micStreamRef, tunerInstrument],
+    [liveMicOnly, micStreamRef, tunerInstrument],
   )
 
   const playbackTrackerOptions = useMemo(

@@ -27,24 +27,16 @@ function parseWaveform(value: unknown): DroneWaveform {
   return 'sine'
 }
 
-function parseActiveNotes(value: unknown): number[] {
-  if (!Array.isArray(value)) return []
-  return value
-    .map((entry) => Number(entry))
-    .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 11)
-}
-
 export function loadDronePrefs(): DronePrefs {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_DRONE_PREFS }
 
     const parsed = JSON.parse(raw) as Partial<DronePrefs>
-    const activeNotes = parseActiveNotes(parsed.activeNotes)
     return {
-      activeNotes,
+      activeNotes: [],
       octave: clampOctave(Number(parsed.octave) || DEFAULT_DRONE_PREFS.octave),
-      enabled: activeNotes.length > 0 || Boolean(parsed.enabled),
+      enabled: false,
       volume:
         parsed.volume === undefined
           ? DEFAULT_DRONE_PREFS.volume
@@ -62,7 +54,8 @@ export function saveDronePrefs(prefs: DronePrefs): void {
       STORAGE_KEY,
       JSON.stringify({
         ...prefs,
-        enabled: prefs.activeNotes.length > 0,
+        activeNotes: [],
+        enabled: false,
       }),
     )
   } catch {

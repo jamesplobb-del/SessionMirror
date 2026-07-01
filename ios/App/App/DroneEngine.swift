@@ -196,13 +196,21 @@ final class DroneEngine {
         mainMixer.outputVolume = masterVolume
         self.waveform = DroneWaveform.parse(waveform)
         let notes = Set(activeNotes.filter { (0...11).contains($0) })
+        for pitchClass in voices.keys where !notes.contains(pitchClass) {
+            fadeVoice(pitchClass: pitchClass, to: 0)
+            scheduleDetachIfSilent(pitchClass: pitchClass)
+        }
         for pitchClass in notes {
             attachVoiceIfNeeded(pitchClass: pitchClass)
             updateVoiceFrequency(pitchClass: pitchClass)
             fadeVoice(pitchClass: pitchClass, to: 1)
         }
         stateLock.unlock()
-        ensureEngineRunning()
+        if notes.isEmpty {
+            stopEngineIfIdle()
+        } else {
+            ensureEngineRunning()
+        }
     }
 
     // MARK: - Voice management

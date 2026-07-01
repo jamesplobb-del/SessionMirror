@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Capacitor } from '@capacitor/core'
 import type { RecordingMode } from '../types'
 import {
@@ -397,11 +397,10 @@ export function useCameraSession({
   }, [])
 
   const isCaptureSessionStale = useCallback(
-    (epoch: number, mode: RecordingMode, cancelled?: () => boolean) => {
+    (epoch: number, _mode: RecordingMode, cancelled?: () => boolean) => {
       return (
         cancelled?.() === true ||
-        epoch !== captureSessionEpochRef.current ||
-        mode !== recordingModeRef.current
+        epoch !== captureSessionEpochRef.current
       )
     },
     [],
@@ -640,20 +639,14 @@ export function useCameraSession({
     logGetUserMediaEvent('before', `useCameraSession.requestCameraAccess.${mode}`, { constraints })
     getUserMedia(constraints)
       .then(async (mediaStream) => {
-        if (
-          epoch !== captureSessionEpochRef.current ||
-          recordingModeRef.current !== mode
-        ) {
+        if (epoch !== captureSessionEpochRef.current) {
           stopStreamTracks(mediaStream)
           return
         }
 
         logGetUserMediaEvent('after', `useCameraSession.requestCameraAccess.${mode}`, describeMediaStream(mediaStream))
         await tuneMusicRecordingStream(mediaStream)
-        if (
-          epoch !== captureSessionEpochRef.current ||
-          recordingModeRef.current !== mode
-        ) {
+        if (epoch !== captureSessionEpochRef.current) {
           stopStreamTracks(mediaStream)
           return
         }
@@ -662,10 +655,7 @@ export function useCameraSession({
           await maybeBoostTabletPreviewResolution(mediaStream)
           await resetFrontCameraZoom(mediaStream)
         }
-        if (
-          epoch !== captureSessionEpochRef.current ||
-          recordingModeRef.current !== mode
-        ) {
+        if (epoch !== captureSessionEpochRef.current) {
           stopStreamTracks(mediaStream)
           return
         }
@@ -677,7 +667,7 @@ export function useCameraSession({
         setReady(true)
       })
       .catch((err) => {
-        if (epoch !== captureSessionEpochRef.current || recordingModeRef.current !== mode) {
+        if (epoch !== captureSessionEpochRef.current) {
           return
         }
         console.warn('Failed to acquire camera/microphone stream', err)
@@ -1489,13 +1479,11 @@ export function useCameraSession({
 
       recordingModeRef.current = mode
 
-      startTransition(() => {
-        if (!softAudioHandoff) {
-          setReady(false)
-        }
-        setStreamGeneration((generation) => generation + 1)
-        setRecordingMode(mode)
-      })
+      if (!softAudioHandoff) {
+        setReady(false)
+      }
+      setStreamGeneration((generation) => generation + 1)
+      setRecordingMode(mode)
     },
     [cancelScheduledRelease, detachAllPreviewTargets, isRecording, stopStreamTracks],
   )

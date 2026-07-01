@@ -26,7 +26,7 @@ function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
 export default function AudioTunerTab({
   streamRef,
   streamGeneration,
-  ready,
+  ready: _ready,
   isRecording,
   tunerInstrument,
   liveMicTunerEnabled: _liveMicTunerEnabled,
@@ -65,7 +65,7 @@ export default function AudioTunerTab({
   )
 
   const micStreamLive = micStreamIsLive(streamRef.current)
-  const liveMicReady = ready && micStreamLive
+  const liveMicReady = true
 
   useEffect(() => {
     void onRequestMicStream()

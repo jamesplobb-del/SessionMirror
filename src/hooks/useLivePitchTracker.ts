@@ -259,6 +259,8 @@ export interface PitchTrackerOptions {
   realtimeMode?: boolean
   /** Temporarily ignore mic analysis during local reference-tone touches. */
   suppressUntilRef?: RefObject<number>
+  /** Last-resort live tuner fallback when the app-owned shared mic stream has not attached. */
+  allowStandaloneMicFallback?: boolean
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
@@ -1271,6 +1273,7 @@ export function useLivePitchTracker(
   const realtimeMode = options.realtimeMode ?? false
   const tunerInstrument = options.tunerInstrument ?? 'voice'
   const suppressUntilRef = options.suppressUntilRef
+  const allowStandaloneMicFallback = options.allowStandaloneMicFallback ?? false
   const profile = getTunerProfile(tunerInstrument)
   const profileRef = useRef(profile)
   profileRef.current = profile
@@ -1497,10 +1500,16 @@ export function useLivePitchTracker(
           const sharedStream = micStreamRef?.current
           const sharedStreamLive = micStreamIsLive(sharedStream)
           const requireSharedStream = Boolean(micStreamRef)
+          const canFallbackToStandaloneMic =
+            allowStandaloneMicFallback && attachAttempt >= 6
 
-          if (requireSharedStream && !sharedStreamLive) {
+          if (requireSharedStream && !sharedStreamLive && !canFallbackToStandaloneMic) {
             scheduleRetry(80)
             return
+          }
+
+          if (requireSharedStream && !sharedStreamLive && canFallbackToStandaloneMic) {
+            console.info('[PitchTracker] Shared mic stream not ready; using standalone tuner mic fallback')
           }
 
           const graph = await createMicPitchGraph(
@@ -1603,6 +1612,8 @@ export function useLivePitchTracker(
 
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('focus', recoverMicGraph)
+    document.addEventListener('pointerdown', recoverMicGraph)
+    document.addEventListener('touchstart', recoverMicGraph)
 
     let removeAppListener: (() => void) | undefined
     if (typeof window !== 'undefined') {
@@ -1625,6 +1636,8 @@ export function useLivePitchTracker(
       tryAttachRef.current = null
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('focus', recoverMicGraph)
+      document.removeEventListener('pointerdown', recoverMicGraph)
+      document.removeEventListener('touchstart', recoverMicGraph)
       removeAppListener?.()
       if (initTimer !== null) {
         window.clearTimeout(initTimer)
@@ -2070,6 +2083,7 @@ export function useLivePitchTracker(
     source,
     suppressUntilRef,
     tunerInstrument,
+    allowStandaloneMicFallback,
   ])
 
   return { readout, inTuneGlow }
