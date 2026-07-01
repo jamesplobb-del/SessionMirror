@@ -157,7 +157,7 @@ import AudioTunerTab from './components/audioPractice/AudioTunerTab'
 import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
 import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './context/AudioModePlaybackContext'
 
-const AUTO_PLAYBACK_POST_COOLDOWN_MS = 650
+const AUTO_PLAYBACK_POST_COOLDOWN_MS = 350
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
 
 function waitMs(ms: number): Promise<void> {
@@ -549,6 +549,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const suspendInteractiveAudio = () => {
       pauseYoutubeProxy(youtubeIframeRef.current)
       stopAutoPlaybackAudio()
+      releaseAutoRecordSuppress(0)
       pausePipVideos()
       void finalizeTakePlaybackCleanup()
     }
@@ -578,7 +579,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [pausePipVideos, stopAutoPlaybackAudio])
+  }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const finishAutoPlayback = useCallback(() => {
     void finalizeTakePlaybackCleanup().finally(() => {
@@ -855,9 +856,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     } = payload
 
     const shouldAutoPlay =
-      mediaType === 'audio' &&
       pendingAutoPlaybackRef.current &&
-      recordingModeRef.current === 'audio'
+      ((mediaType === 'audio' && recordingModeRef.current === 'audio') ||
+        (mediaType === 'video' && recordingModeRef.current === 'video'))
 
     const optimisticUrl =
       resolveTakePlaybackUrlFast(filePath, videoUrl) ??
@@ -878,9 +879,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       return [...prev, savedTake]
     })
 
-    if (shouldAutoPlay && optimisticUrl) {
+    if (shouldAutoPlay && mediaType === 'audio' && optimisticUrl) {
       pendingAutoPlaybackRef.current = false
       playAutoTakeAudioRef.current(optimisticUrl, takeId, autoPerformanceStartSeconds)
+    } else if (shouldAutoPlay && mediaType === 'video') {
+      pendingAutoPlaybackRef.current = false
+      autoRecordStartSuppressedRef.current = true
+      setAutoRecordStartSuppressed(true)
+      setHandsFreePlaybackPending(true)
+      setAutoPlaybackPlaying(false)
+      setAutoPlaybackTakeId(takeId)
     } else if (shouldAutoPlay) {
       pendingAutoPlaybackRef.current = false
       setHandsFreePlaybackPending(false)
@@ -1062,10 +1070,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     recordingMode,
     changeRecordingMode,
     toggleRecording,
-    startAutoAudioRecording,
+    startAutoRecording,
     stopRecording,
-    warmAutoAudioRecorder,
-    disarmAutoAudioRecorder,
+    warmAutoRecording,
+    disarmAutoRecording,
     tryMarkAutoPerformanceStart,
     isAutoPreRollCaptureActive,
     getAutoPreRollAgeMs,
@@ -1235,20 +1243,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       autoPlaybackPlaying ||
       benchmarkPipPlaying ||
       challengerPipPlaying,
-    recordingMode,
     ready,
     isRecording,
     streamRef,
     streamGeneration,
     silenceMs: settings.soundSilenceSeconds * 1000,
     volumeThreshold: settings.soundVolumeThreshold,
-    startRecording: startAutoAudioRecording,
+    startRecording: startAutoRecording,
     stopRecording,
     warmRecorder: () => {
-      void warmAutoAudioRecorder()
+      void warmAutoRecording()
     },
     disarmRecorder: () => {
-      void disarmAutoAudioRecorder()
+      void disarmAutoRecording()
     },
     tryMarkAutoPerformance: tryMarkAutoPerformanceStart,
     isAutoPreRollCaptureActive,
@@ -1311,22 +1318,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [autoRecordStartSuppressed])
 
   useEffect(() => {
-    if (!settings.autoSoundRecording || recordingMode !== 'audio') return
-
-    const recoverHandsFreeMonitor = () => {
+    const recoverAfterForeground = () => {
       if (document.visibilityState !== 'visible') return
+
+      void resumePlaybackAudioContext()
+      setCameraResumeNonce((nonce) => nonce + 1)
+
       window.setTimeout(() => {
         void refreshCameraSession().finally(() => {
-          restartHandsFreeMonitor()
+          if (settings.autoSoundRecording) {
+            restartHandsFreeMonitor()
+          }
         })
-      }, 800)
+      }, 400)
     }
 
     if (Capacitor.isNativePlatform()) {
       let removeListener: (() => void) | undefined
       void import('@capacitor/app').then(({ App }) => {
         void App.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) recoverHandsFreeMonitor()
+          if (isActive) recoverAfterForeground()
         }).then((sub) => {
           removeListener = () => {
             void sub.remove()
@@ -1339,15 +1350,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
     }
 
-    document.addEventListener('visibilitychange', recoverHandsFreeMonitor)
-    return () => {
-      document.removeEventListener('visibilitychange', recoverHandsFreeMonitor)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        recoverAfterForeground()
+      }
     }
-  }, [recordingMode, refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
 
   const autoSoundListening =
     settings.autoSoundRecording &&
-    recordingMode === 'audio' &&
     autoMonitoringAllowed &&
     !isRecording &&
     !autoRecordStartSuppressed &&

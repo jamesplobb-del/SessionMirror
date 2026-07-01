@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import type { RecordingMode } from '../types'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
 import { AUTO_RECORD_MAX_IDLE_PREROLL_MS } from '../utils/autoRecordPlayback'
@@ -10,9 +9,9 @@ import {
 
 const POLL_INTERVAL_MS = 32
 const MIN_RECORDING_MS = 400
-const COOLDOWN_MS = 180
+const COOLDOWN_MS = 120
 const MONITOR_WARMUP_MS = 280
-const POST_PLAYBACK_WARMUP_MS = 450
+const POST_PLAYBACK_WARMUP_MS = 250
 const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
 const HEALTH_CHECK_MS = 2500
@@ -27,7 +26,6 @@ interface UseAutoSoundRecordingOptions {
   suppressStart: boolean
   /** Tear down mic analyser while takes play so iOS does not duck speaker output. */
   monitoringPaused?: boolean
-  recordingMode: RecordingMode
   ready: boolean
   isRecording: boolean
   streamRef: RefObject<MediaStream | null>
@@ -77,7 +75,6 @@ export function useAutoSoundRecording({
   monitoringAllowed,
   suppressStart,
   monitoringPaused = false,
-  recordingMode,
   ready,
   isRecording,
   streamRef,
@@ -157,7 +154,7 @@ export function useAutoSoundRecording({
   )
 
   const shouldMonitor =
-    enabled && monitoringAllowed && recordingMode === 'audio' && ready && !monitoringPaused
+    enabled && monitoringAllowed && ready && !monitoringPaused
 
   const clearStartFailureTimer = () => {
     if (startFailureTimerRef.current !== null) {
@@ -313,7 +310,7 @@ export function useAutoSoundRecording({
       cooldownUntilRef.current = performance.now() + COOLDOWN_MS
       const warmTimer = window.setTimeout(() => {
         void warmRecorderRef.current()
-      }, 200)
+      }, 100)
 
       wasRecordingRef.current = isRecording
       return () => {

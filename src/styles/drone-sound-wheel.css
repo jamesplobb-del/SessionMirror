@@ -8,14 +8,14 @@
 
 .drone-sound-wheel__stage {
   position: relative;
-  width: min(82vw, 18.25rem);
+  width: min(84vw, 19rem);
   aspect-ratio: 1;
   margin-inline: auto;
 }
 
 .drone-sound-wheel__guide {
   position: absolute;
-  inset: 7.5%;
+  inset: 4.8%;
   z-index: 0;
   border-radius: 50%;
   border: 1px solid rgba(21, 152, 255, 0.16);
@@ -45,7 +45,7 @@
 }
 
 .drone-sound-wheel__center .pitch-note-orbit {
-  --orbit-size: min(57vw, 12.85rem);
+  --orbit-size: min(55vw, 12.45rem);
 }
 
 .drone-sound-wheel__center .pitch-note-orbit--light-native::before {
@@ -70,8 +70,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.95rem;
-  height: 1.95rem;
+  width: 2.42rem;
+  height: 2.42rem;
   padding: 0;
   border-radius: 999px;
   border: 1px solid rgba(21, 152, 255, 0.16);
@@ -79,12 +79,12 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 250, 255, 0.62)),
     rgba(255, 255, 255, 0.74);
   color: rgba(23, 26, 34, 0.58);
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
   box-shadow:
-    0 4px 12px rgba(21, 152, 255, 0.07),
+    0 8px 20px rgba(21, 152, 255, 0.075),
     inset 0 1px 0 rgba(255, 255, 255, 0.88);
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -104,7 +104,7 @@
   color: #075985;
   box-shadow:
     0 0 0 1px rgba(21, 152, 255, 0.2),
-    0 0 18px rgba(21, 152, 255, 0.18),
+    0 0 22px rgba(21, 152, 255, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
@@ -231,9 +231,9 @@ html.app-dark-mode .drone-sound-wheel__octave-btn {
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__stage {
-  width: min(82vw, 18rem);
+  width: min(84vw, 18.9rem);
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__center .pitch-note-orbit {
-  --orbit-size: min(56vw, 12.6rem);
+  --orbit-size: min(55vw, 12.35rem);
 }

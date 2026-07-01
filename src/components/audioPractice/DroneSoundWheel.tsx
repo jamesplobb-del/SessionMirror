@@ -3,10 +3,10 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { DRONE_NOTE_STRIP } from '../../utils/droneEngine'
 
 const WHEEL_NOTE_COUNT = 12
-const WHEEL_RADIUS_PERCENT = 36.5
+const WHEEL_RADIUS_PERCENT = 42.5
 const GLISSANDO_THRESHOLD_PX = 10
-const INNER_DEAD_ZONE_RATIO = 0.28
-const OUTER_EDGE_RATIO = 0.56
+const INNER_DEAD_ZONE_RATIO = 0.31
+const OUTER_EDGE_RATIO = 0.64
 
 export interface DroneSoundWheelProps {
   activeNotes: number[]

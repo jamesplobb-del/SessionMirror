@@ -75,3 +75,35 @@ export async function tuneVideoRecordingStream(
     /* keep full field of view if landscape constraints fail */
   }
 }
+
+type ZoomCapableCapabilities = MediaTrackCapabilities & {
+  zoom?: { min?: number; max?: number }
+}
+
+type ZoomCapableTrack = MediaStreamTrack & {
+  getCapabilities?: () => ZoomCapableCapabilities
+}
+
+/** Keep front camera at 1× after iOS background resume (WebKit track zoom can stick). */
+export async function resetFrontCameraZoom(stream: MediaStream): Promise<void> {
+  const track = stream.getVideoTracks()[0] as ZoomCapableTrack | undefined
+  if (!track || track.readyState !== 'live') return
+
+  try {
+    const capabilities = track.getCapabilities?.() as ZoomCapableCapabilities | undefined
+    if (capabilities?.zoom) {
+      const minZoom = capabilities.zoom.min ?? 1
+      await track.applyConstraints({
+        advanced: [{ zoom: minZoom } as MediaTrackConstraintSet],
+      })
+    }
+  } catch {
+    /* zoom constraint unsupported or rejected */
+  }
+
+  try {
+    await track.applyConstraints(getPortraitVideoCaptureConstraints())
+  } catch {
+    /* keep current FOV if portrait constraints are rejected */
+  }
+}

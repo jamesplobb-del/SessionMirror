@@ -61,7 +61,9 @@ function ModeSlot({
     ? isRecording
       ? 'Stop recording'
       : isVideo
-        ? 'Start video recording'
+        ? onLongPress
+          ? 'Start video recording. Long press to toggle hands-free practice.'
+          : 'Start video recording'
         : onLongPress
           ? 'Start audio recording. Long press to toggle hands-free practice.'
           : 'Start audio recording'
@@ -147,10 +149,10 @@ function RecordingModeCarousel({
   )
 
   const handleRecordLongPress = useCallback(() => {
-    if (value !== 'audio' || isRecording || !onAutoSoundRecordingChange) return
+    if (isRecording || !onAutoSoundRecordingChange) return
     triggerLightHaptic(hapticFeedback)
     onAutoSoundRecordingChange(!autoSoundRecording)
-  }, [autoSoundRecording, hapticFeedback, isRecording, onAutoSoundRecordingChange, value])
+  }, [autoSoundRecording, hapticFeedback, isRecording, onAutoSoundRecordingChange])
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
     touchStartXRef.current = event.touches[0]?.clientX ?? 0
@@ -190,6 +192,8 @@ function RecordingModeCarousel({
           ready={ready}
           modeSwitchLocked={modeSwitchLocked}
           onActivate={() => handleSlotActivate('video')}
+          onLongPress={value === 'video' ? handleRecordLongPress : undefined}
+          longPressActive={value === 'video' && autoSoundRecording}
           hapticFeedback={hapticFeedback}
         />
         <ModeSlot

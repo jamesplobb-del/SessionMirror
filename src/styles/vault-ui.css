@@ -49,6 +49,17 @@
   font-size: 1.65rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.1;
+  padding-right: 0.35rem;
+}
+
+.native-bottom-sheet--vault .native-sheet-title-block {
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 0.5rem;
 }
 
 .native-bottom-sheet--vault .native-sheet-subtitle {
@@ -419,10 +430,6 @@
   padding-block: 0.08rem;
 }
 
-.native-bottom-sheet--vault .native-sheet-title-block {
-  min-width: 0;
-  overflow: hidden;
-}
 
 .native-bottom-sheet--vault .vault-take-row__title-row {
   display: flex;

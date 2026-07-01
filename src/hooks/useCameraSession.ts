@@ -9,7 +9,7 @@ import {
   RECORDING_TIMESLICE_MS,
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
-import { maybeBoostTabletPreviewResolution } from '../utils/videoCapture'
+import { maybeBoostTabletPreviewResolution, resetFrontCameraZoom } from '../utils/videoCapture'
 import { readRecordingOrientation } from '../utils/takeVideoTransform'
 import {
   normalizeBlobMime,
@@ -322,12 +322,14 @@ export function useCameraSession({
     }
 
     const stream = streamRef.current
-    if (!isStreamRecordable(stream, mode)) {
+    if (!stream || !isStreamRecordable(stream, mode)) {
       previewHealthyRef.current = false
       return false
     }
 
     syncPreviewTargets(stream, mode)
+
+    void resetFrontCameraZoom(stream)
 
     const videos = [previewRef.current, secondaryPreviewRef?.current ?? null]
     for (const video of videos) {
@@ -519,6 +521,7 @@ export function useCameraSession({
         await tuneMusicRecordingStream(mediaStream)
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
+          await resetFrontCameraZoom(mediaStream)
         }
         streamRef.current = mediaStream
         syncPreviewTargets(mediaStream, mode)
@@ -588,6 +591,7 @@ export function useCameraSession({
         await tuneMusicRecordingStream(mediaStream)
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
+          await resetFrontCameraZoom(mediaStream)
         }
         streamRef.current = mediaStream
         syncPreviewTargets(mediaStream, mode)
@@ -1309,6 +1313,30 @@ export function useCameraSession({
     warmAutoAudioRecorder,
   ])
 
+  const startAutoRecording = useCallback(() => {
+    if (recordingModeRef.current === 'audio') {
+      startAutoAudioRecording()
+      return
+    }
+
+    startRecording()
+  }, [startAutoAudioRecording, startRecording])
+
+  const warmAutoRecording = useCallback(async () => {
+    if (recordingModeRef.current === 'audio') {
+      await warmAutoAudioRecorder()
+      return
+    }
+
+    await ensureRecordableStream()
+  }, [ensureRecordableStream, warmAutoAudioRecorder])
+
+  const disarmAutoRecording = useCallback(async () => {
+    if (recordingModeRef.current === 'audio') {
+      await disarmAutoAudioRecorder()
+    }
+  }, [disarmAutoAudioRecorder])
+
   const stopRecording = useCallback(() => {
     if (nativeExperimentalRecordingRef.current) {
       stopNativeExperimentalRecording()
@@ -1411,6 +1439,9 @@ export function useCameraSession({
       const mode = recordingModeRef.current
       const stream = streamRef.current
       if (isStreamRecordable(stream, mode)) {
+        if (mode === 'video' && stream) {
+          await resetFrontCameraZoom(stream)
+        }
         if (ensureCameraPreviewActive()) {
           if (import.meta.env.DEV) {
             console.log('[CameraPreview] resume skipped: already active')
@@ -1681,9 +1712,13 @@ export function useCameraSession({
     toggleRecording,
     startRecording,
     startAutoAudioRecording,
+    startAutoRecording,
     stopRecording,
+    ensureRecordableStream,
     warmAutoAudioRecorder,
     disarmAutoAudioRecorder,
+    warmAutoRecording,
+    disarmAutoRecording,
     tryMarkAutoPerformanceStart,
     isAutoPreRollCaptureActive: () =>
       autoPreRollActiveRef.current && !autoPerformanceActiveRef.current,
