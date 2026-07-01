@@ -250,6 +250,7 @@ export function useCameraSession({
   const readyRef = useRef(false)
   const resumeInFlightRef = useRef(false)
   const streamAcquireInFlightRef = useRef(false)
+  const captureSessionEpochRef = useRef(0)
   const queuedCaptureRequestModeRef = useRef<RecordingMode | null>(null)
   const previewHealthyRef = useRef(false)
   const foregroundRestartTokenRef = useRef(0)
@@ -395,7 +396,19 @@ export function useCameraSession({
     }
   }, [])
 
+  const isCaptureSessionStale = useCallback(
+    (epoch: number, mode: RecordingMode, cancelled?: () => boolean) => {
+      return (
+        cancelled?.() === true ||
+        epoch !== captureSessionEpochRef.current ||
+        mode !== recordingModeRef.current
+      )
+    },
+    [],
+  )
+
   const forceClearCameraState = useCallback(() => {
+    captureSessionEpochRef.current += 1
     if (recorderRef.current?.state === 'recording') {
       try {
         recorderRef.current.stop()
@@ -483,14 +496,23 @@ export function useCameraSession({
 
   const acquireStream = useCallback(
     async (mode: RecordingMode, cancelled?: () => boolean) => {
+      const epoch = captureSessionEpochRef.current
       setError(null)
 
       const existing = streamRef.current
-      if (existing && isStreamCompatibleForMode(existing, mode)) {
+      if (
+        existing &&
+        isStreamCompatibleForMode(existing, mode) &&
+        !isCaptureSessionStale(epoch, mode, cancelled)
+      ) {
         syncPreviewTargets(existing, mode)
         setNeedsPermission(false)
         setReady(true)
         return existing
+      }
+
+      if (isCaptureSessionStale(epoch, mode, cancelled)) {
+        return null
       }
 
       stopStreamTracks(streamRef.current)
@@ -510,21 +532,31 @@ export function useCameraSession({
         }
 
         await applyQueuedMicPreferenceBeforeAcquire(`acquire-${mode}`)
-        if (cancelled?.()) return null
+        if (isCaptureSessionStale(epoch, mode, cancelled)) return null
 
         logGetUserMediaEvent('before', `useCameraSession.acquireStream.${mode}`, { constraints })
         const mediaStream = await getUserMedia(constraints)
         logGetUserMediaEvent('after', `useCameraSession.acquireStream.${mode}`, describeMediaStream(mediaStream))
-        if (cancelled?.()) {
+        if (isCaptureSessionStale(epoch, mode, cancelled)) {
           mediaStream.getTracks().forEach((track) => track.stop())
           return null
         }
 
         await tuneMusicRecordingStream(mediaStream)
+        if (isCaptureSessionStale(epoch, mode, cancelled)) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          return null
+        }
+
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
           await resetFrontCameraZoom(mediaStream)
         }
+        if (isCaptureSessionStale(epoch, mode, cancelled)) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          return null
+        }
+
         streamRef.current = mediaStream
         syncPreviewTargets(mediaStream, mode)
         setStreamGeneration((generation) => generation + 1)
@@ -532,9 +564,11 @@ export function useCameraSession({
         setReady(true)
         return mediaStream
       } catch (err) {
-        console.warn('Failed to acquire camera/microphone stream', err)
-        setNeedsPermission(true)
-        setReady(false)
+        if (!isCaptureSessionStale(epoch, mode, cancelled)) {
+          console.warn('Failed to acquire camera/microphone stream', err)
+          setNeedsPermission(true)
+          setReady(false)
+        }
         return null
       } finally {
         streamAcquireInFlightRef.current = false
@@ -545,7 +579,13 @@ export function useCameraSession({
         }
       }
     },
-    [applyQueuedMicPreferenceBeforeAcquire, detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets],
+    [
+      applyQueuedMicPreferenceBeforeAcquire,
+      detachAllPreviewTargets,
+      isCaptureSessionStale,
+      stopStreamTracks,
+      syncPreviewTargets,
+    ],
   )
 
   const reacquireCaptureStream = useCallback(async () => {
@@ -564,10 +604,6 @@ export function useCameraSession({
   const requestCameraAccess = useCallback((requestedMode?: RecordingMode) => {
     const mode = requestedMode ?? recordingModeRef.current
     if (isRecordingRef.current) return
-    if (permissionRequestInFlightRef.current || streamAcquireInFlightRef.current) {
-      queuedCaptureRequestModeRef.current = mode
-      return
-    }
 
     const existing = streamRef.current
     if (existing && isStreamCompatibleForMode(existing, mode)) {
@@ -576,6 +612,12 @@ export function useCameraSession({
       setReady(true)
       return
     }
+
+    if (permissionRequestInFlightRef.current || streamAcquireInFlightRef.current) {
+      captureSessionEpochRef.current += 1
+    }
+
+    const epoch = captureSessionEpochRef.current
 
     const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
     if (!getUserMedia) {
@@ -598,12 +640,36 @@ export function useCameraSession({
     logGetUserMediaEvent('before', `useCameraSession.requestCameraAccess.${mode}`, { constraints })
     getUserMedia(constraints)
       .then(async (mediaStream) => {
+        if (
+          epoch !== captureSessionEpochRef.current ||
+          recordingModeRef.current !== mode
+        ) {
+          stopStreamTracks(mediaStream)
+          return
+        }
+
         logGetUserMediaEvent('after', `useCameraSession.requestCameraAccess.${mode}`, describeMediaStream(mediaStream))
         await tuneMusicRecordingStream(mediaStream)
+        if (
+          epoch !== captureSessionEpochRef.current ||
+          recordingModeRef.current !== mode
+        ) {
+          stopStreamTracks(mediaStream)
+          return
+        }
+
         if (mode === 'video') {
           await maybeBoostTabletPreviewResolution(mediaStream)
           await resetFrontCameraZoom(mediaStream)
         }
+        if (
+          epoch !== captureSessionEpochRef.current ||
+          recordingModeRef.current !== mode
+        ) {
+          stopStreamTracks(mediaStream)
+          return
+        }
+
         streamRef.current = mediaStream
         syncPreviewTargets(mediaStream, mode)
         setStreamGeneration((generation) => generation + 1)
@@ -611,6 +677,9 @@ export function useCameraSession({
         setReady(true)
       })
       .catch((err) => {
+        if (epoch !== captureSessionEpochRef.current || recordingModeRef.current !== mode) {
+          return
+        }
         console.warn('Failed to acquire camera/microphone stream', err)
         setNeedsPermission(true)
         setReady(false)
@@ -668,6 +737,10 @@ export function useCameraSession({
             'video',
           )
         }
+        return
+      }
+
+      if (permissionRequestInFlightRef.current) {
         return
       }
 
@@ -1398,10 +1471,23 @@ export function useCameraSession({
 
       cancelScheduledRelease()
       setError(null)
-      recordingModeRef.current = mode
+      captureSessionEpochRef.current += 1
 
       const softAudioHandoff =
         mode === 'audio' && canSoftHandoffToAudio(streamRef.current)
+
+      if (softAudioHandoff) {
+        releaseVideoTracksOnly(streamRef.current)
+        detachAllPreviewTargets()
+        previewHealthyRef.current = false
+      } else {
+        stopStreamTracks(streamRef.current)
+        streamRef.current = null
+        previewHealthyRef.current = false
+        detachAllPreviewTargets()
+      }
+
+      recordingModeRef.current = mode
 
       startTransition(() => {
         if (!softAudioHandoff) {
@@ -1411,7 +1497,7 @@ export function useCameraSession({
         setRecordingMode(mode)
       })
     },
-    [cancelScheduledRelease, isRecording],
+    [cancelScheduledRelease, detachAllPreviewTargets, isRecording, stopStreamTracks],
   )
 
   const suspendCameraForBackground = useCallback(() => {
