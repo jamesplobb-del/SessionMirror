@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { FileImage, Music2, Pause, Play, Plus, Type } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { formatTime } from '../../hooks/useVideoPlayback'
@@ -137,6 +137,7 @@ export default function CreatorStudioCanvas({
   onDeleteObject,
 }: CreatorStudioCanvasProps) {
   const stageRef = useRef<HTMLDivElement>(null)
+  const recordingMediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null)
   const separateSheet = getSeparateSheet(previewModel.objects)
   const videoRatio = separateSheet?.separateRatio ?? 60
   const sheetRatio = 100 - videoRatio
@@ -162,13 +163,29 @@ export default function CreatorStudioCanvas({
 
   const bindRecordingMediaRef = useCallback(
     (node: HTMLVideoElement | HTMLAudioElement | null) => {
+      recordingMediaRef.current = node
       bindMediaRef(node)
       if (node && mediaSrc && node.src !== mediaSrc) {
         node.src = mediaSrc
+        node.load()
       }
     },
     [bindMediaRef, mediaSrc],
   )
+
+  useEffect(() => {
+    const media = recordingMediaRef.current
+    if (!media || !mediaSrc) return
+
+    if (media.src !== mediaSrc) {
+      media.src = mediaSrc
+    }
+
+    media.load()
+    if (media instanceof HTMLVideoElement) {
+      media.currentTime = 0.001
+    }
+  }, [mediaSrc])
 
   const handleDividerPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -392,12 +409,6 @@ export default function CreatorStudioCanvas({
       {duration > 0 && (
         <p className="creator-studio__preview-time" aria-live="polite">
           {formatTime(currentTime)} / {formatTime(duration)}
-          {separateSheet && (
-            <span className="creator-studio__preview-ratio">
-              {' '}
-              · {videoRatio}% video / {sheetRatio}% sheet
-            </span>
-          )}
         </p>
       )}
     </section>

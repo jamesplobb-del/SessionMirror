@@ -1,5 +1,10 @@
 import { useSharedMetronome } from '../context/MetronomeContext'
-import type { MetronomeMeter, MetronomeSubdivision } from '../utils/metronomeConfig'
+import {
+  accentLevelsToLegacyPattern,
+  type MetronomeAccentLevel,
+  type MetronomeMeter,
+  type MetronomeSubdivision,
+} from '../utils/metronomeConfig'
 
 export interface UseMetronomeOptions {
   /** @deprecated Playback mute policy is set on MetronomeProvider. */
@@ -16,6 +21,8 @@ export interface UseMetronomeResult {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
+  feelId?: string
+  accentLevels: MetronomeAccentLevel[]
   accentPattern: boolean[]
   accentFirstBeat: boolean
   soundId: string
@@ -26,6 +33,8 @@ export interface UseMetronomeResult {
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
+  setFeel: (feelId: string) => void
+  setAccentLevels: (accentLevels: MetronomeAccentLevel[]) => void
   setAccentPattern: (accentPattern: boolean[]) => void
   toggleBeatAccent: (beatIndex: number) => void
   setAccentFirstBeat: (accentFirstBeat: boolean) => void
@@ -39,6 +48,7 @@ export function useMetronome(_options: UseMetronomeOptions = {}): UseMetronomeRe
   const state = useSharedMetronome()
   return {
     ...state,
-    accentFirstBeat: state.accentPattern[0] ?? true,
+    accentPattern: accentLevelsToLegacyPattern(state.accentLevels),
+    accentFirstBeat: state.accentLevels[0] !== 'weak',
   }
 }

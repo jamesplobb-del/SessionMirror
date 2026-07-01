@@ -9,12 +9,14 @@ import {
   sharedMetronomeEngine,
   type SharedMetronomeSnapshot,
 } from '../metronome/sharedMetronomeEngine'
-import type { MetronomeMeter, MetronomeSubdivision } from '../utils/metronomeConfig'
+import type { MetronomeMeter, MetronomeSubdivision, MetronomeAccentLevel } from '../utils/metronomeConfig'
 
 export interface SharedMetronomeControls {
   setBpm: (value: number) => void
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
+  setFeel: (feelId: string) => void
+  setAccentLevels: (accentLevels: MetronomeAccentLevel[]) => void
   setAccentPattern: (accentPattern: boolean[]) => void
   toggleBeatAccent: (beatIndex: number) => void
   setAccentFirstBeat: (accentFirstBeat: boolean) => void
@@ -29,6 +31,8 @@ const controls: SharedMetronomeControls = {
   setBpm: sharedMetronomeEngine.setBpm,
   setMeter: sharedMetronomeEngine.setMeter,
   setSubdivision: sharedMetronomeEngine.setSubdivision,
+  setFeel: sharedMetronomeEngine.setFeel,
+  setAccentLevels: sharedMetronomeEngine.setAccentLevels,
   setAccentPattern: sharedMetronomeEngine.setAccentPattern,
   toggleBeatAccent: sharedMetronomeEngine.toggleBeatAccent,
   setAccentFirstBeat: sharedMetronomeEngine.setAccentFirstBeat,

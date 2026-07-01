@@ -8,11 +8,11 @@ import type {
 
 export const DEFAULT_RECORDING_TRANSFORM: StudioTransform = {
   x: 50,
-  y: 42,
+  y: 50,
   scale: 1,
   rotation: 0,
   zIndex: 20,
-  width: 88,
+  width: 100,
 }
 
 export const DEFAULT_WATERMARK_TRANSFORM: StudioTransform = {

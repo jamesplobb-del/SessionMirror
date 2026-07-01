@@ -10,9 +10,10 @@ import {
 } from '../../utils/haptics'
 import {
   getBeatsPerBar,
-  getCompoundGroupSize,
+  getBeatGrouping,
   isCompoundMeter,
-  subdivisionsPerBeat,
+  subTicksPerPulse,
+  type MetronomeAccentLevel,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../../utils/metronomeConfig'
@@ -21,8 +22,9 @@ import {
   AUDIO_PRACTICE_MAX_BPM,
   AUDIO_PRACTICE_MIN_BPM,
   PRACTICE_ALL_METERS,
-  PRACTICE_ALL_RHYTHM_OPTIONS,
   clampAudioPracticeBpm,
+  getPracticeFeelOptions,
+  getPracticeRhythmOptions,
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
 import MetronomeAudioSelect from './MetronomeAudioSelect'
@@ -94,7 +96,8 @@ export default function AudioPracticeMetronomeView() {
     bpm,
     meter,
     subdivision,
-    accentPattern,
+    feelId,
+    accentLevels,
     soundId,
     playing,
     beatIndex,
@@ -103,6 +106,7 @@ export default function AudioPracticeMetronomeView() {
     setBpm,
     setMeter,
     setSubdivision,
+    setFeel,
     toggleBeatAccent,
     setSoundId,
     togglePlay,
@@ -125,10 +129,10 @@ export default function AudioPracticeMetronomeView() {
 
   const beatsPerBar = getBeatsPerBar(meter)
   const compoundMeter = isCompoundMeter(meter)
-  const compoundGroupSize = getCompoundGroupSize(meter)
-  const ticksPerBeat = subdivisionsPerBeat(subdivision)
-  const subNotchCount =
-    compoundMeter && subdivision === 'off' ? compoundGroupSize - 1 : Math.max(0, ticksPerBeat - 1)
+  const beatGrouping = getBeatGrouping(meter, feelId)
+  const feelOptions = getPracticeFeelOptions(meter)
+  const rhythmOptions = getPracticeRhythmOptions(meter)
+  const subNotchCount = subTicksPerPulse(meter, subdivision)
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -171,6 +175,14 @@ export default function AudioPracticeMetronomeView() {
       setSubdivision(nextSubdivision)
     },
     [setSubdivision, subdivision],
+  )
+
+  const handleFeelChange = useCallback(
+    (nextFeelId: string) => {
+      if (nextFeelId === feelId) return
+      setFeel(nextFeelId)
+    },
+    [feelId, setFeel],
   )
 
   const handleBeatAccentToggle = useCallback(
@@ -279,12 +291,21 @@ export default function AudioPracticeMetronomeView() {
   }, [bpmDraft, setPracticeBpm])
 
   const isMainBeatPulse = playing && subTickIndex === 0
-  const isAccentedPulse = isMainBeatPulse && Boolean(accentPattern[beatIndex])
-  const pulseClass = isAccentedPulse
-    ? beatIndex === 0
+  const activeAccentLevel: MetronomeAccentLevel = accentLevels[beatIndex] ?? 'weak'
+  const pulseClass = isMainBeatPulse
+    ? activeAccentLevel === 'strong'
       ? 'audio-practice-metronome__pulse--accent'
-      : 'audio-practice-metronome__pulse--beat'
+      : activeAccentLevel === 'medium'
+        ? 'audio-practice-metronome__pulse--medium'
+        : 'audio-practice-metronome__pulse--beat'
     : 'audio-practice-metronome__pulse--beat'
+
+  const beatGroups: { startIndex: number; size: number }[] = []
+  let groupStart = 0
+  for (const groupSize of beatGrouping) {
+    beatGroups.push({ startIndex: groupStart, size: groupSize })
+    groupStart += groupSize
+  }
 
   return (
     <div
@@ -380,7 +401,14 @@ export default function AudioPracticeMetronomeView() {
           className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel pointer-events-auto shrink-0"
           aria-label="Metronome time, rhythm, and accent"
         >
-          <div className="audio-practice-metronome__select-row audio-practice-metronome__select-row--triple">
+          <div
+            className={[
+              'audio-practice-metronome__select-row',
+              feelOptions.length > 0
+                ? 'audio-practice-metronome__select-row--quad'
+                : 'audio-practice-metronome__select-row--triple',
+            ].join(' ')}
+          >
             <MetronomeAudioSelect
               label="Time"
               ariaLabel="Time signature"
@@ -388,11 +416,20 @@ export default function AudioPracticeMetronomeView() {
               options={PRACTICE_ALL_METERS.map((value) => ({ value, label: value }))}
               onChange={handleMeterChange}
             />
+            {feelOptions.length > 0 ? (
+              <MetronomeAudioSelect
+                label="Feel"
+                ariaLabel="Beat grouping feel"
+                value={feelId ?? feelOptions[0].value}
+                options={feelOptions}
+                onChange={handleFeelChange}
+              />
+            ) : null}
             <MetronomeAudioSelect
               label="Rhythm"
               ariaLabel="Rhythm subdivision"
               value={subdivision}
-              options={PRACTICE_ALL_RHYTHM_OPTIONS.map((option) => ({
+              options={rhythmOptions.map((option) => ({
                 value: option.value,
                 label: option.name,
               }))}
@@ -432,6 +469,7 @@ export default function AudioPracticeMetronomeView() {
                 'metronome-audio-stage__beat-row',
                 'audio-practice-metronome__beat-row',
                 compoundMeter ? 'audio-practice-metronome__beat-row--compound' : '',
+                beatGroups.length > 1 ? 'audio-practice-metronome__beat-row--grouped' : '',
                 beatsPerBar > 8 ? 'audio-practice-metronome__beat-row--compact' : '',
                 playing ? 'metronome-audio-stage__beat-row--playing' : '',
                 prefersReducedMotion ? 'metronome-audio-stage__beat-row--reduced-motion' : '',
@@ -441,75 +479,92 @@ export default function AudioPracticeMetronomeView() {
               role="group"
               aria-label="Beat indicators"
             >
-              {Array.from({ length: beatsPerBar }, (_, index) => {
-                const isBeatActive = playing && beatIndex === index
-                const isAccented = Boolean(accentPattern[index])
-                const isDownbeat = index === 0 && isAccented
-                const isMainTick = isBeatActive && subTickIndex === 0
-                const isSubTick = isBeatActive && subTickIndex > 0
-                return (
-                  <div
-                    key={`${index}-${isBeatActive ? beatPulseId : 'idle'}`}
-                    className={[
-                      'audio-practice-metronome__beat-cell',
-                      compoundMeter ? 'audio-practice-metronome__beat-cell--compound' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    <button
-                      type="button"
-                      className={[
-                        'audio-practice-metronome__beat',
-                        'audio-practice-metronome__beat-tap',
-                        'pointer-events-auto',
-                        isAccented ? 'audio-practice-metronome__beat--accented' : '',
-                        isMainTick ? 'audio-practice-metronome__beat--active' : '',
-                        isSubTick ? 'audio-practice-metronome__beat--sub-active' : '',
-                        isDownbeat ? 'audio-practice-metronome__beat--downbeat' : '',
-                        isMainTick && isAccented && index === 0
-                          ? 'audio-practice-metronome__beat--pulse'
-                          : '',
-                        isMainTick && isAccented && index > 0
-                          ? 'audio-practice-metronome__beat--pulse-soft'
-                          : '',
-                        isMainTick && !isAccented ? 'audio-practice-metronome__beat--pulse-soft' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      aria-label={`Beat ${index + 1}${isAccented ? ', accented' : ''}. Tap to toggle accent.`}
-                      aria-pressed={isAccented}
-                      onPointerUp={(event) => {
-                        if (event.button !== 0) return
-                        handleBeatAccentToggle(index)
-                      }}
-                    >
-                      <span className="audio-practice-metronome__beat-number" aria-hidden>
-                        {index + 1}
-                      </span>
-                    </button>
-                    {subNotchCount > 0 && (
-                      <div className="audio-practice-metronome__sub-notches" aria-hidden>
-                        {Array.from({ length: subNotchCount }, (_, notchIndex) => {
-                          const notchTick = notchIndex + 1
-                          const notchActive = isBeatActive && subTickIndex === notchTick
-                          return (
-                            <span
-                              key={notchTick}
-                              className={[
-                                'audio-practice-metronome__sub-notch',
-                                notchActive ? 'audio-practice-metronome__sub-notch--active' : '',
-                              ]
-                                .filter(Boolean)
-                                .join(' ')}
-                            />
-                          )
-                        })}
+              {beatGroups.map((group, groupIndex) => (
+                <div
+                  key={`group-${groupIndex}`}
+                  className="audio-practice-metronome__beat-group"
+                  aria-label={`Beat group ${groupIndex + 1}`}
+                >
+                  {Array.from({ length: group.size }, (_, offset) => {
+                    const index = group.startIndex + offset
+                    const accentLevel = accentLevels[index] ?? 'weak'
+                    const isBeatActive = playing && beatIndex === index
+                    const isDownbeat = index === 0 && accentLevel === 'strong'
+                    const isMediumAccent = accentLevel === 'medium'
+                    const isMainTick = isBeatActive && subTickIndex === 0
+                    const isSubTick = isBeatActive && subTickIndex > 0
+                    return (
+                      <div
+                        key={`${index}-${isBeatActive ? beatPulseId : 'idle'}`}
+                        className={[
+                          'audio-practice-metronome__beat-cell',
+                          compoundMeter ? 'audio-practice-metronome__beat-cell--compound' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        <button
+                          type="button"
+                          className={[
+                            'audio-practice-metronome__beat',
+                            'audio-practice-metronome__beat-tap',
+                            'pointer-events-auto',
+                            accentLevel === 'strong'
+                              ? 'audio-practice-metronome__beat--accent-strong'
+                              : '',
+                            isMediumAccent ? 'audio-practice-metronome__beat--accent-medium' : '',
+                            accentLevel !== 'weak' ? 'audio-practice-metronome__beat--accented' : '',
+                            isMainTick ? 'audio-practice-metronome__beat--active' : '',
+                            isSubTick ? 'audio-practice-metronome__beat--sub-active' : '',
+                            isDownbeat ? 'audio-practice-metronome__beat--downbeat' : '',
+                            isMediumAccent ? 'audio-practice-metronome__beat--medium-accent' : '',
+                            isMainTick && accentLevel === 'strong'
+                              ? 'audio-practice-metronome__beat--pulse'
+                              : '',
+                            isMainTick && isMediumAccent
+                              ? 'audio-practice-metronome__beat--pulse-medium'
+                              : '',
+                            isMainTick && accentLevel === 'weak'
+                              ? 'audio-practice-metronome__beat--pulse-soft'
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          aria-label={`Beat ${index + 1}${accentLevel !== 'weak' ? `, ${accentLevel} accent` : ''}. Tap to cycle accent.`}
+                          aria-pressed={accentLevel !== 'weak'}
+                          onPointerUp={(event) => {
+                            if (event.button !== 0) return
+                            handleBeatAccentToggle(index)
+                          }}
+                        >
+                          <span className="audio-practice-metronome__beat-number" aria-hidden>
+                            {index + 1}
+                          </span>
+                        </button>
+                        {subNotchCount > 0 && (
+                          <div className="audio-practice-metronome__sub-notches" aria-hidden>
+                            {Array.from({ length: subNotchCount }, (_, notchIndex) => {
+                              const notchTick = notchIndex + 1
+                              const notchActive = isBeatActive && subTickIndex === notchTick
+                              return (
+                                <span
+                                  key={notchTick}
+                                  className={[
+                                    'audio-practice-metronome__sub-notch',
+                                    notchActive ? 'audio-practice-metronome__sub-notch--active' : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                />
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           </div>
           </div>

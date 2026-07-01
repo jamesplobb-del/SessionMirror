@@ -1,4 +1,11 @@
-import type { MetronomeMeter, MetronomeSubdivision } from '../../utils/metronomeConfig'
+import {
+  getAvailableSubdivisions,
+  getSubdivisionLabel,
+  getTimeSignatureDefinition,
+  subdivisionsPerBeat,
+  type MetronomeMeter,
+  type MetronomeSubdivision,
+} from '../../utils/metronomeConfig'
 
 export const AUDIO_PRACTICE_MIN_BPM = 30
 export const AUDIO_PRACTICE_MAX_BPM = 240
@@ -17,13 +24,28 @@ export const PRACTICE_CORE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4', '5/4
 export const PRACTICE_EXTENDED_METERS: MetronomeMeter[] = [
   '9/8',
   '12/8',
+  '15/8',
   '6/4',
   '7/4',
+  '2/2',
+  '3/2',
+  '4/2',
+  '5/2',
+  '6/2',
+  '7/2',
   '5/8',
   '7/8',
   '8/8',
   '10/8',
   '11/8',
+  '3/16',
+  '5/16',
+  '7/16',
+  '9/16',
+  '11/16',
+  '13/16',
+  '15/16',
+  '16/16',
 ]
 
 export const PRACTICE_ALL_METERS: MetronomeMeter[] = [
@@ -39,24 +61,36 @@ export interface PracticeRhythmOption {
   ticksPerBeat: number
 }
 
-/** First visible window (5 across). */
-export const PRACTICE_CORE_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
-  { id: 'quarter', value: 'off', label: '♩', name: 'Quarter notes', ticksPerBeat: 1 },
-  { id: 'eighth', value: '8ths', label: '♪', name: 'Eighth notes', ticksPerBeat: 2 },
-  { id: 'triplet', value: 'triplets', label: '♪3', name: 'Triplets', ticksPerBeat: 3 },
-  { id: 'sixteenth', value: '16ths', label: '♬', name: 'Sixteenth notes', ticksPerBeat: 4 },
-  { id: 'dotted', value: 'dotted', label: '♩·', name: 'Dotted quarter', ticksPerBeat: 3 },
-]
+const RHYTHM_LABELS: Record<MetronomeSubdivision, { id: string; label: string }> = {
+  off: { id: 'pulse', label: '♩' },
+  '8ths': { id: 'eighth', label: '♪' },
+  triplets: { id: 'triplet', label: '♪3' },
+  '16ths': { id: 'sixteenth', label: '♬' },
+  dotted: { id: 'dotted', label: '♩·' },
+  quints: { id: 'quintuplet', label: '5' },
+  septuplets: { id: 'septuplet', label: '7' },
+}
 
-export const PRACTICE_EXTENDED_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
-  { id: 'quintuplet', value: 'quints', label: '5', name: 'Quintuplets', ticksPerBeat: 5 },
-  { id: 'septuplet', value: 'septuplets', label: '7', name: 'Septuplets', ticksPerBeat: 7 },
-]
+export function getPracticeRhythmOptions(meter: MetronomeMeter): PracticeRhythmOption[] {
+  return getAvailableSubdivisions(meter).map((value) => {
+    const meta = RHYTHM_LABELS[value]
+    const name =
+      value === 'off' ? getTimeSignatureDefinition(meter).pulseName : getSubdivisionLabel(meter, value)
+    return {
+      id: meta.id,
+      value,
+      label: meta.label,
+      name,
+      ticksPerBeat: subdivisionsPerBeat(value),
+    }
+  })
+}
 
-export const PRACTICE_ALL_RHYTHM_OPTIONS: PracticeRhythmOption[] = [
-  ...PRACTICE_CORE_RHYTHM_OPTIONS,
-  ...PRACTICE_EXTENDED_RHYTHM_OPTIONS,
-]
+export function getPracticeFeelOptions(meter: MetronomeMeter): { value: string; label: string }[] {
+  const def = getTimeSignatureDefinition(meter)
+  if (!def.feelOptions?.length) return []
+  return def.feelOptions.map((option) => ({ value: option.id, label: option.label }))
+}
 
 /** UI-only until sound engine supports multiple click timbres. */
 export const AUDIO_PRACTICE_CLICK_SOUNDS = [
@@ -67,3 +101,6 @@ export const AUDIO_PRACTICE_CLICK_SOUNDS = [
 ] as const
 
 export type AudioPracticeClickSoundId = (typeof AUDIO_PRACTICE_CLICK_SOUNDS)[number]['id']
+
+/** @deprecated Use getPracticeRhythmOptions(meter) */
+export const PRACTICE_ALL_RHYTHM_OPTIONS: PracticeRhythmOption[] = getPracticeRhythmOptions('4/4')

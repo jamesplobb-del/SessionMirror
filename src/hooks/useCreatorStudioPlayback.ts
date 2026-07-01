@@ -67,6 +67,7 @@ export function useCreatorStudioPlayback(
 
     prepareInlineMediaElement(mediaNode)
     assignMediaPlaybackSrc(mediaNode, resolvedSrc)
+    mediaNode.load()
     primeTakePlaybackForUserGesture(mediaNode)
     routeTakePlaybackToSpeaker(mediaNode, 1, false)
 

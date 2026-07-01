@@ -728,6 +728,12 @@ html.app-dark-mode .creator-studio__trim-dim {
   touch-action: none;
 }
 
+.creator-studio__canvas-object--recording {
+  inset: 0;
+  width: 100% !important;
+  transform: none !important;
+}
+
 .creator-studio__canvas-object.is-editable {
   cursor: grab;
 }
@@ -744,12 +750,13 @@ html.app-dark-mode .creator-studio__trim-dim {
 .creator-studio__recording-frame {
   position: relative;
   width: 100%;
-  min-height: 6rem;
-  aspect-ratio: 9 / 16;
+  height: 100%;
+  min-height: 100%;
+  aspect-ratio: auto;
   overflow: hidden;
-  border-radius: 1rem;
+  border-radius: 0;
   background: #020617;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
 }
 
 .creator-studio__media-loading {

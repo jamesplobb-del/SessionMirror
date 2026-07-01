@@ -1,88 +1,95 @@
-export type MetronomeMeter =
-  | '2/4'
-  | '3/4'
-  | '4/4'
-  | '5/4'
-  | '6/4'
-  | '7/4'
-  | '6/8'
-  | '9/8'
-  | '12/8'
-  | '5/8'
-  | '7/8'
-  | '8/8'
-  | '10/8'
-  | '11/8'
-  | '3/16'
-  | '5/16'
-  | '7/16'
-  | '9/16'
-  | '11/16'
-  | '13/16'
-  | '15/16'
-  | '16/16'
+import {
+  getAccentLevelsForMeter,
+  getBeatGrouping,
+  getDefaultFeelId,
+  getFeelOption,
+  getTimeSignatureDefinition,
+  TIME_SIGNATURE_DEFINITIONS,
+  type MetronomeAccentLevel,
+  type MetronomeMeter,
+} from '../metronome/timeSignatureDefinitions'
+import {
+  accentLevelsToLegacyPattern,
+  getPulseLabel,
+  getSubdivisionLabel,
+  isSubdivisionAvailable,
+  legacyPatternToAccentLevels,
+  resolveClickTier,
+  secondsPerSchedulerTick,
+  suggestSubdivisionForMeterChange,
+  subTicksPerPulse,
+  ticksPerBar,
+  ticksPerPulse,
+} from '../metronome/metronomeTiming'
+import type { MetronomeClickTier, MetronomeSubdivision } from '../metronome/metronomeTypes'
 
-export type MetronomeMeterGroup = 'simple' | 'compound' | 'odd' | 'sixteenth'
+export type { MetronomeMeter, MetronomeAccentLevel } from '../metronome/timeSignatureDefinitions'
+export type { MetronomeClickTier, MetronomeSubdivision } from '../metronome/metronomeTypes'
+
+export {
+  getAccentLevelsForMeter,
+  getBeatGrouping,
+  getDefaultFeelId,
+  getFeelOption,
+  getTimeSignatureDefinition,
+  TIME_SIGNATURE_DEFINITIONS,
+}
+
+export {
+  accentLevelsToLegacyPattern,
+  getPulseLabel,
+  getSubdivisionLabel,
+  isSubdivisionAvailable,
+  legacyPatternToAccentLevels,
+  resolveClickTier,
+  secondsPerSchedulerTick,
+  suggestSubdivisionForMeterChange,
+  subTicksPerPulse,
+  ticksPerBar,
+  ticksPerPulse,
+}
+
+export type MetronomeMeterGroup = 'simple' | 'compound' | 'odd' | 'sixteenth' | 'cut-time'
 
 export interface MetronomeMeterDef {
   label: string
   numerator: number
   denominator: number
-  /** Main beat dots shown in the UI. */
   beatsPerBar: number
   group: MetronomeMeterGroup
-  /** Compound 8th-note pulses per bar when subdivision is quarter (off). */
-  eighthNotesPerBar?: number
+  pulseName: string
+  compound: boolean
 }
 
-export const METRONOME_METERS: Record<MetronomeMeter, MetronomeMeterDef> = {
-  '2/4': { label: '2/4', numerator: 2, denominator: 4, beatsPerBar: 2, group: 'simple' },
-  '3/4': { label: '3/4', numerator: 3, denominator: 4, beatsPerBar: 3, group: 'simple' },
-  '4/4': { label: '4/4', numerator: 4, denominator: 4, beatsPerBar: 4, group: 'simple' },
-  '5/4': { label: '5/4', numerator: 5, denominator: 4, beatsPerBar: 5, group: 'simple' },
-  '6/4': { label: '6/4', numerator: 6, denominator: 4, beatsPerBar: 6, group: 'simple' },
-  '7/4': { label: '7/4', numerator: 7, denominator: 4, beatsPerBar: 7, group: 'simple' },
-  '6/8': {
-    label: '6/8',
-    numerator: 6,
-    denominator: 8,
-    beatsPerBar: 2,
-    group: 'compound',
-    eighthNotesPerBar: 6,
-  },
-  '9/8': {
-    label: '9/8',
-    numerator: 9,
-    denominator: 8,
-    beatsPerBar: 3,
-    group: 'compound',
-    eighthNotesPerBar: 9,
-  },
-  '12/8': {
-    label: '12/8',
-    numerator: 12,
-    denominator: 8,
-    beatsPerBar: 4,
-    group: 'compound',
-    eighthNotesPerBar: 12,
-  },
-  '5/8': { label: '5/8', numerator: 5, denominator: 8, beatsPerBar: 5, group: 'odd' },
-  '7/8': { label: '7/8', numerator: 7, denominator: 8, beatsPerBar: 7, group: 'odd' },
-  '8/8': { label: '8/8', numerator: 8, denominator: 8, beatsPerBar: 8, group: 'odd' },
-  '10/8': { label: '10/8', numerator: 10, denominator: 8, beatsPerBar: 10, group: 'odd' },
-  '11/8': { label: '11/8', numerator: 11, denominator: 8, beatsPerBar: 11, group: 'odd' },
-  '3/16': { label: '3/16', numerator: 3, denominator: 16, beatsPerBar: 3, group: 'sixteenth' },
-  '5/16': { label: '5/16', numerator: 5, denominator: 16, beatsPerBar: 5, group: 'sixteenth' },
-  '7/16': { label: '7/16', numerator: 7, denominator: 16, beatsPerBar: 7, group: 'sixteenth' },
-  '9/16': { label: '9/16', numerator: 9, denominator: 16, beatsPerBar: 9, group: 'sixteenth' },
-  '11/16': { label: '11/16', numerator: 11, denominator: 16, beatsPerBar: 11, group: 'sixteenth' },
-  '13/16': { label: '13/16', numerator: 13, denominator: 16, beatsPerBar: 13, group: 'sixteenth' },
-  '15/16': { label: '15/16', numerator: 15, denominator: 16, beatsPerBar: 15, group: 'sixteenth' },
-  '16/16': { label: '16/16', numerator: 16, denominator: 16, beatsPerBar: 16, group: 'sixteenth' },
+function meterGroup(meter: MetronomeMeter): MetronomeMeterGroup {
+  const def = getTimeSignatureDefinition(meter)
+  if (def.compound) return 'compound'
+  if (def.denominator === 16) return 'sixteenth'
+  if (def.denominator === 8 && def.pulseUnit === 'eighth') return 'odd'
+  if (def.denominator === 2) return 'cut-time'
+  return 'simple'
 }
+
+export const METRONOME_METERS: Record<MetronomeMeter, MetronomeMeterDef> = Object.fromEntries(
+  (Object.keys(TIME_SIGNATURE_DEFINITIONS) as MetronomeMeter[]).map((meter) => {
+    const def = TIME_SIGNATURE_DEFINITIONS[meter]
+    return [
+      meter,
+      {
+        label: def.label,
+        numerator: def.numerator,
+        denominator: def.denominator,
+        beatsPerBar: def.pulseCount,
+        group: meterGroup(meter),
+        pulseName: def.pulseName,
+        compound: def.compound,
+      },
+    ]
+  }),
+) as Record<MetronomeMeter, MetronomeMeterDef>
 
 export const SIMPLE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4']
-export const COMPOUND_METERS: MetronomeMeter[] = ['6/8', '9/8', '12/8']
+export const COMPOUND_METERS: MetronomeMeter[] = ['6/8', '9/8', '12/8', '15/8']
 export const AUDIO_STAGE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4', '5/4', '6/8']
 
 export const MIN_BPM = 1
@@ -90,15 +97,6 @@ export const MAX_BPM = 400
 export const DEFAULT_BPM = 120
 export const DEFAULT_METER: MetronomeMeter = '4/4'
 export const DEFAULT_SUBDIVISION: MetronomeSubdivision = 'off'
-
-export type MetronomeSubdivision =
-  | 'off'
-  | '8ths'
-  | 'triplets'
-  | '16ths'
-  | 'dotted'
-  | 'quints'
-  | 'septuplets'
 
 export const METRONOME_SUBDIVISIONS: { value: MetronomeSubdivision; label: string }[] = [
   { value: 'off', label: 'Off' },
@@ -108,7 +106,7 @@ export const METRONOME_SUBDIVISIONS: { value: MetronomeSubdivision; label: strin
 ]
 
 export const STAGE_SUBDIVISIONS: { value: MetronomeSubdivision; label: string }[] = [
-  { value: 'off', label: 'Quarter Notes' },
+  { value: 'off', label: 'Pulse' },
   { value: '8ths', label: 'Eighth Notes' },
   { value: 'triplets', label: 'Triplets' },
   { value: '16ths', label: 'Sixteenth Notes' },
@@ -122,7 +120,10 @@ export interface MetronomePrefs {
   bpm: number
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
-  accentPattern: boolean[]
+  feelId?: string
+  accentLevels: MetronomeAccentLevel[]
+  /** @deprecated Migrated to accentLevels on load. */
+  accentPattern?: boolean[]
   soundId: string
 }
 
@@ -139,37 +140,59 @@ const VALID_SUBDIVISIONS = new Set<MetronomeSubdivision>([
 ])
 
 function defaultMetronomePrefs(): MetronomePrefs {
+  const feelId = getDefaultFeelId(DEFAULT_METER)
   return {
     bpm: DEFAULT_BPM,
     meter: DEFAULT_METER,
-    subdivision: DEFAULT_SUBDIVISION,
-    accentPattern: getDefaultAccentPattern(DEFAULT_METER),
+    subdivision: getTimeSignatureDefinition(DEFAULT_METER).defaultSubdivision,
+    feelId,
+    accentLevels: getAccentLevelsForMeter(DEFAULT_METER, feelId),
     soundId: DEFAULT_SOUND_ID,
   }
 }
 
-export function getDefaultAccentPattern(meter: MetronomeMeter): boolean[] {
-  const beats = getBeatsPerBar(meter)
-  if (meter === '6/8') return [true, true]
-  if (meter === '9/8') return [true, true, true]
-  if (meter === '12/8') return [true, true, true, true]
-  return Array.from({ length: beats }, (_, index) => index === 0)
+export function getDefaultAccentLevels(
+  meter: MetronomeMeter,
+  feelId?: string,
+): MetronomeAccentLevel[] {
+  return getAccentLevelsForMeter(meter, feelId)
 }
 
+/** @deprecated Use getDefaultAccentLevels */
+export function getDefaultAccentPattern(meter: MetronomeMeter, feelId?: string): boolean[] {
+  return accentLevelsToLegacyPattern(getDefaultAccentLevels(meter, feelId))
+}
+
+export function normalizeAccentLevels(
+  meter: MetronomeMeter,
+  levels: MetronomeAccentLevel[],
+  feelId?: string,
+): MetronomeAccentLevel[] {
+  const pulseCount = getTimeSignatureDefinition(meter).pulseCount
+  const defaults = getDefaultAccentLevels(meter, feelId)
+  return Array.from({ length: pulseCount }, (_, index) => levels[index] ?? defaults[index] ?? 'weak')
+}
+
+/** @deprecated Use normalizeAccentLevels */
 export function normalizeAccentPattern(meter: MetronomeMeter, pattern: boolean[]): boolean[] {
-  const beats = getBeatsPerBar(meter)
-  const next = Array.from({ length: beats }, (_, index) => Boolean(pattern[index]))
-  if (next.length === 0) return getDefaultAccentPattern(meter)
-  return next
+  const levels = legacyPatternToAccentLevels(meter, pattern)
+  return accentLevelsToLegacyPattern(levels)
 }
 
-function parseAccentPattern(meter: MetronomeMeter, parsed: Partial<MetronomePrefs> & { accentFirstBeat?: boolean }): boolean[] {
-  if (Array.isArray(parsed.accentPattern)) {
-    return normalizeAccentPattern(meter, parsed.accentPattern)
+function parseAccentLevels(
+  meter: MetronomeMeter,
+  feelId: string | undefined,
+  parsed: Partial<MetronomePrefs> & { accentFirstBeat?: boolean },
+): MetronomeAccentLevel[] {
+  if (Array.isArray(parsed.accentLevels) && parsed.accentLevels.length > 0) {
+    return normalizeAccentLevels(meter, parsed.accentLevels, feelId)
   }
-  const defaults = getDefaultAccentPattern(meter)
+  if (Array.isArray(parsed.accentPattern)) {
+    return legacyPatternToAccentLevels(meter, parsed.accentPattern, feelId)
+  }
+  const defaults = getDefaultAccentLevels(meter, feelId)
   if (typeof parsed.accentFirstBeat === 'boolean' && defaults.length > 0) {
-    defaults[0] = parsed.accentFirstBeat
+    defaults[0] = parsed.accentFirstBeat ? 'strong' : 'weak'
   }
   return defaults
 }
@@ -179,17 +202,27 @@ export function clampBpm(value: number): number {
 }
 
 function parseMeter(value: unknown): MetronomeMeter {
-  if (typeof value === 'string' && value in METRONOME_METERS) {
+  if (typeof value === 'string' && value in TIME_SIGNATURE_DEFINITIONS) {
     return value as MetronomeMeter
   }
   return DEFAULT_METER
 }
 
-function parseSubdivision(value: unknown): MetronomeSubdivision {
+function parseSubdivision(value: unknown, meter: MetronomeMeter): MetronomeSubdivision {
   if (typeof value === 'string' && VALID_SUBDIVISIONS.has(value as MetronomeSubdivision)) {
-    return value as MetronomeSubdivision
+    const subdivision = value as MetronomeSubdivision
+    if (isSubdivisionAvailable(meter, subdivision)) return subdivision
   }
-  return DEFAULT_SUBDIVISION
+  return getTimeSignatureDefinition(meter).defaultSubdivision
+}
+
+function parseFeelId(meter: MetronomeMeter, value: unknown): string | undefined {
+  const def = getTimeSignatureDefinition(meter)
+  if (!def.feelOptions?.length) return undefined
+  if (typeof value === 'string' && def.feelOptions.some((option) => option.id === value)) {
+    return value
+  }
+  return def.defaultFeelId
 }
 
 export function subdivisionsPerBeat(subdivision: MetronomeSubdivision): number {
@@ -218,11 +251,13 @@ export function loadMetronomePrefs(): MetronomePrefs {
     }
     const parsed = JSON.parse(raw) as Partial<MetronomePrefs> & { accentFirstBeat?: boolean }
     const meter = parseMeter(parsed.meter)
+    const feelId = parseFeelId(meter, parsed.feelId)
     return {
       bpm: clampBpm(Number(parsed.bpm) || DEFAULT_BPM),
       meter,
-      subdivision: parseSubdivision(parsed.subdivision),
-      accentPattern: parseAccentPattern(meter, parsed),
+      subdivision: parseSubdivision(parsed.subdivision, meter),
+      feelId,
+      accentLevels: parseAccentLevels(meter, feelId, parsed),
       soundId:
         typeof parsed.soundId === 'string' && parsed.soundId.length > 0
           ? parsed.soundId
@@ -241,7 +276,8 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
         bpm: clampBpm(prefs.bpm),
         meter: prefs.meter,
         subdivision: prefs.subdivision,
-        accentPattern: normalizeAccentPattern(prefs.meter, prefs.accentPattern),
+        feelId: prefs.feelId,
+        accentLevels: normalizeAccentLevels(prefs.meter, prefs.accentLevels, prefs.feelId),
         soundId: prefs.soundId,
       }),
     )
@@ -255,70 +291,57 @@ export function getMeterDef(meter: MetronomeMeter): MetronomeMeterDef {
 }
 
 export function getBeatsPerBar(meter: MetronomeMeter): number {
-  return METRONOME_METERS[meter].beatsPerBar
+  return getTimeSignatureDefinition(meter).pulseCount
 }
 
 export function isCompoundMeter(meter: MetronomeMeter): boolean {
-  return METRONOME_METERS[meter].group === 'compound'
+  return getTimeSignatureDefinition(meter).compound
 }
 
-/** Odd /8 meters (5/8, 7/8, …) — natural pulse is eighth notes, not quarters. */
+/** Odd /8 meters (5/8, 7/8, …) — natural pulse is eighth notes. */
 export function isSimpleEighthMeter(meter: MetronomeMeter): boolean {
-  const def = METRONOME_METERS[meter]
-  return def.denominator === 8 && def.group === 'odd'
+  const def = getTimeSignatureDefinition(meter)
+  return def.denominator === 8 && def.pulseUnit === 'eighth'
 }
 
 export function isSixteenthMeter(meter: MetronomeMeter): boolean {
-  return METRONOME_METERS[meter].denominator === 16
+  return getTimeSignatureDefinition(meter).denominator === 16
 }
 
-/** Divisor applied to quarter-note beat when subdivision is off (eighth = 2, sixteenth = 4). */
+/** @deprecated Timing is data-driven via metronomeTiming. */
 export function naturalPulseDivisor(meter: MetronomeMeter): number {
-  if (isCompoundMeter(meter)) return 3
-  const def = METRONOME_METERS[meter]
-  if (def.denominator === 8) return 2
-  if (def.denominator === 16) return 4
-  return 1
-}
-
-export function suggestSubdivisionForMeterChange(
-  nextMeter: MetronomeMeter,
-  previousMeter: MetronomeMeter,
-  currentSubdivision: MetronomeSubdivision,
-): MetronomeSubdivision {
-  const prevDef = METRONOME_METERS[previousMeter]
-  const nextDef = METRONOME_METERS[nextMeter]
-  if (
-    prevDef.denominator !== nextDef.denominator ||
-    isCompoundMeter(nextMeter) !== isCompoundMeter(previousMeter)
-  ) {
-    return 'off'
-  }
-  return currentSubdivision
+  return ticksPerPulse(meter, 'off')
 }
 
 export function getEighthNotesPerBar(meter: MetronomeMeter): number {
-  const def = METRONOME_METERS[meter]
-  return def.eighthNotesPerBar ?? def.beatsPerBar
+  const def = getTimeSignatureDefinition(meter)
+  return def.numerator * (8 / def.denominator)
 }
 
-export function getCompoundGroupSize(_meter: MetronomeMeter): number {
-  return 3
+export function getCompoundGroupSize(meter: MetronomeMeter): number {
+  const def = getTimeSignatureDefinition(meter)
+  if (!def.compound) return 1
+  return ticksPerPulse(meter, '8ths')
 }
 
-export type MetronomeClickTier = 'downbeat' | 'macro' | 'subdivision'
-
-/** Compound 8th-note accent: 1 = downbeat, 4/7/10… = macro pulse, others = fill. */
-export function getCompoundClickTier(eighthIndexInBar: number): MetronomeClickTier {
-  if (eighthIndexInBar === 0) return 'downbeat'
-  if (eighthIndexInBar % 3 === 0) return 'macro'
-  return 'subdivision'
+export function getAvailableSubdivisions(meter: MetronomeMeter): MetronomeSubdivision[] {
+  return getTimeSignatureDefinition(meter).availableSubdivisions
 }
 
-export function getSimpleClickTier(beatIndexInBar: number): MetronomeClickTier {
-  return beatIndexInBar === 0 ? 'downbeat' : 'subdivision'
+export function hasFeelOptions(meter: MetronomeMeter): boolean {
+  return Boolean(getTimeSignatureDefinition(meter).feelOptions?.length)
 }
 
+export function resolveClickTierWithAccents(
+  meter: MetronomeMeter,
+  tickIndexInBar: number,
+  subdivision: MetronomeSubdivision,
+  accentLevels: MetronomeAccentLevel[],
+): MetronomeClickTier {
+  return resolveClickTier({ meter, subdivision, accentLevels }, tickIndexInBar)
+}
+
+/** @deprecated Use resolveClickTierWithAccents with accentLevels */
 export function getAccentedMainBeatTier(
   beatIndexInBar: number,
   accentPattern: boolean[],
@@ -327,35 +350,26 @@ export function getAccentedMainBeatTier(
   return beatIndexInBar === 0 ? 'downbeat' : 'macro'
 }
 
-export function resolveClickTierWithAccents(
-  meter: MetronomeMeter,
-  tickIndexInBar: number,
-  subdivision: MetronomeSubdivision,
-  accentPattern: boolean[],
-): MetronomeClickTier {
-  const pattern = normalizeAccentPattern(meter, accentPattern)
+/** @deprecated Compound click tiers are resolved via resolveClickTier */
+export function getCompoundClickTier(_eighthIndexInBar: number): MetronomeClickTier {
+  return 'subdivision'
+}
 
-  if (isCompoundMeter(meter) && subdivision === 'off') {
-    const macroBeatIndex = Math.floor(tickIndexInBar / 3)
-    const tickInGroup = tickIndexInBar % 3
-    if (tickInGroup !== 0) return 'subdivision'
-    return getAccentedMainBeatTier(macroBeatIndex, pattern)
+/** @deprecated */
+export function getSimpleClickTier(beatIndexInBar: number): MetronomeClickTier {
+  return beatIndexInBar === 0 ? 'downbeat' : 'subdivision'
+}
+
+export function getMeterDefaults(meter: MetronomeMeter): {
+  subdivision: MetronomeSubdivision
+  feelId?: string
+  accentLevels: MetronomeAccentLevel[]
+} {
+  const def = getTimeSignatureDefinition(meter)
+  const feelId = def.defaultFeelId
+  return {
+    subdivision: def.defaultSubdivision,
+    feelId,
+    accentLevels: getAccentLevelsForMeter(meter, feelId),
   }
-
-  if (isSimpleEighthMeter(meter) && subdivision === 'off') {
-    if (tickIndexInBar === 0) return 'downbeat'
-    return getAccentedMainBeatTier(tickIndexInBar, pattern)
-  }
-
-  if (isSixteenthMeter(meter) && subdivision === 'off') {
-    if (tickIndexInBar === 0) return 'downbeat'
-    return getAccentedMainBeatTier(tickIndexInBar, pattern)
-  }
-
-  const ticksPerBeat = subdivisionsPerBeat(subdivision)
-  const beatIndex = Math.floor(tickIndexInBar / ticksPerBeat)
-  const tickInBeat = tickIndexInBar % ticksPerBeat
-
-  if (tickInBeat !== 0) return 'subdivision'
-  return getAccentedMainBeatTier(beatIndex, pattern)
 }
