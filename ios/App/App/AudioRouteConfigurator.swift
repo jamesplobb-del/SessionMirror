@@ -513,6 +513,26 @@ enum AudioRouteConfigurator {
         logRoute("capture session deactivated while app backgrounded")
     }
 
+    static func suspendForAppBackground() {
+        CameraSessionGuard.setPreviewActive(false)
+        CameraSessionGuard.setRecordingActive(false)
+        CameraSessionGuard.setPlaybackRouteActive(false)
+
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try debugSetPreferredInput(session, input: nil, caller: "suspendForAppBackground.clearPreferredInput")
+            try debugSetActive(
+                session,
+                active: false,
+                options: .notifyOthersOnDeactivation,
+                caller: "suspendForAppBackground"
+            )
+            logRoute("audio session suspended for app background")
+        } catch {
+            print("[AudioRoute] failed to suspend audio session for background: \(error.localizedDescription)")
+        }
+    }
+
     static func maintainHighQualityInputIfNeeded() {
         // Deferred to JS at explicit safe times — setPreferredInput here interrupts camera/getUserMedia.
         logRoute("route-change event (maintenance deferred)")

@@ -81,9 +81,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
+        AudioRouteConfigurator.suspendForAppBackground()
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
+        AudioRouteConfigurator.suspendForAppBackground()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

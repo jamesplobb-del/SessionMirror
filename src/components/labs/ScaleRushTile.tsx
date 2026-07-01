@@ -10,9 +10,9 @@ interface ScaleRushTileProps {
   depthIndex?: number
 }
 
-function obstacleLabel(terrain: CourseRow['terrain']): string | null {
-  if (terrain === 'road') return '🚗'
-  if (terrain === 'river') return '🪵'
+function obstacleClass(terrain: CourseRow['terrain']): string | null {
+  if (terrain === 'road') return 'vehicle'
+  if (terrain === 'river') return 'log'
   return null
 }
 
@@ -36,7 +36,7 @@ export default function ScaleRushTile({ row, variant, depthIndex = 0 }: ScaleRus
   }
 
   const color = noteTileColor(row.pitchClass)
-  const obstacle = obstacleLabel(row.terrain)
+  const obstacle = obstacleClass(row.terrain)
   const isTarget = variant === 'target' || row.isTarget
   const isLanded = variant === 'landed'
 
@@ -52,7 +52,7 @@ export default function ScaleRushTile({ row, variant, depthIndex = 0 }: ScaleRus
     >
       {obstacle && row.terrain !== 'grass' && (
         <div className={`sr-iso-obstacle sr-iso-obstacle--${row.terrain}`} aria-hidden>
-          <span className="sr-iso-obstacle__emoji">{obstacle}</span>
+          <span className={`sr-iso-obstacle__shape sr-iso-obstacle__shape--${obstacle}`} />
         </div>
       )}
       <div className="sr-iso-tile__cube">
