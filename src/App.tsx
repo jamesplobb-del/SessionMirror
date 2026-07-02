@@ -13,6 +13,7 @@ import {
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Headphones, X } from 'lucide-react'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import CameraPermissionPrompt from './components/CameraPermissionPrompt'
 import HudHeader from './components/HudHeader'
@@ -160,6 +161,7 @@ import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './conte
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 350
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
+const YOUTUBE_HEADPHONES_TIP_MS = 3200
 
 function waitMs(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -379,6 +381,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
+  const [showYoutubeHeadphonesTip, setShowYoutubeHeadphonesTip] = useState(false)
+  const [youtubeHeadphonesTipNonce, setYoutubeHeadphonesTipNonce] = useState(0)
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
@@ -496,6 +500,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     isSplitViewRef.current = isSplitView
   }, [isSplitView])
+
+  useEffect(() => {
+    if (!showYoutubeHeadphonesTip) return
+    const timer = window.setTimeout(() => {
+      setShowYoutubeHeadphonesTip(false)
+    }, YOUTUBE_HEADPHONES_TIP_MS)
+    return () => window.clearTimeout(timer)
+  }, [showYoutubeHeadphonesTip, youtubeHeadphonesTipNonce])
 
   const teardownPipMedia = useCallback((media: HTMLMediaElement | null | undefined) => {
     if (!media) return
@@ -2558,6 +2570,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     prepareNewYoutubeReference()
     setYoutubeUrl(embedUrl)
+    setYoutubeHeadphonesTipNonce((current) => current + 1)
+    setShowYoutubeHeadphonesTip(true)
   }, [])
 
   const handleClearYoutube = useCallback(() => {
@@ -2658,6 +2672,45 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   iframeRef={youtubeIframeRef}
                 />
               )}
+
+              <AnimatePresence>
+                {showYoutubeHeadphonesTip && (
+                  <motion.div
+                    key={`youtube-headphones-tip-${youtubeHeadphonesTipNonce}`}
+                    className="pointer-events-none fixed inset-x-0 top-4 z-[130] flex justify-center px-4"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={iosHudDim}
+                    style={motionGpuLayer}
+                  >
+                    <div className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border border-[rgba(255,255,255,0.24)] bg-[rgba(20,24,31,0.86)] px-4 py-3 text-white shadow-[0_18px_36px_rgba(8,10,14,0.24)] backdrop-blur-xl">
+                      <div className="mt-0.5 rounded-full bg-white/12 p-2">
+                        <Headphones className="h-4 w-4" aria-hidden />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
+                          YouTube Tip
+                        </p>
+                        <p className="mt-1 text-sm leading-snug text-white/92">
+                          Headphones work best for YouTube play-alongs.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerLightHaptic()
+                          setShowYoutubeHeadphonesTip(false)
+                        }}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/6 text-white/72"
+                        aria-label="Dismiss YouTube tip"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {isAudioPracticeMetronomeTab && (
                 <div className="audio-practice-metronome-scrim pointer-events-none" aria-hidden />
