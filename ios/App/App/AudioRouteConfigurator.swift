@@ -265,15 +265,14 @@ enum AudioRouteConfigurator {
             if builtInSpeakerOutputs.contains(outputPort) {
                 try debugSetCategory(
                     session,
-                    category: .playAndRecord,
+                    category: .playback,
                     mode: .default,
-                    options: [.allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+                    options: [.allowBluetoothA2DP, .allowAirPlay],
                     caller: "applyWebPlaybackRoute.builtInSpeaker"
                 )
                 try session.setPreferredSampleRate(48_000)
                 try session.setPreferredIOBufferDuration(0.005)
                 try debugSetActive(session, active: true, options: [], caller: "applyWebPlaybackRoute.builtInSpeaker")
-                try preferBuiltInSpeakerIfSafe(session)
             } else {
                 // Full-volume external playback. Do not use duckOthers; omit mixWithOthers so WebView audio is not softened.
                 try debugSetCategory(
@@ -441,27 +440,21 @@ enum AudioRouteConfigurator {
             } else {
                 let playbackFocused = playbackActive && !recordingActive
                 let options: AVAudioSession.CategoryOptions = playbackFocused
-                    ? [.allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                    ? [.allowBluetoothA2DP, .allowAirPlay]
                     : micInputPreference == .headphone
                         ? [.mixWithOthers, .allowBluetoothHFP, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
                         : [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                let category: AVAudioSession.Category = playbackFocused ? .playback : .playAndRecord
                 let mode: AVAudioSession.Mode = playbackFocused ? .default : .videoRecording
 
-                try debugSetCategory(session, category: .playAndRecord, mode: mode, options: options, caller: "applyNativeExperimentalAudioMode")
+                try debugSetCategory(session, category: category, mode: mode, options: options, caller: "applyNativeExperimentalAudioMode")
                 try session.setPreferredSampleRate(48_000)
                 try session.setPreferredIOBufferDuration(playbackFocused ? 0.005 : 0.0029)
                 try debugSetActive(session, active: true, options: [], caller: "applyNativeExperimentalAudioMode")
 
-                let micSnapshot = try applyMicInputPreference(micInputPreference, session: session)
-                fallbackReason = micSnapshot["fallbackReason"] as? String
-
-                if playbackFocused {
-                    do {
-                        try preferBuiltInSpeakerIfSafe(session)
-                    } catch {
-                        let speakerFallback = "speaker override failed: \(error.localizedDescription)"
-                        fallbackReason = fallbackReason.map { "\($0); \(speakerFallback)" } ?? speakerFallback
-                    }
+                if !playbackFocused {
+                    let micSnapshot = try applyMicInputPreference(micInputPreference, session: session)
+                    fallbackReason = micSnapshot["fallbackReason"] as? String
                 }
             }
         } else {

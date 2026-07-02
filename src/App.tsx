@@ -2067,7 +2067,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const takePlaybackActive =
     autoPlaybackPlaying || audioModeTakePlaying || benchmarkPipPlaying || challengerPipPlaying
-  const nativeSessionPlaybackActive = recordingMode === 'video' && takePlaybackActive
+  const nativeSessionPlaybackActive = takePlaybackActive
 
   const selectedAudioEngine = settings.audioEnhancerEnabled ? 'Native + Enhanced' : 'Native'
 

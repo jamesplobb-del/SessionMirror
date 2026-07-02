@@ -92,14 +92,21 @@ enum NativeCameraTestAudio {
 
         print("[PlaybackRoute] applying playback session")
         print("[CameraLikePlayback] applying session")
-        try NativeCameraAudioSessionProfile.playAndRecordDefault.apply(to: audioSession)
+        try AudioRouteConfigurator.debugSetCategory(
+            audioSession,
+            category: .playback,
+            mode: .default,
+            options: [.allowBluetoothA2DP, .allowAirPlay],
+            caller: "NativeCameraTestAudio.prepareCameraLikePlaybackSession"
+        )
+        try AudioRouteConfigurator.debugSetActive(
+            audioSession,
+            active: true,
+            options: [],
+            caller: "NativeCameraTestAudio.prepareCameraLikePlaybackSession"
+        )
         try audioSession.setPreferredSampleRate(48_000)
         try audioSession.setPreferredIOBufferDuration(0.005)
-        if !audioSession.currentRoute.outputs.contains(where: { output in
-            [.airPlay, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .carAudio, .headphones, .usbAudio].contains(output.portType)
-        }) {
-            try audioSession.overrideOutputAudioPort(.speaker)
-        }
         CameraSessionGuard.markPlaybackSessionPrepared()
 
         let category = audioSession.category.rawValue
