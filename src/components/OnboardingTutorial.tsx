@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, ChevronLeft, Sparkles, X } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, X } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
@@ -77,7 +77,7 @@ export default function OnboardingTutorial({
             <ChevronLeft className="h-5 w-5" />
           </Pressable>
           <div className="onboarding-lite__glyph" aria-hidden>
-            <Sparkles className="h-5 w-5" />
+            <img src="/icons/icon.png" alt="" draggable={false} />
           </div>
           <Pressable
             type="button"
