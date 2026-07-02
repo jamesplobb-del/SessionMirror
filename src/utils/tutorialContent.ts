@@ -7,8 +7,6 @@ export type OnboardingCardId =
   | 'import-practice-media'
 
 export type CoachMarkId =
-  | 'record-button'
-  | 'current-to-best'
   | 'best-take-box'
   | 'quick-settings'
   | 'audio-mode'
@@ -93,20 +91,6 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
 ]
 
 export const COACH_MARKS: CoachMarkContent[] = [
-  {
-    id: 'record-button',
-    title: 'First: Make Two Takes',
-    body: 'Tap Record, say something short, then tap Record again to stop. Repeat once more so the take boxes have something real to use.',
-    selector: '[data-tutorial="record-controls"]',
-    placement: 'top',
-  },
-  {
-    id: 'current-to-best',
-    title: 'Pin One As Best Take',
-    body: 'Now long-press Current Take and drag it into Best Take. After it lands there, tap X to keep going.',
-    selector: '[data-tutorial="challenger-card"]',
-    placement: 'top',
-  },
   {
     id: 'best-take-box',
     title: 'Best Take',
