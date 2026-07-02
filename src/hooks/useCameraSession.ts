@@ -325,6 +325,15 @@ export function useCameraSession({
     [secondaryPreviewRef],
   )
 
+  const normalizeReusableVideoPreview = useCallback(
+    async (stream: MediaStream | null, mode: RecordingMode = recordingModeRef.current): Promise<void> => {
+      if (!stream || mode !== 'video') return
+      resetCameraPreviewZoom()
+      await normalizeVideoPreviewAfterWake(stream)
+    },
+    [],
+  )
+
   const ensureCameraPreviewActive = useCallback((): boolean => {
     const mode = recordingModeRef.current
     if (mode !== 'video') {
@@ -338,6 +347,11 @@ export function useCameraSession({
       return false
     }
 
+    void normalizeReusableVideoPreview(stream, mode).then(() => {
+      if (streamRef.current === stream && recordingModeRef.current === mode) {
+        syncPreviewTargets(stream, mode)
+      }
+    })
     syncPreviewTargets(stream, mode)
 
     const videos = [previewRef.current, secondaryPreviewRef?.current ?? null]
@@ -357,7 +371,7 @@ export function useCameraSession({
     const healthy = isVideoPreviewHealthy(previewRef.current, stream, mode)
     previewHealthyRef.current = healthy
     return healthy
-  }, [secondaryPreviewRef, syncPreviewTargets])
+  }, [normalizeReusableVideoPreview, secondaryPreviewRef, syncPreviewTargets])
 
   const retuneCaptureAudio = useCallback(async () => {
     const stream = streamRef.current
@@ -516,6 +530,9 @@ export function useCameraSession({
         isStreamCompatibleForMode(existing, mode) &&
         !isCaptureSessionStale(epoch, mode, cancelled)
       ) {
+        if (mode === 'video') {
+          await normalizeReusableVideoPreview(existing, mode)
+        }
         syncPreviewTargets(existing, mode)
         setNeedsPermission(false)
         setReady(true)
@@ -595,6 +612,7 @@ export function useCameraSession({
       applyQueuedMicPreferenceBeforeAcquire,
       detachAllPreviewTargets,
       isCaptureSessionStale,
+      normalizeReusableVideoPreview,
       stopStreamTracks,
       syncPreviewTargets,
     ],
@@ -620,6 +638,13 @@ export function useCameraSession({
 
     const existing = streamRef.current
     if (existing && isStreamCompatibleForMode(existing, mode)) {
+      if (mode === 'video') {
+        void normalizeReusableVideoPreview(existing, mode).then(() => {
+          if (streamRef.current === existing && recordingModeRef.current === mode) {
+            syncPreviewTargets(existing, mode)
+          }
+        })
+      }
       syncPreviewTargets(existing, mode)
       setNeedsPermission(false)
       setReady(true)
@@ -698,7 +723,7 @@ export function useCameraSession({
           window.setTimeout(() => requestCameraAccessRef.current?.(queuedMode), 0)
         }
       })
-  }, [detachAllPreviewTargets, stopStreamTracks, syncPreviewTargets])
+  }, [detachAllPreviewTargets, normalizeReusableVideoPreview, stopStreamTracks, syncPreviewTargets])
 
   requestCameraAccessRef.current = requestCameraAccess
 
@@ -710,6 +735,9 @@ export function useCameraSession({
     const stream = streamRef.current
 
     if (isStreamCompatibleForMode(stream, mode)) {
+      if (mode === 'video') {
+        await normalizeReusableVideoPreview(stream, mode)
+      }
       if (!readyRef.current) {
         setReady(true)
       }
@@ -721,7 +749,7 @@ export function useCameraSession({
     } catch {
       return null
     }
-  }, [acquireStream])
+  }, [acquireStream, normalizeReusableVideoPreview])
 
   ensureRecordableStreamRef.current = ensureRecordableStream
 
@@ -735,6 +763,9 @@ export function useCameraSession({
       const mode = recordingMode
       if (streamRef.current && isStreamCompatibleForMode(streamRef.current, mode)) {
         previousRecordingModeRef.current = mode
+        if (mode === 'video') {
+          await normalizeReusableVideoPreview(streamRef.current, mode)
+        }
         syncPreviewTargets(streamRef.current, mode)
         setReady(true)
         activeStream = streamRef.current
@@ -832,6 +863,7 @@ export function useCameraSession({
     cancelScheduledRelease,
     forceClearCameraState,
     nativeExperimentalAudioEnabled,
+    normalizeReusableVideoPreview,
     recordingMode,
     releaseLiveStream,
     stopStreamTracks,

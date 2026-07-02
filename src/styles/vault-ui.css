@@ -67,15 +67,15 @@
 
 .native-bottom-sheet--vault .native-sheet-title-block {
   min-width: 0;
-  overflow: hidden;
-  padding-inline: 0.1rem 0.5rem;
+  overflow: visible;
+  padding: 0.02rem 0.5rem 0.08rem 0.1rem;
 }
 
 .native-bottom-sheet--vault .native-sheet-subtitle {
   color: var(--audio-text-secondary);
   font-size: 0.82rem;
-  margin-top: 0.18rem;
-  line-height: 1.25;
+  margin-top: 0.22rem;
+  line-height: 1.38;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

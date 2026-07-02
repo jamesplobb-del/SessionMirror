@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Music2, Star, Trash2 } from 'lucide-react'
 import Pressable from './ui/Pressable'
+import { useActionSheet } from '../context/ActionSheetContext'
 import type { HydratedLibraryItem } from '../utils/libraryBridge'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 
@@ -21,6 +22,7 @@ export default function LibraryItemCard({
   onDelete,
   onSetAsReference,
 }: LibraryItemCardProps) {
+  const { showConfirm } = useActionSheet()
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(item.name)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -51,6 +53,17 @@ export default function LibraryItemCard({
   ]
     .filter(Boolean)
     .join(' ')
+
+  const handleDelete = () => {
+    void (async () => {
+      const confirmed = await showConfirm({
+        message: `Delete "${item.name || 'Untitled reference'}"? This cannot be undone.`,
+        destructive: true,
+        confirmLabel: 'Delete',
+      })
+      if (confirmed) onDelete()
+    })()
+  }
 
   return (
     <article className={rowClass}>
@@ -126,9 +139,9 @@ export default function LibraryItemCard({
               type="button"
               intensity="icon"
               haptic="light"
-              onClick={onDelete}
+              onClick={handleDelete}
               className="vault-take-row__icon-btn text-red-300"
-              aria-label={`Delete ${item.name}`}
+              aria-label={`Delete ${item.name || 'untitled reference'}`}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Pressable>
