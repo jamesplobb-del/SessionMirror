@@ -54,12 +54,6 @@ async function readNativeCameraSessionState(): Promise<{
   }
 }
 
-async function isLivePreviewActive(): Promise<boolean> {
-  const state = await readNativeCameraSessionState()
-  const jsPreviewLive = cameraHandlers?.hasLivePreview?.() ?? false
-  return state.previewActive || state.recordingActive || jsPreviewLive
-}
-
 async function ensureCameraSuspendedForPlayback(): Promise<boolean> {
   const state = await readNativeCameraSessionState()
   const jsPreviewLive = cameraHandlers?.hasLivePreview?.() ?? false
@@ -134,10 +128,10 @@ export async function preparePlaybackRoute(
       cameraWasSuspendedForPlayback = await ensureCameraSuspendedForPlayback()
       loudSessionAppliedForPlayback = await applyLoudPlaybackSessionIfSpeaker()
     } else {
-      const previewLive = await isLivePreviewActive()
-      if (previewLive) {
+      const jsVideoPreviewLive = cameraHandlers?.hasLivePreview?.() ?? false
+      if (jsVideoPreviewLive) {
         console.log(
-          '[PlaybackRoute] skipping loud session — live preview keeps camera FOV',
+          '[PlaybackRoute] skipping loud session — live video preview keeps camera FOV',
         )
       } else {
         loudSessionAppliedForPlayback = await applyLoudPlaybackSessionIfSpeaker({

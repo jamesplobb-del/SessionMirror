@@ -1150,10 +1150,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     if (isPlaybackRouteHoldActive()) return
     void syncNativeCameraSessionState({
-      previewActive: ready,
+      previewActive: ready && recordingMode === 'video',
       recordingActive: isRecording,
     })
-  }, [ready, isRecording])
+  }, [isRecording, ready, recordingMode])
 
   useEffect(() => {
     if (recordingMode !== 'video') return

@@ -7,18 +7,10 @@ export type OnboardingCardId =
   | 'import-practice-media'
 
 export type CoachMarkId =
-  | 'best-take-box'
-  | 'quick-settings'
-  | 'audio-mode'
-  | 'metronome'
-  | 'tuner'
   | 'expand-mode'
   | 'practice-media'
-  | 'vault-take-card'
-  | 'pin-best-take'
-  | 'drag-to-best-take'
-  | 'vault-expand-mode'
-  | 'vault-settings'
+  | 'quick-settings'
+  | 'hands-free-record'
   | 'youtube-opened'
 
 export type HelpTopicId =
@@ -92,41 +84,6 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
 
 export const COACH_MARKS: CoachMarkContent[] = [
   {
-    id: 'best-take-box',
-    title: 'Best Take',
-    body: 'This is your pinned reference take. Drag Current Take here whenever you want to replace your best performance.',
-    selector: '[data-tutorial="best-take-box"]',
-    placement: 'top',
-  },
-  {
-    id: 'quick-settings',
-    title: 'Quick Settings',
-    body: 'Long-press the settings widget for additional controls and shortcuts.',
-    selector: '[data-tutorial="settings-button"]',
-    placement: 'top',
-  },
-  {
-    id: 'audio-mode',
-    title: 'Audio Mode',
-    body: 'Focus on sound without video while using imported media, metronome tools, and practice recordings.',
-    selector: '[data-tutorial="audio-mode-tabs"]',
-    placement: 'bottom',
-  },
-  {
-    id: 'metronome',
-    title: 'Metronome',
-    body: 'Choose time signatures, subdivisions, and tempo to build your practice routine.',
-    selector: '[data-tutorial="audio-metronome-tab"]',
-    placement: 'bottom',
-  },
-  {
-    id: 'tuner',
-    title: 'Tuner & Drones',
-    body: 'Play a note to see your pitch in real time and use drones for intonation practice.',
-    selector: '[data-tutorial="audio-tuner-tab"]',
-    placement: 'bottom',
-  },
-  {
     id: 'expand-mode',
     title: 'Expand Mode',
     body: 'Expand the workspace to focus on imported media and detailed practice tools.',
@@ -136,44 +93,23 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'practice-media',
     title: 'Practice Media',
-    body: 'Import YouTube audio and other media to practice alongside your favorite recordings.',
+    body: 'Import YouTube audio and upload files to practice alongside your favorite recordings.',
     selector: '[data-tutorial="best-take-youtube"]',
     placement: 'top',
   },
   {
-    id: 'vault-take-card',
-    title: 'Take Cards',
-    body: 'Tap a take to play it. Long-press a take for more actions like renaming, pinning, and organizing your recordings.',
-    selector: '[data-tutorial="vault-take-card"]',
-    placement: 'bottom',
-  },
-  {
-    id: 'pin-best-take',
-    title: 'Pin Your Best Take',
-    body: 'Mark your strongest performance so you can quickly find and compare it later.',
-    selector: '[data-tutorial="vault-pin-best"]',
-    placement: 'bottom',
-  },
-  {
-    id: 'drag-to-best-take',
-    title: 'Best Take Box',
-    body: 'Long-press and drag any take into the Best Take box to make it your current featured recording.',
-    selector: '[data-tutorial="best-take-box"]',
+    id: 'quick-settings',
+    title: 'Quick Settings',
+    body: 'Long-press the settings button to open widget shortcuts and quick controls.',
+    selector: '[data-tutorial="settings-button"]',
     placement: 'top',
   },
   {
-    id: 'vault-expand-mode',
-    title: 'Expand Mode',
-    body: 'Expand a take to focus on playback, comparison tools, and imported media.',
-    selector: '[data-tutorial="vault-expand"]',
-    placement: 'bottom',
-  },
-  {
-    id: 'vault-settings',
-    title: 'Vault Settings',
-    body: 'Long-press the settings widget inside the Take Vault to access additional organization and display options.',
-    selector: '[data-tutorial="vault-settings"]',
-    placement: 'bottom',
+    id: 'hands-free-record',
+    title: 'Hands-Free Practice',
+    body: 'Long-press Record to toggle hands-free practice that starts and stops around your playing.',
+    selector: '[data-tutorial="record-controls"]',
+    placement: 'top',
   },
 ]
 
