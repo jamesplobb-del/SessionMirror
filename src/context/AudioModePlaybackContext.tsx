@@ -59,6 +59,7 @@ interface AudioModePlaybackContextValue {
 }
 
 const AudioModePlaybackContext = createContext<AudioModePlaybackContextValue | null>(null)
+const AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS = 850
 
 /** App-level hook for pausing inline audio-mode take playback (vault, settings, review). */
 export const audioModePlaybackControlsRef: { pause: (() => void) | null } = { pause: null }
@@ -74,7 +75,7 @@ function logPlayback(message: string, details: Record<string, unknown> = {}): vo
 }
 
 function sourceKeyFor(item: Pick<AudioModePlaybackItem, 'filePath' | 'mediaUrl'>): string {
-  return `${item.filePath || ''}::${item.mediaUrl || ''}`
+  return item.filePath ? `file:${item.filePath}` : `url:${item.mediaUrl || ''}`
 }
 
 function resolveItemSrc(item: AudioModePlaybackItem): string {
@@ -87,6 +88,35 @@ async function resolveItemSrcForPlayback(item: AudioModePlaybackItem): Promise<s
   if (cached) return resolveMediaPlaybackSrc(cached)
   const resolved = await resolveTakePlaybackUrl(item.filePath, item.mediaUrl)
   return resolveMediaPlaybackSrc(resolved || item.mediaUrl)
+}
+
+function waitForAudioModePlaybackReady(player: HTMLAudioElement): Promise<void> {
+  if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    let settled = false
+    let timeoutId: number | null = null
+
+    const settle = () => {
+      if (settled) return
+      settled = true
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      player.removeEventListener('loadeddata', settle)
+      player.removeEventListener('canplay', settle)
+      player.removeEventListener('error', settle)
+      resolve()
+    }
+
+    timeoutId = window.setTimeout(settle, AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS)
+    player.addEventListener('loadeddata', settle, { once: true })
+    player.addEventListener('canplay', settle, { once: true })
+    player.addEventListener('error', settle, { once: true })
+  })
 }
 
 export function AudioModePlaybackProvider({
@@ -103,6 +133,9 @@ export function AudioModePlaybackProvider({
   const endedListenerSourceKeyRef = useRef('')
   const progressRafRef = useRef<number | null>(null)
   const pipelineDetachRef = useRef<(() => void) | null>(null)
+  const desiredPlayingRef = useRef(false)
+  const resumeTimerRef = useRef<number | null>(null)
+  const resumeInFlightRef = useRef(false)
   const [state, setState] = useState<AudioModePlaybackState>({
     currentItem: null,
     isPlaying: false,
@@ -129,6 +162,13 @@ export function AudioModePlaybackProvider({
     if (progressRafRef.current !== null) {
       cancelAnimationFrame(progressRafRef.current)
       progressRafRef.current = null
+    }
+  }, [])
+
+  const clearResumeTimer = useCallback(() => {
+    if (resumeTimerRef.current !== null) {
+      window.clearTimeout(resumeTimerRef.current)
+      resumeTimerRef.current = null
     }
   }, [])
 
@@ -183,8 +223,8 @@ export function AudioModePlaybackProvider({
 
     player.pause()
     player.src = nextSrc
-    player.preload = 'metadata'
-    prepareInlineMediaElement(player, { preload: 'metadata' })
+    player.preload = 'auto'
+    prepareInlineMediaElement(player, { preload: 'auto' })
     player.muted = false
     player.volume = 1
     player.load()
@@ -257,9 +297,11 @@ export function AudioModePlaybackProvider({
         }
       }
 
-      prepareInlineMediaElement(player, { preload: 'metadata' })
+      prepareInlineMediaElement(player, { preload: 'auto' })
       player.muted = false
       player.volume = 1
+      desiredPlayingRef.current = true
+      clearResumeTimer()
       onPlaybackActiveChangeRef.current?.(true)
 
       void (async () => {
@@ -289,12 +331,19 @@ export function AudioModePlaybackProvider({
           if (resolvedSrc && player.src !== resolvedSrc) {
             player.pause()
             player.src = resolvedSrc
-            player.preload = 'metadata'
-            prepareInlineMediaElement(player, { preload: 'metadata' })
+            player.preload = 'auto'
+            prepareInlineMediaElement(player, { preload: 'auto' })
             player.muted = false
             player.volume = 1
             player.load()
             onPlaybackActiveChangeRef.current?.(true)
+          }
+          await waitForAudioModePlaybackReady(player)
+          if (currentSourceKeyRef.current !== sourceKeyFor(item)) {
+            pipelineDetachRef.current?.()
+            pipelineDetachRef.current = null
+            setActivePlaybackDiagSession(null)
+            return
           }
           if (pendingStartTimeRef.current !== null) {
             try {
@@ -340,12 +389,59 @@ export function AudioModePlaybackProvider({
         }
       })()
     },
-    [ensurePlayerSource, prepareSessionOnce]
+    [clearResumeTimer, ensurePlayerSource, prepareSessionOnce]
+  )
+
+  const schedulePlaybackRecovery = useCallback(
+    (reason: string) => {
+      const player = playerRef.current
+      if (!player || !desiredPlayingRef.current || player.ended) return
+      if (resumeTimerRef.current !== null || resumeInFlightRef.current) return
+
+      resumeTimerRef.current = window.setTimeout(() => {
+        resumeTimerRef.current = null
+        const currentPlayer = playerRef.current
+        if (!currentPlayer || !desiredPlayingRef.current || currentPlayer.ended) return
+        if (!currentPlayer.paused && currentPlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          return
+        }
+
+        resumeInFlightRef.current = true
+        logPlayback('Recovering playback', {
+          reason,
+          takeId: state.currentItem?.takeId ?? state.currentItem?.id,
+          position: currentPlayer.currentTime,
+          readyState: currentPlayer.readyState,
+          networkState: currentPlayer.networkState,
+        })
+        void playTakeMediaAudible(currentPlayer, { skipRoutePrep: true })
+          .then((started) => {
+            if (started && desiredPlayingRef.current) {
+              onPlaybackActiveChangeRef.current?.(true)
+              startProgressLoop()
+              return
+            }
+            desiredPlayingRef.current = false
+            onPlaybackActiveChangeRef.current?.(false)
+            setState((prev) => ({
+              ...prev,
+              isPlaying: false,
+              currentTime: currentPlayer.currentTime,
+            }))
+          })
+          .finally(() => {
+            resumeInFlightRef.current = false
+          })
+      }, 180)
+    },
+    [startProgressLoop, state.currentItem],
   )
 
   const pause = useCallback(() => {
     const player = playerRef.current
     if (!player) return
+    desiredPlayingRef.current = false
+    clearResumeTimer()
     player.pause()
     onPlaybackActiveChangeRef.current?.(false)
     logPlayback('Paused', {
@@ -359,7 +455,7 @@ export function AudioModePlaybackProvider({
       isPlaying: false,
       currentTime: player.currentTime,
     }))
-  }, [state.currentItem])
+  }, [clearResumeTimer, state.currentItem])
 
   const toggle = useCallback(
     (item: AudioModePlaybackItem) => {
@@ -439,13 +535,19 @@ export function AudioModePlaybackProvider({
       setState((prev) => ({ ...prev, currentTime: player.currentTime }))
     }
     const onPlay = () => {
+      desiredPlayingRef.current = true
+      clearResumeTimer()
       onPlaybackActiveChangeRef.current?.(true)
       setState((prev) => ({ ...prev, isPlaying: true }))
       startProgressLoop()
     }
     const onPause = () => {
-      onPlaybackActiveChangeRef.current?.(false)
       stopProgressLoop()
+      if (desiredPlayingRef.current && !player.ended) {
+        schedulePlaybackRecovery('unexpected-pause')
+        return
+      }
+      onPlaybackActiveChangeRef.current?.(false)
       setState((prev) => ({
         ...prev,
         isPlaying: false,
@@ -453,6 +555,8 @@ export function AudioModePlaybackProvider({
       }))
     }
     const onEnded = () => {
+      desiredPlayingRef.current = false
+      clearResumeTimer()
       onPlaybackActiveChangeRef.current?.(false)
       stopProgressLoop()
       updateSessionPrepared(false)
@@ -469,6 +573,10 @@ export function AudioModePlaybackProvider({
         sessionPrepared: false,
       })
     }
+    const onPlaybackInterrupted = () => {
+      if (!desiredPlayingRef.current || player.ended) return
+      schedulePlaybackRecovery('stalled-or-waiting')
+    }
 
     player.addEventListener('loadedmetadata', syncDuration)
     player.addEventListener('durationchange', syncDuration)
@@ -476,6 +584,9 @@ export function AudioModePlaybackProvider({
     player.addEventListener('play', onPlay)
     player.addEventListener('pause', onPause)
     player.addEventListener('ended', onEnded)
+    player.addEventListener('stalled', onPlaybackInterrupted)
+    player.addEventListener('waiting', onPlaybackInterrupted)
+    player.addEventListener('suspend', onPlaybackInterrupted)
     return () => {
       player.removeEventListener('loadedmetadata', syncDuration)
       player.removeEventListener('durationchange', syncDuration)
@@ -483,8 +594,18 @@ export function AudioModePlaybackProvider({
       player.removeEventListener('play', onPlay)
       player.removeEventListener('pause', onPause)
       player.removeEventListener('ended', onEnded)
+      player.removeEventListener('stalled', onPlaybackInterrupted)
+      player.removeEventListener('waiting', onPlaybackInterrupted)
+      player.removeEventListener('suspend', onPlaybackInterrupted)
     }
-  }, [startProgressLoop, state.currentItem, stopProgressLoop, updateSessionPrepared])
+  }, [
+    clearResumeTimer,
+    schedulePlaybackRecovery,
+    startProgressLoop,
+    state.currentItem,
+    stopProgressLoop,
+    updateSessionPrepared,
+  ])
 
   useEffect(() => {
     audioModePlaybackControlsRef.pause = pause
@@ -496,6 +617,8 @@ export function AudioModePlaybackProvider({
   useEffect(() => {
     return () => {
       stopProgressLoop()
+      desiredPlayingRef.current = false
+      clearResumeTimer()
       onPlaybackActiveChangeRef.current?.(false)
       updateSessionPrepared(false)
       void completePlaybackRouteRestore()
@@ -531,7 +654,7 @@ export function AudioModePlaybackProvider({
   return (
     <AudioModePlaybackContext.Provider value={value}>
       {children}
-      <audio ref={playerRef} className="sr-only" preload="metadata" playsInline />
+      <audio ref={playerRef} className="sr-only" preload="auto" playsInline />
     </AudioModePlaybackContext.Provider>
   )
 }

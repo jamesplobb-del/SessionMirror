@@ -5413,6 +5413,19 @@ html.native-dark-chrome body {
   transform: translateX(-50%) rotate(225deg);
 }
 
+.coach-mark-card--left .coach-mark-card__arrow {
+  left: auto;
+  right: -0.45rem;
+  top: var(--coach-arrow-top);
+  transform: translateY(-50%) rotate(135deg);
+}
+
+.coach-mark-card--right .coach-mark-card__arrow {
+  left: -0.45rem;
+  top: var(--coach-arrow-top);
+  transform: translateY(-50%) rotate(-45deg);
+}
+
 .coach-mark-card__copy {
   padding: 0.9rem 2.6rem 2.55rem 1rem;
 }

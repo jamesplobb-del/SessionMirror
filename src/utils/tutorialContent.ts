@@ -49,7 +49,7 @@ export interface CoachMarkContent {
   title: string
   body: string
   selector: string
-  placement?: 'top' | 'bottom'
+  placement?: 'top' | 'bottom' | 'left' | 'right'
   advance: CoachMarkAdvance
   continueHint: string
   requiresSplitView?: 'open' | 'closed'
@@ -102,7 +102,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
     title: 'Expand Mode',
     body: 'Tap expand to open a larger workspace for media, playback, and comparison.',
     selector: '[data-tutorial="best-take-expand"]',
-    placement: 'top',
+    placement: 'left',
     advance: 'split-open',
     continueHint: 'Tap expand to continue.',
     requiresSplitView: 'closed',
@@ -122,7 +122,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
     title: 'Close Expand View',
     body: 'Tap the expand button again to return to the normal practice layout.',
     selector: '[data-tutorial="best-take-collapse"]',
-    placement: 'top',
+    placement: 'left',
     advance: 'split-close',
     continueHint: 'Tap expand to close and continue.',
     requiresSplitView: 'open',
@@ -132,7 +132,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
     title: 'Long-Press Shortcuts',
     body: 'In Camera Mode, long-press Settings to toggle widgets like Pitch Analysis, Take Cards, Metronome, and Audio Enhancer. Or long-press Record for hands-free practice.',
     selector: '[data-tutorial="settings-button"]',
-    placement: 'top',
+    placement: 'left',
     advance: 'branch-widget-or-hands-free',
     continueHint: 'Long-press Settings and pick a widget, or long-press Record.',
     requiresSplitView: 'closed',

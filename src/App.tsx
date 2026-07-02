@@ -2051,6 +2051,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const takePlaybackActive =
     autoPlaybackPlaying || audioModeTakePlaying || benchmarkPipPlaying || challengerPipPlaying
+  const nativeSessionPlaybackActive = recordingMode === 'video' && takePlaybackActive
 
   const selectedAudioEngine = settings.audioEnhancerEnabled ? 'Native + Enhanced' : 'Native'
 
@@ -2072,15 +2073,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       selectedAudioEngine,
       micInputPreference: settings.micInputPreference,
       recordingActive: isRecording,
-      playbackActive: takePlaybackActive,
+      playbackActive: nativeSessionPlaybackActive,
     })
   }, [
     isRecording,
+    nativeSessionPlaybackActive,
     ready,
     recordingMode,
     selectedAudioEngine,
     settings.micInputPreference,
-    takePlaybackActive,
   ])
 
   useAppShellPolicies({
