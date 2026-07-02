@@ -387,7 +387,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
-  const [tutorialStepIndex, setTutorialStepIndex] = useState(0)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const {
@@ -461,14 +460,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setShowOnboardingTutorial(false)
   }, [])
 
-  const handleTutorialComplete = useCallback(() => {
-    markOnboardingComplete()
-    setShowOnboardingTutorial(false)
-  }, [])
-
   const handleReplayOnboardingTutorial = useCallback(() => {
     setIsSettingsOpen(false)
-    setTutorialStepIndex(0)
     scheduleAfterPaint(() => {
       setShowOnboardingTutorial(true)
     })
@@ -2631,18 +2624,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       isVaultOpen,
       isSplitView,
       autoSoundRecording: settings.autoSoundRecording,
+      recordingMode,
     }),
-    [isRecording, isReviewOpen, isSplitView, isVaultOpen, settings.autoSoundRecording]
+    [isRecording, isReviewOpen, isSplitView, isVaultOpen, recordingMode, settings.autoSoundRecording]
   )
 
   return (
-    <TutorialProvider
-      active={showOnboardingTutorial}
-      stepIndex={tutorialStepIndex}
-      onStepIndexChange={setTutorialStepIndex}
-      onComplete={handleTutorialComplete}
-      signals={tutorialSignals}
-    >
+    <TutorialProvider active={showOnboardingTutorial} signals={tutorialSignals}>
       <ActionSheetProvider>
         <MetronomeProvider
           isTakePlaying={takePlaybackActive}

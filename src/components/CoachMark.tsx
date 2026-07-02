@@ -22,6 +22,7 @@ export default function CoachMark() {
     ? Math.min(window.innerHeight - 148, targetRect.bottom + 12)
     : Math.max(14, targetRect.top - 142)
   const arrowLeft = Math.max(18, Math.min(width - 18, targetCenter - left))
+  const canDismiss = coachMark.advance === 'dismiss'
 
   return createPortal(
     <div className="coach-mark-layer fixed inset-0 z-[140] pointer-events-none" aria-live="polite">
@@ -60,18 +61,20 @@ export default function CoachMark() {
         <div className="coach-mark-card__copy">
           <h2>{coachMark.title}</h2>
           <p>{coachMark.body}</p>
-          <p className="coach-mark-card__continue">Tap X to continue.</p>
+          <p className="coach-mark-card__continue">{coachMark.continueHint}</p>
         </div>
-        <Pressable
-          type="button"
-          intensity="icon"
-          haptic="light"
-          onClick={tutorial.dismissCoachMark}
-          className="coach-mark-card__close"
-          aria-label="Dismiss tip"
-        >
-          <X className="h-3.5 w-3.5" />
-        </Pressable>
+        {canDismiss && (
+          <Pressable
+            type="button"
+            intensity="icon"
+            haptic="light"
+            onClick={tutorial.dismissCoachMark}
+            className="coach-mark-card__close"
+            aria-label="Dismiss tip"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Pressable>
+        )}
         <Pressable
           type="button"
           intensity="soft"

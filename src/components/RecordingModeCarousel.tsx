@@ -8,6 +8,7 @@ import {
 } from '../utils/haptics'
 import type { RecordingMode } from '../types'
 import { useLongPress } from '../hooks/useLongPress'
+import { useTutorialAction } from '../context/TutorialContext'
 
 const SWIPE_THRESHOLD_PX = 36
 
@@ -127,6 +128,7 @@ function RecordingModeCarousel({
   onAutoSoundRecordingChange,
   hapticFeedback = true,
 }: RecordingModeCarouselProps) {
+  const notifyTutorial = useTutorialAction()
   const touchStartXRef = useRef(0)
   const modeSwitchLocked = disabled || isRecording
 
@@ -152,7 +154,8 @@ function RecordingModeCarousel({
     if (isRecording || !onAutoSoundRecordingChange) return
     triggerLightHaptic(hapticFeedback)
     onAutoSoundRecordingChange(!autoSoundRecording)
-  }, [autoSoundRecording, hapticFeedback, isRecording, onAutoSoundRecordingChange])
+    notifyTutorial?.('hands-free-toggled')
+  }, [autoSoundRecording, hapticFeedback, isRecording, notifyTutorial, onAutoSoundRecordingChange])
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
     touchStartXRef.current = event.touches[0]?.clientX ?? 0

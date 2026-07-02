@@ -533,6 +533,7 @@ export default function SettingsDrawer({
               {[
                 ['recording-modes', 'Recording Modes'],
                 ['hands-free-recording', 'Hands-Free Recording'],
+                ['quick-settings-widgets', 'Quick Settings Widgets'],
                 ['take-vault', 'Take Vault'],
                 ['pinning-best-takes', 'Best Take Pinning'],
                 ['media-youtube', 'Media & YouTube'],

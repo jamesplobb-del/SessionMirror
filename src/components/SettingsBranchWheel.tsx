@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AudioLines, LayoutGrid, Sparkles } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import { useTutorialAction } from '../context/TutorialContext'
 import MetronomeIcon from './icons/MetronomeIcon'
 import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
 import { motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
@@ -51,6 +52,7 @@ export default function SettingsBranchWheel({
   onShowMetronomeChange,
   onAudioEnhancerChange,
 }: SettingsBranchWheelProps) {
+  const notifyTutorial = useTutorialAction()
   const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
     null,
   )
@@ -242,6 +244,7 @@ export default function SettingsBranchWheel({
                       onClick={() => {
                         triggerLightHaptic()
                         item.onSelect()
+                        notifyTutorial?.('branch-widget-selected')
                       }}
                     >
                       <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">

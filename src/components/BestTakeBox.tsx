@@ -291,9 +291,12 @@ function BestTakeBox({
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       event.target.value = ''
-      if (file) onUpload?.(file)
+      if (file) {
+        notifyTutorial?.('media-touched')
+        onUpload?.(file)
+      }
     },
-    [onUpload],
+    [notifyTutorial, onUpload],
   )
 
   const handleClearReference = useCallback(() => {
@@ -373,7 +376,9 @@ function BestTakeBox({
         intensity="icon"
         squish={false}
         haptic="light"
-        {...(!splitViewActive ? { 'data-tutorial': 'best-take-expand' } : {})}
+        {...(splitViewActive
+          ? { 'data-tutorial': 'best-take-collapse' }
+          : { 'data-tutorial': 'best-take-expand' })}
         onPointerDown={stopEventBubble}
         onTouchStart={stopEventBubble}
         onTouchEnd={stopEventBubble}
@@ -542,6 +547,7 @@ function BestTakeBox({
                   onTouchEnd={stopEventBubble}
                   onClick={(e) => {
                     e.stopPropagation()
+                    notifyTutorial?.('media-touched')
                     setYoutubeDialogOpen(true)
                   }}
                   className={`${emptyActionClass} pip-empty-action--youtube`}
@@ -560,6 +566,7 @@ function BestTakeBox({
           {showUploadBadge && (
             <label
               htmlFor="benchmark-upload"
+              data-tutorial="best-take-youtube"
               onPointerDown={stopEventBubble}
               onTouchStart={stopEventBubble}
               onTouchEnd={stopEventBubble}

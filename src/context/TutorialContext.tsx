@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -30,12 +31,11 @@ export interface TutorialSignals {
   isVaultOpen: boolean
   isSplitView: boolean
   autoSoundRecording: boolean
+  recordingMode: 'video' | 'audio'
 }
 
 interface TutorialProviderProps {
   active: boolean
-  stepIndex?: number
-  onStepIndexChange?: (index: number) => void
   onComplete?: () => void
   signals?: TutorialSignals
   children: ReactNode
@@ -51,28 +51,89 @@ function findVisibleTarget(selector: string): Element | null {
   )
 }
 
-export function TutorialProvider({ active, children }: TutorialProviderProps) {
+function coachMarkIsVisible(coachMark: CoachMarkContent, signals?: TutorialSignals): boolean {
+  if (coachMark.requiresSplitView === 'open' && !signals?.isSplitView) return false
+  if (coachMark.requiresSplitView === 'closed' && signals?.isSplitView) return false
+  if (coachMark.requiresRecordingMode && signals?.recordingMode !== coachMark.requiresRecordingMode) {
+    return false
+  }
+  return Boolean(findVisibleTarget(coachMark.selector))
+}
+
+export function TutorialProvider({ active, onComplete, signals, children }: TutorialProviderProps) {
   const [activeCoachMark, setActiveCoachMark] = useState<CoachMarkContent | null>(null)
   const [activeTargetRect, setActiveTargetRect] = useState<DOMRect | null>(null)
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
+
+  const clearCoachMark = useCallback(() => {
+    setActiveCoachMark(null)
+    setActiveTargetRect(null)
+  }, [])
+
+  const advanceCoachMark = useCallback(
+    (coachMark: CoachMarkContent) => {
+      markCoachMarkSeen(coachMark.id)
+      clearCoachMark()
+    },
+    [clearCoachMark],
+  )
 
   const dismissCoachMark = useCallback(() => {
     setActiveCoachMark((current) => {
-      if (current) markCoachMarkSeen(current.id)
+      if (!current || current.advance !== 'dismiss') return current
+      markCoachMarkSeen(current.id)
       return null
     })
     setActiveTargetRect(null)
   }, [])
 
-  const markCoachMark = useCallback((id: CoachMarkId) => {
-    markCoachMarkSeen(id)
-    setActiveCoachMark((current) => (current?.id === id ? null : current))
-  }, [])
+  const completeInteractiveTutorial = useCallback(() => {
+    markAllCoachMarksSeen()
+    clearCoachMark()
+    onCompleteRef.current?.()
+  }, [clearCoachMark])
+
+  const markCoachMark = useCallback(
+    (id: CoachMarkId) => {
+      if (id === 'youtube-opened' || id === 'media-touched') {
+        setActiveCoachMark((current) => {
+          if (current?.id !== 'practice-media') return current
+          markCoachMarkSeen('practice-media')
+          return null
+        })
+        setActiveTargetRect(null)
+        return
+      }
+
+      if (id !== 'branch-widget-selected' && id !== 'hands-free-toggled') return
+
+      setActiveCoachMark((current) => {
+        if (!current || current.advance !== 'branch-widget-or-hands-free') return current
+        markCoachMarkSeen(current.id)
+        return null
+      })
+      setActiveTargetRect(null)
+    },
+    [],
+  )
 
   const skipCoachMarks = useCallback(() => {
-    markAllCoachMarksSeen()
-    setActiveCoachMark(null)
-    setActiveTargetRect(null)
-  }, [])
+    completeInteractiveTutorial()
+  }, [completeInteractiveTutorial])
+
+  const showNextCoachMark = useCallback(() => {
+    for (const coachMark of COACH_MARKS) {
+      if (hasSeenCoachMark(coachMark.id)) continue
+      if (!coachMarkIsVisible(coachMark, signals)) continue
+      const target = findVisibleTarget(coachMark.selector)
+      if (!target) continue
+      setActiveCoachMark(coachMark)
+      setActiveTargetRect(target.getBoundingClientRect())
+      return true
+    }
+    return false
+  }, [signals])
 
   useEffect(() => {
     if (active || activeCoachMark || typeof document === 'undefined') return
@@ -80,14 +141,9 @@ export function TutorialProvider({ active, children }: TutorialProviderProps) {
     let cancelled = false
     const timer = window.setTimeout(() => {
       if (cancelled) return
-
-      for (const coachMark of COACH_MARKS) {
-        if (hasSeenCoachMark(coachMark.id)) continue
-        const target = findVisibleTarget(coachMark.selector)
-        if (!target) continue
-        setActiveCoachMark(coachMark)
-        setActiveTargetRect(target.getBoundingClientRect())
-        return
+      const shown = showNextCoachMark()
+      if (!shown) {
+        onCompleteRef.current?.()
       }
     }, 900)
 
@@ -95,7 +151,42 @@ export function TutorialProvider({ active, children }: TutorialProviderProps) {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [active, activeCoachMark])
+  }, [active, activeCoachMark, showNextCoachMark])
+
+  useEffect(() => {
+    if (active || activeCoachMark || typeof document === 'undefined') return
+
+    const shown = showNextCoachMark()
+    if (!shown && COACH_MARKS.every((coachMark) => hasSeenCoachMark(coachMark.id))) {
+      onCompleteRef.current?.()
+    }
+  }, [active, activeCoachMark, showNextCoachMark, signals?.isSplitView, signals?.recordingMode])
+
+  useEffect(() => {
+    if (!activeCoachMark) return
+
+    if (activeCoachMark.advance === 'split-open' && signals?.isSplitView) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'split-close' && !signals?.isSplitView) {
+      advanceCoachMark(activeCoachMark)
+    }
+  }, [activeCoachMark, advanceCoachMark, signals?.isSplitView])
+
+  useEffect(() => {
+    if (!activeCoachMark || activeCoachMark.advance !== 'branch-widget-or-hands-free') return
+    if (hasSeenCoachMark(activeCoachMark.id)) {
+      clearCoachMark()
+    }
+  }, [activeCoachMark, clearCoachMark])
+
+  useEffect(() => {
+    if (activeCoachMark || typeof document === 'undefined') return
+    if (!COACH_MARKS.every((coachMark) => hasSeenCoachMark(coachMark.id))) return
+    onCompleteRef.current?.()
+  }, [activeCoachMark])
 
   useEffect(() => {
     if (!activeCoachMark || typeof window === 'undefined') return
@@ -103,7 +194,8 @@ export function TutorialProvider({ active, children }: TutorialProviderProps) {
     const updateRect = () => {
       const target = findVisibleTarget(activeCoachMark.selector)
       if (!target) {
-        dismissCoachMark()
+        if (coachMarkIsVisible(activeCoachMark, signals)) return
+        clearCoachMark()
         return
       }
       setActiveTargetRect(target.getBoundingClientRect())
@@ -119,7 +211,7 @@ export function TutorialProvider({ active, children }: TutorialProviderProps) {
       window.removeEventListener('scroll', updateRect, true)
       window.clearInterval(interval)
     }
-  }, [activeCoachMark, dismissCoachMark])
+  }, [activeCoachMark, clearCoachMark, signals])
 
   const value = useMemo(
     () => ({

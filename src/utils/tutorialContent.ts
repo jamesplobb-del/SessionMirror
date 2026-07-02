@@ -9,13 +9,23 @@ export type OnboardingCardId =
 export type CoachMarkId =
   | 'expand-mode'
   | 'practice-media'
+  | 'close-expand'
   | 'quick-settings'
-  | 'hands-free-record'
   | 'youtube-opened'
+  | 'media-touched'
+  | 'branch-widget-selected'
+  | 'hands-free-toggled'
+
+export type CoachMarkAdvance =
+  | 'dismiss'
+  | 'split-open'
+  | 'split-close'
+  | 'branch-widget-or-hands-free'
 
 export type HelpTopicId =
   | 'recording-modes'
   | 'hands-free-recording'
+  | 'quick-settings-widgets'
   | 'audio-mode'
   | 'take-vault'
   | 'take-cards'
@@ -40,6 +50,10 @@ export interface CoachMarkContent {
   body: string
   selector: string
   placement?: 'top' | 'bottom'
+  advance: CoachMarkAdvance
+  continueHint: string
+  requiresSplitView?: 'open' | 'closed'
+  requiresRecordingMode?: 'video' | 'audio'
 }
 
 export interface HelpTopic {
@@ -86,30 +100,43 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'expand-mode',
     title: 'Expand Mode',
-    body: 'Expand the workspace to focus on imported media and detailed practice tools.',
+    body: 'Tap expand to open a larger workspace for media, playback, and comparison.',
     selector: '[data-tutorial="best-take-expand"]',
     placement: 'top',
+    advance: 'split-open',
+    continueHint: 'Tap expand to continue.',
+    requiresSplitView: 'closed',
   },
   {
     id: 'practice-media',
     title: 'Practice Media',
-    body: 'Import YouTube audio and upload files to practice alongside your favorite recordings.',
-    selector: '[data-tutorial="best-take-youtube"]',
+    body: 'Upload files or load YouTube play-alongs here while expand view is open.',
+    selector: '[data-tutorial="best-take-youtube"], [data-tutorial="best-take-box"]',
     placement: 'top',
+    advance: 'dismiss',
+    continueHint: 'Tap X when you are ready to continue.',
+    requiresSplitView: 'open',
+  },
+  {
+    id: 'close-expand',
+    title: 'Close Expand View',
+    body: 'Tap the expand button again to return to the normal practice layout.',
+    selector: '[data-tutorial="best-take-collapse"]',
+    placement: 'top',
+    advance: 'split-close',
+    continueHint: 'Tap expand to close and continue.',
+    requiresSplitView: 'open',
   },
   {
     id: 'quick-settings',
-    title: 'Quick Settings',
-    body: 'Long-press the settings button to open widget shortcuts and quick controls.',
+    title: 'Long-Press Shortcuts',
+    body: 'In Camera Mode, long-press Settings to toggle widgets like Pitch Analysis, Take Cards, Metronome, and Audio Enhancer. Or long-press Record for hands-free practice.',
     selector: '[data-tutorial="settings-button"]',
     placement: 'top',
-  },
-  {
-    id: 'hands-free-record',
-    title: 'Hands-Free Practice',
-    body: 'Long-press Record to toggle hands-free practice that starts and stops around your playing.',
-    selector: '[data-tutorial="record-controls"]',
-    placement: 'top',
+    advance: 'branch-widget-or-hands-free',
+    continueHint: 'Long-press Settings and pick a widget, or long-press Record.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
   },
 ]
 
@@ -123,8 +150,22 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'hands-free-recording',
     title: 'Hands-Free Recording',
-    body: 'Hands-free practice starts and stops around your playing so you can stay with your instrument.',
-    bullets: ['Long-press Record in Audio Mode', 'Use Settings for Camera Mode', 'BestTake plays takes back automatically'],
+    body: 'Long-press Record to toggle hands-free practice that starts and stops around your playing.',
+    bullets: [
+      'Works in Camera Mode and Audio Mode',
+      'BestTake plays takes back automatically',
+      'Stay with your instrument between takes',
+    ],
+  },
+  {
+    id: 'quick-settings-widgets',
+    title: 'Quick Settings Widgets',
+    body: 'In Camera Mode, long-press the Settings button to open the widget wheel without leaving practice.',
+    bullets: [
+      'Toggle Pitch Analysis, Take Cards, Metronome, and Audio Enhancer',
+      'Tap a widget to show or hide it on screen',
+      'Tap Settings normally to open the full settings drawer',
+    ],
   },
   {
     id: 'audio-mode',
@@ -159,8 +200,12 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'expand-mode',
     title: 'Expand Mode',
-    body: 'Expand Mode gives the practice workspace more room for media, playback, and comparison.',
-    bullets: ['Use it for deeper review', 'Exit anytime', 'Great for imported references'],
+    body: 'Expand Mode gives Best Take more room for imported media, playback, and comparison.',
+    bullets: [
+      'Tap expand on Best Take to open split view',
+      'Upload or load YouTube while expanded',
+      'Tap expand again to return to normal view',
+    ],
   },
   {
     id: 'vault-settings',
@@ -171,14 +216,22 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'media-youtube',
     title: 'Media & YouTube',
-    body: 'Practice with reference material directly beside your recordings.',
-    bullets: ['Use YouTube for play-alongs', 'Upload files for references', 'Keep media separate from your takes'],
+    body: 'Practice with reference material directly beside your recordings. Open expand view for the easiest access.',
+    bullets: [
+      'Use YouTube for play-alongs',
+      'Upload audio or video references',
+      'Keep media separate from your takes',
+    ],
   },
   {
     id: 'metronome',
     title: 'Metronome',
     body: 'Build timing with tempo, time signatures, subdivisions, and click sounds.',
-    bullets: ['Spin the tempo wheel', 'Use tap tempo', 'Choose subdivisions and accents'],
+    bullets: [
+      'Spin the tempo wheel in Audio Mode',
+      'Long-press Settings in Camera Mode to toggle the metronome widget',
+      'Choose subdivisions and accents',
+    ],
   },
   {
     id: 'tuner-drones',
@@ -195,4 +248,4 @@ export const HELP_TOPICS: HelpTopic[] = [
 ]
 
 export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v1'
-export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v1'
+export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v2'
