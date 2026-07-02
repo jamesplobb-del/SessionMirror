@@ -115,6 +115,7 @@ export default function CoachMark() {
         <div className="coach-mark-card__copy">
           <h2>{coachMark.title}</h2>
           <p>{coachMark.body}</p>
+          <p className="coach-mark-card__continue">Tap X to continue.</p>
         </div>
         <Pressable
           type="button"

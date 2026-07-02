@@ -5432,6 +5432,13 @@ html.native-dark-chrome body {
   line-height: 1.35;
 }
 
+.coach-mark-card__copy .coach-mark-card__continue {
+  margin-top: 0.55rem;
+  color: rgba(15, 23, 42, 0.48);
+  font-size: 0.74rem;
+  font-weight: 720;
+}
+
 .coach-mark-card__close {
   position: absolute;
   right: 0.55rem;

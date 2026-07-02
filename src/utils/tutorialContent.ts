@@ -1,15 +1,17 @@
 export type OnboardingCardId =
   | 'record-two-videos'
+  | 'pin-first-best'
   | 'record-practice'
   | 'analyze-playing'
   | 'save-best-takes'
   | 'import-practice-media'
 
 export type CoachMarkId =
+  | 'record-button'
+  | 'current-to-best'
   | 'take-cards'
   | 'best-take-box'
   | 'quick-settings'
-  | 'record-button'
   | 'audio-mode'
   | 'metronome'
   | 'tuner'
@@ -61,8 +63,13 @@ export interface HelpTopic {
 export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
     id: 'record-two-videos',
-    title: 'Start With Two Quick Videos',
-    body: 'Before using the take boxes, record two short video takes. It can be literally anything. Once you have two takes, the boxes have something to play, compare, and pin.',
+    title: 'Record Two Quick Takes',
+    body: 'Tap Record, say something quick, then tap Record again to stop. Do that twice. It can be literally anything, just enough to fill Current Take and Best Take.',
+  },
+  {
+    id: 'pin-first-best',
+    title: 'Move One Into Best Take',
+    body: 'After the second take, long-press Current Take and drag it into Best Take. You can also use Make Best from the Vault later.',
   },
   {
     id: 'record-practice',
@@ -88,16 +95,30 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
 
 export const COACH_MARKS: CoachMarkContent[] = [
   {
+    id: 'record-button',
+    title: 'First: Make Two Takes',
+    body: 'Tap Record, say something short, then tap Record again to stop. Repeat once more so the take boxes have something real to use.',
+    selector: '[data-tutorial="record-controls"]',
+    placement: 'top',
+  },
+  {
+    id: 'current-to-best',
+    title: 'Pin One As Best Take',
+    body: 'Now long-press Current Take and drag it into Best Take. After it lands there, tap X to keep going.',
+    selector: '[data-tutorial="challenger-card"]',
+    placement: 'top',
+  },
+  {
     id: 'take-cards',
     title: 'Take Cards',
-    body: 'After you record a couple of quick takes, tap a take to play it. Long-press a take for more actions and organization tools.',
+    body: 'Tap a take to play it. Long-press a take for more actions and organization tools.',
     selector: '[data-tutorial="pip-row"], [data-tutorial="audio-take-cards"]',
     placement: 'top',
   },
   {
     id: 'best-take-box',
     title: 'Best Take',
-    body: 'Once you have recordings, long-press and drag a take into this box to pin your current best performance.',
+    body: 'This is your pinned reference take. Drag Current Take here whenever you want to replace your best performance.',
     selector: '[data-tutorial="best-take-box"]',
     placement: 'top',
   },
@@ -106,13 +127,6 @@ export const COACH_MARKS: CoachMarkContent[] = [
     title: 'Quick Settings',
     body: 'Long-press the settings widget for additional controls and shortcuts.',
     selector: '[data-tutorial="settings-button"]',
-    placement: 'top',
-  },
-  {
-    id: 'record-button',
-    title: 'Hands-Free Practice',
-    body: 'Long-press the Record button in Camera or Audio Mode to enable hands-free recording.',
-    selector: '[data-tutorial="record-controls"]',
     placement: 'top',
   },
   {
