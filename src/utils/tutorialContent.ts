@@ -9,7 +9,6 @@ export type OnboardingCardId =
 export type CoachMarkId =
   | 'record-button'
   | 'current-to-best'
-  | 'take-cards'
   | 'best-take-box'
   | 'quick-settings'
   | 'audio-mode'
@@ -106,13 +105,6 @@ export const COACH_MARKS: CoachMarkContent[] = [
     title: 'Pin One As Best Take',
     body: 'Now long-press Current Take and drag it into Best Take. After it lands there, tap X to keep going.',
     selector: '[data-tutorial="challenger-card"]',
-    placement: 'top',
-  },
-  {
-    id: 'take-cards',
-    title: 'Take Cards',
-    body: 'Tap a take to play it. Long-press a take for more actions and organization tools.',
-    selector: '[data-tutorial="pip-row"], [data-tutorial="audio-take-cards"]',
     placement: 'top',
   },
   {
