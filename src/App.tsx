@@ -1528,6 +1528,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
 
+  const recoverCameraAfterSurfaceDismiss = useCallback(
+    (reason: string) => {
+      stabilizeViewportAfterMediaInteraction()
+      scheduleAfterPaint(() => {
+        if (recordingModeRef.current === 'video') {
+          void requestCameraPreviewResume(reason)
+          window.setTimeout(() => {
+            void requestCameraPreviewResume(`${reason}-retry`)
+          }, 650)
+          return
+        }
+
+        void refreshCameraSession()
+      })
+    },
+    [refreshCameraSession, requestCameraPreviewResume],
+  )
+
   const autoSoundListening =
     settings.autoSoundRecording &&
     autoMonitoringAllowed &&
@@ -1585,39 +1603,37 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     if (wasVaultOpenRef.current && !isVaultOpen) {
-      stabilizeViewportAfterMediaInteraction()
       const timer = window.setTimeout(() => {
-        void refreshCameraSession()
+        recoverCameraAfterSurfaceDismiss('vault-close')
       }, 350)
       wasVaultOpenRef.current = isVaultOpen
       return () => window.clearTimeout(timer)
     }
     wasVaultOpenRef.current = isVaultOpen
-  }, [isVaultOpen, refreshCameraSession])
+  }, [isVaultOpen, recoverCameraAfterSurfaceDismiss])
 
   const wasSettingsOpenRef = useRef(false)
   useEffect(() => {
     if (wasSettingsOpenRef.current && !isSettingsOpen) {
-      stabilizeViewportAfterMediaInteraction()
       const timer = window.setTimeout(() => {
-        void refreshCameraSession()
+        recoverCameraAfterSurfaceDismiss('settings-close')
       }, 350)
       wasSettingsOpenRef.current = isSettingsOpen
       return () => window.clearTimeout(timer)
     }
     wasSettingsOpenRef.current = isSettingsOpen
-  }, [isSettingsOpen, refreshCameraSession])
+  }, [isSettingsOpen, recoverCameraAfterSurfaceDismiss])
 
   const wasReviewOpenRef = useRef(false)
   useEffect(() => {
     if (wasReviewOpenRef.current && !isReviewOpen) {
-      stabilizeViewportAfterMediaInteraction()
       void finalizeTakePlaybackCleanup()
+      recoverCameraAfterSurfaceDismiss('review-close')
       wasReviewOpenRef.current = isReviewOpen
       return
     }
     wasReviewOpenRef.current = isReviewOpen
-  }, [isReviewOpen])
+  }, [isReviewOpen, recoverCameraAfterSurfaceDismiss])
 
   const deferHudMediaPause = useCallback(() => {
     scheduleAfterPaint(() => {
@@ -1770,14 +1786,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleCloseCreatorStudioPicker = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setIsCreatorStudioPickerOpen(false)
-    refreshCameraSession()
-  }, [refreshCameraSession, settings.hapticFeedback])
+    recoverCameraAfterSurfaceDismiss('creator-studio-picker-close')
+  }, [recoverCameraAfterSurfaceDismiss, settings.hapticFeedback])
 
   const handleCloseLabs = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setLabsRoute(null)
-    refreshCameraSession()
-  }, [refreshCameraSession, settings.hapticFeedback])
+    recoverCameraAfterSurfaceDismiss('labs-close')
+  }, [recoverCameraAfterSurfaceDismiss, settings.hapticFeedback])
 
   const handleLabsNavigate = useCallback((route: LabsRoute) => {
     setLabsRoute(route)
@@ -2372,8 +2388,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleCloseCreatorStudio = useCallback(() => {
     pauseYoutubeReference()
     setCreatorStudioTake(null)
-    refreshCameraSession()
-  }, [pauseYoutubeReference, refreshCameraSession])
+    recoverCameraAfterSurfaceDismiss('creator-studio-close')
+  }, [pauseYoutubeReference, recoverCameraAfterSurfaceDismiss])
 
   const handleOpenCompareReview = useCallback(
     (slot: ReviewSlot) => {
@@ -2398,13 +2414,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     stopAutoPlaybackAudio()
     audioModePlaybackControlsRef.pause?.()
     releaseAutoRecordSuppress(0)
-    stabilizeViewportAfterMediaInteraction()
     window.setTimeout(() => {
-      void refreshCameraSession()
+      recoverCameraAfterSurfaceDismiss('review-close-button')
     }, 350)
   }, [
     pausePipVideos,
-    refreshCameraSession,
+    recoverCameraAfterSurfaceDismiss,
     releaseAutoRecordSuppress,
     reviewContext,
     stopAutoPlaybackAudio,
@@ -2722,19 +2737,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       if (!next) {
         window.requestAnimationFrame(() => {
-          void refreshCameraSession()
+          recoverCameraAfterSurfaceDismiss('split-close')
         })
       }
       return next
     })
-  }, [refreshCameraSession])
+  }, [recoverCameraAfterSurfaceDismiss])
 
   const handleExitSplitView = useCallback(() => {
     setIsSplitView(false)
     window.requestAnimationFrame(() => {
-      void refreshCameraSession()
+      recoverCameraAfterSurfaceDismiss('split-exit')
     })
-  }, [refreshCameraSession])
+  }, [recoverCameraAfterSurfaceDismiss])
 
   const hasBestTakeReference = hasBenchmarkReference(youtubeUrl, resolvedBenchmark)
 

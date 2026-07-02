@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import type { CSSProperties } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Pressable from './ui/Pressable'
 import { useTutorial } from '../context/TutorialContext'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
@@ -10,10 +10,31 @@ export default function CoachMark() {
   const tutorial = useTutorial()
   const coachMark = tutorial?.activeCoachMark
   const targetRect = tutorial?.activeTargetRect
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [measuredCardHeight, setMeasuredCardHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    if (!coachMark || !targetRect) return
+    const card = cardRef.current
+    if (!card) return
+
+    const updateHeight = () => {
+      setMeasuredCardHeight(card.getBoundingClientRect().height)
+    }
+
+    updateHeight()
+    if (typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [coachMark, targetRect])
 
   if (!coachMark || !targetRect || typeof document === 'undefined') return null
 
   const width = Math.min(280, window.innerWidth - 28)
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight
+  const cardHeight = Math.max(measuredCardHeight || 0, 158)
   const targetCenter = targetRect.left + targetRect.width / 2
   const targetMiddle = targetRect.top + targetRect.height / 2
   const canShowLeft = targetRect.left >= width + 28
@@ -26,6 +47,8 @@ export default function CoachMark() {
         : null
   const shouldShowBelow =
     !sidePlacement && (coachMark.placement === 'bottom' || targetRect.top < 170)
+  const clampTop = (value: number) =>
+    Math.max(14, Math.min(Math.max(14, viewportHeight - cardHeight - 14), value))
   const left =
     sidePlacement === 'left'
       ? Math.max(14, targetRect.left - width - 14)
@@ -33,12 +56,12 @@ export default function CoachMark() {
         ? Math.min(window.innerWidth - width - 14, targetRect.right + 14)
         : Math.max(14, Math.min(window.innerWidth - width - 14, targetCenter - width / 2))
   const top = sidePlacement
-    ? Math.max(14, Math.min(window.innerHeight - 148, targetMiddle - 74))
+    ? clampTop(targetMiddle - cardHeight / 2)
     : shouldShowBelow
-      ? Math.min(window.innerHeight - 148, targetRect.bottom + 12)
-      : Math.max(14, targetRect.top - 158)
+      ? clampTop(targetRect.bottom + 12)
+      : clampTop(targetRect.top - cardHeight - 12)
   const arrowLeft = Math.max(18, Math.min(width - 18, targetCenter - left))
-  const arrowTop = Math.max(20, Math.min(120, targetMiddle - top))
+  const arrowTop = Math.max(20, Math.min(Math.max(20, cardHeight - 20), targetMiddle - top))
   const placementClass = sidePlacement
     ? `coach-mark-card--${sidePlacement}`
     : shouldShowBelow
@@ -66,6 +89,7 @@ export default function CoachMark() {
         style={motionGpuLayer}
       />
       <motion.div
+        ref={cardRef}
         className={`coach-mark-card pointer-events-auto ${placementClass}`}
         role="dialog"
         aria-label={coachMark.title}

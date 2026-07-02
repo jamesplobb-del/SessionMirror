@@ -19,12 +19,12 @@
 		BESTTAKE2FED79650016851F /* BestTakeAudioPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */; };
 		BESTTAKE4FED79650016851F /* BestTakeAudioPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = BESTTAKE3FED79650016851F /* BestTakeAudioPlugin.m */; };
 		CAMGUARD2FED79650016851F /* CameraSessionGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAMGUARD1FED79650016851F /* CameraSessionGuard.swift */; };
-		NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */; };
-		NATIVECAM2FED79650016851F /* NativeCameraRecordingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */; };
-		PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */; };
 		DRONEENG2FED79650016851F /* DroneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEENG1FED79650016851F /* DroneEngine.swift */; };
 		DRONEPLG2FED79650016851F /* DronePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG1FED79650016851F /* DronePlugin.swift */; };
 		DRONEPLG4FED79650016851F /* DronePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG3FED79650016851F /* DronePlugin.m */; };
+		NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */; };
+		NATIVECAM2FED79650016851F /* NativeCameraRecordingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */; };
+		PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,14 +43,14 @@
 		BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BestTakeAudioPlugin.swift; sourceTree = "<group>"; };
 		BESTTAKE3FED79650016851F /* BestTakeAudioPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BestTakeAudioPlugin.m; sourceTree = "<group>"; };
 		CAMGUARD1FED79650016851F /* CameraSessionGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraSessionGuard.swift; sourceTree = "<group>"; };
+		DRONEENG1FED79650016851F /* DroneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneEngine.swift; sourceTree = "<group>"; };
+		DRONEPLG1FED79650016851F /* DronePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DronePlugin.swift; sourceTree = "<group>"; };
+		DRONEPLG3FED79650016851F /* DronePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DronePlugin.m; sourceTree = "<group>"; };
 		ENTITLE1FED79650016851F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraTestAudio.swift; sourceTree = "<group>"; };
 		NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraRecordingEngine.swift; sourceTree = "<group>"; };
 		PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitBridgeViewController.swift; sourceTree = "<group>"; };
-		DRONEENG1FED79650016851F /* DroneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneEngine.swift; sourceTree = "<group>"; };
-		DRONEPLG1FED79650016851F /* DronePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DronePlugin.swift; sourceTree = "<group>"; };
-		DRONEPLG3FED79650016851F /* DronePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DronePlugin.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -410,7 +410,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = X24D9LKQ58;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -432,7 +432,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = X24D9LKQ58;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;

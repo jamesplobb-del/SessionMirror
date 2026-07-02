@@ -466,6 +466,14 @@ export function useCameraSession({
     detachAllPreviewTargets()
   }, [detachAllPreviewTargets, stopStreamTracks])
 
+  const clearStaleCaptureStartState = useCallback(() => {
+    streamAcquireInFlightRef.current = false
+    permissionRequestInFlightRef.current = false
+    setPermissionRequestInFlight(false)
+    resumeInFlightRef.current = false
+    setIsPreviewRecovering(false)
+  }, [])
+
   useEffect(() => {
     if (!nativePreviewActiveRef.current) return
     nativePreviewActiveRef.current = false
@@ -1499,6 +1507,42 @@ export function useCameraSession({
     recorder.stop()
   }, [stopNativeExperimentalRecording])
 
+  const interruptRecordingForBackground = useCallback(() => {
+    if (!isRecordingRef.current && !autoPreRollActiveRef.current) return
+
+    if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current && !isRecordingRef.current) {
+      cancelAutoPreRollCapture()
+      return
+    }
+
+    if (nativeExperimentalRecordingRef.current) {
+      stopNativeExperimentalRecording()
+      return
+    }
+
+    const recorder = recorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      try {
+        recorder.stop()
+      } catch {
+        if (recorderRef.current) {
+          detachRecorder(recorderRef.current)
+        }
+        recorderRef.current = null
+      }
+    } else if (recorder) {
+      detachRecorder(recorder)
+      recorderRef.current = null
+    }
+
+    autoPreRollActiveRef.current = false
+    autoPerformanceActiveRef.current = false
+    autoPreRollStartedAtRef.current = 0
+    autoPerformanceStartedAtRef.current = 0
+    isRecordingRef.current = false
+    setIsRecording(false)
+  }, [cancelAutoPreRollCapture, stopNativeExperimentalRecording])
+
   const toggleRecording = useCallback(() => {
     if (isRecording) {
       stopRecording()
@@ -1541,7 +1585,7 @@ export function useCameraSession({
   )
 
   const suspendCameraForBackground = useCallback(() => {
-    if (isRecordingRef.current) return
+    interruptRecordingForBackground()
     captureSessionEpochRef.current += 1
     cancelScheduledRelease()
     if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
@@ -1559,10 +1603,19 @@ export function useCameraSession({
       previewActive: false,
       recordingActive: false,
     })
-  }, [cancelAutoPreRollCapture, cancelScheduledRelease, disarmAutoRecording, releaseLiveStream])
+  }, [
+    cancelAutoPreRollCapture,
+    cancelScheduledRelease,
+    disarmAutoRecording,
+    interruptRecordingForBackground,
+    releaseLiveStream,
+  ])
 
-  const restartCameraAfterForeground = useCallback(async () => {
+  const restartCameraAfterForeground = useCallback(async (options: { force?: boolean } = {}) => {
     if (document.visibilityState === 'hidden' && !isAppInForeground()) return
+    if (options.force) {
+      clearStaleCaptureStartState()
+    }
     if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
       if (import.meta.env.DEV) {
         console.log('[CameraPreview] resume skipped: already starting')
@@ -1634,6 +1687,7 @@ export function useCameraSession({
   }, [
     acquireStream,
     cancelScheduledRelease,
+    clearStaleCaptureStartState,
     ensureCameraPreviewActive,
     releaseLiveStream,
     syncPreviewTargets,
@@ -1652,7 +1706,7 @@ export function useCameraSession({
 
     const runRecovery = () => {
       foregroundRestartTimerRef.current = null
-      void restartCameraAfterForeground()
+      void restartCameraAfterForeground({ force: true })
     }
 
     const nativeVideoWake =
