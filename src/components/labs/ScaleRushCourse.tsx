@@ -128,19 +128,18 @@ function Lane({ row, variant, depth, isPlayer = false, children }: LaneProps) {
       ]
         .filter(Boolean)
         .join(' ')}
-      style={
-        {
-          '--sr-depth': depth,
-          ...(surfaceUrl
-            ? { '--sr-lane-texture': `url(${surfaceUrl})` }
-            : {}),
-        } as CSSProperties
-      }
+      style={{ '--sr-depth': depth } as CSSProperties}
     >
-      {surfaceUrl && <div className="sr-lane__texture" aria-hidden />}
+      {surfaceUrl && (
+        <div
+          className="sr-lane__texture"
+          style={{ backgroundImage: `url(${surfaceUrl})` }}
+          aria-hidden
+        />
+      )}
       <LaneHazards lane={visual} seed={row.rowOffset} />
       <LaneDecor lane={visual} seed={row.rowOffset} />
-      <div className="sr-lane__pad-slot">
+      <div className="sr-lane__path">
         <ScaleRushTile row={row} variant={variant} />
         {children}
       </div>

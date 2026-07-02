@@ -7,10 +7,13 @@ interface ScaleRushCharacterProps {
 }
 
 export default function ScaleRushCharacter({ hopping, landing, hit }: ScaleRushCharacterProps) {
+  const idle = !hopping && !landing && !hit
+
   return (
     <div
       className={[
         'sr-char',
+        idle && 'sr-char--idle',
         hopping && 'sr-char--hop',
         landing && 'sr-char--land',
         hit && 'sr-char--hit',
@@ -26,7 +29,6 @@ export default function ScaleRushCharacter({ hopping, landing, hit }: ScaleRushC
         alt=""
         draggable={false}
       />
-      <div className="sr-char__flash" />
     </div>
   )
 }
