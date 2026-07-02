@@ -10,7 +10,7 @@ import {
 } from '../../labs/scaleRush/scaleRushMusicLogic'
 import type { ScaleRushState } from '../../labs/scaleRush/scaleRushTypes'
 import Pressable from '../ui/Pressable'
-import ScaleRushCourse from './ScaleRushCourse'
+import ScaleRushPhaserView from './ScaleRushPhaserView'
 
 interface ScaleRushGameProps {
   state: ScaleRushState
@@ -52,7 +52,7 @@ export default function ScaleRushGame({ state, readout, onPause }: ScaleRushGame
   return (
     <div className="scale-rush-screen scale-rush-screen--playing">
       <div className="sr-playfield">
-        <ScaleRushCourse
+        <ScaleRushPhaserView
           config={config}
           sequenceStep={state.sequenceStep}
           advanceToken={state.advanceToken}
