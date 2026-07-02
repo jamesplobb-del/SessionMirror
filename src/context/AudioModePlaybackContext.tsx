@@ -17,7 +17,7 @@ import {
   preparePlaybackRoute,
 } from '../utils/playbackRouteCoordinator'
 import {
-  primeTakePlaybackForPreparedSession,
+  primeTakePlaybackAudio,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
 import { readCachedPlaybackSrc } from '../utils/takeStorage'
@@ -245,7 +245,7 @@ export function AudioModePlaybackProvider({
         try {
           await onBeforePlayRef.current?.()
           await prepareSessionOnce(item)
-          primeTakePlaybackForPreparedSession(player)
+          await primeTakePlaybackAudio(player)
           if (pendingStartTimeRef.current !== null) {
             try {
               player.currentTime = Math.max(0, pendingStartTimeRef.current)
