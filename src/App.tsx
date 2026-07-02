@@ -3078,6 +3078,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             onPinCurrentAsBest={handlePinCurrentAsBest}
                             onClearBenchmark={handleClearAudioBenchmark}
                             onClearChallenger={handleClearAudioChallenger}
+                            hapticFeedback={settings.hapticFeedback}
                           />
                         </div>
                       </div>

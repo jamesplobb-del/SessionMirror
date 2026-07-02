@@ -122,7 +122,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
     title: 'Close Expand View',
     body: 'Tap the expand button again to return to the normal practice layout.',
     selector: '[data-tutorial="best-take-collapse"]',
-    placement: 'left',
+    placement: 'top',
     advance: 'split-close',
     continueHint: 'Tap expand to close and continue.',
     requiresSplitView: 'open',

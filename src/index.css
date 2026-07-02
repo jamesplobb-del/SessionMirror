@@ -822,6 +822,10 @@ body.settings-branch-open * {
   will-change: left;
 }
 
+.audio-mode-waveform--scrubbing .audio-mode-waveform__playhead {
+  transition: none;
+}
+
 .audio-mode-waveform__playhead::before {
   position: absolute;
   top: -0.18rem;

@@ -1,4 +1,4 @@
-import { memo, useCallback, type PointerEvent } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { motion } from 'framer-motion'
 import { Pause, Play, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
@@ -6,6 +6,7 @@ import AudioModeHeroMic from './AudioModeHeroMic'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
 import { stopEventBubble } from '../../utils/eventBubbling'
+import { triggerDragStartHaptic, triggerLightHaptic } from '../../utils/haptics'
 import { iosHudDim, motionGpuLayer } from '../../utils/motionPresets'
 import type { Take } from '../../types'
 import type { LibraryPlaybackReference } from '../../types/library'
@@ -41,7 +42,10 @@ interface AudioModeTakeCardProps {
   onOpen?: () => void
   onFavorite?: () => void
   onClear?: () => void
+  hapticFeedback?: boolean
 }
+
+type ScrubPhase = 'start' | 'move' | 'end'
 
 function AudioWaveform({
   tone,
@@ -49,19 +53,49 @@ function AudioWaveform({
   peaks,
   progress,
   onScrub,
+  hapticFeedback = true,
 }: {
   tone: 'current' | 'best'
   active: boolean
   peaks: number[]
   progress: number
-  onScrub: (clientX: number, rect: DOMRect) => void
+  onScrub: (progress: number, phase: ScrubPhase) => void
+  hapticFeedback?: boolean
 }) {
   const safeProgress = Math.max(0, Math.min(1, progress))
+  const [dragProgress, setDragProgress] = useState<number | null>(null)
+  const dragProgressRef = useRef(safeProgress)
+  const hapticMilestoneRef = useRef(-1)
+  const displayedProgress = dragProgress ?? safeProgress
+
+  const updateDragProgress = (
+    clientX: number,
+    rect: DOMRect,
+    phase: ScrubPhase,
+  ) => {
+    const nextProgress = rect.width > 0
+      ? Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+      : displayedProgress
+    dragProgressRef.current = nextProgress
+    setDragProgress(nextProgress)
+    onScrub(nextProgress, phase)
+
+    if (phase !== 'move' || !hapticFeedback) return
+    const milestone = Math.floor(nextProgress * 4)
+    if (milestone !== hapticMilestoneRef.current) {
+      hapticMilestoneRef.current = milestone
+      triggerLightHaptic(true)
+    }
+  }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    onScrub(event.clientX, event.currentTarget.getBoundingClientRect())
+    hapticMilestoneRef.current = -1
+    if (hapticFeedback) {
+      void triggerDragStartHaptic()
+    }
+    updateDragProgress(event.clientX, event.currentTarget.getBoundingClientRect(), 'start')
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -69,13 +103,17 @@ function AudioWaveform({
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
     event.preventDefault()
     event.stopPropagation()
-    onScrub(event.clientX, event.currentTarget.getBoundingClientRect())
+    updateDragProgress(event.clientX, event.currentTarget.getBoundingClientRect(), 'move')
   }
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      updateDragProgress(event.clientX, event.currentTarget.getBoundingClientRect(), 'end')
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
+    setDragProgress(null)
+    hapticMilestoneRef.current = -1
+    triggerLightHaptic(hapticFeedback)
     event.stopPropagation()
   }
 
@@ -83,23 +121,24 @@ function AudioWaveform({
     <div
       className={`audio-mode-waveform audio-mode-waveform--${tone} ${
         active ? 'audio-mode-waveform--active' : ''
-      }`}
+      } ${dragProgress !== null ? 'audio-mode-waveform--scrubbing' : ''}`}
       role="slider"
       aria-label="Take waveform"
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={Math.round(safeProgress * 100)}
+      aria-valuenow={Math.round(displayedProgress * 100)}
       tabIndex={0}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onClick={stopEventBubble}
     >
       {peaks.map((peak, index) => (
         <span
           key={index}
           className={
-            index / Math.max(1, peaks.length - 1) > safeProgress
+            index / Math.max(1, peaks.length - 1) > displayedProgress
               ? 'audio-mode-waveform__bar audio-mode-waveform__bar--future'
               : 'audio-mode-waveform__bar'
           }
@@ -109,7 +148,7 @@ function AudioWaveform({
           }}
         />
       ))}
-      <span className="audio-mode-waveform__playhead" style={{ left: `${safeProgress * 100}%` }} />
+      <span className="audio-mode-waveform__playhead" style={{ left: `${displayedProgress * 100}%` }} />
     </div>
   )
 }
@@ -122,6 +161,7 @@ function AudioModeTakeCard({
   onOpen,
   onFavorite,
   onClear,
+  hapticFeedback = true,
 }: AudioModeTakeCardProps) {
   const {
     playbackItem,
@@ -143,18 +183,22 @@ function AudioModeTakeCard({
   })
   const displayPeaks = waveformPeaks.length > 0 ? waveformPeaks : EMPTY_WAVEFORM_PEAKS
 
+  useEffect(() => {
+    if (!playbackItem) return
+    audioPlayback.prime(playbackItem)
+  }, [audioPlayback.prime, playbackItem])
+
   const handleWaveformScrub = useCallback(
-    (clientX: number, rect: DOMRect) => {
-      if (!playbackItem || rect.width <= 0) return
+    (progress: number, phase: ScrubPhase) => {
+      if (!playbackItem) return
       if (durationSeconds <= 0) {
-        audioPlayback.play(playbackItem)
+        if (phase === 'start') audioPlayback.play(playbackItem)
         return
       }
-      const progress = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
       const nextTime = progress * durationSeconds
-      if (isCurrentItem) {
+      if (isCurrentItem || audioPlayback.matchesCurrentSource(playbackItem)) {
         audioPlayback.seek(nextTime)
-      } else {
+      } else if (phase === 'start') {
         audioPlayback.play(playbackItem, { startTime: nextTime })
       }
     },
@@ -225,6 +269,7 @@ function AudioModeTakeCard({
           peaks={displayPeaks}
           progress={hasMedia ? playbackProgress : 0}
           onScrub={handleWaveformScrub}
+          hapticFeedback={hapticFeedback}
         />
         <Pressable
           type="button"
@@ -262,6 +307,7 @@ interface AudioModeHomeProps {
   onPinCurrentAsBest?: () => void
   onClearBenchmark?: () => void
   onClearChallenger?: () => void
+  hapticFeedback?: boolean
 }
 
 function AudioModeHome({
@@ -275,6 +321,7 @@ function AudioModeHome({
   onPinCurrentAsBest,
   onClearBenchmark,
   onClearChallenger,
+  hapticFeedback = true,
 }: AudioModeHomeProps) {
   const status = isRecording ? 'Recording...' : ready ? 'Ready to record' : 'Preparing audio'
   const hint = isRecording ? 'Listening now' : 'Tap the mic to start'
@@ -302,6 +349,7 @@ function AudioModeHome({
             Boolean(libraryBenchmarkPlayback || benchmarkTake) ? onExpandBenchmark : undefined
           }
           onClear={onClearBenchmark}
+          hapticFeedback={hapticFeedback}
         />
         <AudioModeTakeCard
           label="Current Take"
@@ -310,6 +358,7 @@ function AudioModeHome({
           onOpen={onExpandChallenger}
           onFavorite={onPinCurrentAsBest}
           onClear={onClearChallenger}
+          hapticFeedback={hapticFeedback}
         />
       </div>
     </section>

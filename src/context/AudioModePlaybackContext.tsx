@@ -17,6 +17,7 @@ import {
 } from '../utils/playbackRouteCoordinator'
 import {
   playTakeMediaAudible,
+  primeTakePlaybackForPreparedSession,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
 import { readCachedPlaybackSrc, resolveTakePlaybackUrl } from '../utils/takeStorage'
@@ -49,6 +50,7 @@ interface AudioModePlaybackContextValue {
   playerRef: RefObject<HTMLAudioElement | null>
   state: AudioModePlaybackState
   select: (item: AudioModePlaybackItem) => void
+  prime: (item: AudioModePlaybackItem) => void
   play: (item: AudioModePlaybackItem, options?: { startTime?: number }) => void
   toggle: (item: AudioModePlaybackItem) => void
   pause: () => void
@@ -59,7 +61,8 @@ interface AudioModePlaybackContextValue {
 }
 
 const AudioModePlaybackContext = createContext<AudioModePlaybackContextValue | null>(null)
-const AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS = 850
+const AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS = 220
+const AUDIO_MODE_PRIME_READY_TIMEOUT_MS = 700
 
 /** App-level hook for pausing inline audio-mode take playback (vault, settings, review). */
 export const audioModePlaybackControlsRef: { pause: (() => void) | null } = { pause: null }
@@ -90,7 +93,10 @@ async function resolveItemSrcForPlayback(item: AudioModePlaybackItem): Promise<s
   return resolveMediaPlaybackSrc(resolved || item.mediaUrl)
 }
 
-function waitForAudioModePlaybackReady(player: HTMLAudioElement): Promise<void> {
+function waitForAudioModePlaybackReady(
+  player: HTMLAudioElement,
+  timeoutMs = AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS,
+): Promise<void> {
   if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
     return Promise.resolve()
   }
@@ -112,7 +118,7 @@ function waitForAudioModePlaybackReady(player: HTMLAudioElement): Promise<void> 
       resolve()
     }
 
-    timeoutId = window.setTimeout(settle, AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS)
+    timeoutId = window.setTimeout(settle, timeoutMs)
     player.addEventListener('loadeddata', settle, { once: true })
     player.addEventListener('canplay', settle, { once: true })
     player.addEventListener('error', settle, { once: true })
@@ -136,6 +142,8 @@ export function AudioModePlaybackProvider({
   const desiredPlayingRef = useRef(false)
   const resumeTimerRef = useRef<number | null>(null)
   const resumeInFlightRef = useRef(false)
+  const primingSourceKeyRef = useRef('')
+  const primeInFlightRef = useRef<Promise<void> | null>(null)
   const [state, setState] = useState<AudioModePlaybackState>({
     currentItem: null,
     isPlaying: false,
@@ -276,6 +284,57 @@ export function AudioModePlaybackProvider({
     [ensurePlayerSource]
   )
 
+  const prime = useCallback((item: AudioModePlaybackItem) => {
+    const player = playerRef.current
+    if (!player || desiredPlayingRef.current) return
+
+    const sourceKey = sourceKeyFor(item)
+    if (
+      primingSourceKeyRef.current === sourceKey &&
+      currentSourceKeyRef.current === sourceKey &&
+      player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+    ) {
+      return
+    }
+
+    primingSourceKeyRef.current = sourceKey
+    primeInFlightRef.current = (async () => {
+      const resolvedSrc = await resolveItemSrcForPlayback(item)
+      if (!resolvedSrc || desiredPlayingRef.current || primingSourceKeyRef.current !== sourceKey) {
+        return
+      }
+
+      if (currentSourceKeyRef.current !== sourceKey || player.src !== resolvedSrc) {
+        player.pause()
+        player.src = resolvedSrc
+        currentSourceKeyRef.current = sourceKey
+        endedListenerSourceKeyRef.current = ''
+        setState((prev) => ({
+          ...prev,
+          currentItem: item,
+          isPlaying: false,
+          currentTime: 0,
+          duration: 0,
+          playerExists: true,
+        }))
+      }
+
+      player.preload = 'auto'
+      prepareInlineMediaElement(player, { preload: 'auto' })
+      player.muted = false
+      player.volume = 1
+      if (player.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        player.load()
+      }
+      primeTakePlaybackForPreparedSession(player)
+      await waitForAudioModePlaybackReady(player, AUDIO_MODE_PRIME_READY_TIMEOUT_MS)
+    })().finally(() => {
+      if (primingSourceKeyRef.current === sourceKey) {
+        primeInFlightRef.current = null
+      }
+    })
+  }, [])
+
   const play = useCallback(
     (item: AudioModePlaybackItem, options: { startTime?: number } = {}) => {
       const player = ensurePlayerSource(item)
@@ -379,6 +438,7 @@ export function AudioModePlaybackProvider({
           pipelineDetachRef.current = null
           setActivePlaybackDiagSession(null)
           onPlaybackActiveChangeRef.current?.(false)
+          desiredPlayingRef.current = false
           logPlayback('Playback intercepted', {
             takeId: item.takeId ?? item.id,
             error: error instanceof Error ? error.message : String(error),
@@ -630,6 +690,7 @@ export function AudioModePlaybackProvider({
       playerRef,
       state,
       select,
+      prime,
       play,
       toggle,
       pause,
@@ -643,6 +704,7 @@ export function AudioModePlaybackProvider({
       matchesCurrentSource,
       pause,
       play,
+      prime,
       seek,
       select,
       state,
