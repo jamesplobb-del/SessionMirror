@@ -5064,6 +5064,16 @@ html.physical-landscape-right .control-deck__vault-btn {
   background: var(--audio-surface, #ffffff);
 }
 
+html.app-dark-mode .pitch-tuner--widget .pitch-chart-card,
+html.app-dark-mode .pitch-tuner--widget .pitch-chart-card .pitch-chart-shell,
+html.app-dark-mode .pitch-chart-shell {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(7, 16, 31, 0.98));
+}
+
+html.app-dark-mode .pitch-spectrogram--glass {
+  background-color: #07101f;
+}
+
 .pitch-chart-shell {
   width: 100%;
   min-height: 140px;

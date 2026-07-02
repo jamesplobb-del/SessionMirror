@@ -1,4 +1,5 @@
 export type OnboardingCardId =
+  | 'record-two-videos'
   | 'record-practice'
   | 'analyze-playing'
   | 'save-best-takes'
@@ -59,6 +60,11 @@ export interface HelpTopic {
 
 export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
+    id: 'record-two-videos',
+    title: 'Start With Two Quick Videos',
+    body: 'Before using the take boxes, record two short video takes. It can be literally anything. Once you have two takes, the boxes have something to play, compare, and pin.',
+  },
+  {
     id: 'record-practice',
     title: 'Record Your Practice',
     body: 'Use Camera Mode for video practice or Audio Mode for focused listening. Long-press Record for hands-free sessions.',
@@ -84,14 +90,14 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'take-cards',
     title: 'Take Cards',
-    body: 'Tap a take to play it. Long-press a take for more actions and organization tools.',
+    body: 'After you record a couple of quick takes, tap a take to play it. Long-press a take for more actions and organization tools.',
     selector: '[data-tutorial="pip-row"], [data-tutorial="audio-take-cards"]',
     placement: 'top',
   },
   {
     id: 'best-take-box',
     title: 'Best Take',
-    body: 'Long-press and drag a take into this box to pin your current best performance.',
+    body: 'Once you have recordings, long-press and drag a take into this box to pin your current best performance.',
     selector: '[data-tutorial="best-take-box"]',
     placement: 'top',
   },

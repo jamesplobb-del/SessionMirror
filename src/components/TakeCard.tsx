@@ -75,7 +75,9 @@ function TakeCard({
   const [thumbnailBroken, setThumbnailBroken] = useState(false)
   const [thumbnailSrc, setThumbnailSrc] = useState(take.thumbnailUrl)
   const [thumbnailRevision, setThumbnailRevision] = useState(0)
+  const [actionFeedback, setActionFeedback] = useState<'best' | 'load' | null>(null)
   const notesDebounceRef = useRef<number | null>(null)
+  const actionFeedbackTimerRef = useRef<number | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -90,6 +92,9 @@ function TakeCard({
     return () => {
       if (notesDebounceRef.current !== null) {
         window.clearTimeout(notesDebounceRef.current)
+      }
+      if (actionFeedbackTimerRef.current !== null) {
+        window.clearTimeout(actionFeedbackTimerRef.current)
       }
     }
   }, [])
@@ -184,6 +189,17 @@ function TakeCard({
     onOpenTake?.()
   }
 
+  const flashActionFeedback = (action: 'best' | 'load') => {
+    setActionFeedback(action)
+    if (actionFeedbackTimerRef.current !== null) {
+      window.clearTimeout(actionFeedbackTimerRef.current)
+    }
+    actionFeedbackTimerRef.current = window.setTimeout(() => {
+      actionFeedbackTimerRef.current = null
+      setActionFeedback((current) => (current === action ? null : current))
+    }, 950)
+  }
+
   const handleDelete = (event?: MouseEvent<HTMLElement>) => {
     event?.stopPropagation()
     void (async () => {
@@ -207,6 +223,7 @@ function TakeCard({
     isChallenger ? 'vault-take-row--challenger' : '',
     selectionMode && selected ? 'vault-take-row--selected' : '',
     detailOpen ? 'vault-take-row--expanded' : '',
+    actionFeedback ? 'vault-take-row--action-feedback' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -404,26 +421,40 @@ function TakeCard({
             )}
             <button
               type="button"
-              className="vault-take-row__detail-btn"
+              className={`vault-take-row__detail-btn ${
+                actionFeedback === 'best' ? 'vault-take-row__detail-btn--confirmed' : ''
+              }`}
               data-tutorial="vault-pin-best"
               onClick={(event) => {
                 event.stopPropagation()
+                flashActionFeedback('best')
                 onPinBenchmark()
               }}
             >
-              <Pin className="h-3.5 w-3.5" />
-              {isBenchmark ? 'Best Take' : 'Make Best'}
+              {actionFeedback === 'best' ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Pin className="h-3.5 w-3.5" />
+              )}
+              {actionFeedback === 'best' ? 'Made Best' : isBenchmark ? 'Best Take' : 'Make Best'}
             </button>
             <button
               type="button"
-              className="vault-take-row__detail-btn"
+              className={`vault-take-row__detail-btn ${
+                actionFeedback === 'load' ? 'vault-take-row__detail-btn--confirmed' : ''
+              }`}
               onClick={(event) => {
                 event.stopPropagation()
+                flashActionFeedback('load')
                 onPinChallenger()
               }}
             >
-              <Pin className="h-3.5 w-3.5" />
-              Load Take
+              {actionFeedback === 'load' ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Pin className="h-3.5 w-3.5" />
+              )}
+              {actionFeedback === 'load' ? 'Loaded' : 'Load Take'}
             </button>
             {onCreate && mediaType === 'video' && (
               <button

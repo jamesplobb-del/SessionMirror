@@ -396,6 +396,10 @@
   box-shadow: var(--audio-shadow-card), 0 0 0 2px var(--audio-blue-soft);
 }
 
+.native-bottom-sheet--vault .vault-take-row--action-feedback {
+  animation: vault-action-feedback-row 0.95s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .native-bottom-sheet--vault .vault-take-row__thumb {
   position: relative;
   flex-shrink: 0;
@@ -565,6 +569,13 @@
 
 .native-bottom-sheet--vault .vault-take-row__detail-btn:hover {
   background: #ffffff;
+}
+
+.native-bottom-sheet--vault .vault-take-row__detail-btn--confirmed {
+  border-color: var(--audio-blue-border);
+  background: var(--audio-blue-soft);
+  color: var(--audio-blue);
+  animation: vault-action-feedback-btn 0.95s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .native-bottom-sheet--vault .vault-take-row__detail-btn:disabled {
@@ -919,6 +930,36 @@ html.app-dark-mode .native-bottom-sheet--vault .vault-header-action-btn--danger:
   color: #fca5a5 !important;
 }
 
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar form,
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar input,
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .rounded-full,
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .bg-white,
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .bg-stone-50,
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .bg-sky-50 {
+  border-color: rgba(226, 232, 240, 0.14) !important;
+  background: rgba(15, 23, 42, 0.62) !important;
+  color: #f8fafc !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .border-dashed {
+  border-color: rgba(125, 211, 252, 0.34) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .border-sky-300,
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .text-sky-800 {
+  border-color: rgba(56, 189, 248, 0.45) !important;
+  color: #bae6fd !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .hover\:bg-stone-100:hover,
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .hover\:bg-stone-50:hover {
+  background: rgba(226, 232, 240, 0.08) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--vault .vault-session-bar .hover\:text-red-600:hover {
+  color: #fca5a5 !important;
+}
+
 html.app-dark-mode .native-bottom-sheet--vault .vault-take-row {
   border-color: rgba(21, 152, 255, 0.35) !important;
   background:
@@ -969,4 +1010,40 @@ html.app-dark-mode .native-bottom-sheet--vault .vault-take-row__detail-btn--dang
   border-color: rgba(248, 113, 113, 0.22) !important;
   background: rgba(127, 29, 29, 0.18) !important;
   color: #fca5a5 !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--vault .vault-take-row__detail-btn--confirmed {
+  border-color: rgba(56, 189, 248, 0.45) !important;
+  background: rgba(14, 165, 233, 0.18) !important;
+  color: #bae6fd !important;
+}
+
+@keyframes vault-action-feedback-row {
+  0% {
+    transform: scale(1);
+    box-shadow: var(--audio-shadow-card);
+  }
+  28% {
+    transform: scale(1.012);
+    box-shadow:
+      var(--audio-shadow-card),
+      0 0 0 2px rgba(21, 152, 255, 0.25),
+      0 12px 30px rgba(21, 152, 255, 0.14);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: var(--audio-shadow-card);
+  }
+}
+
+@keyframes vault-action-feedback-btn {
+  0% {
+    transform: scale(1);
+  }
+  26% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
 }

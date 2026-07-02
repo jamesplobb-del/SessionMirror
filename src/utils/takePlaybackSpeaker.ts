@@ -68,6 +68,8 @@ export interface TakeSpeakerNodes {
   limiterTrim?: number
   /** Negative dB reduces mastering makeup when limiter is too hot. */
   makeupTrimDb?: number
+  /** Audio-only takes use clean unity playback; speaker mastering can overdrive them. */
+  audioOnly?: boolean
 }
 
 export function isTakePlaybackEnhancerEnabled(): boolean {
@@ -80,6 +82,13 @@ const routedSpeakerElements = new Set<HTMLMediaElement>()
 let enhancerEnabled = false
 let enhancerSettings: AudioEnhancerSettings | null = null
 let speakerLoudnessPreset: SpeakerLoudnessPreset = 'phone'
+
+function isAudioOnlyElement(el: HTMLMediaElement): boolean {
+  if (typeof HTMLAudioElement !== 'undefined' && el instanceof HTMLAudioElement) {
+    return true
+  }
+  return el.tagName?.toLowerCase() === 'audio'
+}
 
 export function setSpeakerLoudnessPreset(preset: SpeakerLoudnessPreset): void {
   speakerLoudnessPreset = preset
@@ -94,7 +103,7 @@ export function setSpeakerLoudnessPreset(preset: SpeakerLoudnessPreset): void {
       nodes.limiterTrim = 1
       syncMasteringMakeup(nodes)
     }
-    if (nodes && shouldUseSpeakerMastering()) {
+    if (nodes && shouldUseSpeakerMastering(nodes)) {
       recomputeNormalizationFromMeasurement(el, nodes)
     }
   }
@@ -104,8 +113,12 @@ export function getSpeakerLoudnessPreset(): SpeakerLoudnessPreset {
   return speakerLoudnessPreset
 }
 
-function shouldUseSpeakerMastering(): boolean {
-  return !isHeadphoneOutputActive() && speakerLoudnessPreset !== 'off'
+function shouldUseSpeakerMastering(nodes?: TakeSpeakerNodes): boolean {
+  return !nodes?.audioOnly && !isHeadphoneOutputActive() && speakerLoudnessPreset !== 'off'
+}
+
+function shouldUseEnhancer(nodes: TakeSpeakerNodes): boolean {
+  return !nodes.audioOnly && enhancerEnabled && Boolean(enhancerSettings)
 }
 
 function disconnectSpeakerMastering(nodes: TakeSpeakerNodes): void {
@@ -140,7 +153,7 @@ function connectPlaybackTail(tail: AudioNode, nodes: TakeSpeakerNodes): void {
     /* ignore */
   }
 
-  if (shouldUseSpeakerMastering()) {
+  if (shouldUseSpeakerMastering(nodes)) {
     const mastering = ensureSpeakerMastering(nodes)
     tail.connect(mastering.input)
     return
@@ -190,6 +203,9 @@ function busGain(
   if (muted) return 0
   if (isHeadphoneOutputActive()) {
     return effectiveHeadphoneGain(volume, muted)
+  }
+  if (nodes?.audioOnly || (el && isAudioOnlyElement(el))) {
+    return Math.min(1, Math.max(0, volume))
   }
   if (speakerLoudnessPreset === 'off') {
     return effectiveSpeakerGain(volume, muted, true)
@@ -252,7 +268,7 @@ function balanceSpeakerChainDynamics(
   el: HTMLMediaElement,
   nodes: TakeSpeakerNodes,
 ): void {
-  if (!nodes.speakerMastering || speakerLoudnessPreset === 'off') return
+  if (!nodes.speakerMastering || nodes.audioOnly || speakerLoudnessPreset === 'off') return
   if (isFixedBusGainPreset(speakerLoudnessPreset)) return
   if (el.paused || el.ended) return
 
@@ -314,7 +330,7 @@ function recomputeNormalizationFromMeasurement(
   el: HTMLMediaElement,
   nodes: TakeSpeakerNodes,
 ): void {
-  if (!shouldUseSpeakerMastering()) return
+  if (!shouldUseSpeakerMastering(nodes)) return
   const preset = speakerLoudnessPreset as Exclude<SpeakerLoudnessPreset, 'off'>
 
   if (isFixedBusGainPreset(preset)) {
@@ -343,7 +359,7 @@ async function applyNormalizationToElement(
   el: HTMLMediaElement,
   nodes: TakeSpeakerNodes,
 ): Promise<void> {
-  if (!shouldUseSpeakerMastering()) return
+  if (!shouldUseSpeakerMastering(nodes)) return
 
   const generation = ++normalizationGeneration
   const preset = speakerLoudnessPreset as Exclude<SpeakerLoudnessPreset, 'off'>
@@ -410,8 +426,10 @@ function reapplyAllBusGains(): void {
       continue
     }
     nodes.gain.gain.value = busGain(nodes.lastVolume ?? 1, nodes.lastMuted ?? false, el, nodes)
-    if (shouldUseSpeakerMastering()) {
+    if (shouldUseSpeakerMastering(nodes)) {
       recomputeNormalizationFromMeasurement(el, nodes)
+    } else if (nodes.audioOnly) {
+      disconnectSpeakerMastering(nodes)
     }
   }
 }
@@ -463,7 +481,7 @@ export function setTakePlaybackEnhancerState(
 
     applyGraphOutputElementState(el)
 
-    if (!enhancerEnabled || !enhancerSettings) {
+    if (!shouldUseEnhancer(nodes) || !enhancerSettings) {
       disconnectEnhancer(nodes)
       ensurePassthroughChain(nodes)
       nodes.gain.gain.value = busGain(1, false, el, nodes)
@@ -586,7 +604,7 @@ function repairSpeakerBus(el: HTMLMediaElement, nodes: TakeSpeakerNodes): void {
     /* already connected */
   }
 
-  if (enhancerEnabled && enhancerSettings) {
+  if (shouldUseEnhancer(nodes) && enhancerSettings) {
     ensureEnhancerForElement(el, nodes)
     if (nodes.enhancer) {
       updateAudioEnhancerChain(nodes.enhancer, enhancerSettings)
@@ -610,13 +628,15 @@ export function registerTakePlaybackSpeakerRoute(
   gain: GainNode,
 ): void {
   const existing = speakerNodesByElement.get(el)
+  const audioOnly = isAudioOnlyElement(el)
   if (existing) {
+    existing.audioOnly = existing.audioOnly || audioOnly
     if (existing.source === source && existing.gain === gain) {
       repairSpeakerBus(el, existing)
       applyGraphOutputElementState(el)
       existing.gain.gain.value = busGain(1, false, el, existing)
       armPlaybackGraphKeepAlive(el, existing)
-      if (shouldUseSpeakerMastering()) {
+      if (shouldUseSpeakerMastering(existing)) {
         void applyNormalizationToElement(el, existing)
         ensureLimiterTrimPolling()
       }
@@ -624,14 +644,14 @@ export function registerTakePlaybackSpeakerRoute(
     return
   }
 
-  const nodes: TakeSpeakerNodes = { source, gain }
+  const nodes: TakeSpeakerNodes = { source, gain, audioOnly }
   speakerNodesByElement.set(el, nodes)
   routedSpeakerElements.add(el)
   applyGraphOutputElementState(el)
   repairSpeakerBus(el, nodes)
   gain.gain.value = busGain(1, false, el, nodes)
   armPlaybackGraphKeepAlive(el, nodes)
-  if (shouldUseSpeakerMastering()) {
+  if (shouldUseSpeakerMastering(nodes)) {
     void applyNormalizationToElement(el, nodes)
     ensureLimiterTrimPolling()
   }
@@ -667,7 +687,7 @@ export function routeTakePlaybackToSpeaker(
       const source = ctx.createMediaElementSource(el)
       const gain = ctx.createGain()
       source.connect(gain)
-      nodes = { source, gain }
+      nodes = { source, gain, audioOnly: isAudioOnlyElement(el) }
       speakerNodesByElement.set(el, nodes)
       routedSpeakerElements.add(el)
     } catch {
@@ -687,6 +707,7 @@ export function routeTakePlaybackToSpeaker(
       repairSpeakerBus(el, nodes)
     }
   } else {
+    nodes.audioOnly = nodes.audioOnly || isAudioOnlyElement(el)
     repairSpeakerBus(el, nodes)
   }
 
@@ -695,7 +716,7 @@ export function routeTakePlaybackToSpeaker(
   nodes.lastMuted = muted
   nodes.gain.gain.value = busGain(volume, muted, el, nodes)
 
-  if (enhancerEnabled && enhancerSettings) {
+  if (shouldUseEnhancer(nodes) && enhancerSettings) {
     ensureEnhancerForElement(el, nodes)
     if (nodes.enhancer) {
       updateAudioEnhancerChain(nodes.enhancer, enhancerSettings)
@@ -707,7 +728,7 @@ export function routeTakePlaybackToSpeaker(
 
   armPlaybackGraphKeepAlive(el, nodes)
   resumePlaybackBus()
-  if (shouldUseSpeakerMastering()) {
+  if (shouldUseSpeakerMastering(nodes)) {
     void applyNormalizationToElement(el, nodes)
     ensureLimiterTrimPolling()
   }

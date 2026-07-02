@@ -927,18 +927,19 @@ function drawGlassAudioGrid(
   pitchTop: number,
   pitchBottom: number,
   centsToY: (cents: number) => number,
+  dark: boolean,
 ): void {
   const labelPad = 48
 
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = dark ? '#07101f' : '#ffffff'
   ctx.fillRect(0, 0, width, height)
 
   const bandTop = Math.min(centsToY(10), centsToY(-10))
   const bandBottom = Math.max(centsToY(10), centsToY(-10))
-  ctx.fillStyle = 'rgba(34, 197, 94, 0.07)'
+  ctx.fillStyle = dark ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.07)'
   ctx.fillRect(labelPad, bandTop, width - labelPad, bandBottom - bandTop)
 
-  ctx.strokeStyle = 'rgba(23, 26, 34, 0.05)'
+  ctx.strokeStyle = dark ? 'rgba(226, 232, 240, 0.055)' : 'rgba(23, 26, 34, 0.05)'
   ctx.lineWidth = 1
   ctx.setLineDash([])
   const vStep = Math.max(28, Math.floor((width - labelPad) / 9))
@@ -949,7 +950,7 @@ function drawGlassAudioGrid(
     ctx.stroke()
   }
 
-  ctx.strokeStyle = 'rgba(23, 26, 34, 0.07)'
+  ctx.strokeStyle = dark ? 'rgba(226, 232, 240, 0.09)' : 'rgba(23, 26, 34, 0.07)'
   ctx.lineWidth = 1
   ctx.setLineDash([3, 7])
   for (const cents of [50, 25, -25, -50]) {
@@ -962,7 +963,7 @@ function drawGlassAudioGrid(
   ctx.setLineDash([])
 
   const centerY = centsToY(0)
-  ctx.strokeStyle = 'rgba(34, 197, 94, 0.28)'
+  ctx.strokeStyle = dark ? 'rgba(74, 222, 128, 0.36)' : 'rgba(34, 197, 94, 0.28)'
   ctx.lineWidth = 1
   ctx.beginPath()
   ctx.moveTo(labelPad, centerY + 0.5)
@@ -980,28 +981,38 @@ function drawGlassAudioGrid(
     ctx.roundRect(labelX, y - 8, widthPx, 16, radius)
     ctx.fillStyle = accent
     ctx.fill()
-    ctx.fillStyle = 'rgba(17, 24, 39, 0.66)'
+    ctx.fillStyle = dark ? 'rgba(226, 232, 240, 0.74)' : 'rgba(17, 24, 39, 0.66)'
     ctx.font = '600 9px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif'
     ctx.fillText(text, x, y + 0.25)
   }
 
-  drawLabelPill('Sharp', centsToY(50) - 13, 34, 'rgba(59, 130, 246, 0.08)')
-  drawLabelPill('Flat', centsToY(-50) + 13, 28, 'rgba(251, 146, 60, 0.08)')
+  drawLabelPill(
+    'Sharp',
+    centsToY(50) - 13,
+    34,
+    dark ? 'rgba(59, 130, 246, 0.18)' : 'rgba(59, 130, 246, 0.08)',
+  )
+  drawLabelPill(
+    'Flat',
+    centsToY(-50) + 13,
+    28,
+    dark ? 'rgba(251, 146, 60, 0.18)' : 'rgba(251, 146, 60, 0.08)',
+  )
 
   ctx.font = '600 8px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif'
-  ctx.fillStyle = 'rgba(17, 24, 39, 0.44)'
+  ctx.fillStyle = dark ? 'rgba(226, 232, 240, 0.55)' : 'rgba(17, 24, 39, 0.44)'
   const numberX = labelX + 16
   ctx.fillText('+50', numberX, centsToY(50))
   ctx.fillText('+25', numberX, centsToY(25))
-  ctx.fillStyle = 'rgba(22, 163, 74, 0.68)'
+  ctx.fillStyle = dark ? 'rgba(134, 239, 172, 0.82)' : 'rgba(22, 163, 74, 0.68)'
   ctx.fillText('0', numberX, centsToY(0))
-  ctx.fillStyle = 'rgba(17, 24, 39, 0.44)'
+  ctx.fillStyle = dark ? 'rgba(226, 232, 240, 0.55)' : 'rgba(17, 24, 39, 0.44)'
   ctx.fillText('-25', numberX, centsToY(-25))
   ctx.fillText('-50', numberX, centsToY(-50))
 }
 
 /** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 8
+const GLASS_STATIC_GRID_VERSION = 9
 
 type GlassStaticVariant = 'widget' | 'legacy' | 'audio'
 
@@ -1011,18 +1022,24 @@ interface GlassStaticLayerCache {
   dpr: number
   version: number
   variant: GlassStaticVariant
+  dark: boolean
   canvas: HTMLCanvasElement
 }
 
 const glassStaticLayerCache = new WeakMap<HTMLCanvasElement, GlassStaticLayerCache>()
 
+function isPitchCanvasDarkMode(): boolean {
+  return document.documentElement.classList.contains('app-dark-mode')
+}
+
 function drawGlassWidgetStaticContent(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
+  dark: boolean,
 ): void {
   ctx.clearRect(0, 0, width, height)
-  ctx.fillStyle = '#f7f8fa'
+  ctx.fillStyle = dark ? '#07101f' : '#f7f8fa'
   ctx.fillRect(0, 0, width, height)
 }
 
@@ -1035,13 +1052,15 @@ function blitGlassStaticLayer(
   variant: GlassStaticVariant,
 ): ReturnType<typeof getGlassLayoutMetrics> {
   let cache = glassStaticLayerCache.get(canvas)
+  const dark = isPitchCanvasDarkMode()
   if (
     !cache ||
     cache.width !== width ||
     cache.height !== height ||
     cache.dpr !== dpr ||
     cache.version !== GLASS_STATIC_GRID_VERSION ||
-    cache.variant !== variant
+    cache.variant !== variant ||
+    cache.dark !== dark
   ) {
     const off = cache?.canvas ?? document.createElement('canvas')
     off.width = Math.floor(width * dpr)
@@ -1050,17 +1069,17 @@ function blitGlassStaticLayer(
     if (!offCtx) return getGlassLayoutMetrics(height)
     offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
     if (variant === 'widget') {
-      drawGlassWidgetStaticContent(offCtx, width, height)
+      drawGlassWidgetStaticContent(offCtx, width, height, dark)
     } else if (variant === 'audio') {
       const { pitchTop, pitchBottom, centsToY } = getGlassLayoutMetrics(height)
       offCtx.clearRect(0, 0, width, height)
-      drawGlassAudioGrid(offCtx, width, height, pitchTop, pitchBottom, centsToY)
+      drawGlassAudioGrid(offCtx, width, height, pitchTop, pitchBottom, centsToY, dark)
     } else {
       const { pitchTop, pitchBottom, pitchHeight, centsToY } = getGlassLayoutMetrics(height)
       offCtx.clearRect(0, 0, width, height)
       drawGlassLegacyGrid(offCtx, width, height, pitchTop, pitchBottom, pitchHeight, centsToY)
     }
-    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, variant, canvas: off }
+    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, variant, dark, canvas: off }
     glassStaticLayerCache.set(canvas, cache)
   }
 
