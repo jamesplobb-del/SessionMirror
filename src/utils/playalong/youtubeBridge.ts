@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { logPlaybackGainAuditYoutubeStart } from '../playbackGainAudit'
+import { isHeadphoneOutputActive, subscribeHeadphoneOutput } from '../headphoneOutput'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
 import { YOUTUBE_PROXY_ORIGIN } from '../youtubeEmbed'
 import {
@@ -26,6 +27,7 @@ let wakeRetryGeneration = 0
 let pendingYoutubeWake = false
 let lastStereoRefreshAt = 0
 let lastPlayingMaintainAt = 0
+let headphoneProfileListenerInstalled = false
 
 /** Skip stereo while recording or during hands-free auto-playback. */
 export function registerYoutubeStereoGuard(guard: () => boolean): void {
@@ -48,6 +50,28 @@ function postToYoutubeIframe(
     JSON.stringify({ event: 'command', func, args }),
     YOUTUBE_PROXY_ORIGIN,
   )
+}
+
+function postYoutubeVolumeProfile(iframe: HTMLIFrameElement | null | undefined): void {
+  if (!iframe?.contentWindow) return
+  iframe.contentWindow.postMessage(
+    {
+      event: 'volume-profile',
+      profile: isHeadphoneOutputActive() ? 'headphones' : 'speaker',
+    },
+    YOUTUBE_PROXY_ORIGIN,
+  )
+}
+
+function ensureYoutubeHeadphoneProfileListener(): void {
+  if (headphoneProfileListenerInstalled) return
+  headphoneProfileListenerInstalled = true
+  subscribeHeadphoneOutput(() => {
+    postYoutubeVolumeProfile(activeYoutubeIframe)
+    if (activeYoutubeIframe) {
+      boostYoutubeProxyAudio(activeYoutubeIframe, 1)
+    }
+  })
 }
 
 /** Re-apply iOS stereo playback — throttled to avoid AVAudioSession churn that stalls camera preview. */
@@ -89,7 +113,9 @@ export function prepareNewYoutubeReference(): void {
 }
 
 export function registerYoutubeIframe(iframe: HTMLIFrameElement | null | undefined): void {
+  ensureYoutubeHeadphoneProfileListener()
   activeYoutubeIframe = iframe ?? null
+  postYoutubeVolumeProfile(iframe)
   if (pendingYoutubeWake && iframe) {
     wakeYoutubeReference(iframe)
   }
@@ -167,6 +193,7 @@ export function wakeYoutubeReference(
   registerYoutubeIframe(iframe)
   pendingYoutubeWake = false
 
+  postYoutubeVolumeProfile(iframe)
   refreshYoutubeStereoRoute(true)
   boostYoutubeProxyAudio(iframe, uiVolume)
 

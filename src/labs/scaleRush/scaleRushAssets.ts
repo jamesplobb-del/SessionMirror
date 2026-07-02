@@ -1,3 +1,4 @@
+import grassTileImg from '../../assets/scalerush/grass.png'
 import grassLaneImg from '../../assets/scalerush/kenney/grass-lane.png'
 import waterLaneImg from '../../assets/scalerush/kenney/water-lane.png'
 import roadLaneImg from '../../assets/scalerush/kenney/road-lane.png'
@@ -8,7 +9,7 @@ import trumpetPlayerImg from '../../assets/scalerush/trumpet-player.png'
 
 export const SCALE_RUSH_ASSETS = {
   grassLane: grassLaneImg,
-  grassPath: grassLaneImg,
+  grassPath: grassTileImg,
   waterLane: waterLaneImg,
   roadLane: roadLaneImg,
   log: logImg,

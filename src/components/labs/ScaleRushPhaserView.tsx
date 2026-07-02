@@ -35,6 +35,12 @@ export default function ScaleRushPhaserView({
       ({ createScaleRushPhaserGame }) => {
         if (cancelled || !hostRef.current) return
         gameRef.current = createScaleRushPhaserGame(hostRef.current)
+        queueMicrotask(() => {
+          const el = hostRef.current
+          const game = gameRef.current
+          if (!el || !game) return
+          game.scale.resize(el.clientWidth, el.clientHeight)
+        })
       },
     )
 

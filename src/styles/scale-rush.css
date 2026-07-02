@@ -334,13 +334,13 @@
   position: absolute;
   inset: 0;
   z-index: 2;
-  perspective: 920px;
-  perspective-origin: 50% 72%;
+  perspective: 860px;
+  perspective-origin: 50% 74%;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   height: 100%;
-  padding-bottom: clamp(1.5rem, 16vh, 5rem);
+  padding-bottom: clamp(1rem, 12vh, 3.5rem);
 }
 
 .sr-world__tilt {
@@ -349,7 +349,7 @@
   justify-content: flex-end;
   width: 100%;
   transform-style: preserve-3d;
-  transform: rotateX(40deg) scale(1.42);
+  transform: rotateX(38deg) scale(1.22);
   transform-origin: 50% 100%;
 }
 

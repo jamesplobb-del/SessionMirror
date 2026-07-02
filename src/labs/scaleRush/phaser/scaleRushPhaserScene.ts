@@ -39,8 +39,6 @@ interface LaneLayout {
   charH: number
   playerAnchorY: number
   laneW: number
-  worldZoom: number
-  followOffsetY: number
   pathCorridorW: number
 }
 
@@ -62,8 +60,6 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
   private isHopping = false
   private idleTween: Phaser.Tweens.Tween | null = null
   private layout!: LaneLayout
-  private cameraFollowing = false
-
   constructor() {
     super(SCENE_KEY)
   }
@@ -126,14 +122,12 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
   private onResize() {
     const w = this.scale.width
     const h = this.scale.height
-    const laneH = Phaser.Math.Clamp(Math.round(h * 0.118), 52, 82)
-    const pathTileW = Math.round(laneH * 0.88 * 0.82)
+    const laneH = Phaser.Math.Clamp(Math.round(h * 0.108), 52, 76)
+    const pathTileW = Math.round(laneH * 0.88)
     const pathTileH = Math.round(laneH * 0.82)
-    const charH = Phaser.Math.Clamp(Math.round(h * 0.135), 56, 96)
-    const playerAnchorY = Math.round(h * 0.72)
-    const worldZoom = Phaser.Math.Clamp(Math.min(w / 340, h / 600) * 1.32, 1.18, 1.45)
-    const laneW = w / worldZoom + 48
-    const followOffsetY = Math.round(h * 0.2)
+    const charH = Phaser.Math.Clamp(Math.round(h * 0.126), 56, 92)
+    const playerAnchorY = Math.round(h * 0.76)
+    const laneW = w + 52
     const pathCorridorW = pathTileW * 1.35
 
     this.layout = {
@@ -143,8 +137,6 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
       charH,
       playerAnchorY,
       laneW,
-      worldZoom,
-      followOffsetY,
       pathCorridorW,
     }
 
@@ -157,7 +149,9 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
     this.worldRoot.setPosition(w * 0.5, 0)
     this.worldRoot.setScale(1)
 
-    this.cameras.main.setZoom(worldZoom)
+    this.cameras.main.stopFollow()
+    this.cameras.main.setZoom(1)
+    this.cameras.main.setScroll(0, 0)
     this.playerLaneRoot.setPosition(0, playerAnchorY)
     this.playerObjectsRoot.setPosition(0, playerAnchorY)
     this.lanesRoot.setPosition(0, playerAnchorY)
@@ -168,22 +162,8 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
     this.playerSprite.setDisplaySize(charH / aspect, charH)
     this.playerShadow.setSize(charH * 0.5, charH * 0.1)
 
-    this.setupCameraFollow()
-
     if (this.lastSequenceStep >= 0) {
       this.rebuildWorld()
-    }
-  }
-
-  private setupCameraFollow() {
-    if (!this.layout) return
-
-    const cam = this.cameras.main
-    if (!this.cameraFollowing) {
-      cam.startFollow(this.playerSprite, true, 0.14, 0.14, 0, this.layout.followOffsetY)
-      this.cameraFollowing = true
-    } else {
-      cam.setFollowOffset(0, this.layout.followOffsetY)
     }
   }
 
@@ -579,9 +559,8 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
       },
     })
 
-    const baseZoom = this.layout.worldZoom
-    this.cameras.main.zoomTo(baseZoom * 1.03, 110, 'Sine.easeOut', true, () => {
-      this.cameras.main.zoomTo(baseZoom, 170, 'Sine.easeOut')
+    this.cameras.main.zoomTo(1.03, 110, 'Sine.easeOut', true, () => {
+      this.cameras.main.zoomTo(1, 170, 'Sine.easeOut')
     })
   }
 
@@ -643,7 +622,6 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
   shutdown() {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this)
     this.cameras.main.stopFollow()
-    this.cameraFollowing = false
     this.stopIdleBounce()
   }
 }

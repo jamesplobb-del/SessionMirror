@@ -55,7 +55,7 @@
         const cap = volumeProfile === 'headphones'
           ? Math.min(100, Math.max(0, requestedVolume))
           : 100
-        const repeats = volumeProfile === 'headphones' ? 1 : 8
+        const repeats = volumeProfile === 'headphones' ? 1 : 14
         for (let i = 0; i < repeats; i++) {
           ytPlayer.unMute()
           ytPlayer.setVolume(cap)
@@ -68,16 +68,18 @@
           return
         }
         applyVolume()
-        window.setTimeout(applyVolume, 60)
-        window.setTimeout(applyVolume, 160)
+        window.setTimeout(applyVolume, 40)
+        window.setTimeout(applyVolume, 100)
+        window.setTimeout(applyVolume, 180)
         window.setTimeout(applyVolume, 320)
+        window.setTimeout(applyVolume, 520)
       }
 
       function startVolumeBoostLoop() {
         stopVolumeBoostLoop()
         burstMaxVolume()
         if (volumeProfile === 'headphones') return
-        volumeBoostTimer = window.setInterval(burstMaxVolume, 150)
+        volumeBoostTimer = window.setInterval(burstMaxVolume, 90)
       }
 
       function stopVolumeBoostLoop() {
