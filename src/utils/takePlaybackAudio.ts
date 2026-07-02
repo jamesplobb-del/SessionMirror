@@ -238,16 +238,23 @@ export async function playTakeMediaMuted(
   return started
 }
 
+export interface PlayTakeMediaAudibleOptions extends PlaybackAttemptOptions {
+  /** When playback route was already prepared (e.g. hands-free auto-playback). */
+  skipRoutePrep?: boolean
+}
+
 export async function playTakeMediaAudible(
   media: HTMLMediaElement,
-  options: PlaybackAttemptOptions = {},
+  options: PlayTakeMediaAudibleOptions = {},
 ): Promise<boolean> {
   prepareMediaForAudiblePlayback(media)
 
-  try {
-    await preparePlaybackRoute({ suspendCamera: false })
-  } catch {
-    return false
+  if (!options.skipRoutePrep) {
+    try {
+      await preparePlaybackRoute({ suspendCamera: false })
+    } catch {
+      return false
+    }
   }
 
   await prepareLoudPlaybackBeforeStart(media)
@@ -255,6 +262,7 @@ export async function playTakeMediaAudible(
   try {
     await media.play()
     attachPlaybackRouteEndedListener(media)
+    wireTakePlaybackAfterStart(media, true)
     reportTakePlaybackStarted(media)
     return true
   } catch {
@@ -264,6 +272,7 @@ export async function playTakeMediaAudible(
       media.muted = false
       media.volume = 1
       attachPlaybackRouteEndedListener(media)
+      wireTakePlaybackAfterStart(media, true)
       reportTakePlaybackStarted(media)
       return true
     } catch (error) {

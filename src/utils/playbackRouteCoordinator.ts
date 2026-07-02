@@ -1,6 +1,11 @@
 import { Capacitor } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
 import { isHeadphoneOutputActive } from './headphoneOutput'
+import {
+  getActivePlaybackDiagSession,
+  logAudioSessionSnapshot,
+  logRouteTransition,
+} from './audioPlaybackDiagnostics'
 
 const PLAYBACK_CAMERA_SUSPEND_MS = 300
 
@@ -121,6 +126,11 @@ export async function preparePlaybackRoute(
   playbackRouteActive = true
   cameraWasSuspendedForPlayback = false
   loudSessionAppliedForPlayback = false
+  const diagSessionId = getActivePlaybackDiagSession()
+  if (diagSessionId) {
+    logRouteTransition(diagSessionId, 'preparePlaybackRoute-start', { suspendCamera })
+    void logAudioSessionSnapshot('preparePlaybackRoute-start', diagSessionId)
+  }
   await BestTakeAudioPlugin.setPlaybackRouteActive({ active: true })
 
   try {
@@ -138,6 +148,15 @@ export async function preparePlaybackRoute(
           failSoft: true,
         })
       }
+    }
+    if (diagSessionId) {
+      logRouteTransition(diagSessionId, 'preparePlaybackRoute-complete', {
+        loudSessionAppliedForPlayback,
+        cameraWasSuspendedForPlayback,
+      })
+      void logAudioSessionSnapshot('preparePlaybackRoute-complete', diagSessionId, {
+        loudSessionAppliedForPlayback,
+      })
     }
   } catch (error) {
     playbackRouteActive = false

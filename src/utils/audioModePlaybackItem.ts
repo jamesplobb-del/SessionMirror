@@ -7,12 +7,14 @@ export function buildAudioModePlaybackItem({
   tone,
   take,
   libraryPlayback,
+  resolvedMediaUrl,
 }: {
   tone: 'current' | 'best'
   take: Take | null
   libraryPlayback?: LibraryPlaybackReference | null
+  resolvedMediaUrl?: string | null
 }): AudioModePlaybackItem | null {
-  const mediaUrl = libraryPlayback?.playbackUrl ?? take?.videoUrl ?? ''
+  const mediaUrl = resolvedMediaUrl ?? libraryPlayback?.playbackUrl ?? take?.videoUrl ?? ''
   const filePath = libraryPlayback?.filePath ?? take?.filePath ?? ''
   if (!mediaUrl && !filePath) return null
 

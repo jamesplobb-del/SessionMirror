@@ -103,6 +103,29 @@ export function convertFileSrcIfNeeded(uri: string): string {
 /** In-memory cache so PiP / vault players don't hammer Filesystem.getUri. */
 const playbackSrcCache = new Map<string, string>()
 
+/** Drop cached capacitor URLs when a take file is removed or replaced. */
+export function invalidatePlaybackSrcCache(filePath: string): void {
+  if (!filePath) return
+
+  const takeId = filePath.match(/\/([^/]+)\.[^.]+$/)?.[1]
+  const keysToDelete = new Set<string>()
+
+  for (const [key, value] of playbackSrcCache.entries()) {
+    if (
+      key === filePath ||
+      key.includes(filePath) ||
+      filePath.includes(key) ||
+      (takeId !== undefined && (key.includes(takeId) || value.includes(takeId)))
+    ) {
+      keysToDelete.add(key)
+    }
+  }
+
+  for (const key of keysToDelete) {
+    playbackSrcCache.delete(key)
+  }
+}
+
 /** Sync read when a take was just saved — avoids a black frame while getUri resolves. */
 export function readCachedPlaybackSrc(
   filePath: string,
@@ -155,7 +178,11 @@ export async function resolveNativeVideoPlaybackSrc(
   if (cacheKey) {
     const cached = playbackSrcCache.get(cacheKey)
     if (cached) {
-      return sanitizeNativeVideoSrc(cached)
+      if (filePath && !(await nativeDataFileExists(filePath))) {
+        invalidatePlaybackSrcCache(filePath)
+      } else {
+        return sanitizeNativeVideoSrc(cached)
+      }
     }
   }
 
@@ -194,7 +221,11 @@ export async function toCapacitorPlaybackSrc(
 
   const cached = playbackSrcCache.get(uriOrPath)
   if (cached) {
-    return cached
+    const isRelativeTakePath = uriOrPath.includes('/') && !uriOrPath.startsWith('file://')
+    if (!isRelativeTakePath || (await nativeDataFileExists(uriOrPath))) {
+      return cached
+    }
+    invalidatePlaybackSrcCache(uriOrPath)
   }
 
   let converted = uriOrPath
@@ -515,18 +546,19 @@ export async function deleteTakeFile(filePath: string): Promise<void> {
   const task = (async () => {
     try {
       const exists = await nativeDataFileExists(filePath)
-      if (!exists) return
-
-      await Filesystem.deleteFile({
-        path: filePath,
-        directory: Directory.Data,
-      })
+      if (exists) {
+        await Filesystem.deleteFile({
+          path: filePath,
+          directory: Directory.Data,
+        })
+      }
     } catch (err) {
       if (isFilesystemMissingError(err)) {
         return
       }
       /* file may already be gone or delete is best-effort */
     } finally {
+      invalidatePlaybackSrcCache(filePath)
       deleteTakeFileInFlight.delete(filePath)
     }
   })()

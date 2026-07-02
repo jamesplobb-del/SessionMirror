@@ -65,10 +65,10 @@ import {
   NATIVE_AUDIO_MIME,
   NATIVE_VIDEO_MIME,
   persistUploadedVideo,
-  isConvertedPlaybackUrl,
   readCachedPlaybackSrc,
   resolveTakePlaybackUrl,
   resolveNativeFileUri,
+  sanitizeNativeVideoSrc,
   type RecordingCompletePayload,
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
@@ -82,10 +82,7 @@ import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
-import {
-  isOnboardingComplete,
-  markOnboardingComplete,
-} from './utils/onboardingTutorial'
+import { isOnboardingComplete } from './utils/onboardingTutorial'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
@@ -144,12 +141,23 @@ import {
 } from './utils/playbackRouteCoordinator'
 import { syncNativeCameraSessionState } from './utils/cameraSessionState'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
-import { initAppFilesystem } from './utils/filesystemInit'
+import { initAppFilesystem, nativeDataFileExists } from './utils/filesystemInit'
 import { bootstrapViewport, stabilizeViewportAfterMediaInteraction } from './utils/viewportSync'
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
 import { isAppInForeground } from './utils/appForeground'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
 import { applyAutoPlaybackLeadIn } from './utils/autoRecordPlayback'
+import {
+  attachPlaybackPipelineInstrumentation,
+  createPlaybackDiagSession,
+  logAudioFileContentVerification,
+  logAudioSessionSnapshot,
+  logPlaybackSourceVerification,
+  logRecordingOutputVerification,
+  logRouteTransition,
+  setActivePlaybackDiagSession,
+  snapshotPlaybackMedia,
+} from './utils/audioPlaybackDiagnostics'
 import { tuneMusicRecordingStream, tunePlaybackIsolationStream } from './utils/audioCapture'
 import AppBootGate from './components/ui/AppBootGate'
 import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTabs'
@@ -168,8 +176,11 @@ function waitMs(ms: number): Promise<void> {
 }
 
 function resolveTakePlaybackUrlFast(filePath: string, videoUrl: string): string | null {
-  if (videoUrl && (videoUrl.startsWith('blob:') || isConvertedPlaybackUrl(videoUrl))) {
-    return readCachedPlaybackSrc(filePath, videoUrl) ?? videoUrl
+  const freshUrl = sanitizeNativeVideoSrc(videoUrl)
+  if (freshUrl) return freshUrl
+
+  if (videoUrl && videoUrl.startsWith('blob:')) {
+    return videoUrl
   }
 
   if (!filePath && videoUrl) {
@@ -375,6 +386,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   })
   const [autoPlaybackTakeId, setAutoPlaybackTakeId] = useState<string | null>(null)
   const [autoPlaybackPlaying, setAutoPlaybackPlaying] = useState(false)
+  const [audioModeTakePlaying, setAudioModeTakePlaying] = useState(false)
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [showPitch, setShowPitch] = useState(false)
@@ -409,7 +421,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
   const autoPlaybackGenerationRef = useRef(0)
   const playAutoTakeAudioRef = useRef<
-    (playbackUrl: string, takeId: string, performanceStartSeconds?: number) => void
+    (playbackUrl: string, takeId: string, performanceStartSeconds?: number, filePath?: string) => void
   >(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
@@ -608,7 +620,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const playAutoTakeAudio = useCallback(
-    (playbackUrl: string, takeId: string, performanceStartSeconds?: number) => {
+    (playbackUrl: string, takeId: string, performanceStartSeconds?: number, filePath = '') => {
       if (recordingModeRef.current !== 'audio') {
         pendingAutoPlaybackRef.current = false
         setHandsFreePlaybackPending(false)
@@ -625,6 +637,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const playbackGeneration = autoPlaybackGenerationRef.current + 1
       autoPlaybackGenerationRef.current = playbackGeneration
 
+      const sessionId = createPlaybackDiagSession('auto-playback')
+      setActivePlaybackDiagSession(sessionId)
+      const previousAutoPlaybackTakeId = queuedAutoPlayRef.current?.takeId ?? null
+      const newestTakeId = takesRef.current[takesRef.current.length - 1]?.id ?? null
+
       teardownAutoPlaybackMedia()
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
 
@@ -637,45 +654,152 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (!audio) {
         pendingAutoPlaybackRef.current = false
         setHandsFreePlaybackPending(false)
+        setActivePlaybackDiagSession(null)
         finishAutoPlayback()
         return
       }
 
-      prepareInlineMediaElement(audio)
-      audio.preload = 'auto'
-      assignMediaPlaybackSrc(audio, playbackUrl)
-      audio.load()
+      void logPlaybackSourceVerification({
+        sessionId,
+        requestedTakeId: takeId,
+        filePath,
+        requestedUrl: playbackUrl,
+        resolvedUrl: playbackUrl,
+        newestTakeId,
+        previousAutoPlaybackTakeId,
+        queuedTakeId: takeId,
+      })
+      void logAudioSessionSnapshot('before-auto-playback-assign-src', sessionId, {
+        playbackGeneration,
+      })
+
+      const detachPipeline = attachPlaybackPipelineInstrumentation(audio, {
+        sessionId,
+        takeId,
+        path: 'auto-playback',
+      })
 
       void (async () => {
-        const routePrep = Capacitor.isNativePlatform()
-          ? preparePlaybackRoute({ suspendCamera: false }).catch((error) => {
-              console.warn('[PlaybackRoute] auto-playback prep failed', error)
-            })
-          : Promise.resolve()
+        if (Capacitor.isNativePlatform()) {
+          await waitMs(AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS)
+        }
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) {
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
+          return
+        }
 
-        const ready = await Promise.all([waitForMediaReadyWithRetry(audio), routePrep]).then(
-          ([mediaReady]) => mediaReady
-        )
-        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
-        if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
+        if (Capacitor.isNativePlatform() && filePath) {
+          if (!(await nativeDataFileExists(filePath))) {
+            console.warn('[Playback] auto-playback aborted — recording file missing', {
+              takeId,
+              filePath,
+            })
+            detachPipeline()
+            setActivePlaybackDiagSession(null)
+            finishAutoPlayback()
+            return
+          }
+        }
+
+        try {
+          if (Capacitor.isNativePlatform()) {
+            await preparePlaybackRoute({ suspendCamera: false })
+          }
+        } catch (error) {
+          console.warn('[PlaybackRoute] auto-playback prep failed', error)
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
           finishAutoPlayback()
           return
         }
 
+        prepareInlineMediaElement(audio)
+        audio.preload = 'auto'
+        assignMediaPlaybackSrc(audio, playbackUrl)
+        audio.load()
+
+        logRouteTransition(sessionId, 'recording-ended-playback-pending', {
+          takeId,
+          playbackUrl,
+        })
+
+        await logAudioSessionSnapshot('before-wait-for-media-ready', sessionId)
+
+        const ready = await waitForMediaReadyWithRetry(audio)
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) {
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
+          return
+        }
+        if (!ready || queuedAutoPlayRef.current?.takeId !== takeId) {
+          logRouteTransition(sessionId, 'auto-playback-aborted-not-ready', {
+            ready,
+            queuedTakeId: queuedAutoPlayRef.current?.takeId ?? null,
+            ...snapshotPlaybackMedia(audio),
+          })
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
+          finishAutoPlayback()
+          return
+        }
+
+        if (!Number.isFinite(audio.duration) || audio.duration <= 0) {
+          console.warn('[Playback] auto-playback aborted — media has no duration', {
+            takeId,
+            duration: audio.duration,
+            readyState: audio.readyState,
+          })
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
+          finishAutoPlayback()
+          return
+        }
+
+        await logAudioSessionSnapshot('before-playTakeMediaAudible', sessionId)
+        void logAudioFileContentVerification({
+          sessionId,
+          takeId,
+          filePath,
+          playbackUrl,
+          durationSeconds: audio.duration,
+        })
+
         await applyAutoPlaybackLeadIn(audio, undefined, performanceStartSeconds)
 
-        audio.onended = () => finishAutoPlayback()
-        audio.onerror = () => finishAutoPlayback()
+        audio.onended = () => {
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
+          finishAutoPlayback()
+        }
+        audio.onerror = () => {
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
+          finishAutoPlayback()
+        }
 
         const started = await playTakeMediaAudible(audio, {
+          skipRoutePrep: true,
           onFailure: () => setAutoPlaybackPlaying(false),
         })
-        if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+        if (autoPlaybackGenerationRef.current !== playbackGeneration) {
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
+          return
+        }
+
+        await logAudioSessionSnapshot(
+          started ? 'after-playTakeMediaAudible-started' : 'after-playTakeMediaAudible-failed',
+          sessionId,
+          { started },
+        )
 
         if (started) {
           setHandsFreePlaybackPending(false)
           setAutoPlaybackPlaying(true)
         } else {
+          detachPipeline()
+          setActivePlaybackDiagSession(null)
           finishAutoPlayback()
         }
       })()
@@ -874,6 +998,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       autoPerformanceStartSeconds,
     } = payload
 
+    void logRecordingOutputVerification({
+      takeId,
+      filePath,
+      mimeType,
+      durationSeconds,
+      videoUrl,
+      mediaType,
+    })
+
     const shouldAutoPlay =
       pendingAutoPlaybackRef.current &&
       ((mediaType === 'audio' && recordingModeRef.current === 'audio') ||
@@ -900,7 +1033,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
     if (shouldAutoPlay && mediaType === 'audio' && optimisticUrl) {
       pendingAutoPlaybackRef.current = false
-      playAutoTakeAudioRef.current(optimisticUrl, takeId, autoPerformanceStartSeconds)
+      playAutoTakeAudioRef.current(optimisticUrl, takeId, autoPerformanceStartSeconds, filePath)
     } else if (shouldAutoPlay && mediaType === 'video') {
       pendingAutoPlaybackRef.current = false
       autoRecordStartSuppressedRef.current = true
@@ -1123,9 +1256,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     registerYoutubeStereoGuard(
-      () => !isRecording && !autoPlaybackPlaying && !handsFreePlaybackPending
+      () => !isRecording && !autoPlaybackPlaying && !audioModeTakePlaying && !handsFreePlaybackPending
     )
-  }, [autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
+  }, [audioModeTakePlaying, autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
 
   // Re-open WebKit capture so iOS applies the queued mic preference before getUserMedia.
   useEffect(() => {
@@ -1263,6 +1396,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     monitoringPaused:
       handsFreePlaybackPending ||
       autoPlaybackPlaying ||
+      audioModeTakePlaying ||
       benchmarkPipPlaying ||
       challengerPipPlaying ||
       isPreviewRecovering,
@@ -1915,7 +2049,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const metronomeWidgetInteractive = showMetronomeWidget && !metronomeHudSuspended
 
-  const takePlaybackActive = autoPlaybackPlaying || benchmarkPipPlaying || challengerPipPlaying
+  const takePlaybackActive =
+    autoPlaybackPlaying || audioModeTakePlaying || benchmarkPipPlaying || challengerPipPlaying
 
   const selectedAudioEngine = settings.audioEnhancerEnabled ? 'Native + Enhanced' : 'Native'
 
@@ -2357,6 +2492,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         stopAutoPlaybackAudio()
         releaseAutoRecordSuppress(0)
       }
+      audioModePlaybackControlsRef.pause?.()
 
       if (ids.some((id) => id === benchmarkId || id === challengerId)) {
         pausePipVideos()
@@ -2636,7 +2772,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           isTakePlaying={takePlaybackActive}
           muteDuringPlayback={settings.muteMetronomeDuringPlayback}
         >
-          <AudioModePlaybackProvider onBeforePlay={handleAudioModeBeforePlaybackStart}>
+          <AudioModePlaybackProvider
+            onBeforePlay={handleAudioModeBeforePlaybackStart}
+            onPlaybackActiveChange={setAudioModeTakePlaying}
+          >
             <div
               ref={appShellRef}
               className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${

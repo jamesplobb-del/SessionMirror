@@ -145,7 +145,11 @@ function AudioModeTakeCard({
 
   const handleWaveformScrub = useCallback(
     (clientX: number, rect: DOMRect) => {
-      if (!playbackItem || durationSeconds <= 0 || rect.width <= 0) return
+      if (!playbackItem || rect.width <= 0) return
+      if (durationSeconds <= 0) {
+        audioPlayback.play(playbackItem)
+        return
+      }
       const progress = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
       const nextTime = progress * durationSeconds
       if (isCurrentItem) {

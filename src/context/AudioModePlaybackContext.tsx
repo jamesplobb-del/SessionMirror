@@ -11,16 +11,21 @@ import {
 } from 'react'
 import { prepareInlineMediaElement, resolveMediaPlaybackSrc } from '../utils/mediaPlayback'
 import {
-  attachPlaybackRouteEndedListener,
   completePlaybackRouteRestore,
   isPlaybackRouteHoldActive,
   preparePlaybackRoute,
 } from '../utils/playbackRouteCoordinator'
 import {
-  primeTakePlaybackAudio,
+  playTakeMediaAudible,
   releaseTakePlaybackAudio,
 } from '../utils/takePlaybackAudio'
-import { readCachedPlaybackSrc } from '../utils/takeStorage'
+import { readCachedPlaybackSrc, resolveTakePlaybackUrl } from '../utils/takeStorage'
+import {
+  attachPlaybackPipelineInstrumentation,
+  createPlaybackDiagSession,
+  logAudioSessionSnapshot,
+  setActivePlaybackDiagSession,
+} from '../utils/audioPlaybackDiagnostics'
 
 export interface AudioModePlaybackItem {
   id: string
@@ -61,6 +66,7 @@ export const audioModePlaybackControlsRef: { pause: (() => void) | null } = { pa
 interface AudioModePlaybackProviderProps {
   children: ReactNode
   onBeforePlay?: () => void | Promise<void>
+  onPlaybackActiveChange?: (active: boolean) => void
 }
 
 function logPlayback(message: string, details: Record<string, unknown> = {}): void {
@@ -76,17 +82,27 @@ function resolveItemSrc(item: AudioModePlaybackItem): string {
   return resolveMediaPlaybackSrc(cached ?? item.mediaUrl)
 }
 
+async function resolveItemSrcForPlayback(item: AudioModePlaybackItem): Promise<string> {
+  const cached = readCachedPlaybackSrc(item.filePath, item.mediaUrl)
+  if (cached) return resolveMediaPlaybackSrc(cached)
+  const resolved = await resolveTakePlaybackUrl(item.filePath, item.mediaUrl)
+  return resolveMediaPlaybackSrc(resolved || item.mediaUrl)
+}
+
 export function AudioModePlaybackProvider({
   children,
   onBeforePlay,
+  onPlaybackActiveChange,
 }: AudioModePlaybackProviderProps) {
   const playerRef = useRef<HTMLAudioElement>(null)
   const onBeforePlayRef = useRef(onBeforePlay)
+  const onPlaybackActiveChangeRef = useRef(onPlaybackActiveChange)
   const sessionPreparedRef = useRef(false)
   const pendingStartTimeRef = useRef<number | null>(null)
   const currentSourceKeyRef = useRef('')
   const endedListenerSourceKeyRef = useRef('')
   const progressRafRef = useRef<number | null>(null)
+  const pipelineDetachRef = useRef<(() => void) | null>(null)
   const [state, setState] = useState<AudioModePlaybackState>({
     currentItem: null,
     isPlaying: false,
@@ -99,6 +115,10 @@ export function AudioModePlaybackProvider({
   useEffect(() => {
     onBeforePlayRef.current = onBeforePlay
   }, [onBeforePlay])
+
+  useEffect(() => {
+    onPlaybackActiveChangeRef.current = onPlaybackActiveChange
+  }, [onPlaybackActiveChange])
 
   const updateSessionPrepared = useCallback((prepared: boolean) => {
     sessionPreparedRef.current = prepared
@@ -240,12 +260,42 @@ export function AudioModePlaybackProvider({
       prepareInlineMediaElement(player, { preload: 'metadata' })
       player.muted = false
       player.volume = 1
+      onPlaybackActiveChangeRef.current?.(true)
 
       void (async () => {
+        const sessionId = createPlaybackDiagSession('audio-mode-playback')
+        setActivePlaybackDiagSession(sessionId)
+        pipelineDetachRef.current?.()
+        pipelineDetachRef.current = attachPlaybackPipelineInstrumentation(player, {
+          sessionId,
+          takeId: item.takeId ?? item.id,
+          path: 'audio-mode-context',
+        })
         try {
           await onBeforePlayRef.current?.()
+          await logAudioSessionSnapshot('audio-mode-before-session-prep', sessionId)
           await prepareSessionOnce(item)
-          await primeTakePlaybackAudio(player)
+          await logAudioSessionSnapshot('audio-mode-before-prime', sessionId)
+          const resolvedSrc = await resolveItemSrcForPlayback(item)
+          if (!resolvedSrc) {
+            throw new Error('Audio mode playback source is empty')
+          }
+          if (currentSourceKeyRef.current !== sourceKeyFor(item)) {
+            pipelineDetachRef.current?.()
+            pipelineDetachRef.current = null
+            setActivePlaybackDiagSession(null)
+            return
+          }
+          if (resolvedSrc && player.src !== resolvedSrc) {
+            player.pause()
+            player.src = resolvedSrc
+            player.preload = 'metadata'
+            prepareInlineMediaElement(player, { preload: 'metadata' })
+            player.muted = false
+            player.volume = 1
+            player.load()
+            onPlaybackActiveChangeRef.current?.(true)
+          }
           if (pendingStartTimeRef.current !== null) {
             try {
               player.currentTime = Math.max(0, pendingStartTimeRef.current)
@@ -254,11 +304,15 @@ export function AudioModePlaybackProvider({
             }
             pendingStartTimeRef.current = null
           }
-          await player.play()
-          if (endedListenerSourceKeyRef.current !== currentSourceKeyRef.current) {
-            attachPlaybackRouteEndedListener(player)
-            endedListenerSourceKeyRef.current = currentSourceKeyRef.current
+          const started = await playTakeMediaAudible(player, { skipRoutePrep: true })
+          if (!started) {
+            throw new Error('Audio mode playback did not start')
           }
+          await logAudioSessionSnapshot('audio-mode-after-play', sessionId, {
+            duration: player.duration,
+            paused: player.paused,
+          })
+          endedListenerSourceKeyRef.current = currentSourceKeyRef.current
           logPlayback('Starting playback', {
             takeId: item.takeId ?? item.id,
             position: player.currentTime,
@@ -272,6 +326,10 @@ export function AudioModePlaybackProvider({
             playerExists: true,
           }))
         } catch (error) {
+          pipelineDetachRef.current?.()
+          pipelineDetachRef.current = null
+          setActivePlaybackDiagSession(null)
+          onPlaybackActiveChangeRef.current?.(false)
           logPlayback('Playback intercepted', {
             takeId: item.takeId ?? item.id,
             error: error instanceof Error ? error.message : String(error),
@@ -289,6 +347,7 @@ export function AudioModePlaybackProvider({
     const player = playerRef.current
     if (!player) return
     player.pause()
+    onPlaybackActiveChangeRef.current?.(false)
     logPlayback('Paused', {
       takeId: state.currentItem?.takeId ?? state.currentItem?.id,
       position: player.currentTime,
@@ -380,10 +439,12 @@ export function AudioModePlaybackProvider({
       setState((prev) => ({ ...prev, currentTime: player.currentTime }))
     }
     const onPlay = () => {
+      onPlaybackActiveChangeRef.current?.(true)
       setState((prev) => ({ ...prev, isPlaying: true }))
       startProgressLoop()
     }
     const onPause = () => {
+      onPlaybackActiveChangeRef.current?.(false)
       stopProgressLoop()
       setState((prev) => ({
         ...prev,
@@ -392,6 +453,7 @@ export function AudioModePlaybackProvider({
       }))
     }
     const onEnded = () => {
+      onPlaybackActiveChangeRef.current?.(false)
       stopProgressLoop()
       updateSessionPrepared(false)
       void releaseTakePlaybackAudio()
@@ -434,6 +496,7 @@ export function AudioModePlaybackProvider({
   useEffect(() => {
     return () => {
       stopProgressLoop()
+      onPlaybackActiveChangeRef.current?.(false)
       updateSessionPrepared(false)
       void completePlaybackRouteRestore()
     }

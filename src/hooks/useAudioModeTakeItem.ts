@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useAudioModePlayback } from '../context/AudioModePlaybackContext'
+import { useCapacitorVideoSrc } from './useCapacitorVideoSrc'
 import { buildAudioModePlaybackItem } from '../utils/audioModePlaybackItem'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
@@ -14,9 +15,12 @@ export function useAudioModeTakeItem({
   libraryPlayback?: LibraryPlaybackReference | null
 }) {
   const audioPlayback = useAudioModePlayback()
+  const filePath = libraryPlayback?.filePath ?? take?.filePath ?? ''
+  const rawMediaUrl = libraryPlayback?.playbackUrl ?? take?.videoUrl ?? ''
+  const resolvedMediaUrl = useCapacitorVideoSrc(filePath, rawMediaUrl)
   const playbackItem = useMemo(
-    () => buildAudioModePlaybackItem({ tone, take, libraryPlayback }),
-    [libraryPlayback, take, tone]
+    () => buildAudioModePlaybackItem({ tone, take, libraryPlayback, resolvedMediaUrl }),
+    [libraryPlayback, resolvedMediaUrl, take, tone]
   )
   const hasMedia = Boolean(playbackItem)
   const isCurrentItem = playbackItem ? audioPlayback.matchesCurrentSource(playbackItem) : false

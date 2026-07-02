@@ -7,6 +7,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
     private var audioRouteObserver: NSObjectProtocol?
+    private var audioInterruptionObserver: NSObjectProtocol?
 
     /// Keep the Swift plugin class linked so Capacitor packageClassList can resolve it.
     private let bestTakeAudioPluginClass = BestTakeAudioPlugin.self
@@ -18,7 +19,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
         installAudioRouteObserver()
+        installAudioInterruptionObserver()
         return true
+    }
+
+    private func installAudioInterruptionObserver() {
+        let session = AVAudioSession.sharedInstance()
+        audioInterruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: session,
+            queue: .main
+        ) { notification in
+            let typeRaw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let type = typeRaw.flatMap { AVAudioSession.InterruptionType(rawValue: $0) }
+            let reasonRaw: UInt? = {
+                if #available(iOS 14.5, *) {
+                    return notification.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt
+                }
+                return nil
+            }()
+            let wasSuspended = notification.userInfo?[AVAudioSessionInterruptionWasSuspendedKey] as? Bool
+            let optionsRaw = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
+            let options = optionsRaw.flatMap { AVAudioSession.InterruptionOptions(rawValue: $0) }
+            let snapshot = AudioRouteConfigurator.routeSnapshot(for: session)
+            print(
+                "[AVAudioSessionInterruption] type=\(String(describing: type)) " +
+                "reason=\(String(describing: reasonRaw)) wasSuspended=\(String(describing: wasSuspended)) " +
+                "options=\(String(describing: options)) " +
+                "category=\(snapshot["category"] as? String ?? "unknown") " +
+                "mode=\(snapshot["mode"] as? String ?? "unknown") " +
+                "active=\(session.isOtherAudioPlaying) otherAudioPlaying=\(session.isOtherAudioPlaying) " +
+                "route=\(snapshot["outputPort"] as? String ?? "unknown")"
+            )
+        }
     }
 
     private func installAudioRouteObserver() {
