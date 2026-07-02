@@ -115,9 +115,11 @@ function Lane({ row, variant, depth, isPlayer = false, children }: LaneProps) {
   const visual = laneVisualForRow(row)
   const surfaceUrl =
     visual === 'river'
-      ? SCALE_RUSH_ASSETS.water
+      ? SCALE_RUSH_ASSETS.waterLane
       : visual === 'grass'
-        ? SCALE_RUSH_ASSETS.grass
+        ? SCALE_RUSH_ASSETS.grassLane
+        : visual === 'road'
+          ? SCALE_RUSH_ASSETS.roadLane
         : null
 
   return (

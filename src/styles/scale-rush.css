@@ -10,6 +10,7 @@
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
   width: 100%;
   max-width: 48rem;
   margin: 0 auto;
@@ -18,6 +19,12 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   padding: clamp(1rem, 2.8vh, 1.6rem) clamp(0.85rem, 2.4vh, 1.5rem) clamp(0.75rem, 2vh, 1.35rem);
+}
+
+.scale-rush-screen--setup,
+.scale-rush-screen--gameover {
+  max-height: 100%;
+  gap: 0;
 }
 
 .scale-rush-screen--playing {
@@ -47,9 +54,11 @@
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
   width: 100%;
   border-radius: 1.25rem;
   overflow: hidden;
+  contain: layout paint size;
 }
 
 .sr-phaser-host {
@@ -86,7 +95,11 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 0.65rem 0.7rem 0;
+  padding:
+    max(0.65rem, env(safe-area-inset-top, 0px))
+    max(0.7rem, env(safe-area-inset-right, 0px))
+    0
+    max(0.7rem, env(safe-area-inset-left, 0px));
 }
 
 .sr-hud-hearts {
@@ -124,19 +137,19 @@
 
 .sr-hud-side {
   position: absolute;
-  top: 3.2rem;
+  top: max(3.2rem, calc(env(safe-area-inset-top, 0px) + 2.65rem));
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  max-width: 5.5rem;
+  max-width: min(6.25rem, 30vw);
 }
 
 .sr-hud-side--left {
-  left: 0.55rem;
+  left: max(0.55rem, env(safe-area-inset-left, 0px));
 }
 
 .sr-hud-side--right {
-  right: 0.55rem;
+  right: max(0.55rem, env(safe-area-inset-right, 0px));
   align-items: flex-end;
 }
 
@@ -146,6 +159,10 @@
   background: rgba(15, 23, 42, 0.55);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
   min-width: 4.2rem;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .sr-hud-side--right .sr-hud-panel {
@@ -166,6 +183,7 @@
   font-size: 1.15rem;
   font-weight: 900;
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .sr-hud-panel__value--score {
@@ -181,13 +199,13 @@
 }
 
 .sr-hud-panel__value--target {
-  font-size: 1.85rem;
+  font-size: clamp(1.25rem, 5vw, 1.85rem);
   color: #fde047;
   text-shadow: 0 0 18px rgba(253, 224, 71, 0.45);
 }
 
 .sr-hud-panel__value--detected {
-  font-size: 1.55rem;
+  font-size: clamp(1.1rem, 4.2vw, 1.55rem);
   color: #fff;
 }
 
@@ -935,6 +953,30 @@
 
   .sr-lane {
     height: clamp(3.6rem, 9.5vh, 5.5rem);
+  }
+}
+
+@media (max-height: 680px) {
+  .scale-rush-screen {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .scale-rush-screen--playing {
+    padding: 0;
+  }
+
+  .sr-hud-panel {
+    padding: 0.24rem 0.42rem;
+    min-width: 3.85rem;
+  }
+
+  .sr-hud-panel__label {
+    font-size: 0.48rem;
+  }
+
+  .sr-hud-panel__value {
+    font-size: 1rem;
   }
 }
 

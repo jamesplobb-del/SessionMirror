@@ -9,7 +9,7 @@ interface ScaleRushTileProps {
 }
 
 /**
- * Center path tile — grass.png IS the tile; note label from buildCourseRows().
+ * Center path tile — grass lane sprite carries the note label from buildCourseRows().
  */
 export default function ScaleRushTile({ row, variant }: ScaleRushTileProps) {
   const isStart = variant === 'start' || row.isStart
@@ -31,7 +31,7 @@ export default function ScaleRushTile({ row, variant }: ScaleRushTileProps) {
       <div className="sr-tile__shadow" aria-hidden />
       <img
         className="sr-tile__sprite"
-        src={SCALE_RUSH_ASSETS.grass}
+        src={SCALE_RUSH_ASSETS.grassPath}
         alt=""
         draggable={false}
       />
