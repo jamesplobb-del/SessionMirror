@@ -5327,7 +5327,23 @@ html.native-dark-chrome body {
 }
 
 .onboarding-lite__footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
   padding: 0 1rem 1rem;
+}
+
+.onboarding-lite__skip {
+  display: inline-flex;
+  min-height: 3.2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.05rem;
+  padding: 0 0.95rem;
+  color: rgba(15, 23, 42, 0.58);
+  font-size: 0.92rem;
+  font-weight: 760;
 }
 
 .onboarding-lite__primary {
@@ -5388,7 +5404,7 @@ html.native-dark-chrome body {
 }
 
 .coach-mark-card__copy {
-  padding: 0.9rem 2.6rem 0.95rem 1rem;
+  padding: 0.9rem 2.6rem 2.55rem 1rem;
 }
 
 .coach-mark-card__copy h2 {
@@ -5417,6 +5433,21 @@ html.native-dark-chrome body {
   justify-content: center;
   border-radius: 999px;
   color: rgba(15, 23, 42, 0.58);
+}
+
+.coach-mark-card__skip {
+  position: absolute;
+  bottom: 0.55rem;
+  right: 0.7rem;
+  display: inline-flex;
+  min-height: 1.85rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 0.65rem;
+  color: rgba(15, 23, 42, 0.58);
+  font-size: 0.75rem;
+  font-weight: 760;
 }
 
 .settings-learn-list {
@@ -5496,7 +5527,9 @@ html.dark .coach-mark-card__copy h2 {
 html.dark .onboarding-lite__copy p,
 html.dark .coach-mark-card__copy p,
 html.dark .onboarding-lite__icon-btn,
-html.dark .coach-mark-card__close {
+html.dark .onboarding-lite__skip,
+html.dark .coach-mark-card__close,
+html.dark .coach-mark-card__skip {
   color: rgba(226, 232, 240, 0.74);
 }
 

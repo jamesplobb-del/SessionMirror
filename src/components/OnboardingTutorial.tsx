@@ -116,6 +116,16 @@ export default function OnboardingTutorial({
             intensity="soft"
             haptic="light"
             hapticFeedback={hapticFeedback}
+            onClick={finish}
+            className="onboarding-lite__skip"
+          >
+            Skip
+          </Pressable>
+          <Pressable
+            type="button"
+            intensity="soft"
+            haptic="light"
+            hapticFeedback={hapticFeedback}
             onClick={handleNext}
             className="onboarding-lite__primary"
           >

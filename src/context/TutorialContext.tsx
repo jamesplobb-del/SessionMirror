@@ -8,12 +8,17 @@ import {
   type ReactNode,
 } from 'react'
 import { COACH_MARKS, type CoachMarkContent, type CoachMarkId } from '../utils/tutorialContent'
-import { hasSeenCoachMark, markCoachMarkSeen } from '../utils/onboardingTutorial'
+import {
+  hasSeenCoachMark,
+  markAllCoachMarksSeen,
+  markCoachMarkSeen,
+} from '../utils/onboardingTutorial'
 
 interface TutorialContextValue {
   activeCoachMark: CoachMarkContent | null
   activeTargetRect: DOMRect | null
   dismissCoachMark: () => void
+  skipCoachMarks: () => void
   markCoachMark: (id: CoachMarkId) => void
 }
 
@@ -61,6 +66,12 @@ export function TutorialProvider({ active, children }: TutorialProviderProps) {
   const markCoachMark = useCallback((id: CoachMarkId) => {
     markCoachMarkSeen(id)
     setActiveCoachMark((current) => (current?.id === id ? null : current))
+  }, [])
+
+  const skipCoachMarks = useCallback(() => {
+    markAllCoachMarksSeen()
+    setActiveCoachMark(null)
+    setActiveTargetRect(null)
   }, [])
 
   useEffect(() => {
@@ -115,9 +126,10 @@ export function TutorialProvider({ active, children }: TutorialProviderProps) {
       activeCoachMark,
       activeTargetRect,
       dismissCoachMark,
+      skipCoachMarks,
       markCoachMark,
     }),
-    [activeCoachMark, activeTargetRect, dismissCoachMark, markCoachMark],
+    [activeCoachMark, activeTargetRect, dismissCoachMark, markCoachMark, skipCoachMarks],
   )
 
   return <TutorialContext.Provider value={value}>{children}</TutorialContext.Provider>

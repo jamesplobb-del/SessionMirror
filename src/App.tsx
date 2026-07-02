@@ -3004,6 +3004,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           youtubeIframeRef={youtubeIframeRef}
                           deleteDropRef={recordDeleteDropRef}
                           onPinBenchmark={handlePinBenchmark}
+                          onPinChallenger={handlePinChallenger}
                           onDeleteTake={handleDragDeleteTake}
                           onDragStateChange={handlePipDragStateChange}
                           hapticFeedback={settings.hapticFeedback}
@@ -3059,6 +3060,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             challengerPipVideoRef={challengerPipVideoRef}
                             deleteDropRef={recordDeleteDropRef}
                             onPinBenchmark={handlePinBenchmark}
+                            onPinChallenger={handlePinChallenger}
                             onDeleteTake={handleDragDeleteTake}
                             onUnpinBenchmark={handleUnpinBenchmark}
                             onClearLibraryReference={handleClearLibraryReference}

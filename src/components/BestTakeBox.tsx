@@ -8,6 +8,7 @@ import {
   type MouseEvent,
   type PointerEvent,
   type RefObject,
+  type CSSProperties,
 } from 'react'
 import { Maximize2, Minimize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
@@ -83,6 +84,15 @@ export interface BestTakeBoxProps {
   onPlaybackChange?: (playing: boolean) => void
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
   youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
+  dragSourceActive?: boolean
+  dragSourceArming?: boolean
+  dragSourceProps?: {
+    onPointerDown: (event: PointerEvent<HTMLElement>) => void
+    onPointerMove: (event: PointerEvent<HTMLElement>) => void
+    onPointerUp: (event: PointerEvent<HTMLElement>) => void
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => void
+    style?: CSSProperties
+  }
 }
 
 function BestTakeBox({
@@ -104,6 +114,9 @@ function BestTakeBox({
   onPlaybackChange,
   onYoutubeHostChange,
   youtubeIframeRef,
+  dragSourceActive = false,
+  dragSourceArming = false,
+  dragSourceProps,
 }: BestTakeBoxProps) {
   const librarySrc = libraryPlayback?.playbackUrl ?? null
   const src = librarySrc || take?.videoUrl || null
@@ -308,10 +321,14 @@ function BestTakeBox({
   const innerClass = isFill
     ? `group relative z-0 h-full w-full overflow-hidden ${mediaStageClass} ring-1 ring-amber-400/50 ${
         hasReference ? 'opacity-100' : 'opacity-90'
+      } ${dragSourceActive ? 'pip-drag-source--active' : ''} ${
+        dragSourceArming ? 'pip-drag-source--arming' : ''
       }`
     : `group relative z-0 h-full w-full overflow-hidden rounded-xl border-[0.5px] ${mediaStageClass} shadow-lg shadow-black/50 ring-1 ring-amber-400/50 transition-opacity duration-200 ease-in ${
         hasReference ? 'opacity-100' : 'opacity-90'
-      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'}`
+      } ${dropHighlight ? 'pip-drop-target--active border-amber-400/80' : 'border-white/10'} ${
+        dragSourceActive ? 'pip-drag-source--active' : ''
+      } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
 
   const pillLeft = showUploadBadge ? 36 : 8
 
@@ -430,15 +447,25 @@ function BestTakeBox({
               )}
 
               {onExpand && (
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  squish={false}
-                  haptic="light"
-                  className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
-                  onClick={onExpand}
-                  aria-label="Open Best Take in full screen"
-                />
+                dragSourceProps ? (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="pip-drag-layer absolute inset-0 z-[1] cursor-grab touch-none select-none border-0 bg-transparent p-0 active:cursor-grabbing"
+                    aria-label="Hold then drag Best Take to Current Take, or tap to open full screen"
+                    {...dragSourceProps}
+                  />
+                ) : (
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    squish={false}
+                    haptic="light"
+                    className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
+                    onClick={onExpand}
+                    aria-label="Open Best Take in full screen"
+                  />
+                )
               )}
 
               <div className="absolute inset-0 z-[5] pointer-events-none">

@@ -20,6 +20,7 @@ export interface PipCompareRowProps {
   challengerPipVideoRef: RefObject<HTMLMediaElement | null>
   deleteDropRef: RefObject<HTMLElement | null>
   onPinBenchmark: (takeId: string) => void
+  onPinChallenger: (takeId: string) => void
   onDeleteTake: (takeId: string) => void
   onUnpinBenchmark: () => void
   onClearLibraryReference?: () => void
@@ -47,11 +48,13 @@ export function PipDragGhost({
   x,
   y,
   overDelete,
+  actionLabel = 'Pin',
 }: {
   take: Take
   x: number
   y: number
   overDelete: boolean
+  actionLabel?: string
 }) {
   const poster =
     take.thumbnailUrl ||
@@ -93,7 +96,7 @@ export function PipDragGhost({
             overDelete ? 'bg-red-500/90' : 'bg-sky-500/90'
           }`}
         >
-          {overDelete ? 'Delete' : 'Pin'}
+          {overDelete ? 'Delete' : actionLabel}
         </span>
       </motion.div>
     </div>
@@ -110,6 +113,7 @@ export default memo(function PipCompareRow({
   challengerPipVideoRef,
   deleteDropRef,
   onPinBenchmark,
+  onPinChallenger,
   onDeleteTake,
   onUnpinBenchmark,
   onClearLibraryReference,
@@ -132,8 +136,14 @@ export default memo(function PipCompareRow({
   youtubeIframeRef,
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
+  const challengerDropRef = useRef<HTMLDivElement>(null)
 
-  const { ghost, isDragging, isArming, dragSourceProps } = useDragToPin({
+  const {
+    ghost: challengerGhost,
+    isDragging: challengerDragging,
+    isArming: challengerArming,
+    dragSourceProps: challengerDragSourceProps,
+  } = useDragToPin({
     sourceTakeId: challengerTake?.id ?? null,
     dropTargetRef: benchmarkDropRef,
     deleteDropTargetRef: deleteDropRef,
@@ -142,6 +152,21 @@ export default memo(function PipCompareRow({
     onTap: onExpandChallenger,
     onDragStateChange,
     enabled: takeHasPlaybackMedia(challengerTake),
+    hapticFeedback,
+  })
+
+  const {
+    ghost: benchmarkGhost,
+    isDragging: benchmarkDragging,
+    isArming: benchmarkArming,
+    dragSourceProps: benchmarkDragSourceProps,
+  } = useDragToPin({
+    sourceTakeId: libraryBenchmarkPlayback || youtubeEmbedUrl ? null : benchmarkTake?.id ?? null,
+    dropTargetRef: challengerDropRef,
+    onPin: onPinChallenger,
+    onTap: onExpandBenchmark,
+    onDragStateChange,
+    enabled: takeHasPlaybackMedia(benchmarkTake) && !libraryBenchmarkPlayback && !youtubeEmbedUrl,
     hapticFeedback,
   })
 
@@ -156,7 +181,7 @@ export default memo(function PipCompareRow({
             youtubeEmbedUrl={youtubeEmbedUrl}
             suspendPlayback={suspendPipPlayback}
             videoRef={benchmarkPipVideoRef}
-            dropHighlight={ghost?.overPin ?? false}
+            dropHighlight={challengerGhost?.overPin ?? false}
             onUnpinTake={onUnpinBenchmark}
             onClearLibraryReference={onClearLibraryReference}
             onClearYoutube={onClearYoutube}
@@ -171,10 +196,17 @@ export default memo(function PipCompareRow({
             onPlaybackChange={onBenchmarkPlaybackChange}
             onYoutubeHostChange={onYoutubeHostChange}
             youtubeIframeRef={youtubeIframeRef}
+            dragSourceActive={benchmarkDragging}
+            dragSourceArming={benchmarkArming}
+            dragSourceProps={
+              takeHasPlaybackMedia(benchmarkTake) && !libraryBenchmarkPlayback && !youtubeEmbedUrl
+                ? benchmarkDragSourceProps
+                : undefined
+            }
           />
         </div>
 
-        <div className="app-pip-slot pointer-events-auto" data-tutorial="challenger-card">
+        <div ref={challengerDropRef} className="app-pip-slot pointer-events-auto" data-tutorial="challenger-card">
           <PipWindow
             src={challengerTake?.videoUrl ?? null}
           filePath={challengerTake?.filePath}
@@ -192,10 +224,11 @@ export default memo(function PipCompareRow({
           videoRef={challengerPipVideoRef}
           onUnpin={onUnpinChallenger}
           onExpand={takeHasPlaybackMedia(challengerTake) ? onExpandChallenger : undefined}
-          dragSourceActive={isDragging}
-          dragSourceArming={isArming}
+          dropHighlight={benchmarkGhost?.overPin ?? false}
+          dragSourceActive={challengerDragging}
+          dragSourceArming={challengerArming}
           dragSourceProps={
-            takeHasPlaybackMedia(challengerTake) ? dragSourceProps : undefined
+            takeHasPlaybackMedia(challengerTake) ? challengerDragSourceProps : undefined
           }
           onPlaybackChange={onChallengerPlaybackChange}
           autoPlayRequestId={challengerAutoPlayRequestId}
@@ -211,12 +244,22 @@ export default memo(function PipCompareRow({
         </div>
       </div>
 
-      {ghost && challengerTake && (
+      {challengerGhost && challengerTake && (
         <PipDragGhost
           take={challengerTake}
-          x={ghost.x}
-          y={ghost.y}
-          overDelete={ghost.overDelete}
+          x={challengerGhost.x}
+          y={challengerGhost.y}
+          overDelete={challengerGhost.overDelete}
+        />
+      )}
+
+      {benchmarkGhost && benchmarkTake && (
+        <PipDragGhost
+          take={benchmarkTake}
+          x={benchmarkGhost.x}
+          y={benchmarkGhost.y}
+          overDelete={benchmarkGhost.overDelete}
+          actionLabel="Current"
         />
       )}
     </>

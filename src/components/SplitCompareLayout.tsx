@@ -50,6 +50,7 @@ interface SplitCompareLayoutProps {
   youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
   deleteDropRef?: RefObject<HTMLElement | null>
   onPinBenchmark?: (takeId: string) => void
+  onPinChallenger?: (takeId: string) => void
   onDeleteTake?: (takeId: string) => void
   onDragStateChange?: (state: PipDragUiState) => void
   hapticFeedback?: boolean
@@ -94,17 +95,30 @@ export default function SplitCompareLayout({
   youtubeIframeRef,
   deleteDropRef,
   onPinBenchmark,
+  onPinChallenger,
   onDeleteTake,
   onDragStateChange,
   hapticFeedback = true,
 }: SplitCompareLayoutProps) {
   const layoutRef = useRef<HTMLDivElement>(null)
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
+  const challengerDropRef = useRef<HTMLDivElement>(null)
   const bottomHeight = 100 - splitRatio
   const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
-  const dragEnabled = showCurrentTake && Boolean(onPinBenchmark)
+  const challengerDragEnabled = showCurrentTake && Boolean(onPinBenchmark)
+  const benchmarkDragEnabled =
+    !isRecording &&
+    Boolean(onPinChallenger) &&
+    takeHasPlaybackMedia(benchmarkTake) &&
+    !libraryBenchmarkPlayback &&
+    !youtubeEmbedUrl
 
-  const { ghost, isDragging, isArming, dragSourceProps } = useDragToPin({
+  const {
+    ghost: challengerGhost,
+    isDragging: challengerDragging,
+    isArming: challengerArming,
+    dragSourceProps: challengerDragSourceProps,
+  } = useDragToPin({
     sourceTakeId: challengerTake?.id ?? null,
     dropTargetRef: benchmarkDropRef,
     deleteDropTargetRef: deleteDropRef,
@@ -112,7 +126,22 @@ export default function SplitCompareLayout({
     onDelete: onDeleteTake,
     onTap: onExpandChallenger,
     onDragStateChange,
-    enabled: dragEnabled,
+    enabled: challengerDragEnabled,
+    hapticFeedback,
+  })
+
+  const {
+    ghost: benchmarkGhost,
+    isDragging: benchmarkDragging,
+    isArming: benchmarkArming,
+    dragSourceProps: benchmarkDragSourceProps,
+  } = useDragToPin({
+    sourceTakeId: benchmarkTake?.id ?? null,
+    dropTargetRef: challengerDropRef,
+    onPin: onPinChallenger ?? (() => {}),
+    onTap: onExpandBenchmark,
+    onDragStateChange,
+    enabled: benchmarkDragEnabled,
     hapticFeedback,
   })
 
@@ -154,7 +183,7 @@ export default function SplitCompareLayout({
               youtubeEmbedUrl={youtubeEmbedUrl}
               suspendPlayback={suspendPipPlayback}
               videoRef={benchmarkPipVideoRef}
-              dropHighlight={ghost?.overPin ?? false}
+              dropHighlight={challengerGhost?.overPin ?? false}
               onUnpinTake={onUnpinBenchmark}
               onClearLibraryReference={onClearLibraryReference}
               onClearYoutube={onClearYoutube}
@@ -166,6 +195,9 @@ export default function SplitCompareLayout({
               onPlaybackChange={onBenchmarkPlaybackChange}
               onYoutubeHostChange={onYoutubeHostChange}
               youtubeIframeRef={youtubeIframeRef}
+              dragSourceActive={benchmarkDragging}
+              dragSourceArming={benchmarkArming}
+              dragSourceProps={benchmarkDragEnabled ? benchmarkDragSourceProps : undefined}
             />
           </div>
         </div>
@@ -182,7 +214,7 @@ export default function SplitCompareLayout({
           style={{ height: `${bottomHeight}%` }}
         >
           {showCurrentTake && challengerTake ? (
-            <div className={`split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0${
+            <div ref={challengerDropRef} className={`split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0${
               challengerIsAudio ? ' split-compare-panel--media-audio' : ''
             }`}>
               <span className="split-compare-panel__label split-compare-panel__label--current">
@@ -213,9 +245,10 @@ export default function SplitCompareLayout({
                 onAutoPlayComplete={onChallengerAutoPlayComplete}
                 showPinAsBest={showPinCurrentAsBest}
                 onPinAsBest={onPinCurrentAsBest}
-                dragSourceActive={isDragging}
-                dragSourceArming={isArming}
-                dragSourceProps={dragEnabled ? dragSourceProps : undefined}
+                dropHighlight={benchmarkGhost?.overPin ?? false}
+                dragSourceActive={challengerDragging}
+                dragSourceArming={challengerArming}
+                dragSourceProps={challengerDragEnabled ? challengerDragSourceProps : undefined}
                 splitViewActive
                 posterUrl={
                   challengerTake.thumbnailUrl ??
@@ -224,7 +257,12 @@ export default function SplitCompareLayout({
               />
             </div>
           ) : (
-            <div className="split-compare-panel split-compare-panel--current h-full w-full min-h-0">
+            <div
+              ref={challengerDropRef}
+              className={`split-compare-panel split-compare-panel--current h-full w-full min-h-0${
+                benchmarkGhost?.overPin ? ' pip-drop-target--active' : ''
+              }`}
+            >
               <span className="split-compare-panel__label split-compare-panel__label--current">
                 {currentPanelLabel}
               </span>
@@ -247,12 +285,22 @@ export default function SplitCompareLayout({
         </div>
       </div>
 
-      {ghost && challengerTake && (
+      {challengerGhost && challengerTake && (
         <PipDragGhost
           take={challengerTake}
-          x={ghost.x}
-          y={ghost.y}
-          overDelete={ghost.overDelete}
+          x={challengerGhost.x}
+          y={challengerGhost.y}
+          overDelete={challengerGhost.overDelete}
+        />
+      )}
+
+      {benchmarkGhost && benchmarkTake && (
+        <PipDragGhost
+          take={benchmarkTake}
+          x={benchmarkGhost.x}
+          y={benchmarkGhost.y}
+          overDelete={benchmarkGhost.overDelete}
+          actionLabel="Current"
         />
       )}
     </>

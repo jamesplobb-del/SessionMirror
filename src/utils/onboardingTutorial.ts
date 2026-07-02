@@ -1,4 +1,5 @@
 import {
+  COACH_MARKS,
   COACH_STORAGE_KEY,
   ONBOARDING_STORAGE_KEY,
   type CoachMarkId,
@@ -57,6 +58,10 @@ export function markCoachMarkSeen(id: CoachMarkId): void {
   const seen = readSeenCoachMarks()
   seen.add(id)
   writeSeenCoachMarks(seen)
+}
+
+export function markAllCoachMarksSeen(): void {
+  writeSeenCoachMarks(new Set(COACH_MARKS.map((coachMark) => coachMark.id)))
 }
 
 export function resetTutorials(): void {
