@@ -136,15 +136,24 @@ import {
 } from './utils/recordingDiagnostics'
 import {
   installPlaybackRouteEndedListener,
+  clearPlaybackRouteForLifecycle,
   preparePlaybackRoute,
   registerPlaybackCameraHandlers,
 } from './utils/playbackRouteCoordinator'
 import { syncNativeCameraSessionState } from './utils/cameraSessionState'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem, nativeDataFileExists } from './utils/filesystemInit'
-import { bootstrapViewport, stabilizeViewportAfterMediaInteraction } from './utils/viewportSync'
+import {
+  bootstrapViewport,
+  requestCameraPreviewLayoutRecovery,
+  stabilizeViewportAfterMediaInteraction,
+} from './utils/viewportSync'
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
-import { isAppInForeground } from './utils/appForeground'
+import {
+  APP_BACKGROUND_SUSPEND_EVENT,
+  APP_FOREGROUND_RECOVERY_EVENT,
+  isAppInForeground,
+} from './utils/appForeground'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
 import { applyAutoPlaybackLeadIn } from './utils/autoRecordPlayback'
 import {
@@ -431,7 +440,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
-  const [practiceMusicScanFullscreen, setPracticeMusicScanFullscreen] = useState(false)
   const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
   autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -589,32 +597,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       releaseAutoRecordSuppress(0)
       pausePipVideos()
       void finalizeTakePlaybackCleanup()
-    }
-
-    if (Capacitor.isNativePlatform()) {
-      let removeListener: (() => void) | undefined
-      void import('@capacitor/app').then(({ App }) => {
-        void App.addListener('appStateChange', ({ isActive }) => {
-          if (!isActive) suspendInteractiveAudio()
-        }).then((sub) => {
-          removeListener = () => {
-            void sub.remove()
-          }
-        })
-      })
-
-      return () => {
-        removeListener?.()
-      }
+      void clearPlaybackRouteForLifecycle('app-background')
     }
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') suspendInteractiveAudio()
     }
+    const onBackgroundSuspend = () => suspendInteractiveAudio()
 
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, onBackgroundSuspend)
+
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener(APP_BACKGROUND_SUSPEND_EVENT, onBackgroundSuspend)
     }
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
@@ -1291,6 +1287,56 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       recordingActive: isRecording,
     })
   }, [isRecording, ready, recordingMode])
+
+  useEffect(() => {
+    let firstTimer: number | null = null
+    let secondTimer: number | null = null
+
+    const clearTimers = () => {
+      if (firstTimer !== null) {
+        window.clearTimeout(firstTimer)
+        firstTimer = null
+      }
+      if (secondTimer !== null) {
+        window.clearTimeout(secondTimer)
+        secondTimer = null
+      }
+    }
+
+    const recoverAppAfterForeground = (event: Event) => {
+      if (!isAppInForeground()) return
+      clearTimers()
+
+      const reason =
+        event instanceof CustomEvent && typeof event.detail?.reason === 'string'
+          ? event.detail.reason
+          : 'foreground'
+
+      void clearPlaybackRouteForLifecycle(`foreground:${reason}`)
+      void resumePlaybackAudioContext()
+      requestCameraPreviewLayoutRecovery(`foreground:${reason}`)
+
+      firstTimer = window.setTimeout(() => {
+        void refreshCameraSession()
+      }, 140)
+
+      secondTimer = window.setTimeout(() => {
+        void refreshCameraSession().finally(() => {
+          void syncNativeCameraSessionState({
+            previewActive: ready && recordingMode === 'video',
+            recordingActive: isRecording,
+          })
+        })
+      }, 720)
+    }
+
+    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverAppAfterForeground)
+
+    return () => {
+      clearTimers()
+      window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverAppAfterForeground)
+    }
+  }, [isRecording, ready, recordingMode, refreshCameraSession])
 
   useEffect(() => {
     if (recordingMode !== 'video') return
@@ -2078,7 +2124,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const takePlaybackActive =
     autoPlaybackPlaying || audioModeTakePlaying || benchmarkPipPlaying || challengerPipPlaying
-  const nativeSessionPlaybackActive = recordingMode === 'video' && takePlaybackActive
+  const nativeSessionPlaybackActive =
+    autoPlaybackPlaying || (recordingMode === 'video' && takePlaybackActive)
 
   const selectedAudioEngine = settings.audioEnhancerEnabled ? 'Native + Enhanced' : 'Native'
 
@@ -3016,7 +3063,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
                   } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${
                     isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline app-ui-overlay--audio-practice-metronome' : ''
-                  } ${practiceMusicScanFullscreen ? 'app-ui-overlay--music-scan-fullscreen' : ''}`}
+                  }`}
                   aria-hidden={hudModalState === 'review'}
                   animate={{
                     opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -3080,7 +3127,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           isRecording={isRecording}
                           onStartRecording={toggleRecording}
                           onStopRecording={toggleRecording}
-                          onScanFullscreenChange={setPracticeMusicScanFullscreen}
                         />
                       </div>
                     )}

@@ -15,6 +15,7 @@ import {
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
 import { getPulseModesForMeter } from '../metronome/pulseModes'
+import { tempoMarkersSummary, tempoRampShapeLabel } from './tempoDepth'
 import { formatGrouping } from './groupingUtils'
 import {
   effectivePatternBars,
@@ -68,10 +69,18 @@ export function resolveSectionTiming(
 
 export function tempoRampLabel(section: TimelineSection): string | null {
   const ramp = section.advanced?.tempoRamp
-  if (!ramp?.enabled) return null
-  if (ramp.endBpm > section.bpm) return `Accel ${section.bpm}→${ramp.endBpm}`
-  if (ramp.endBpm < section.bpm) return `Rit. ${section.bpm}→${ramp.endBpm}`
-  return null
+  const markers = tempoMarkersSummary(section)
+  if (!ramp?.enabled && !markers) return null
+
+  const parts: string[] = []
+  if (ramp?.enabled) {
+    const shape = ramp.shape && ramp.shape !== 'linear' ? ` (${tempoRampShapeLabel(ramp.shape)})` : ''
+    if (ramp.endBpm > section.bpm) parts.push(`Accel ${section.bpm}→${ramp.endBpm}${shape}`)
+    else if (ramp.endBpm < section.bpm) parts.push(`Rit. ${section.bpm}→${ramp.endBpm}${shape}`)
+    else parts.push(`Ramp${shape}`)
+  }
+  if (markers) parts.push(markers)
+  return parts.join(' · ')
 }
 
 export function sectionTimingSummary(section: TimelineSection, measure = 1): string {

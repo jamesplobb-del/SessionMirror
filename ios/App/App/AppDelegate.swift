@@ -70,10 +70,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         lockInterfaceToPortrait()
+        configurePersistentAudioSession()
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
         lockInterfaceToPortrait()
+        configurePersistentAudioSession()
     }
 
     /// Passive launch session — do not force HQ/headphone routes; JS applies on user action.

@@ -1,6 +1,8 @@
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
+import { COUNT_IN_WHEN_OPTIONS } from '../timelineEditorOptions'
 import type { PracticeTrackSettings } from '../types'
+import TimelineEditorSelect from './TimelineEditorSelect'
 
 interface TrackSettingsPanelProps {
   settings: PracticeTrackSettings
@@ -36,26 +38,14 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
       </div>
 
       {settings.countInBars > 0 ? (
-        <div className="practice-timeline__track-settings-row">
-          <span className="practice-timeline__track-settings-label">Count-in when</span>
-          <div className="practice-timeline-editor__chips">
-            <Pressable
-              type="button"
-              intensity="soft"
-              className={`practice-timeline-editor__chip ${settings.countInWhen === 'start' ? 'practice-timeline-editor__chip--active' : ''}`}
-              onClick={() => onChange({ countInWhen: 'start' })}
-            >
-              Start & jumps
-            </Pressable>
-            <Pressable
-              type="button"
-              intensity="soft"
-              className={`practice-timeline-editor__chip ${settings.countInWhen === 'every-loop' ? 'practice-timeline-editor__chip--active' : ''}`}
-              onClick={() => onChange({ countInWhen: 'every-loop' })}
-            >
-              Every loop
-            </Pressable>
-          </div>
+        <div className="practice-timeline__track-settings-select">
+          <TimelineEditorSelect
+            label="Count-in when"
+            ariaLabel="When to play count-in"
+            value={settings.countInWhen}
+            options={COUNT_IN_WHEN_OPTIONS}
+            onChange={(countInWhen) => onChange({ countInWhen })}
+          />
         </div>
       ) : null}
 

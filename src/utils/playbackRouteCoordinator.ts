@@ -45,6 +45,34 @@ export function isPlaybackRouteHoldActive(): boolean {
   return playbackRouteActive
 }
 
+export async function clearPlaybackRouteForLifecycle(
+  reason = 'lifecycle',
+): Promise<void> {
+  if (!isIosNative()) return
+
+  const hadRouteState =
+    playbackRouteActive ||
+    cameraWasSuspendedForPlayback ||
+    loudSessionAppliedForPlayback ||
+    restoreInFlight !== null
+
+  playbackRouteActive = false
+  cameraWasSuspendedForPlayback = false
+  loudSessionAppliedForPlayback = false
+  restoreInFlight = null
+
+  if (!hadRouteState) return
+
+  try {
+    await BestTakeAudioPlugin.setPlaybackRouteActive({ active: false })
+  } catch (error) {
+    console.warn('[PlaybackRoute] failed to clear lifecycle route hold', {
+      reason,
+      error,
+    })
+  }
+}
+
 async function readNativeCameraSessionState(): Promise<{
   previewActive: boolean
   recordingActive: boolean

@@ -253,6 +253,17 @@ html.app-dark-mode .app-ui-overlay--audio-mode .metronome-audio-select__option--
   color: #bae6fd;
 }
 
+.metronome-audio-select__option--header {
+  cursor: default;
+  user-select: none;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--audio-text-secondary);
+  opacity: 0.85;
+}
+
 .app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
   justify-content: flex-start;
   gap: clamp(0.25rem, 0.8vh, 0.45rem);

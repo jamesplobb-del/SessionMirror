@@ -484,42 +484,6 @@ export default function SettingsDrawer({
             />
           </section>
 
-          <section className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Music Scan
-            </h3>
-            <SettingToggle
-              label="Music Scan Dev Mode"
-              description="On-device testing: use your OpenAI API key for real sheet-music scanning. Disable before App Store release."
-              checked={settings.musicScanDevMode}
-              onChange={(checked) => onUpdate({ musicScanDevMode: checked })}
-            />
-            {(settings.musicScanDevMode || import.meta.env.DEV) && (
-              <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
-                <label className="block">
-                  <p className="text-sm font-semibold text-stone-900">OpenAI API Key</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                    Paste your key here for real scans on this device. Stored locally on your phone only.
-                  </p>
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={settings.musicScanDevApiKey ?? ''}
-                    onChange={(event) => {
-                      const trimmed = event.target.value.trim()
-                      onUpdate({
-                        musicScanDevApiKey: trimmed.length > 0 ? trimmed : undefined,
-                      })
-                    }}
-                    placeholder="sk-…"
-                    className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
-                  />
-                </label>
-              </div>
-            )}
-          </section>
-
           {(onOpenLabs || onOpenCreatorStudio) && (
             <section className="settings-group space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">

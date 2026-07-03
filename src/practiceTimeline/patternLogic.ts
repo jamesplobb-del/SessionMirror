@@ -10,6 +10,7 @@ import {
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
+import { derivePatternStepBpm } from './patternTempo'
 import { repeatMultiplier } from './sectionDefaults'
 import type { MeterPatternStep, PatternRepeatMode, TimelineSection } from './types'
 import type { ResolvedSectionTiming } from './timeSignatureLogic'
@@ -24,7 +25,6 @@ export function createPatternStepId(): string {
 
 export function createPatternStep(
   meter: MetronomeMeter,
-  bpm: number,
   overrides?: Partial<MeterPatternStep>,
 ): MeterPatternStep {
   const defaults = getMeterDefaults(meter, overrides?.pulseModeId)
@@ -33,7 +33,6 @@ export function createPatternStep(
     meter,
     pulseModeId: defaults.pulseModeId,
     feelId: defaults.feelId,
-    bpm,
     subdivision: 'auto',
     bars: 1,
     ...overrides,
@@ -165,22 +164,24 @@ export function resolveSectionTimingAtMeasure(
   return {
     ...timing,
     stepIndex,
-    stepBpm: step.bpm,
+    stepBpm: derivePatternStepBpm(section.bpm, step),
     patternStep: step,
   }
 }
 
-export function formatPatternMetersLabel(steps: MeterPatternStep[]): string {
-  return steps.map((step) => step.meter).join(' + ')
-}
+export function formatPatternBpmLabel(section: TimelineSection): string {
+  const steps = section.patternSteps ?? []
+  if (steps.length === 0) {
+    const timing = resolveSectionTiming(section)
+    return formatBpmLabel(section.bpm, timing)
+  }
 
-export function formatPatternBpmLabel(steps: MeterPatternStep[]): string {
-  const labels = steps.map((step) => {
+  const derived = steps.map((step) => {
     const timing = resolvePatternStepTiming(step)
-    return formatBpmLabel(step.bpm, timing)
+    const bpm = derivePatternStepBpm(section.bpm, step)
+    return `${step.meter} ${formatBpmLabel(bpm, timing)}`
   })
-  const unique = [...new Set(labels)]
-  return unique.join(' / ')
+  return `♩ = ${section.bpm} → ${derived.join(', ')}`
 }
 
 export function patternRepeatSummary(section: TimelineSection): string {
@@ -193,12 +194,16 @@ export function patternRepeatSummary(section: TimelineSection): string {
   return `${repeat.cycles}× pattern`
 }
 
+export function formatPatternMetersLabel(steps: MeterPatternStep[]): string {
+  return steps.map((step) => step.meter).join(' + ')
+}
+
 export function patternSectionSummary(section: TimelineSection): string {
   const steps = section.patternSteps ?? []
   if (steps.length === 0) return ''
 
   const meters = formatPatternMetersLabel(steps)
-  const bpms = formatPatternBpmLabel(steps)
+  const bpms = formatPatternBpmLabel(section)
   const repeat = patternRepeatSummary(section)
   const parts = [meters]
   if (repeat) parts.push(repeat)

@@ -13,15 +13,30 @@ export interface PracticeTrackSettings {
   loopTrack: boolean
 }
 
+export type TempoRampShape = 'linear' | 'stepped' | 'ease-in' | 'ease-out' | 'ease-in-out'
+
 export interface TempoRamp {
   enabled: boolean
   endBpm: number
+  /** How tempo moves between start and end across the section. */
+  shape?: TempoRampShape
+}
+
+/** Explicit tempo at a bar or beat within a section (overrides ramp). */
+export interface SectionTempoMarker {
+  id: string
+  /** 1-based bar in the section. */
+  measure: number
+  /** 1-based conducting pulse; omit for bar-line change. */
+  beat?: number
+  bpm: number
 }
 
 export interface SectionAdvanced {
   beatGrouping?: number[]
   customAccents?: MetronomeAccentLevel[]
   tempoRamp?: TempoRamp
+  tempoMarkers?: SectionTempoMarker[]
   swing?: number
   clickSoundId?: string
   pickupMeasure?: boolean
@@ -37,7 +52,8 @@ export interface MeterPatternStep {
   meter: MetronomeMeter
   pulseModeId?: string
   feelId?: string
-  bpm: number
+  /** @deprecated Legacy — use section.bpm + derivePatternStepBpm. Stripped on normalize. */
+  bpm?: number
   subdivision: SectionSubdivision
   /** Bars at this meter before advancing (default 1). */
   bars?: number

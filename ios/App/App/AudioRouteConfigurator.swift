@@ -452,8 +452,14 @@ enum AudioRouteConfigurator {
                 try session.setPreferredIOBufferDuration(playbackFocused ? 0.005 : 0.0029)
                 try debugSetActive(session, active: true, options: [], caller: "applyNativeExperimentalAudioMode")
 
-                let micSnapshot = try applyMicInputPreference(micInputPreference, session: session)
-                fallbackReason = micSnapshot["fallbackReason"] as? String
+                if playbackFocused {
+                    fallbackReason = micInputPreference == .iphone
+                        ? "mic preference deferred during playback"
+                        : nil
+                } else {
+                    let micSnapshot = try applyMicInputPreference(micInputPreference, session: session)
+                    fallbackReason = micSnapshot["fallbackReason"] as? String
+                }
 
                 if playbackFocused {
                     do {

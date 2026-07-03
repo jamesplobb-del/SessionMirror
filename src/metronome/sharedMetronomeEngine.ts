@@ -1,5 +1,9 @@
 import { Capacitor } from '@capacitor/core'
 import { App } from '@capacitor/app'
+import {
+  APP_BACKGROUND_SUSPEND_EVENT,
+  APP_FOREGROUND_RECOVERY_EVENT,
+} from '../utils/appForeground'
 import { metronomeSpeakerGain } from '../utils/playbackVolume'
 import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import { scheduleMetronomeClick } from '../utils/metronomeClickSounds'
@@ -51,6 +55,7 @@ export interface SharedMetronomeSnapshot {
 
 type Listener = () => void
 type BarListener = () => void
+type PulseListener = (beatIndex: number) => void
 
 function createInitialSnapshot(): SharedMetronomeSnapshot {
   const prefs = loadMetronomePrefs()
@@ -88,6 +93,7 @@ function createInitialSnapshot(): SharedMetronomeSnapshot {
 class SharedMetronomeEngine {
   private listeners = new Set<Listener>()
   private barListeners = new Set<BarListener>()
+  private pulseListeners = new Set<PulseListener>()
   private snapshot: SharedMetronomeSnapshot = createInitialSnapshot()
 
   private audioCtx: AudioContext | null = null
@@ -122,9 +128,23 @@ class SharedMetronomeEngine {
     }
   }
 
+  /** Fires at the start of each conducting pulse (subTick 0). beatIndex is 0-based. */
+  subscribePulse = (listener: PulseListener): (() => void) => {
+    this.pulseListeners.add(listener)
+    return () => {
+      this.pulseListeners.delete(listener)
+    }
+  }
+
   private emitBar(): void {
     for (const listener of this.barListeners) {
       listener()
+    }
+  }
+
+  private emitPulse(beatIndex: number): void {
+    for (const listener of this.pulseListeners) {
+      listener(beatIndex)
     }
   }
 
@@ -207,6 +227,8 @@ class SharedMetronomeEngine {
     window.addEventListener('pageshow', onForeground)
     window.addEventListener('focus', onForeground)
     window.addEventListener('pagehide', onPageHide)
+    window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, onBackground)
+    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, onForeground)
 
     const retryOnUserGesture = () => {
       if (!this.resumeOnForeground || this.snapshot.playing) return
@@ -738,6 +760,9 @@ class SharedMetronomeEngine {
       }
 
       if (uiBeat >= 0) {
+        if (uiSubTick === 0) {
+          this.emitPulse(uiBeat)
+        }
         this.patchState({
           beatIndex: uiBeat,
           subTickIndex: uiSubTick,

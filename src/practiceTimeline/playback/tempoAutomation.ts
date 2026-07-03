@@ -1,5 +1,12 @@
 import { secondsPerPulse } from '../../metronome/metronomeTiming'
-import type { TempoRamp } from '../types'
+import {
+  interpolateRampBpm,
+  resolveMasterBpmAt,
+  resolveSectionPlaybackBpm,
+  sectionProgressAt,
+} from '../tempoDepth'
+import { effectiveBars } from '../timeSignatureLogic'
+import type { TempoRamp, TimelineSection } from '../types'
 
 export function bpmAtMeasure(
   startBpm: number,
@@ -8,8 +15,9 @@ export function bpmAtMeasure(
   ramp?: TempoRamp,
 ): number {
   if (!ramp?.enabled || totalMeasures <= 1) return startBpm
-  const t = Math.max(0, Math.min(1, (measure - 1) / (totalMeasures - 1)))
-  return Math.round(startBpm + (ramp.endBpm - startBpm) * t)
+  const shape = ramp.shape ?? 'linear'
+  const progress = sectionProgressAt(measure, 1, 1, totalMeasures, shape)
+  return interpolateRampBpm(startBpm, ramp.endBpm, progress, shape)
 }
 
 export function estimateSectionDurationSeconds(
@@ -25,4 +33,30 @@ export function estimateSectionDurationSeconds(
     total += pulseCount * secondsPerPulse(bpmAtMeasure(bpm, measure, bars, ramp))
   }
   return total
+}
+
+/** Duration with per-beat ramps and explicit tempo markers. */
+export function estimateSectionDurationWithDepth(
+  section: TimelineSection,
+  pulseCount: number,
+): number {
+  const bars = effectiveBars(section)
+  if (bars <= 0) return 0
+  let total = 0
+  for (let measure = 1; measure <= bars; measure += 1) {
+    for (let beat = 1; beat <= pulseCount; beat += 1) {
+      const bpm = resolveSectionPlaybackBpm(section, measure, beat, pulseCount)
+      if (bpm > 0) total += secondsPerPulse(bpm)
+    }
+  }
+  return total
+}
+
+export function resolveMasterBpmForSection(
+  section: TimelineSection,
+  measure: number,
+  beat: number,
+  pulseCount: number,
+): number {
+  return resolveMasterBpmAt(section, measure, beat, pulseCount, section.advanced?.tempoRamp)
 }

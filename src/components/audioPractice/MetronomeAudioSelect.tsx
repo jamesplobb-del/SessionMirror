@@ -5,6 +5,8 @@ import { triggerLightHaptic } from '../../utils/haptics'
 export interface MetronomeAudioSelectOption<T extends string> {
   value: T
   label: string
+  /** Non-selectable section header or divider row */
+  disabled?: boolean
 }
 
 interface MetronomeAudioSelectProps<T extends string> {
@@ -74,6 +76,18 @@ export default function MetronomeAudioSelect<T extends string>({
             aria-label={ariaLabel}
           >
             {options.map((option) => {
+              if (option.disabled) {
+                return (
+                  <div
+                    key={option.value}
+                    className="metronome-audio-select__option metronome-audio-select__option--header"
+                    role="presentation"
+                  >
+                    {option.label}
+                  </div>
+                )
+              }
+
               const selected = option.value === value
               return (
                 <button

@@ -1,9 +1,9 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 import type { MetronomeMeter } from '../../utils/metronomeConfig'
+import { formatBpmLabel } from '../../metronome/pulseResolution'
 import { getPulseModesForMeter } from '../../metronome/pulseModes'
 import Pressable from '../../components/ui/Pressable'
-import { COMMON_METERS } from '../sectionDefaults'
 import {
   applyMeterChangeToPatternStep,
   createPatternStep,
@@ -15,7 +15,14 @@ import {
   patternRepeatSummary,
   resolvePatternStepTiming,
 } from '../patternLogic'
+import { derivePatternStepBpm } from '../patternTempo'
+import {
+  meterSelectOptions,
+  PATTERN_REPEAT_OPTIONS,
+  pulseSelectOptions,
+} from '../timelineEditorOptions'
 import type { MeterPatternStep, PatternRepeatMode, TimelineSection } from '../types'
+import TimelineEditorSelect from './TimelineEditorSelect'
 
 interface MeterPatternEditorProps {
   section: TimelineSection
@@ -33,7 +40,6 @@ function updateSteps(
     patternSteps: steps,
     patternRepeat: nextRepeat,
     meter: first?.meter ?? section.meter,
-    bpm: first?.bpm ?? section.bpm,
   }
 }
 
@@ -42,6 +48,7 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
   const repeat = section.patternRepeat ?? defaultPatternRepeat(steps)
   const totalMeasures = useMemo(() => patternMeasuresBeforeRepeat(section), [section])
   const cycleBars = patternCycleBars(steps)
+  const meterOptions = useMemo(() => meterSelectOptions(), [])
 
   const setRepeatMode = (kind: PatternRepeatMode['kind']) => {
     if (kind === 'totalMeasures') {
@@ -61,7 +68,7 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
 
   const addStep = () => {
     const last = steps[steps.length - 1]
-    const nextStep = createPatternStep(last?.meter ?? '4/4', last?.bpm ?? section.bpm)
+    const nextStep = createPatternStep(last?.meter ?? '4/4')
     onChange(updateSteps(section, [...steps, nextStep]))
   }
 
@@ -72,10 +79,11 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
   }
 
   const applyPreset34_68 = () => {
-    const preset = [createPatternStep('3/4', 120), createPatternStep('6/8', 80)]
+    const preset = [createPatternStep('3/4'), createPatternStep('6/8')]
     onChange({
       ...updateSteps(section, preset, { kind: 'totalMeasures', measures: 24 }),
       title: section.title === 'New Section' ? 'Alternating Feel' : section.title,
+      bpm: section.bpm || 120,
     })
   }
 
@@ -84,16 +92,44 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
       <div className="practice-timeline-editor__field">
         <span className="practice-timeline-editor__label">Meter pattern</span>
         <p className="practice-timeline-editor__hint">
-          {formatPatternMetersLabel(steps)} • {formatPatternBpmLabel(steps)}
+          {formatPatternMetersLabel(steps)} • {formatPatternBpmLabel(section)}
         </p>
-        <Pressable type="button" intensity="soft" className="practice-timeline-editor__chip" onClick={applyPreset34_68}>
-          Preset: 3/4 + 6/8
+        <Pressable type="button" intensity="soft" className="practice-timeline-editor__preset-btn" onClick={applyPreset34_68}>
+          Load preset: 3/4 + 6/8
         </Pressable>
+      </div>
+
+      <div className="practice-timeline-editor__field">
+        <span className="practice-timeline-editor__label">Master tempo (quarter note)</span>
+        <p className="practice-timeline-editor__hint">
+          One tempo for the whole pattern. Each meter shows its equivalent beat speed below.
+        </p>
+        <div className="practice-timeline-editor__stepper">
+          <Pressable
+            type="button"
+            intensity="icon"
+            className="practice-timeline-editor__stepper-btn"
+            onClick={() => onChange({ bpm: Math.max(40, section.bpm - 1) })}
+          >
+            −
+          </Pressable>
+          <span className="practice-timeline-editor__stepper-value">{section.bpm}</span>
+          <span className="practice-timeline-editor__hint">♩ = BPM</span>
+          <Pressable
+            type="button"
+            intensity="icon"
+            className="practice-timeline-editor__stepper-btn"
+            onClick={() => onChange({ bpm: Math.min(300, section.bpm + 1) })}
+          >
+            +
+          </Pressable>
+        </div>
       </div>
 
       {steps.map((step, index) => {
         const timing = resolvePatternStepTiming(step, index > 0 ? steps[index - 1] : undefined)
         const pulseModes = getPulseModesForMeter(step.meter)
+        const derivedBpm = derivePatternStepBpm(section.bpm, step)
         return (
           <div key={step.id} className="practice-timeline-editor__pattern-step">
             <div className="practice-timeline-editor__pattern-step-header">
@@ -110,63 +146,38 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
               ) : null}
             </div>
 
-            <div className="practice-timeline-editor__chips">
-              {COMMON_METERS.map((meter) => (
-                <Pressable
-                  key={`${step.id}-${meter}`}
-                  type="button"
-                  intensity="soft"
-                  className={`practice-timeline-editor__chip ${step.meter === meter ? 'practice-timeline-editor__chip--active' : ''}`}
-                  onClick={() => updateStep(index, applyMeterChangeToPatternStep(step, meter as MetronomeMeter))}
-                >
-                  {meter}
-                </Pressable>
-              ))}
+            <div className="practice-timeline-editor__select-grid">
+              <TimelineEditorSelect
+                label="Time signature"
+                ariaLabel={`Step ${index + 1} time signature`}
+                value={step.meter}
+                options={meterOptions}
+                onChange={(meter) =>
+                  updateStep(index, applyMeterChangeToPatternStep(step, meter as MetronomeMeter))
+                }
+              />
+
+              {pulseModes.length > 1 ? (
+                <TimelineEditorSelect
+                  label="Beat unit"
+                  ariaLabel={`Step ${index + 1} beat unit`}
+                  value={step.pulseModeId ?? timing.pulseModeId}
+                  options={pulseSelectOptions(pulseModes)}
+                  onChange={(pulseModeId) =>
+                    updateStep(index, {
+                      pulseModeId,
+                      feelId: undefined,
+                      beatGrouping: undefined,
+                      customAccents: undefined,
+                    })
+                  }
+                />
+              ) : null}
             </div>
 
-            {pulseModes.length > 1 ? (
-              <div className="practice-timeline-editor__chips mt-2">
-                {pulseModes.map((mode) => (
-                  <Pressable
-                    key={mode.id}
-                    type="button"
-                    intensity="soft"
-                    className={`practice-timeline-editor__chip ${(step.pulseModeId ?? timing.pulseModeId) === mode.id ? 'practice-timeline-editor__chip--active' : ''}`}
-                    onClick={() =>
-                      updateStep(index, {
-                        pulseModeId: mode.id,
-                        feelId: undefined,
-                        beatGrouping: undefined,
-                        customAccents: undefined,
-                      })
-                    }
-                  >
-                    {mode.label}
-                  </Pressable>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="practice-timeline-editor__stepper mt-2">
-              <Pressable
-                type="button"
-                intensity="icon"
-                className="practice-timeline-editor__stepper-btn"
-                onClick={() => updateStep(index, { bpm: Math.max(40, step.bpm - 1) })}
-              >
-                −
-              </Pressable>
-              <span className="practice-timeline-editor__stepper-value">{step.bpm}</span>
-              <span className="practice-timeline-editor__hint">{timing.bpmSymbol} = BPM</span>
-              <Pressable
-                type="button"
-                intensity="icon"
-                className="practice-timeline-editor__stepper-btn"
-                onClick={() => updateStep(index, { bpm: Math.min(300, step.bpm + 1) })}
-              >
-                +
-              </Pressable>
-            </div>
+            <p className="practice-timeline-editor__derived-tempo">
+              Equivalent beat: {formatBpmLabel(derivedBpm, timing)}
+            </p>
           </div>
         )
       })}
@@ -176,93 +187,81 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
         Add step
       </Pressable>
 
-      <div className="practice-timeline-editor__field">
-        <span className="practice-timeline-editor__label">Repeat pattern</span>
-        <div className="practice-timeline-editor__chips">
+      <div className="practice-timeline-editor__select-grid">
+        <TimelineEditorSelect
+          label="Repeat pattern"
+          ariaLabel="How to repeat the meter pattern"
+          value={repeat.kind}
+          options={PATTERN_REPEAT_OPTIONS}
+          onChange={setRepeatMode}
+        />
+      </div>
+
+      {repeat.kind === 'cycles' ? (
+        <div className="practice-timeline-editor__stepper mt-2">
           <Pressable
             type="button"
-            intensity="soft"
-            className={`practice-timeline-editor__chip ${repeat.kind === 'cycles' ? 'practice-timeline-editor__chip--active' : ''}`}
-            onClick={() => setRepeatMode('cycles')}
+            intensity="icon"
+            className="practice-timeline-editor__stepper-btn"
+            onClick={() =>
+              onChange({
+                patternRepeat: { kind: 'cycles', cycles: Math.max(1, (repeat.cycles ?? 1) - 1) },
+              })
+            }
           >
-            By count
+            −
           </Pressable>
+          <span className="practice-timeline-editor__stepper-value">{repeat.cycles}×</span>
+          <span className="practice-timeline-editor__hint">{cycleBars * repeat.cycles} bars total</span>
           <Pressable
             type="button"
-            intensity="soft"
-            className={`practice-timeline-editor__chip ${repeat.kind === 'totalMeasures' ? 'practice-timeline-editor__chip--active' : ''}`}
-            onClick={() => setRepeatMode('totalMeasures')}
+            intensity="icon"
+            className="practice-timeline-editor__stepper-btn"
+            onClick={() =>
+              onChange({
+                patternRepeat: { kind: 'cycles', cycles: Math.min(99, repeat.cycles + 1) },
+              })
+            }
           >
-            Until measure
+            +
           </Pressable>
         </div>
-
-        {repeat.kind === 'cycles' ? (
-          <div className="practice-timeline-editor__stepper mt-2">
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() =>
-                onChange({
-                  patternRepeat: { kind: 'cycles', cycles: Math.max(1, (repeat.cycles ?? 1) - 1) },
-                })
-              }
-            >
-              −
-            </Pressable>
-            <span className="practice-timeline-editor__stepper-value">{repeat.cycles}×</span>
-            <span className="practice-timeline-editor__hint">{cycleBars * repeat.cycles} bars total</span>
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() =>
-                onChange({
-                  patternRepeat: { kind: 'cycles', cycles: Math.min(99, repeat.cycles + 1) },
-                })
-              }
-            >
-              +
-            </Pressable>
-          </div>
-        ) : (
-          <div className="practice-timeline-editor__stepper mt-2">
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() =>
-                onChange({
-                  patternRepeat: {
-                    kind: 'totalMeasures',
-                    measures: Math.max(cycleBars, repeat.measures - 1),
-                  },
-                })
-              }
-            >
-              −
-            </Pressable>
-            <span className="practice-timeline-editor__stepper-value">m. {repeat.measures}</span>
-            <span className="practice-timeline-editor__hint">{patternRepeatSummary(section)}</span>
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() =>
-                onChange({
-                  patternRepeat: {
-                    kind: 'totalMeasures',
-                    measures: Math.min(512, repeat.measures + 1),
-                  },
-                })
-              }
-            >
-              +
-            </Pressable>
-          </div>
-        )}
-      </div>
+      ) : (
+        <div className="practice-timeline-editor__stepper mt-2">
+          <Pressable
+            type="button"
+            intensity="icon"
+            className="practice-timeline-editor__stepper-btn"
+            onClick={() =>
+              onChange({
+                patternRepeat: {
+                  kind: 'totalMeasures',
+                  measures: Math.max(cycleBars, repeat.measures - 1),
+                },
+              })
+            }
+          >
+            −
+          </Pressable>
+          <span className="practice-timeline-editor__stepper-value">m. {repeat.measures}</span>
+          <span className="practice-timeline-editor__hint">{patternRepeatSummary(section)}</span>
+          <Pressable
+            type="button"
+            intensity="icon"
+            className="practice-timeline-editor__stepper-btn"
+            onClick={() =>
+              onChange({
+                patternRepeat: {
+                  kind: 'totalMeasures',
+                  measures: Math.min(512, repeat.measures + 1),
+                },
+              })
+            }
+          >
+            +
+          </Pressable>
+        </div>
+      )}
     </div>
   )
 }

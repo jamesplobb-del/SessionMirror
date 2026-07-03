@@ -1,5 +1,6 @@
 import { patternRepeatSummary, patternSectionSummary, sectionHasMeterPattern } from './patternLogic'
-import { effectiveBars, formatBpmLabel, resolveSectionTiming } from './timeSignatureLogic'
+import { tempoMarkersSummary } from './tempoDepth'
+import { effectiveBars, formatBpmLabel, resolveSectionTiming, tempoRampLabel } from './timeSignatureLogic'
 import type { PracticeTimeline, TimelineSection } from './types'
 
 export function describeSection(section: TimelineSection): string {
@@ -17,16 +18,14 @@ export function describeSection(section: TimelineSection): string {
   const repeat = section.repeatCount > 1 ? ` · ${section.repeatCount}×` : ''
   const bpmLabel = formatBpmLabel(section.bpm, timing)
 
-  const rampLabel = section.advanced?.tempoRamp?.enabled
-    ? section.advanced.tempoRamp.endBpm > section.bpm
-      ? `Accel ${section.bpm}→${section.advanced.tempoRamp.endBpm}`
-      : section.advanced.tempoRamp.endBpm < section.bpm
-        ? `Rit. ${section.bpm}→${section.advanced.tempoRamp.endBpm}`
-        : null
-    : null
+  const rampLabel = tempoRampLabel(section)
+  const markerNote = tempoMarkersSummary(section)
 
   if (feel && rampLabel) {
     return `${section.meter} · ${feel.label} · ${bars} ${barWord} · ${bpmLabel} · ${rampLabel}${repeat}`
+  }
+  if (feel && markerNote) {
+    return `${section.meter} · ${feel.label} · ${bars} ${barWord} · ${bpmLabel} · ${markerNote}${repeat}`
   }
   if (feel) {
     return `${section.meter} · ${feel.label} · ${bars} ${barWord} · ${bpmLabel}${repeat}`

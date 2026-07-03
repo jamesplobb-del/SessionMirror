@@ -9,7 +9,7 @@ import {
   validateGroupingForMeter,
 } from '../groupingUtils'
 import { createPatternStep, defaultPatternRepeat, sectionHasMeterPattern } from '../patternLogic'
-import { COMMON_METERS, repeatLabel } from '../sectionDefaults'
+import { repeatLabel } from '../sectionDefaults'
 import {
   applyMeterChange,
   pulseModeOptionsForSection,
@@ -17,11 +17,20 @@ import {
   sectionNeedsFeelPrompt,
   sectionNeedsPulseModeChoice,
   subdivisionOptionsForSection,
-  tempoRampLabel,
 } from '../timeSignatureLogic'
+import {
+  feelSelectOptions,
+  meterSelectOptions,
+  pulseSelectOptions,
+  SECTION_TYPE_OPTIONS,
+  subdivisionSelectOptions,
+  type SectionTypeValue,
+} from '../timelineEditorOptions'
 import type { SectionSubdivision, TimelineSection } from '../types'
 import MeterPatternEditor from './MeterPatternEditor'
 import SectionAccentEditor from './SectionAccentEditor'
+import SectionTempoDepthPanel from './SectionTempoDepthPanel'
+import TimelineEditorSelect from './TimelineEditorSelect'
 
 const SUBDIVISION_LABELS: Record<MetronomeSubdivision, string> = {
   off: 'Pulse only',
@@ -49,11 +58,10 @@ export default function TimelineSectionEditor({
     () => section.advanced?.beatGrouping?.length ? formatGrouping(section.advanced.beatGrouping) : '',
   )
   const timing = useMemo(() => resolveSectionTiming(section), [section])
-  const rampLabel = tempoRampLabel(section)
   const isPatternMode = sectionHasMeterPattern(section)
 
   const enablePatternMode = () => {
-    const steps = [createPatternStep(section.meter, section.bpm), createPatternStep('6/8', section.bpm)]
+    const steps = [createPatternStep(section.meter), createPatternStep('6/8')]
     onChange({
       patternSteps: steps,
       patternRepeat: defaultPatternRepeat(steps),
@@ -80,6 +88,10 @@ export default function TimelineSectionEditor({
       ? section.advanced.customAccents
       : timing.accentLevels
 
+  const activeFeelId =
+    section.feelId ??
+    (section.advanced?.beatGrouping?.length ? '' : timing.feelOptions[0]?.id ?? '')
+
   const applyCustomGrouping = (text: string) => {
     setGroupingDraft(text)
     const parsed = parseGroupingInput(text)
@@ -101,6 +113,11 @@ export default function TimelineSectionEditor({
         customAccents: undefined,
       },
     })
+  }
+
+  const handleSectionTypeChange = (value: SectionTypeValue) => {
+    if (value === 'pattern') enablePatternMode()
+    else disablePatternMode()
   }
 
   return (
@@ -129,109 +146,86 @@ export default function TimelineSectionEditor({
           />
         </div>
 
-        <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">Section type</span>
-          <div className="practice-timeline-editor__chips">
-            <Pressable
-              type="button"
-              intensity="soft"
-              className={`practice-timeline-editor__chip ${!isPatternMode ? 'practice-timeline-editor__chip--active' : ''}`}
-              onClick={disablePatternMode}
-            >
-              Single meter
-            </Pressable>
-            <Pressable
-              type="button"
-              intensity="soft"
-              className={`practice-timeline-editor__chip ${isPatternMode ? 'practice-timeline-editor__chip--active' : ''}`}
-              onClick={enablePatternMode}
-            >
-              Meter pattern
-            </Pressable>
-          </div>
+        <div className="practice-timeline-editor__select-grid">
+          <TimelineEditorSelect
+            label="Section type"
+            ariaLabel="Section type"
+            value={isPatternMode ? 'pattern' : 'single'}
+            options={SECTION_TYPE_OPTIONS}
+            onChange={handleSectionTypeChange}
+          />
         </div>
 
         {isPatternMode ? (
           <MeterPatternEditor section={section} onChange={onChange} />
         ) : (
           <>
-        <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">How many bars?</span>
-          <div className="practice-timeline-editor__stepper">
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() => onChange({ bars: Math.max(1, section.bars - 1) })}
-            >
-              −
-            </Pressable>
-            <span className="practice-timeline-editor__stepper-value">{section.bars}</span>
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() => onChange({ bars: Math.min(128, section.bars + 1) })}
-            >
-              +
-            </Pressable>
-          </div>
-        </div>
+            <div className="practice-timeline-editor__field-row">
+              <div className="practice-timeline-editor__field practice-timeline-editor__field--half">
+                <span className="practice-timeline-editor__label">How many bars?</span>
+                <div className="practice-timeline-editor__stepper">
+                  <Pressable
+                    type="button"
+                    intensity="icon"
+                    className="practice-timeline-editor__stepper-btn"
+                    onClick={() => onChange({ bars: Math.max(1, section.bars - 1) })}
+                  >
+                    −
+                  </Pressable>
+                  <span className="practice-timeline-editor__stepper-value">{section.bars}</span>
+                  <Pressable
+                    type="button"
+                    intensity="icon"
+                    className="practice-timeline-editor__stepper-btn"
+                    onClick={() => onChange({ bars: Math.min(128, section.bars + 1) })}
+                  >
+                    +
+                  </Pressable>
+                </div>
+              </div>
 
-        <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">How fast?</span>
-          <div className="practice-timeline-editor__stepper">
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() => onChange({ bpm: Math.max(40, section.bpm - 1) })}
-            >
-              −
-            </Pressable>
-            <span className="practice-timeline-editor__stepper-value">{section.bpm}</span>
-            <span className="practice-timeline-editor__hint">{timing.bpmSymbol} = BPM</span>
-            <Pressable
-              type="button"
-              intensity="icon"
-              className="practice-timeline-editor__stepper-btn"
-              onClick={() => onChange({ bpm: Math.min(300, section.bpm + 1) })}
-            >
-              +
-            </Pressable>
-          </div>
-        </div>
+              <div className="practice-timeline-editor__field practice-timeline-editor__field--half">
+                <span className="practice-timeline-editor__label">How fast? ({timing.bpmSymbol})</span>
+                <div className="practice-timeline-editor__stepper">
+                  <Pressable
+                    type="button"
+                    intensity="icon"
+                    className="practice-timeline-editor__stepper-btn"
+                    onClick={() => onChange({ bpm: Math.max(40, section.bpm - 1) })}
+                  >
+                    −
+                  </Pressable>
+                  <span className="practice-timeline-editor__stepper-value">{section.bpm}</span>
+                  <Pressable
+                    type="button"
+                    intensity="icon"
+                    className="practice-timeline-editor__stepper-btn"
+                    onClick={() => onChange({ bpm: Math.min(300, section.bpm + 1) })}
+                  >
+                    +
+                  </Pressable>
+                </div>
+              </div>
+            </div>
 
-        <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">Time signature</span>
-          <div className="practice-timeline-editor__chips">
-            {COMMON_METERS.map((meter) => (
-              <Pressable
-                key={meter}
-                type="button"
-                intensity="soft"
-                className={`practice-timeline-editor__chip ${section.meter === meter ? 'practice-timeline-editor__chip--active' : ''}`}
-                onClick={() => onChange(applyMeterChange(section, meter as MetronomeMeter))}
-              >
-                {meter}
-              </Pressable>
-            ))}
-          </div>
-        </div>
+            <div className="practice-timeline-editor__select-grid">
+              <TimelineEditorSelect
+                label="Time signature"
+                ariaLabel="Time signature"
+                value={section.meter}
+                options={meterSelectOptions()}
+                onChange={(meter) => onChange(applyMeterChange(section, meter as MetronomeMeter))}
+              />
 
-        {sectionNeedsPulseModeChoice(section) ? (
-          <div className="practice-timeline-editor__field">
-            <span className="practice-timeline-editor__label">Pulse (what BPM means)</span>
-            <div className="practice-timeline-editor__chips">
-              {pulseModes.map((mode) => (
-                <Pressable
-                  key={mode.id}
-                  type="button"
-                  intensity="soft"
-                  className={`practice-timeline-editor__chip ${(section.pulseModeId ?? timing.pulseModeId) === mode.id ? 'practice-timeline-editor__chip--active' : ''}`}
-                  onClick={() =>
+              {sectionNeedsPulseModeChoice(section) ? (
+                <TimelineEditorSelect
+                  label="Beat unit"
+                  ariaLabel="Which note value the tempo refers to"
+                  value={section.pulseModeId ?? timing.pulseModeId}
+                  options={pulseSelectOptions(pulseModes)}
+                  onChange={(pulseModeId) =>
                     onChange({
-                      pulseModeId: mode.id,
+                      pulseModeId,
                       feelId: undefined,
                       subdivision: 'auto',
                       advanced: {
@@ -241,28 +235,19 @@ export default function TimelineSectionEditor({
                       },
                     })
                   }
-                >
-                  {mode.label}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-        ) : null}
+                />
+              ) : null}
 
-        {sectionNeedsFeelPrompt(section) && timing.feelOptions.length > 0 ? (
-          <div className="practice-timeline-editor__field">
-            <span className="practice-timeline-editor__label">Beat grouping</span>
-            <div className="practice-timeline-editor__chips">
-              {timing.feelOptions.map((option) => (
-                <Pressable
-                  key={option.id}
-                  type="button"
-                  intensity="soft"
-                  className={`practice-timeline-editor__chip ${section.feelId === option.id || (!section.feelId && !section.advanced?.beatGrouping?.length && option.id === timing.feelOptions[0]?.id) ? 'practice-timeline-editor__chip--active' : ''}`}
-                  onClick={() => {
+              {sectionNeedsFeelPrompt(section) && timing.feelOptions.length > 0 ? (
+                <TimelineEditorSelect
+                  label="Beat grouping"
+                  ariaLabel="Beat grouping"
+                  value={activeFeelId || timing.feelOptions[0]?.id}
+                  options={feelSelectOptions(timing.feelOptions)}
+                  onChange={(feelId) => {
                     setGroupingDraft('')
                     onChange({
-                      feelId: option.id,
+                      feelId,
                       advanced: {
                         ...section.advanced,
                         beatGrouping: undefined,
@@ -270,60 +255,47 @@ export default function TimelineSectionEditor({
                       },
                     })
                   }}
-                >
-                  {option.label}
-                </Pressable>
-              ))}
+                />
+              ) : null}
+
+              <TimelineEditorSelect
+                label="Subdivision"
+                ariaLabel="Click subdivision"
+                value={section.subdivision}
+                options={subdivisionSelectOptions(subdivisionChoices)}
+                onChange={(subdivision) => onChange({ subdivision })}
+              />
             </div>
-          </div>
-        ) : null}
 
-        <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">Custom grouping</span>
-          <input
-            className="practice-timeline-editor__input"
-            value={groupingDraft}
-            onChange={(e) => applyCustomGrouping(e.target.value)}
-            placeholder="e.g. 2+2+3"
-            inputMode="text"
-          />
-          <p className="practice-timeline-editor__hint">{groupingValidationMessage(section)}</p>
-        </div>
+            <div className="practice-timeline-editor__field">
+              <span className="practice-timeline-editor__label">Custom grouping</span>
+              <input
+                className="practice-timeline-editor__input"
+                value={groupingDraft}
+                onChange={(e) => applyCustomGrouping(e.target.value)}
+                placeholder="e.g. 2+2+3"
+                inputMode="text"
+              />
+              <p className="practice-timeline-editor__hint">{groupingValidationMessage(section)}</p>
+            </div>
 
-        <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">Subdivision</span>
-          <div className="practice-timeline-editor__chips">
-            {subdivisionChoices.map((option) => (
-              <Pressable
-                key={option.id}
-                type="button"
-                intensity="soft"
-                className={`practice-timeline-editor__chip ${section.subdivision === option.id ? 'practice-timeline-editor__chip--active' : ''}`}
-                onClick={() => onChange({ subdivision: option.id })}
-              >
-                {option.label}
-              </Pressable>
-            ))}
-          </div>
-        </div>
-
-        <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">Accents</span>
-          <p className="practice-timeline-editor__hint">Tap a beat to cycle: weak → medium → strong → silent</p>
-          <SectionAccentEditor
-            pulseCount={timing.pulseCount}
-            accentLevels={accentLevels}
-            onChange={(customAccents) =>
-              onChange({
-                advanced: {
-                  ...section.advanced,
-                  customAccents,
-                  beatGrouping: section.advanced?.beatGrouping,
-                },
-              })
-            }
-          />
-        </div>
+            <div className="practice-timeline-editor__field">
+              <span className="practice-timeline-editor__label">Accents</span>
+              <p className="practice-timeline-editor__hint">Tap a beat to cycle: weak → medium → strong → silent</p>
+              <SectionAccentEditor
+                pulseCount={timing.pulseCount}
+                accentLevels={accentLevels}
+                onChange={(customAccents) =>
+                  onChange({
+                    advanced: {
+                      ...section.advanced,
+                      customAccents,
+                      beatGrouping: section.advanced?.beatGrouping,
+                    },
+                  })
+                }
+              />
+            </div>
           </>
         )}
 
@@ -361,69 +333,11 @@ export default function TimelineSectionEditor({
         </Pressable>
 
         {showAdvanced ? (
-          <div className="practice-timeline-editor__field">
-            <span className="practice-timeline-editor__label">Section count-in (bars)</span>
-            <p className="practice-timeline-editor__hint">Overrides routine count-in for this section only.</p>
-            <div className="practice-timeline-editor__stepper">
-              <Pressable
-                type="button"
-                intensity="icon"
-                className="practice-timeline-editor__stepper-btn"
-                onClick={() =>
-                  onChange({
-                    advanced: {
-                      ...section.advanced,
-                      countInBars: Math.max(0, (section.advanced?.countInBars ?? 0) - 1),
-                    },
-                  })
-                }
-              >
-                −
-              </Pressable>
-              <span className="practice-timeline-editor__stepper-value">
-                {section.advanced?.countInBars ?? 0}
-              </span>
-              <Pressable
-                type="button"
-                intensity="icon"
-                className="practice-timeline-editor__stepper-btn"
-                onClick={() =>
-                  onChange({
-                    advanced: {
-                      ...section.advanced,
-                      countInBars: Math.min(8, (section.advanced?.countInBars ?? 0) + 1),
-                    },
-                  })
-                }
-              >
-                +
-              </Pressable>
-            </div>
-
-            <span className="practice-timeline-editor__label mt-4">Tempo change</span>
-            <div className="practice-timeline-editor__chips">
-              <Pressable
-                type="button"
-                intensity="soft"
-                className={`practice-timeline-editor__chip ${section.advanced?.tempoRamp?.enabled ? 'practice-timeline-editor__chip--active' : ''}`}
-                onClick={() =>
-                  onChange({
-                    advanced: {
-                      ...section.advanced,
-                      tempoRamp: {
-                        enabled: !section.advanced?.tempoRamp?.enabled,
-                        endBpm: section.advanced?.tempoRamp?.endBpm ?? section.bpm + 20,
-                      },
-                    },
-                  })
-                }
-              >
-                {section.advanced?.tempoRamp?.enabled ? rampLabel ?? 'On' : 'Off'}
-              </Pressable>
-            </div>
-
-            {section.advanced?.tempoRamp?.enabled ? (
-              <div className="practice-timeline-editor__stepper mt-3">
+          <div className="practice-timeline-editor__advanced">
+            <div className="practice-timeline-editor__field">
+              <span className="practice-timeline-editor__label">Section count-in (bars)</span>
+              <p className="practice-timeline-editor__hint">Overrides routine count-in for this section only.</p>
+              <div className="practice-timeline-editor__stepper">
                 <Pressable
                   type="button"
                   intensity="icon"
@@ -432,10 +346,7 @@ export default function TimelineSectionEditor({
                     onChange({
                       advanced: {
                         ...section.advanced,
-                        tempoRamp: {
-                          enabled: true,
-                          endBpm: Math.max(40, (section.advanced?.tempoRamp?.endBpm ?? section.bpm) - 1),
-                        },
+                        countInBars: Math.max(0, (section.advanced?.countInBars ?? 0) - 1),
                       },
                     })
                   }
@@ -443,7 +354,7 @@ export default function TimelineSectionEditor({
                   −
                 </Pressable>
                 <span className="practice-timeline-editor__stepper-value">
-                  {rampLabel ?? `→ ${section.advanced?.tempoRamp?.endBpm ?? section.bpm}`}
+                  {section.advanced?.countInBars ?? 0}
                 </span>
                 <Pressable
                   type="button"
@@ -453,10 +364,7 @@ export default function TimelineSectionEditor({
                     onChange({
                       advanced: {
                         ...section.advanced,
-                        tempoRamp: {
-                          enabled: true,
-                          endBpm: Math.min(300, (section.advanced?.tempoRamp?.endBpm ?? section.bpm) + 1),
-                        },
+                        countInBars: Math.min(8, (section.advanced?.countInBars ?? 0) + 1),
                       },
                     })
                   }
@@ -464,17 +372,21 @@ export default function TimelineSectionEditor({
                   +
                 </Pressable>
               </div>
-            ) : null}
+            </div>
 
-            <span className="practice-timeline-editor__label mt-4">Marker notes</span>
-            <input
-              className="practice-timeline-editor__input"
-              value={section.advanced?.markerNotes ?? ''}
-              onChange={(e) =>
-                onChange({ advanced: { ...section.advanced, markerNotes: e.target.value } })
-              }
-              placeholder="Optional note"
-            />
+            <SectionTempoDepthPanel section={section} onChange={onChange} />
+
+            <div className="practice-timeline-editor__field">
+              <span className="practice-timeline-editor__label">Marker notes</span>
+              <input
+                className="practice-timeline-editor__input"
+                value={section.advanced?.markerNotes ?? ''}
+                onChange={(e) =>
+                  onChange({ advanced: { ...section.advanced, markerNotes: e.target.value } })
+                }
+                placeholder="Optional note"
+              />
+            </div>
           </div>
         ) : null}
       </div>

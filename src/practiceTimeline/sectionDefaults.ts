@@ -80,7 +80,7 @@ export function createAlternatingPatternSection(): TimelineSection {
     title: 'Alternating Feel',
     meter: '3/4',
     bpm: 120,
-    patternSteps: [createPatternStep('3/4', 120), createPatternStep('6/8', 80)],
+    patternSteps: [createPatternStep('3/4'), createPatternStep('6/8')],
     patternRepeat: { kind: 'totalMeasures', measures: 24 },
   })
 }

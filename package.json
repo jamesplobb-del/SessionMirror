@@ -29,7 +29,6 @@
     "framer-motion": "^12.40.0",
     "jeep-sqlite": "^2.8.0",
     "lucide-react": "^0.511.0",
-    "pdfjs-dist": "^4.10.38",
     "phaser": "^4.2.0",
     "pitchy": "^4.1.0",
     "react": "^19.1.0",

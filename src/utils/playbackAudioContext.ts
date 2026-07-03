@@ -1,3 +1,5 @@
+import { APP_FOREGROUND_RECOVERY_EVENT } from './appForeground'
+
 let playbackContext: AudioContext | null = null
 let playbackContextWatchAttached = false
 
@@ -17,6 +19,10 @@ function attachPlaybackContextWatch(ctx: AudioContext): void {
     }
   }
   document.addEventListener('visibilitychange', resumeOnVisible)
+
+  window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, () => {
+    void ctx.resume().catch(() => {})
+  })
 }
 
 function createPlaybackContext(): AudioContext {
