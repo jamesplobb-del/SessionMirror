@@ -1,5 +1,8 @@
 import { Capacitor } from '@capacitor/core'
 import { syncFormFactorClass } from './deviceFormFactor'
+import { resetCameraPreviewZoom } from './videoCapture'
+
+export const CAMERA_PREVIEW_LAYOUT_RECOVERY_EVENT = 'sessionmirror:camera-preview-layout-recovery'
 
 export function isIOSNative(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
@@ -98,6 +101,17 @@ export function stabilizeViewportAfterMediaInteraction(): void {
   })
 }
 
+export function requestCameraPreviewLayoutRecovery(reason = 'layout-change'): void {
+  if (typeof window === 'undefined') return
+  resetCameraPreviewZoom()
+  stabilizeViewportAfterMediaInteraction()
+  window.dispatchEvent(
+    new CustomEvent(CAMERA_PREVIEW_LAYOUT_RECOVERY_EVENT, {
+      detail: { reason },
+    }),
+  )
+}
+
 export function refreshCameraPreviewLayout(_video: HTMLVideoElement | null): void {
   /* Preview layout is CSS-only — never touch srcObject or play() on orientation. */
 }
@@ -123,8 +137,26 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
     }, 80)
   }
 
-  window.addEventListener('resize', scheduleSync)
-  window.visualViewport?.addEventListener('resize', scheduleSync)
+  let cameraRecoveryTimer: number | null = null
+  const scheduleCameraRecovery = () => {
+    const scale = window.visualViewport?.scale ?? 1
+    if (Math.abs(scale - 1) > 0.01) return
+
+    if (cameraRecoveryTimer !== null) window.clearTimeout(cameraRecoveryTimer)
+    cameraRecoveryTimer = window.setTimeout(() => {
+      cameraRecoveryTimer = null
+      requestCameraPreviewLayoutRecovery('viewport-settled')
+    }, 180)
+  }
+
+  const scheduleLayoutRecovery = () => {
+    scheduleSync()
+    scheduleCameraRecovery()
+  }
+
+  window.addEventListener('resize', scheduleLayoutRecovery)
+  window.addEventListener('orientationchange', scheduleLayoutRecovery)
+  window.visualViewport?.addEventListener('resize', scheduleLayoutRecovery)
 
   let capCleanup: (() => void) | undefined
   if (Capacitor.isNativePlatform()) {
@@ -133,6 +165,9 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
         if (!isActive) return
         applyViewportCssVarsOnResume()
         sync()
+        window.setTimeout(() => {
+          requestCameraPreviewLayoutRecovery('app-foreground')
+        }, 220)
       }).then((sub) => {
         capCleanup = () => {
           void sub.remove()
@@ -143,8 +178,10 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
 
   return () => {
     if (debounceTimer !== null) window.clearTimeout(debounceTimer)
-    window.removeEventListener('resize', scheduleSync)
-    window.visualViewport?.removeEventListener('resize', scheduleSync)
+    if (cameraRecoveryTimer !== null) window.clearTimeout(cameraRecoveryTimer)
+    window.removeEventListener('resize', scheduleLayoutRecovery)
+    window.removeEventListener('orientationchange', scheduleLayoutRecovery)
+    window.visualViewport?.removeEventListener('resize', scheduleLayoutRecovery)
     capCleanup?.()
     lastAppliedWidth = 0
     lastAppliedHeight = 0

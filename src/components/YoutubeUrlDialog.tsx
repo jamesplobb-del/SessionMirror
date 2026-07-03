@@ -8,6 +8,7 @@ import { parseYoutubeEmbedUrl } from '../utils/youtubeEmbed'
 import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
 import { nativeGlideEase, motionGpuLayer } from '../utils/motionPresets'
 import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
+import { requestCameraPreviewLayoutRecovery } from '../utils/viewportSync'
 
 interface YoutubeUrlDialogProps {
   open: boolean
@@ -69,11 +70,13 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     releaseInputFocus()
     onSubmit(embedUrl)
     onClose()
+    requestCameraPreviewLayoutRecovery('youtube-submit')
   }, [onClose, onSubmit, releaseInputFocus, value])
 
   const handleClose = useCallback(() => {
     releaseInputFocus()
     onClose()
+    requestCameraPreviewLayoutRecovery('youtube-close')
   }, [onClose, releaseInputFocus])
 
   if (typeof document === 'undefined') return null

@@ -43,6 +43,7 @@ export interface SharedMetronomeSnapshot {
 }
 
 type Listener = () => void
+type BarListener = () => void
 
 function createInitialSnapshot(): SharedMetronomeSnapshot {
   const prefs = loadMetronomePrefs()
@@ -62,6 +63,7 @@ function createInitialSnapshot(): SharedMetronomeSnapshot {
 
 class SharedMetronomeEngine {
   private listeners = new Set<Listener>()
+  private barListeners = new Set<BarListener>()
   private snapshot: SharedMetronomeSnapshot = createInitialSnapshot()
 
   private audioCtx: AudioContext | null = null
@@ -86,6 +88,19 @@ class SharedMetronomeEngine {
     this.listeners.add(listener)
     return () => {
       this.listeners.delete(listener)
+    }
+  }
+
+  subscribeBar = (listener: BarListener): (() => void) => {
+    this.barListeners.add(listener)
+    return () => {
+      this.barListeners.delete(listener)
+    }
+  }
+
+  private emitBar(): void {
+    for (const listener of this.barListeners) {
+      listener()
     }
   }
 
@@ -438,6 +453,30 @@ class SharedMetronomeEngine {
     )
   }
 
+  /** Apply section settings during timeline playback without overwriting saved metronome prefs. */
+  applySectionConfig = (config: {
+    bpm: number
+    meter: MetronomeMeter
+    subdivision: MetronomeSubdivision
+    feelId?: string
+    accentLevels: MetronomeAccentLevel[]
+    soundId?: string
+  }): void => {
+    const nextBpm = clampBpm(config.bpm)
+    const levels = normalizeAccentLevels(config.meter, config.accentLevels, config.feelId)
+    this.tickCounter = 0
+    this.patchState({
+      bpm: nextBpm,
+      meter: config.meter,
+      subdivision: config.subdivision,
+      feelId: config.feelId,
+      accentLevels: levels,
+      beatIndex: 0,
+      subTickIndex: 0,
+      ...(config.soundId ? { soundId: config.soundId } : {}),
+    })
+  }
+
   private clearSchedulerTimer(): void {
     if (this.schedulerTimer !== null) {
       window.clearTimeout(this.schedulerTimer)
@@ -561,6 +600,9 @@ class SharedMetronomeEngine {
 
         this.nextBeatTime += secondsPerTick
         this.tickCounter += 1
+        if (this.tickCounter > 0 && this.tickCounter % barTicks === 0) {
+          this.emitBar()
+        }
       }
 
       if (uiBeat >= 0) {

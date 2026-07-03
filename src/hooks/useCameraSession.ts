@@ -31,6 +31,7 @@ import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
   applyViewportCssVarsOnResume,
+  CAMERA_PREVIEW_LAYOUT_RECOVERY_EVENT,
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import {
@@ -1822,6 +1823,70 @@ export function useCameraSession({
     ensureCameraPreviewActive,
     restartCameraAfterForeground,
   ])
+
+  const recoverCameraPreviewLayout = useCallback(
+    async (_reason = 'layout-change') => {
+      if (!isAppInForeground()) return
+      if (recordingModeRef.current !== 'video') return
+      if (isRecordingRef.current) return
+
+      applyViewportCssVarsOnResume()
+      resetCameraPreviewZoom()
+
+      const stream = streamRef.current
+      if (!stream || !isStreamRecordable(stream, 'video')) return
+
+      await normalizeVideoPreviewAfterWake(stream)
+      if (recordingModeRef.current !== 'video' || streamRef.current !== stream) return
+
+      syncPreviewTargets(stream, 'video')
+      previewHealthyRef.current = isVideoPreviewHealthy(
+        previewRef.current,
+        stream,
+        'video',
+      )
+    },
+    [syncPreviewTargets],
+  )
+
+  useEffect(() => {
+    let firstTimer: number | null = null
+    let secondTimer: number | null = null
+
+    const clearTimers = () => {
+      if (firstTimer !== null) {
+        window.clearTimeout(firstTimer)
+        firstTimer = null
+      }
+      if (secondTimer !== null) {
+        window.clearTimeout(secondTimer)
+        secondTimer = null
+      }
+    }
+
+    const onRecovery = (event: Event) => {
+      clearTimers()
+      const reason =
+        event instanceof CustomEvent && typeof event.detail?.reason === 'string'
+          ? event.detail.reason
+          : 'layout-change'
+
+      resetCameraPreviewZoom()
+      firstTimer = window.setTimeout(() => {
+        void recoverCameraPreviewLayout(reason)
+      }, 80)
+      secondTimer = window.setTimeout(() => {
+        void recoverCameraPreviewLayout(`${reason}:settled`)
+      }, 320)
+    }
+
+    window.addEventListener(CAMERA_PREVIEW_LAYOUT_RECOVERY_EVENT, onRecovery)
+
+    return () => {
+      clearTimers()
+      window.removeEventListener(CAMERA_PREVIEW_LAYOUT_RECOVERY_EVENT, onRecovery)
+    }
+  }, [recoverCameraPreviewLayout])
 
   /** Re-open getUserMedia after AVAudioSession route changes (e.g. device mic vs BT HFP). */
   const reacquireStreamForAudioRoute = useCallback(async () => {

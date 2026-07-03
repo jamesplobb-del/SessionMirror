@@ -164,6 +164,11 @@ import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTab
 import AudioModeHome from './components/audioPractice/AudioModeHome'
 import AudioMetronomeTab from './components/audioPractice/AudioMetronomeTab'
 import AudioTunerTab from './components/audioPractice/AudioTunerTab'
+import PracticeTimelineView from './practiceTimeline/components/PracticeTimelineView'
+import {
+  consumePendingMarkers,
+  saveTakeMarkers,
+} from './practiceTimeline/recording/timelineMarkers'
 import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
 import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './context/AudioModePlaybackContext'
 
@@ -1006,6 +1011,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       videoUrl,
       mediaType,
     })
+
+    const timelineMarkers = consumePendingMarkers()
+    if (timelineMarkers.length > 0) {
+      saveTakeMarkers(takeId, timelineMarkers)
+    }
 
     const shouldAutoPlay =
       pendingAutoPlaybackRef.current &&
@@ -2067,7 +2077,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const takePlaybackActive =
     autoPlaybackPlaying || audioModeTakePlaying || benchmarkPipPlaying || challengerPipPlaying
-  const nativeSessionPlaybackActive = takePlaybackActive
+  const nativeSessionPlaybackActive = recordingMode === 'video' && takePlaybackActive
 
   const selectedAudioEngine = settings.audioEnhancerEnabled ? 'Native + Enhanced' : 'Native'
 
@@ -2126,7 +2136,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const isAudioPracticeTunerTab = recordingMode === 'audio' && audioPracticeTab === 'tuner'
 
-  const isAudioPracticeToolTab = isAudioPracticeMetronomeTab || isAudioPracticeTunerTab
+  const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
+
+  const isAudioPracticeToolTab =
+    isAudioPracticeMetronomeTab || isAudioPracticeTunerTab || isAudioPracticeTimelineTab
 
   useEffect(() => {
     if (!isAudioPracticeTunerTab || quickSettingsOpen || isRecording) return
@@ -3000,7 +3013,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     isSplitView ? 'app-ui-overlay--split-open' : ''
                   } ${
                     isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
-                  } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''}`}
+                  } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${
+                    isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline' : ''
+                  }`}
                   aria-hidden={hudModalState === 'review'}
                   animate={{
                     opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -3049,6 +3064,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         data-tutorial="audio-metronome-tab"
                       >
                         <AudioMetronomeTab key="audio-metronome-tab" />
+                      </div>
+                    )}
+
+                  {recordingMode === 'audio' &&
+                    isAudioPracticeTimelineTab &&
+                    !quickSettingsOpen && (
+                      <div
+                        key="audio-practice-timeline-layer"
+                        className="audio-practice-timeline-layer flex min-h-0 flex-1 flex-col"
+                        data-tutorial="audio-practice-tab"
+                      >
+                        <PracticeTimelineView
+                          isRecording={isRecording}
+                          onStartRecording={toggleRecording}
+                          onStopRecording={toggleRecording}
+                        />
                       </div>
                     )}
 

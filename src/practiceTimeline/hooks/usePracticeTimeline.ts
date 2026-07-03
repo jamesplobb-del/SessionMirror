@@ -1,0 +1,125 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { timelinePlaybackEngine } from '../playback/timelinePlaybackEngine'
+import { saveTimeline, loadOrCreateActiveTimeline } from '../storage/timelineStorage'
+import { createDefaultSection } from '../sectionDefaults'
+import type { PracticeTimeline, PracticeTimelineMarker, TimelinePlaybackState, TimelineSection } from '../types'
+
+export function usePracticeTimeline() {
+  const [timeline, setTimeline] = useState<PracticeTimeline>(() => loadOrCreateActiveTimeline())
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
+
+  const persist = useCallback((next: PracticeTimeline) => {
+    const saved = saveTimeline(next)
+    setTimeline(saved)
+    return saved
+  }, [])
+
+  const addSection = useCallback(() => {
+    const section = createDefaultSection({ title: `Section ${timeline.sections.length + 1}` })
+    persist({ ...timeline, sections: [...timeline.sections, section] })
+    setEditingSectionId(section.id)
+  }, [persist, timeline])
+
+  const updateSection = useCallback(
+    (sectionId: string, patch: Partial<TimelineSection>) => {
+      persist({
+        ...timeline,
+        sections: timeline.sections.map((s) => (s.id === sectionId ? { ...s, ...patch } : s)),
+      })
+    },
+    [persist, timeline],
+  )
+
+  const deleteSection = useCallback(
+    (sectionId: string) => {
+      persist({ ...timeline, sections: timeline.sections.filter((s) => s.id !== sectionId) })
+      if (editingSectionId === sectionId) setEditingSectionId(null)
+    },
+    [editingSectionId, persist, timeline],
+  )
+
+  const duplicateSection = useCallback(
+    (sectionId: string) => {
+      const source = timeline.sections.find((s) => s.id === sectionId)
+      if (!source) return
+      const copy = createDefaultSection({ ...source, title: `${source.title} Copy` })
+      const index = timeline.sections.findIndex((s) => s.id === sectionId)
+      const sections = [...timeline.sections]
+      sections.splice(index + 1, 0, copy)
+      persist({ ...timeline, sections })
+    },
+    [persist, timeline],
+  )
+
+  const reorderSections = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return
+      const sections = [...timeline.sections]
+      const [moved] = sections.splice(fromIndex, 1)
+      sections.splice(toIndex, 0, moved)
+      persist({ ...timeline, sections })
+    },
+    [persist, timeline],
+  )
+
+  const loadTimeline = useCallback((next: PracticeTimeline) => {
+    saveTimeline(next)
+    setTimeline(next)
+    setEditingSectionId(null)
+  }, [])
+
+  const renameTimeline = useCallback(
+    (name: string) => persist({ ...timeline, name }),
+    [persist, timeline],
+  )
+
+  return {
+    timeline,
+    editingSectionId,
+    setEditingSectionId,
+    addSection,
+    updateSection,
+    deleteSection,
+    duplicateSection,
+    reorderSections,
+    loadTimeline,
+    renameTimeline,
+    persist,
+  }
+}
+
+export function useTimelinePlayback() {
+  const [playbackState, setPlaybackState] = useState<TimelinePlaybackState>(() =>
+    timelinePlaybackEngine.getState(),
+  )
+  const onFinishedRef = useRef<((markers: PracticeTimelineMarker[]) => void) | undefined>(undefined)
+
+  useEffect(() => {
+    timelinePlaybackEngine.setCallbacks({
+      onStateChange: setPlaybackState,
+      onFinished: (markers) => onFinishedRef.current?.(markers),
+    })
+    return () => timelinePlaybackEngine.setCallbacks({})
+  }, [])
+
+  const start = useCallback(
+    async (
+      timeline: PracticeTimeline,
+      options?: { recordingOffsetSeconds?: number; onFinished?: (m: PracticeTimelineMarker[]) => void },
+    ) => {
+      onFinishedRef.current = options?.onFinished
+      return timelinePlaybackEngine.start(timeline, options?.recordingOffsetSeconds ?? 0)
+    },
+    [],
+  )
+
+  const stop = useCallback(() => timelinePlaybackEngine.stop(), [])
+
+  return {
+    playbackState,
+    start,
+    stop,
+    currentSection: timelinePlaybackEngine.getCurrentSection(),
+    nextSection: timelinePlaybackEngine.getNextSection(),
+  }
+}

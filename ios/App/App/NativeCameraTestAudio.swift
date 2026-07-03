@@ -92,27 +92,17 @@ enum NativeCameraTestAudio {
 
         print("[PlaybackRoute] applying playback session")
         print("[CameraLikePlayback] applying session")
-        try AudioRouteConfigurator.debugSetCategory(
-            audioSession,
-            category: .playback,
-            mode: .default,
-            options: [.allowBluetoothA2DP, .allowAirPlay],
-            caller: "NativeCameraTestAudio.prepareCameraLikePlaybackSession"
-        )
-        try AudioRouteConfigurator.debugSetActive(
-            audioSession,
-            active: true,
-            options: [],
-            caller: "NativeCameraTestAudio.prepareCameraLikePlaybackSession"
-        )
-        try audioSession.setPreferredSampleRate(48_000)
-        try audioSession.setPreferredIOBufferDuration(0.005)
+        let playbackSnapshot = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
         CameraSessionGuard.markPlaybackSessionPrepared()
 
-        let category = audioSession.category.rawValue
-        let mode = audioSession.mode.rawValue
-        let inputRoute = audioSession.currentRoute.inputs.first?.portType.rawValue ?? "none"
-        let outputRoute = audioSession.currentRoute.outputs.first?.portType.rawValue ?? "none"
+        let category = (playbackSnapshot["category"] as? String) ?? audioSession.category.rawValue
+        let mode = (playbackSnapshot["mode"] as? String) ?? audioSession.mode.rawValue
+        let inputRoute = (playbackSnapshot["currentInputRoute"] as? String)
+            ?? audioSession.currentRoute.inputs.first?.portType.rawValue
+            ?? "none"
+        let outputRoute = (playbackSnapshot["currentOutputRoute"] as? String)
+            ?? audioSession.currentRoute.outputs.first?.portType.rawValue
+            ?? "none"
 
         print("[CameraLikePlayback] category = \(category)")
         print("[CameraLikePlayback] mode = \(mode)")

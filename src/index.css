@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import './styles/audio-mode-tokens.css';
 @import './styles/audio-mode.css';
+@import './styles/practice-timeline.css';
 
 :root {
   --app-base: #000000;
@@ -4248,6 +4249,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 .pitch-widget-hint {
   font-size: 0.6875rem;
+  line-height: 1.15;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--audio-text-secondary, rgba(108, 112, 119, 0.88));
@@ -5014,8 +5016,8 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .pitch-tuner--widget .pitch-audio-stage--polished {
-  gap: 0.2rem;
-  padding: 0.35rem 0.4rem 0.4rem;
+  gap: 0.15rem;
+  padding: 0.35rem 0.4rem 0.2rem;
   background: transparent;
 }
 
@@ -5024,7 +5026,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .pitch-tuner--widget .pitch-note-orbit {
-  --orbit-size: min(38cqw, 5.25rem);
+  --orbit-size: min(34cqw, 4.8rem);
   filter: drop-shadow(0 6px 16px rgba(23, 26, 34, 0.06));
 }
 
@@ -5053,7 +5055,12 @@ html.physical-landscape-right .control-deck__vault-btn {
 .pitch-tuner--widget .pitch-audio-stage__chart {
   min-height: 0;
   flex: 1;
-  padding-top: 0.1rem;
+  padding-top: 0;
+}
+
+.pitch-tuner--widget .pitch-audio-stage__chart .pitch-chart-shell {
+  min-height: 0 !important;
+  height: 100%;
 }
 
 .pitch-tuner--widget .pitch-chart-card {
@@ -5062,10 +5069,12 @@ html.physical-landscape-right .control-deck__vault-btn {
   background: var(--audio-surface, #ffffff);
   box-shadow: 0 2px 8px rgba(23, 26, 34, 0.05);
   overflow: hidden;
+  min-height: 3.25rem;
 }
 
 .pitch-tuner--widget .pitch-chart-card .pitch-chart-shell {
   background: var(--audio-surface, #ffffff);
+  min-height: 0 !important;
 }
 
 html.app-dark-mode .pitch-tuner--widget .pitch-chart-card,

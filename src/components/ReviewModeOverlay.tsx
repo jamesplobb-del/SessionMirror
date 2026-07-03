@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
+import ReviewSectionMarkers from './ReviewSectionMarkers'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import Pressable from './ui/Pressable'
@@ -25,6 +26,7 @@ import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/u
 import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
+import { loadTakeMarkers } from '../practiceTimeline/recording/timelineMarkers'
 import { describeSaveTakeResult, shareTakeToSystem, shareTakeVideo } from '../utils/shareTakeVideo'
 import { triggerBestTakeHaptic, triggerLightHaptic, triggerWarningHaptic } from '../utils/haptics'
 import { useActionSheet } from '../context/ActionSheetContext'
@@ -375,6 +377,11 @@ export default function ReviewModeOverlay({
     ? audioPlayback.state.isPlaying
     : isPlaying
 
+  const practiceMarkers = useMemo(
+    () => (activeTake?.id ? loadTakeMarkers(activeTake.id) : []),
+    [activeTake?.id],
+  )
+
   const pauseAllReviewVideos = useCallback(() => {
     resetVideoPlayback(benchmarkVideoRef.current)
     resetVideoPlayback(challengerVideoRef.current)
@@ -430,6 +437,20 @@ export default function ReviewModeOverlay({
       setCurrentTime(pendingTimeRef.current)
     })
   }, [])
+
+  const seekToPracticeMarker = useCallback(
+    (timeSeconds: number) => {
+      if (activeAudioPlaybackItem) {
+        audioPlayback.seek(timeSeconds)
+        return
+      }
+      const video = getActiveVideo()
+      if (!video) return
+      video.currentTime = timeSeconds
+      scheduleTimeUpdate(timeSeconds)
+    },
+    [activeAudioPlaybackItem, audioPlayback, getActiveVideo, scheduleTimeUpdate],
+  )
 
   const syncDurationFromVideo = useCallback((media: HTMLMediaElement) => {
     const playable = getPlayableDuration(media)
@@ -1249,6 +1270,13 @@ export default function ReviewModeOverlay({
                     onPlayPause={togglePlayPause}
                     mediaFilePath={activeTimelineFilePath}
                     mediaUrl={activeTimelineUrl}
+                  />
+
+                  <ReviewSectionMarkers
+                    markers={practiceMarkers}
+                    duration={displayDuration}
+                    currentTime={displayCurrentTime}
+                    onSeek={seekToPracticeMarker}
                   />
 
                   <div className="review-native-toolbar">

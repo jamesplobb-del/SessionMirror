@@ -562,7 +562,7 @@ export default function LivePitchTuner({
             canvasRef={canvasRef}
           />
           {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
-            <p className="pitch-widget-hint pointer-events-none absolute inset-x-3 bottom-2 z-10 text-center">
+            <p className="pitch-widget-hint pointer-events-none shrink-0 px-3 pb-2 text-center">
               Pitch trace during playback
             </p>
           )}
