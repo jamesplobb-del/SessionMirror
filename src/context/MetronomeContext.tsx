@@ -16,6 +16,7 @@ export interface SharedMetronomeControls {
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
   setFeel: (feelId: string) => void
+  setPulseMode: (pulseModeId: string) => void
   setAccentLevels: (accentLevels: MetronomeAccentLevel[]) => void
   setAccentPattern: (accentPattern: boolean[]) => void
   toggleBeatAccent: (beatIndex: number) => void
@@ -32,6 +33,7 @@ const controls: SharedMetronomeControls = {
   setMeter: sharedMetronomeEngine.setMeter,
   setSubdivision: sharedMetronomeEngine.setSubdivision,
   setFeel: sharedMetronomeEngine.setFeel,
+  setPulseMode: sharedMetronomeEngine.setPulseMode,
   setAccentLevels: sharedMetronomeEngine.setAccentLevels,
   setAccentPattern: sharedMetronomeEngine.setAccentPattern,
   toggleBeatAccent: sharedMetronomeEngine.toggleBeatAccent,

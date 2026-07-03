@@ -1,5 +1,6 @@
-import { getTimeSignatureDefinition } from '../utils/metronomeConfig'
+import { resolveSectionPulse } from './timeSignatureLogic'
 import type { MetronomeMeter } from '../utils/metronomeConfig'
+import type { TimelineSection } from './types'
 
 /** Parse "2+2+3" or "2 2 3" into [2, 2, 3]. Returns null if invalid. */
 export function parseGroupingInput(text: string): number[] | null {
@@ -31,12 +32,19 @@ export function groupingSum(grouping: number[]): number {
   return grouping.reduce((sum, value) => sum + value, 0)
 }
 
-export function validateGroupingForMeter(grouping: number[], meter: MetronomeMeter): boolean {
-  const def = getTimeSignatureDefinition(meter)
-  return groupingSum(grouping) === def.pulseCount
+export function validateGroupingForMeter(grouping: number[], section: TimelineSection): boolean {
+  const resolved = resolveSectionPulse(section)
+  return groupingSum(grouping) === resolved.pulseCount
 }
 
-export function groupingValidationMessage(meter: MetronomeMeter): string {
-  const def = getTimeSignatureDefinition(meter)
-  return `Groups must add up to ${def.pulseCount} (e.g. 2+2+3 for 7/8)`
+export function groupingValidationMessage(section: TimelineSection): string {
+  const resolved = resolveSectionPulse(section)
+  return `Groups must add up to ${resolved.pulseCount} (e.g. 2+2+3)`
+}
+
+/** @deprecated Use validateGroupingForMeter with section */
+export function validateGroupingForMeterLegacy(grouping: number[], meter: MetronomeMeter): boolean {
+  const sum = groupingSum(grouping)
+  const [numerator] = meter.split('/').map(Number)
+  return sum === numerator
 }

@@ -759,3 +759,339 @@
   background: linear-gradient(90deg, var(--audio-gold), #ffbe3d);
   transition: width 0.25s ease;
 }
+
+.practice-timeline-editor__pattern {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.practice-timeline-editor__pattern-step {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-surface);
+}
+
+.practice-timeline-editor__pattern-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.practice-timeline-editor__pattern-step-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--audio-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.practice-timeline-editor__pattern-add {
+  width: 100%;
+  padding: 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px dashed var(--audio-divider);
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--audio-blue);
+}
+
+.practice-timeline__section-meta-pattern {
+  flex: 1 1 100%;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+/* ── Scan Music ── */
+
+.practice-timeline__scan-hero-btn,
+.practice-timeline__scan-btn {
+  margin-top: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.85rem;
+  border: 1px dashed var(--audio-blue-border);
+  background: var(--audio-blue-soft);
+  color: var(--audio-blue);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.music-scan-capture__lead {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-capture__notice {
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.music-scan-capture__notice code {
+  font-size: 0.78rem;
+}
+
+.music-scan-capture__options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+}
+
+.music-scan-capture__option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-surface);
+  font-weight: 600;
+  color: var(--audio-text-primary);
+}
+
+.music-scan-capture__busy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1.5rem 0;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-capture__spinner {
+  animation: music-scan-spin 0.9s linear infinite;
+}
+
+@keyframes music-scan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.music-scan-capture__error {
+  margin-top: 0.75rem;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+.music-scan-capture__fine-print {
+  margin-top: 1rem;
+  font-size: 0.78rem;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--audio-bg);
+}
+
+.music-scan-review__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--audio-divider);
+}
+
+.music-scan-review__title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.music-scan-review__subtitle {
+  font-size: 0.82rem;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+}
+
+.music-scan-review__banner {
+  margin-bottom: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.65rem;
+  background: var(--audio-blue-soft);
+  color: var(--audio-blue);
+  font-size: 0.84rem;
+}
+
+.music-scan-review__banner--warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.music-scan-review__warning {
+  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review__events {
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-surface);
+}
+
+.music-scan-review__events h3 {
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review__events ul {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.85rem;
+}
+
+.music-scan-review__card {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-surface);
+}
+
+.music-scan-review__card--uncertain {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.15);
+}
+
+.music-scan-review__card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.music-scan-review__title-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--audio-text-primary);
+}
+
+.music-scan-review__card-meta {
+  font-size: 0.78rem;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review__uncertain {
+  color: #b45309;
+}
+
+.music-scan-review__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.music-scan-review__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review__field input {
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-bg);
+  color: var(--audio-text-primary);
+  font-size: 0.9rem;
+}
+
+.music-scan-review__field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.music-scan-review__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.music-scan-review__grouping {
+  margin-bottom: 0.5rem;
+}
+
+.music-scan-review__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review__flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.music-scan-review__check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.music-scan-review__note {
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--audio-text-secondary);
+}
+
+.music-scan-review__add {
+  width: 100%;
+  padding: 0.7rem;
+  border-radius: 0.65rem;
+  border: 1px dashed var(--audio-divider);
+  font-weight: 600;
+  color: var(--audio-blue);
+}
+
+.music-scan-review__footer {
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem calc(0.65rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--audio-divider);
+  background: var(--audio-bg);
+}
+
+.music-scan-review__footer .practice-timeline__footer-btn {
+  flex: 1;
+}

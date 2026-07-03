@@ -1,11 +1,15 @@
-import { Plus } from 'lucide-react'
+import { Plus, ScanLine } from 'lucide-react'
 import { Fragment, useMemo, useState } from 'react'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
 import { describeSection, timelineSummaryLines } from '../naturalLanguage'
+import { draftToTimelineSections } from '../scan/scanToProgram'
+import { useMusicScan } from '../scan/useMusicScan'
 import { stashPendingMarkers } from '../recording/timelineMarkers'
 import { effectiveBars } from '../timeSignatureLogic'
+import MusicScanCaptureSheet from './MusicScanCaptureSheet'
+import MusicScanReviewSheet from './MusicScanReviewSheet'
 import TimelineLibrarySheet from './TimelineLibrarySheet'
 import TimelinePracticeSessionView from './TimelinePracticeSessionView'
 import TimelineSectionCard from './TimelineSectionCard'
@@ -35,6 +39,7 @@ export default function PracticeTimelineView({
     loadTimeline,
     renameTimeline,
     updateTrackSettings,
+    applyScanProgram,
   } = usePracticeTimeline()
 
   const {
@@ -56,6 +61,9 @@ export default function PracticeTimelineView({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(timeline.name)
+  const [scanOpen, setScanOpen] = useState(false)
+
+  const musicScan = useMusicScan()
 
   const trackSettings = {
     countInBars: timeline.settings?.countInBars ?? 0,
@@ -89,6 +97,28 @@ export default function PracticeTimelineView({
   const handleExitSession = () => {
     exitSession()
     if (recordEnabled && isRecording) onStopRecording?.()
+  }
+
+  const handleApplyScan = (mode: 'replace' | 'append') => {
+    if (!musicScan.draft) return
+    const sections = draftToTimelineSections(musicScan.draft)
+    applyScanProgram(sections, mode, musicScan.draft.title)
+    musicScan.reset()
+    setScanOpen(false)
+  }
+
+  if (musicScan.phase === 'review' && musicScan.draft) {
+    return (
+      <MusicScanReviewSheet
+        draft={musicScan.draft}
+        onChange={musicScan.updateDraft}
+        onClose={() => {
+          musicScan.reset()
+          setScanOpen(false)
+        }}
+        onApply={handleApplyScan}
+      />
+    )
   }
 
   if (playbackState.sessionActive && sessionTimeline) {
@@ -149,9 +179,21 @@ export default function PracticeTimelineView({
           )}
           <p className="practice-timeline__hero-sub">
             {timeline.sections.length === 0
-              ? 'Add sections like a playlist'
+              ? 'Add sections like a playlist, or scan sheet music'
               : `${timeline.sections.length} sections`}
           </p>
+          {timeline.sections.length === 0 ? (
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              className="practice-timeline__scan-hero-btn"
+              onClick={() => setScanOpen(true)}
+            >
+              <ScanLine size={18} className="mr-1 inline" />
+              Scan Music
+            </Pressable>
+          ) : null}
         </header>
 
         {timeline.sections.length > 0 ? (
@@ -193,6 +235,17 @@ export default function PracticeTimelineView({
         >
           <Plus size={20} />
           Add Section
+        </Pressable>
+
+        <Pressable
+          type="button"
+          intensity="soft"
+          haptic="light"
+          className="practice-timeline__scan-btn"
+          onClick={() => setScanOpen(true)}
+        >
+          <ScanLine size={18} className="mr-1 inline" />
+          Scan Music
         </Pressable>
 
         <label className="practice-timeline__record-toggle pointer-events-auto">
@@ -239,6 +292,30 @@ export default function PracticeTimelineView({
         activeTimelineId={timeline.id}
         onClose={() => setLibraryOpen(false)}
         onSelect={loadTimeline}
+      />
+
+      <input
+        ref={musicScan.fileInputRef}
+        type="file"
+        accept={musicScan.inputAccept}
+        capture={musicScan.inputCapture}
+        className="sr-only"
+        onChange={musicScan.handleFileChange}
+      />
+
+      <MusicScanCaptureSheet
+        open={scanOpen || musicScan.phase === 'reading' || musicScan.phase === 'analyzing' || musicScan.phase === 'error'}
+        phase={musicScan.phase}
+        error={musicScan.error}
+        scanConfigured={musicScan.scanConfigured}
+        onClose={() => {
+          if (musicScan.phase === 'reading' || musicScan.phase === 'analyzing') return
+          musicScan.reset()
+          setScanOpen(false)
+        }}
+        onTakePhoto={() => musicScan.openPicker('photo')}
+        onImportImage={() => musicScan.openPicker('image')}
+        onImportPdf={() => musicScan.openPicker('pdf')}
       />
     </div>
   )

@@ -1,65 +1,69 @@
 import {
-  getAccentLevelsForMeter,
-  getDefaultFeelId,
+  formatBpmLabel,
+  groupingValidationMessageForResolved,
+  resolvePulseTiming,
+  validateGroupingForResolved,
+  type ResolvedPulseTiming,
+} from '../metronome/pulseResolution'
+import {
   getMeterDefaults,
   getSubdivisionLabel,
-  getTimeSignatureDefinition,
-  getAvailableSubdivisions,
   hasFeelOptions,
   suggestSubdivisionForMeterChange,
   type MetronomeAccentLevel,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
+import { getPulseModesForMeter } from '../metronome/pulseModes'
 import { formatGrouping } from './groupingUtils'
+import {
+  effectivePatternBars,
+  formatPatternMetersLabel,
+  patternRepeatSummary,
+  patternSectionSummary,
+  resolveSectionTimingAtMeasure,
+  sectionHasMeterPattern,
+} from './patternLogic'
 import { repeatMultiplier } from './sectionDefaults'
 import type { TimelineSection } from './types'
 
-export interface ResolvedSectionTiming {
-  meter: MetronomeMeter
-  feelId?: string
+export type { ResolvedPulseTiming }
+
+export interface ResolvedSectionTiming extends ResolvedPulseTiming {
   subdivision: MetronomeSubdivision
-  accentLevels: MetronomeAccentLevel[]
-  feelOptions: { id: string; label: string }[]
 }
 
-export function resolveSubdivision(
+export function resolveSectionPulse(section: TimelineSection): ResolvedPulseTiming {
+  return resolvePulseTiming({
+    meter: section.meter,
+    pulseModeId: section.pulseModeId,
+    feelId: section.feelId,
+    beatGrouping: section.advanced?.beatGrouping,
+    customAccents: section.advanced?.customAccents,
+  })
+}
+
+export function resolveSectionTiming(
   section: TimelineSection,
-  previousMeter?: MetronomeMeter,
-): MetronomeSubdivision {
-  if (section.subdivision !== 'auto') return section.subdivision
-
-  const defaults = getMeterDefaults(section.meter)
-  if (previousMeter) {
-    return suggestSubdivisionForMeterChange(
+  previousSection?: TimelineSection,
+): ResolvedSectionTiming {
+  const pulse = resolveSectionPulse(section)
+  let subdivision: MetronomeSubdivision
+  if (section.subdivision !== 'auto') {
+    subdivision = section.subdivision
+  } else if (previousSection) {
+    const prev = resolveSectionTiming(previousSection)
+    subdivision = suggestSubdivisionForMeterChange(
       section.meter,
-      previousMeter,
-      defaults.subdivision,
+      previousSection.meter,
+      prev.subdivision,
+      pulse.pulseModeId,
+      prev.pulseModeId,
     )
-  }
-  return defaults.subdivision
-}
-
-export function resolveSectionTiming(section: TimelineSection): ResolvedSectionTiming {
-  const def = getTimeSignatureDefinition(section.meter)
-  const feelOptions =
-    def.feelOptions?.map((option) => ({ id: option.id, label: option.label })) ?? []
-  const feelId = section.feelId ?? def.defaultFeelId
-  const subdivision = resolveSubdivision(section)
-  const meterDefaults = getMeterDefaults(section.meter)
-
-  let accentLevels = getAccentLevelsForMeter(section.meter, feelId)
-  if (section.advanced?.customAccents?.length) {
-    accentLevels = section.advanced.customAccents
-  } else if (section.advanced?.beatGrouping?.length) {
-    accentLevels = accentsFromGrouping(section.advanced.beatGrouping)
-  } else if (feelId) {
-    accentLevels = getAccentLevelsForMeter(section.meter, feelId)
   } else {
-    accentLevels = meterDefaults.accentLevels
+    subdivision = pulse.defaultSubdivision
   }
-
-  return { meter: section.meter, feelId, subdivision, accentLevels, feelOptions }
+  return { ...pulse, subdivision }
 }
 
 export function tempoRampLabel(section: TimelineSection): string | null {
@@ -70,9 +74,19 @@ export function tempoRampLabel(section: TimelineSection): string | null {
   return null
 }
 
-export function sectionTimingSummary(section: TimelineSection): string {
+export function sectionTimingSummary(section: TimelineSection, measure = 1): string {
+  if (sectionHasMeterPattern(section)) {
+    if (measure > 1) {
+      const timing = resolveSectionTimingAtMeasure(section, measure)
+      const bpmLabel = formatBpmLabel(timing.stepBpm, timing)
+      const pattern = formatPatternMetersLabel(section.patternSteps!)
+      const repeat = patternRepeatSummary(section)
+      return `${timing.meter} · ${pattern} · ${repeat} · ${bpmLabel}`
+    }
+    return patternSectionSummary(section)
+  }
+
   const timing = resolveSectionTiming(section)
-  const def = getTimeSignatureDefinition(section.meter)
   const feel = timing.feelOptions.find((option) => option.id === timing.feelId)
   const customGroup =
     section.advanced?.beatGrouping?.length && !feel
@@ -80,10 +94,11 @@ export function sectionTimingSummary(section: TimelineSection): string {
       : null
   const rhythm =
     timing.subdivision === 'off'
-      ? def.pulseName
+      ? timing.pulseName
       : getSubdivisionLabel(section.meter, timing.subdivision)
   const ramp = tempoRampLabel(section)
-  const parts: string[] = [section.meter]
+  const bpmLabel = formatBpmLabel(section.bpm, timing)
+  const parts: string[] = [section.meter, bpmLabel]
   if (feel) parts.push(feel.label)
   else if (customGroup) parts.push(customGroup)
   parts.push(rhythm)
@@ -106,12 +121,13 @@ export function applyMeterChange(
   section: TimelineSection,
   nextMeter: MetronomeMeter,
 ): TimelineSection {
-  const def = getTimeSignatureDefinition(nextMeter)
+  const defaults = getMeterDefaults(nextMeter)
   return {
     ...section,
     meter: nextMeter,
-    feelId: def.defaultFeelId,
-    subdivision: section.subdivision === 'auto' ? 'auto' : section.subdivision,
+    pulseModeId: defaults.pulseModeId,
+    feelId: defaults.feelId,
+    subdivision: 'auto',
     advanced: {
       ...section.advanced,
       beatGrouping: undefined,
@@ -122,17 +138,36 @@ export function applyMeterChange(
 
 export function subdivisionLabel(section: TimelineSection): string {
   if (section.subdivision === 'auto') return 'Auto'
-  const resolved = resolveSubdivision(section)
-  const def = getTimeSignatureDefinition(section.meter)
-  if (resolved === 'off') return def.pulseName
-  return getSubdivisionLabel(section.meter, resolved)
+  const resolved = resolveSectionTiming(section)
+  if (resolved.subdivision === 'off') return resolved.pulseName
+  return getSubdivisionLabel(section.meter, resolved.subdivision)
 }
 
-export function subdivisionOptionsForMeter(meter: MetronomeMeter): MetronomeSubdivision[] {
-  return getAvailableSubdivisions(meter)
+export function subdivisionOptionsForSection(section: TimelineSection): MetronomeSubdivision[] {
+  return resolveSectionPulse(section).availableSubdivisions
+}
+
+export function pulseModeOptionsForSection(section: TimelineSection) {
+  return getPulseModesForMeter(section.meter).map((mode) => ({
+    id: mode.id,
+    label: mode.label,
+    bpmSymbol: mode.bpmSymbol,
+  }))
+}
+
+export function sectionNeedsPulseModeChoice(section: TimelineSection): boolean {
+  return getPulseModesForMeter(section.meter).length > 1
+}
+
+export function sectionNeedsFeelPrompt(section: TimelineSection): boolean {
+  const resolved = resolveSectionPulse(section)
+  return hasFeelOptions(section.meter, resolved.pulseModeId)
 }
 
 export function effectiveBars(section: TimelineSection): number {
+  if (sectionHasMeterPattern(section)) {
+    return effectivePatternBars(section)
+  }
   return section.bars * repeatMultiplier(section.repeatCount)
 }
 
@@ -142,10 +177,18 @@ export function sectionBarWidth(section: TimelineSection, maxBars: number): numb
   return Math.max(0.15, Math.min(1, bars / maxBars))
 }
 
-export function meterNeedsFeelPrompt(meter: MetronomeMeter): boolean {
-  return hasFeelOptions(meter)
+export function defaultFeelForMeter(meter: MetronomeMeter, pulseModeId?: string): string | undefined {
+  return getMeterDefaults(meter, pulseModeId).feelId
 }
 
-export function defaultFeelForMeter(meter: MetronomeMeter): string | undefined {
-  return getDefaultFeelId(meter)
+export function validateSectionGrouping(section: TimelineSection, grouping: number[]): boolean {
+  const resolved = resolveSectionPulse(section)
+  return validateGroupingForResolved(grouping, resolved)
 }
+
+export function sectionGroupingValidationMessage(section: TimelineSection): string {
+  const resolved = resolveSectionPulse(section)
+  return groupingValidationMessageForResolved(resolved)
+}
+
+export { formatBpmLabel }

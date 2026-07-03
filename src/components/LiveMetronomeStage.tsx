@@ -8,7 +8,6 @@ import IOSSwitch from './ui/IOSSwitch'
 import {
   AUDIO_STAGE_METERS,
   AUDIO_STAGE_METRONOME_SOUNDS,
-  getBeatsPerBar,
   loadMetronomePrefs,
   MAX_BPM,
   MIN_BPM,
@@ -70,6 +69,7 @@ export default function LiveMetronomeStage({
     accentFirstBeat,
     playing,
     beatIndex,
+    pulseCount,
     setBpm,
     setMeter,
     setSubdivision,
@@ -83,7 +83,7 @@ export default function LiveMetronomeStage({
     setBpm(nextBpm)
   })
 
-  const beatsPerBar = getBeatsPerBar(meter)
+  const beatsPerBar = pulseCount
 
   const handleTogglePlay = useCallback(() => {
     togglePlay()

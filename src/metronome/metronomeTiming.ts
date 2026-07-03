@@ -1,4 +1,6 @@
 import type { MetronomeClickTier, MetronomeSubdivision } from './metronomeTypes'
+import { getPulseModeById } from './pulseModes'
+import type { ResolvedPulseTiming } from './pulseResolution'
 import {
   getAccentLevelsForMeter,
   getTimeSignatureDefinition,
@@ -12,6 +14,8 @@ export interface MetronomeTimingState {
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
   accentLevels: MetronomeAccentLevel[]
+  /** Conducting pulses per bar — BPM refers to this pulse. */
+  pulseCount: number
 }
 
 export interface ResolvedUiTick {
@@ -19,18 +23,27 @@ export interface ResolvedUiTick {
   subTickIndex: number
 }
 
+function smallestNoteUnitsPerBarFromResolved(resolved: ResolvedPulseTiming): number {
+  return resolved.numerator * (16 / resolved.denominator)
+}
+
 function smallestNoteUnitsPerBar(meter: MetronomeMeter): number {
   const def = getTimeSignatureDefinition(meter)
   return def.numerator * (16 / def.denominator)
 }
 
-function smallestNoteUnitsPerPulse(meter: MetronomeMeter): number {
-  const def = getTimeSignatureDefinition(meter)
-  return smallestNoteUnitsPerBar(meter) / def.pulseCount
+function smallestNoteUnitsPerPulse(meter: MetronomeMeter, pulseCount: number): number {
+  return smallestNoteUnitsPerBar(meter) / pulseCount
 }
 
-/** Scheduler ticks within one conducting pulse for the current subdivision. */
-export function ticksPerPulse(meter: MetronomeMeter, subdivision: MetronomeSubdivision): number {
+function smallestNoteUnitsPerPulseResolved(resolved: ResolvedPulseTiming): number {
+  return smallestNoteUnitsPerBarFromResolved(resolved) / resolved.pulseCount
+}
+
+function ticksPerPulseInner(
+  naturalUnits: number,
+  subdivision: MetronomeSubdivision,
+): number {
   if (subdivision === 'off') return 1
 
   if (
@@ -52,8 +65,6 @@ export function ticksPerPulse(meter: MetronomeMeter, subdivision: MetronomeSubdi
     }
   }
 
-  const naturalUnits = smallestNoteUnitsPerPulse(meter)
-
   if (subdivision === '8ths') {
     if (naturalUnits <= 2) return 2
     return naturalUnits / 2
@@ -67,9 +78,37 @@ export function ticksPerPulse(meter: MetronomeMeter, subdivision: MetronomeSubdi
   return 1
 }
 
-export function ticksPerBar(meter: MetronomeMeter, subdivision: MetronomeSubdivision): number {
-  const def = getTimeSignatureDefinition(meter)
-  return def.pulseCount * ticksPerPulse(meter, subdivision)
+/** Scheduler ticks within one conducting pulse for the current subdivision. */
+export function ticksPerPulse(
+  meter: MetronomeMeter,
+  subdivision: MetronomeSubdivision,
+  pulseCount?: number,
+): number {
+  const count = pulseCount ?? getTimeSignatureDefinition(meter).pulseCount
+  return ticksPerPulseInner(smallestNoteUnitsPerPulse(meter, count), subdivision)
+}
+
+export function ticksPerPulseResolved(
+  resolved: ResolvedPulseTiming,
+  subdivision: MetronomeSubdivision,
+): number {
+  return ticksPerPulseInner(smallestNoteUnitsPerPulseResolved(resolved), subdivision)
+}
+
+export function ticksPerBar(
+  meter: MetronomeMeter,
+  subdivision: MetronomeSubdivision,
+  pulseCount?: number,
+): number {
+  const count = pulseCount ?? getTimeSignatureDefinition(meter).pulseCount
+  return count * ticksPerPulse(meter, subdivision, count)
+}
+
+export function ticksPerBarResolved(
+  resolved: ResolvedPulseTiming,
+  subdivision: MetronomeSubdivision,
+): number {
+  return resolved.pulseCount * ticksPerPulseResolved(resolved, subdivision)
 }
 
 /** BPM always refers to the conducting pulse. */
@@ -81,18 +120,39 @@ export function secondsPerSchedulerTick(
   meter: MetronomeMeter,
   bpm: number,
   subdivision: MetronomeSubdivision,
+  pulseCount?: number,
 ): number {
-  return secondsPerPulse(bpm) / ticksPerPulse(meter, subdivision)
+  return secondsPerPulse(bpm) / ticksPerPulse(meter, subdivision, pulseCount)
+}
+
+export function secondsPerSchedulerTickResolved(
+  resolved: ResolvedPulseTiming,
+  bpm: number,
+  subdivision: MetronomeSubdivision,
+): number {
+  return secondsPerPulse(bpm) / ticksPerPulseResolved(resolved, subdivision)
 }
 
 export function resolveUiTick(
   meter: MetronomeMeter,
   tickIndexInBar: number,
   subdivision: MetronomeSubdivision,
+  pulseCount?: number,
 ): ResolvedUiTick {
-  const pulseTicks = ticksPerPulse(meter, subdivision)
-  const def = getTimeSignatureDefinition(meter)
-  const beatIndex = Math.floor(tickIndexInBar / pulseTicks) % def.pulseCount
+  const count = pulseCount ?? getTimeSignatureDefinition(meter).pulseCount
+  const pulseTicks = ticksPerPulse(meter, subdivision, count)
+  const beatIndex = Math.floor(tickIndexInBar / pulseTicks) % count
+  const subTickIndex = tickIndexInBar % pulseTicks
+  return { beatIndex, subTickIndex }
+}
+
+export function resolveUiTickResolved(
+  resolved: ResolvedPulseTiming,
+  tickIndexInBar: number,
+  subdivision: MetronomeSubdivision,
+): ResolvedUiTick {
+  const pulseTicks = ticksPerPulseResolved(resolved, subdivision)
+  const beatIndex = Math.floor(tickIndexInBar / pulseTicks) % resolved.pulseCount
   const subTickIndex = tickIndexInBar % pulseTicks
   return { beatIndex, subTickIndex }
 }
@@ -111,41 +171,56 @@ export function resolveClickTier(
   state: MetronomeTimingState,
   tickIndexInBar: number,
 ): MetronomeClickTier | null {
-  const { meter, subdivision, accentLevels } = state
-  const pulseTicks = ticksPerPulse(meter, subdivision)
+  const { meter, subdivision, accentLevels, pulseCount } = state
+  const pulseTicks = ticksPerPulse(meter, subdivision, pulseCount)
   const tickInPulse = tickIndexInBar % pulseTicks
 
   if (tickInPulse !== 0) return 'subdivision'
 
-  const { beatIndex } = resolveUiTick(meter, tickIndexInBar, subdivision)
+  const { beatIndex } = resolveUiTick(meter, tickIndexInBar, subdivision, pulseCount)
   const level = accentLevels[beatIndex] ?? 'weak'
   return accentLevelToClickTier(beatIndex, level)
 }
 
-export function subTicksPerPulse(meter: MetronomeMeter, subdivision: MetronomeSubdivision): number {
-  return Math.max(0, ticksPerPulse(meter, subdivision) - 1)
+export function subTicksPerPulse(
+  meter: MetronomeMeter,
+  subdivision: MetronomeSubdivision,
+  pulseCount?: number,
+): number {
+  return Math.max(0, ticksPerPulse(meter, subdivision, pulseCount) - 1)
+}
+
+export function subTicksPerPulseResolved(
+  resolved: ResolvedPulseTiming,
+  subdivision: MetronomeSubdivision,
+): number {
+  return Math.max(0, ticksPerPulseResolved(resolved, subdivision) - 1)
 }
 
 export function isSubdivisionAvailable(
   meter: MetronomeMeter,
   subdivision: MetronomeSubdivision,
+  availableSubdivisions?: MetronomeSubdivision[],
 ): boolean {
-  return getTimeSignatureDefinition(meter).availableSubdivisions.includes(subdivision)
+  const list = availableSubdivisions ?? getTimeSignatureDefinition(meter).availableSubdivisions
+  return list.includes(subdivision)
 }
 
 export function suggestSubdivisionForMeterChange(
   nextMeter: MetronomeMeter,
   previousMeter: MetronomeMeter,
   currentSubdivision: MetronomeSubdivision,
+  nextPulseModeId?: string,
+  prevPulseModeId?: string,
 ): MetronomeSubdivision {
-  const nextDef = getTimeSignatureDefinition(nextMeter)
-  if (!isSubdivisionAvailable(nextMeter, currentSubdivision)) {
-    return nextDef.defaultSubdivision
+  const nextMode = getPulseModeById(nextMeter, nextPulseModeId)
+  if (!isSubdivisionAvailable(nextMeter, currentSubdivision, nextMode.availableSubdivisions)) {
+    return nextMode.defaultSubdivision
   }
 
-  const prevDef = getTimeSignatureDefinition(previousMeter)
-  if (prevDef.pulseUnit !== nextDef.pulseUnit || prevDef.compound !== nextDef.compound) {
-    return nextDef.defaultSubdivision
+  const prevMode = getPulseModeById(previousMeter, prevPulseModeId)
+  if (prevMode.pulseUnit !== nextMode.pulseUnit || prevMode.compound !== nextMode.compound) {
+    return nextMode.defaultSubdivision
   }
 
   return currentSubdivision
@@ -159,25 +234,27 @@ export function legacyPatternToAccentLevels(
   meter: MetronomeMeter,
   pattern: boolean[],
   feelId?: string,
+  pulseModeId?: string,
+  pulseCount?: number,
 ): MetronomeAccentLevel[] {
-  const defaults = getTimeSignatureDefinition(meter)
-  const pulseCount = defaults.pulseCount
+  const count = pulseCount ?? getTimeSignatureDefinition(meter).pulseCount
   const defaultLevels =
-    pattern.length === pulseCount
+    pattern.length === count
       ? pattern.map((accented, index) => {
           if (!accented) return 'weak'
           return index === 0 ? 'strong' : 'medium'
         })
-      : getAccentLevelsFromDefaults(meter, feelId)
+      : getAccentLevelsFromDefaults(meter, feelId, pulseModeId)
 
-  return Array.from({ length: pulseCount }, (_, index) => defaultLevels[index] ?? 'weak')
+  return Array.from({ length: count }, (_, index) => defaultLevels[index] ?? 'weak')
 }
 
 export function getAccentLevelsFromDefaults(
   meter: MetronomeMeter,
   feelId?: string,
+  pulseModeId?: string,
 ): MetronomeAccentLevel[] {
-  return getAccentLevelsForMeter(meter, feelId)
+  return getAccentLevelsForMeter(meter, feelId, pulseModeId)
 }
 
 export function cycleAccentLevel(current: MetronomeAccentLevel): MetronomeAccentLevel {

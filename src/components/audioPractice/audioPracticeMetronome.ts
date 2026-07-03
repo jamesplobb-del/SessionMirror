@@ -1,11 +1,12 @@
 import {
   getAvailableSubdivisions,
   getSubdivisionLabel,
-  getTimeSignatureDefinition,
+  hasFeelOptions,
   subdivisionsPerBeat,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../../utils/metronomeConfig'
+import { getPulseModeById, meterHasPulseModeChoice, METER_PULSE_MODES } from '../../metronome/pulseModes'
 
 export const AUDIO_PRACTICE_MIN_BPM = 30
 export const AUDIO_PRACTICE_MAX_BPM = 240
@@ -22,9 +23,13 @@ export function clampAudioPracticeBpm(value: number): number {
 export const PRACTICE_CORE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4', '5/4', '6/8']
 
 export const PRACTICE_EXTENDED_METERS: MetronomeMeter[] = [
+  '3/8',
+  '4/8',
   '9/8',
   '12/8',
+  '13/8',
   '15/8',
+  '16/8',
   '6/4',
   '7/4',
   '2/2',
@@ -71,11 +76,14 @@ const RHYTHM_LABELS: Record<MetronomeSubdivision, { id: string; label: string }>
   septuplets: { id: 'septuplet', label: '7' },
 }
 
-export function getPracticeRhythmOptions(meter: MetronomeMeter): PracticeRhythmOption[] {
-  return getAvailableSubdivisions(meter).map((value) => {
+export function getPracticeRhythmOptions(
+  meter: MetronomeMeter,
+  pulseModeId?: string,
+): PracticeRhythmOption[] {
+  return getAvailableSubdivisions(meter, pulseModeId).map((value) => {
+    const mode = getPulseModeById(meter, pulseModeId)
     const meta = RHYTHM_LABELS[value]
-    const name =
-      value === 'off' ? getTimeSignatureDefinition(meter).pulseName : getSubdivisionLabel(meter, value)
+    const name = value === 'off' ? mode.pulseName : getSubdivisionLabel(meter, value)
     return {
       id: meta.id,
       value,
@@ -86,10 +94,25 @@ export function getPracticeRhythmOptions(meter: MetronomeMeter): PracticeRhythmO
   })
 }
 
-export function getPracticeFeelOptions(meter: MetronomeMeter): { value: string; label: string }[] {
-  const def = getTimeSignatureDefinition(meter)
-  if (!def.feelOptions?.length) return []
-  return def.feelOptions.map((option) => ({ value: option.id, label: option.label }))
+export function getPracticeFeelOptions(
+  meter: MetronomeMeter,
+  pulseModeId?: string,
+): { value: string; label: string }[] {
+  const mode = getPulseModeById(meter, pulseModeId)
+  if (!mode.feelOptions?.length) return []
+  return mode.feelOptions.map((option) => ({ value: option.id, label: option.label }))
+}
+
+export function getPracticePulseModeOptions(meter: MetronomeMeter): { value: string; label: string }[] {
+  return METER_PULSE_MODES[meter].map((mode) => ({ value: mode.id, label: mode.label }))
+}
+
+export function practiceMeterHasPulseChoice(meter: MetronomeMeter): boolean {
+  return meterHasPulseModeChoice(meter)
+}
+
+export function practiceMeterHasFeelOptions(meter: MetronomeMeter, pulseModeId?: string): boolean {
+  return hasFeelOptions(meter, pulseModeId)
 }
 
 /** UI-only until sound engine supports multiple click timbres. */

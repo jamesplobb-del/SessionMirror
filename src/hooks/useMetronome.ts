@@ -22,6 +22,11 @@ export interface UseMetronomeResult {
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
   feelId?: string
+  pulseModeId: string
+  pulseCount: number
+  compound: boolean
+  bpmSymbol: string
+  pulseName: string
   accentLevels: MetronomeAccentLevel[]
   accentPattern: boolean[]
   accentFirstBeat: boolean
@@ -34,6 +39,7 @@ export interface UseMetronomeResult {
   setMeter: (meter: MetronomeMeter) => void
   setSubdivision: (subdivision: MetronomeSubdivision) => void
   setFeel: (feelId: string) => void
+  setPulseMode: (pulseModeId: string) => void
   setAccentLevels: (accentLevels: MetronomeAccentLevel[]) => void
   setAccentPattern: (accentPattern: boolean[]) => void
   toggleBeatAccent: (beatIndex: number) => void

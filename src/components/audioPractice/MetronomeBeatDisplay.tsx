@@ -1,10 +1,6 @@
 import { useMetronome } from '../../hooks/useMetronome'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
-import {
-  getBeatsPerBar,
-  isCompoundMeter,
-  subTicksPerPulse,
-} from '../../utils/metronomeConfig'
+import { subTicksPerPulse } from '../../utils/metronomeConfig'
 import { triggerLightHaptic } from '../../utils/haptics'
 
 interface MetronomeBeatDisplayProps {
@@ -22,12 +18,14 @@ export default function MetronomeBeatDisplay({ interactive = true }: MetronomeBe
     subTickIndex,
     beatPulseId,
     accentLevels,
+    pulseCount,
+    compound,
     toggleBeatAccent,
   } = useMetronome()
 
-  const beatsPerBar = getBeatsPerBar(meter)
-  const compoundMeter = isCompoundMeter(meter)
-  const subNotchCount = subTicksPerPulse(meter, subdivision)
+  const beatsPerBar = pulseCount
+  const compoundMeter = compound
+  const subNotchCount = subTicksPerPulse(meter, subdivision, pulseCount)
 
   const isMainBeatPulse = playing && subTickIndex === 0
   const activeLevel = accentLevels[beatIndex] ?? 'weak'

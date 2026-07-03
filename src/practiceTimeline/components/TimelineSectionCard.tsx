@@ -1,6 +1,7 @@
 import { Copy, GripVertical, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import Pressable from '../../components/ui/Pressable'
+import { patternSectionSummary, sectionHasMeterPattern } from '../patternLogic'
 import {
   effectiveBars,
   sectionBarWidth,
@@ -40,6 +41,8 @@ export default function TimelineSectionCard({
   const [showActions, setShowActions] = useState(false)
   const barWidth = sectionBarWidth(section, maxBars)
   const ramp = tempoRampLabel(section)
+  const isPattern = sectionHasMeterPattern(section)
+  const patternSummary = isPattern ? patternSectionSummary(section) : null
 
   return (
     <div
@@ -76,15 +79,23 @@ export default function TimelineSectionCard({
               <span>
                 <strong>{effectiveBars(section)}</strong> bars
               </span>
-              <span>
-                <strong>{section.meter}</strong>
-              </span>
-              <span>
-                <strong>{section.bpm}</strong> BPM
-              </span>
-              <span>
-                Sub: <strong>{subdivisionLabel(section)}</strong>
-              </span>
+              {isPattern ? (
+                <span className="practice-timeline__section-meta-pattern">
+                  <strong>{patternSummary}</strong>
+                </span>
+              ) : (
+                <>
+                  <span>
+                    <strong>{section.meter}</strong>
+                  </span>
+                  <span>
+                    <strong>{section.bpm}</strong> BPM
+                  </span>
+                  <span>
+                    Sub: <strong>{subdivisionLabel(section)}</strong>
+                  </span>
+                </>
+              )}
               <span>
                 Repeat: <strong>{repeatLabel(section.repeatCount)}</strong>
               </span>

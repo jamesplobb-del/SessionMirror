@@ -31,16 +31,41 @@ export interface SectionAdvanced {
   markerNotes?: string
 }
 
+/** One step in an alternating / mixed meter pattern within a section. */
+export interface MeterPatternStep {
+  id: string
+  meter: MetronomeMeter
+  pulseModeId?: string
+  feelId?: string
+  bpm: number
+  subdivision: SectionSubdivision
+  /** Bars at this meter before advancing (default 1). */
+  bars?: number
+  beatGrouping?: number[]
+  customAccents?: MetronomeAccentLevel[]
+}
+
+/** How a meter pattern repeats within a section. */
+export type PatternRepeatMode =
+  | { kind: 'cycles'; cycles: number }
+  | { kind: 'totalMeasures'; measures: number }
+
 export interface TimelineSection {
   id: string
   title: string
   bars: number
   bpm: number
   meter: MetronomeMeter
+  /** Overrides default pulse unit for this meter (e.g. simple 6/8 vs compound). */
+  pulseModeId?: string
   feelId?: string
   subdivision: SectionSubdivision
   /** How many times this section plays in a row (1 = once). */
   repeatCount: number
+  /** When set, section alternates through these meters instead of a single meter. */
+  patternSteps?: MeterPatternStep[]
+  /** How the pattern repeats (cycles or total measures). */
+  patternRepeat?: PatternRepeatMode
   advanced?: SectionAdvanced
 }
 
@@ -74,6 +99,10 @@ export interface TimelinePlaybackState {
   tempoScale: number
   effectiveBpm: number
   countInActive: boolean
+  /** Active pattern step when section uses meter pattern mode. */
+  patternStepIndex?: number
+  patternStepMeter?: MetronomeMeter
+  patternLabel?: string
 }
 
 export const PRACTICE_TIMELINE_EXPORT_VERSION = 1

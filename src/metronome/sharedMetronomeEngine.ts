@@ -12,7 +12,6 @@ import {
 import {
   clampBpm,
   getAccentLevelsForMeter,
-  getBeatsPerBar,
   getMeterDefaults,
   hasFeelOptions,
   loadMetronomePrefs,
@@ -24,6 +23,8 @@ import {
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
+import { resolvePulseTiming } from './pulseResolution'
+import { meterHasPulseModeChoice } from './pulseModes'
 
 const SCHEDULE_AHEAD_SEC = 0.12
 const LOOKAHEAD_MS = 25
@@ -35,6 +36,11 @@ export interface SharedMetronomeSnapshot {
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
   feelId?: string
+  pulseModeId: string
+  pulseCount: number
+  compound: boolean
+  bpmSymbol: string
+  pulseName: string
   accentLevels: MetronomeAccentLevel[]
   soundId: string
   playing: boolean
@@ -48,12 +54,29 @@ type BarListener = () => void
 
 function createInitialSnapshot(): SharedMetronomeSnapshot {
   const prefs = loadMetronomePrefs()
+  const defaults = getMeterDefaults(prefs.meter, prefs.pulseModeId)
+  const resolved = resolvePulseTiming({
+    meter: prefs.meter,
+    pulseModeId: defaults.pulseModeId,
+    feelId: prefs.feelId ?? defaults.feelId,
+    customAccents: prefs.accentLevels,
+  })
   return {
     bpm: prefs.bpm,
     meter: prefs.meter,
     subdivision: prefs.subdivision,
-    feelId: prefs.feelId,
-    accentLevels: normalizeAccentLevels(prefs.meter, prefs.accentLevels, prefs.feelId),
+    feelId: resolved.feelId,
+    pulseModeId: resolved.pulseModeId,
+    pulseCount: resolved.pulseCount,
+    compound: resolved.compound,
+    bpmSymbol: resolved.bpmSymbol,
+    pulseName: resolved.pulseName,
+    accentLevels: normalizeAccentLevels(
+      prefs.meter,
+      resolved.accentLevels,
+      resolved.feelId,
+      resolved.pulseModeId,
+    ),
     soundId: prefs.soundId,
     playing: false,
     beatIndex: 0,
@@ -296,6 +319,35 @@ class SharedMetronomeEngine {
     }
   }
 
+  private enrichPulseFields(
+    partial: Partial<SharedMetronomeSnapshot>,
+  ): Partial<SharedMetronomeSnapshot> {
+    const meter = partial.meter ?? this.snapshot.meter
+    const pulseModeId = partial.pulseModeId ?? this.snapshot.pulseModeId
+    const feelId = partial.feelId !== undefined ? partial.feelId : this.snapshot.feelId
+    const accentLevels = partial.accentLevels ?? this.snapshot.accentLevels
+    const resolved = resolvePulseTiming({
+      meter,
+      pulseModeId,
+      feelId,
+      customAccents: accentLevels,
+    })
+    return {
+      pulseModeId: resolved.pulseModeId,
+      pulseCount: resolved.pulseCount,
+      compound: resolved.compound,
+      bpmSymbol: resolved.bpmSymbol,
+      pulseName: resolved.pulseName,
+      feelId: resolved.feelId,
+      accentLevels: normalizeAccentLevels(
+        meter,
+        resolved.accentLevels,
+        resolved.feelId,
+        resolved.pulseModeId,
+      ),
+    }
+  }
+
   private persistPrefs(
     nextBpm: number = this.snapshot.bpm,
     nextMeter: MetronomeMeter = this.snapshot.meter,
@@ -303,13 +355,15 @@ class SharedMetronomeEngine {
     nextFeelId: string | undefined = this.snapshot.feelId,
     nextAccentLevels: MetronomeAccentLevel[] = this.snapshot.accentLevels,
     nextSoundId: string = this.snapshot.soundId,
+    nextPulseModeId: string = this.snapshot.pulseModeId,
   ): void {
     saveMetronomePrefs({
       bpm: nextBpm,
       meter: nextMeter,
       subdivision: nextSubdivision,
       feelId: nextFeelId,
-      accentLevels: normalizeAccentLevels(nextMeter, nextAccentLevels, nextFeelId),
+      pulseModeId: nextPulseModeId,
+      accentLevels: normalizeAccentLevels(nextMeter, nextAccentLevels, nextFeelId, nextPulseModeId),
       soundId: nextSoundId,
     })
   }
@@ -326,39 +380,88 @@ class SharedMetronomeEngine {
       nextMeter,
       this.snapshot.meter,
       this.snapshot.subdivision,
+      defaults.pulseModeId,
+      this.snapshot.pulseModeId,
     )
     const nextFeelId = defaults.feelId
-    const nextAccentLevels = getAccentLevelsForMeter(nextMeter, nextFeelId)
+    const nextAccentLevels = getAccentLevelsForMeter(nextMeter, nextFeelId, defaults.pulseModeId)
     this.tickCounter = 0
     this.patchState({
       meter: nextMeter,
       subdivision: nextSubdivision,
       feelId: nextFeelId,
+      pulseModeId: defaults.pulseModeId,
       beatIndex: 0,
       subTickIndex: 0,
       accentLevels: nextAccentLevels,
+      ...this.enrichPulseFields({
+        meter: nextMeter,
+        pulseModeId: defaults.pulseModeId,
+        feelId: nextFeelId,
+        accentLevels: nextAccentLevels,
+      }),
     })
     this.persistPrefs(
       this.snapshot.bpm,
       nextMeter,
       nextSubdivision,
       nextFeelId,
-      nextAccentLevels,
+      this.snapshot.accentLevels,
+      this.snapshot.soundId,
+      defaults.pulseModeId,
     )
     if (import.meta.env.DEV) {
       console.log(`[MetronomeTab] timeSignature=${nextMeter}`)
     }
   }
 
+  setPulseMode = (nextPulseModeId: string): void => {
+    if (!meterHasPulseModeChoice(this.snapshot.meter)) return
+    const defaults = getMeterDefaults(this.snapshot.meter, nextPulseModeId)
+    const nextAccentLevels = getAccentLevelsForMeter(
+      this.snapshot.meter,
+      defaults.feelId,
+      nextPulseModeId,
+    )
+    this.tickCounter = 0
+    this.patchState({
+      pulseModeId: nextPulseModeId,
+      subdivision: defaults.subdivision,
+      feelId: defaults.feelId,
+      accentLevels: nextAccentLevels,
+      beatIndex: 0,
+      subTickIndex: 0,
+      ...this.enrichPulseFields({
+        pulseModeId: nextPulseModeId,
+        feelId: defaults.feelId,
+        accentLevels: nextAccentLevels,
+      }),
+    })
+    this.persistPrefs(
+      this.snapshot.bpm,
+      this.snapshot.meter,
+      defaults.subdivision,
+      defaults.feelId,
+      this.snapshot.accentLevels,
+      this.snapshot.soundId,
+      nextPulseModeId,
+    )
+  }
+
   setFeel = (nextFeelId: string): void => {
-    if (!hasFeelOptions(this.snapshot.meter)) return
-    const nextAccentLevels = getAccentLevelsForMeter(this.snapshot.meter, nextFeelId)
+    if (!hasFeelOptions(this.snapshot.meter, this.snapshot.pulseModeId)) return
+    const nextAccentLevels = getAccentLevelsForMeter(
+      this.snapshot.meter,
+      nextFeelId,
+      this.snapshot.pulseModeId,
+    )
     this.tickCounter = 0
     this.patchState({
       feelId: nextFeelId,
       accentLevels: nextAccentLevels,
       beatIndex: 0,
       subTickIndex: 0,
+      ...this.enrichPulseFields({ feelId: nextFeelId, accentLevels: nextAccentLevels }),
     })
     this.persistPrefs(
       this.snapshot.bpm,
@@ -392,8 +495,12 @@ class SharedMetronomeEngine {
       this.snapshot.meter,
       nextAccentLevels,
       this.snapshot.feelId,
+      this.snapshot.pulseModeId,
     )
-    this.patchState({ accentLevels: levels })
+    this.patchState({
+      accentLevels: levels,
+      ...this.enrichPulseFields({ accentLevels: levels }),
+    })
     this.persistPrefs(
       this.snapshot.bpm,
       this.snapshot.meter,
@@ -412,17 +519,19 @@ class SharedMetronomeEngine {
         return index === 0 ? 'strong' : 'medium'
       }),
       this.snapshot.feelId,
+      this.snapshot.pulseModeId,
     )
     this.setAccentLevels(levels)
   }
 
   toggleBeatAccent = (beatIndex: number): void => {
-    const beats = getBeatsPerBar(this.snapshot.meter)
+    const beats = this.snapshot.pulseCount
     if (beatIndex < 0 || beatIndex >= beats) return
     const levels = normalizeAccentLevels(
       this.snapshot.meter,
       [...this.snapshot.accentLevels],
       this.snapshot.feelId,
+      this.snapshot.pulseModeId,
     )
     const current = levels[beatIndex] ?? 'weak'
     levels[beatIndex] = cycleAccentLevel(current)
@@ -435,6 +544,7 @@ class SharedMetronomeEngine {
       this.snapshot.meter,
       [...this.snapshot.accentLevels],
       this.snapshot.feelId,
+      this.snapshot.pulseModeId,
     )
     if (levels.length > 0) {
       levels[0] = nextAccentFirstBeat ? 'strong' : 'weak'
@@ -461,13 +571,20 @@ class SharedMetronomeEngine {
       meter: MetronomeMeter
       subdivision: MetronomeSubdivision
       feelId?: string
+      pulseModeId?: string
       accentLevels: MetronomeAccentLevel[]
       soundId?: string
     },
     options?: { resetBeat?: boolean },
   ): void => {
     const nextBpm = clampBpm(config.bpm)
-    const levels = normalizeAccentLevels(config.meter, config.accentLevels, config.feelId)
+    const pulseModeId = config.pulseModeId ?? getMeterDefaults(config.meter).pulseModeId
+    const levels = normalizeAccentLevels(
+      config.meter,
+      config.accentLevels,
+      config.feelId,
+      pulseModeId,
+    )
     const resetBeat = options?.resetBeat !== false
     if (resetBeat) this.tickCounter = 0
     this.patchState({
@@ -475,9 +592,16 @@ class SharedMetronomeEngine {
       meter: config.meter,
       subdivision: config.subdivision,
       feelId: config.feelId,
+      pulseModeId,
       accentLevels: levels,
       ...(resetBeat ? { beatIndex: 0, subTickIndex: 0 } : {}),
       ...(config.soundId ? { soundId: config.soundId } : {}),
+      ...this.enrichPulseFields({
+        meter: config.meter,
+        pulseModeId,
+        feelId: config.feelId,
+        accentLevels: levels,
+      }),
     })
   }
 
@@ -576,8 +700,9 @@ class SharedMetronomeEngine {
 
       const meter = this.snapshot.meter
       const subdivision = this.snapshot.subdivision
-      const barTicks = ticksPerBar(meter, subdivision)
-      const secondsPerTick = secondsPerSchedulerTick(meter, this.snapshot.bpm, subdivision)
+      const pulseCount = this.snapshot.pulseCount
+      const barTicks = ticksPerBar(meter, subdivision, pulseCount)
+      const secondsPerTick = secondsPerSchedulerTick(meter, this.snapshot.bpm, subdivision, pulseCount)
       const outputNode = this.ensureMasterGain(activeCtx)
       const muted = this.shouldMuteOutput()
       const sound = this.snapshot.soundId
@@ -593,13 +718,14 @@ class SharedMetronomeEngine {
           tickInBar,
           subdivision,
           this.snapshot.accentLevels,
+          pulseCount,
         )
         if (tier) {
           scheduleMetronomeClick(activeCtx, beatTime, tier, outputNode, muted, sound)
         }
 
         if (beatTime - activeCtx.currentTime <= SCHEDULE_AHEAD_SEC) {
-          const uiTick = resolveUiTick(meter, tickInBar, subdivision)
+          const uiTick = resolveUiTick(meter, tickInBar, subdivision, pulseCount)
           uiBeat = uiTick.beatIndex
           uiSubTick = uiTick.subTickIndex
         }

@@ -100,6 +100,19 @@ export function usePracticeTimeline() {
     [persist, timeline],
   )
 
+  const applyScanProgram = useCallback(
+    (sections: TimelineSection[], mode: 'replace' | 'append', title?: string) => {
+      if (sections.length === 0) return
+      persist({
+        ...timeline,
+        name: title?.trim() || timeline.name,
+        sections: mode === 'replace' ? sections : [...timeline.sections, ...sections],
+      })
+      setEditingSectionId(null)
+    },
+    [persist, timeline],
+  )
+
   return {
     timeline,
     editingSectionId,
@@ -112,6 +125,7 @@ export function usePracticeTimeline() {
     loadTimeline,
     renameTimeline,
     updateTrackSettings,
+    applyScanProgram,
     persist,
   }
 }

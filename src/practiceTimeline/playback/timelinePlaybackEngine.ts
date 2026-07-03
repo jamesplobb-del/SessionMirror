@@ -1,7 +1,12 @@
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
 import { clampBpm } from '../../utils/metronomeConfig'
 import { bpmAtMeasure } from './tempoAutomation'
-import { effectiveBars, resolveSectionTiming } from '../timeSignatureLogic'
+import {
+  formatPatternMetersLabel,
+  resolveSectionTimingAtMeasure,
+  sectionHasMeterPattern,
+} from '../patternLogic'
+import { effectiveBars } from '../timeSignatureLogic'
 import type {
   PracticeTimeline,
   PracticeTimelineMarker,
@@ -53,6 +58,7 @@ export class TimelinePlaybackEngine {
   private countInRemaining = 0
   private sessionStart = 0
   private recordingOffsetSeconds = 0
+  private lastPatternStepIndex: number | null = null
 
   setCallbacks(callbacks: TimelinePlaybackCallbacks): void {
     this.callbacks = callbacks
@@ -63,13 +69,36 @@ export class TimelinePlaybackEngine {
   }
 
   private baseBpmForCurrentMeasure(section: TimelineSection): number {
+    if (sectionHasMeterPattern(section)) {
+      const timing = this.getTimingForCurrentMeasure(section)
+      return timing.stepBpm
+    }
     const ramp = section.advanced?.tempoRamp
     return bpmAtMeasure(section.bpm, this.measure, effectiveBars(section), ramp)
+  }
+
+  private getTimingForCurrentMeasure(section: TimelineSection) {
+    const previousSection =
+      this.sectionIndex > 0 ? this.timeline?.sections[this.sectionIndex - 1] : undefined
+    return resolveSectionTimingAtMeasure(section, this.measure, previousSection)
+  }
+
+  private patternFieldsForState(section: TimelineSection) {
+    if (!sectionHasMeterPattern(section)) {
+      return { patternStepIndex: undefined, patternStepMeter: undefined, patternLabel: undefined }
+    }
+    const timing = this.getTimingForCurrentMeasure(section)
+    return {
+      patternStepIndex: timing.stepIndex,
+      patternStepMeter: timing.meter,
+      patternLabel: formatPatternMetersLabel(section.patternSteps!),
+    }
   }
 
   getState(): TimelinePlaybackState {
     const section = this.timeline?.sections[this.sectionIndex]
     const baseBpm = section ? this.baseBpmForCurrentMeasure(section) : 0
+    const patternFields = section ? this.patternFieldsForState(section) : {}
     return {
       sessionActive: this.sessionActive,
       playing: this.playing,
@@ -81,6 +110,7 @@ export class TimelinePlaybackEngine {
       tempoScale: this.tempoScale,
       effectiveBpm: section ? this.scaledBpm(baseBpm) : 0,
       countInActive: this.countInRemaining > 0,
+      ...patternFields,
     }
   }
 
@@ -126,6 +156,7 @@ export class TimelinePlaybackEngine {
     this.recordingOffsetSeconds = options.recordingOffsetSeconds ?? 0
     this.sessionStart = performance.now()
     this.countInRemaining = 0
+    this.lastPatternStepIndex = null
 
     this.applyCurrentSection()
     this.armCountInForCurrentPosition('start')
@@ -184,6 +215,7 @@ export class TimelinePlaybackEngine {
     this.measure = 1
     this.finished = false
     this.countInRemaining = 0
+    this.lastPatternStepIndex = null
     this.applyCurrentSection()
     this.armCountInForCurrentPosition('start')
     this.emitState()
@@ -227,6 +259,7 @@ export class TimelinePlaybackEngine {
     this.measure = 1
     this.countInRemaining = 0
     this.finished = false
+    this.lastPatternStepIndex = null
     this.applyCurrentSection()
     this.armCountInForCurrentPosition('jump')
     this.recordSectionMarker()
@@ -290,8 +323,20 @@ export class TimelinePlaybackEngine {
     const section = this.getCurrentSection()
     if (!section) return
 
-    const timing = resolveSectionTiming(section)
+    const timing = this.getTimingForCurrentMeasure(section)
     const baseBpm = this.baseBpmForCurrentMeasure(section)
+    const stepChanged =
+      sectionHasMeterPattern(section) &&
+      timing.stepIndex !== undefined &&
+      this.lastPatternStepIndex !== null &&
+      timing.stepIndex !== this.lastPatternStepIndex
+    const resetBeat = !options?.tempoOnly && (this.measure === 1 || stepChanged)
+
+    if (sectionHasMeterPattern(section) && timing.stepIndex !== undefined) {
+      this.lastPatternStepIndex = timing.stepIndex
+    } else {
+      this.lastPatternStepIndex = null
+    }
 
     sharedMetronomeEngine.applySectionConfig(
       {
@@ -299,10 +344,11 @@ export class TimelinePlaybackEngine {
         meter: timing.meter,
         subdivision: timing.subdivision,
         feelId: timing.feelId,
+        pulseModeId: timing.pulseModeId,
         accentLevels: timing.accentLevels,
         soundId: section.advanced?.clickSoundId,
       },
-      { resetBeat: !options?.tempoOnly },
+      { resetBeat },
     )
 
     if (options?.tempoOnly) return
@@ -336,6 +382,7 @@ export class TimelinePlaybackEngine {
     this.measure = 1
     this.finished = false
     this.countInRemaining = 0
+    this.lastPatternStepIndex = null
     this.applyCurrentSection()
     this.armCountInForCurrentPosition('loop')
     this.recordSectionMarker()
@@ -363,23 +410,42 @@ export class TimelinePlaybackEngine {
     }
 
     const totalMeasures = effectiveBars(section)
-    const timing = resolveSectionTiming(section)
+    const currentTiming = this.getTimingForCurrentMeasure(section)
     const ramp = section.advanced?.tempoRamp
     const nextMeasure = this.measure + 1
 
     if (nextMeasure <= totalMeasures) {
       this.measure = nextMeasure
-      const baseBpm = bpmAtMeasure(section.bpm, this.measure, totalMeasures, ramp)
+      const nextTiming = resolveSectionTimingAtMeasure(
+        section,
+        nextMeasure,
+        this.sectionIndex > 0 ? this.timeline.sections[this.sectionIndex - 1] : undefined,
+      )
+      const stepChanged =
+        sectionHasMeterPattern(section) &&
+        currentTiming.stepIndex !== undefined &&
+        nextTiming.stepIndex !== undefined &&
+        currentTiming.stepIndex !== nextTiming.stepIndex
+
+      if (stepChanged && nextTiming.stepIndex !== undefined) {
+        this.lastPatternStepIndex = nextTiming.stepIndex
+      }
+
+      const baseBpm = sectionHasMeterPattern(section)
+        ? nextTiming.stepBpm
+        : bpmAtMeasure(section.bpm, this.measure, totalMeasures, ramp)
+
       sharedMetronomeEngine.applySectionConfig(
         {
           bpm: this.scaledBpm(baseBpm),
-          meter: section.meter,
-          subdivision: timing.subdivision,
-          feelId: timing.feelId,
-          accentLevels: timing.accentLevels,
+          meter: nextTiming.meter,
+          subdivision: nextTiming.subdivision,
+          feelId: nextTiming.feelId,
+          pulseModeId: nextTiming.pulseModeId,
+          accentLevels: nextTiming.accentLevels,
           soundId: section.advanced?.clickSoundId,
         },
-        { resetBeat: false },
+        { resetBeat: stepChanged },
       )
       this.emitState()
       return
@@ -407,6 +473,7 @@ export class TimelinePlaybackEngine {
     this.sectionIndex = nextIndex
     this.measure = 1
     this.countInRemaining = 0
+    this.lastPatternStepIndex = null
     this.applyCurrentSection()
     this.armCountInForCurrentPosition('loop')
     this.recordSectionMarker()

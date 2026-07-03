@@ -18,7 +18,9 @@ import {
   PRACTICE_ALL_METERS,
   clampAudioPracticeBpm,
   getPracticeFeelOptions,
+  getPracticePulseModeOptions,
   getPracticeRhythmOptions,
+  practiceMeterHasPulseChoice,
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
 import MetronomeAudioSelect from './MetronomeAudioSelect'
@@ -91,12 +93,15 @@ export default function AudioPracticeMetronomeView() {
     meter,
     subdivision,
     feelId,
+    pulseModeId,
+    bpmSymbol,
     soundId,
     playing,
     setBpm,
     setMeter,
     setSubdivision,
     setFeel,
+    setPulseMode,
     setSoundId,
     togglePlay,
     stop,
@@ -116,8 +121,11 @@ export default function AudioPracticeMetronomeView() {
     { minBpm: AUDIO_PRACTICE_MIN_BPM, maxBpm: AUDIO_PRACTICE_MAX_BPM },
   )
 
-  const feelOptions = getPracticeFeelOptions(meter)
-  const rhythmOptions = getPracticeRhythmOptions(meter)
+  const feelOptions = getPracticeFeelOptions(meter, pulseModeId)
+  const rhythmOptions = getPracticeRhythmOptions(meter, pulseModeId)
+  const pulseModeOptions = practiceMeterHasPulseChoice(meter)
+    ? getPracticePulseModeOptions(meter)
+    : []
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -168,6 +176,14 @@ export default function AudioPracticeMetronomeView() {
       setFeel(nextFeelId)
     },
     [feelId, setFeel],
+  )
+
+  const handlePulseModeChange = useCallback(
+    (nextPulseModeId: string) => {
+      if (nextPulseModeId === pulseModeId) return
+      setPulseMode(nextPulseModeId)
+    },
+    [pulseModeId, setPulseMode],
   )
 
   const handleSoundChange = useCallback(
@@ -338,9 +354,9 @@ export default function AudioPracticeMetronomeView() {
                       openBpmEditor()
                     }}
                   >
-                    <span className="audio-practice-metronome__tempo-label">Tempo</span>
+                    <span className="audio-practice-metronome__tempo-label">{bpmSymbol} = BPM</span>
                     <span className="metronome-audio-stage__bpm-value">{bpm}</span>
-                    <span className="metronome-audio-stage__bpm-label">BPM</span>
+                    <span className="metronome-audio-stage__bpm-label">Tempo</span>
                   </button>
                 )}
               </div>
@@ -364,9 +380,11 @@ export default function AudioPracticeMetronomeView() {
           <div
             className={[
               'audio-practice-metronome__select-row',
-              feelOptions.length > 0
-                ? 'audio-practice-metronome__select-row--quad'
-                : 'audio-practice-metronome__select-row--triple',
+              pulseModeOptions.length > 0 && feelOptions.length > 0
+                ? 'audio-practice-metronome__select-row--five'
+                : pulseModeOptions.length > 0 || feelOptions.length > 0
+                  ? 'audio-practice-metronome__select-row--quad'
+                  : 'audio-practice-metronome__select-row--triple',
             ].join(' ')}
           >
             <MetronomeAudioSelect
@@ -376,6 +394,15 @@ export default function AudioPracticeMetronomeView() {
               options={PRACTICE_ALL_METERS.map((value) => ({ value, label: value }))}
               onChange={handleMeterChange}
             />
+            {pulseModeOptions.length > 0 ? (
+              <MetronomeAudioSelect
+                label="Pulse"
+                ariaLabel="Conducting pulse (what BPM means)"
+                value={pulseModeId}
+                options={pulseModeOptions}
+                onChange={handlePulseModeChange}
+              />
+            ) : null}
             {feelOptions.length > 0 ? (
               <MetronomeAudioSelect
                 label="Feel"

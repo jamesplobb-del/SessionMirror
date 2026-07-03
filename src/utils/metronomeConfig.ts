@@ -8,6 +8,8 @@ import {
   type MetronomeAccentLevel,
   type MetronomeMeter,
 } from '../metronome/timeSignatureDefinitions'
+import { getPulseModeById, METER_PULSE_MODES } from '../metronome/pulseModes'
+import { resolvePulseTiming } from '../metronome/pulseResolution'
 import {
   accentLevelsToLegacyPattern,
   getPulseLabel,
@@ -89,7 +91,7 @@ export const METRONOME_METERS: Record<MetronomeMeter, MetronomeMeterDef> = Objec
 ) as Record<MetronomeMeter, MetronomeMeterDef>
 
 export const SIMPLE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4']
-export const COMPOUND_METERS: MetronomeMeter[] = ['6/8', '9/8', '12/8', '15/8']
+export const COMPOUND_METERS: MetronomeMeter[] = ['6/8', '9/8', '12/8']
 export const AUDIO_STAGE_METERS: MetronomeMeter[] = ['2/4', '3/4', '4/4', '5/4', '6/8']
 
 export const MIN_BPM = 1
@@ -121,6 +123,7 @@ export interface MetronomePrefs {
   meter: MetronomeMeter
   subdivision: MetronomeSubdivision
   feelId?: string
+  pulseModeId?: string
   accentLevels: MetronomeAccentLevel[]
   /** @deprecated Migrated to accentLevels on load. */
   accentPattern?: boolean[]
@@ -140,13 +143,14 @@ const VALID_SUBDIVISIONS = new Set<MetronomeSubdivision>([
 ])
 
 function defaultMetronomePrefs(): MetronomePrefs {
-  const feelId = getDefaultFeelId(DEFAULT_METER)
+  const defaults = getMeterDefaults(DEFAULT_METER)
   return {
     bpm: DEFAULT_BPM,
     meter: DEFAULT_METER,
-    subdivision: getTimeSignatureDefinition(DEFAULT_METER).defaultSubdivision,
-    feelId,
-    accentLevels: getAccentLevelsForMeter(DEFAULT_METER, feelId),
+    subdivision: defaults.subdivision,
+    feelId: defaults.feelId,
+    pulseModeId: defaults.pulseModeId,
+    accentLevels: getAccentLevelsForMeter(DEFAULT_METER, defaults.feelId, defaults.pulseModeId),
     soundId: DEFAULT_SOUND_ID,
   }
 }
@@ -154,8 +158,9 @@ function defaultMetronomePrefs(): MetronomePrefs {
 export function getDefaultAccentLevels(
   meter: MetronomeMeter,
   feelId?: string,
+  pulseModeId?: string,
 ): MetronomeAccentLevel[] {
-  return getAccentLevelsForMeter(meter, feelId)
+  return getAccentLevelsForMeter(meter, feelId, pulseModeId)
 }
 
 /** @deprecated Use getDefaultAccentLevels */
@@ -167,9 +172,10 @@ export function normalizeAccentLevels(
   meter: MetronomeMeter,
   levels: MetronomeAccentLevel[],
   feelId?: string,
+  pulseModeId?: string,
 ): MetronomeAccentLevel[] {
-  const pulseCount = getTimeSignatureDefinition(meter).pulseCount
-  const defaults = getDefaultAccentLevels(meter, feelId)
+  const pulseCount = getBeatsPerBar(meter, pulseModeId)
+  const defaults = getDefaultAccentLevels(meter, feelId, pulseModeId)
   return Array.from({ length: pulseCount }, (_, index) => levels[index] ?? defaults[index] ?? 'weak')
 }
 
@@ -182,19 +188,28 @@ export function normalizeAccentPattern(meter: MetronomeMeter, pattern: boolean[]
 function parseAccentLevels(
   meter: MetronomeMeter,
   feelId: string | undefined,
+  pulseModeId: string | undefined,
   parsed: Partial<MetronomePrefs> & { accentFirstBeat?: boolean },
 ): MetronomeAccentLevel[] {
   if (Array.isArray(parsed.accentLevels) && parsed.accentLevels.length > 0) {
-    return normalizeAccentLevels(meter, parsed.accentLevels, feelId)
+    return normalizeAccentLevels(meter, parsed.accentLevels, feelId, pulseModeId)
   }
   if (Array.isArray(parsed.accentPattern)) {
     return legacyPatternToAccentLevels(meter, parsed.accentPattern, feelId)
   }
-  const defaults = getDefaultAccentLevels(meter, feelId)
+  const defaults = getDefaultAccentLevels(meter, feelId, pulseModeId)
   if (typeof parsed.accentFirstBeat === 'boolean' && defaults.length > 0) {
     defaults[0] = parsed.accentFirstBeat ? 'strong' : 'weak'
   }
   return defaults
+}
+
+function parsePulseModeId(meter: MetronomeMeter, value: unknown): string {
+  const modes = METER_PULSE_MODES[meter]
+  if (typeof value === 'string' && modes.some((mode) => mode.id === value)) {
+    return value
+  }
+  return getMeterDefaults(meter).pulseModeId
 }
 
 export function clampBpm(value: number): number {
@@ -208,21 +223,31 @@ function parseMeter(value: unknown): MetronomeMeter {
   return DEFAULT_METER
 }
 
-function parseSubdivision(value: unknown, meter: MetronomeMeter): MetronomeSubdivision {
+function parseSubdivision(
+  value: unknown,
+  meter: MetronomeMeter,
+  pulseModeId?: string,
+): MetronomeSubdivision {
   if (typeof value === 'string' && VALID_SUBDIVISIONS.has(value as MetronomeSubdivision)) {
     const subdivision = value as MetronomeSubdivision
-    if (isSubdivisionAvailable(meter, subdivision)) return subdivision
+    if (isSubdivisionAvailable(meter, subdivision, getAvailableSubdivisions(meter, pulseModeId))) {
+      return subdivision
+    }
   }
-  return getTimeSignatureDefinition(meter).defaultSubdivision
+  return getPulseModeById(meter, pulseModeId).defaultSubdivision
 }
 
-function parseFeelId(meter: MetronomeMeter, value: unknown): string | undefined {
-  const def = getTimeSignatureDefinition(meter)
-  if (!def.feelOptions?.length) return undefined
-  if (typeof value === 'string' && def.feelOptions.some((option) => option.id === value)) {
+function parseFeelId(
+  meter: MetronomeMeter,
+  value: unknown,
+  pulseModeId?: string,
+): string | undefined {
+  const mode = getPulseModeById(meter, pulseModeId)
+  if (!mode.feelOptions?.length) return undefined
+  if (typeof value === 'string' && mode.feelOptions.some((option) => option.id === value)) {
     return value
   }
-  return def.defaultFeelId
+  return mode.defaultFeelId
 }
 
 export function subdivisionsPerBeat(subdivision: MetronomeSubdivision): number {
@@ -251,13 +276,15 @@ export function loadMetronomePrefs(): MetronomePrefs {
     }
     const parsed = JSON.parse(raw) as Partial<MetronomePrefs> & { accentFirstBeat?: boolean }
     const meter = parseMeter(parsed.meter)
-    const feelId = parseFeelId(meter, parsed.feelId)
+    const pulseModeId = parsePulseModeId(meter, parsed.pulseModeId)
+    const feelId = parseFeelId(meter, parsed.feelId, pulseModeId)
     return {
       bpm: clampBpm(Number(parsed.bpm) || DEFAULT_BPM),
       meter,
-      subdivision: parseSubdivision(parsed.subdivision, meter),
+      subdivision: parseSubdivision(parsed.subdivision, meter, pulseModeId),
       feelId,
-      accentLevels: parseAccentLevels(meter, feelId, parsed),
+      pulseModeId,
+      accentLevels: parseAccentLevels(meter, feelId, pulseModeId, parsed),
       soundId:
         typeof parsed.soundId === 'string' && parsed.soundId.length > 0
           ? parsed.soundId
@@ -277,7 +304,13 @@ export function saveMetronomePrefs(prefs: MetronomePrefs): void {
         meter: prefs.meter,
         subdivision: prefs.subdivision,
         feelId: prefs.feelId,
-        accentLevels: normalizeAccentLevels(prefs.meter, prefs.accentLevels, prefs.feelId),
+        pulseModeId: prefs.pulseModeId ?? getMeterDefaults(prefs.meter).pulseModeId,
+        accentLevels: normalizeAccentLevels(
+          prefs.meter,
+          prefs.accentLevels,
+          prefs.feelId,
+          prefs.pulseModeId,
+        ),
         soundId: prefs.soundId,
       }),
     )
@@ -290,12 +323,12 @@ export function getMeterDef(meter: MetronomeMeter): MetronomeMeterDef {
   return METRONOME_METERS[meter]
 }
 
-export function getBeatsPerBar(meter: MetronomeMeter): number {
-  return getTimeSignatureDefinition(meter).pulseCount
+export function getBeatsPerBar(meter: MetronomeMeter, pulseModeId?: string): number {
+  return getPulseModeById(meter, pulseModeId).pulseCount
 }
 
-export function isCompoundMeter(meter: MetronomeMeter): boolean {
-  return getTimeSignatureDefinition(meter).compound
+export function isCompoundMeter(meter: MetronomeMeter, pulseModeId?: string): boolean {
+  return getPulseModeById(meter, pulseModeId).compound
 }
 
 /** Odd /8 meters (5/8, 7/8, …) — natural pulse is eighth notes. */
@@ -324,12 +357,16 @@ export function getCompoundGroupSize(meter: MetronomeMeter): number {
   return ticksPerPulse(meter, '8ths')
 }
 
-export function getAvailableSubdivisions(meter: MetronomeMeter): MetronomeSubdivision[] {
-  return getTimeSignatureDefinition(meter).availableSubdivisions
+export function getAvailableSubdivisions(
+  meter: MetronomeMeter,
+  pulseModeId?: string,
+): MetronomeSubdivision[] {
+  return getPulseModeById(meter, pulseModeId).availableSubdivisions
 }
 
-export function hasFeelOptions(meter: MetronomeMeter): boolean {
-  return Boolean(getTimeSignatureDefinition(meter).feelOptions?.length)
+export function hasFeelOptions(meter: MetronomeMeter, pulseModeId?: string): boolean {
+  const mode = getPulseModeById(meter, pulseModeId)
+  return Boolean(mode.feelOptions?.length)
 }
 
 export function resolveClickTierWithAccents(
@@ -337,8 +374,10 @@ export function resolveClickTierWithAccents(
   tickIndexInBar: number,
   subdivision: MetronomeSubdivision,
   accentLevels: MetronomeAccentLevel[],
+  pulseCount?: number,
 ): MetronomeClickTier | null {
-  return resolveClickTier({ meter, subdivision, accentLevels }, tickIndexInBar)
+  const count = pulseCount ?? getBeatsPerBar(meter)
+  return resolveClickTier({ meter, subdivision, accentLevels, pulseCount: count }, tickIndexInBar)
 }
 
 /** @deprecated Use resolveClickTierWithAccents with accentLevels */
@@ -360,16 +399,39 @@ export function getSimpleClickTier(beatIndexInBar: number): MetronomeClickTier {
   return beatIndexInBar === 0 ? 'downbeat' : 'subdivision'
 }
 
-export function getMeterDefaults(meter: MetronomeMeter): {
+export function getMeterDefaults(
+  meter: MetronomeMeter,
+  pulseModeId?: string,
+): {
   subdivision: MetronomeSubdivision
   feelId?: string
   accentLevels: MetronomeAccentLevel[]
+  pulseModeId: string
 } {
-  const def = getTimeSignatureDefinition(meter)
-  const feelId = def.defaultFeelId
+  const mode = getPulseModeById(meter, pulseModeId)
+  const feelId = mode.defaultFeelId
   return {
-    subdivision: def.defaultSubdivision,
+    subdivision: mode.defaultSubdivision,
     feelId,
-    accentLevels: getAccentLevelsForMeter(meter, feelId),
+    accentLevels: getAccentLevelsForMeter(meter, feelId, mode.id),
+    pulseModeId: mode.id,
   }
+}
+
+export function resolveMeterTiming(
+  meter: MetronomeMeter,
+  options?: {
+    pulseModeId?: string
+    feelId?: string
+    beatGrouping?: number[]
+    customAccents?: MetronomeAccentLevel[]
+  },
+) {
+  return resolvePulseTiming({
+    meter,
+    pulseModeId: options?.pulseModeId,
+    feelId: options?.feelId,
+    beatGrouping: options?.beatGrouping,
+    customAccents: options?.customAccents,
+  })
 }

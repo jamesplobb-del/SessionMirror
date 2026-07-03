@@ -1,4 +1,5 @@
 import type { MetronomeMeter } from '../utils/metronomeConfig'
+import { createPatternStep } from './patternLogic'
 import type { PracticeTimeline, TimelineSection } from './types'
 
 let sectionCounter = 0
@@ -47,6 +48,11 @@ export const COMMON_METERS: MetronomeMeter[] = [
   '3/4',
   '4/4',
   '5/4',
+  '6/4',
+  '7/4',
+  '2/2',
+  '3/8',
+  '4/8',
   '6/8',
   '9/8',
   '12/8',
@@ -55,6 +61,9 @@ export const COMMON_METERS: MetronomeMeter[] = [
   '8/8',
   '10/8',
   '11/8',
+  '13/8',
+  '15/8',
+  '16/8',
 ]
 
 export function repeatMultiplier(repeatCount: number): number {
@@ -64,4 +73,14 @@ export function repeatMultiplier(repeatCount: number): number {
 export function repeatLabel(repeatCount: number): string {
   const count = repeatMultiplier(repeatCount)
   return count <= 1 ? 'Once' : `${count}×`
+}
+
+export function createAlternatingPatternSection(): TimelineSection {
+  return createDefaultSection({
+    title: 'Alternating Feel',
+    meter: '3/4',
+    bpm: 120,
+    patternSteps: [createPatternStep('3/4', 120), createPatternStep('6/8', 80)],
+    patternRepeat: { kind: 'totalMeasures', measures: 24 },
+  })
 }

@@ -1,8 +1,6 @@
 import { cycleAccentLevel } from '../../metronome/metronomeTiming'
 import type { MetronomeAccentLevel } from '../../utils/metronomeConfig'
 import Pressable from '../../components/ui/Pressable'
-import { getBeatsPerBar } from '../../utils/metronomeConfig'
-import type { MetronomeMeter } from '../../utils/metronomeConfig'
 
 const LEVEL_LABEL: Record<MetronomeAccentLevel, string> = {
   strong: 'Strong',
@@ -12,21 +10,19 @@ const LEVEL_LABEL: Record<MetronomeAccentLevel, string> = {
 }
 
 interface SectionAccentEditorProps {
-  meter: MetronomeMeter
+  pulseCount: number
   accentLevels: MetronomeAccentLevel[]
   onChange: (levels: MetronomeAccentLevel[]) => void
 }
 
 export default function SectionAccentEditor({
-  meter,
+  pulseCount,
   accentLevels,
   onChange,
 }: SectionAccentEditorProps) {
-  const beats = getBeatsPerBar(meter)
-
   return (
     <div className="practice-timeline-editor__accent-row">
-      {Array.from({ length: beats }, (_, index) => {
+      {Array.from({ length: pulseCount }, (_, index) => {
         const level = accentLevels[index] ?? 'weak'
         return (
           <Pressable
@@ -37,9 +33,9 @@ export default function SectionAccentEditor({
             aria-label={`Beat ${index + 1}, ${LEVEL_LABEL[level]}. Tap to change.`}
             onClick={() => {
               const next = [...accentLevels]
-              while (next.length < beats) next.push('weak')
+              while (next.length < pulseCount) next.push('weak')
               next[index] = cycleAccentLevel(level)
-              onChange(next.slice(0, beats))
+              onChange(next.slice(0, pulseCount))
             }}
           >
             {index + 1}

@@ -1646,9 +1646,25 @@ body.settings-branch-open * {
   gap: 0.45rem;
 }
 
+.audio-practice-metronome__select-row--five {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
 @media (min-width: 390px) {
   .audio-practice-metronome__select-row--quad {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .audio-practice-metronome__select-row--five {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 520px) {
+  .audio-practice-metronome__select-row--five {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 

@@ -62,8 +62,14 @@ export default function TimelinePracticeSessionView({
   const { playing } = useMetronome()
   const scalePercent = Math.round(playbackState.tempoScale * 100)
   const timingSummary = useMemo(
-    () => (currentSection ? sectionTimingSummary(currentSection) : ''),
-    [currentSection],
+    () =>
+      currentSection
+        ? sectionTimingSummary(
+            currentSection,
+            playbackState.countInActive ? 1 : Math.max(1, playbackState.measure),
+          )
+        : '',
+    [currentSection, playbackState.countInActive, playbackState.measure],
   )
 
   const canGoPrev = playbackState.sectionIndex > 0
