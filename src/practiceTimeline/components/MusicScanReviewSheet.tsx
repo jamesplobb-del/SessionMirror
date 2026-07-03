@@ -281,7 +281,11 @@ export default function MusicScanReviewSheet({
 
       <div className="music-scan-review__body">
         {draft.usedDemoParser ? (
-          <p className="music-scan-review__banner">Demo parser — configure a vision API for real scans.</p>
+          <p className="music-scan-review__banner">
+            {import.meta.env.PROD
+              ? 'Demo parser — configure VITE_MUSIC_SCAN_API_URL for production scans.'
+              : 'Demo parser — add VITE_OPENAI_API_KEY to .env.local for local testing.'}
+          </p>
         ) : null}
 
         {uncertainCount > 0 ? (

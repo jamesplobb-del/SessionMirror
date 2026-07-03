@@ -56,6 +56,11 @@ export interface AppSettings {
   micInputPreference: MicInputPreference
   /** Mic capture profile — Natural preserves prior behavior; Loud Camera-like enables AGC. */
   captureProfile: CaptureProfile
+  /**
+   * When enabled, allows VITE_OPENAI_API_KEY for Music Scan on production builds (device testing only).
+   * Never enable in App Store releases.
+   */
+  musicScanDevMode: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -80,6 +85,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   excludeYoutubeFromRecording: false,
   micInputPreference: 'headphone',
   captureProfile: 'natural',
+  musicScanDevMode: false,
 }
 
 /** Floating widgets — forced off on each cold app start. */
@@ -201,6 +207,10 @@ export function loadAppSettings(): AppSettings {
       captureProfile: parseCaptureProfile(
         parsed.captureProfile ?? DEFAULT_APP_SETTINGS.captureProfile,
       ),
+      musicScanDevMode:
+        parsed.musicScanDevMode !== undefined
+          ? Boolean(parsed.musicScanDevMode)
+          : DEFAULT_APP_SETTINGS.musicScanDevMode,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }
@@ -220,6 +230,18 @@ export function saveAppSettings(settings: AppSettings): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
   } catch {
     /* private mode / quota — ignore */
+  }
+}
+
+/** Settings override: allow frontend OpenAI key on production builds (device testing). */
+export function isMusicScanDevModeEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return false
+    const parsed = JSON.parse(raw) as Partial<AppSettings>
+    return Boolean(parsed.musicScanDevMode)
+  } catch {
+    return false
   }
 }
 

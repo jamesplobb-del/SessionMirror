@@ -7,7 +7,9 @@ export function createDemoScanResult(): MusicScanParseResult {
     totalMeasures: 24,
     pickupMeasure: false,
     warnings: [
-      'Demo scan — configure VITE_OPENAI_API_KEY or VITE_MUSIC_SCAN_API_URL for real analysis.',
+      import.meta.env.PROD
+        ? 'Demo scan — set VITE_MUSIC_SCAN_API_URL for production analysis.'
+        : 'Demo scan — add VITE_OPENAI_API_KEY to .env.local for local testing, or VITE_MUSIC_SCAN_API_URL for backend mode.',
     ],
     sections: [
       {

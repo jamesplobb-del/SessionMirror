@@ -237,16 +237,18 @@ export default function PracticeTimelineView({
           Add Section
         </Pressable>
 
-        <Pressable
-          type="button"
-          intensity="soft"
-          haptic="light"
-          className="practice-timeline__scan-btn"
-          onClick={() => setScanOpen(true)}
-        >
-          <ScanLine size={18} className="mr-1 inline" />
-          Scan Music
-        </Pressable>
+        {timeline.sections.length > 0 ? (
+          <Pressable
+            type="button"
+            intensity="soft"
+            haptic="light"
+            className="practice-timeline__scan-btn"
+            onClick={() => setScanOpen(true)}
+          >
+            <ScanLine size={18} className="mr-1 inline" />
+            Scan Music
+          </Pressable>
+        ) : null}
 
         <label className="practice-timeline__record-toggle pointer-events-auto">
           <span>Record with practice</span>
@@ -307,7 +309,6 @@ export default function PracticeTimelineView({
         open={scanOpen || musicScan.phase === 'reading' || musicScan.phase === 'analyzing' || musicScan.phase === 'error'}
         phase={musicScan.phase}
         error={musicScan.error}
-        scanConfigured={musicScan.scanConfigured}
         onClose={() => {
           if (musicScan.phase === 'reading' || musicScan.phase === 'analyzing') return
           musicScan.reset()

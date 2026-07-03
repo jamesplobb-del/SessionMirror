@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import { analyzeMusicPages, isMusicScanConfigured } from './musicScanClient'
+import { analyzeMusicPages } from './musicScanClient'
+import { isMusicScanConfigured, resolveMusicScanMode } from './musicScanConfig'
 import { fileToScanPages } from './musicScanPdf'
 import {
   attachRepeatBlocksToDraft,
@@ -103,6 +104,7 @@ export function useMusicScan() {
     error,
     draft,
     scanConfigured: isMusicScanConfigured(),
+    scanMode: resolveMusicScanMode(),
     reset,
     openPicker,
     handleFileChange,

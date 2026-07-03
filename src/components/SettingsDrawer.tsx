@@ -521,6 +521,13 @@ export default function SettingsDrawer({
                   </div>
                 </Pressable>
               )}
+
+              <SettingToggle
+                label="Music Scan Dev Mode"
+                description="On-device testing only: allows the bundled OpenAI API key for Scan Music on production builds. Disable before App Store release."
+                checked={settings.musicScanDevMode}
+                onChange={(checked) => onUpdate({ musicScanDevMode: checked })}
+              />
             </section>
           )}
 

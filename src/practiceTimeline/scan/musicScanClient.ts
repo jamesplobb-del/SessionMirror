@@ -1,4 +1,11 @@
 import { createDemoScanResult } from './musicScanDemo'
+import {
+  getLocalMusicScanModel,
+  getLocalOpenAiApiKey,
+  getMusicScanBackendUrl,
+  logMusicScanMode,
+  type MusicScanMode,
+} from './musicScanConfig'
 import { MUSIC_SCAN_SYSTEM_PROMPT } from './musicScanPrompt'
 import type { MusicScanPageImage, MusicScanParseResult } from './musicScanTypes'
 
@@ -11,18 +18,7 @@ export interface MusicScanClientOptions {
 export interface MusicScanClientResult {
   parseResult: MusicScanParseResult
   usedDemoParser: boolean
-  provider: 'openai' | 'custom' | 'demo'
-}
-
-function scanApiUrl(): string | undefined {
-  const url = import.meta.env.VITE_MUSIC_SCAN_API_URL
-  return typeof url === 'string' && url.length > 0 ? url : undefined
-}
-
-function openAiApiKey(): string | undefined {
-  const key =
-    import.meta.env.VITE_OPENAI_API_KEY ?? import.meta.env.VITE_MUSIC_SCAN_API_KEY
-  return typeof key === 'string' && key.length > 0 ? key : undefined
+  mode: MusicScanMode
 }
 
 function extractJsonFromText(text: string): MusicScanParseResult {
@@ -39,7 +35,7 @@ function extractJsonFromText(text: string): MusicScanParseResult {
   }
 }
 
-async function callCustomScanApi(
+async function callBackendScanApi(
   url: string,
   pages: MusicScanPageImage[],
 ): Promise<MusicScanParseResult> {
@@ -63,11 +59,17 @@ async function callCustomScanApi(
   throw new Error('Scan API returned unexpected response shape')
 }
 
-async function callOpenAiVision(pages: MusicScanPageImage[]): Promise<MusicScanParseResult> {
-  const apiKey = openAiApiKey()
-  if (!apiKey) throw new Error('OpenAI API key not configured')
+/**
+ * LOCAL DEVELOPMENT ONLY — calls OpenAI directly from the browser.
+ * Blocked when import.meta.env.PROD is true (see musicScanConfig).
+ */
+async function callLocalOpenAiVision(pages: MusicScanPageImage[]): Promise<MusicScanParseResult> {
+  const apiKey = getLocalOpenAiApiKey()
+  if (!apiKey) {
+    throw new Error('OpenAI API key is only available in local development')
+  }
 
-  const model = import.meta.env.VITE_MUSIC_SCAN_MODEL ?? 'gpt-4o'
+  const model = getLocalMusicScanModel()
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -110,28 +112,30 @@ async function callOpenAiVision(pages: MusicScanPageImage[]): Promise<MusicScanP
   return extractJsonFromText(content)
 }
 
-export function isMusicScanConfigured(): boolean {
-  return Boolean(scanApiUrl() || openAiApiKey())
-}
+export { isMusicScanConfigured, resolveMusicScanMode } from './musicScanConfig'
+export type { MusicScanMode } from './musicScanConfig'
 
 export async function analyzeMusicPages(
   options: MusicScanClientOptions,
 ): Promise<MusicScanClientResult> {
-  const customUrl = scanApiUrl()
-  if (customUrl) {
-    const parseResult = await callCustomScanApi(customUrl, options.pages)
-    return { parseResult, usedDemoParser: false, provider: 'custom' }
+  logMusicScanMode('scan')
+
+  const backendUrl = getMusicScanBackendUrl()
+
+  if (backendUrl) {
+    const parseResult = await callBackendScanApi(backendUrl, options.pages)
+    return { parseResult, usedDemoParser: false, mode: 'backend' }
   }
 
-  const apiKey = openAiApiKey()
-  if (apiKey) {
-    const parseResult = await callOpenAiVision(options.pages)
-    return { parseResult, usedDemoParser: false, provider: 'openai' }
+  const localKey = getLocalOpenAiApiKey()
+  if (localKey) {
+    const parseResult = await callLocalOpenAiVision(options.pages)
+    return { parseResult, usedDemoParser: false, mode: 'local-dev' }
   }
 
   return {
     parseResult: createDemoScanResult(),
     usedDemoParser: true,
-    provider: 'demo',
+    mode: 'demo',
   }
 }

@@ -1,13 +1,13 @@
 import { Camera, FileImage, FileText, Loader2, ScanLine, X } from 'lucide-react'
 import AnimatedBottomSheet from '../../components/ui/AnimatedBottomSheet'
 import Pressable from '../../components/ui/Pressable'
+import { musicScanSetupNotice, resolveMusicScanMode } from '../scan/musicScanConfig'
 import type { MusicScanPhase } from '../scan/useMusicScan'
 
 interface MusicScanCaptureSheetProps {
   open: boolean
   phase: MusicScanPhase
   error: string | null
-  scanConfigured: boolean
   onClose: () => void
   onTakePhoto: () => void
   onImportImage: () => void
@@ -18,13 +18,14 @@ export default function MusicScanCaptureSheet({
   open,
   phase,
   error,
-  scanConfigured,
   onClose,
   onTakePhoto,
   onImportImage,
   onImportPdf,
 }: MusicScanCaptureSheetProps) {
   const busy = phase === 'reading' || phase === 'analyzing'
+  const scanMode = resolveMusicScanMode()
+  const setupNotice = musicScanSetupNotice()
 
   return (
     <AnimatedBottomSheet
@@ -47,13 +48,11 @@ export default function MusicScanCaptureSheet({
           edit before applying.
         </p>
 
-        {!scanConfigured ? (
-          <p className="music-scan-capture__notice">
-            No vision API configured — demo draft will be generated. Set{' '}
-            <code>VITE_OPENAI_API_KEY</code> or <code>VITE_MUSIC_SCAN_API_URL</code> for real
-            analysis.
-          </p>
-        ) : null}
+        {scanMode === 'demo' ? (
+          <p className="music-scan-capture__notice">{setupNotice}</p>
+        ) : (
+          <p className="music-scan-capture__notice music-scan-capture__notice--ok">{setupNotice}</p>
+        )}
 
         {busy ? (
           <div className="music-scan-capture__busy" role="status">
