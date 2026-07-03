@@ -8,7 +8,7 @@
  * - Optional settings toggle `musicScanDevMode` allows the bundled key on device test builds only.
  */
 
-import { isMusicScanDevModeEnabled } from '../../utils/appSettings'
+import { getMusicScanDevApiKey, isMusicScanDevModeEnabled } from '../../utils/appSettings'
 
 export type MusicScanMode = 'backend' | 'local-dev' | 'demo'
 
@@ -16,7 +16,7 @@ const LOG_LABEL = 'Music Scan:'
 
 let startupLogged = false
 
-function allowLocalOpenAiKey(): boolean {
+function allowEnvOpenAiKey(): boolean {
   if (!import.meta.env.PROD) return true
   return isMusicScanDevModeEnabled()
 }
@@ -27,11 +27,17 @@ export function getMusicScanBackendUrl(): string | undefined {
 }
 
 /**
- * LOCAL DEVELOPMENT ONLY (or production when Music Scan Dev Mode is enabled in Settings).
- * Returns undefined in production unless the settings override is on.
+ * OpenAI key from Settings paste, then VITE_OPENAI_API_KEY (.env.local / build).
+ * In production, requires Music Scan Dev Mode unless using the dev server.
  */
 export function getLocalOpenAiApiKey(): string | undefined {
-  if (!allowLocalOpenAiKey()) return undefined
+  const pasted = getMusicScanDevApiKey()
+  if (pasted) {
+    if (import.meta.env.PROD && !isMusicScanDevModeEnabled()) return undefined
+    return pasted
+  }
+
+  if (!allowEnvOpenAiKey()) return undefined
 
   const key = import.meta.env.VITE_OPENAI_API_KEY
   return typeof key === 'string' && key.trim().length > 0 ? key.trim() : undefined
@@ -134,17 +140,17 @@ export function musicScanSetupNotice(): string {
     return 'Using your scan backend for analysis.'
   }
   if (mode === 'local-dev') {
+    if (getMusicScanDevApiKey()) {
+      return 'Dev Mode — using API key from Settings.'
+    }
     if (import.meta.env.PROD) {
-      return 'Dev Mode — using API key from this build (Settings).'
+      return 'Dev Mode — using API key from this build.'
     }
     return 'Local development mode — using VITE_OPENAI_API_KEY from .env.local.'
   }
   if (import.meta.env.PROD) {
-    const hasKey =
-      typeof import.meta.env.VITE_OPENAI_API_KEY === 'string' &&
-      import.meta.env.VITE_OPENAI_API_KEY.trim().length > 0
-    if (hasKey) {
-      return 'Demo draft only. Enable Music Scan Dev Mode in Settings to use your API key.'
+    if (isMusicScanDevModeEnabled()) {
+      return 'Paste your OpenAI API key in Settings → Music Scan Dev Mode to run real scans.'
     }
     return 'Demo draft only. Configure VITE_MUSIC_SCAN_API_URL for production scanning.'
   }

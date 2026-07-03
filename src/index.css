@@ -426,6 +426,12 @@ body.settings-branch-open * {
   pointer-events: none !important;
 }
 
+.app-ui-overlay--music-scan-fullscreen [data-tutorial='audio-mode-tabs'],
+.app-ui-overlay--music-scan-fullscreen .audio-practice-top-tabs,
+.app-ui-overlay--music-scan-fullscreen .app-hud-bottom {
+  display: none !important;
+}
+
 .app-ui-overlay--sheet-open .control-deck__vault-btn,
 .app-ui-overlay--sheet-open .control-deck__settings-btn {
   pointer-events: auto !important;

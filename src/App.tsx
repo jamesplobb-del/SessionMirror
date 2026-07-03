@@ -431,6 +431,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
+  const [practiceMusicScanFullscreen, setPracticeMusicScanFullscreen] = useState(false)
   const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
   autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -3015,7 +3016,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
                   } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${
                     isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline app-ui-overlay--audio-practice-metronome' : ''
-                  }`}
+                  } ${practiceMusicScanFullscreen ? 'app-ui-overlay--music-scan-fullscreen' : ''}`}
                   aria-hidden={hudModalState === 'review'}
                   animate={{
                     opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -3079,6 +3080,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           isRecording={isRecording}
                           onStartRecording={toggleRecording}
                           onStopRecording={toggleRecording}
+                          onScanFullscreenChange={setPracticeMusicScanFullscreen}
                         />
                       </div>
                     )}

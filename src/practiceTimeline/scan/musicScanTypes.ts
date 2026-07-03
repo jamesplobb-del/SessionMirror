@@ -97,6 +97,7 @@ export interface MusicScanParseResult {
   meterEvents?: Array<{
     measure: number
     meter?: string
+    pulseUnit?: string
     grouping?: number[]
     feelLabel?: string
     confidence?: number

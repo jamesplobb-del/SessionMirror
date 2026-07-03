@@ -6,7 +6,9 @@ import {
   attachRepeatBlocksToDraft,
   optimizeDraftPatterns,
   parseResultToDraft,
+  reconcileMeterAndTempoIntoSections,
   suggestGroupingForDraftSection,
+  validateDraftConsistency,
 } from './scanToProgram'
 import type { MusicScanDraftProgram } from './musicScanTypes'
 
@@ -56,16 +58,18 @@ export function useMusicScan() {
         mimeType: file.type || 'application/octet-stream',
       })
 
-      let program = parseResultToDraft(parseResult, [
+      let       program = parseResultToDraft(parseResult, [
         { name: file.name, mimeType: file.type, pageCount: pages.length },
       ], usedDemoParser)
 
+      program = reconcileMeterAndTempoIntoSections(program)
       program = {
         ...program,
         sections: program.sections.map(suggestGroupingForDraftSection),
       }
       program = attachRepeatBlocksToDraft(program)
       program = optimizeDraftPatterns(program)
+      program = validateDraftConsistency(program)
 
       setDraft(program)
       setPhase('review')

@@ -108,6 +108,7 @@ export function parseResultToDraft(
       id: `meter-${index}`,
       measure: Math.max(1, Math.round(event.measure)),
       meter: event.meter ?? '4/4',
+      pulseUnit: event.pulseUnit,
       grouping: event.grouping,
       feelLabel: event.feelLabel,
       confidence: clampConfidence(event.confidence),
@@ -158,6 +159,305 @@ type ScanNavType = MusicScanDraftProgram['navigation'][number]['type']
 
 export function draftSectionBars(section: MusicScanDraftSection): number {
   return Math.max(1, section.endMeasure - section.startMeasure + 1)
+}
+
+function draftTotalMeasures(draft: MusicScanDraftProgram): number {
+  return Math.max(
+    draft.totalMeasures,
+    ...draft.sections.map((section) => section.endMeasure),
+    ...draft.meterEvents.map((event) => event.measure),
+    1,
+  )
+}
+
+function findCoveringSection(
+  sections: MusicScanDraftSection[],
+  measure: number,
+): MusicScanDraftSection | undefined {
+  return (
+    sections.find((section) => measure >= section.startMeasure && measure <= section.endMeasure) ??
+    sections.find((section) => section.startMeasure <= measure) ??
+    sections[sections.length - 1]
+  )
+}
+
+/** Per-measure meter map: section ranges first, then meterEvents override from their measure onward. */
+export function buildMeasureMeterMap(draft: MusicScanDraftProgram): Map<number, MetronomeMeter> {
+  const total = draftTotalMeasures(draft)
+  const map = new Map<number, MetronomeMeter>()
+
+  for (const section of [...draft.sections].sort((a, b) => a.startMeasure - b.startMeasure)) {
+    for (let measure = section.startMeasure; measure <= section.endMeasure && measure <= total; measure++) {
+      map.set(measure, section.meter)
+    }
+  }
+
+  const meterEvents = [...draft.meterEvents]
+    .sort((a, b) => a.measure - b.measure)
+    .filter((event) => event.measure >= 1 && event.measure <= total)
+
+  for (let index = 0; index < meterEvents.length; index++) {
+    const event = meterEvents[index]
+    const nextMeasure = meterEvents[index + 1]?.measure ?? total + 1
+    const meter = parseMeter(event.meter)
+    for (let measure = event.measure; measure < nextMeasure && measure <= total; measure++) {
+      map.set(measure, meter)
+    }
+  }
+
+  for (let measure = 1; measure <= total; measure++) {
+    if (!map.has(measure)) map.set(measure, '4/4')
+  }
+
+  return map
+}
+
+/** Per-measure BPM map: section ranges first, then tempoEvents override (except rit/accel markers). */
+export function buildMeasureBpmMap(draft: MusicScanDraftProgram): Map<number, number> {
+  const total = draftTotalMeasures(draft)
+  const map = new Map<number, number>()
+
+  for (const section of draft.sections) {
+    for (let measure = section.startMeasure; measure <= section.endMeasure && measure <= total; measure++) {
+      map.set(measure, section.bpm)
+    }
+  }
+
+  const tempoEvents = [...draft.tempoEvents]
+    .sort((a, b) => a.measure - b.measure)
+    .filter(
+      (event) =>
+        event.measure >= 1 &&
+        event.measure <= total &&
+        event.kind !== 'ritardando' &&
+        event.kind !== 'accelerando',
+    )
+
+  for (let index = 0; index < tempoEvents.length; index++) {
+    const event = tempoEvents[index]
+    const nextMeasure = tempoEvents[index + 1]?.measure ?? total + 1
+    for (let measure = event.measure; measure < nextMeasure && measure <= total; measure++) {
+      map.set(measure, event.bpm)
+    }
+  }
+
+  for (let measure = 1; measure <= total; measure++) {
+    if (!map.has(measure)) map.set(measure, 80)
+  }
+
+  return map
+}
+
+interface MeasureSegment {
+  startMeasure: number
+  endMeasure: number
+  meter: MetronomeMeter
+  bpm: number
+}
+
+function segmentsFromMeasureTimelines(
+  total: number,
+  meterMap: Map<number, MetronomeMeter>,
+  bpmMap: Map<number, number>,
+): MeasureSegment[] {
+  if (total < 1) return []
+
+  const segments: MeasureSegment[] = []
+  let start = 1
+  let meter = meterMap.get(1) ?? '4/4'
+  let bpm = bpmMap.get(1) ?? 80
+
+  for (let measure = 2; measure <= total + 1; measure++) {
+    const atEnd = measure > total
+    const nextMeter = meterMap.get(measure) ?? meter
+    const nextBpm = bpmMap.get(measure) ?? bpm
+
+    if (atEnd || nextMeter !== meter || nextBpm !== bpm) {
+      segments.push({ startMeasure: start, endMeasure: measure - 1, meter, bpm })
+      if (!atEnd) {
+        start = measure
+        meter = nextMeter
+        bpm = nextBpm
+      }
+    }
+  }
+
+  return segments
+}
+
+function sectionTitleForSegment(
+  segment: MeasureSegment,
+  parent: MusicScanDraftSection | undefined,
+  index: number,
+  totalSegments: number,
+): string {
+  if (!parent) return `Section ${index + 1}`
+
+  const isFirstInParent = segment.startMeasure === parent.startMeasure
+  if (totalSegments === 1 || (isFirstInParent && segment.meter === parent.meter)) {
+    return parent.title
+  }
+
+  if (isFirstInParent) {
+    return `${parent.title} (${segment.meter})`
+  }
+
+  const span =
+    segment.startMeasure === segment.endMeasure
+      ? `m.${segment.startMeasure}`
+      : `m.${segment.startMeasure}–${segment.endMeasure}`
+  return `${parent.title} · ${span} (${segment.meter})`
+}
+
+/**
+ * Split sections at every meter/tempo boundary using meterEvents and tempoEvents.
+ * Ensures mid-piece meter changes become separate practice sections.
+ */
+export function reconcileMeterAndTempoIntoSections(
+  draft: MusicScanDraftProgram,
+): MusicScanDraftProgram {
+  if (draft.sections.length === 0) return draft
+
+  const total = draftTotalMeasures(draft)
+  const meterMap = buildMeasureMeterMap(draft)
+  const bpmMap = buildMeasureBpmMap(draft)
+  const segments = segmentsFromMeasureTimelines(total, meterMap, bpmMap)
+
+  if (segments.length === 0) return draft
+
+  const originalSections = draft.sections
+  const newSections: MusicScanDraftSection[] = segments.map((segment, index) => {
+    const parent = findCoveringSection(originalSections, segment.startMeasure)
+    const meterEvent = draft.meterEvents.find((event) => event.measure === segment.startMeasure)
+    const tempoEvent = draft.tempoEvents.find((event) => event.measure === segment.startMeasure)
+
+    const grouping =
+      meterEvent?.grouping?.length
+        ? meterEvent.grouping
+        : segment.startMeasure === parent?.startMeasure
+          ? parent?.beatGrouping
+          : undefined
+
+    const feelId =
+      meterEvent?.feelLabel?.replace(/\s/g, '') ??
+      (grouping ? suggestFeelIdForGrouping(segment.meter, grouping) : parent?.feelId)
+
+    const defaults = getMeterDefaults(
+      segment.meter,
+      pulseModeFromUnit(segment.meter, meterEvent?.pulseUnit),
+    )
+
+    const meterChanged =
+      Boolean(meterEvent) ||
+      (parent !== undefined && segment.meter !== parent.meter && segment.startMeasure > parent.startMeasure)
+
+    const tempoChanged =
+      Boolean(tempoEvent && tempoEvent.kind !== 'ritardando' && tempoEvent.kind !== 'accelerando') ||
+      (parent !== undefined && segment.bpm !== parent.bpm && segment.startMeasure > parent.startMeasure)
+
+    let tempoRamp = parent?.tempoRamp
+    if (tempoEvent?.kind === 'ritardando' || tempoEvent?.kind === 'accelerando') {
+      const base = segment.bpm
+      tempoRamp = {
+        enabled: true,
+        endBpm:
+          tempoEvent.kind === 'ritardando'
+            ? Math.max(40, base - 20)
+            : Math.min(300, base + 20),
+      }
+    } else if (meterChanged || tempoChanged) {
+      tempoRamp = undefined
+    }
+
+    const notes = [
+      parent?.notes,
+      meterEvent ? `Meter change at m.${meterEvent.measure}` : undefined,
+      tempoEvent?.marking ? `Tempo: ${tempoEvent.marking}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+
+    return {
+      id: draftId(),
+      title: sectionTitleForSegment(segment, parent, index, segments.length),
+      startMeasure: segment.startMeasure,
+      endMeasure: segment.endMeasure,
+      meter: segment.meter,
+      pulseModeId:
+        pulseModeFromUnit(segment.meter, meterEvent?.pulseUnit) ??
+        (segment.meter === parent?.meter ? parent?.pulseModeId : undefined) ??
+        defaults.pulseModeId,
+      feelId: feelId ?? defaults.feelId,
+      beatGrouping: grouping,
+      bpm: segment.bpm,
+      subdivision: parent?.subdivision ?? 'auto',
+      repeatCount: parent?.repeatCount ?? 1,
+      pickupMeasure: segment.startMeasure === 1 && (parent?.pickupMeasure ?? draft.pickupMeasure),
+      tempoRamp,
+      endings: parent?.endings ?? [],
+      navigation: parent?.navigation ?? [],
+      confidence: Math.min(
+        parent?.confidence ?? 0.5,
+        meterEvent?.confidence ?? 1,
+        tempoEvent?.confidence ?? 1,
+      ),
+      uncertain: Boolean(
+        parent?.uncertain ||
+          meterEvent?.uncertain ||
+          tempoEvent?.uncertain ||
+          (meterChanged && !meterEvent),
+      ),
+      notes: notes || undefined,
+      sourcePages: parent?.sourcePages ?? [],
+    }
+  })
+
+  return { ...draft, sections: newSections, totalMeasures: total }
+}
+
+/** Add warnings when scan data is inconsistent before/after reconciliation. */
+export function validateDraftConsistency(draft: MusicScanDraftProgram): MusicScanDraftProgram {
+  const warnings = [...draft.warnings]
+  const total = draftTotalMeasures(draft)
+  const covered = new Set<number>()
+
+  for (const section of draft.sections) {
+    for (let measure = section.startMeasure; measure <= section.endMeasure; measure++) {
+      covered.add(measure)
+    }
+  }
+
+  for (let measure = 1; measure <= total; measure++) {
+    if (!covered.has(measure)) {
+      warnings.push(`No section covers measure ${measure}.`)
+    }
+  }
+
+  for (const event of draft.meterEvents) {
+    const section = draft.sections.find((item) => item.startMeasure === event.measure)
+    if (section && parseMeter(event.meter) !== section.meter) {
+      warnings.push(
+        `Meter event at m.${event.measure} (${event.meter}) does not match section start (${section.meter}).`,
+      )
+    }
+    if (!section) {
+      warnings.push(`Meter event at m.${event.measure} has no matching section start.`)
+    }
+  }
+
+  for (const section of draft.sections) {
+    const internalEvents = draft.meterEvents.filter(
+      (event) => event.measure > section.startMeasure && event.measure <= section.endMeasure,
+    )
+    if (internalEvents.length > 0) {
+      warnings.push(
+        `Section "${section.title}" (m.${section.startMeasure}–${section.endMeasure}) spans ${internalEvents.length} internal meter change(s) — split into separate sections.`,
+      )
+    }
+  }
+
+  const uniqueWarnings = [...new Set(warnings)]
+  return uniqueWarnings.length === draft.warnings.length ? draft : { ...draft, warnings: uniqueWarnings }
 }
 
 export function draftToTimelineSections(draft: MusicScanDraftProgram): TimelineSection[] {

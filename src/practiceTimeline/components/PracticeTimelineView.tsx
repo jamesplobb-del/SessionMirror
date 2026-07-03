@@ -1,5 +1,5 @@
 import { Plus, ScanLine } from 'lucide-react'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
@@ -20,12 +20,14 @@ export interface PracticeTimelineViewProps {
   isRecording?: boolean
   onStartRecording?: () => void
   onStopRecording?: () => void
+  onScanFullscreenChange?: (active: boolean) => void
 }
 
 export default function PracticeTimelineView({
   isRecording = false,
   onStartRecording,
   onStopRecording,
+  onScanFullscreenChange,
 }: PracticeTimelineViewProps) {
   const {
     timeline,
@@ -64,6 +66,17 @@ export default function PracticeTimelineView({
   const [scanOpen, setScanOpen] = useState(false)
 
   const musicScan = useMusicScan()
+
+  const scanFullscreenActive =
+    scanOpen ||
+    musicScan.phase === 'review' ||
+    musicScan.phase === 'reading' ||
+    musicScan.phase === 'analyzing'
+
+  useEffect(() => {
+    onScanFullscreenChange?.(scanFullscreenActive)
+    return () => onScanFullscreenChange?.(false)
+  }, [scanFullscreenActive, onScanFullscreenChange])
 
   const trackSettings = {
     countInBars: timeline.settings?.countInBars ?? 0,

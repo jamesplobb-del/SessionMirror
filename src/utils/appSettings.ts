@@ -61,6 +61,8 @@ export interface AppSettings {
    * Never enable in App Store releases.
    */
   musicScanDevMode: boolean
+  /** Pasted OpenAI key for Music Scan dev testing (Settings). Used when Dev Mode is on or in local dev. */
+  musicScanDevApiKey?: string
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -211,6 +213,10 @@ export function loadAppSettings(): AppSettings {
         parsed.musicScanDevMode !== undefined
           ? Boolean(parsed.musicScanDevMode)
           : DEFAULT_APP_SETTINGS.musicScanDevMode,
+      musicScanDevApiKey:
+        typeof parsed.musicScanDevApiKey === 'string' && parsed.musicScanDevApiKey.trim().length > 0
+          ? parsed.musicScanDevApiKey.trim()
+          : undefined,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }
@@ -237,11 +243,25 @@ export function saveAppSettings(settings: AppSettings): void {
 export function isMusicScanDevModeEnabled(): boolean {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return false
+    if (!raw) return import.meta.env.DEV
     const parsed = JSON.parse(raw) as Partial<AppSettings>
-    return Boolean(parsed.musicScanDevMode)
+    if (parsed.musicScanDevMode !== undefined) return Boolean(parsed.musicScanDevMode)
+    return import.meta.env.DEV
   } catch {
-    return false
+    return import.meta.env.DEV
+  }
+}
+
+/** User-pasted API key from Settings (dev testing). */
+export function getMusicScanDevApiKey(): string | undefined {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as Partial<AppSettings>
+    const key = parsed.musicScanDevApiKey?.trim()
+    return key && key.length > 0 ? key : undefined
+  } catch {
+    return undefined
   }
 }
 

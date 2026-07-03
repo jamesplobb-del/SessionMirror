@@ -79,7 +79,7 @@ async function callLocalOpenAiVision(pages: MusicScanPageImage[]): Promise<Music
     },
     body: JSON.stringify({
       model,
-      temperature: 0.2,
+      temperature: 0.15,
       response_format: { type: 'json_object' },
       messages: [
         {
