@@ -8,13 +8,15 @@
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome-layer,
-.app-ui-overlay--audio-mode .audio-practice-tuner-layer {
+.app-ui-overlay--audio-mode .audio-practice-tuner-layer,
+.app-ui-overlay--audio-mode .audio-practice-timeline-layer {
   background: var(--audio-bg-base);
   border-top: 0;
 }
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome,
-.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-timeline {
   background: var(--audio-bg-base) !important;
 }
 
@@ -438,6 +440,13 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-
 .app-ui-overlay--audio-mode .audio-practice-metronome__beat--accented {
   border-color: rgba(21, 152, 255, 0.35);
   box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__beat--silent {
+  opacity: 0.3;
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__beat-number {

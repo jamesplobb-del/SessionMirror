@@ -1,18 +1,33 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import type { MetronomeMeter } from '../../utils/metronomeConfig'
+import type { MetronomeMeter, MetronomeSubdivision } from '../../utils/metronomeConfig'
 import Pressable from '../../components/ui/Pressable'
-import { COMMON_METERS, REPEAT_OPTIONS } from '../sectionDefaults'
-import { applyMeterChange, meterNeedsFeelPrompt, resolveSectionTiming } from '../timeSignatureLogic'
+import {
+  formatGrouping,
+  groupingValidationMessage,
+  parseGroupingInput,
+  validateGroupingForMeter,
+} from '../groupingUtils'
+import { COMMON_METERS, repeatLabel } from '../sectionDefaults'
+import {
+  applyMeterChange,
+  meterNeedsFeelPrompt,
+  resolveSectionTiming,
+  subdivisionOptionsForMeter,
+  tempoRampLabel,
+} from '../timeSignatureLogic'
 import type { SectionSubdivision, TimelineSection } from '../types'
+import SectionAccentEditor from './SectionAccentEditor'
 
-const SUBDIVISION_OPTIONS: { id: SectionSubdivision; label: string }[] = [
-  { id: 'auto', label: 'Auto' },
-  { id: 'off', label: 'Pulse only' },
-  { id: '8ths', label: '8ths' },
-  { id: '16ths', label: '16ths' },
-  { id: 'triplets', label: 'Triplets' },
-]
+const SUBDIVISION_LABELS: Record<MetronomeSubdivision, string> = {
+  off: 'Pulse only',
+  '8ths': '8ths',
+  '16ths': '16ths',
+  triplets: 'Triplets',
+  dotted: 'Dotted',
+  quints: 'Quints',
+  septuplets: '7-tuplets',
+}
 
 interface TimelineSectionEditorProps {
   section: TimelineSection
@@ -26,7 +41,47 @@ export default function TimelineSectionEditor({
   onClose,
 }: TimelineSectionEditorProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [groupingDraft, setGroupingDraft] = useState(
+    () => section.advanced?.beatGrouping?.length ? formatGrouping(section.advanced.beatGrouping) : '',
+  )
   const timing = useMemo(() => resolveSectionTiming(section), [section])
+  const rampLabel = tempoRampLabel(section)
+
+  const subdivisionChoices = useMemo(() => {
+    const available = subdivisionOptionsForMeter(section.meter)
+    const choices: { id: SectionSubdivision; label: string }[] = [{ id: 'auto', label: 'Auto' }]
+    for (const value of available) {
+      choices.push({ id: value, label: SUBDIVISION_LABELS[value] ?? value })
+    }
+    return choices
+  }, [section.meter])
+
+  const accentLevels =
+    section.advanced?.customAccents?.length
+      ? section.advanced.customAccents
+      : timing.accentLevels
+
+  const applyCustomGrouping = (text: string) => {
+    setGroupingDraft(text)
+    const parsed = parseGroupingInput(text)
+    if (!parsed) {
+      if (!text.trim()) {
+        onChange({
+          advanced: { ...section.advanced, beatGrouping: undefined },
+        })
+      }
+      return
+    }
+    if (!validateGroupingForMeter(parsed, section.meter)) return
+    onChange({
+      feelId: undefined,
+      advanced: {
+        ...section.advanced,
+        beatGrouping: parsed,
+        customAccents: undefined,
+      },
+    })
+  }
 
   return (
     <div className="practice-timeline-editor pointer-events-auto">
@@ -126,8 +181,18 @@ export default function TimelineSectionEditor({
                   key={option.id}
                   type="button"
                   intensity="soft"
-                  className={`practice-timeline-editor__chip ${section.feelId === option.id || (!section.feelId && option.id === timing.feelOptions[0]?.id) ? 'practice-timeline-editor__chip--active' : ''}`}
-                  onClick={() => onChange({ feelId: option.id })}
+                  className={`practice-timeline-editor__chip ${section.feelId === option.id || (!section.feelId && !section.advanced?.beatGrouping?.length && option.id === timing.feelOptions[0]?.id) ? 'practice-timeline-editor__chip--active' : ''}`}
+                  onClick={() => {
+                    setGroupingDraft('')
+                    onChange({
+                      feelId: option.id,
+                      advanced: {
+                        ...section.advanced,
+                        beatGrouping: undefined,
+                        customAccents: undefined,
+                      },
+                    })
+                  }}
                 >
                   {option.label}
                 </Pressable>
@@ -137,9 +202,21 @@ export default function TimelineSectionEditor({
         ) : null}
 
         <div className="practice-timeline-editor__field">
+          <span className="practice-timeline-editor__label">Custom grouping</span>
+          <input
+            className="practice-timeline-editor__input"
+            value={groupingDraft}
+            onChange={(e) => applyCustomGrouping(e.target.value)}
+            placeholder="e.g. 2+2+3"
+            inputMode="text"
+          />
+          <p className="practice-timeline-editor__hint">{groupingValidationMessage(section.meter)}</p>
+        </div>
+
+        <div className="practice-timeline-editor__field">
           <span className="practice-timeline-editor__label">Subdivision</span>
           <div className="practice-timeline-editor__chips">
-            {SUBDIVISION_OPTIONS.map((option) => (
+            {subdivisionChoices.map((option) => (
               <Pressable
                 key={option.id}
                 type="button"
@@ -154,20 +231,44 @@ export default function TimelineSectionEditor({
         </div>
 
         <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">Repeat</span>
-          <div className="practice-timeline-editor__chips">
-            {REPEAT_OPTIONS.map((option) => (
-              <Pressable
-                key={option.id}
-                type="button"
-                intensity="soft"
-                className={`practice-timeline-editor__chip ${section.repeat === option.id ? 'practice-timeline-editor__chip--active' : ''}`}
-                onClick={() => onChange({ repeat: option.id })}
-              >
-                {option.label}
-              </Pressable>
-            ))}
+          <span className="practice-timeline-editor__label">Repeat section</span>
+          <div className="practice-timeline-editor__stepper">
+            <Pressable
+              type="button"
+              intensity="icon"
+              className="practice-timeline-editor__stepper-btn"
+              onClick={() => onChange({ repeatCount: Math.max(1, section.repeatCount - 1) })}
+            >
+              −
+            </Pressable>
+            <span className="practice-timeline-editor__stepper-value">{repeatLabel(section.repeatCount)}</span>
+            <Pressable
+              type="button"
+              intensity="icon"
+              className="practice-timeline-editor__stepper-btn"
+              onClick={() => onChange({ repeatCount: Math.min(16, section.repeatCount + 1) })}
+            >
+              +
+            </Pressable>
           </div>
+        </div>
+
+        <div className="practice-timeline-editor__field">
+          <span className="practice-timeline-editor__label">Accents</span>
+          <p className="practice-timeline-editor__hint">Tap a beat to cycle: weak → medium → strong → silent</p>
+          <SectionAccentEditor
+            meter={section.meter}
+            accentLevels={accentLevels}
+            onChange={(customAccents) =>
+              onChange({
+                advanced: {
+                  ...section.advanced,
+                  customAccents,
+                  beatGrouping: section.advanced?.beatGrouping,
+                },
+              })
+            }
+          />
         </div>
 
         <Pressable
@@ -177,12 +278,13 @@ export default function TimelineSectionEditor({
           onClick={() => setShowAdvanced((v) => !v)}
         >
           {showAdvanced ? <ChevronUp size={16} className="mr-1 inline" /> : <ChevronDown size={16} className="mr-1 inline" />}
-          Advanced
+          More options
         </Pressable>
 
         {showAdvanced ? (
           <div className="practice-timeline-editor__field">
-            <span className="practice-timeline-editor__label">Count-in (bars)</span>
+            <span className="practice-timeline-editor__label">Section count-in (bars)</span>
+            <p className="practice-timeline-editor__hint">Overrides routine count-in for this section only.</p>
             <div className="practice-timeline-editor__stepper">
               <Pressable
                 type="button"
@@ -210,7 +312,7 @@ export default function TimelineSectionEditor({
                   onChange({
                     advanced: {
                       ...section.advanced,
-                      countInBars: Math.min(4, (section.advanced?.countInBars ?? 0) + 1),
+                      countInBars: Math.min(8, (section.advanced?.countInBars ?? 0) + 1),
                     },
                   })
                 }
@@ -219,7 +321,7 @@ export default function TimelineSectionEditor({
               </Pressable>
             </div>
 
-            <span className="practice-timeline-editor__label mt-4">Tempo ramp</span>
+            <span className="practice-timeline-editor__label mt-4">Tempo change</span>
             <div className="practice-timeline-editor__chips">
               <Pressable
                 type="button"
@@ -237,7 +339,7 @@ export default function TimelineSectionEditor({
                   })
                 }
               >
-                {section.advanced?.tempoRamp?.enabled ? 'On' : 'Off'}
+                {section.advanced?.tempoRamp?.enabled ? rampLabel ?? 'On' : 'Off'}
               </Pressable>
             </div>
 
@@ -262,7 +364,7 @@ export default function TimelineSectionEditor({
                   −
                 </Pressable>
                 <span className="practice-timeline-editor__stepper-value">
-                  → {section.advanced?.tempoRamp?.endBpm ?? section.bpm}
+                  {rampLabel ?? `→ ${section.advanced?.tempoRamp?.endBpm ?? section.bpm}`}
                 </span>
                 <Pressable
                   type="button"

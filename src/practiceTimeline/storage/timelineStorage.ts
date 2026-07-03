@@ -1,5 +1,6 @@
 import type { PracticeTimeline, PracticeTimelineExport, TimelineSection } from '../types'
 import { createEmptyTimeline, createTimelineId } from '../sectionDefaults'
+import { normalizeTimeline } from '../timelineNormalize'
 
 const STORAGE_KEY = 'besttake:practice-timelines'
 const ACTIVE_KEY = 'besttake:practice-timeline-active'
@@ -10,7 +11,7 @@ function readAll(): PracticeTimeline[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as PracticeTimeline[]
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? parsed.map(normalizeTimeline) : []
   } catch {
     return []
   }
@@ -40,7 +41,7 @@ export function getTimelineById(id: string): PracticeTimeline | undefined {
 }
 
 export function saveTimeline(timeline: PracticeTimeline): PracticeTimeline {
-  const next = { ...timeline, updatedAt: Date.now() }
+  const next = normalizeTimeline({ ...timeline, updatedAt: Date.now() })
   const all = readAll()
   const index = all.findIndex((item) => item.id === next.id)
   if (index >= 0) all[index] = next
@@ -98,7 +99,7 @@ export function importTimeline(json: string): PracticeTimeline {
   const timeline =
     'version' in parsed && parsed.version === 1 ? parsed.timeline : (parsed as PracticeTimeline)
   const now = Date.now()
-  return saveTimeline({
+  return saveTimeline(normalizeTimeline({
     ...timeline,
     id: createTimelineId(),
     createdAt: now,
@@ -107,7 +108,7 @@ export function importTimeline(json: string): PracticeTimeline {
       ...section,
       id: `${section.id}-imported-${now}`,
     })),
-  })
+  }))
 }
 
 export async function shareTimelineExport(timeline: PracticeTimeline): Promise<void> {

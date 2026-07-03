@@ -1,7 +1,17 @@
 import type { MetronomeMeter, MetronomeSubdivision, MetronomeAccentLevel } from '../utils/metronomeConfig'
 
 export type SectionSubdivision = 'auto' | MetronomeSubdivision
-export type SectionRepeat = 'none' | '2x' | '3x' | '4x'
+
+export type CountInWhen = 'start' | 'every-loop'
+
+export interface PracticeTrackSettings {
+  /** 0 = off. Uses first section meter/tempo when counting in. */
+  countInBars: number
+  /** When to play count-in during a session. */
+  countInWhen: CountInWhen
+  /** Loop the full routine when the last section ends. */
+  loopTrack: boolean
+}
 
 export interface TempoRamp {
   enabled: boolean
@@ -15,6 +25,7 @@ export interface SectionAdvanced {
   swing?: number
   clickSoundId?: string
   pickupMeasure?: boolean
+  /** Per-section count-in overrides track count-in when > 0. */
   countInBars?: number
   color?: string
   markerNotes?: string
@@ -28,7 +39,8 @@ export interface TimelineSection {
   meter: MetronomeMeter
   feelId?: string
   subdivision: SectionSubdivision
-  repeat: SectionRepeat
+  /** How many times this section plays in a row (1 = once). */
+  repeatCount: number
   advanced?: SectionAdvanced
 }
 
@@ -37,6 +49,7 @@ export interface PracticeTimeline {
   name: string
   sections: TimelineSection[]
   favorite: boolean
+  settings?: PracticeTrackSettings
   createdAt: number
   updatedAt: number
 }
@@ -51,12 +64,16 @@ export interface PracticeTimelineMarker {
 }
 
 export interface TimelinePlaybackState {
+  sessionActive: boolean
   playing: boolean
   finished: boolean
   sectionIndex: number
   measure: number
   totalMeasuresInSection: number
   elapsedSeconds: number
+  tempoScale: number
+  effectiveBpm: number
+  countInActive: boolean
 }
 
 export const PRACTICE_TIMELINE_EXPORT_VERSION = 1

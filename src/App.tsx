@@ -3014,7 +3014,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   } ${
                     isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
                   } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${
-                    isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline' : ''
+                    isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline app-ui-overlay--audio-practice-metronome' : ''
                   }`}
                   aria-hidden={hudModalState === 'review'}
                   animate={{

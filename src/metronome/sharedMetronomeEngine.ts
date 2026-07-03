@@ -4,6 +4,7 @@ import { metronomeSpeakerGain } from '../utils/playbackVolume'
 import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import { scheduleMetronomeClick } from '../utils/metronomeClickSounds'
 import {
+  cycleAccentLevel,
   resolveUiTick,
   secondsPerSchedulerTick,
   ticksPerBar,
@@ -424,7 +425,7 @@ class SharedMetronomeEngine {
       this.snapshot.feelId,
     )
     const current = levels[beatIndex] ?? 'weak'
-    levels[beatIndex] = current === 'weak' ? 'medium' : current === 'medium' ? 'strong' : 'weak'
+    levels[beatIndex] = cycleAccentLevel(current)
     this.setAccentLevels(levels)
   }
 
@@ -454,25 +455,28 @@ class SharedMetronomeEngine {
   }
 
   /** Apply section settings during timeline playback without overwriting saved metronome prefs. */
-  applySectionConfig = (config: {
-    bpm: number
-    meter: MetronomeMeter
-    subdivision: MetronomeSubdivision
-    feelId?: string
-    accentLevels: MetronomeAccentLevel[]
-    soundId?: string
-  }): void => {
+  applySectionConfig = (
+    config: {
+      bpm: number
+      meter: MetronomeMeter
+      subdivision: MetronomeSubdivision
+      feelId?: string
+      accentLevels: MetronomeAccentLevel[]
+      soundId?: string
+    },
+    options?: { resetBeat?: boolean },
+  ): void => {
     const nextBpm = clampBpm(config.bpm)
     const levels = normalizeAccentLevels(config.meter, config.accentLevels, config.feelId)
-    this.tickCounter = 0
+    const resetBeat = options?.resetBeat !== false
+    if (resetBeat) this.tickCounter = 0
     this.patchState({
       bpm: nextBpm,
       meter: config.meter,
       subdivision: config.subdivision,
       feelId: config.feelId,
       accentLevels: levels,
-      beatIndex: 0,
-      subTickIndex: 0,
+      ...(resetBeat ? { beatIndex: 0, subTickIndex: 0 } : {}),
       ...(config.soundId ? { soundId: config.soundId } : {}),
     })
   }
@@ -590,7 +594,9 @@ class SharedMetronomeEngine {
           subdivision,
           this.snapshot.accentLevels,
         )
-        scheduleMetronomeClick(activeCtx, beatTime, tier, outputNode, muted, sound)
+        if (tier) {
+          scheduleMetronomeClick(activeCtx, beatTime, tier, outputNode, muted, sound)
+        }
 
         if (beatTime - activeCtx.currentTime <= SCHEDULE_AHEAD_SEC) {
           const uiTick = resolveUiTick(meter, tickInBar, subdivision)

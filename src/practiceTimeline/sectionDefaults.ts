@@ -1,5 +1,5 @@
 import type { MetronomeMeter } from '../utils/metronomeConfig'
-import type { PracticeTimeline, SectionRepeat, TimelineSection } from './types'
+import type { PracticeTimeline, TimelineSection } from './types'
 
 let sectionCounter = 0
 
@@ -16,7 +16,7 @@ export function createDefaultSection(overrides?: Partial<TimelineSection>): Time
     bpm: 80,
     meter: '4/4',
     subdivision: 'auto',
-    repeat: 'none',
+    repeatCount: 1,
     ...overrides,
   }
 }
@@ -32,6 +32,11 @@ export function createEmptyTimeline(name = 'My Practice'): PracticeTimeline {
     name,
     sections: [],
     favorite: false,
+    settings: {
+      countInBars: 0,
+      countInWhen: 'start',
+      loopTrack: false,
+    },
     createdAt: now,
     updatedAt: now,
   }
@@ -47,24 +52,16 @@ export const COMMON_METERS: MetronomeMeter[] = [
   '12/8',
   '5/8',
   '7/8',
+  '8/8',
+  '10/8',
+  '11/8',
 ]
 
-export const REPEAT_OPTIONS: { id: SectionRepeat; label: string }[] = [
-  { id: 'none', label: 'None' },
-  { id: '2x', label: '2×' },
-  { id: '3x', label: '3×' },
-  { id: '4x', label: '4×' },
-]
+export function repeatMultiplier(repeatCount: number): number {
+  return Math.max(1, Math.min(99, Math.round(repeatCount)))
+}
 
-export function repeatMultiplier(repeat: SectionRepeat): number {
-  switch (repeat) {
-    case '2x':
-      return 2
-    case '3x':
-      return 3
-    case '4x':
-      return 4
-    default:
-      return 1
-  }
+export function repeatLabel(repeatCount: number): string {
+  const count = repeatMultiplier(repeatCount)
+  return count <= 1 ? 'Once' : `${count}×`
 }

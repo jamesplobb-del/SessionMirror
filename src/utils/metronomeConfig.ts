@@ -337,7 +337,7 @@ export function resolveClickTierWithAccents(
   tickIndexInBar: number,
   subdivision: MetronomeSubdivision,
   accentLevels: MetronomeAccentLevel[],
-): MetronomeClickTier {
+): MetronomeClickTier | null {
   return resolveClickTier({ meter, subdivision, accentLevels }, tickIndexInBar)
 }
 

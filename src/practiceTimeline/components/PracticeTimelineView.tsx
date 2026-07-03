@@ -7,9 +7,10 @@ import { describeSection, timelineSummaryLines } from '../naturalLanguage'
 import { stashPendingMarkers } from '../recording/timelineMarkers'
 import { effectiveBars } from '../timeSignatureLogic'
 import TimelineLibrarySheet from './TimelineLibrarySheet'
-import TimelinePlaybackView from './TimelinePlaybackView'
+import TimelinePracticeSessionView from './TimelinePracticeSessionView'
 import TimelineSectionCard from './TimelineSectionCard'
 import TimelineSectionEditor from './TimelineSectionEditor'
+import TrackSettingsPanel from './TrackSettingsPanel'
 
 export interface PracticeTimelineViewProps {
   isRecording?: boolean
@@ -32,12 +33,35 @@ export default function PracticeTimelineView({
     duplicateSection,
     reorderSections,
     loadTimeline,
+    renameTimeline,
+    updateTrackSettings,
   } = usePracticeTimeline()
 
-  const { playbackState, start, stop, currentSection, nextSection } = useTimelinePlayback()
+  const {
+    playbackState,
+    prepareSession,
+    togglePlay,
+    exitSession,
+    resetSession,
+    adjustTempoScale,
+    goToSection,
+    skipSection,
+    sessionTimeline,
+    currentSection,
+    nextSection,
+  } = useTimelinePlayback()
+
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [recordEnabled, setRecordEnabled] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [nameDraft, setNameDraft] = useState(timeline.name)
+
+  const trackSettings = {
+    countInBars: timeline.settings?.countInBars ?? 0,
+    countInWhen: timeline.settings?.countInWhen ?? 'start',
+    loopTrack: timeline.settings?.loopTrack ?? false,
+  }
 
   const maxBars = useMemo(
     () => Math.max(1, ...timeline.sections.map((s) => effectiveBars(s))),
@@ -46,33 +70,40 @@ export default function PracticeTimelineView({
   const summaryLines = useMemo(() => timelineSummaryLines(timeline), [timeline])
   const editingSection = timeline.sections.find((s) => s.id === editingSectionId)
 
-  const handleStart = async () => {
+  const beginSession = (startSectionIndex = 0) => {
     if (timeline.sections.length === 0) return
     if (recordEnabled && !isRecording) onStartRecording?.()
 
-    await start(timeline, {
+    prepareSession(timeline, {
+      startSectionIndex,
       onFinished: (markers) => {
         if (recordEnabled) {
           stashPendingMarkers(markers)
           if (isRecording) onStopRecording?.()
         }
+        if (!trackSettings.loopTrack) exitSession()
       },
     })
   }
 
-  const handleStop = () => {
-    stop()
+  const handleExitSession = () => {
+    exitSession()
     if (recordEnabled && isRecording) onStopRecording?.()
   }
 
-  if (playbackState.playing) {
+  if (playbackState.sessionActive && sessionTimeline) {
     return (
-      <TimelinePlaybackView
-        section={currentSection}
+      <TimelinePracticeSessionView
+        timeline={sessionTimeline}
+        playbackState={playbackState}
+        currentSection={currentSection}
         nextSection={nextSection}
-        measure={playbackState.measure}
-        totalMeasures={playbackState.totalMeasuresInSection}
-        onStop={handleStop}
+        onTogglePlay={() => void togglePlay()}
+        onExit={handleExitSession}
+        onReset={resetSession}
+        onAdjustTempoScale={adjustTempoScale}
+        onGoToSection={goToSection}
+        onSkipSection={skipSection}
       />
     )
   }
@@ -89,15 +120,43 @@ export default function PracticeTimelineView({
 
       <div className="practice-timeline__scroll">
         <header className="practice-timeline__hero">
-          <h1 className="practice-timeline__hero-title">
-            {timeline.sections.length === 0 ? 'Create Your Practice' : timeline.name}
-          </h1>
+          {renaming ? (
+            <input
+              className="practice-timeline__hero-rename"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={() => {
+                renameTimeline(nameDraft)
+                setRenaming(false)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  renameTimeline(nameDraft)
+                  setRenaming(false)
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <Pressable type="button" intensity="soft" onClick={() => {
+              setNameDraft(timeline.name)
+              setRenaming(true)
+            }}>
+              <h1 className="practice-timeline__hero-title">
+                {timeline.sections.length === 0 ? 'Create Your Practice' : timeline.name}
+              </h1>
+            </Pressable>
+          )}
           <p className="practice-timeline__hero-sub">
             {timeline.sections.length === 0
               ? 'Add sections like a playlist'
               : `${timeline.sections.length} sections`}
           </p>
         </header>
+
+        {timeline.sections.length > 0 ? (
+          <TrackSettingsPanel settings={trackSettings} onChange={updateTrackSettings} />
+        ) : null}
 
         {timeline.sections.map((section, index) => (
           <Fragment key={section.id}>
@@ -108,6 +167,7 @@ export default function PracticeTimelineView({
               index={index}
               isDragging={dragIndex === index}
               onPress={() => setEditingSectionId(section.id)}
+              onPlayFrom={() => beginSession(index)}
               onDuplicate={() => duplicateSection(section.id)}
               onDelete={() => deleteSection(section.id)}
               onDragStart={setDragIndex}
@@ -168,7 +228,7 @@ export default function PracticeTimelineView({
           haptic="success"
           className="practice-timeline__footer-btn practice-timeline__footer-btn--primary"
           disabled={timeline.sections.length === 0}
-          onClick={() => void handleStart()}
+          onClick={() => beginSession(0)}
         >
           Start Practice
         </Pressable>

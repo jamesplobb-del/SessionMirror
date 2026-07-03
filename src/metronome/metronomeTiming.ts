@@ -100,7 +100,8 @@ export function resolveUiTick(
 export function accentLevelToClickTier(
   beatIndex: number,
   level: MetronomeAccentLevel,
-): MetronomeClickTier {
+): MetronomeClickTier | null {
+  if (level === 'silent') return null
   if (level === 'weak') return 'subdivision'
   if (level === 'strong' && beatIndex === 0) return 'downbeat'
   return 'macro'
@@ -109,7 +110,7 @@ export function accentLevelToClickTier(
 export function resolveClickTier(
   state: MetronomeTimingState,
   tickIndexInBar: number,
-): MetronomeClickTier {
+): MetronomeClickTier | null {
   const { meter, subdivision, accentLevels } = state
   const pulseTicks = ticksPerPulse(meter, subdivision)
   const tickInPulse = tickIndexInBar % pulseTicks
@@ -151,7 +152,7 @@ export function suggestSubdivisionForMeterChange(
 }
 
 export function accentLevelsToLegacyPattern(levels: MetronomeAccentLevel[]): boolean[] {
-  return levels.map((level) => level !== 'weak')
+  return levels.map((level) => level === 'strong' || level === 'medium')
 }
 
 export function legacyPatternToAccentLevels(
@@ -182,6 +183,7 @@ export function getAccentLevelsFromDefaults(
 export function cycleAccentLevel(current: MetronomeAccentLevel): MetronomeAccentLevel {
   if (current === 'weak') return 'medium'
   if (current === 'medium') return 'strong'
+  if (current === 'strong') return 'silent'
   return 'weak'
 }
 

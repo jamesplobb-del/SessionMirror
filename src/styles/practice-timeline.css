@@ -446,3 +446,316 @@
 .app-ui-overlay--audio-practice-timeline .audio-practice-timeline-layer {
   flex: 1;
 }
+
+/* Practice session — metronome-style playback */
+.practice-timeline-session__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.35rem var(--audio-space-md) 0;
+}
+
+.practice-timeline-session__section-title {
+  margin: 0;
+  font-size: clamp(1.1rem, 3vh, 1.35rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.practice-timeline-session__measure {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--audio-text-secondary);
+}
+
+.practice-timeline-session__timing {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--audio-text-tertiary, var(--audio-text-secondary));
+  opacity: 0.85;
+}
+
+.practice-timeline-session__next {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  color: var(--audio-text-secondary);
+  opacity: 0.8;
+}
+
+.practice-timeline__hero-rename {
+  width: 100%;
+  text-align: center;
+  font-size: clamp(1.35rem, 4vh, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--audio-gold);
+  color: inherit;
+  padding: 0.15rem 0;
+}
+
+.practice-timeline__track-settings {
+  margin: 0.5rem var(--audio-space-md) 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  background: var(--audio-surface);
+  border: 1px solid var(--audio-divider);
+}
+
+.practice-timeline__track-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.practice-timeline__track-settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.practice-timeline__track-settings-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--audio-text-secondary);
+}
+
+.practice-timeline__track-settings-stepper {
+  flex-shrink: 0;
+}
+
+.practice-timeline__track-settings-loop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--audio-divider);
+}
+
+.practice-timeline-editor__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--audio-text-secondary);
+  opacity: 0.85;
+}
+
+.practice-timeline-editor__accent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.practice-timeline-editor__accent-beat {
+  min-width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-surface);
+}
+
+.practice-timeline-editor__accent-beat--strong {
+  border-color: var(--audio-gold-border);
+  background: var(--audio-gold-soft);
+  color: var(--audio-gold);
+}
+
+.practice-timeline-editor__accent-beat--medium {
+  border-color: color-mix(in srgb, var(--audio-gold) 45%, var(--audio-divider));
+  background: color-mix(in srgb, var(--audio-gold-soft) 60%, transparent);
+}
+
+.practice-timeline-editor__accent-beat--silent {
+  opacity: 0.35;
+  border-style: dashed;
+}
+
+.practice-timeline__section-action--play {
+  color: var(--audio-blue);
+}
+
+.practice-timeline-session__scale {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--audio-text-secondary);
+}
+
+.practice-timeline-session__section-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem var(--audio-space-md) 0.25rem;
+}
+
+.practice-timeline-session__section-strip {
+  display: flex;
+  flex: 1;
+  gap: 0.4rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 0.15rem 0;
+}
+
+.practice-timeline-session__section-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.practice-timeline-session__section-pill {
+  flex-shrink: 0;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--audio-divider);
+  background: var(--audio-surface);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--audio-text-secondary);
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.practice-timeline-session__section-pill--active {
+  border-color: var(--audio-gold-border);
+  background: var(--audio-gold-soft);
+  color: var(--audio-gold);
+}
+
+/* Measure progress with tick marks */
+.practice-timeline-session__measure-progress {
+  padding: 0.35rem var(--audio-space-md) 0.15rem;
+}
+
+.practice-timeline-session__measure-track {
+  position: relative;
+  height: 0.32rem;
+  border-radius: 999px;
+  background: var(--audio-divider);
+  overflow: visible;
+}
+
+.practice-timeline-session__measure-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--audio-gold), #ffbe3d);
+  transition: width 0.25s ease;
+  pointer-events: none;
+}
+
+.practice-timeline-session__measure-tick {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 0.65rem;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--audio-text-secondary) 55%, transparent);
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.practice-timeline-session__measure-tick--past {
+  background: color-mix(in srgb, var(--audio-gold) 70%, var(--audio-text-secondary));
+}
+
+.practice-timeline-session__measure-tick--active {
+  width: 3px;
+  height: 0.85rem;
+  margin-left: -1.5px;
+  background: var(--audio-gold);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--audio-gold) 50%, transparent);
+}
+
+.practice-timeline-session__measure-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--audio-text-secondary);
+  opacity: 0.75;
+}
+
+.practice-timeline-session__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0.25rem 0 0;
+}
+
+.practice-timeline-session__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.practice-timeline-session__tempo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.practice-timeline-session__tempo-btn {
+  flex-shrink: 0;
+}
+
+.practice-timeline-session__tempo-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 5.5rem;
+  line-height: 1.1;
+}
+
+.practice-timeline-session__tempo-value {
+  font-size: clamp(1.5rem, 4.5vh, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-timeline-session__tempo-unit {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--audio-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.practice-timeline-session__tempo-scale {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--audio-gold);
+}
+
+.practice-timeline-session__progress {
+  height: 0.28rem;
+  margin: 0.35rem var(--audio-space-md) 0.5rem;
+  border-radius: 999px;
+  background: var(--audio-divider);
+  overflow: hidden;
+}
+
+.practice-timeline-session__progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--audio-gold), #ffbe3d);
+  transition: width 0.25s ease;
+}

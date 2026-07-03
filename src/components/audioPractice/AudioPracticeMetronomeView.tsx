@@ -2,16 +2,12 @@ import { Minus, Pause, Play, Plus } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useMetronome } from '../../hooks/useMetronome'
 import { useTapTempo } from '../../hooks/useTapTempo'
-import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import {
   triggerLightHaptic,
   triggerMetronomeTapHaptic,
   triggerMetronomeToggleHaptic,
 } from '../../utils/haptics'
 import {
-  getBeatsPerBar,
-  isCompoundMeter,
-  subTicksPerPulse,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../../utils/metronomeConfig'
@@ -26,6 +22,7 @@ import {
   type AudioPracticeClickSoundId,
 } from './audioPracticeMetronome'
 import MetronomeAudioSelect from './MetronomeAudioSelect'
+import MetronomeBeatDisplay from './MetronomeBeatDisplay'
 
 const TEMPO_DEGREES_PER_BPM = 7
 
@@ -76,7 +73,6 @@ function PracticeControlButton({
 
 export default function AudioPracticeMetronomeView() {
   const bpmInputId = useId()
-  const prefersReducedMotion = usePrefersReducedMotion()
   const didNormalizeBpmRef = useRef(false)
   const tempoDragRef = useRef<{
     pointerId: number
@@ -95,17 +91,12 @@ export default function AudioPracticeMetronomeView() {
     meter,
     subdivision,
     feelId,
-    accentPattern,
     soundId,
     playing,
-    beatIndex,
-    subTickIndex,
-    beatPulseId,
     setBpm,
     setMeter,
     setSubdivision,
     setFeel,
-    toggleBeatAccent,
     setSoundId,
     togglePlay,
     stop,
@@ -125,11 +116,8 @@ export default function AudioPracticeMetronomeView() {
     { minBpm: AUDIO_PRACTICE_MIN_BPM, maxBpm: AUDIO_PRACTICE_MAX_BPM },
   )
 
-  const beatsPerBar = getBeatsPerBar(meter)
-  const compoundMeter = isCompoundMeter(meter)
   const feelOptions = getPracticeFeelOptions(meter)
   const rhythmOptions = getPracticeRhythmOptions(meter)
-  const subNotchCount = subTicksPerPulse(meter, subdivision)
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -180,14 +168,6 @@ export default function AudioPracticeMetronomeView() {
       setFeel(nextFeelId)
     },
     [feelId, setFeel],
-  )
-
-  const handleBeatAccentToggle = useCallback(
-    (beat: number) => {
-      triggerLightHaptic()
-      toggleBeatAccent(beat)
-    },
-    [toggleBeatAccent],
   )
 
   const handleSoundChange = useCallback(
@@ -286,14 +266,6 @@ export default function AudioPracticeMetronomeView() {
     }
     setEditingBpm(false)
   }, [bpmDraft, setPracticeBpm])
-
-  const isMainBeatPulse = playing && subTickIndex === 0
-  const isAccentedPulse = isMainBeatPulse && Boolean(accentPattern[beatIndex])
-  const pulseClass = isAccentedPulse
-    ? beatIndex === 0
-      ? 'audio-practice-metronome__pulse--accent'
-      : 'audio-practice-metronome__pulse--beat'
-    : 'audio-practice-metronome__pulse--beat'
 
   return (
     <div
@@ -436,109 +408,7 @@ export default function AudioPracticeMetronomeView() {
           </div>
         </section>
 
-        <div className="audio-practice-metronome__center-stack min-h-0 flex-1">
-          <div className="metronome-audio-stage__beats min-h-0 flex-1" aria-live="polite" aria-atomic>
-          <div className="audio-practice-metronome__visual audio-practice-metronome__visual--large">
-            <div
-              key={beatPulseId}
-              className={[
-                'audio-practice-metronome__pulse',
-                playing ? pulseClass : '',
-                playing && beatPulseId > 0 && !prefersReducedMotion
-                  ? 'audio-practice-metronome__pulse--animate'
-                  : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              aria-hidden
-            />
-            <div
-              className={[
-                'metronome-audio-stage__beat-row',
-                'audio-practice-metronome__beat-row',
-                compoundMeter ? 'audio-practice-metronome__beat-row--compound' : '',
-                beatsPerBar > 8 ? 'audio-practice-metronome__beat-row--compact' : '',
-                playing ? 'metronome-audio-stage__beat-row--playing' : '',
-                prefersReducedMotion ? 'metronome-audio-stage__beat-row--reduced-motion' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              role="group"
-              aria-label="Beat indicators"
-            >
-              {Array.from({ length: beatsPerBar }, (_, index) => {
-                const isBeatActive = playing && beatIndex === index
-                const isAccented = Boolean(accentPattern[index])
-                const isDownbeat = index === 0 && isAccented
-                const isMainTick = isBeatActive && subTickIndex === 0
-                const isSubTick = isBeatActive && subTickIndex > 0
-                return (
-                  <div
-                    key={`${index}-${isBeatActive ? beatPulseId : 'idle'}`}
-                    className={[
-                      'audio-practice-metronome__beat-cell',
-                      compoundMeter ? 'audio-practice-metronome__beat-cell--compound' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    <button
-                      type="button"
-                      className={[
-                        'audio-practice-metronome__beat',
-                        'audio-practice-metronome__beat-tap',
-                        'pointer-events-auto',
-                        isAccented ? 'audio-practice-metronome__beat--accented' : '',
-                        isMainTick ? 'audio-practice-metronome__beat--active' : '',
-                        isSubTick ? 'audio-practice-metronome__beat--sub-active' : '',
-                        isDownbeat ? 'audio-practice-metronome__beat--downbeat' : '',
-                        isMainTick && isAccented && index === 0
-                          ? 'audio-practice-metronome__beat--pulse'
-                          : '',
-                        isMainTick && isAccented && index > 0
-                          ? 'audio-practice-metronome__beat--pulse-soft'
-                          : '',
-                        isMainTick && !isAccented ? 'audio-practice-metronome__beat--pulse-soft' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      aria-label={`Beat ${index + 1}${isAccented ? ', accented' : ''}. Tap to toggle accent.`}
-                      aria-pressed={isAccented}
-                      onPointerUp={(event) => {
-                        if (event.button !== 0) return
-                        handleBeatAccentToggle(index)
-                      }}
-                    >
-                      <span className="audio-practice-metronome__beat-number" aria-hidden>
-                        {index + 1}
-                      </span>
-                    </button>
-                    {subNotchCount > 0 && (
-                      <div className="audio-practice-metronome__sub-notches" aria-hidden>
-                        {Array.from({ length: subNotchCount }, (_, notchIndex) => {
-                          const notchTick = notchIndex + 1
-                          const notchActive = isBeatActive && subTickIndex === notchTick
-                          return (
-                            <span
-                              key={notchTick}
-                              className={[
-                                'audio-practice-metronome__sub-notch',
-                                notchActive ? 'audio-practice-metronome__sub-notch--active' : '',
-                              ]
-                                .filter(Boolean)
-                                .join(' ')}
-                            />
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          </div>
-        </div>
+        <MetronomeBeatDisplay interactive />
       </div>
 
       <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">

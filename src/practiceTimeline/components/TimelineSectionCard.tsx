@@ -3,10 +3,11 @@ import { useState } from 'react'
 import Pressable from '../../components/ui/Pressable'
 import {
   effectiveBars,
-  repeatLabel,
   sectionBarWidth,
   subdivisionLabel,
+  tempoRampLabel,
 } from '../timeSignatureLogic'
+import { repeatLabel } from '../sectionDefaults'
 import type { TimelineSection } from '../types'
 
 interface TimelineSectionCardProps {
@@ -14,6 +15,7 @@ interface TimelineSectionCardProps {
   maxBars: number
   index: number
   onPress: () => void
+  onPlayFrom: () => void
   onDuplicate: () => void
   onDelete: () => void
   onDragStart: (index: number) => void
@@ -27,6 +29,7 @@ export default function TimelineSectionCard({
   maxBars,
   index,
   onPress,
+  onPlayFrom,
   onDuplicate,
   onDelete,
   onDragStart,
@@ -36,6 +39,7 @@ export default function TimelineSectionCard({
 }: TimelineSectionCardProps) {
   const [showActions, setShowActions] = useState(false)
   const barWidth = sectionBarWidth(section, maxBars)
+  const ramp = tempoRampLabel(section)
 
   return (
     <div
@@ -82,14 +86,27 @@ export default function TimelineSectionCard({
                 Sub: <strong>{subdivisionLabel(section)}</strong>
               </span>
               <span>
-                Repeat: <strong>{repeatLabel(section.repeat)}</strong>
+                Repeat: <strong>{repeatLabel(section.repeatCount)}</strong>
               </span>
+              {ramp ? (
+                <span>
+                  <strong>{ramp}</strong>
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
 
         {showActions ? (
           <div className="practice-timeline__section-actions" onClick={(e) => e.stopPropagation()}>
+            <Pressable
+              type="button"
+              intensity="soft"
+              className="practice-timeline__section-action practice-timeline__section-action--play"
+              onClick={onPlayFrom}
+            >
+              Play from here
+            </Pressable>
             <Pressable
               type="button"
               intensity="soft"

@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { timelinePlaybackEngine } from '../playback/timelinePlaybackEngine'
+import {
+  timelinePlaybackEngine,
+  TEMPO_SCALE_STEP,
+} from '../playback/timelinePlaybackEngine'
 import { saveTimeline, loadOrCreateActiveTimeline } from '../storage/timelineStorage'
 import { createDefaultSection } from '../sectionDefaults'
-import type { PracticeTimeline, PracticeTimelineMarker, TimelinePlaybackState, TimelineSection } from '../types'
+import { normalizeTimeline } from '../timelineNormalize'
+import type {
+  PracticeTimeline,
+  PracticeTimelineMarker,
+  PracticeTrackSettings,
+  TimelinePlaybackState,
+  TimelineSection,
+} from '../types'
 
 export function usePracticeTimeline() {
-  const [timeline, setTimeline] = useState<PracticeTimeline>(() => loadOrCreateActiveTimeline())
+  const [timeline, setTimeline] = useState<PracticeTimeline>(() =>
+    normalizeTimeline(loadOrCreateActiveTimeline()),
+  )
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
 
   const persist = useCallback((next: PracticeTimeline) => {
@@ -42,10 +54,10 @@ export function usePracticeTimeline() {
     (sectionId: string) => {
       const source = timeline.sections.find((s) => s.id === sectionId)
       if (!source) return
-      const copy = createDefaultSection({ ...source, title: `${source.title} Copy` })
+      const newSection = createDefaultSection({ ...source, title: `${source.title} Copy` })
       const index = timeline.sections.findIndex((s) => s.id === sectionId)
       const sections = [...timeline.sections]
-      sections.splice(index + 1, 0, copy)
+      sections.splice(index + 1, 0, newSection)
       persist({ ...timeline, sections })
     },
     [persist, timeline],
@@ -63,13 +75,28 @@ export function usePracticeTimeline() {
   )
 
   const loadTimeline = useCallback((next: PracticeTimeline) => {
-    saveTimeline(next)
-    setTimeline(next)
+    const saved = saveTimeline(normalizeTimeline(next))
+    setTimeline(saved)
     setEditingSectionId(null)
   }, [])
 
   const renameTimeline = useCallback(
-    (name: string) => persist({ ...timeline, name }),
+    (name: string) => persist({ ...timeline, name: name.trim() || timeline.name }),
+    [persist, timeline],
+  )
+
+  const updateTrackSettings = useCallback(
+    (patch: Partial<PracticeTrackSettings>) => {
+      persist({
+        ...timeline,
+        settings: {
+          countInBars: timeline.settings?.countInBars ?? 0,
+          countInWhen: timeline.settings?.countInWhen ?? 'start',
+          loopTrack: timeline.settings?.loopTrack ?? false,
+          ...patch,
+        },
+      })
+    },
     [persist, timeline],
   )
 
@@ -84,6 +111,7 @@ export function usePracticeTimeline() {
     reorderSections,
     loadTimeline,
     renameTimeline,
+    updateTrackSettings,
     persist,
   }
 }
@@ -102,24 +130,51 @@ export function useTimelinePlayback() {
     return () => timelinePlaybackEngine.setCallbacks({})
   }, [])
 
-  const start = useCallback(
-    async (
+  const prepareSession = useCallback(
+    (
       timeline: PracticeTimeline,
-      options?: { recordingOffsetSeconds?: number; onFinished?: (m: PracticeTimelineMarker[]) => void },
+      options?: {
+        recordingOffsetSeconds?: number
+        startSectionIndex?: number
+        onFinished?: (m: PracticeTimelineMarker[]) => void
+      },
     ) => {
       onFinishedRef.current = options?.onFinished
-      return timelinePlaybackEngine.start(timeline, options?.recordingOffsetSeconds ?? 0)
+      return timelinePlaybackEngine.prepareSession(timeline, {
+        recordingOffsetSeconds: options?.recordingOffsetSeconds,
+        startSectionIndex: options?.startSectionIndex,
+      })
     },
     [],
   )
 
-  const stop = useCallback(() => timelinePlaybackEngine.stop(), [])
+  const togglePlay = useCallback(() => timelinePlaybackEngine.togglePlay(), [])
+  const exitSession = useCallback(() => timelinePlaybackEngine.exitSession(), [])
+  const resetSession = useCallback(() => timelinePlaybackEngine.resetToBeginning(), [])
+  const setTempoScale = useCallback((scale: number) => timelinePlaybackEngine.setTempoScale(scale), [])
+  const adjustTempoScale = useCallback(
+    (delta: number) => timelinePlaybackEngine.adjustTempoScale(delta),
+    [],
+  )
+  const goToSection = useCallback((index: number) => timelinePlaybackEngine.goToSection(index), [])
+  const skipSection = useCallback(
+    (direction: -1 | 1) => timelinePlaybackEngine.skipSection(direction),
+    [],
+  )
 
   return {
     playbackState,
-    start,
-    stop,
+    prepareSession,
+    togglePlay,
+    exitSession,
+    resetSession,
+    setTempoScale,
+    adjustTempoScale,
+    goToSection,
+    skipSection,
+    sessionTimeline: timelinePlaybackEngine.getTimeline(),
     currentSection: timelinePlaybackEngine.getCurrentSection(),
     nextSection: timelinePlaybackEngine.getNextSection(),
+    tempoScaleStep: TEMPO_SCALE_STEP,
   }
 }

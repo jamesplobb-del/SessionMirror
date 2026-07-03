@@ -39,7 +39,7 @@ export type PulseUnit =
   | 'eighth'
   | 'sixteenth'
 
-export type MetronomeAccentLevel = 'strong' | 'medium' | 'weak'
+export type MetronomeAccentLevel = 'strong' | 'medium' | 'weak' | 'silent'
 
 export interface BeatFeelOption {
   id: string
@@ -275,7 +275,15 @@ export const TIME_SIGNATURE_DEFINITIONS: Record<MetronomeMeter, TimeSignatureDef
     compound: true,
     defaultSubdivision: '8ths',
     availableSubdivisions: COMPOUND_SUBDIVS,
-    defaultAccentLevels: ['strong', 'medium', 'medium'],
+    feelOptions: [
+      feel('3+3+3', '3+3+3', [3, 3, 3]),
+      feel('2+2+2+3', '2+2+2+3', [2, 2, 2, 3]),
+      feel('2+2+3+2', '2+2+3+2', [2, 2, 3, 2]),
+      feel('2+3+2+2', '2+3+2+2', [2, 3, 2, 2]),
+      feel('3+2+2+2', '3+2+2+2', [3, 2, 2, 2]),
+    ],
+    defaultFeelId: '3+3+3',
+    defaultAccentLevels: accentsFromGrouping([3, 3, 3]),
   },
   '12/8': {
     label: '12/8',
@@ -287,7 +295,13 @@ export const TIME_SIGNATURE_DEFINITIONS: Record<MetronomeMeter, TimeSignatureDef
     compound: true,
     defaultSubdivision: '8ths',
     availableSubdivisions: COMPOUND_SUBDIVS,
-    defaultAccentLevels: ['strong', 'medium', 'medium', 'medium'],
+    feelOptions: [
+      feel('3+3+3+3', '3+3+3+3', [3, 3, 3, 3]),
+      feel('2+2+2+2+2+2', '2+2+2+2+2+2', [2, 2, 2, 2, 2, 2]),
+      feel('4+4+4', '4+4+4', [4, 4, 4]),
+    ],
+    defaultFeelId: '3+3+3+3',
+    defaultAccentLevels: accentsFromGrouping([3, 3, 3, 3]),
   },
   '15/8': {
     label: '15/8',
@@ -367,6 +381,8 @@ export const TIME_SIGNATURE_DEFINITIONS: Record<MetronomeMeter, TimeSignatureDef
       feel('2+3+3+2', '2+3+3+2', [2, 3, 3, 2]),
       feel('3+2+3+2', '3+2+3+2', [3, 2, 3, 2]),
       feel('2+2+2+2+2', '2+2+2+2+2', [2, 2, 2, 2, 2]),
+      feel('5+5', '5+5', [5, 5]),
+      feel('2+2+3+3', '2+2+3+3', [2, 2, 3, 3]),
     ],
     defaultFeelId: '3+3+2+2',
     defaultAccentLevels: accentsFromGrouping([3, 3, 2, 2]),
@@ -383,6 +399,7 @@ export const TIME_SIGNATURE_DEFINITIONS: Record<MetronomeMeter, TimeSignatureDef
     availableSubdivisions: EIGHTH_PULSE_SUBDIVS,
     feelOptions: [
       feel('3+3+3+2', '3+3+3+2', [3, 3, 3, 2]),
+      feel('3+3+2+3', '3+3+2+3', [3, 3, 2, 3]),
       feel('2+3+3+3', '2+3+3+3', [2, 3, 3, 3]),
       feel('3+2+3+3', '3+2+3+3', [3, 2, 3, 3]),
       feel('2+2+3+2+2', '2+2+3+2+2', [2, 2, 3, 2, 2]),

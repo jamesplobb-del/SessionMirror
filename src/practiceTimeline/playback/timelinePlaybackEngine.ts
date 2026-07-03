@@ -1,12 +1,18 @@
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
+import { clampBpm } from '../../utils/metronomeConfig'
 import { bpmAtMeasure } from './tempoAutomation'
 import { effectiveBars, resolveSectionTiming } from '../timeSignatureLogic'
 import type {
   PracticeTimeline,
   PracticeTimelineMarker,
+  PracticeTrackSettings,
   TimelinePlaybackState,
   TimelineSection,
 } from '../types'
+
+export const TEMPO_SCALE_MIN = 0.5
+export const TEMPO_SCALE_MAX = 1.5
+export const TEMPO_SCALE_STEP = 0.05
 
 export interface TimelinePlaybackCallbacks {
   onSectionStart?: (section: TimelineSection, index: number, timeSeconds: number) => void
@@ -15,13 +21,32 @@ export interface TimelinePlaybackCallbacks {
   onStateChange?: (state: TimelinePlaybackState) => void
 }
 
+export interface PrepareSessionOptions {
+  recordingOffsetSeconds?: number
+  startSectionIndex?: number
+}
+
+function clampTempoScale(scale: number): number {
+  return Math.min(TEMPO_SCALE_MAX, Math.max(TEMPO_SCALE_MIN, scale))
+}
+
+function trackSettings(timeline: PracticeTimeline): PracticeTrackSettings {
+  return {
+    countInBars: timeline.settings?.countInBars ?? 0,
+    countInWhen: timeline.settings?.countInWhen ?? 'start',
+    loopTrack: timeline.settings?.loopTrack ?? false,
+  }
+}
+
 export class TimelinePlaybackEngine {
   private timeline: PracticeTimeline | null = null
   private sectionIndex = 0
   private measure = 1
+  private sessionActive = false
   private playing = false
   private finished = false
   private elapsedSeconds = 0
+  private tempoScale = 1
   private markers: PracticeTimelineMarker[] = []
   private callbacks: TimelinePlaybackCallbacks = {}
   private unsubscribeBar: (() => void) | null = null
@@ -33,16 +58,34 @@ export class TimelinePlaybackEngine {
     this.callbacks = callbacks
   }
 
+  private scaledBpm(baseBpm: number): number {
+    return clampBpm(Math.round(baseBpm * this.tempoScale))
+  }
+
+  private baseBpmForCurrentMeasure(section: TimelineSection): number {
+    const ramp = section.advanced?.tempoRamp
+    return bpmAtMeasure(section.bpm, this.measure, effectiveBars(section), ramp)
+  }
+
   getState(): TimelinePlaybackState {
     const section = this.timeline?.sections[this.sectionIndex]
+    const baseBpm = section ? this.baseBpmForCurrentMeasure(section) : 0
     return {
+      sessionActive: this.sessionActive,
       playing: this.playing,
       finished: this.finished,
       sectionIndex: this.sectionIndex,
       measure: this.measure,
       totalMeasuresInSection: section ? effectiveBars(section) : 0,
       elapsedSeconds: this.elapsedSeconds,
+      tempoScale: this.tempoScale,
+      effectiveBpm: section ? this.scaledBpm(baseBpm) : 0,
+      countInActive: this.countInRemaining > 0,
     }
+  }
+
+  getTimeline(): PracticeTimeline | null {
+    return this.timeline
   }
 
   getMarkers(): PracticeTimelineMarker[] {
@@ -57,70 +100,212 @@ export class TimelinePlaybackEngine {
     return this.timeline?.sections[this.sectionIndex + 1]
   }
 
-  async start(timeline: PracticeTimeline, recordingOffsetSeconds = 0): Promise<boolean> {
+  prepareSession(
+    timeline: PracticeTimeline,
+    options: PrepareSessionOptions = {},
+  ): boolean {
     if (timeline.sections.length === 0) return false
 
-    this.stop()
+    this.detachBarListener()
+    sharedMetronomeEngine.stop()
+
+    const startIndex = Math.max(
+      0,
+      Math.min(options.startSectionIndex ?? 0, timeline.sections.length - 1),
+    )
+
     this.timeline = timeline
-    this.sectionIndex = 0
+    this.sectionIndex = startIndex
     this.measure = 1
-    this.playing = true
+    this.sessionActive = true
+    this.playing = false
     this.finished = false
     this.elapsedSeconds = 0
+    this.tempoScale = 1
     this.markers = []
-    this.recordingOffsetSeconds = recordingOffsetSeconds
+    this.recordingOffsetSeconds = options.recordingOffsetSeconds ?? 0
     this.sessionStart = performance.now()
+    this.countInRemaining = 0
 
     this.applyCurrentSection()
+    this.armCountInForCurrentPosition('start')
     this.recordSectionMarker()
-
-    this.unsubscribeBar = sharedMetronomeEngine.subscribeBar(() => {
-      this.handleBarComplete()
-    })
-
-    const started = await sharedMetronomeEngine.start()
-    if (!started) {
-      this.stop()
-      return false
-    }
-
     this.emitState()
     return true
   }
 
-  stop(): void {
-    this.unsubscribeBar?.()
-    this.unsubscribeBar = null
+  async togglePlay(): Promise<boolean> {
+    if (!this.sessionActive || !this.timeline) return false
+
+    if (this.playing) {
+      this.pause()
+      return true
+    }
+
+    return this.play()
+  }
+
+  private async play(): Promise<boolean> {
+    if (!this.sessionActive || !this.timeline) return false
+
+    if (this.finished) {
+      this.resetToBeginning()
+    }
+
+    this.applyCurrentSection()
+    this.attachBarListener()
+
+    const started = await sharedMetronomeEngine.start()
+    if (!started) {
+      this.detachBarListener()
+      return false
+    }
+
+    this.playing = true
+    this.emitState()
+    return true
+  }
+
+  pause(): void {
+    if (!this.playing) return
+    this.playing = false
+    this.detachBarListener()
     sharedMetronomeEngine.stop()
+    this.emitState()
+  }
+
+  resetToBeginning(): void {
+    if (!this.timeline) return
+    const wasPlaying = this.playing
+    if (wasPlaying) {
+      this.pause()
+    }
+    this.sectionIndex = 0
+    this.measure = 1
+    this.finished = false
+    this.countInRemaining = 0
+    this.applyCurrentSection()
+    this.armCountInForCurrentPosition('start')
+    this.emitState()
+  }
+
+  exitSession(): void {
+    this.detachBarListener()
+    sharedMetronomeEngine.stop()
+    this.timeline = null
+    this.sessionActive = false
     this.playing = false
     this.finished = false
+    this.sectionIndex = 0
+    this.measure = 1
+    this.tempoScale = 1
+    this.countInRemaining = 0
     this.emitState()
+  }
+
+  stop(): void {
+    this.exitSession()
+  }
+
+  setTempoScale(scale: number): void {
+    this.tempoScale = clampTempoScale(scale)
+    if (this.sessionActive) {
+      this.applyCurrentSection({ tempoOnly: true })
+      this.emitState()
+    }
+  }
+
+  adjustTempoScale(delta: number): void {
+    this.setTempoScale(this.tempoScale + delta)
+  }
+
+  goToSection(index: number): void {
+    if (!this.timeline || index < 0 || index >= this.timeline.sections.length) return
+    if (index === this.sectionIndex && this.countInRemaining <= 0) return
+
+    this.sectionIndex = index
+    this.measure = 1
+    this.countInRemaining = 0
+    this.finished = false
+    this.applyCurrentSection()
+    this.armCountInForCurrentPosition('jump')
+    this.recordSectionMarker()
+    this.emitState()
+  }
+
+  skipSection(direction: -1 | 1): void {
+    this.goToSection(this.sectionIndex + direction)
+  }
+
+  private attachBarListener(): void {
+    this.detachBarListener()
+    this.unsubscribeBar = sharedMetronomeEngine.subscribeBar(() => {
+      this.handleBarComplete()
+    })
+  }
+
+  private detachBarListener(): void {
+    this.unsubscribeBar?.()
+    this.unsubscribeBar = null
   }
 
   private emitState(): void {
     this.callbacks.onStateChange?.(this.getState())
   }
 
-  private applyCurrentSection(): void {
+  private armCountInForCurrentPosition(context: 'start' | 'jump' | 'loop'): void {
+    const section = this.getCurrentSection()
+    if (!section || !this.timeline) return
+
+    const settings = trackSettings(this.timeline)
+    const sectionCountIn = section.advanced?.countInBars ?? 0
+    let bars = sectionCountIn
+
+    if (bars <= 0 && settings.countInBars > 0) {
+      if (sectionCountIn === 0) {
+        if (context === 'loop' && settings.countInWhen !== 'every-loop') {
+          bars = 0
+        } else if (context === 'start' && this.sectionIndex !== 0) {
+          bars = settings.countInBars
+        } else if (context === 'jump') {
+          bars = settings.countInBars
+        } else if (context === 'start' && this.sectionIndex === 0) {
+          bars = settings.countInBars
+        } else if (context === 'loop') {
+          bars = settings.countInBars
+        }
+      }
+    }
+
+    if (bars <= 0) {
+      this.countInRemaining = 0
+      return
+    }
+
+    this.countInRemaining = bars
+    if (this.measure === 1) this.measure = 0
+  }
+
+  private applyCurrentSection(options?: { tempoOnly?: boolean }): void {
     const section = this.getCurrentSection()
     if (!section) return
 
     const timing = resolveSectionTiming(section)
-    const ramp = section.advanced?.tempoRamp
-    const bpm = bpmAtMeasure(section.bpm, this.measure, effectiveBars(section), ramp)
+    const baseBpm = this.baseBpmForCurrentMeasure(section)
 
-    sharedMetronomeEngine.applySectionConfig({
-      bpm,
-      meter: timing.meter,
-      subdivision: timing.subdivision,
-      feelId: timing.feelId,
-      accentLevels: timing.accentLevels,
-      soundId: section.advanced?.clickSoundId,
-    })
+    sharedMetronomeEngine.applySectionConfig(
+      {
+        bpm: this.scaledBpm(baseBpm),
+        meter: timing.meter,
+        subdivision: timing.subdivision,
+        feelId: timing.feelId,
+        accentLevels: timing.accentLevels,
+        soundId: section.advanced?.clickSoundId,
+      },
+      { resetBeat: !options?.tempoOnly },
+    )
 
-    const countIn = section.advanced?.countInBars ?? 0
-    this.countInRemaining = countIn
-    if (countIn > 0) this.measure = 0
+    if (options?.tempoOnly) return
 
     this.callbacks.onSectionStart?.(section, this.sectionIndex, this.elapsedSeconds)
   }
@@ -128,6 +313,13 @@ export class TimelinePlaybackEngine {
   private recordSectionMarker(): void {
     const section = this.getCurrentSection()
     if (!section) return
+    const exists = this.markers.some(
+      (marker) =>
+        marker.sectionId === section.id &&
+        marker.timeSeconds === this.recordingOffsetSeconds + this.elapsedSeconds,
+    )
+    if (exists) return
+
     this.markers.push({
       sectionId: section.id,
       title: section.title,
@@ -138,8 +330,21 @@ export class TimelinePlaybackEngine {
     })
   }
 
+  private restartTrack(): void {
+    if (!this.timeline) return
+    this.sectionIndex = 0
+    this.measure = 1
+    this.finished = false
+    this.countInRemaining = 0
+    this.applyCurrentSection()
+    this.armCountInForCurrentPosition('loop')
+    this.recordSectionMarker()
+    this.emitState()
+  }
+
   private handleBarComplete(): void {
-    if (!this.playing || this.finished || !this.timeline) return
+    if (!this.playing || !this.timeline) return
+    if (this.finished) return
 
     const section = this.getCurrentSection()
     if (!section) return
@@ -164,14 +369,18 @@ export class TimelinePlaybackEngine {
 
     if (nextMeasure <= totalMeasures) {
       this.measure = nextMeasure
-      sharedMetronomeEngine.applySectionConfig({
-        bpm: bpmAtMeasure(section.bpm, this.measure, totalMeasures, ramp),
-        meter: section.meter,
-        subdivision: timing.subdivision,
-        feelId: timing.feelId,
-        accentLevels: timing.accentLevels,
-        soundId: section.advanced?.clickSoundId,
-      })
+      const baseBpm = bpmAtMeasure(section.bpm, this.measure, totalMeasures, ramp)
+      sharedMetronomeEngine.applySectionConfig(
+        {
+          bpm: this.scaledBpm(baseBpm),
+          meter: section.meter,
+          subdivision: timing.subdivision,
+          feelId: timing.feelId,
+          accentLevels: timing.accentLevels,
+          soundId: section.advanced?.clickSoundId,
+        },
+        { resetBeat: false },
+      )
       this.emitState()
       return
     }
@@ -180,11 +389,16 @@ export class TimelinePlaybackEngine {
 
     const nextIndex = this.sectionIndex + 1
     if (nextIndex >= this.timeline.sections.length) {
+      const settings = trackSettings(this.timeline)
+      if (settings.loopTrack) {
+        this.restartTrack()
+        return
+      }
+
       this.finished = true
       this.playing = false
+      this.detachBarListener()
       sharedMetronomeEngine.stop()
-      this.unsubscribeBar?.()
-      this.unsubscribeBar = null
       this.emitState()
       this.callbacks.onFinished?.(this.markers)
       return
@@ -192,7 +406,9 @@ export class TimelinePlaybackEngine {
 
     this.sectionIndex = nextIndex
     this.measure = 1
+    this.countInRemaining = 0
     this.applyCurrentSection()
+    this.armCountInForCurrentPosition('loop')
     this.recordSectionMarker()
     this.emitState()
   }

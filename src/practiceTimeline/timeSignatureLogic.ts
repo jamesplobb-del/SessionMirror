@@ -1,13 +1,17 @@
 import {
   getAccentLevelsForMeter,
   getDefaultFeelId,
+  getMeterDefaults,
+  getSubdivisionLabel,
   getTimeSignatureDefinition,
+  getAvailableSubdivisions,
   hasFeelOptions,
   suggestSubdivisionForMeterChange,
   type MetronomeAccentLevel,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
+import { formatGrouping } from './groupingUtils'
 import { repeatMultiplier } from './sectionDefaults'
 import type { TimelineSection } from './types'
 
@@ -24,11 +28,16 @@ export function resolveSubdivision(
   previousMeter?: MetronomeMeter,
 ): MetronomeSubdivision {
   if (section.subdivision !== 'auto') return section.subdivision
-  const def = getTimeSignatureDefinition(section.meter)
+
+  const defaults = getMeterDefaults(section.meter)
   if (previousMeter) {
-    return suggestSubdivisionForMeterChange(section.meter, previousMeter, def.defaultSubdivision)
+    return suggestSubdivisionForMeterChange(
+      section.meter,
+      previousMeter,
+      defaults.subdivision,
+    )
   }
-  return def.defaultSubdivision
+  return defaults.subdivision
 }
 
 export function resolveSectionTiming(section: TimelineSection): ResolvedSectionTiming {
@@ -37,18 +46,52 @@ export function resolveSectionTiming(section: TimelineSection): ResolvedSectionT
     def.feelOptions?.map((option) => ({ id: option.id, label: option.label })) ?? []
   const feelId = section.feelId ?? def.defaultFeelId
   const subdivision = resolveSubdivision(section)
+  const meterDefaults = getMeterDefaults(section.meter)
 
   let accentLevels = getAccentLevelsForMeter(section.meter, feelId)
   if (section.advanced?.customAccents?.length) {
     accentLevels = section.advanced.customAccents
   } else if (section.advanced?.beatGrouping?.length) {
     accentLevels = accentsFromGrouping(section.advanced.beatGrouping)
+  } else if (feelId) {
+    accentLevels = getAccentLevelsForMeter(section.meter, feelId)
+  } else {
+    accentLevels = meterDefaults.accentLevels
   }
 
   return { meter: section.meter, feelId, subdivision, accentLevels, feelOptions }
 }
 
-function accentsFromGrouping(grouping: number[]): MetronomeAccentLevel[] {
+export function tempoRampLabel(section: TimelineSection): string | null {
+  const ramp = section.advanced?.tempoRamp
+  if (!ramp?.enabled) return null
+  if (ramp.endBpm > section.bpm) return `Accel ${section.bpm}→${ramp.endBpm}`
+  if (ramp.endBpm < section.bpm) return `Rit. ${section.bpm}→${ramp.endBpm}`
+  return null
+}
+
+export function sectionTimingSummary(section: TimelineSection): string {
+  const timing = resolveSectionTiming(section)
+  const def = getTimeSignatureDefinition(section.meter)
+  const feel = timing.feelOptions.find((option) => option.id === timing.feelId)
+  const customGroup =
+    section.advanced?.beatGrouping?.length && !feel
+      ? formatGrouping(section.advanced.beatGrouping)
+      : null
+  const rhythm =
+    timing.subdivision === 'off'
+      ? def.pulseName
+      : getSubdivisionLabel(section.meter, timing.subdivision)
+  const ramp = tempoRampLabel(section)
+  const parts: string[] = [section.meter]
+  if (feel) parts.push(feel.label)
+  else if (customGroup) parts.push(customGroup)
+  parts.push(rhythm)
+  if (ramp) parts.push(ramp)
+  return parts.join(' · ')
+}
+
+export function accentsFromGrouping(grouping: number[]): MetronomeAccentLevel[] {
   const levels: MetronomeAccentLevel[] = []
   for (let groupIndex = 0; groupIndex < grouping.length; groupIndex += 1) {
     const groupAccent: MetronomeAccentLevel = groupIndex === 0 ? 'strong' : 'medium'
@@ -69,6 +112,11 @@ export function applyMeterChange(
     meter: nextMeter,
     feelId: def.defaultFeelId,
     subdivision: section.subdivision === 'auto' ? 'auto' : section.subdivision,
+    advanced: {
+      ...section.advanced,
+      beatGrouping: undefined,
+      customAccents: undefined,
+    },
   }
 }
 
@@ -77,25 +125,15 @@ export function subdivisionLabel(section: TimelineSection): string {
   const resolved = resolveSubdivision(section)
   const def = getTimeSignatureDefinition(section.meter)
   if (resolved === 'off') return def.pulseName
-  switch (resolved) {
-    case '8ths':
-      return '8ths'
-    case '16ths':
-      return '16ths'
-    case 'triplets':
-      return 'Triplets'
-    default:
-      return resolved
-  }
+  return getSubdivisionLabel(section.meter, resolved)
 }
 
-export function repeatLabel(repeat: TimelineSection['repeat']): string {
-  if (repeat === 'none') return 'None'
-  return repeat.toUpperCase()
+export function subdivisionOptionsForMeter(meter: MetronomeMeter): MetronomeSubdivision[] {
+  return getAvailableSubdivisions(meter)
 }
 
 export function effectiveBars(section: TimelineSection): number {
-  return section.bars * repeatMultiplier(section.repeat)
+  return section.bars * repeatMultiplier(section.repeatCount)
 }
 
 export function sectionBarWidth(section: TimelineSection, maxBars: number): number {
