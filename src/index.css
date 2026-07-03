@@ -1195,6 +1195,10 @@ body.settings-branch-open * {
   background: linear-gradient(180deg, #0b1220 0%, #0f172a 52%, #020617 100%);
 }
 
+.youtube-headphones-tip {
+  top: max(1rem, calc(env(safe-area-inset-top, 0px) + 0.65rem));
+}
+
 .audio-practice-metronome-shell,
 .audio-practice-metronome {
   flex: 1;

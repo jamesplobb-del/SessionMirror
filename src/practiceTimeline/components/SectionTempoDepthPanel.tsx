@@ -9,6 +9,7 @@ import {
   type TempoRampMode,
 } from '../timelineEditorOptions'
 import type { SectionTempoMarker, TempoRampShape, TimelineSection } from '../types'
+import EditableNumberValue from './EditableNumberValue'
 import TimelineEditorSelect from './TimelineEditorSelect'
 
 interface SectionTempoDepthPanelProps {
@@ -135,7 +136,21 @@ export default function SectionTempoDepthPanel({
             >
               −
             </Pressable>
-            <span className="practice-timeline-editor__stepper-value">{ramp.endBpm}</span>
+            <EditableNumberValue
+              value={ramp.endBpm}
+              min={40}
+              max={300}
+              ariaLabel="Type end tempo"
+              onCommit={(endBpm) =>
+                updateAdvanced({
+                  tempoRamp: {
+                    enabled: true,
+                    endBpm,
+                    shape: rampShape,
+                  },
+                })
+              }
+            />
             <Pressable
               type="button"
               intensity="icon"
@@ -248,7 +263,13 @@ export default function SectionTempoDepthPanel({
                   >
                     −
                   </Pressable>
-                  <span className="practice-timeline-editor__stepper-value">{marker.bpm}</span>
+                  <EditableNumberValue
+                    value={marker.bpm}
+                    min={40}
+                    max={300}
+                    ariaLabel="Type pinned tempo"
+                    onCommit={(bpm) => updateMarker(marker.id, { bpm })}
+                  />
                   <Pressable
                     type="button"
                     intensity="icon"

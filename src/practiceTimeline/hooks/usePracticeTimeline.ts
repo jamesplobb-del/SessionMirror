@@ -152,6 +152,10 @@ export function useTimelinePlayback() {
   const exitSession = useCallback(() => timelinePlaybackEngine.exitSession(), [])
   const resetSession = useCallback(() => timelinePlaybackEngine.resetToBeginning(), [])
   const setTempoScale = useCallback((scale: number) => timelinePlaybackEngine.setTempoScale(scale), [])
+  const setCurrentEffectiveBpm = useCallback(
+    (bpm: number) => timelinePlaybackEngine.setCurrentEffectiveBpm(bpm),
+    [],
+  )
   const adjustTempoScale = useCallback(
     (delta: number) => timelinePlaybackEngine.adjustTempoScale(delta),
     [],
@@ -173,6 +177,7 @@ export function useTimelinePlayback() {
     exitSession,
     resetSession,
     setTempoScale,
+    setCurrentEffectiveBpm,
     adjustTempoScale,
     goToSection,
     seekToMeasure,

@@ -22,6 +22,7 @@ import {
   pulseSelectOptions,
 } from '../timelineEditorOptions'
 import type { MeterPatternStep, PatternRepeatMode, TimelineSection } from '../types'
+import EditableNumberValue from './EditableNumberValue'
 import TimelineEditorSelect from './TimelineEditorSelect'
 
 interface MeterPatternEditorProps {
@@ -110,7 +111,13 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
           >
             −
           </Pressable>
-          <span className="practice-timeline-editor__stepper-value">{section.bpm}</span>
+          <EditableNumberValue
+            value={section.bpm}
+            min={40}
+            max={300}
+            ariaLabel="Type tempo"
+            onCommit={(bpm) => onChange({ bpm })}
+          />
           <span className="practice-timeline-editor__hint">♩ = BPM</span>
           <Pressable
             type="button"

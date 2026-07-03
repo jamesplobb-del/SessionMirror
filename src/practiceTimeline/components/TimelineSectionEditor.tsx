@@ -28,6 +28,7 @@ import {
 } from '../timelineEditorOptions'
 import type { SectionSubdivision, TimelineSection } from '../types'
 import MeterPatternEditor from './MeterPatternEditor'
+import EditableNumberValue from './EditableNumberValue'
 import SectionAccentEditor from './SectionAccentEditor'
 import SectionTempoDepthPanel from './SectionTempoDepthPanel'
 import TimelineEditorSelect from './TimelineEditorSelect'
@@ -195,7 +196,13 @@ export default function TimelineSectionEditor({
                   >
                     −
                   </Pressable>
-                  <span className="practice-timeline-editor__stepper-value">{section.bpm}</span>
+                  <EditableNumberValue
+                    value={section.bpm}
+                    min={40}
+                    max={300}
+                    ariaLabel="Type tempo"
+                    onCommit={(bpm) => onChange({ bpm })}
+                  />
                   <Pressable
                     type="button"
                     intensity="icon"

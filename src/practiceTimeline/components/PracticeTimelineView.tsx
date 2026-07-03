@@ -44,6 +44,7 @@ export default function PracticeTimelineView({
     exitSession,
     resetSession,
     adjustTempoScale,
+    setCurrentEffectiveBpm,
     goToSection,
     seekToMeasure,
     skipSection,
@@ -103,6 +104,7 @@ export default function PracticeTimelineView({
         onExit={handleExitSession}
         onReset={resetSession}
         onAdjustTempoScale={adjustTempoScale}
+        onSetEffectiveBpm={setCurrentEffectiveBpm}
         onGoToSection={goToSection}
         onSeekMeasure={seekToMeasure}
         onSkipSection={skipSection}

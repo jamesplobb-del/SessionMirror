@@ -6,6 +6,7 @@ import { useMetronome } from '../../hooks/useMetronome'
 import Pressable from '../../components/ui/Pressable'
 import { sectionTimingSummary } from '../timeSignatureLogic'
 import type { PracticeTimeline, TimelinePlaybackState, TimelineSection } from '../types'
+import EditableNumberValue from './EditableNumberValue'
 import MeasureProgressBar from './MeasureProgressBar'
 
 interface TimelinePracticeSessionViewProps {
@@ -17,6 +18,7 @@ interface TimelinePracticeSessionViewProps {
   onExit: () => void
   onReset: () => void
   onAdjustTempoScale: (delta: number) => void
+  onSetEffectiveBpm: (bpm: number) => void
   onGoToSection: (index: number) => void
   onSeekMeasure: (measure: number) => void
   onSkipSection: (direction: -1 | 1) => void
@@ -57,6 +59,7 @@ export default function TimelinePracticeSessionView({
   onExit,
   onReset,
   onAdjustTempoScale,
+  onSetEffectiveBpm,
   onGoToSection,
   onSeekMeasure,
   onSkipSection,
@@ -160,6 +163,7 @@ export default function TimelinePracticeSessionView({
         measure={playbackState.countInActive ? 0 : playbackState.measure}
         totalMeasures={playbackState.totalMeasuresInSection}
         onSeekMeasure={onSeekMeasure}
+        disabled={playbackState.countInActive}
       />
 
       <div className="audio-practice-metronome__body practice-timeline-session__body min-h-0 flex-1">
@@ -177,7 +181,14 @@ export default function TimelinePracticeSessionView({
           </SessionControlButton>
 
           <div className="practice-timeline-session__tempo-readout">
-            <span className="practice-timeline-session__tempo-value">{playbackState.effectiveBpm}</span>
+            <EditableNumberValue
+              value={playbackState.effectiveBpm}
+              min={40}
+              max={300}
+              ariaLabel="Type playback tempo"
+              className="practice-timeline-session__tempo-value"
+              onCommit={onSetEffectiveBpm}
+            />
             <span className="practice-timeline-session__tempo-unit">BPM</span>
             <span className="practice-timeline-session__tempo-scale">{scalePercent}%</span>
           </div>

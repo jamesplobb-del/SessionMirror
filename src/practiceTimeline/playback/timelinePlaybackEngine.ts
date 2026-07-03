@@ -257,6 +257,16 @@ export class TimelinePlaybackEngine {
     this.setTempoScale(this.tempoScale + delta)
   }
 
+  setCurrentEffectiveBpm(bpm: number): void {
+    const section = this.getCurrentSection()
+    if (!section) return
+
+    const baseBpm = this.baseBpmForCurrentMeasure(section)
+    if (baseBpm <= 0) return
+
+    this.setTempoScale(bpm / baseBpm)
+  }
+
   goToSection(index: number): void {
     if (!this.timeline || index < 0 || index >= this.timeline.sections.length) return
     if (index === this.sectionIndex && this.countInRemaining <= 0) return
