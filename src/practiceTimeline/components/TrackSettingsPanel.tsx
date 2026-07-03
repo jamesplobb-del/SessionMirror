@@ -50,7 +50,7 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
       ) : null}
 
       <label className="practice-timeline__track-settings-loop">
-        <span>Loop routine</span>
+        <span>Loop</span>
         <IOSSwitch checked={settings.loopTrack} onChange={(loopTrack) => onChange({ loopTrack })} />
       </label>
     </div>

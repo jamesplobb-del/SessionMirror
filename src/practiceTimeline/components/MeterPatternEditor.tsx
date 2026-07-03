@@ -90,20 +90,17 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
   return (
     <div className="practice-timeline-editor__pattern">
       <div className="practice-timeline-editor__field">
-        <span className="practice-timeline-editor__label">Meter pattern</span>
+        <span className="practice-timeline-editor__label">Pattern</span>
         <p className="practice-timeline-editor__hint">
           {formatPatternMetersLabel(steps)} • {formatPatternBpmLabel(section)}
         </p>
         <Pressable type="button" intensity="soft" className="practice-timeline-editor__preset-btn" onClick={applyPreset34_68}>
-          Load preset: 3/4 + 6/8
+          3/4 + 6/8
         </Pressable>
       </div>
 
       <div className="practice-timeline-editor__field">
-        <span className="practice-timeline-editor__label">Master tempo (quarter note)</span>
-        <p className="practice-timeline-editor__hint">
-          One tempo for the whole pattern. Each meter shows its equivalent beat speed below.
-        </p>
+        <span className="practice-timeline-editor__label">Tempo</span>
         <div className="practice-timeline-editor__stepper">
           <Pressable
             type="button"
@@ -133,7 +130,7 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
         return (
           <div key={step.id} className="practice-timeline-editor__pattern-step">
             <div className="practice-timeline-editor__pattern-step-header">
-              <span className="practice-timeline-editor__pattern-step-title">Step {index + 1}</span>
+              <span className="practice-timeline-editor__pattern-step-title">Signature {index + 1}</span>
               {steps.length > 2 ? (
                 <Pressable
                   type="button"
@@ -159,7 +156,7 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
 
               {pulseModes.length > 1 ? (
                 <TimelineEditorSelect
-                  label="Beat unit"
+                  label="Tempo counts"
                   ariaLabel={`Step ${index + 1} beat unit`}
                   value={step.pulseModeId ?? timing.pulseModeId}
                   options={pulseSelectOptions(pulseModes)}
@@ -176,7 +173,7 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
             </div>
 
             <p className="practice-timeline-editor__derived-tempo">
-              Equivalent beat: {formatBpmLabel(derivedBpm, timing)}
+              Beat speed: {formatBpmLabel(derivedBpm, timing)}
             </p>
           </div>
         )
@@ -184,12 +181,12 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
 
       <Pressable type="button" intensity="soft" className="practice-timeline-editor__pattern-add" onClick={addStep}>
         <Plus size={16} className="mr-1 inline" />
-        Add step
+        Add signature
       </Pressable>
 
       <div className="practice-timeline-editor__select-grid">
         <TimelineEditorSelect
-          label="Repeat pattern"
+          label="Length"
           ariaLabel="How to repeat the meter pattern"
           value={repeat.kind}
           options={PATTERN_REPEAT_OPTIONS}
@@ -243,7 +240,7 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
           >
             −
           </Pressable>
-          <span className="practice-timeline-editor__stepper-value">m. {repeat.measures}</span>
+          <span className="practice-timeline-editor__stepper-value">{repeat.measures} bars</span>
           <span className="practice-timeline-editor__hint">{patternRepeatSummary(section)}</span>
           <Pressable
             type="button"

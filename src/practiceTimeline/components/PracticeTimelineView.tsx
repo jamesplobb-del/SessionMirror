@@ -45,6 +45,7 @@ export default function PracticeTimelineView({
     resetSession,
     adjustTempoScale,
     goToSection,
+    seekToMeasure,
     skipSection,
     sessionTimeline,
     currentSection,
@@ -103,6 +104,7 @@ export default function PracticeTimelineView({
         onReset={resetSession}
         onAdjustTempoScale={adjustTempoScale}
         onGoToSection={goToSection}
+        onSeekMeasure={seekToMeasure}
         onSkipSection={skipSection}
       />
     )

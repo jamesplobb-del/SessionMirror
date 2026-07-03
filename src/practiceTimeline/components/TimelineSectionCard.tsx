@@ -1,6 +1,7 @@
 import { Copy, GripVertical, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState, type PointerEvent } from 'react'
 import Pressable from '../../components/ui/Pressable'
+import { triggerLightHaptic, triggerWarningHaptic } from '../../utils/haptics'
 import { patternSectionSummary, sectionHasMeterPattern } from '../patternLogic'
 import {
   effectiveBars,
@@ -25,6 +26,10 @@ interface TimelineSectionCardProps {
   isDragging: boolean
 }
 
+const DELETE_REVEAL_WIDTH = 88
+const SWIPE_ACTIVATE_DISTANCE = 12
+const SWIPE_REVEAL_THRESHOLD = 38
+
 export default function TimelineSectionCard({
   section,
   maxBars,
@@ -39,24 +44,109 @@ export default function TimelineSectionCard({
   isDragging,
 }: TimelineSectionCardProps) {
   const [showActions, setShowActions] = useState(false)
+  const [deleteRevealed, setDeleteRevealed] = useState(false)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const swipeStartRef = useRef<{ x: number; y: number; pointerId: number } | null>(null)
+  const swipeOffsetRef = useRef(0)
+  const swipeConsumedRef = useRef(false)
   const barWidth = sectionBarWidth(section, maxBars)
   const ramp = tempoRampLabel(section)
   const isPattern = sectionHasMeterPattern(section)
   const patternSummary = isPattern ? patternSectionSummary(section) : null
 
+  const closeDelete = () => {
+    setDeleteRevealed(false)
+    setSwipeOffset(0)
+    swipeOffsetRef.current = 0
+  }
+
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    swipeStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    }
+    swipeConsumedRef.current = false
+  }
+
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const start = swipeStartRef.current
+    if (!start || start.pointerId !== event.pointerId) return
+
+    const dx = event.clientX - start.x
+    const dy = event.clientY - start.y
+    if (!swiping && Math.abs(dx) < SWIPE_ACTIVATE_DISTANCE) return
+    if (!swiping && Math.abs(dy) > Math.abs(dx)) return
+
+    const offset = Math.max(0, Math.min(DELETE_REVEAL_WIDTH, deleteRevealed ? DELETE_REVEAL_WIDTH - dx : -dx))
+    if (offset <= 0 && !deleteRevealed) return
+
+    event.preventDefault()
+    setSwiping(true)
+    setSwipeOffset(offset)
+    swipeOffsetRef.current = offset
+    swipeConsumedRef.current = true
+  }
+
+  const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    const start = swipeStartRef.current
+    if (!start || start.pointerId !== event.pointerId) return
+
+    const nextRevealed = swipeOffsetRef.current > SWIPE_REVEAL_THRESHOLD
+    setDeleteRevealed(nextRevealed)
+    setSwipeOffset(0)
+    swipeOffsetRef.current = 0
+    setSwiping(false)
+    swipeStartRef.current = null
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    if (nextRevealed && !deleteRevealed) triggerLightHaptic()
+  }
+
+  const cardTranslate = swiping ? -swipeOffset : deleteRevealed ? -DELETE_REVEAL_WIDTH : 0
+
   return (
     <div
+      className="practice-timeline__section-swipe"
       onDragOver={(event) => {
         event.preventDefault()
         onDragOver(index)
       }}
     >
+      <button
+        type="button"
+        className="practice-timeline__section-delete"
+        onClick={(event) => {
+          event.stopPropagation()
+          triggerWarningHaptic()
+          onDelete()
+        }}
+      >
+        <Trash2 size={18} aria-hidden />
+        Delete
+      </button>
       <div
-        className={`practice-timeline__section-card ${isDragging ? 'practice-timeline__section-card--dragging' : ''}`}
-        draggable
+        className={`practice-timeline__section-card ${isDragging ? 'practice-timeline__section-card--dragging' : ''} ${swiping ? 'practice-timeline__section-card--swiping' : ''}`}
+        style={{ transform: `translateX(${cardTranslate}px)` }}
+        draggable={!deleteRevealed}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
         onDragStart={() => onDragStart(index)}
         onDragEnd={onDragEnd}
-        onClick={onPress}
+        onClick={() => {
+          if (swipeConsumedRef.current) {
+            swipeConsumedRef.current = false
+            return
+          }
+          if (deleteRevealed) {
+            closeDelete()
+            return
+          }
+          onPress()
+        }}
         role="button"
         tabIndex={0}
         onKeyDown={(event) => {
@@ -92,12 +182,12 @@ export default function TimelineSectionCard({
                     <strong>{section.bpm}</strong> BPM
                   </span>
                   <span>
-                    Sub: <strong>{subdivisionLabel(section)}</strong>
+                    Clicks <strong>{subdivisionLabel(section)}</strong>
                   </span>
                 </>
               )}
               <span>
-                Repeat: <strong>{repeatLabel(section.repeatCount)}</strong>
+                Repeat <strong>{repeatLabel(section.repeatCount)}</strong>
               </span>
               {ramp ? (
                 <span>
@@ -131,7 +221,10 @@ export default function TimelineSectionCard({
               type="button"
               intensity="soft"
               className="practice-timeline__section-action practice-timeline__section-action--danger"
-              onClick={onDelete}
+              onClick={() => {
+                triggerWarningHaptic()
+                onDelete()
+              }}
             >
               <Trash2 size={14} className="mr-1 inline" />
               Delete

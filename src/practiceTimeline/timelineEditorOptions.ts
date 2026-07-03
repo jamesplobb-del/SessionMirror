@@ -4,32 +4,8 @@ import type { MetronomeMeter, MetronomeSubdivision } from '../utils/metronomeCon
 import { COMMON_METERS } from './sectionDefaults'
 import type { PatternRepeatMode, SectionSubdivision, TempoRampShape } from './types'
 
-const METER_HINTS: Partial<Record<MetronomeMeter, string>> = {
-  '2/4': 'March — 2 beats',
-  '3/4': 'Waltz — 3 beats',
-  '4/4': 'Common time — 4 beats',
-  '5/4': '5 beats',
-  '6/4': '6 quarter beats',
-  '7/4': '7 beats',
-  '2/2': 'Cut time — 2 half beats',
-  '3/8': '3 eighth notes',
-  '4/8': '4 eighth notes',
-  '6/8': 'Compound — 2 dotted quarters',
-  '9/8': 'Compound — 3 dotted quarters',
-  '12/8': 'Compound — 4 dotted quarters',
-  '5/8': 'Odd — 5 eighths',
-  '7/8': 'Odd — 7 eighths',
-  '8/8': 'Odd — 8 eighths',
-  '10/8': 'Odd — 10 eighths',
-  '11/8': 'Odd — 11 eighths',
-  '13/8': 'Odd — 13 eighths',
-  '15/8': 'Odd — 15 eighths',
-  '16/8': 'Odd — 16 eighths',
-}
-
 function meterLabel(meter: MetronomeMeter): string {
-  const hint = METER_HINTS[meter]
-  return hint ? `${meter} — ${hint}` : meter
+  return meter
 }
 
 type HeaderValue = '__header_common__' | '__header_more__'
@@ -71,11 +47,11 @@ export function feelSelectOptions(
 }
 
 const SUBDIVISION_LABELS: Record<MetronomeSubdivision, string> = {
-  off: 'Pulse only — no extra clicks',
-  '8ths': 'Eighth notes',
-  '16ths': 'Sixteenth notes',
+  off: 'Pulse only',
+  '8ths': '8ths',
+  '16ths': '16ths',
   triplets: 'Triplets',
-  dotted: 'Dotted rhythm',
+  dotted: 'Dotted',
   quints: 'Quintuplets',
   septuplets: 'Septuplets',
 }
@@ -87,7 +63,7 @@ export function subdivisionSelectOptions(
     value: choice.id,
     label:
       choice.id === 'auto'
-        ? 'Auto — match the meter'
+        ? 'Auto'
         : SUBDIVISION_LABELS[choice.id as MetronomeSubdivision] ?? choice.label,
   }))
 }
@@ -95,30 +71,30 @@ export function subdivisionSelectOptions(
 export type SectionTypeValue = 'single' | 'pattern'
 
 export const SECTION_TYPE_OPTIONS: MetronomeAudioSelectOption<SectionTypeValue>[] = [
-  { value: 'single', label: 'Single meter — one time signature' },
-  { value: 'pattern', label: 'Meter pattern — alternating meters' },
+  { value: 'single', label: 'One signature' },
+  { value: 'pattern', label: 'Alternating' },
 ]
 
 export type CountInWhenValue = 'start' | 'every-loop'
 
 export const COUNT_IN_WHEN_OPTIONS: MetronomeAudioSelectOption<CountInWhenValue>[] = [
-  { value: 'start', label: 'Start & section jumps' },
+  { value: 'start', label: 'Start only' },
   { value: 'every-loop', label: 'Every loop' },
 ]
 
 export type PatternRepeatKind = PatternRepeatMode['kind']
 
 export const PATTERN_REPEAT_OPTIONS: MetronomeAudioSelectOption<PatternRepeatKind>[] = [
-  { value: 'cycles', label: 'Repeat a set number of times' },
-  { value: 'totalMeasures', label: 'Play until a measure number' },
+  { value: 'cycles', label: 'Cycles' },
+  { value: 'totalMeasures', label: 'Bars' },
 ]
 
 export type TempoRampMode = 'off' | 'faster' | 'slower'
 
 export const TEMPO_RAMP_OPTIONS: MetronomeAudioSelectOption<TempoRampMode>[] = [
-  { value: 'off', label: 'Steady tempo' },
-  { value: 'faster', label: 'Gradually faster (accel.)' },
-  { value: 'slower', label: 'Gradually slower (rit.)' },
+  { value: 'off', label: 'Steady' },
+  { value: 'faster', label: 'Speed up' },
+  { value: 'slower', label: 'Slow down' },
 ]
 
 export function tempoRampModeFromSection(section: {
@@ -131,9 +107,9 @@ export function tempoRampModeFromSection(section: {
 }
 
 export const TEMPO_RAMP_SHAPE_OPTIONS: MetronomeAudioSelectOption<TempoRampShape>[] = [
-  { value: 'linear', label: 'Smooth (linear)' },
-  { value: 'stepped', label: 'Stepped (per bar)' },
+  { value: 'linear', label: 'Smooth' },
+  { value: 'stepped', label: 'Steps' },
   { value: 'ease-in', label: 'Ease in' },
   { value: 'ease-out', label: 'Ease out' },
-  { value: 'ease-in-out', label: 'Ease in / out' },
+  { value: 'ease-in-out', label: 'Ease both' },
 ]

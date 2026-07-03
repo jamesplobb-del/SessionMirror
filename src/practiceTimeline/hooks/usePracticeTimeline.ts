@@ -157,6 +157,10 @@ export function useTimelinePlayback() {
     [],
   )
   const goToSection = useCallback((index: number) => timelinePlaybackEngine.goToSection(index), [])
+  const seekToMeasure = useCallback(
+    (measure: number) => timelinePlaybackEngine.seekToMeasure(measure),
+    [],
+  )
   const skipSection = useCallback(
     (direction: -1 | 1) => timelinePlaybackEngine.skipSection(direction),
     [],
@@ -171,6 +175,7 @@ export function useTimelinePlayback() {
     setTempoScale,
     adjustTempoScale,
     goToSection,
+    seekToMeasure,
     skipSection,
     sessionTimeline: timelinePlaybackEngine.getTimeline(),
     currentSection: timelinePlaybackEngine.getCurrentSection(),

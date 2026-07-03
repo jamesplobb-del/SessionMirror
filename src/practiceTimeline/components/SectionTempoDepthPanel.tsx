@@ -85,10 +85,7 @@ export default function SectionTempoDepthPanel({
 
   return (
     <div className="practice-timeline-editor__tempo-depth">
-      <p className="practice-timeline-editor__label">Tempo over time</p>
-      <p className="practice-timeline-editor__hint">
-        Set a gradual change, curve shape, or pin tempo at specific bars and beats.
-      </p>
+      <p className="practice-timeline-editor__label">Tempo changes</p>
 
       <div className="practice-timeline-editor__select-grid">
         <TimelineEditorSelect
@@ -161,7 +158,7 @@ export default function SectionTempoDepthPanel({
 
       <div className="practice-timeline-editor__tempo-markers">
         <div className="practice-timeline-editor__tempo-markers-header">
-          <span className="practice-timeline-editor__label">Tempo pins</span>
+          <span className="practice-timeline-editor__label">Pins</span>
           <Pressable type="button" intensity="soft" onClick={addMarker}>
             <Plus size={14} className="mr-1 inline" />
             Add
@@ -169,7 +166,7 @@ export default function SectionTempoDepthPanel({
         </div>
 
         {markers.length === 0 ? (
-          <p className="practice-timeline-editor__hint">No pinned tempos — ramp or steady tempo only.</p>
+          <p className="practice-timeline-editor__hint">No pins</p>
         ) : (
           <ul className="practice-timeline-editor__tempo-marker-list">
             {markers.map((marker) => (

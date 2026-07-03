@@ -17,6 +17,8 @@ function markPlatformClass(): void {
 let cachedSafeAreaInsets: { top: number; bottom: number } | null = null
 let lastAppliedWidth = 0
 let lastAppliedHeight = 0
+let deferredCameraRecoveryTimer: number | null = null
+let deferredCameraRecoveryReason = 'layout-change'
 
 function readSafeAreaInsets(): { top: number; bottom: number } {
   if (cachedSafeAreaInsets) return cachedSafeAreaInsets
@@ -48,6 +50,28 @@ export function readViewportSize(): { width: number; height: number } {
     width: Math.round(window.innerWidth),
     height: Math.round(window.innerHeight),
   }
+}
+
+function isTextEntryElement(element: Element | null): boolean {
+  if (!element) return false
+  if (element instanceof HTMLTextAreaElement) return true
+  if (element instanceof HTMLInputElement) {
+    return !['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'].includes(
+      element.type,
+    )
+  }
+  return element instanceof HTMLElement && element.isContentEditable
+}
+
+export function getVisualViewportKeyboardInset(): number {
+  const viewport = window.visualViewport
+  if (!viewport) return 0
+  return Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))
+}
+
+export function isKeyboardLikelyOpen(): boolean {
+  if (typeof window === 'undefined' || !isIOSNative()) return false
+  return getVisualViewportKeyboardInset() > 80 || isTextEntryElement(document.activeElement)
 }
 
 /** HUD layout vars only — live camera uses orientation-stable CSS, not these. */
@@ -103,6 +127,21 @@ export function stabilizeViewportAfterMediaInteraction(): void {
 
 export function requestCameraPreviewLayoutRecovery(reason = 'layout-change'): void {
   if (typeof window === 'undefined') return
+  if (isKeyboardLikelyOpen()) {
+    deferredCameraRecoveryReason = reason
+    if (deferredCameraRecoveryTimer !== null) window.clearTimeout(deferredCameraRecoveryTimer)
+    deferredCameraRecoveryTimer = window.setTimeout(() => {
+      deferredCameraRecoveryTimer = null
+      requestCameraPreviewLayoutRecovery(deferredCameraRecoveryReason)
+    }, 180)
+    return
+  }
+
+  if (deferredCameraRecoveryTimer !== null) {
+    window.clearTimeout(deferredCameraRecoveryTimer)
+    deferredCameraRecoveryTimer = null
+  }
+
   resetCameraPreviewZoom()
   stabilizeViewportAfterMediaInteraction()
   window.dispatchEvent(
@@ -141,6 +180,13 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
   const scheduleCameraRecovery = () => {
     const scale = window.visualViewport?.scale ?? 1
     if (Math.abs(scale - 1) > 0.01) return
+    if (isKeyboardLikelyOpen()) {
+      if (cameraRecoveryTimer !== null) {
+        window.clearTimeout(cameraRecoveryTimer)
+        cameraRecoveryTimer = null
+      }
+      return
+    }
 
     if (cameraRecoveryTimer !== null) window.clearTimeout(cameraRecoveryTimer)
     cameraRecoveryTimer = window.setTimeout(() => {

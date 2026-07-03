@@ -19,6 +19,8 @@ interface YoutubeUrlDialogProps {
 export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrlDialogProps) {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null)
+  const [viewportTop, setViewportTop] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const releaseInputFocus = useCallback(() => {
@@ -28,12 +30,43 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
   useEffect(() => {
     if (!open) {
       releaseInputFocus()
+      setViewportHeight(null)
+      setViewportTop(0)
       return
     }
 
     setValue('')
     setError(null)
   }, [open, releaseInputFocus])
+
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return
+
+    let frameId: number | null = null
+    const updateKeyboardLayout = () => {
+      if (frameId !== null) window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null
+        const visualViewport = window.visualViewport
+        setViewportHeight(Math.round(visualViewport?.height ?? window.innerHeight))
+        setViewportTop(Math.round(visualViewport?.offsetTop ?? 0))
+      })
+    }
+
+    updateKeyboardLayout()
+    window.addEventListener('resize', updateKeyboardLayout)
+    window.addEventListener('orientationchange', updateKeyboardLayout)
+    window.visualViewport?.addEventListener('resize', updateKeyboardLayout)
+    window.visualViewport?.addEventListener('scroll', updateKeyboardLayout)
+
+    return () => {
+      if (frameId !== null) window.cancelAnimationFrame(frameId)
+      window.removeEventListener('resize', updateKeyboardLayout)
+      window.removeEventListener('orientationchange', updateKeyboardLayout)
+      window.visualViewport?.removeEventListener('resize', updateKeyboardLayout)
+      window.visualViewport?.removeEventListener('scroll', updateKeyboardLayout)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -85,11 +118,17 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[120] flex items-end justify-center p-4 sm:items-center"
+          className="fixed left-0 right-0 z-[120] flex items-end justify-center sm:items-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={nativeGlideEase}
+          style={{
+            top: `${viewportTop}px`,
+            height: viewportHeight ? `${viewportHeight}px` : '100dvh',
+            padding: 16,
+            boxSizing: 'border-box',
+          }}
           onClick={(event) => {
             if (event.target === event.currentTarget) handleClose()
           }}
@@ -112,7 +151,11 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
             animate={nativeGlideShown}
             exit={nativeGlideIn}
             transition={nativeGlideEase}
-            style={motionGpuLayer}
+            style={{
+              ...motionGpuLayer,
+              maxHeight: viewportHeight ? `${Math.max(280, viewportHeight - 32)}px` : undefined,
+              overflowY: 'auto',
+            }}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">

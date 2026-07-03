@@ -277,6 +277,21 @@ export class TimelinePlaybackEngine {
     this.goToSection(this.sectionIndex + direction)
   }
 
+  seekToMeasure(measure: number): void {
+    const section = this.getCurrentSection()
+    if (!this.timeline || !section) return
+
+    const totalMeasures = effectiveBars(section)
+    const nextMeasure = Math.max(1, Math.min(totalMeasures, Math.round(measure)))
+
+    this.measure = nextMeasure
+    this.conductingBeat = 1
+    this.countInRemaining = 0
+    this.finished = false
+    this.applyCurrentSection({ forceResetBeat: true })
+    this.emitState()
+  }
+
   private attachBarListener(): void {
     this.detachBarListener()
     this.unsubscribeBar = sharedMetronomeEngine.subscribeBar(() => {
@@ -361,7 +376,7 @@ export class TimelinePlaybackEngine {
     if (this.measure === 1) this.measure = 0
   }
 
-  private applyCurrentSection(options?: { tempoOnly?: boolean }): void {
+  private applyCurrentSection(options?: { tempoOnly?: boolean; forceResetBeat?: boolean }): void {
     const section = this.getCurrentSection()
     if (!section) return
 
@@ -372,7 +387,7 @@ export class TimelinePlaybackEngine {
       timing.stepIndex !== undefined &&
       this.lastPatternStepIndex !== null &&
       timing.stepIndex !== this.lastPatternStepIndex
-    const resetBeat = !options?.tempoOnly && (this.measure === 1 || stepChanged)
+    const resetBeat = !options?.tempoOnly && (options?.forceResetBeat || this.measure === 1 || stepChanged)
 
     if (sectionHasMeterPattern(section) && timing.stepIndex !== undefined) {
       this.lastPatternStepIndex = timing.stepIndex

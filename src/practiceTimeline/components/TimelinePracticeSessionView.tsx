@@ -18,6 +18,7 @@ interface TimelinePracticeSessionViewProps {
   onReset: () => void
   onAdjustTempoScale: (delta: number) => void
   onGoToSection: (index: number) => void
+  onSeekMeasure: (measure: number) => void
   onSkipSection: (direction: -1 | 1) => void
 }
 
@@ -57,6 +58,7 @@ export default function TimelinePracticeSessionView({
   onReset,
   onAdjustTempoScale,
   onGoToSection,
+  onSeekMeasure,
   onSkipSection,
 }: TimelinePracticeSessionViewProps) {
   const { playing } = useMetronome()
@@ -157,6 +159,7 @@ export default function TimelinePracticeSessionView({
       <MeasureProgressBar
         measure={playbackState.countInActive ? 0 : playbackState.measure}
         totalMeasures={playbackState.totalMeasuresInSection}
+        onSeekMeasure={onSeekMeasure}
       />
 
       <div className="audio-practice-metronome__body practice-timeline-session__body min-h-0 flex-1">

@@ -126,7 +126,7 @@ export default function TimelineSectionEditor({
         <Pressable type="button" intensity="icon" onClick={onClose} aria-label="Close">
           <X size={22} />
         </Pressable>
-        <span className="practice-timeline-editor__title">Edit Section</span>
+        <span className="practice-timeline-editor__title">Section</span>
         <Pressable type="button" intensity="soft" haptic="success" onClick={onClose}>
           Done
         </Pressable>
@@ -148,7 +148,7 @@ export default function TimelineSectionEditor({
 
         <div className="practice-timeline-editor__select-grid">
           <TimelineEditorSelect
-            label="Section type"
+            label="Mode"
             ariaLabel="Section type"
             value={isPatternMode ? 'pattern' : 'single'}
             options={SECTION_TYPE_OPTIONS}
@@ -162,7 +162,7 @@ export default function TimelineSectionEditor({
           <>
             <div className="practice-timeline-editor__field-row">
               <div className="practice-timeline-editor__field practice-timeline-editor__field--half">
-                <span className="practice-timeline-editor__label">How many bars?</span>
+                <span className="practice-timeline-editor__label">Bars</span>
                 <div className="practice-timeline-editor__stepper">
                   <Pressable
                     type="button"
@@ -185,7 +185,7 @@ export default function TimelineSectionEditor({
               </div>
 
               <div className="practice-timeline-editor__field practice-timeline-editor__field--half">
-                <span className="practice-timeline-editor__label">How fast? ({timing.bpmSymbol})</span>
+                <span className="practice-timeline-editor__label">Tempo ({timing.bpmSymbol})</span>
                 <div className="practice-timeline-editor__stepper">
                   <Pressable
                     type="button"
@@ -219,7 +219,7 @@ export default function TimelineSectionEditor({
 
               {sectionNeedsPulseModeChoice(section) ? (
                 <TimelineEditorSelect
-                  label="Beat unit"
+                  label="Tempo counts"
                   ariaLabel="Which note value the tempo refers to"
                   value={section.pulseModeId ?? timing.pulseModeId}
                   options={pulseSelectOptions(pulseModes)}
@@ -240,7 +240,7 @@ export default function TimelineSectionEditor({
 
               {sectionNeedsFeelPrompt(section) && timing.feelOptions.length > 0 ? (
                 <TimelineEditorSelect
-                  label="Beat grouping"
+                  label="Feel"
                   ariaLabel="Beat grouping"
                   value={activeFeelId || timing.feelOptions[0]?.id}
                   options={feelSelectOptions(timing.feelOptions)}
@@ -258,49 +258,12 @@ export default function TimelineSectionEditor({
                 />
               ) : null}
 
-              <TimelineEditorSelect
-                label="Subdivision"
-                ariaLabel="Click subdivision"
-                value={section.subdivision}
-                options={subdivisionSelectOptions(subdivisionChoices)}
-                onChange={(subdivision) => onChange({ subdivision })}
-              />
-            </div>
-
-            <div className="practice-timeline-editor__field">
-              <span className="practice-timeline-editor__label">Custom grouping</span>
-              <input
-                className="practice-timeline-editor__input"
-                value={groupingDraft}
-                onChange={(e) => applyCustomGrouping(e.target.value)}
-                placeholder="e.g. 2+2+3"
-                inputMode="text"
-              />
-              <p className="practice-timeline-editor__hint">{groupingValidationMessage(section)}</p>
-            </div>
-
-            <div className="practice-timeline-editor__field">
-              <span className="practice-timeline-editor__label">Accents</span>
-              <p className="practice-timeline-editor__hint">Tap a beat to cycle: weak → medium → strong → silent</p>
-              <SectionAccentEditor
-                pulseCount={timing.pulseCount}
-                accentLevels={accentLevels}
-                onChange={(customAccents) =>
-                  onChange({
-                    advanced: {
-                      ...section.advanced,
-                      customAccents,
-                      beatGrouping: section.advanced?.beatGrouping,
-                    },
-                  })
-                }
-              />
             </div>
           </>
         )}
 
         <div className="practice-timeline-editor__field">
-          <span className="practice-timeline-editor__label">Repeat section</span>
+          <span className="practice-timeline-editor__label">Repeat</span>
           <div className="practice-timeline-editor__stepper">
             <Pressable
               type="button"
@@ -329,14 +292,57 @@ export default function TimelineSectionEditor({
           onClick={() => setShowAdvanced((v) => !v)}
         >
           {showAdvanced ? <ChevronUp size={16} className="mr-1 inline" /> : <ChevronDown size={16} className="mr-1 inline" />}
-          More options
+          Fine tune
         </Pressable>
 
         {showAdvanced ? (
           <div className="practice-timeline-editor__advanced">
+            {!isPatternMode ? (
+              <>
+                <div className="practice-timeline-editor__select-grid">
+                  <TimelineEditorSelect
+                    label="Extra clicks"
+                    ariaLabel="Click subdivision"
+                    value={section.subdivision}
+                    options={subdivisionSelectOptions(subdivisionChoices)}
+                    onChange={(subdivision) => onChange({ subdivision })}
+                  />
+                </div>
+
+                <div className="practice-timeline-editor__field">
+                  <span className="practice-timeline-editor__label">Custom feel</span>
+                  <input
+                    className="practice-timeline-editor__input"
+                    value={groupingDraft}
+                    onChange={(e) => applyCustomGrouping(e.target.value)}
+                    placeholder="2+2+3"
+                    inputMode="text"
+                  />
+                  <p className="practice-timeline-editor__hint">{groupingValidationMessage(section)}</p>
+                </div>
+
+                <div className="practice-timeline-editor__field">
+                  <span className="practice-timeline-editor__label">Accents</span>
+                  <p className="practice-timeline-editor__hint">Tap beats to change accents.</p>
+                  <SectionAccentEditor
+                    pulseCount={timing.pulseCount}
+                    accentLevels={accentLevels}
+                    onChange={(customAccents) =>
+                      onChange({
+                        advanced: {
+                          ...section.advanced,
+                          customAccents,
+                          beatGrouping: section.advanced?.beatGrouping,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </>
+            ) : null}
+
             <div className="practice-timeline-editor__field">
-              <span className="practice-timeline-editor__label">Section count-in (bars)</span>
-              <p className="practice-timeline-editor__hint">Overrides routine count-in for this section only.</p>
+              <span className="practice-timeline-editor__label">Count-in</span>
               <div className="practice-timeline-editor__stepper">
                 <Pressable
                   type="button"
@@ -377,7 +383,7 @@ export default function TimelineSectionEditor({
             <SectionTempoDepthPanel section={section} onChange={onChange} />
 
             <div className="practice-timeline-editor__field">
-              <span className="practice-timeline-editor__label">Marker notes</span>
+              <span className="practice-timeline-editor__label">Notes</span>
               <input
                 className="practice-timeline-editor__input"
                 value={section.advanced?.markerNotes ?? ''}
