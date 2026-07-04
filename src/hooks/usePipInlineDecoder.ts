@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
 interface UsePipInlineDecoderOptions {
   suspendPlayback: boolean
   isAutoPlayArmed: boolean
   isPlaying: boolean
   videoSourceKey: string
+  videoRef?: RefObject<HTMLMediaElement | null>
+}
+
+function isMediaActivelyPlaying(media: HTMLMediaElement | null | undefined): boolean {
+  return Boolean(media && !media.paused && !media.ended)
 }
 
 /** Gates PiP `<video>` mount — poster when idle, decoder when playing or auto-play armed. */
@@ -13,6 +18,7 @@ export function usePipInlineDecoder({
   isAutoPlayArmed,
   isPlaying,
   videoSourceKey,
+  videoRef,
 }: UsePipInlineDecoderOptions) {
   const [decoderActive, setDecoderActive] = useState(isAutoPlayArmed)
   const pendingPlayRef = useRef(false)
@@ -39,11 +45,32 @@ export function usePipInlineDecoder({
   }, [suspendPlayback])
 
   useEffect(() => {
-    if (!isPlaying && !isAutoPlayArmed) {
-      setDecoderActive(false)
-      pendingPlayRef.current = false
+    if (isAutoPlayArmed || isPlaying) return
+    if (isMediaActivelyPlaying(videoRef?.current)) return
+    setDecoderActive(false)
+    pendingPlayRef.current = false
+  }, [isAutoPlayArmed, isPlaying, videoRef, videoSourceKey])
+
+  useEffect(() => {
+    const media = videoRef?.current
+    if (!media || !decoderActive) return
+
+    const keepDecoderWhilePlaying = () => {
+      if (isMediaActivelyPlaying(media)) {
+        setDecoderActive(true)
+      }
     }
-  }, [isAutoPlayArmed, isPlaying])
+
+    media.addEventListener('play', keepDecoderWhilePlaying)
+    media.addEventListener('playing', keepDecoderWhilePlaying)
+    media.addEventListener('timeupdate', keepDecoderWhilePlaying)
+
+    return () => {
+      media.removeEventListener('play', keepDecoderWhilePlaying)
+      media.removeEventListener('playing', keepDecoderWhilePlaying)
+      media.removeEventListener('timeupdate', keepDecoderWhilePlaying)
+    }
+  }, [decoderActive, videoRef, videoSourceKey])
 
   const requestDecoderForPlay = useCallback(() => {
     pendingPlayRef.current = true

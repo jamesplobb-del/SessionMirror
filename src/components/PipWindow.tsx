@@ -130,6 +130,7 @@ function PipWindow({
     isAutoPlayArmed,
     isPlaying,
     videoSourceKey,
+    videoRef,
   })
   const playbackAudible = (isAutoPlayArmed || isPlaying) && !suspendPlayback
 
@@ -148,11 +149,13 @@ function PipWindow({
     media.addEventListener('play', syncPlaying)
     media.addEventListener('pause', syncPlaying)
     media.addEventListener('ended', syncPlaying)
+    media.addEventListener('timeupdate', syncPlaying)
 
     return () => {
       media.removeEventListener('play', syncPlaying)
       media.removeEventListener('pause', syncPlaying)
       media.removeEventListener('ended', syncPlaying)
+      media.removeEventListener('timeupdate', syncPlaying)
     }
   }, [videoRef, videoSourceKey])
 

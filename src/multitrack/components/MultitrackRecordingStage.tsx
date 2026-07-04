@@ -142,7 +142,7 @@ export default function MultitrackRecordingStage({
 
       {phase === 'count-in' ? (
         <div className="multitrack-recording-stage__count">
-          {Math.max(1, countInRemaining)}
+          {countInRemaining > 0 ? Math.max(1, countInRemaining) : 'NOW'}
         </div>
       ) : null}
 

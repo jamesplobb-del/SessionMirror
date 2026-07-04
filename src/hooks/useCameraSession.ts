@@ -257,6 +257,8 @@ export function useCameraSession({
   const isRecordingRef = useRef(false)
   const readyRef = useRef(false)
   const resumeInFlightRef = useRef(false)
+  const previewVideoSuspendedForPlaybackRef = useRef(false)
+  const previewVideoTrackStatesRef = useRef<Map<MediaStreamTrack, boolean>>(new Map())
   const streamAcquireInFlightRef = useRef(false)
   const captureSessionEpochRef = useRef(0)
   const queuedCaptureRequestModeRef = useRef<RecordingMode | null>(null)
@@ -1924,6 +1926,47 @@ export function useCameraSession({
     }
   }, [])
 
+  /** Pause preview decode while a take plays — frees iOS video decoder budget. */
+  const suspendPreviewVideoForPlayback = useCallback(async () => {
+    if (isRecordingRef.current || recordingModeRef.current !== 'video') return
+    if (previewVideoSuspendedForPlaybackRef.current) return
+
+    const stream = streamRef.current
+    const preview = previewRef.current
+    if (!stream && !preview) return
+
+    previewVideoSuspendedForPlaybackRef.current = true
+    previewVideoTrackStatesRef.current.clear()
+
+    if (preview && !preview.paused) {
+      preview.pause()
+    }
+
+    for (const track of stream?.getVideoTracks() ?? []) {
+      if (track.readyState === 'live') {
+        previewVideoTrackStatesRef.current.set(track, track.enabled)
+        track.enabled = false
+      }
+    }
+  }, [previewRef])
+
+  const resumePreviewVideoAfterPlayback = useCallback(async () => {
+    if (!previewVideoSuspendedForPlaybackRef.current) return
+    previewVideoSuspendedForPlaybackRef.current = false
+
+    for (const [track, wasEnabled] of previewVideoTrackStatesRef.current) {
+      if (track.readyState === 'live') {
+        track.enabled = wasEnabled
+      }
+    }
+    previewVideoTrackStatesRef.current.clear()
+
+    const stream = streamRef.current
+    if (stream && recordingModeRef.current === 'video') {
+      syncPreviewTargets(stream, 'video')
+    }
+  }, [previewRef, syncPreviewTargets])
+
   useEffect(() => {
     const suspendForPageHide = () => {
       scheduleBackgroundSuspend()
@@ -2055,6 +2098,8 @@ export function useCameraSession({
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
+    suspendPreviewVideoForPlayback,
+    resumePreviewVideoAfterPlayback,
     isPreviewRecovering,
   }
 }

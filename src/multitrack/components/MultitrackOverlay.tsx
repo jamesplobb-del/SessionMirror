@@ -7,7 +7,7 @@ import type { TunerInstrument } from '../../utils/pitchConfig'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import { triggerLightHaptic } from '../../utils/haptics'
 import { shareTakeVideo } from '../../utils/shareTakeVideo'
-import { playTakeMediaAudible, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
+import { playTakeMediaAudible, playTakeMediaFromUserGesture, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
 import { routeTakePlaybackToSpeaker } from '../../utils/takePlaybackSpeaker'
 import {
   pauseYoutubeProxy,
@@ -84,13 +84,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
   }, [session.backing])
 
-  const playBackingFromStart = useCallback(async () => {
+  const prepareBackingAtStart = useCallback(async () => {
     const backing = session.backing
-    if (backing.kind === 'none') return false
-
     if (backing.kind === 'audio') {
       const audio = backingAudioRef.current
-      if (!audio) return false
+      if (!audio) return
       audio.volume = backing.volume
       audio.muted = false
       audio.preload = 'auto'
@@ -100,17 +98,79 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       } catch {
         /* media may still be loading */
       }
-      const started = await playTakeMediaAudible(audio)
+      audio.pause()
+      primeTakePlaybackAudioSync(audio)
+      return
+    }
+
+    if (backing.kind === 'youtube') {
+      const iframe = backingYoutubeIframeRef.current
+      setYoutubeProxyVolumeFromUi(iframe, backing.volume)
+      wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume: backing.volume })
+      seekYoutubeProxy(iframe, 0)
+    }
+  }, [session.backing])
+
+  const startBackingPlayback = useCallback(async () => {
+    const backing = session.backing
+    if (backing.kind === 'none') return false
+
+    if (backing.kind === 'audio') {
+      const audio = backingAudioRef.current
+      if (!audio) return false
+      const started = await playTakeMediaAudible(audio, { skipRoutePrep: true })
       setBackingPlaying(started)
       return started
     }
 
     const iframe = backingYoutubeIframeRef.current
-    seekYoutubeProxy(iframe, 0)
     startYoutubeProxyPlayback(iframe, backing.volume)
     setBackingPlaying(true)
     return true
   }, [session.backing])
+
+  const playBackingFromStart = useCallback(async () => {
+    await prepareBackingAtStart()
+    return startBackingPlayback()
+  }, [prepareBackingAtStart, startBackingPlayback])
+
+  const startAllPlaybackFromUserGesture = useCallback(() => {
+    sync.playAllFromUserGesture()
+    const backing = session.backing
+    if (backing.kind === 'audio') {
+      const audio = backingAudioRef.current
+      if (!audio) return
+      try {
+        audio.currentTime = 0
+      } catch {
+        /* media may still be loading */
+      }
+      playTakeMediaFromUserGesture(audio, {
+        onPlaying: () => setBackingPlaying(true),
+        onFailure: () => setBackingPlaying(false),
+      })
+      return
+    }
+    if (backing.kind === 'youtube') {
+      const iframe = backingYoutubeIframeRef.current
+      seekYoutubeProxy(iframe, 0)
+      startYoutubeProxyPlayback(iframe, backing.volume)
+      setBackingPlaying(true)
+    }
+  }, [session.backing, sync])
+
+  const recordingTargetPanelIdRef = useRef<string | null>(null)
+
+  const preparePerformancePlayback = useCallback(async () => {
+    sync.setExcludePanelId(recordingTargetPanelIdRef.current)
+    await sync.prepareFromStart(0)
+    await prepareBackingAtStart()
+  }, [prepareBackingAtStart, sync])
+
+  const startPerformancePlayback = useCallback(async () => {
+    await sync.startPrepared()
+    await startBackingPlayback()
+  }, [startBackingPlayback, sync])
 
   const toggleBackingPlayback = useCallback(() => {
     if (backingPlaying) {
@@ -130,12 +190,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   }, [sync.registerMedia])
 
   const recording = useMultitrackRecording({
-    onCountInComplete: () => { onStartRecording() },
-    onSyncPlaybackBeforeRecord: async () => {
-      if (!sync.state.isPlaying) await sync.play()
-      await playBackingFromStart()
+    onCountInStart: () => {
+      onStartRecording()
     },
+    onPreparePlaybackDuringCountIn: preparePerformancePlayback,
+    onPerformanceStart: startPerformancePlayback,
   })
+
+  useEffect(() => {
+    recordingTargetPanelIdRef.current = recording.targetPanelId
+    sync.setExcludePanelId(recording.targetPanelId)
+  }, [recording.targetPanelId, sync])
 
   useEffect(() => {
     if (!isOpen) pauseBacking()
@@ -180,15 +245,21 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onRegisterMedia={registerPanelMedia} />
             </div>
             <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying} currentTime={sync.state.currentTime} duration={sync.state.duration} showLayoutPicker={showLayoutPicker}
-              onTogglePlay={() => void (async () => {
+              onTogglePlay={() => {
                 if (sync.state.isPlaying || backingPlaying) {
                   sync.pause()
                   pauseBacking()
                   return
                 }
-                await sync.play()
+                sync.setExcludePanelId(null)
+                startAllPlaybackFromUserGesture()
+              }} onRestart={() => void (async () => {
+                sync.pause()
+                pauseBacking()
+                sync.setExcludePanelId(null)
+                await sync.restart()
                 await playBackingFromStart()
-              })()} onRestart={() => void (async () => { sync.pause(); pauseBacking(); await sync.restart(); await playBackingFromStart() })()} onSeek={sync.seek}
+              })()} onSeek={sync.seek}
               onToggleLayoutPicker={() => setShowLayoutPicker((v) => !v)}
               onExport={() => void (async () => { sync.pause(); pauseBacking(); const plan = buildMultitrackExportPlan(session, sync.state.duration); if (plan) await shareTakeVideo(getPrimaryExportTake(plan)) })()} />
           </motion.div>
@@ -217,13 +288,22 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               }}
               onToggleBackingPlayback={toggleBackingPlayback}
               onRecord={() => {
+                recordingTargetPanelIdRef.current = activePanel.id
+                sync.setExcludePanelId(activePanel.id)
                 prepareBackingForRecord()
                 recording.beginCountIn(activePanel.id, session.practice)
               }}
-              onStop={() => { sync.pause(); pauseBacking(); onStopRecording(); recording.cancel() }}
+              onStop={() => {
+                sync.setExcludePanelId(null)
+                sync.pause()
+                pauseBacking()
+                onStopRecording()
+                recording.cancel()
+              }}
               onUseExisting={() => setTakePickerPanelId(activePanel.id)}
               onClose={() => {
                 if (isRecording) onStopRecording()
+                sync.setExcludePanelId(null)
                 sync.pause()
                 pauseBacking()
                 recording.cancel()

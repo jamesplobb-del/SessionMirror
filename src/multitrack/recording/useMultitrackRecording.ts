@@ -3,10 +3,12 @@ import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
 import type { MultitrackRecordingPhase } from '../types'
 
 export function useMultitrackRecording(options: {
-  onCountInComplete: (panelId: string) => void
-  onSyncPlaybackBeforeRecord?: () => Promise<void>
+  onCountInStart?: (panelId: string) => void
+  onPreparePlaybackDuringCountIn?: () => Promise<void>
+  onPerformanceStart?: () => Promise<void>
+  onCountInComplete?: (panelId: string) => void
 }) {
-  const { onCountInComplete, onSyncPlaybackBeforeRecord } = options
+  const { onCountInStart, onPreparePlaybackDuringCountIn, onPerformanceStart, onCountInComplete } = options
   const [phase, setPhase] = useState<MultitrackRecordingPhase>('idle')
   const [targetPanelId, setTargetPanelId] = useState<string | null>(null)
   const [countInRemaining, setCountInRemaining] = useState(0)
@@ -46,6 +48,9 @@ export function useMultitrackRecording(options: {
     setPhase(countInBeats > 0 ? 'count-in' : 'recording')
 
     void (async () => {
+      onCountInStart?.(panelId)
+      void onPreparePlaybackDuringCountIn?.()
+
       if (settings?.clickEnabled !== false) {
         sharedMetronomeEngine.applySectionConfig(
           {
@@ -70,12 +75,12 @@ export function useMultitrackRecording(options: {
 
       if (!activeRef.current) return
       setCountInRemaining(0)
-      await onSyncPlaybackBeforeRecord?.()
+      await onPerformanceStart?.()
       if (!activeRef.current) return
       setPhase('recording')
-      onCountInComplete(panelId)
+      onCountInComplete?.(panelId)
     })()
-  }, [onCountInComplete, onSyncPlaybackBeforeRecord])
+  }, [onCountInComplete, onCountInStart, onPerformanceStart, onPreparePlaybackDuringCountIn])
 
   return { phase, targetPanelId, countInRemaining, beginCountIn, cancel }
 }

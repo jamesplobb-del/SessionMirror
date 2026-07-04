@@ -16,12 +16,15 @@ export interface PreparePlaybackRouteOptions {
 
 let playbackRouteActive = false
 let cameraWasSuspendedForPlayback = false
+let cameraPreviewVideoWasSuspendedForPlayback = false
 let loudSessionAppliedForPlayback = false
 let restoreInFlight: Promise<void> | null = null
 let cameraHandlers: {
   suspend: () => void | Promise<void>
   resume: () => void | Promise<void>
   hasLivePreview?: () => boolean
+  suspendPreviewVideo?: () => void | Promise<void>
+  resumePreviewVideo?: () => void | Promise<void>
 } | null = null
 let playbackRouteListenerInstalled = false
 
@@ -37,6 +40,8 @@ export function registerPlaybackCameraHandlers(handlers: {
   suspend: () => void | Promise<void>
   resume: () => void | Promise<void>
   hasLivePreview?: () => boolean
+  suspendPreviewVideo?: () => void | Promise<void>
+  resumePreviewVideo?: () => void | Promise<void>
 }): void {
   cameraHandlers = handlers
 }
@@ -153,6 +158,7 @@ export async function preparePlaybackRoute(
 
   playbackRouteActive = true
   cameraWasSuspendedForPlayback = false
+  cameraPreviewVideoWasSuspendedForPlayback = false
   loudSessionAppliedForPlayback = false
   const diagSessionId = getActivePlaybackDiagSession()
   if (diagSessionId) {
@@ -169,8 +175,13 @@ export async function preparePlaybackRoute(
       const jsVideoPreviewLive = cameraHandlers?.hasLivePreview?.() ?? false
       if (jsVideoPreviewLive) {
         console.log(
-          '[PlaybackRoute] skipping loud session — live video preview keeps camera FOV',
+          '[PlaybackRoute] suspending live preview video tracks for take playback',
         )
+        await cameraHandlers?.suspendPreviewVideo?.()
+        cameraPreviewVideoWasSuspendedForPlayback = true
+        loudSessionAppliedForPlayback = await applyLoudPlaybackSessionIfSpeaker({
+          failSoft: true,
+        })
       } else {
         loudSessionAppliedForPlayback = await applyLoudPlaybackSessionIfSpeaker({
           failSoft: true,
@@ -189,6 +200,7 @@ export async function preparePlaybackRoute(
   } catch (error) {
     playbackRouteActive = false
     cameraWasSuspendedForPlayback = false
+    cameraPreviewVideoWasSuspendedForPlayback = false
     loudSessionAppliedForPlayback = false
     await BestTakeAudioPlugin.setPlaybackRouteActive({ active: false }).catch(() => {
       /* ignore */
@@ -207,12 +219,14 @@ export async function completePlaybackRouteRestore(): Promise<void> {
   }
 
   const shouldResumeCamera = cameraWasSuspendedForPlayback
+  const shouldResumePreviewVideo = cameraPreviewVideoWasSuspendedForPlayback
   const shouldRestoreLoudSession = loudSessionAppliedForPlayback
   const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
 
   restoreInFlight = (async () => {
     playbackRouteActive = false
     cameraWasSuspendedForPlayback = false
+    cameraPreviewVideoWasSuspendedForPlayback = false
     loudSessionAppliedForPlayback = false
 
     console.log('[PlaybackRoute] playback ended')
@@ -236,6 +250,9 @@ export async function completePlaybackRouteRestore(): Promise<void> {
     if (shouldResumeCamera || shouldRefreshLivePreview) {
       await delay(120)
       await cameraHandlers?.resume()
+    } else if (shouldResumePreviewVideo) {
+      await delay(120)
+      await cameraHandlers?.resumePreviewVideo?.()
     }
   })()
 
@@ -258,9 +275,11 @@ export function installPlaybackRouteEndedListener(
       if (!playbackRouteActive) return
 
       const shouldResumeCamera = cameraWasSuspendedForPlayback
+      const shouldResumePreviewVideo = cameraPreviewVideoWasSuspendedForPlayback
       const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
       playbackRouteActive = false
       cameraWasSuspendedForPlayback = false
+      cameraPreviewVideoWasSuspendedForPlayback = false
       loudSessionAppliedForPlayback = false
       restoreInFlight = null
 
@@ -272,6 +291,8 @@ export function installPlaybackRouteEndedListener(
 
       if (shouldResumeCamera || shouldRefreshLivePreview) {
         await onEnded()
+      } else if (shouldResumePreviewVideo) {
+        await cameraHandlers?.resumePreviewVideo?.()
       }
     })()
   })

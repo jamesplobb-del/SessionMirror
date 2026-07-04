@@ -1257,6 +1257,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     suspendCameraForBackground,
     suspendMicForPlayback,
     resumeMicAfterPlayback,
+    suspendPreviewVideoForPlayback,
+    resumePreviewVideoAfterPlayback,
     isPreviewRecovering,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
@@ -1384,6 +1386,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         void refreshCameraSession()
       },
       hasLivePreview: () => cameraReadyRef.current && recordingModeRef.current === 'video',
+      suspendPreviewVideo: () => suspendPreviewVideoForPlayback(),
+      resumePreviewVideo: () => resumePreviewVideoAfterPlayback(),
     })
     installPlaybackRouteEndedListener(() => {
       void refreshCameraSession()
@@ -1405,6 +1409,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     resumeMicAfterPlayback,
     suspendCameraForBackground,
     suspendMicForPlayback,
+    suspendPreviewVideoForPlayback,
+    resumePreviewVideoAfterPlayback,
   ])
 
   useEffect(() => {

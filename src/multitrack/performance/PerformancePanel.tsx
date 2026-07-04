@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Film, Pause, Play, RotateCcw, Video, X } from 'lucide-react'
-import { playTakeMediaAudible } from '../../utils/takePlaybackAudio'
+import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
 import Pressable from '../../components/ui/Pressable'
 import TakeVideoPlayer from '../../components/TakeVideoPlayer'
 import type { MultitrackRecordingPhase, PerformancePanelState } from '../types'
@@ -48,7 +48,10 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
     } catch {
       /* media may still be loading */
     }
-    void playTakeMediaAudible(media).then(setQuickPlaying)
+    void playTakeMediaFromUserGesture(media, {
+      onPlaying: () => setQuickPlaying(true),
+      onFailure: () => setQuickPlaying(false),
+    })
   }
 
   return (
@@ -74,6 +77,7 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
         eagerLoad
         preload="auto"
         manualPlayOnly
+        audible
         poster={panel.take.thumbnailUrl || undefined}
         onLoadedMetadata={(event) => onRegisterMedia(panel.id, event.currentTarget)}
         onCanPlay={(event) => onRegisterMedia(panel.id, event.currentTarget)}
