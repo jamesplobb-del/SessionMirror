@@ -1863,10 +1863,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsCreatorStudioPickerOpen(false)
     setCreatorStudioTake(null)
     setShowPitch(false)
+    handleRecordingModeChange('video')
     setMultitrackOpen(true)
     deferHudMediaPause()
-    void requestCameraAccess('audio')
-  }, [deferHudMediaPause, markOverlayClosed, requestCameraAccess, settings.hapticFeedback])
+    void requestCameraAccess('video')
+  }, [deferHudMediaPause, handleRecordingModeChange, markOverlayClosed, requestCameraAccess, settings.hapticFeedback])
 
   const handleMultitrackStartRecording = useCallback(() => {
     multitrackRecordingActiveRef.current = true

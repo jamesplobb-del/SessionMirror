@@ -32,18 +32,21 @@ export interface MultitrackLayoutPreset {
   areas: string[]
   columns: string
   rows: string
-  defaultKinds: MultitrackPanelKind[]
 }
 
 export interface MultitrackPracticeSettings {
   showMetronome: boolean
   showPitch: boolean
   practiceOverlayEnabled: boolean
+  clickEnabled: boolean
+  countInBars: number
+  bpm: number
 }
 
 export interface MultitrackSession {
   layoutId: string
   panels: MultitrackPanelState[]
+  sheetMusic: SheetMusicPanelState
   practice: MultitrackPracticeSettings
 }
 

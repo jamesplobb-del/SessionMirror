@@ -1,12 +1,12 @@
 import type { MultitrackLayoutPreset, MultitrackPanelState } from '../types'
 
 export const MULTITRACK_LAYOUT_PRESETS: MultitrackLayoutPreset[] = [
-  { id: 'solo', label: 'Solo', panelCount: 1, areas: ['a'], columns: '1fr', rows: '1fr', defaultKinds: ['performance'] },
-  { id: 'duo-h', label: 'Duo', panelCount: 2, areas: ['a b'], columns: '1fr 1fr', rows: '1fr', defaultKinds: ['performance', 'performance'] },
-  { id: 'duo-v', label: 'Stack', panelCount: 2, areas: ['a', 'b'], columns: '1fr', rows: '1fr 1fr', defaultKinds: ['performance', 'sheet-music'] },
-  { id: 'trio', label: 'Trio', panelCount: 3, areas: ['a a', 'b c'], columns: '1fr 1fr', rows: '1fr 1fr', defaultKinds: ['performance', 'performance', 'sheet-music'] },
-  { id: 'quad', label: 'Quad', panelCount: 4, areas: ['a b', 'c d'], columns: '1fr 1fr', rows: '1fr 1fr', defaultKinds: ['performance', 'performance', 'sheet-music', 'sheet-music'] },
-  { id: 'six', label: 'Six', panelCount: 6, areas: ['a b c', 'd e f'], columns: '1fr 1fr 1fr', rows: '1fr 1fr', defaultKinds: ['performance', 'performance', 'sheet-music', 'performance', 'sheet-music', 'sheet-music'] },
+  { id: 'one', label: '1 box', panelCount: 1, areas: ['a'], columns: '1fr', rows: '1fr' },
+  { id: 'two', label: '2 boxes', panelCount: 2, areas: ['a b'], columns: '1fr 1fr', rows: '1fr' },
+  { id: 'three', label: '3 boxes', panelCount: 3, areas: ['a a', 'b c'], columns: '1fr 1fr', rows: '1fr 1fr' },
+  { id: 'four', label: '4 boxes', panelCount: 4, areas: ['a b', 'c d'], columns: '1fr 1fr', rows: '1fr 1fr' },
+  { id: 'five', label: '5 boxes', panelCount: 5, areas: ['a b c', 'd e .'], columns: '1fr 1fr 1fr', rows: '1fr 1fr' },
+  { id: 'six', label: '6 boxes', panelCount: 6, areas: ['a b c', 'd e f'], columns: '1fr 1fr 1fr', rows: '1fr 1fr' },
 ]
 
 export function getLayoutPreset(id: string): MultitrackLayoutPreset {
@@ -15,8 +15,7 @@ export function getLayoutPreset(id: string): MultitrackLayoutPreset {
 
 export function createPanelsForLayout(preset: MultitrackLayoutPreset): MultitrackPanelState[] {
   const slotIds = ['a', 'b', 'c', 'd', 'e', 'f']
-  return preset.defaultKinds.map((kind, index) => {
-    const id = slotIds[index]
-    return kind === 'sheet-music' ? { kind: 'sheet-music', id, asset: null } : { kind: 'performance', id, take: null }
-  })
+  return slotIds
+    .slice(0, preset.panelCount)
+    .map((id) => ({ kind: 'performance', id, take: null }))
 }

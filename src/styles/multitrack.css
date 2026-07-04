@@ -5,6 +5,7 @@
   display: flex;
   flex-direction: column;
   background: #f5f5f4;
+  color: #1c1917;
 }
 
 .multitrack-overlay__header {
@@ -31,6 +32,11 @@
   min-height: 0;
 }
 
+.multitrack-music-adder {
+  flex-shrink: 0;
+  height: 7rem;
+}
+
 .multitrack-grid__cell {
   min-width: 0;
   min-height: 0;
@@ -53,6 +59,7 @@
   justify-content: center;
   background: #fafaf9;
   border: 2px dashed #d6d3d1;
+  color: #57534e;
 }
 
 .multitrack-panel--recording {
@@ -63,6 +70,11 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.multitrack-panel--performance {
+  display: block;
+  padding: 0;
 }
 
 .multitrack-panel__overlay {
@@ -205,6 +217,191 @@
   margin-left: auto;
   background: #ecfccb;
   color: #3f6212;
+}
+
+.multitrack-recording-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  overflow: hidden;
+  background: #050505;
+  color: #fff;
+}
+
+.multitrack-recording-stage__preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.multitrack-recording-stage__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.58), transparent 24%, transparent 58%, rgba(0, 0, 0, 0.72)),
+    radial-gradient(circle at 50% 35%, transparent 0, rgba(0, 0, 0, 0.24) 70%);
+  pointer-events: none;
+}
+
+.multitrack-recording-stage__header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: calc(env(safe-area-inset-top, 0px) + 0.75rem) 1rem 0.75rem;
+}
+
+.multitrack-recording-stage__kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.multitrack-recording-stage__header h2 {
+  margin: 0.1rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 750;
+}
+
+.multitrack-recording-stage__count {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(5rem, 28vw, 9rem);
+  font-weight: 850;
+  text-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.multitrack-recording-stage__widgets {
+  position: absolute;
+  right: 1rem;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12.5rem);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.multitrack-recording-stage__widgets button {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  backdrop-filter: blur(16px);
+}
+
+.multitrack-recording-stage__widgets button.is-active {
+  background: rgba(250, 204, 21, 0.9);
+  color: #1c1917;
+}
+
+.multitrack-recording-stage__controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1rem calc(env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+.multitrack-recording-stage__settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.multitrack-recording-stage__settings label {
+  min-width: 0;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 0.65rem;
+  backdrop-filter: blur(18px);
+}
+
+.multitrack-recording-stage__settings span {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.multitrack-recording-stage__settings input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.multitrack-recording-stage__stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+
+.multitrack-recording-stage__stepper button {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.multitrack-recording-stage__actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 0.65rem;
+}
+
+.multitrack-recording-stage__actions button {
+  min-height: 3.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font-weight: 800;
+}
+
+.multitrack-recording-stage__record {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+
+.multitrack-recording-stage__record.is-recording {
+  background: #fff !important;
+  color: #b91c1c !important;
+}
+
+.multitrack-recording-stage__missing-camera {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .multitrack-layout-picker {
@@ -543,4 +740,3 @@
   padding: 0.75rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
-

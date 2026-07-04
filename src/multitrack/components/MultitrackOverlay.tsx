@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { ChevronLeft, Mic, Sparkles } from 'lucide-react'
+import { ChevronLeft, Sparkles } from 'lucide-react'
 import type { Take } from '../../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
@@ -17,6 +17,8 @@ import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackLayoutPicker from './MultitrackLayoutPicker'
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
+import SheetMusicPanel from '../sheetMusic/SheetMusicPanel'
+import MultitrackRecordingStage from './MultitrackRecordingStage'
 
 interface MultitrackOverlayProps {
   isOpen: boolean
@@ -39,25 +41,28 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const masterMediaRef = useRef<HTMLMediaElement | null>(null)
   const [showLayoutPicker, setShowLayoutPicker] = useState(false)
   const [takePickerPanelId, setTakePickerPanelId] = useState<string | null>(null)
-  const [actionPanelId, setActionPanelId] = useState<string | null>(null)
+  const [activePanelId, setActivePanelId] = useState<string | null>(null)
   const { session, layout, setLayout, assignTakeToPanel, assignSheetMusic, updatePractice } = useMultitrackSession()
   const sync = useMultitrackSync()
 
   const recording = useMultitrackRecording({
-    onCountInComplete: (panelId) => { onStartRecording(); setActionPanelId(panelId) },
+    onCountInComplete: () => { onStartRecording() },
     onSyncPlaybackBeforeRecord: async () => { if (!sync.state.isPlaying) await sync.play() },
   })
 
   useEffect(() => {
-    if (!pendingRecordingTakeId || !actionPanelId) return
+    const targetPanelId = recording.targetPanelId ?? activePanelId
+    if (!pendingRecordingTakeId || !targetPanelId) return
     const take = takes.find((t) => t.id === pendingRecordingTakeId)
     if (!take) return
-    assignTakeToPanel(actionPanelId, take)
+    assignTakeToPanel(targetPanelId, take)
     onRecordingComplete()
     onClearPendingRecording()
     recording.cancel()
-    setActionPanelId(null)
-  }, [actionPanelId, assignTakeToPanel, onClearPendingRecording, onRecordingComplete, pendingRecordingTakeId, recording.cancel, takes])
+    setActivePanelId(null)
+  }, [activePanelId, assignTakeToPanel, onClearPendingRecording, onRecordingComplete, pendingRecordingTakeId, recording, takes])
+
+  const activePanel = session.panels.find((panel) => panel.id === activePanelId)
 
   return createPortal(
     <>
@@ -70,8 +75,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             </header>
             <div className="multitrack-overlay__body">
               {showLayoutPicker && <MultitrackLayoutPicker activeLayoutId={session.layoutId} onSelectLayout={setLayout} />}
-              <MultitrackPanelGrid layout={layout} panels={session.panels} recordingTargetPanelId={recording.targetPanelId} recordingPhase={recording.phase}
-                onTapEmptyPerformance={(id) => { triggerLightHaptic(hapticFeedback); setActionPanelId(id) }}
+              {!session.sheetMusic.asset ? (
+                <div className="multitrack-music-adder">
+                  <SheetMusicPanel panel={session.sheetMusic} onAssetChange={(asset) => assignSheetMusic(session.sheetMusic.id, asset)} />
+                </div>
+              ) : null}
+              <MultitrackPanelGrid layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={recording.targetPanelId} recordingPhase={recording.phase}
+                onTapPerformance={(id) => { triggerLightHaptic(hapticFeedback); setActivePanelId(id) }}
                 onRemoveTake={(id) => assignTakeToPanel(id, null)} onSheetMusicChange={assignSheetMusic}
                 onRegisterMedia={(id, el) => { sync.registerMedia(id, el); if (el && !masterMediaRef.current) masterMediaRef.current = el }} />
             </div>
@@ -85,17 +95,29 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {actionPanelId && !takePickerPanelId && isOpen && (
-          <motion.div key="mt-actions" className="multitrack-action-sheet" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="multitrack-action-sheet__backdrop" onClick={() => setActionPanelId(null)} />
-            <motion.div className="multitrack-action-sheet__panel" initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }} transition={iosSpringSnappy}>
-              <Pressable type="button" intensity="soft" className="multitrack-action-sheet__option" onClick={() => { recording.beginCountIn(actionPanelId); setActionPanelId(null) }}><Mic className="h-5 w-5 text-red-500" />Record new take</Pressable>
-              <Pressable type="button" intensity="soft" className="multitrack-action-sheet__option" onClick={() => setTakePickerPanelId(actionPanelId)}><Sparkles className="h-5 w-5" />Use existing take</Pressable>
-              {isRecording && <Pressable type="button" intensity="soft" className="multitrack-action-sheet__option multitrack-action-sheet__option--danger" onClick={() => { onStopRecording(); recording.cancel(); setActionPanelId(null) }}>Stop recording</Pressable>}
-            </motion.div>
+        {activePanel && isOpen && (
+          <motion.div key="mt-recording-stage" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <MultitrackRecordingStage
+              panelLabel={`Box ${session.panels.findIndex((panel) => panel.id === activePanel.id) + 1}`}
+              streamRef={streamRef}
+              tunerInstrument={tunerInstrument}
+              practice={session.practice}
+              phase={recording.phase}
+              countInRemaining={recording.countInRemaining}
+              isRecording={isRecording}
+              onPracticeChange={updatePractice}
+              onRecord={() => recording.beginCountIn(activePanel.id, session.practice)}
+              onStop={() => { onStopRecording(); recording.cancel() }}
+              onUseExisting={() => setTakePickerPanelId(activePanel.id)}
+              onClose={() => {
+                if (isRecording) onStopRecording()
+                recording.cancel()
+                setActivePanelId(null)
+              }}
+            />
           </motion.div>
         )}
       </AnimatePresence>
-      <MultitrackTakePicker isOpen={takePickerPanelId !== null} takes={takes} onClose={() => setTakePickerPanelId(null)} onSelectTake={(take) => { if (takePickerPanelId) assignTakeToPanel(takePickerPanelId, take); setTakePickerPanelId(null); setActionPanelId(null) }} />
+      <MultitrackTakePicker isOpen={takePickerPanelId !== null} takes={takes} onClose={() => setTakePickerPanelId(null)} onSelectTake={(take) => { if (takePickerPanelId) assignTakeToPanel(takePickerPanelId, take); setTakePickerPanelId(null); setActivePanelId(null) }} />
     </>, document.body)
 }

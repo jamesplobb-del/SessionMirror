@@ -534,7 +534,7 @@ export default function SettingsDrawer({
                   <div>
                     <p className="text-sm font-semibold text-stone-900">Multitrack</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                      Arrange up to six performance takes and sheet music panels in synced layouts.
+                      Record up to six synced camera boxes with optional music on screen.
                     </p>
                   </div>
                 </Pressable>
