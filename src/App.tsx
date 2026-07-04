@@ -418,6 +418,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [splitRatio, setSplitRatio] = useState(56)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
   const [practiceSessionActive, setPracticeSessionActive] = useState(false)
+  const [practiceFooterHost, setPracticeFooterHost] = useState<HTMLDivElement | null>(null)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const {
@@ -3157,7 +3158,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     />
                   )}
 
-                  {recordingMode === 'audio' && !quickSettingsOpen && (
+                  {recordingMode === 'audio' && !quickSettingsOpen && !practiceSessionActive && (
                     <div data-tutorial="audio-mode-tabs">
                       <AudioPracticeTopTabs
                         activeTab={audioPracticeTab}
@@ -3191,6 +3192,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           onStartRecording={toggleRecording}
                           onStopRecording={toggleRecording}
                           onPracticeSessionActiveChange={setPracticeSessionActive}
+                          footerHost={practiceFooterHost}
                         />
                       </div>
                     )}
@@ -3300,6 +3302,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
+                    {isAudioPracticeTimelineTab &&
+                      !practiceSessionActive &&
+                      !quickSettingsOpen && (
+                        <div
+                          ref={setPracticeFooterHost}
+                          className="practice-timeline-footer-host pointer-events-auto w-full"
+                        />
+                      )}
+
                     {(isAudioPracticeTunerTab ||
                       (isAudioPracticeTimelineTab && practiceSessionActive)) &&
                       !quickSettingsOpen &&

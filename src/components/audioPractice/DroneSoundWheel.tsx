@@ -10,6 +10,8 @@ const DIAL_LABEL_RADIUS = 84
 const GLISSANDO_THRESHOLD_PX = 10
 const INNER_DEAD_ZONE_RATIO = 0.36
 const OUTER_EDGE_RATIO = 0.94
+const INNER_NOTE_RADIUS = DIAL_CENTER * INNER_DEAD_ZONE_RATIO
+const SEGMENT_PAD_ANGLE = (Math.PI * 2) / WHEEL_NOTE_COUNT
 
 export interface DroneSoundWheelProps {
   activeNotes: number[]
@@ -35,6 +37,27 @@ function polarPoint(radius: number, angle: number): { x: number; y: number } {
     x: DIAL_CENTER + radius * Math.cos(angle),
     y: DIAL_CENTER + radius * Math.sin(angle),
   }
+}
+
+function segmentPath(index: number): string {
+  const halfStep = SEGMENT_PAD_ANGLE / 2
+  const mid = noteAngle(index)
+  const start = mid - halfStep
+  const end = mid + halfStep
+  const innerStart = polarPoint(INNER_NOTE_RADIUS, start)
+  const innerEnd = polarPoint(INNER_NOTE_RADIUS, end)
+  const outerStart = polarPoint(DIAL_OUTER_RADIUS, start)
+  const outerEnd = polarPoint(DIAL_OUTER_RADIUS, end)
+  const largeArc = end - start > Math.PI ? 1 : 0
+
+  return [
+    `M ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
+    `L ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
+    `A ${DIAL_OUTER_RADIUS} ${DIAL_OUTER_RADIUS} 0 ${largeArc} 1 ${outerEnd.x.toFixed(2)} ${outerEnd.y.toFixed(2)}`,
+    `L ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
+    `A ${INNER_NOTE_RADIUS} ${INNER_NOTE_RADIUS} 0 ${largeArc} 0 ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
+    'Z',
+  ].join(' ')
 }
 
 function pitchClassFromWheelPoint(rect: DOMRect, clientX: number, clientY: number): number | null {
@@ -169,6 +192,19 @@ export default function DroneSoundWheel({
             cy={DIAL_CENTER}
             r={DIAL_OUTER_RADIUS}
           />
+          {DRONE_NOTE_STRIP.map(({ pitchClass }, index) => {
+            const active = activeNotes.includes(pitchClass)
+            const glissando = glissandoPitch === pitchClass
+            return (
+              <path
+                key={`segment-${pitchClass}`}
+                d={segmentPath(index)}
+                className={`drone-sound-wheel__segment ${
+                  active ? 'drone-sound-wheel__segment--active' : ''
+                } ${glissando ? 'drone-sound-wheel__segment--glissando' : ''}`}
+              />
+            )
+          })}
         </svg>
 
         <div className="drone-sound-wheel__center">{children}</div>

@@ -16,6 +16,7 @@ export default function MultitrackBackingTrackPanel({
   audioRef,
   youtubeIframeRef,
   isPlaying,
+  placement = 'setup',
   onBackingChange,
   onTogglePlayback,
 }: {
@@ -23,6 +24,7 @@ export default function MultitrackBackingTrackPanel({
   audioRef: RefObject<HTMLAudioElement | null>
   youtubeIframeRef: RefObject<HTMLIFrameElement | null>
   isPlaying: boolean
+  placement?: 'setup' | 'stage'
   onBackingChange: (backing: MultitrackBackingTrack) => void
   onTogglePlayback: () => void
 }) {
@@ -82,7 +84,7 @@ export default function MultitrackBackingTrackPanel({
   }
 
   return (
-    <section className="multitrack-backing-strip" aria-label="Backing track">
+    <section className={`multitrack-backing-strip multitrack-backing-strip--${placement}`} aria-label="Backing track">
       <audio ref={audioRef} className="hidden" preload="metadata" />
       {backing.kind === 'youtube' ? (
         <div className="multitrack-backing-strip__youtube-host" aria-hidden>

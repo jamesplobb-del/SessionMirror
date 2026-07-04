@@ -55,8 +55,10 @@ function TunerTakePill({
       }}
     >
       <div className="audio-tuner-take-pill__leading">
-        <span className="audio-tuner-take-pill__label">{label}</span>
-        <span className="audio-tuner-take-pill__name">{displayName}</span>
+        <div className="audio-tuner-take-pill__copy">
+          <span className="audio-tuner-take-pill__label">{label}</span>
+          <span className="audio-tuner-take-pill__name">{displayName}</span>
+        </div>
         {hasMedia && isPlaying && (
           <span
             className="audio-tuner-take-pill__progress"

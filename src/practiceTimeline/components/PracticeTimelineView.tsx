@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
@@ -17,6 +18,7 @@ export interface PracticeTimelineViewProps {
   onStartRecording?: () => void
   onStopRecording?: () => void
   onPracticeSessionActiveChange?: (active: boolean) => void
+  footerHost?: HTMLElement | null
 }
 
 export default function PracticeTimelineView({
@@ -24,6 +26,7 @@ export default function PracticeTimelineView({
   onStartRecording,
   onStopRecording,
   onPracticeSessionActiveChange,
+  footerHost,
 }: PracticeTimelineViewProps) {
   const {
     timeline,
@@ -121,6 +124,29 @@ export default function PracticeTimelineView({
       />
     )
   }
+
+  const footer = (
+    <footer className="practice-timeline__footer">
+      <Pressable
+        type="button"
+        intensity="soft"
+        className="practice-timeline__footer-btn practice-timeline__footer-btn--secondary"
+        onClick={() => setLibraryOpen(true)}
+      >
+        Routines
+      </Pressable>
+      <Pressable
+        type="button"
+        intensity="normal"
+        haptic="success"
+        className="practice-timeline__footer-btn practice-timeline__footer-btn--primary"
+        disabled={timeline.sections.length === 0}
+        onClick={() => beginSession(0)}
+      >
+        Start Practice
+      </Pressable>
+    </footer>
+  )
 
   return (
     <div className="practice-timeline pointer-events-auto">
@@ -231,26 +257,7 @@ export default function PracticeTimelineView({
         </div>
       </div>
 
-      <footer className="practice-timeline__footer">
-        <Pressable
-          type="button"
-          intensity="soft"
-          className="practice-timeline__footer-btn practice-timeline__footer-btn--secondary"
-          onClick={() => setLibraryOpen(true)}
-        >
-          Routines
-        </Pressable>
-        <Pressable
-          type="button"
-          intensity="normal"
-          haptic="success"
-          className="practice-timeline__footer-btn practice-timeline__footer-btn--primary"
-          disabled={timeline.sections.length === 0}
-          onClick={() => beginSession(0)}
-        >
-          Start Practice
-        </Pressable>
-      </footer>
+      {footerHost ? createPortal(footer, footerHost) : null}
 
       <TimelineLibrarySheet
         open={libraryOpen}

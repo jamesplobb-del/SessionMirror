@@ -27,7 +27,6 @@ import MultitrackLayoutPicker from './MultitrackLayoutPicker'
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
 import SheetMusicPanel from '../sheetMusic/SheetMusicPanel'
 import MultitrackRecordingStage from './MultitrackRecordingStage'
-import MultitrackBackingTrackPanel from '../backing/MultitrackBackingTrackPanel'
 
 interface MultitrackOverlayProps {
   isOpen: boolean
@@ -165,17 +164,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   <SheetMusicPanel panel={session.sheetMusic} onAssetChange={(asset) => assignSheetMusic(session.sheetMusic.id, asset)} />
                 </div>
               ) : null}
-              <MultitrackBackingTrackPanel
-                backing={session.backing}
-                audioRef={backingAudioRef}
-                youtubeIframeRef={backingYoutubeIframeRef}
-                isPlaying={backingPlaying}
-                onBackingChange={(backing) => {
-                  pauseBacking()
-                  updateBacking(backing)
-                }}
-                onTogglePlayback={toggleBackingPlayback}
-              />
               <MultitrackPanelGrid layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={recording.targetPanelId} recordingPhase={recording.phase}
                 onTapPerformance={(id) => { triggerLightHaptic(hapticFeedback); setActivePanelId(id) }}
                 onRemoveTake={(id) => assignTakeToPanel(id, null)} onSheetMusicChange={assignSheetMusic}
@@ -208,7 +196,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               countInRemaining={recording.countInRemaining}
               isRecording={isRecording}
               reviewTake={activePanel.kind === 'performance' ? activePanel.take : null}
+              backing={session.backing}
+              backingAudioRef={backingAudioRef}
+              backingYoutubeIframeRef={backingYoutubeIframeRef}
+              backingPlaying={backingPlaying}
               onPracticeChange={updatePractice}
+              onBackingChange={(backing) => {
+                pauseBacking()
+                updateBacking(backing)
+              }}
+              onToggleBackingPlayback={toggleBackingPlayback}
               onRecord={() => {
                 prepareBackingForRecord()
                 recording.beginCountIn(activePanel.id, session.practice)

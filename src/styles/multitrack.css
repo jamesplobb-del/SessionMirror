@@ -47,6 +47,16 @@
   color: #1c1917;
 }
 
+.multitrack-backing-strip--stage {
+  align-self: center;
+  width: min(100%, 25rem);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  padding: 0.45rem;
+  backdrop-filter: blur(18px);
+}
+
 .multitrack-backing-strip__youtube-host {
   position: fixed;
   left: 0;
@@ -99,6 +109,17 @@
   font-weight: 600;
 }
 
+.multitrack-backing-strip--stage .multitrack-backing-strip__identity p {
+  max-width: min(48vw, 18rem);
+  font-size: 0.72rem;
+}
+
+.multitrack-backing-strip--stage .multitrack-backing-strip__identity span {
+  max-width: min(52vw, 20rem);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.6rem;
+}
+
 .multitrack-backing-strip__play,
 .multitrack-backing-strip__clear {
   display: inline-flex;
@@ -115,6 +136,16 @@
 .multitrack-backing-strip__play:disabled {
   background: #e7e5e4;
   color: #a8a29e;
+}
+
+.multitrack-backing-strip--stage .multitrack-backing-strip__play {
+  background: #fff;
+  color: #1c1917;
+}
+
+.multitrack-backing-strip--stage .multitrack-backing-strip__play:disabled {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .multitrack-backing-strip__controls {
@@ -134,6 +165,12 @@
   font-weight: 750;
 }
 
+.multitrack-backing-strip--stage .multitrack-backing-strip__chip {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  padding: 0.3rem 0.5rem;
+}
+
 .multitrack-backing-strip__volume {
   display: inline-flex;
   min-width: 8.5rem;
@@ -145,9 +182,17 @@
   font-weight: 750;
 }
 
+.multitrack-backing-strip--stage .multitrack-backing-strip__volume {
+  color: rgba(255, 255, 255, 0.68);
+}
+
 .multitrack-backing-strip__volume input {
   width: 100%;
   accent-color: #1c1917;
+}
+
+.multitrack-backing-strip--stage .multitrack-backing-strip__volume input {
+  accent-color: #fff;
 }
 
 .multitrack-backing-strip__clear {
@@ -155,11 +200,20 @@
   color: #dc2626;
 }
 
+.multitrack-backing-strip--stage .multitrack-backing-strip__clear {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fecaca;
+}
+
 .multitrack-backing-strip__youtube-row {
   margin-top: 0.45rem;
   border-radius: 0.65rem;
   background: #fafaf9;
   padding: 0.35rem;
+}
+
+.multitrack-backing-strip--stage .multitrack-backing-strip__youtube-row {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .multitrack-backing-strip__youtube-row input {
@@ -171,6 +225,14 @@
   outline: none;
 }
 
+.multitrack-backing-strip--stage .multitrack-backing-strip__youtube-row input {
+  color: #fff;
+}
+
+.multitrack-backing-strip--stage .multitrack-backing-strip__youtube-row input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 .multitrack-backing-strip__youtube-row button {
   border-radius: 0.55rem;
   background: #1c1917;
@@ -178,6 +240,11 @@
   color: #fff;
   font-size: 0.72rem;
   font-weight: 750;
+}
+
+.multitrack-backing-strip--stage .multitrack-backing-strip__youtube-row button {
+  background: #fff;
+  color: #1c1917;
 }
 
 .multitrack-backing-strip__youtube-row span {
@@ -522,7 +589,7 @@
 .multitrack-recording-stage__widgets {
   position: absolute;
   right: 1rem;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 9.6rem);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 15.5rem);
   z-index: 4;
   display: flex;
   flex-direction: column;

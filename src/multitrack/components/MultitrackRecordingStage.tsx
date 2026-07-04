@@ -9,8 +9,9 @@ import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import { playTakeMediaAudible } from '../../utils/takePlaybackAudio'
 import { resolveTakePlaybackUrl } from '../../utils/takeStorage'
-import type { MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
+import type { MultitrackBackingTrack, MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
+import MultitrackBackingTrackPanel from '../backing/MultitrackBackingTrackPanel'
 
 interface MultitrackRecordingStageProps {
   panelLabel: string
@@ -21,7 +22,13 @@ interface MultitrackRecordingStageProps {
   countInRemaining: number
   isRecording: boolean
   reviewTake: Take | null
+  backing: MultitrackBackingTrack
+  backingAudioRef: RefObject<HTMLAudioElement | null>
+  backingYoutubeIframeRef: RefObject<HTMLIFrameElement | null>
+  backingPlaying: boolean
   onPracticeChange: (patch: Partial<MultitrackPracticeSettings>) => void
+  onBackingChange: (backing: MultitrackBackingTrack) => void
+  onToggleBackingPlayback: () => void
   onRecord: () => void
   onStop: () => void
   onUseExisting: () => void
@@ -37,7 +44,13 @@ export default function MultitrackRecordingStage({
   countInRemaining,
   isRecording,
   reviewTake,
+  backing,
+  backingAudioRef,
+  backingYoutubeIframeRef,
+  backingPlaying,
   onPracticeChange,
+  onBackingChange,
+  onToggleBackingPlayback,
   onRecord,
   onStop,
   onUseExisting,
@@ -160,6 +173,16 @@ export default function MultitrackRecordingStage({
       />
 
       <footer className="multitrack-recording-stage__controls">
+        <MultitrackBackingTrackPanel
+          backing={backing}
+          audioRef={backingAudioRef}
+          youtubeIframeRef={backingYoutubeIframeRef}
+          isPlaying={backingPlaying}
+          placement="stage"
+          onBackingChange={onBackingChange}
+          onTogglePlayback={onToggleBackingPlayback}
+        />
+
         <div className="multitrack-recording-stage__settings">
           <label>
             <span>Click</span>

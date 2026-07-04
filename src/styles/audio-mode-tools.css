@@ -806,9 +806,9 @@ html.app-dark-mode
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 0.45rem;
-  min-height: 3.1rem;
-  padding: 0.42rem 0.48rem 0.42rem 0.65rem;
+  column-gap: 0.35rem;
+  min-height: 3.35rem;
+  padding: 0.5rem 0.42rem 0.5rem 0.62rem;
   border-radius: 999px;
   border: 1px solid rgba(23, 26, 34, 0.08);
   background: rgba(255, 255, 255, 0.86);
@@ -870,9 +870,15 @@ html.app-dark-mode
   min-width: 0;
   flex-direction: column;
   justify-self: start;
-  line-height: 1.05;
   overflow: hidden;
-  padding-right: 0.2rem;
+  padding-right: 0.15rem;
+}
+
+.app-ui-overlay--audio-mode .audio-tuner-take-pill__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.14rem;
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__trailing {
@@ -881,7 +887,7 @@ html.app-dark-mode
   align-items: center;
   justify-content: flex-end;
   justify-self: end;
-  gap: 0.2rem;
+  gap: 0.16rem;
   flex-shrink: 0;
 }
 
@@ -907,8 +913,8 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__play {
   display: grid;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2rem;
+  height: 2rem;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 999px;
@@ -923,8 +929,8 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn {
   display: grid;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 1.72rem;
+  height: 1.72rem;
   flex: 0 0 auto;
   place-items: center;
   border: 0;
@@ -944,8 +950,10 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__label {
-  font-size: 0.62rem;
+  display: block;
+  font-size: 0.6rem;
   font-weight: 800;
+  line-height: 1;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--audio-text-secondary);
@@ -960,13 +968,23 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__name {
+  display: block;
   overflow: hidden;
-  margin-top: 0.18rem;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   font-weight: 750;
+  line-height: 1.15;
   color: var(--audio-text-primary);
+}
+
+@media (max-width: 390px) {
+  .app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills,
+  .app-ui-overlay--practice-session-active .audio-tuner-take-pills {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.34rem;
+  }
 }
 
 html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill {

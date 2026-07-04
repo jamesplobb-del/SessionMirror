@@ -14,7 +14,7 @@
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0 var(--audio-space-md) var(--audio-space-md);
+  padding: 0 var(--audio-space-md) 0.35rem;
 }
 
 .practice-timeline__hero {
@@ -221,18 +221,23 @@
 
 .practice-timeline__footer {
   flex-shrink: 0;
-  padding: var(--audio-space-md);
-  padding-bottom: calc(var(--audio-space-md) + env(safe-area-inset-bottom, 0px));
+  padding: 0.55rem 0.75rem 0.35rem;
   display: flex;
   gap: 0.65rem;
-  background: linear-gradient(180deg, transparent, var(--audio-bg-base) 24%);
+  background: transparent;
+}
+
+.practice-timeline-footer-host .practice-timeline__footer {
+  padding: 0.45rem 0.75rem 0.3rem;
+  margin: 0;
+  background: transparent;
 }
 
 .practice-timeline__footer-btn {
   flex: 1;
-  padding: 1rem;
+  padding: 0.9rem 0.85rem;
   border-radius: 1.1rem;
-  font-size: 1rem;
+  font-size: 0.96rem;
   font-weight: 700;
   text-align: center;
 }
@@ -770,6 +775,37 @@
 
 .app-ui-overlay--audio-practice-timeline .audio-practice-timeline-layer {
   flex: 1;
+}
+
+.app-ui-overlay--audio-practice-timeline:not(.app-ui-overlay--practice-session-active)
+  .practice-timeline__hero {
+  padding-top: 0.45rem;
+  padding-bottom: 0.35rem;
+}
+
+.app-ui-overlay--audio-practice-timeline:not(.app-ui-overlay--practice-session-active)
+  .practice-timeline__summary {
+  margin-bottom: 0.35rem;
+}
+
+.app-ui-overlay--practice-session-active .practice-timeline-session {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.35rem);
+}
+
+.app-ui-overlay--practice-session-active .practice-timeline-session__header {
+  padding-top: 0.25rem;
+}
+
+.app-ui-overlay--practice-session-active .practice-timeline-session__body {
+  padding-top: 0.15rem;
+}
+
+.app-ui-overlay--practice-session-active .practice-timeline-session__footer {
+  padding-bottom: 0.15rem;
+}
+
+.practice-timeline-footer-host {
+  flex-shrink: 0;
 }
 
 /* Practice session — metronome-style playback */

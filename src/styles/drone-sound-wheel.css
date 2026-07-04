@@ -29,6 +29,25 @@
   stroke-width: 1.2;
 }
 
+.drone-sound-wheel__segment {
+  fill: rgba(255, 255, 255, 0.34);
+  stroke: rgba(23, 26, 34, 0.14);
+  stroke-width: 1.1;
+  transition:
+    fill 0.14s ease,
+    stroke 0.14s ease;
+}
+
+.drone-sound-wheel__segment--active {
+  fill: rgba(21, 152, 255, 0.14);
+  stroke: rgba(21, 152, 255, 0.42);
+}
+
+.drone-sound-wheel__segment--glissando {
+  fill: rgba(247, 166, 0, 0.16);
+  stroke: rgba(247, 166, 0, 0.5);
+}
+
 .drone-sound-wheel__center {
   position: absolute;
   inset: 0;
@@ -158,6 +177,21 @@
 
 html.app-dark-mode .drone-sound-wheel__ring-circle {
   stroke: rgba(56, 189, 248, 0.22);
+}
+
+html.app-dark-mode .drone-sound-wheel__segment {
+  fill: rgba(15, 23, 42, 0.42);
+  stroke: rgba(226, 232, 240, 0.14);
+}
+
+html.app-dark-mode .drone-sound-wheel__segment--active {
+  fill: rgba(56, 189, 248, 0.16);
+  stroke: rgba(56, 189, 248, 0.42);
+}
+
+html.app-dark-mode .drone-sound-wheel__segment--glissando {
+  fill: rgba(247, 166, 0, 0.14);
+  stroke: rgba(247, 166, 0, 0.48);
 }
 
 html.app-dark-mode .drone-sound-wheel__note {
