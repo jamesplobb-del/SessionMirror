@@ -230,7 +230,7 @@ const CoachMark = lazy(() => import('./components/CoachMark'))
 const CreatorStudio = lazy(() => import('./components/creatorStudio/CreatorStudio'))
 const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
 const CreatorStudioTakePicker = lazy(() => import('./components/labs/CreatorStudioTakePicker'))
-const MultitrackOverlay = lazy(() => import('./multitrack/MultitrackOverlay'))
+const MultitrackOverlay = lazy(() => import('./multitrack/components/MultitrackOverlay'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -394,6 +394,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [labsRoute, setLabsRoute] = useState<LabsRoute | null>(null)
   const [multitrackOpen, setMultitrackOpen] = useState(false)
+  const [multitrackPendingRecordingTakeId, setMultitrackPendingRecordingTakeId] = useState<string | null>(null)
+  const multitrackRecordingActiveRef = useRef(false)
   const [isCreatorStudioPickerOpen, setIsCreatorStudioPickerOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
     isDragging: false,
@@ -1042,6 +1044,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       return [...prev, savedTake]
     })
 
+    if (multitrackRecordingActiveRef.current) {
+      multitrackRecordingActiveRef.current = false
+      setMultitrackPendingRecordingTakeId(takeId)
+    }
+
     if (shouldAutoPlay && mediaType === 'audio' && optimisticUrl) {
       pendingAutoPlaybackRef.current = false
       playAutoTakeAudioRef.current(optimisticUrl, takeId, autoPerformanceStartSeconds, filePath)
@@ -1235,6 +1242,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     recordingMode,
     changeRecordingMode,
     toggleRecording,
+    startRecording,
     startAutoRecording,
     stopRecording,
     warmAutoRecording,
@@ -1860,11 +1868,33 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void requestCameraAccess('audio')
   }, [deferHudMediaPause, markOverlayClosed, requestCameraAccess, settings.hapticFeedback])
 
+  const handleMultitrackStartRecording = useCallback(() => {
+    multitrackRecordingActiveRef.current = true
+    pauseYoutubeReference()
+    pausePipVideos()
+    startRecording()
+  }, [pausePipVideos, pauseYoutubeReference, startRecording])
+
+  const handleMultitrackStopRecording = useCallback(() => {
+    if (isRecording) stopRecording()
+  }, [isRecording, stopRecording])
+
+  const handleClearMultitrackPendingRecording = useCallback(() => {
+    setMultitrackPendingRecordingTakeId(null)
+  }, [])
+
+  const handleMultitrackRecordingComplete = useCallback(() => {
+    multitrackRecordingActiveRef.current = false
+  }, [])
+
   const handleCloseMultitrack = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
+    if (isRecording) stopRecording()
+    multitrackRecordingActiveRef.current = false
+    setMultitrackPendingRecordingTakeId(null)
     setMultitrackOpen(false)
     recoverCameraAfterSurfaceDismiss('multitrack-close')
-  }, [recoverCameraAfterSurfaceDismiss, settings.hapticFeedback])
+  }, [isRecording, recoverCameraAfterSurfaceDismiss, settings.hapticFeedback, stopRecording])
 
   const handleCloseCreatorStudioPicker = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
@@ -3529,11 +3559,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                   <MultitrackOverlay
                     isOpen={multitrackOpen}
-                    onClose={handleCloseMultitrack}
-                    settings={settings}
-                    tunerInstrument={settings.tunerInstrument}
+                    takes={sortedTakes}
                     streamRef={streamRef}
-                    onRequestMicStream={handleRequestLabsMicStream}
+                    tunerInstrument={settings.tunerInstrument}
+                    hapticFeedback={settings.hapticFeedback}
+                    isRecording={isRecording}
+                    onClose={handleCloseMultitrack}
+                    onStartRecording={handleMultitrackStartRecording}
+                    onStopRecording={handleMultitrackStopRecording}
+                    onRecordingComplete={handleMultitrackRecordingComplete}
+                    pendingRecordingTakeId={multitrackPendingRecordingTakeId}
+                    onClearPendingRecording={handleClearMultitrackPendingRecording}
                   />
                 </Suspense>
 

@@ -1,7 +1,5 @@
 import type { Take } from '../types'
 
-/** --- Legacy panel-grid types (unused by MVP overlay; kept for incremental cleanup) --- */
-
 export type MultitrackPanelKind = 'performance' | 'sheet-music'
 
 export interface SheetMusicAsset {
@@ -50,53 +48,3 @@ export interface MultitrackSession {
 }
 
 export type MultitrackRecordingPhase = 'idle' | 'count-in' | 'recording'
-
-/** --- Shared Practice Environment (backing + overdub MVP) --- */
-
-export type MultitrackBackingKind = 'none' | 'mp3' | 'youtube'
-
-export interface MultitrackBackingTrack {
-  kind: MultitrackBackingKind
-  name: string
-  storageKey?: string
-  objectUrl?: string
-  youtubeUrl?: string
-  duration: number
-}
-
-export interface MultitrackBox {
-  id: string
-  name: string
-  storageKey: string
-  objectUrl: string
-  duration: number
-  recordedAt: number
-}
-
-export interface MultitrackMixerLevels {
-  performance: number
-  backing: number
-  metronome: number
-  drone: number
-}
-
-export interface MultitrackWidgetVisibility {
-  metronome: boolean
-  pitch: boolean
-  drone: boolean
-  backingControls: boolean
-}
-
-export const DEFAULT_MIXER: MultitrackMixerLevels = {
-  performance: 85,
-  backing: 80,
-  metronome: 70,
-  drone: 65,
-}
-
-export const DEFAULT_WIDGETS: MultitrackWidgetVisibility = {
-  metronome: true,
-  pitch: false,
-  drone: false,
-  backingControls: true,
-}

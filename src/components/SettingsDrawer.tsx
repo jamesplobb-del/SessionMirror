@@ -532,9 +532,9 @@ export default function SettingsDrawer({
                   className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-stone-900">Shared Practice Environment</p>
+                    <p className="text-sm font-semibold text-stone-900">Multitrack</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                      Layer overdubs on one backing track with metronome, tuner, and drone widgets.
+                      Arrange up to six performance takes and sheet music panels in synced layouts.
                     </p>
                   </div>
                 </Pressable>
