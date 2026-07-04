@@ -230,6 +230,7 @@ const CoachMark = lazy(() => import('./components/CoachMark'))
 const CreatorStudio = lazy(() => import('./components/creatorStudio/CreatorStudio'))
 const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
 const CreatorStudioTakePicker = lazy(() => import('./components/labs/CreatorStudioTakePicker'))
+const MultitrackOverlay = lazy(() => import('./multitrack/MultitrackOverlay'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -392,6 +393,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [labsRoute, setLabsRoute] = useState<LabsRoute | null>(null)
+  const [multitrackOpen, setMultitrackOpen] = useState(false)
   const [isCreatorStudioPickerOpen, setIsCreatorStudioPickerOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
     isDragging: false,
@@ -413,6 +415,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
+  const [practiceSessionActive, setPracticeSessionActive] = useState(false)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const {
@@ -457,7 +460,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const isReviewOpen = reviewSlot !== null
   const isLabsOpen = labsRoute !== null
-  const isExperimentalOpen = isLabsOpen || isCreatorStudioPickerOpen || creatorStudioTake !== null
+  const isExperimentalOpen =
+    isLabsOpen || isCreatorStudioPickerOpen || creatorStudioTake !== null || multitrackOpen
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
     ? 'review'
     : isVaultOpen || isSettingsOpen || isExperimentalOpen
@@ -1816,6 +1820,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsVaultOpen(false)
     setIsCreatorStudioPickerOpen(false)
     setCreatorStudioTake(null)
+    setMultitrackOpen(false)
     setShowPitch(false)
     setLabsRoute('menu')
     deferHudMediaPause()
@@ -1827,6 +1832,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsSettingsOpen(false)
     setIsVaultOpen(false)
     setLabsRoute(null)
+    setMultitrackOpen(false)
     setShowPitch(false)
     pauseYoutubeReference()
     pausePipVideos()
@@ -1839,6 +1845,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     pauseYoutubeReference,
     settings.hapticFeedback,
   ])
+
+  const handleOpenMultitrack = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    markOverlayClosed()
+    setIsSettingsOpen(false)
+    setIsVaultOpen(false)
+    setLabsRoute(null)
+    setIsCreatorStudioPickerOpen(false)
+    setCreatorStudioTake(null)
+    setShowPitch(false)
+    setMultitrackOpen(true)
+    deferHudMediaPause()
+    void requestCameraAccess('audio')
+  }, [deferHudMediaPause, markOverlayClosed, requestCameraAccess, settings.hapticFeedback])
+
+  const handleCloseMultitrack = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    setMultitrackOpen(false)
+    recoverCameraAfterSurfaceDismiss('multitrack-close')
+  }, [recoverCameraAfterSurfaceDismiss, settings.hapticFeedback])
 
   const handleCloseCreatorStudioPicker = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
@@ -2185,6 +2211,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const isAudioPracticeTunerTab = recordingMode === 'audio' && audioPracticeTab === 'tuner'
 
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
+
+  useEffect(() => {
+    if (!isAudioPracticeTimelineTab) {
+      setPracticeSessionActive(false)
+    }
+  }, [isAudioPracticeTimelineTab])
 
   const isAudioPracticeToolTab =
     isAudioPracticeMetronomeTab || isAudioPracticeTunerTab || isAudioPracticeTimelineTab
@@ -3061,9 +3093,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     isSplitView ? 'app-ui-overlay--split-open' : ''
                   } ${
                     isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
-                  } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${
+                  } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''                  } ${
                     isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline app-ui-overlay--audio-practice-metronome' : ''
-                  }`}
+                  } ${practiceSessionActive ? 'app-ui-overlay--practice-session-active' : ''}`}
                   aria-hidden={hudModalState === 'review'}
                   animate={{
                     opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -3127,6 +3159,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           isRecording={isRecording}
                           onStartRecording={toggleRecording}
                           onStopRecording={toggleRecording}
+                          onPracticeSessionActiveChange={setPracticeSessionActive}
                         />
                       </div>
                     )}
@@ -3236,11 +3269,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
-                    {isAudioPracticeTunerTab &&
+                    {(isAudioPracticeTunerTab ||
+                      (isAudioPracticeTimelineTab && practiceSessionActive)) &&
                       !quickSettingsOpen &&
                       settings.showTakeCards && (
                         <motion.div
-                          key="tuner-take-pills"
+                          key={
+                            isAudioPracticeTimelineTab && practiceSessionActive
+                              ? 'practice-take-pills'
+                              : 'tuner-take-pills'
+                          }
                           className="audio-tuner-take-pills-wrap pointer-events-auto w-full"
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -3474,6 +3512,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onReplayTutorial={handleReplayOnboardingTutorial}
                     onOpenLabs={handleOpenLabs}
                     onOpenCreatorStudio={handleOpenCreatorStudioPicker}
+                    onOpenMultitrack={handleOpenMultitrack}
                     recordingMode={recordingMode}
                   />
 
@@ -3485,6 +3524,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     tunerInstrument={settings.tunerInstrument}
                     onClose={handleCloseLabs}
                     onNavigate={handleLabsNavigate}
+                    onRequestMicStream={handleRequestLabsMicStream}
+                  />
+
+                  <MultitrackOverlay
+                    isOpen={multitrackOpen}
+                    onClose={handleCloseMultitrack}
+                    settings={settings}
+                    tunerInstrument={settings.tunerInstrument}
+                    streamRef={streamRef}
                     onRequestMicStream={handleRequestLabsMicStream}
                   />
                 </Suspense>

@@ -105,6 +105,7 @@ class SharedMetronomeEngine {
 
   private isTakePlaying = false
   private muteDuringPlayback = true
+  private outputGainMultiplier = 1
   private resumeOnForeground = false
   private lifecycleAttached = false
   private isBackgrounded = false
@@ -170,15 +171,26 @@ class SharedMetronomeEngine {
     return this.muteDuringPlayback && this.isTakePlaying
   }
 
-  setPlaybackMutePolicy(isTakePlaying: boolean, muteDuringPlayback: boolean): void {
-    this.isTakePlaying = isTakePlaying
-    this.muteDuringPlayback = muteDuringPlayback
-
+  private applyMasterGain(): void {
     const ctx = this.audioCtx
     const master = this.masterGain
     if (!ctx || !master || master.context !== ctx) return
+    master.gain.setValueAtTime(
+      metronomeSpeakerGain(this.shouldMuteOutput()) * this.outputGainMultiplier,
+      ctx.currentTime,
+    )
+  }
 
-    master.gain.setValueAtTime(metronomeSpeakerGain(this.shouldMuteOutput()), ctx.currentTime)
+  /** Optional session gain (e.g. multitrack mixer). Resets to 1 when not used. */
+  setOutputGainMultiplier(multiplier: number): void {
+    this.outputGainMultiplier = Math.max(0, Math.min(1, multiplier))
+    this.applyMasterGain()
+  }
+
+  setPlaybackMutePolicy(isTakePlaying: boolean, muteDuringPlayback: boolean): void {
+    this.isTakePlaying = isTakePlaying
+    this.muteDuringPlayback = muteDuringPlayback
+    this.applyMasterGain()
   }
 
   attachLifecycle(): void {
@@ -648,7 +660,7 @@ class SharedMetronomeEngine {
     let master = this.masterGain
     if (!master || master.context !== ctx) {
       master = ctx.createGain()
-      master.gain.value = metronomeSpeakerGain(this.shouldMuteOutput())
+      master.gain.value = metronomeSpeakerGain(this.shouldMuteOutput()) * this.outputGainMultiplier
       master.connect(ctx.destination)
       this.masterGain = master
     }

@@ -25,27 +25,8 @@
 
 .drone-sound-wheel__ring-circle {
   fill: none;
-  stroke: rgba(21, 152, 255, 0.28);
-  stroke-width: 1.6;
-}
-
-.drone-sound-wheel__tick {
-  stroke: rgba(21, 152, 255, 0.22);
+  stroke: rgba(21, 152, 255, 0.16);
   stroke-width: 1.2;
-  stroke-linecap: round;
-  transition:
-    stroke 0.12s ease,
-    stroke-width 0.12s ease;
-}
-
-.drone-sound-wheel__tick--active {
-  stroke: rgba(21, 152, 255, 0.72);
-  stroke-width: 1.8;
-}
-
-.drone-sound-wheel__tick--glissando {
-  stroke: rgba(247, 166, 0, 0.88);
-  stroke-width: 2.1;
 }
 
 .drone-sound-wheel__center {
@@ -88,47 +69,33 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.66rem;
-  height: 1.24rem;
-  padding: 0 0.34rem;
-  border: 1px solid rgba(21, 152, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  color: rgba(23, 26, 34, 0.64);
-  font-size: 0.68rem;
-  font-weight: 800;
+  min-width: 1.35rem;
+  padding: 0.08rem 0.12rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: rgba(23, 26, 34, 0.48);
+  font-size: 0.74rem;
+  font-weight: 700;
   line-height: 1;
   letter-spacing: -0.02em;
   transform: translate(-50%, -50%);
-  box-shadow:
-    0 2px 7px rgba(23, 26, 34, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.86);
-  -webkit-backdrop-filter: blur(10px) saturate(1.08);
-  backdrop-filter: blur(10px) saturate(1.08);
   pointer-events: none;
   transition:
-    background-color 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease,
-    box-shadow 0.12s ease,
-    transform 0.12s ease;
+    color 0.14s ease,
+    transform 0.14s ease,
+    text-shadow 0.14s ease;
 }
 
 .drone-sound-wheel__note--active {
-  border-color: rgba(21, 152, 255, 0.55);
-  background: rgba(21, 152, 255, 0.16);
-  color: #075985;
-  box-shadow:
-    0 0 0 1px rgba(21, 152, 255, 0.13),
-    0 0 12px rgba(21, 152, 255, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  color: #0369a1;
+  text-shadow: 0 0 10px rgba(21, 152, 255, 0.18);
 }
 
 .drone-sound-wheel__note--glissando {
-  border-color: rgba(247, 166, 0, 0.52);
-  background: rgba(247, 166, 0, 0.14);
   color: #b45309;
-  transform: translate(-50%, -50%) scale(1.12);
+  transform: translate(-50%, -50%) scale(1.14);
+  text-shadow: 0 0 12px rgba(247, 166, 0, 0.22);
 }
 
 .drone-sound-wheel__octave {
@@ -190,40 +157,21 @@
 }
 
 html.app-dark-mode .drone-sound-wheel__ring-circle {
-  stroke: rgba(56, 189, 248, 0.34);
-}
-
-html.app-dark-mode .drone-sound-wheel__tick {
-  stroke: rgba(56, 189, 248, 0.24);
-}
-
-html.app-dark-mode .drone-sound-wheel__tick--active {
-  stroke: rgba(56, 189, 248, 0.78);
-}
-
-html.app-dark-mode .drone-sound-wheel__tick--glissando {
-  stroke: rgba(247, 166, 0, 0.9);
+  stroke: rgba(56, 189, 248, 0.22);
 }
 
 html.app-dark-mode .drone-sound-wheel__note {
-  border-color: rgba(56, 189, 248, 0.22);
-  background: rgba(15, 23, 42, 0.74);
-  color: rgba(248, 250, 252, 0.78);
-  box-shadow:
-    0 2px 9px rgba(0, 0, 0, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: rgba(248, 250, 252, 0.52);
 }
 
 html.app-dark-mode .drone-sound-wheel__note--active {
-  border-color: rgba(56, 189, 248, 0.58);
-  background: rgba(56, 189, 248, 0.16);
-  color: #bae6fd;
+  color: #7dd3fc;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
 }
 
 html.app-dark-mode .drone-sound-wheel__note--glissando {
-  border-color: rgba(247, 166, 0, 0.52);
-  background: rgba(247, 166, 0, 0.16);
   color: #fcd34d;
+  text-shadow: 0 0 12px rgba(247, 166, 0, 0.24);
 }
 
 html.app-dark-mode .drone-sound-wheel__octave {

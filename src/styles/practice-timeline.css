@@ -495,6 +495,53 @@
   margin-bottom: 0.65rem;
 }
 
+.practice-timeline__playback-options {
+  margin: 0.35rem var(--audio-space-md) 0.5rem;
+}
+
+.practice-timeline__playback-options-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.72rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid var(--audio-divider);
+  background: color-mix(in srgb, var(--audio-surface) 88%, transparent);
+  color: var(--audio-text-primary);
+}
+
+.practice-timeline__playback-options-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.18rem;
+  text-align: left;
+}
+
+.practice-timeline__playback-options-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.practice-timeline__playback-options-summary {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--audio-text-secondary);
+  line-height: 1.35;
+}
+
+.practice-timeline__track-settings {
+  margin-top: 0.45rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 1rem;
+  background: var(--audio-surface);
+  border: 1px solid var(--audio-divider);
+}
+
 /* Dropdown selects — match Metronome tab styling inside timeline editor */
 .practice-timeline-editor .metronome-audio-select {
   display: flex;
@@ -775,13 +822,6 @@
   padding: 0.15rem 0;
 }
 
-.practice-timeline__track-settings {
-  margin: 0.5rem var(--audio-space-md) 0.75rem;
-  padding: 0.75rem 0.85rem;
-  border-radius: 14px;
-  background: var(--audio-surface);
-  border: 1px solid var(--audio-divider);
-}
 
 .practice-timeline__track-settings-row {
   display: flex;

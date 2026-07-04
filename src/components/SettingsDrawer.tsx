@@ -33,6 +33,7 @@ interface SettingsDrawerProps {
   onReplayTutorial?: () => void
   onOpenLabs?: () => void
   onOpenCreatorStudio?: () => void
+  onOpenMultitrack?: () => void
   recordingMode: 'video' | 'audio'
 }
 
@@ -175,6 +176,7 @@ export default function SettingsDrawer({
   onReplayTutorial,
   onOpenLabs,
   onOpenCreatorStudio,
+  onOpenMultitrack,
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
@@ -484,7 +486,7 @@ export default function SettingsDrawer({
             />
           </section>
 
-          {(onOpenLabs || onOpenCreatorStudio) && (
+          {(onOpenLabs || onOpenCreatorStudio || onOpenMultitrack) && (
             <section className="settings-group space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
                 Experimental (In Development)
@@ -517,6 +519,22 @@ export default function SettingsDrawer({
                     <p className="text-sm font-semibold text-stone-900">Creator Studio</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
                       Trim, crop, and export a video take.
+                    </p>
+                  </div>
+                </Pressable>
+              )}
+
+              {onOpenMultitrack && (
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={onOpenMultitrack}
+                  className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-stone-900">Shared Practice Environment</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                      Layer overdubs on one backing track with metronome, tuner, and drone widgets.
                     </p>
                   </div>
                 </Pressable>

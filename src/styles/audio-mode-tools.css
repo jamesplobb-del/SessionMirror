@@ -759,6 +759,10 @@ html.app-dark-mode
   padding-top: 0.32rem;
 }
 
+.app-ui-overlay--practice-session-active .audio-tuner-take-pills-wrap {
+  padding-top: 0.32rem;
+}
+
 .app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished {
   margin: 0.35rem 0.5rem;
   border-radius: var(--audio-radius-card);
@@ -786,7 +790,8 @@ html.app-dark-mode
   color: var(--audio-text-secondary);
 }
 
-.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills {
+.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills,
+.app-ui-overlay--practice-session-active .audio-tuner-take-pills {
   position: relative;
   z-index: 8;
   flex-shrink: 0;
@@ -801,9 +806,9 @@ html.app-dark-mode
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 0.38rem;
-  min-height: 2.75rem;
-  padding: 0.34rem 0.38rem 0.34rem 0.55rem;
+  column-gap: 0.45rem;
+  min-height: 3.1rem;
+  padding: 0.42rem 0.48rem 0.42rem 0.65rem;
   border-radius: 999px;
   border: 1px solid rgba(23, 26, 34, 0.08);
   background: rgba(255, 255, 255, 0.86);
@@ -902,8 +907,8 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__play {
   display: grid;
-  width: 2.05rem;
-  height: 2.05rem;
+  width: 2.2rem;
+  height: 2.2rem;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 999px;
@@ -918,8 +923,8 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn {
   display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.9rem;
+  height: 1.9rem;
   flex: 0 0 auto;
   place-items: center;
   border: 0;
@@ -939,7 +944,7 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__label {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -956,10 +961,10 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill__name {
   overflow: hidden;
-  margin-top: 0.16rem;
+  margin-top: 0.18rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   font-weight: 750;
   color: var(--audio-text-primary);
 }

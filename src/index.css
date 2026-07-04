@@ -2,6 +2,7 @@
 @import './styles/audio-mode-tokens.css';
 @import './styles/audio-mode.css';
 @import './styles/practice-timeline.css';
+@import './styles/multitrack.css';
 
 :root {
   --app-base: #000000;
@@ -1062,6 +1063,16 @@ body.settings-branch-open * {
 }
 
 .app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills-wrap {
+  padding: 0 0.75rem 0.2rem;
+}
+
+.app-ui-overlay--practice-session-active .app-hud-bottom {
+  gap: 0.55rem;
+  padding-top: 0.2rem;
+  padding-bottom: 0.1rem;
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pills-wrap {
   padding: 0 0.75rem 0.2rem;
 }
 

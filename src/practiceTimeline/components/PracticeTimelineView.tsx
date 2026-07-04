@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
@@ -16,12 +16,14 @@ export interface PracticeTimelineViewProps {
   isRecording?: boolean
   onStartRecording?: () => void
   onStopRecording?: () => void
+  onPracticeSessionActiveChange?: (active: boolean) => void
 }
 
 export default function PracticeTimelineView({
   isRecording = false,
   onStartRecording,
   onStopRecording,
+  onPracticeSessionActiveChange,
 }: PracticeTimelineViewProps) {
   const {
     timeline,
@@ -52,6 +54,14 @@ export default function PracticeTimelineView({
     currentSection,
     nextSection,
   } = useTimelinePlayback()
+
+  useEffect(() => {
+    onPracticeSessionActiveChange?.(playbackState.sessionActive)
+  }, [onPracticeSessionActiveChange, playbackState.sessionActive])
+
+  useEffect(() => {
+    return () => onPracticeSessionActiveChange?.(false)
+  }, [onPracticeSessionActiveChange])
 
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [recordEnabled, setRecordEnabled] = useState(false)
@@ -162,10 +172,6 @@ export default function PracticeTimelineView({
           </p>
         </header>
 
-        {timeline.sections.length > 0 ? (
-          <TrackSettingsPanel settings={trackSettings} onChange={updateTrackSettings} />
-        ) : null}
-
         {timeline.sections.map((section, index) => (
           <Fragment key={section.id}>
             {index > 0 ? <div className="practice-timeline__connector">↓</div> : null}
@@ -202,6 +208,10 @@ export default function PracticeTimelineView({
           <Plus size={20} />
           Add Section
         </Pressable>
+
+        {timeline.sections.length > 0 ? (
+          <TrackSettingsPanel settings={trackSettings} onChange={updateTrackSettings} />
+        ) : null}
 
         <label className="practice-timeline__record-toggle pointer-events-auto">
           <span>Record with practice</span>

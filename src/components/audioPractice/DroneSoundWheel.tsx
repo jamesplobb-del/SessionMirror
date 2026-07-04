@@ -6,8 +6,7 @@ const WHEEL_NOTE_COUNT = 12
 const DIAL_SIZE = 200
 const DIAL_CENTER = DIAL_SIZE / 2
 const DIAL_OUTER_RADIUS = 92
-const DIAL_TICK_INNER_RADIUS = 74
-const DIAL_LABEL_RADIUS = 79
+const DIAL_LABEL_RADIUS = 84
 const GLISSANDO_THRESHOLD_PX = 10
 const INNER_DEAD_ZONE_RATIO = 0.36
 const OUTER_EDGE_RATIO = 0.94
@@ -170,25 +169,6 @@ export default function DroneSoundWheel({
             cy={DIAL_CENTER}
             r={DIAL_OUTER_RADIUS}
           />
-          {DRONE_NOTE_STRIP.map(({ pitchClass }, index) => {
-            const angle = noteAngle(index)
-            const tickStart = polarPoint(DIAL_TICK_INNER_RADIUS, angle)
-            const tickEnd = polarPoint(DIAL_OUTER_RADIUS, angle)
-            const active = activeNotes.includes(pitchClass)
-            const glissando = glissandoPitch === pitchClass
-            return (
-              <line
-                key={`tick-${pitchClass}`}
-                className={`drone-sound-wheel__tick ${
-                  active ? 'drone-sound-wheel__tick--active' : ''
-                } ${glissando ? 'drone-sound-wheel__tick--glissando' : ''}`}
-                x1={tickStart.x}
-                y1={tickStart.y}
-                x2={tickEnd.x}
-                y2={tickEnd.y}
-              />
-            )
-          })}
         </svg>
 
         <div className="drone-sound-wheel__center">{children}</div>
