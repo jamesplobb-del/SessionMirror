@@ -8,10 +8,6 @@ interface UsePipInlineDecoderOptions {
   videoRef?: RefObject<HTMLMediaElement | null>
 }
 
-function isMediaActivelyPlaying(media: HTMLMediaElement | null | undefined): boolean {
-  return Boolean(media && !media.paused && !media.ended)
-}
-
 /** Gates PiP `<video>` mount — poster when idle, decoder when playing or auto-play armed. */
 export function usePipInlineDecoder({
   suspendPlayback,
@@ -46,31 +42,11 @@ export function usePipInlineDecoder({
 
   useEffect(() => {
     if (isAutoPlayArmed || isPlaying) return
-    if (isMediaActivelyPlaying(videoRef?.current)) return
+    const media = videoRef?.current
+    if (media && !media.paused && !media.ended) return
     setDecoderActive(false)
     pendingPlayRef.current = false
   }, [isAutoPlayArmed, isPlaying, videoRef, videoSourceKey])
-
-  useEffect(() => {
-    const media = videoRef?.current
-    if (!media || !decoderActive) return
-
-    const keepDecoderWhilePlaying = () => {
-      if (isMediaActivelyPlaying(media)) {
-        setDecoderActive(true)
-      }
-    }
-
-    media.addEventListener('play', keepDecoderWhilePlaying)
-    media.addEventListener('playing', keepDecoderWhilePlaying)
-    media.addEventListener('timeupdate', keepDecoderWhilePlaying)
-
-    return () => {
-      media.removeEventListener('play', keepDecoderWhilePlaying)
-      media.removeEventListener('playing', keepDecoderWhilePlaying)
-      media.removeEventListener('timeupdate', keepDecoderWhilePlaying)
-    }
-  }, [decoderActive, videoRef, videoSourceKey])
 
   const requestDecoderForPlay = useCallback(() => {
     pendingPlayRef.current = true

@@ -18,7 +18,7 @@ function pickSyncMaster(elements: HTMLMediaElement[]): HTMLMediaElement | null {
   }, null)
 }
 
-function primeElementForAudiblePlayback(element: HTMLMediaElement): void {
+function primeElementForPlayback(element: HTMLMediaElement): void {
   element.muted = false
   element.volume = 1
   element.preload = 'auto'
@@ -28,7 +28,6 @@ function primeElementForAudiblePlayback(element: HTMLMediaElement): void {
 
 export function useMultitrackSync() {
   const mediaMapRef = useRef<Map<string, HTMLMediaElement>>(new Map())
-  const preparedRef = useRef(false)
   const excludePanelIdRef = useRef<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -61,7 +60,6 @@ export function useMultitrackSync() {
   const registerMedia = useCallback((panelId: string, element: HTMLMediaElement | null) => {
     if (element) {
       mediaMapRef.current.set(panelId, element)
-      primeElementForAudiblePlayback(element)
       element.addEventListener('loadedmetadata', refreshDuration)
       element.addEventListener('durationchange', refreshDuration)
     } else {
@@ -84,15 +82,51 @@ export function useMultitrackSync() {
     setCurrentTime(time)
   }, [])
 
-  const prepareFromStart = useCallback(async (startTime = 0) => {
-    const elements = getElements()
-    if (elements.length === 0) {
-      preparedRef.current = false
+  const playElements = useCallback(async (elements: HTMLMediaElement[], startTime: number) => {
+    if (elements.length === 0) return false
+
+    for (const el of elements) {
+      primeElementForPlayback(el)
+      if (el.readyState < HTMLMediaElement.HAVE_METADATA && (el.src || el.currentSrc)) {
+        try {
+          el.load()
+        } catch {
+          /* ignore */
+        }
+      }
+      try {
+        el.currentTime = startTime
+      } catch {
+        /* ignore */
+      }
+    }
+
+    setCurrentTime(startTime)
+
+    try {
+      await preparePlaybackRoute({ suspendCamera: false })
+    } catch {
       return false
     }
 
+    primeTakePlaybackForUserGesture(...elements)
+    await resumePlaybackAudioContext()
+    await Promise.allSettled(elements.map((el) => waitForMediaReady(el, 900)))
+
+    const starts = await Promise.all(
+      elements.map((el) => playTakeMediaAudible(el, { skipRoutePrep: true })),
+    )
+    const playing = starts.some(Boolean)
+    setIsPlaying(playing)
+    return playing
+  }, [])
+
+  const prepareAtStart = useCallback(async (startTime = 0) => {
+    const elements = getElements()
+    if (elements.length === 0) return false
+
     for (const el of elements) {
-      primeElementForAudiblePlayback(el)
+      primeElementForPlayback(el)
       if (el.readyState < HTMLMediaElement.HAVE_METADATA && (el.src || el.currentSrc)) {
         try {
           el.load()
@@ -113,93 +147,52 @@ export function useMultitrackSync() {
     try {
       await preparePlaybackRoute({ suspendCamera: false })
     } catch {
-      preparedRef.current = false
       return false
     }
 
     primeTakePlaybackForUserGesture(...elements)
     await resumePlaybackAudioContext()
     await Promise.allSettled(elements.map((el) => waitForMediaReady(el, 2000)))
-    preparedRef.current = true
     return true
   }, [getElements])
 
   const startPrepared = useCallback(async () => {
-    let elements = getElements()
+    const elements = getElements()
     if (elements.length === 0) {
       setIsPlaying(false)
       return false
     }
 
-    if (!preparedRef.current) {
-      const prepared = await prepareFromStart(0)
-      if (!prepared) {
-        setIsPlaying(false)
-        return false
-      }
-      elements = getElements()
-    }
-
-    preparedRef.current = false
     const starts = await Promise.all(
       elements.map((el) => playTakeMediaAudible(el, { skipRoutePrep: true })),
     )
     const playing = starts.some(Boolean)
     setIsPlaying(playing)
     return playing
-  }, [getElements, prepareFromStart])
+  }, [getElements])
+
+  const play = useCallback(async () => {
+    const master = getMaster()
+    const elements = getElements()
+    const startTime = master?.currentTime ?? currentTime
+    return playElements(elements, startTime)
+  }, [currentTime, getElements, getMaster, playElements])
 
   const playAllFromUserGesture = useCallback(() => {
     const elements = getElements()
-    if (elements.length === 0) {
-      setIsPlaying(false)
-      return
-    }
-
-    preparedRef.current = false
     syncAllTo(0)
-
-    void (async () => {
-      for (const el of elements) {
-        primeElementForAudiblePlayback(el)
-      }
-
-      try {
-        await preparePlaybackRoute({ suspendCamera: false })
-      } catch {
-        setIsPlaying(false)
-        return
-      }
-
-      primeTakePlaybackForUserGesture(...elements)
-      await resumePlaybackAudioContext()
-      await Promise.allSettled(elements.map((el) => waitForMediaReady(el, 900)))
-
-      const starts = await Promise.all(
-        elements.map((el) => playTakeMediaAudible(el, { skipRoutePrep: true })),
-      )
-      setIsPlaying(starts.some(Boolean))
-    })()
-  }, [getElements, syncAllTo])
-
-  const play = useCallback(async () => {
-    preparedRef.current = false
-    await prepareFromStart(currentTime)
-    await startPrepared()
-  }, [currentTime, prepareFromStart, startPrepared])
+    void playElements(elements, 0)
+  }, [getElements, playElements, syncAllTo])
 
   const pause = useCallback(() => {
     for (const el of mediaMapRef.current.values()) el.pause()
-    preparedRef.current = false
     setIsPlaying(false)
   }, [])
 
   const restart = useCallback(async () => {
-    preparedRef.current = false
     syncAllTo(0)
-    await prepareFromStart(0)
-    await startPrepared()
-  }, [prepareFromStart, startPrepared, syncAllTo])
+    await playElements(getElements(), 0)
+  }, [getElements, playElements, syncAllTo])
 
   const seek = useCallback((time: number) => syncAllTo(time), [syncAllTo])
 
@@ -214,8 +207,7 @@ export function useMultitrackSync() {
       if (master) {
         setCurrentTime(master.currentTime)
         const elements = getElements()
-        const anyPlaying = elements.some((el) => !el.paused && !el.ended)
-        if (!anyPlaying) {
+        if (elements.length > 0 && elements.every((el) => el.paused || el.ended)) {
           setIsPlaying(false)
           return
         }
@@ -245,7 +237,7 @@ export function useMultitrackSync() {
   return {
     registerMedia,
     setExcludePanelId,
-    prepareFromStart,
+    prepareAtStart,
     startPrepared,
     playAllFromUserGesture,
     play,

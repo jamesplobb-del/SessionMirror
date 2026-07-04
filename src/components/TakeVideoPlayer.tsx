@@ -111,10 +111,9 @@ export default function TakeVideoPlayer({
 
   useEffect(() => {
     const media = mediaRef.current
-    if (!media || !mediaSrc) return
+    if (!media) return
 
     const routed = hasTakePlaybackSpeakerRoute(media)
-    const activelyPlaying = !media.paused && !media.ended
 
     if (audible || routed) {
       // Output flows through the Web Audio speaker bus; keep the element unmuted
@@ -126,10 +125,9 @@ export default function TakeVideoPlayer({
       return
     }
 
-    if (!activelyPlaying) {
-      ensureMediaMuted(media)
-    }
-    if (manualPlayOnly && !activelyPlaying) {
+    if (!mediaSrc) return
+    ensureMediaMuted(media)
+    if (manualPlayOnly) {
       media.pause()
     }
   }, [audible, manualPlayOnly, mediaSrc, mediaRef])

@@ -132,7 +132,8 @@ function PipWindow({
     videoSourceKey,
     videoRef,
   })
-  const playbackAudible = (isAutoPlayArmed || isPlaying) && !suspendPlayback
+  const playbackAudible =
+    (isAutoPlayArmed || isPlaying || decoderActive) && !suspendPlayback
 
   useEffect(() => {
     setIsPlaying(false)

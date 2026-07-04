@@ -318,7 +318,7 @@ function BestTakeBox({
   const playbackFit =
     isFill && take?.recordingOrientation === 'landscape' ? 'contain' : 'cover'
 
-  const playbackAudible = isPlaying && !suspendPlayback && hasTake
+  const playbackAudible = (isPlaying || decoderActive) && !suspendPlayback && hasTake
 
   const shellClass = isFill
     ? 'relative h-full w-full min-h-0 overflow-hidden'
