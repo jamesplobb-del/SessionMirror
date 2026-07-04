@@ -1,10 +1,14 @@
-import { useEffect, useRef } from 'react'
-import { AudioLines, Camera, Grid2X2, Mic, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AudioLines, Camera, Grid2X2, Mic, Pause, Play, X } from 'lucide-react'
 import type { RefObject } from 'react'
+import type { Take } from '../../types'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import MetronomeIcon from '../../components/icons/MetronomeIcon'
+import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
 import type { TunerInstrument } from '../../utils/pitchConfig'
+import { playTakeMediaAudible } from '../../utils/takePlaybackAudio'
+import { resolveTakePlaybackUrl } from '../../utils/takeStorage'
 import type { MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
 
@@ -16,6 +20,7 @@ interface MultitrackRecordingStageProps {
   phase: MultitrackRecordingPhase
   countInRemaining: number
   isRecording: boolean
+  reviewTake: Take | null
   onPracticeChange: (patch: Partial<MultitrackPracticeSettings>) => void
   onRecord: () => void
   onStop: () => void
@@ -31,6 +36,7 @@ export default function MultitrackRecordingStage({
   phase,
   countInRemaining,
   isRecording,
+  reviewTake,
   onPracticeChange,
   onRecord,
   onStop,
@@ -39,7 +45,9 @@ export default function MultitrackRecordingStage({
 }: MultitrackRecordingStageProps) {
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const reviewVideoRef = useRef<HTMLVideoElement>(null)
   const emptyMediaRef = useRef<HTMLMediaElement | null>(null)
+  const [reviewPlaying, setReviewPlaying] = useState(false)
 
   useEffect(() => {
     const video = videoRef.current
@@ -53,11 +61,55 @@ export default function MultitrackRecordingStage({
     }
   }, [streamRef])
 
+  useEffect(() => {
+    setReviewPlaying(false)
+    const video = reviewVideoRef.current
+    if (!video) return
+    video.pause()
+    video.removeAttribute('src')
+    video.load()
+  }, [reviewTake?.id])
+
+  const handleReview = useCallback(() => {
+    const video = reviewVideoRef.current
+    if (!video || !reviewTake) return
+
+    if (reviewPlaying) {
+      video.pause()
+      setReviewPlaying(false)
+      return
+    }
+
+    void (async () => {
+      const url = await resolveTakePlaybackUrl(reviewTake.filePath, reviewTake.videoUrl)
+      if (!url) return
+      assignMediaPlaybackSrc(video, url)
+      try {
+        video.currentTime = 0
+      } catch {
+        /* media may still be loading */
+      }
+      video.muted = false
+      video.volume = 1
+      video.preload = 'auto'
+      video.setAttribute('playsinline', 'true')
+      video.setAttribute('webkit-playsinline', 'true')
+      const started = await playTakeMediaAudible(video)
+      setReviewPlaying(started)
+    })()
+  }, [reviewPlaying, reviewTake])
+
   const busy = phase !== 'idle' || isRecording
 
   return (
     <div ref={stageRef} className="multitrack-recording-stage">
       <video ref={videoRef} className="multitrack-recording-stage__preview" muted playsInline />
+      <video
+        ref={reviewVideoRef}
+        className={`multitrack-recording-stage__review-video ${reviewPlaying ? 'is-visible' : ''}`}
+        playsInline
+        onEnded={() => setReviewPlaying(false)}
+      />
       <div className="multitrack-recording-stage__shade" />
 
       <header className="multitrack-recording-stage__header">
@@ -158,6 +210,12 @@ export default function MultitrackRecordingStage({
             <Grid2X2 className="h-4 w-4" />
             Takes
           </Pressable>
+          {reviewTake ? (
+            <Pressable type="button" intensity="soft" onClick={handleReview} disabled={busy} className="multitrack-recording-stage__review">
+              {reviewPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              {reviewPlaying ? 'Pause' : 'Review'}
+            </Pressable>
+          ) : null}
           <Pressable
             type="button"
             intensity="normal"

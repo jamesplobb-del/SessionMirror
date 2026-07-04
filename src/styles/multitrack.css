@@ -37,6 +37,155 @@
   height: 7rem;
 }
 
+.multitrack-backing-strip {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  padding: 0.55rem;
+  color: #1c1917;
+}
+
+.multitrack-backing-strip__youtube-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.multitrack-backing-strip__main,
+.multitrack-backing-strip__controls,
+.multitrack-backing-strip__youtube-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.multitrack-backing-strip__main {
+  justify-content: space-between;
+}
+
+.multitrack-backing-strip__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.multitrack-backing-strip__identity p,
+.multitrack-backing-strip__identity span {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multitrack-backing-strip__identity p {
+  max-width: min(52vw, 20rem);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.multitrack-backing-strip__identity span {
+  max-width: min(58vw, 22rem);
+  color: #78716c;
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.multitrack-backing-strip__play,
+.multitrack-backing-strip__clear {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #1c1917;
+  color: #fff;
+}
+
+.multitrack-backing-strip__play:disabled {
+  background: #e7e5e4;
+  color: #a8a29e;
+}
+
+.multitrack-backing-strip__controls {
+  margin-top: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.multitrack-backing-strip__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  background: #f5f5f4;
+  padding: 0.35rem 0.55rem;
+  color: #44403c;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.multitrack-backing-strip__volume {
+  display: inline-flex;
+  min-width: 8.5rem;
+  flex: 1;
+  align-items: center;
+  gap: 0.4rem;
+  color: #78716c;
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.multitrack-backing-strip__volume input {
+  width: 100%;
+  accent-color: #1c1917;
+}
+
+.multitrack-backing-strip__clear {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.multitrack-backing-strip__youtube-row {
+  margin-top: 0.45rem;
+  border-radius: 0.65rem;
+  background: #fafaf9;
+  padding: 0.35rem;
+}
+
+.multitrack-backing-strip__youtube-row input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 0.86rem;
+  outline: none;
+}
+
+.multitrack-backing-strip__youtube-row button {
+  border-radius: 0.55rem;
+  background: #1c1917;
+  padding: 0.42rem 0.6rem;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.multitrack-backing-strip__youtube-row span {
+  color: #dc2626;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
 .multitrack-grid__cell {
   min-width: 0;
   min-height: 0;
@@ -105,6 +254,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.multitrack-panel__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  pointer-events: auto;
 }
 
 .multitrack-panel__action {
@@ -302,6 +458,23 @@
   transform: scaleX(-1);
 }
 
+.multitrack-recording-stage__review-video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #050505;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.multitrack-recording-stage__review-video.is-visible {
+  opacity: 1;
+}
+
 .multitrack-recording-stage__shade {
   position: absolute;
   inset: 0;
@@ -435,7 +608,7 @@
 
 .multitrack-recording-stage__actions {
   display: grid;
-  grid-template-columns: 1fr 1.35fr;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
   gap: 0.5rem;
   align-self: center;
   width: min(100%, 25rem);
@@ -453,6 +626,11 @@
 
 .multitrack-recording-stage__record {
   background: #ef4444 !important;
+  color: #fff !important;
+}
+
+.multitrack-recording-stage__review {
+  background: rgba(255, 255, 255, 0.18) !important;
   color: #fff !important;
 }
 

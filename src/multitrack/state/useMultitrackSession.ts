@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Take } from '../../types'
 import { createPanelsForLayout, getLayoutPreset } from '../layout/layoutPresets'
-import type { MultitrackPracticeSettings, MultitrackSession, SheetMusicAsset } from '../types'
+import type { MultitrackBackingTrack, MultitrackPracticeSettings, MultitrackSession, SheetMusicAsset } from '../types'
 
 const DEFAULT_PRACTICE: MultitrackPracticeSettings = {
   showMetronome: false,
@@ -19,6 +19,7 @@ function createInitialSession(): MultitrackSession {
     panels: createPanelsForLayout(preset),
     sheetMusic: { kind: 'sheet-music', id: 'music', asset: null },
     practice: { ...DEFAULT_PRACTICE },
+    backing: { kind: 'none', volume: 0.85 },
   }
 }
 
@@ -59,5 +60,9 @@ export function useMultitrackSession() {
     setSession((prev) => ({ ...prev, practice: { ...prev.practice, ...patch } }))
   }, [])
 
-  return { session, layout, setLayout, assignTakeToPanel, assignSheetMusic, updatePractice }
+  const updateBacking = useCallback((backing: MultitrackBackingTrack) => {
+    setSession((prev) => ({ ...prev, backing }))
+  }, [])
+
+  return { session, layout, setLayout, assignTakeToPanel, assignSheetMusic, updatePractice, updateBacking }
 }

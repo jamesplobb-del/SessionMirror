@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { playTakeMediaAudible, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
+import { playTakeMediaBatch, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
+import { waitForMediaReady } from '../../utils/mediaPlayback'
 import { routeTakePlaybackToSpeaker } from '../../utils/takePlaybackSpeaker'
 
 export function useMultitrackSync() {
@@ -76,12 +77,9 @@ export function useMultitrackSync() {
 
     setCurrentTime(startTime)
     primeTakePlaybackAudioSync(...elements)
-    const starts = await Promise.allSettled(
-      elements.map((el) =>
-        el.play().catch(() => playTakeMediaAudible(el, { skipRoutePrep: true })),
-      ),
-    )
-    setIsPlaying(starts.some((result) => result.status === 'fulfilled'))
+    await Promise.allSettled(elements.map((el) => waitForMediaReady(el, 900)))
+    const starts = await playTakeMediaBatch(elements)
+    setIsPlaying(starts.some(Boolean))
   }, [currentTime, getMaster])
 
   const pause = useCallback(() => {

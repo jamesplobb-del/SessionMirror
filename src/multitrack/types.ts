@@ -45,11 +45,17 @@ export interface MultitrackPracticeSettings {
   bpm: number
 }
 
+export type MultitrackBackingTrack =
+  | { kind: 'none'; volume: number }
+  | { kind: 'audio'; src: string; fileName: string; mimeType: string; volume: number }
+  | { kind: 'youtube'; embedUrl: string; label: string; volume: number }
+
 export interface MultitrackSession {
   layoutId: string
   panels: MultitrackPanelState[]
   sheetMusic: SheetMusicPanelState
   practice: MultitrackPracticeSettings
+  backing: MultitrackBackingTrack
 }
 
 export type MultitrackRecordingPhase = 'idle' | 'count-in' | 'recording'
