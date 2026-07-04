@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { Camera, Gauge, Grid2X2, Mic, Music2, X } from 'lucide-react'
+import { AudioLines, Camera, Grid2X2, Mic, X } from 'lucide-react'
 import type { RefObject } from 'react'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
+import MetronomeIcon from '../../components/icons/MetronomeIcon'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
@@ -82,7 +83,7 @@ export default function MultitrackRecordingStage({
           className={practice.showMetronome ? 'is-active' : ''}
           onClick={() => onPracticeChange({ showMetronome: !practice.showMetronome })}
         >
-          <Gauge className="h-4 w-4" />
+          <MetronomeIcon className="h-4 w-4" />
         </Pressable>
         <Pressable
           type="button"
@@ -90,7 +91,7 @@ export default function MultitrackRecordingStage({
           className={practice.showPitch ? 'is-active' : ''}
           onClick={() => onPracticeChange({ showPitch: !practice.showPitch })}
         >
-          <Music2 className="h-4 w-4" />
+          <AudioLines className="h-4 w-4" strokeWidth={2.1} />
         </Pressable>
       </div>
 

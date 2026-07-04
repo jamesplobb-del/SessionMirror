@@ -9,6 +9,8 @@ export interface SheetMusicAsset {
   x: number
   y: number
   scale: number
+  framePosition?: 'top' | 'bottom' | 'left' | 'right'
+  frameScale?: number
 }
 
 export interface PerformancePanelState {

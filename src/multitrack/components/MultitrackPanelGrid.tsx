@@ -16,7 +16,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
 }) {
   const hasMusic = Boolean(sheetMusicPanel.asset)
   return (
-    <div className="multitrack-grid" style={layoutGridStyle(layout, hasMusic)}>
+    <div className="multitrack-grid" style={layoutGridStyle(layout, sheetMusicPanel.asset)}>
       {hasMusic ? (
         <div style={panelAreaStyle(sheetMusicPanel.id)} className="multitrack-grid__cell">
           <SheetMusicPanel panel={sheetMusicPanel} onAssetChange={(asset) => onSheetMusicChange(sheetMusicPanel.id, asset)} />

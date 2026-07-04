@@ -16,7 +16,6 @@ import MultitrackPanelGrid from './MultitrackPanelGrid'
 import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackLayoutPicker from './MultitrackLayoutPicker'
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
-import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
 import SheetMusicPanel from '../sheetMusic/SheetMusicPanel'
 import MultitrackRecordingStage from './MultitrackRecordingStage'
 
@@ -85,12 +84,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onRemoveTake={(id) => assignTakeToPanel(id, null)} onSheetMusicChange={assignSheetMusic}
                 onRegisterMedia={(id, el) => { sync.registerMedia(id, el); if (el && !masterMediaRef.current) masterMediaRef.current = el }} />
             </div>
-            <MultitrackToolbar isPlaying={sync.state.isPlaying} currentTime={sync.state.currentTime} duration={sync.state.duration} practice={session.practice} showLayoutPicker={showLayoutPicker}
+            <MultitrackToolbar isPlaying={sync.state.isPlaying} currentTime={sync.state.currentTime} duration={sync.state.duration} showLayoutPicker={showLayoutPicker}
               onTogglePlay={() => void (sync.state.isPlaying ? sync.pause() : sync.play())} onRestart={() => void sync.restart()} onSeek={sync.seek}
-              onToggleLayoutPicker={() => setShowLayoutPicker((v) => !v)} onToggleMetronome={() => updatePractice({ showMetronome: !session.practice.showMetronome })}
-              onTogglePitch={() => updatePractice({ showPitch: !session.practice.showPitch })} onTogglePracticeOverlay={() => updatePractice({ practiceOverlayEnabled: !session.practice.practiceOverlayEnabled })}
+              onToggleLayoutPicker={() => setShowLayoutPicker((v) => !v)}
               onExport={() => void (async () => { sync.pause(); const plan = buildMultitrackExportPlan(session, sync.state.duration); if (plan) await shareTakeVideo(getPrimaryExportTake(plan)) })()} />
-            <MultitrackPracticeOverlay boundaryRef={shellRef} practice={session.practice} isPlaying={sync.state.isPlaying || isRecording} streamRef={streamRef} tunerInstrument={tunerInstrument} mediaRef={masterMediaRef} mediaKey="multitrack" onHideMetronome={() => updatePractice({ showMetronome: false })} onHidePitch={() => updatePractice({ showPitch: false })} />
           </motion.div>
         )}
       </AnimatePresence>

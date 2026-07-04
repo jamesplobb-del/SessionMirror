@@ -11,7 +11,7 @@ export default function MultitrackTakePicker({ isOpen, takes, onClose, onSelectT
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <motion.div key="mt-picker" className="fixed inset-0 z-[140] flex flex-col bg-stone-50" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={iosSpringSnappy} style={motionGpuLayer}>
+        <motion.div key="mt-picker" className="fixed inset-0 z-[180] flex flex-col bg-stone-50" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={iosSpringSnappy} style={motionGpuLayer}>
           <header className="flex items-center gap-3 border-b border-stone-200 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
             <Pressable type="button" intensity="soft" onClick={onClose}><ChevronLeft className="h-6 w-6" /></Pressable>
             <h1 className="text-lg font-semibold">Use existing take</h1>

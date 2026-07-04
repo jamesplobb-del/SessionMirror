@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { playTakeMediaAudible } from '../../utils/takePlaybackAudio'
+import { playTakeMediaAudible, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
 import { routeTakePlaybackToSpeaker } from '../../utils/takePlaybackSpeaker'
 
 export function useMultitrackSync() {
@@ -22,10 +22,16 @@ export function useMultitrackSync() {
   const registerMedia = useCallback((panelId: string, element: HTMLMediaElement | null) => {
     if (element) {
       mediaMapRef.current.set(panelId, element)
+      element.muted = false
+      element.volume = 1
+      element.preload = 'auto'
+      element.setAttribute('playsinline', 'true')
       routeTakePlaybackToSpeaker(element, 1, false)
       element.addEventListener('loadedmetadata', refreshDuration)
+      element.addEventListener('durationchange', refreshDuration)
     } else {
       mediaMapRef.current.get(panelId)?.removeEventListener('loadedmetadata', refreshDuration)
+      mediaMapRef.current.get(panelId)?.removeEventListener('durationchange', refreshDuration)
       mediaMapRef.current.delete(panelId)
     }
     refreshDuration()
@@ -33,20 +39,50 @@ export function useMultitrackSync() {
 
   const syncAllTo = useCallback((time: number) => {
     for (const el of mediaMapRef.current.values()) {
-      if (Math.abs(el.currentTime - time) > 0.05) el.currentTime = time
+      try {
+        if (Math.abs(el.currentTime - time) > 0.05) el.currentTime = time
+      } catch {
+        /* Some media elements reject seeks until metadata is ready. */
+      }
     }
     setCurrentTime(time)
   }, [])
 
   const play = useCallback(async () => {
     const master = getMaster()
-    syncAllTo(master?.currentTime ?? 0)
-    await Promise.allSettled([...mediaMapRef.current.values()].map(async (el) => {
+    const elements = [...mediaMapRef.current.values()]
+    if (elements.length === 0) return
+
+    const startTime = master?.currentTime ?? currentTime
+    for (const el of elements) {
+      el.muted = false
+      el.volume = 1
+      el.preload = 'auto'
+      el.setAttribute('playsinline', 'true')
       routeTakePlaybackToSpeaker(el, 1, false)
-      await playTakeMediaAudible(el)
-    }))
-    setIsPlaying(true)
-  }, [getMaster, syncAllTo])
+      if (el.readyState < HTMLMediaElement.HAVE_METADATA && (el.src || el.currentSrc)) {
+        try {
+          el.load()
+        } catch {
+          /* ignore */
+        }
+      }
+      try {
+        el.currentTime = startTime
+      } catch {
+        /* ignore */
+      }
+    }
+
+    setCurrentTime(startTime)
+    primeTakePlaybackAudioSync(...elements)
+    const starts = await Promise.allSettled(
+      elements.map((el) =>
+        el.play().catch(() => playTakeMediaAudible(el, { skipRoutePrep: true })),
+      ),
+    )
+    setIsPlaying(starts.some((result) => result.status === 'fulfilled'))
+  }, [currentTime, getMaster])
 
   const pause = useCallback(() => {
     for (const el of mediaMapRef.current.values()) el.pause()
@@ -62,8 +98,17 @@ export function useMultitrackSync() {
       const master = getMaster()
       if (master) {
         setCurrentTime(master.currentTime)
+        const elements = [...mediaMapRef.current.values()]
+        if (elements.length > 0 && elements.every((el) => el.paused || el.ended)) {
+          setIsPlaying(false)
+          return
+        }
         for (const el of mediaMapRef.current.values()) {
-          if (el !== master && Math.abs(el.currentTime - master.currentTime) > 0.12) el.currentTime = master.currentTime
+          try {
+            if (el !== master && !el.paused && Math.abs(el.currentTime - master.currentTime) > 0.18) el.currentTime = master.currentTime
+          } catch {
+            /* ignore */
+          }
         }
       }
       rafRef.current = requestAnimationFrame(tick)
