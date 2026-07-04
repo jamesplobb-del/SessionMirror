@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
-import { FileAudio, Link, Pause, Play, Trash2, Upload, Youtube } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type RefObject } from 'react'
+import { FileAudio, Link, Pause, Play, Trash2, Upload, X, Youtube } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import { normalizeYoutubeEmbedUrl, parseYoutubeEmbedUrl } from '../../utils/youtubeEmbed'
 import {
@@ -19,6 +19,7 @@ export default function MultitrackBackingTrackPanel({
   placement = 'setup',
   onBackingChange,
   onTogglePlayback,
+  onDismiss,
 }: {
   backing: MultitrackBackingTrack
   audioRef: RefObject<HTMLAudioElement | null>
@@ -27,11 +28,14 @@ export default function MultitrackBackingTrackPanel({
   placement?: 'setup' | 'stage'
   onBackingChange: (backing: MultitrackBackingTrack) => void
   onTogglePlayback: () => void
+  onDismiss?: () => void
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragRef = useRef<{ pointerId: number; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null)
   const [youtubeInputOpen, setYoutubeInputOpen] = useState(false)
   const [youtubeValue, setYoutubeValue] = useState('')
   const [youtubeError, setYoutubeError] = useState<string | null>(null)
+  const [stageOffset, setStageOffset] = useState({ x: 0, y: 0 })
   const volume = backing.volume
   const hasBacking = backing.kind !== 'none'
 
@@ -83,8 +87,69 @@ export default function MultitrackBackingTrackPanel({
     onBackingChange({ ...backing, volume: clamped })
   }
 
+  const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
+    if (placement !== 'stage') return
+    const target = event.target as HTMLElement
+    if (target.closest('button,input,label')) return
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: stageOffset.x,
+      startY: stageOffset.y,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const nextX = drag.startX + event.clientX - drag.startClientX
+    const nextY = drag.startY + event.clientY - drag.startClientY
+    const rect = event.currentTarget.getBoundingClientRect()
+    const maxX = Math.max(24, (window.innerWidth - rect.width) / 2)
+    const minY = -Math.max(0, rect.top - 8)
+    const maxY = Math.max(24, window.innerHeight - rect.bottom - 8)
+    setStageOffset({
+      x: Math.min(maxX, Math.max(-maxX, nextX)),
+      y: Math.min(maxY, Math.max(minY, nextY)),
+    })
+  }
+
+  const handlePointerUp = (event: PointerEvent<HTMLElement>) => {
+    if (dragRef.current?.pointerId === event.pointerId) {
+      dragRef.current = null
+    }
+  }
+
+  const stageStyle = placement === 'stage'
+    ? ({
+        '--backing-stage-x': `${stageOffset.x}px`,
+        '--backing-stage-y': `${stageOffset.y}px`,
+      } as CSSProperties)
+    : undefined
+
   return (
-    <section className={`multitrack-backing-strip multitrack-backing-strip--${placement}`} aria-label="Backing track">
+    <section
+      className={`multitrack-backing-strip multitrack-backing-strip--${placement}`}
+      style={stageStyle}
+      aria-label="Backing track"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
+      {placement === 'stage' && onDismiss ? (
+        <Pressable
+          type="button"
+          intensity="icon"
+          className="multitrack-backing-strip__dismiss"
+          aria-label="Hide backing track panel"
+          onClick={onDismiss}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Pressable>
+      ) : null}
       <audio ref={audioRef} className="hidden" preload="metadata" />
       {backing.kind === 'youtube' ? (
         <div className="multitrack-backing-strip__youtube-host" aria-hidden>

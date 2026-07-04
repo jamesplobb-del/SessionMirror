@@ -41,10 +41,11 @@ interface MultitrackOverlayProps {
   onRecordingComplete: () => void
   pendingRecordingTakeId: string | null
   onClearPendingRecording: () => void
+  onOpenRecordingStage?: () => void
 }
 
 export default function MultitrackOverlay(props: MultitrackOverlayProps) {
-  const { isOpen, takes, streamRef, tunerInstrument, hapticFeedback, isRecording, onClose, onStartRecording, onStopRecording, onRecordingComplete, pendingRecordingTakeId, onClearPendingRecording } = props
+  const { isOpen, takes, streamRef, tunerInstrument, hapticFeedback, isRecording, onClose, onStartRecording, onStopRecording, onRecordingComplete, pendingRecordingTakeId, onClearPendingRecording, onOpenRecordingStage } = props
   const shellRef = useRef<HTMLDivElement>(null)
   const masterMediaRef = useRef<HTMLMediaElement | null>(null)
   const backingAudioRef = useRef<HTMLAudioElement>(null)
@@ -119,6 +120,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     void playBackingFromStart()
   }, [backingPlaying, pauseBacking, playBackingFromStart])
 
+  const registerPanelMedia = useCallback((id: string, el: HTMLMediaElement | null) => {
+    sync.registerMedia(id, el)
+    if (el) {
+      masterMediaRef.current = masterMediaRef.current ?? el
+    } else if (masterMediaRef.current && !document.body.contains(masterMediaRef.current)) {
+      masterMediaRef.current = null
+    }
+  }, [sync.registerMedia])
+
   const recording = useMultitrackRecording({
     onCountInComplete: () => { onStartRecording() },
     onSyncPlaybackBeforeRecord: async () => {
@@ -165,9 +175,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 </div>
               ) : null}
               <MultitrackPanelGrid layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={recording.targetPanelId} recordingPhase={recording.phase}
-                onTapPerformance={(id) => { triggerLightHaptic(hapticFeedback); setActivePanelId(id) }}
+                onTapPerformance={(id) => { triggerLightHaptic(hapticFeedback); onOpenRecordingStage?.(); setActivePanelId(id) }}
                 onRemoveTake={(id) => assignTakeToPanel(id, null)} onSheetMusicChange={assignSheetMusic}
-                onRegisterMedia={(id, el) => { sync.registerMedia(id, el); if (el && !masterMediaRef.current) masterMediaRef.current = el }} />
+                onRegisterMedia={registerPanelMedia} />
             </div>
             <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying} currentTime={sync.state.currentTime} duration={sync.state.duration} showLayoutPicker={showLayoutPicker}
               onTogglePlay={() => void (async () => {

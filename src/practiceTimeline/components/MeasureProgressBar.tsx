@@ -6,6 +6,7 @@ interface MeasureProgressBarProps {
   totalMeasures: number
   onSeekMeasure?: (measure: number) => void
   disabled?: boolean
+  className?: string
 }
 
 function measureFromClientX(
@@ -23,6 +24,7 @@ export default function MeasureProgressBar({
   totalMeasures,
   onSeekMeasure,
   disabled = false,
+  className = '',
 }: MeasureProgressBarProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const [previewMeasure, setPreviewMeasure] = useState<number | null>(null)
@@ -88,7 +90,7 @@ export default function MeasureProgressBar({
 
   return (
     <div
-      className={`practice-timeline-session__measure-progress ${seekable ? 'practice-timeline-session__measure-progress--seekable' : ''}`}
+      className={`practice-timeline-session__measure-progress ${seekable ? 'practice-timeline-session__measure-progress--seekable' : ''} ${className}`.trim()}
       role={seekable ? 'slider' : 'progressbar'}
       aria-valuenow={activeMeasure}
       aria-valuemin={1}

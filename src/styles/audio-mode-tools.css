@@ -760,7 +760,52 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--practice-session-active .audio-tuner-take-pills-wrap {
-  padding-top: 0.32rem;
+  padding-top: 0.18rem;
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pills-wrap--compact {
+  padding: 0 0.65rem 0.08rem;
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pills--compact {
+  gap: 0.28rem;
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pill--compact {
+  min-height: 2.45rem;
+  padding: 0.28rem 0.34rem 0.28rem 0.5rem;
+  column-gap: 0.22rem;
+  box-shadow: 0 6px 16px rgba(23, 26, 34, 0.07);
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pill--compact .audio-tuner-take-pill__label {
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pill--compact .audio-tuner-take-pill__name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pill--compact .audio-tuner-take-pill__play {
+  width: 1.62rem;
+  height: 1.62rem;
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pill--compact .audio-tuner-take-pill__mini-btn {
+  width: 1.42rem;
+  height: 1.42rem;
+  box-shadow: 0 2px 8px rgba(23, 26, 34, 0.07);
+}
+
+.app-ui-overlay--practice-session-active .audio-tuner-take-pills--compact .audio-tuner-take-pill__trailing {
+  gap: 0.1rem;
+}
+
+.app-ui-overlay--practice-session-active .control-deck {
+  padding-top: 0.12rem;
 }
 
 .app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished {

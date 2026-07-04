@@ -1067,23 +1067,17 @@ body.settings-branch-open * {
 }
 
 .app-ui-overlay--practice-session-active .app-hud-bottom {
-  gap: 0.45rem;
-  padding-top: 0.15rem;
-  padding-bottom: 0.08rem;
+  gap: 0.28rem;
+  padding-top: 0.08rem;
+  padding-bottom: 0.05rem;
 }
 
 .app-ui-overlay--practice-session-active .audio-tuner-take-pills-wrap {
-  padding: 0 0.75rem 0.15rem;
+  padding: 0 0.75rem 0.08rem;
 }
 
 .app-ui-overlay--audio-practice-timeline:not(.app-ui-overlay--practice-session-active) .app-hud-bottom {
-  gap: 0.35rem;
-  padding-top: 0.1rem;
-}
-
-.app-ui-overlay--audio-practice-timeline:not(.app-ui-overlay--practice-session-active)
-  .practice-timeline-footer-host {
-  padding: 0 0.75rem;
+  display: none;
 }
 
 .app-ui-overlay--audio-practice-tuner .app-pip-row-wrap {

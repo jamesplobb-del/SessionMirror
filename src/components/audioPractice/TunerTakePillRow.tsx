@@ -12,6 +12,7 @@ function TunerTakePill({
   tone,
   take,
   libraryPlayback = null,
+  compact = false,
   onOpen,
   onFavorite,
   onClear,
@@ -20,6 +21,7 @@ function TunerTakePill({
   tone: 'current' | 'best'
   take: Take | null
   libraryPlayback?: LibraryPlaybackReference | null
+  compact?: boolean
   onOpen?: () => void
   onFavorite?: () => void
   onClear?: () => void
@@ -28,16 +30,23 @@ function TunerTakePill({
     hasMedia,
     isPlaying,
     playbackProgress,
-    displayName,
+    displayName: fullDisplayName,
     togglePlayback,
     openTake,
   } = useAudioModeTakeItem({ tone, take, libraryPlayback })
 
+  const displayNameRaw = fullDisplayName
+  const visibleName = compact
+    ? displayNameRaw.length > 11
+      ? `${displayNameRaw.slice(0, 10).trimEnd()}…`
+      : displayNameRaw
+    : displayNameRaw
+
   return (
     <motion.div
       className={`audio-tuner-take-pill audio-tuner-take-pill--${tone} ${
-        hasMedia ? '' : 'audio-tuner-take-pill--empty'
-      } ${isPlaying ? 'audio-tuner-take-pill--playing' : ''}`}
+        compact ? 'audio-tuner-take-pill--compact' : ''
+      } ${hasMedia ? '' : 'audio-tuner-take-pill--empty'} ${isPlaying ? 'audio-tuner-take-pill--playing' : ''}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={iosHudDim}
@@ -57,7 +66,9 @@ function TunerTakePill({
       <div className="audio-tuner-take-pill__leading">
         <div className="audio-tuner-take-pill__copy">
           <span className="audio-tuner-take-pill__label">{label}</span>
-          <span className="audio-tuner-take-pill__name">{displayName}</span>
+          <span className="audio-tuner-take-pill__name" title={displayNameRaw}>
+            {visibleName}
+          </span>
         </div>
         {hasMedia && isPlaying && (
           <span
@@ -82,9 +93,9 @@ function TunerTakePill({
           aria-label={isPlaying ? `Pause ${label}` : `Play ${label}`}
         >
           {isPlaying ? (
-            <Pause className="h-3.5 w-3.5 fill-current" />
+            <Pause className={compact ? 'h-3 w-3 fill-current' : 'h-3.5 w-3.5 fill-current'} />
           ) : (
-            <Play className="h-3.5 w-3.5 fill-current" />
+            <Play className={compact ? 'h-3 w-3 fill-current' : 'h-3.5 w-3.5 fill-current'} />
           )}
         </Pressable>
         {tone === 'current' && hasMedia && (
@@ -100,7 +111,7 @@ function TunerTakePill({
             className="audio-tuner-take-pill__mini-btn audio-tuner-take-pill__mini-btn--best"
             aria-label="Pin Current Take as Best Take"
           >
-            <Star className="h-3.5 w-3.5 fill-current" />
+            <Star className={compact ? 'h-3 w-3 fill-current' : 'h-3.5 w-3.5 fill-current'} />
           </Pressable>
         )}
         {hasMedia && (
@@ -116,7 +127,7 @@ function TunerTakePill({
             className="audio-tuner-take-pill__mini-btn"
             aria-label={`Clear ${label}`}
           >
-            <X className="h-3.5 w-3.5" />
+            <X className={compact ? 'h-3 w-3 fill-current' : 'h-3.5 w-3.5 fill-current'} />
           </Pressable>
         )}
       </div>
@@ -128,6 +139,7 @@ export interface TunerTakePillRowProps {
   benchmarkTake: Take | null
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
   challengerTake: Take | null
+  compact?: boolean
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onPinCurrentAsBest?: () => void
@@ -139,6 +151,7 @@ export default function TunerTakePillRow({
   benchmarkTake,
   libraryBenchmarkPlayback,
   challengerTake,
+  compact = false,
   onExpandBenchmark,
   onExpandChallenger,
   onPinCurrentAsBest,
@@ -146,19 +159,24 @@ export default function TunerTakePillRow({
   onClearChallenger,
 }: TunerTakePillRowProps) {
   return (
-    <div className="audio-tuner-take-pills" aria-label="Tuner takes">
+    <div
+      className={`audio-tuner-take-pills ${compact ? 'audio-tuner-take-pills--compact' : ''}`}
+      aria-label="Tuner takes"
+    >
       <TunerTakePill
-        label="Best"
+        label={compact ? 'Best' : 'Best'}
         tone="best"
         take={benchmarkTake}
         libraryPlayback={libraryBenchmarkPlayback}
+        compact={compact}
         onOpen={libraryBenchmarkPlayback || benchmarkTake ? onExpandBenchmark : undefined}
         onClear={onClearBenchmark}
       />
       <TunerTakePill
-        label="Current"
+        label={compact ? 'Now' : 'Current'}
         tone="current"
         take={challengerTake}
+        compact={compact}
         onOpen={onExpandChallenger}
         onFavorite={onPinCurrentAsBest}
         onClear={onClearChallenger}

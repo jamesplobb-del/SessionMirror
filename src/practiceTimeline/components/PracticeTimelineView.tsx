@@ -1,6 +1,5 @@
 import { Plus } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
@@ -18,7 +17,6 @@ export interface PracticeTimelineViewProps {
   onStartRecording?: () => void
   onStopRecording?: () => void
   onPracticeSessionActiveChange?: (active: boolean) => void
-  footerHost?: HTMLElement | null
 }
 
 export default function PracticeTimelineView({
@@ -26,7 +24,6 @@ export default function PracticeTimelineView({
   onStartRecording,
   onStopRecording,
   onPracticeSessionActiveChange,
-  footerHost,
 }: PracticeTimelineViewProps) {
   const {
     timeline,
@@ -126,7 +123,7 @@ export default function PracticeTimelineView({
   }
 
   const footer = (
-    <footer className="practice-timeline__footer">
+    <footer className="practice-timeline__footer practice-timeline__footer--dock">
       <Pressable
         type="button"
         intensity="soft"
@@ -257,7 +254,7 @@ export default function PracticeTimelineView({
         </div>
       </div>
 
-      {footerHost ? createPortal(footer, footerHost) : null}
+      {footer}
 
       <TimelineLibrarySheet
         open={libraryOpen}

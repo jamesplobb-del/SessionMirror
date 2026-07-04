@@ -48,13 +48,35 @@
 }
 
 .multitrack-backing-strip--stage {
-  align-self: center;
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 4.1rem);
+  z-index: 6;
   width: min(100%, 25rem);
+  max-width: calc(100vw - 1.5rem);
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(0, 0, 0, 0.42);
   color: #fff;
   padding: 0.45rem;
+  padding-top: 1.35rem;
   backdrop-filter: blur(18px);
+  touch-action: none;
+  transform: translate3d(calc(-50% + var(--backing-stage-x, 0px)), var(--backing-stage-y, 0px), 0);
+}
+
+.multitrack-backing-strip__dismiss {
+  position: absolute;
+  top: 0.28rem;
+  right: 0.28rem;
+  z-index: 2;
+  display: inline-flex;
+  width: 1.65rem;
+  height: 1.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .multitrack-backing-strip__youtube-host {
@@ -297,11 +319,34 @@
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
   padding: 0.5rem;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, transparent 40%);
+  padding-top: 0.45rem;
+  padding-right: 2.35rem;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, transparent 38%, transparent 62%, rgba(0, 0, 0, 0.35) 100%);
   pointer-events: none;
+}
+
+.multitrack-panel__remove {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 3;
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.multitrack-panel__remove:active {
+  background: rgba(229, 72, 77, 0.92);
 }
 
 .multitrack-panel__label {
@@ -327,6 +372,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  align-self: flex-end;
   pointer-events: auto;
 }
 
@@ -589,7 +635,7 @@
 .multitrack-recording-stage__widgets {
   position: absolute;
   right: 1rem;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 15.5rem);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 9.6rem);
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -631,6 +677,11 @@
   gap: 0.4rem;
   align-self: center;
   width: min(100%, 25rem);
+}
+
+.multitrack-recording-stage__settings--click-only {
+  grid-template-columns: 1fr;
+  width: min(100%, 8.5rem);
 }
 
 .multitrack-recording-stage__settings label {

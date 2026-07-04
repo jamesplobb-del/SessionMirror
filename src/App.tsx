@@ -418,7 +418,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [splitRatio, setSplitRatio] = useState(56)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
   const [practiceSessionActive, setPracticeSessionActive] = useState(false)
-  const [practiceFooterHost, setPracticeFooterHost] = useState<HTMLDivElement | null>(null)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const {
@@ -1864,11 +1863,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsCreatorStudioPickerOpen(false)
     setCreatorStudioTake(null)
     setShowPitch(false)
-    handleRecordingModeChange('video')
     setMultitrackOpen(true)
     deferHudMediaPause()
+  }, [deferHudMediaPause, markOverlayClosed, settings.hapticFeedback])
+
+  const handleMultitrackOpenRecordingStage = useCallback(() => {
+    handleRecordingModeChange('video')
     void requestCameraAccess('video')
-  }, [deferHudMediaPause, handleRecordingModeChange, markOverlayClosed, requestCameraAccess, settings.hapticFeedback])
+  }, [handleRecordingModeChange, requestCameraAccess])
 
   const handleMultitrackStartRecording = useCallback(() => {
     multitrackRecordingActiveRef.current = true
@@ -3192,7 +3194,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           onStartRecording={toggleRecording}
                           onStopRecording={toggleRecording}
                           onPracticeSessionActiveChange={setPracticeSessionActive}
-                          footerHost={practiceFooterHost}
                         />
                       </div>
                     )}
@@ -3302,15 +3303,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
-                    {isAudioPracticeTimelineTab &&
-                      !practiceSessionActive &&
-                      !quickSettingsOpen && (
-                        <div
-                          ref={setPracticeFooterHost}
-                          className="practice-timeline-footer-host pointer-events-auto w-full"
-                        />
-                      )}
-
                     {(isAudioPracticeTunerTab ||
                       (isAudioPracticeTimelineTab && practiceSessionActive)) &&
                       !quickSettingsOpen &&
@@ -3321,13 +3313,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                               ? 'practice-take-pills'
                               : 'tuner-take-pills'
                           }
-                          className="audio-tuner-take-pills-wrap pointer-events-auto w-full"
+                          className={`audio-tuner-take-pills-wrap pointer-events-auto w-full ${
+                            isAudioPracticeTimelineTab && practiceSessionActive
+                              ? 'audio-tuner-take-pills-wrap--compact'
+                              : ''
+                          }`}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={iosHudDim}
                           style={motionGpuLayer}
                         >
                           <TunerTakePillRow
+                            compact={
+                              isAudioPracticeTimelineTab && practiceSessionActive
+                            }
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                             challengerTake={challengerTake}
@@ -3387,41 +3386,47 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         </motion.div>
                       )}
 
-                    <ControlDeck
-                      isRecording={isRecording}
-                      elapsed={elapsed}
-                      ready={ready}
-                      recordingMode={recordingMode}
-                      onRecordingModeChange={handleRecordingModeChange}
-                      onToggleRecord={handleToggleRecord}
-                      onOpenVault={recordingMode === 'audio' ? handleToggleVault : handleOpenVault}
-                      isVaultOpen={isVaultOpen}
-                      vaultToggleEnabled={recordingMode === 'audio'}
-                      onOpenSettings={handleOpenSettings}
-                      takeCount={takes.length}
-                      autoSoundListening={autoSoundListening}
-                      handsFreeRecording={handsFreeRecording}
-                      handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
-                      autoSoundRecording={settings.autoSoundRecording}
-                      onAutoSoundRecordingChange={(enabled) =>
-                        updateSettings({ autoSoundRecording: enabled })
-                      }
-                      recordDropRef={recordDeleteDropRef}
-                      dragDeleteActive={pipDragState.isDragging}
-                      dragOverDelete={pipDragState.overDelete}
-                      pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
-                      pitchToggleVisible={recordingMode === 'video'}
-                      showTakeCards={hudQuickSettings.showTakeCards}
-                      onPitchTrackerChange={handlePitchTrackerSettingChange}
-                      onShowTakeCardsChange={handleShowTakeCardsSettingChange}
-                      showMetronome={hudQuickSettings.showMetronome}
-                      onShowMetronomeChange={handleShowMetronomeSettingChange}
-                      audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
-                      onAudioEnhancerChange={handleAudioEnhancerSettingChange}
-                      settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen}
-                      onBranchOpenChange={handleQuickSettingsOpenChange}
-                      hapticFeedback={settings.hapticFeedback}
-                    />
+                    {!(
+                      isAudioPracticeTimelineTab &&
+                      !practiceSessionActive &&
+                      !quickSettingsOpen
+                    ) && (
+                      <ControlDeck
+                        isRecording={isRecording}
+                        elapsed={elapsed}
+                        ready={ready}
+                        recordingMode={recordingMode}
+                        onRecordingModeChange={handleRecordingModeChange}
+                        onToggleRecord={handleToggleRecord}
+                        onOpenVault={recordingMode === 'audio' ? handleToggleVault : handleOpenVault}
+                        isVaultOpen={isVaultOpen}
+                        vaultToggleEnabled={recordingMode === 'audio'}
+                        onOpenSettings={handleOpenSettings}
+                        takeCount={takes.length}
+                        autoSoundListening={autoSoundListening}
+                        handsFreeRecording={handsFreeRecording}
+                        handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
+                        autoSoundRecording={settings.autoSoundRecording}
+                        onAutoSoundRecordingChange={(enabled) =>
+                          updateSettings({ autoSoundRecording: enabled })
+                        }
+                        recordDropRef={recordDeleteDropRef}
+                        dragDeleteActive={pipDragState.isDragging}
+                        dragOverDelete={pipDragState.overDelete}
+                        pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
+                        pitchToggleVisible={recordingMode === 'video'}
+                        showTakeCards={hudQuickSettings.showTakeCards}
+                        onPitchTrackerChange={handlePitchTrackerSettingChange}
+                        onShowTakeCardsChange={handleShowTakeCardsSettingChange}
+                        showMetronome={hudQuickSettings.showMetronome}
+                        onShowMetronomeChange={handleShowMetronomeSettingChange}
+                        audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
+                        onAudioEnhancerChange={handleAudioEnhancerSettingChange}
+                        settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen}
+                        onBranchOpenChange={handleQuickSettingsOpenChange}
+                        hapticFeedback={settings.hapticFeedback}
+                      />
+                    )}
                   </div>
                 </motion.div>
 
@@ -3582,6 +3587,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onRecordingComplete={handleMultitrackRecordingComplete}
                     pendingRecordingTakeId={multitrackPendingRecordingTakeId}
                     onClearPendingRecording={handleClearMultitrackPendingRecording}
+                    onOpenRecordingStage={handleMultitrackOpenRecordingStage}
                   />
                 </Suspense>
 

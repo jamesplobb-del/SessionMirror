@@ -6,6 +6,7 @@ import { useMetronome } from '../../hooks/useMetronome'
 import Pressable from '../../components/ui/Pressable'
 import { sectionTimingSummary } from '../timeSignatureLogic'
 import type { PracticeTimeline, TimelinePlaybackState, TimelineSection } from '../types'
+import { abbreviateLabel } from '../uiText'
 import EditableNumberValue from './EditableNumberValue'
 import MeasureProgressBar from './MeasureProgressBar'
 
@@ -81,7 +82,7 @@ export default function TimelinePracticeSessionView({
   const canGoNext = playbackState.sectionIndex < timeline.sections.length - 1
   const displayMeasure = playbackState.countInActive
     ? 'Count-in'
-    : `Measure ${Math.max(1, playbackState.measure)} of ${playbackState.totalMeasuresInSection}`
+    : `M ${Math.max(1, playbackState.measure)}/${playbackState.totalMeasuresInSection}`
 
   const handleTogglePlay = useCallback(() => {
     triggerMetronomeToggleHaptic(playing)
@@ -95,22 +96,31 @@ export default function TimelinePracticeSessionView({
     >
       <header className="practice-timeline-session__header shrink-0">
         <Pressable type="button" intensity="icon" onClick={onExit} aria-label="End practice">
-          <X size={22} />
+          <X size={20} />
         </Pressable>
         <div className="min-w-0 flex-1 text-center">
           <p className="practice-timeline-session__section-title">
-            {currentSection?.title ?? 'Practice'}
+            {abbreviateLabel(currentSection?.title ?? 'Practice', 22)}
           </p>
-          <p className="practice-timeline-session__measure">{displayMeasure}</p>
-          {timingSummary ? (
-            <p className="practice-timeline-session__timing">{timingSummary}</p>
-          ) : null}
+          <p className="practice-timeline-session__meta">
+            <span className="practice-timeline-session__measure">{displayMeasure}</span>
+            {timingSummary ? (
+              <>
+                <span className="practice-timeline-session__meta-sep" aria-hidden>
+                  ·
+                </span>
+                <span className="practice-timeline-session__timing">{timingSummary}</span>
+              </>
+            ) : null}
+          </p>
           {nextSection ? (
-            <p className="practice-timeline-session__next">Next: {nextSection.title}</p>
+            <p className="practice-timeline-session__next">
+              Next: {abbreviateLabel(nextSection.title, 16)}
+            </p>
           ) : null}
         </div>
         <Pressable type="button" intensity="icon" onClick={onReset} aria-label="Reset to beginning">
-          <RotateCcw size={20} />
+          <RotateCcw size={18} />
         </Pressable>
       </header>
 
@@ -141,8 +151,9 @@ export default function TimelinePracticeSessionView({
                 aria-selected={isActive}
                 className={`practice-timeline-session__section-pill ${isActive ? 'practice-timeline-session__section-pill--active' : ''}`}
                 onClick={() => onGoToSection(index)}
+                title={section.title}
               >
-                {section.title}
+                {abbreviateLabel(section.title, 10)}
               </Pressable>
             )
           })}
@@ -159,16 +170,17 @@ export default function TimelinePracticeSessionView({
         </Pressable>
       </div>
 
+      <div className="audio-practice-metronome__body practice-timeline-session__body min-h-0 flex-1">
+        <MetronomeBeatDisplay interactive />
+      </div>
+
       <MeasureProgressBar
+        className="practice-timeline-session__measure-progress--dock"
         measure={playbackState.countInActive ? 0 : playbackState.measure}
         totalMeasures={playbackState.totalMeasuresInSection}
         onSeekMeasure={onSeekMeasure}
         disabled={playbackState.countInActive}
       />
-
-      <div className="audio-practice-metronome__body practice-timeline-session__body min-h-0 flex-1">
-        <MetronomeBeatDisplay interactive />
-      </div>
 
       <footer className="practice-timeline-session__footer metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
         <div className="practice-timeline-session__tempo-row pointer-events-auto">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AudioLines, Camera, Grid2X2, Mic, Pause, Play, X } from 'lucide-react'
+import { AudioLines, Camera, FileAudio, Grid2X2, Mic, Pause, Play, X } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { Take } from '../../types'
 import IOSSwitch from '../../components/ui/IOSSwitch'
@@ -61,6 +61,11 @@ export default function MultitrackRecordingStage({
   const reviewVideoRef = useRef<HTMLVideoElement>(null)
   const emptyMediaRef = useRef<HTMLMediaElement | null>(null)
   const [reviewPlaying, setReviewPlaying] = useState(false)
+  const [backingWidgetHidden, setBackingWidgetHidden] = useState(false)
+
+  useEffect(() => {
+    setBackingWidgetHidden(false)
+  }, [backing.kind])
 
   useEffect(() => {
     const video = videoRef.current
@@ -142,6 +147,16 @@ export default function MultitrackRecordingStage({
       ) : null}
 
       <div className="multitrack-recording-stage__widgets">
+        {backing.kind !== 'none' && backingWidgetHidden ? (
+          <Pressable
+            type="button"
+            intensity="soft"
+            aria-label="Show backing track"
+            onClick={() => setBackingWidgetHidden(false)}
+          >
+            <FileAudio className="h-4 w-4" />
+          </Pressable>
+        ) : null}
         <Pressable
           type="button"
           intensity="soft"
@@ -172,7 +187,7 @@ export default function MultitrackRecordingStage({
         onHidePitch={() => onPracticeChange({ showPitch: false })}
       />
 
-      <footer className="multitrack-recording-stage__controls">
+      {!backingWidgetHidden ? (
         <MultitrackBackingTrackPanel
           backing={backing}
           audioRef={backingAudioRef}
@@ -181,9 +196,14 @@ export default function MultitrackRecordingStage({
           placement="stage"
           onBackingChange={onBackingChange}
           onTogglePlayback={onToggleBackingPlayback}
+          onDismiss={() => setBackingWidgetHidden(true)}
         />
+      ) : null}
 
-        <div className="multitrack-recording-stage__settings">
+      <footer className="multitrack-recording-stage__controls">
+        <div
+          className={`multitrack-recording-stage__settings ${practice.clickEnabled ? '' : 'multitrack-recording-stage__settings--click-only'}`}
+        >
           <label>
             <span>Click</span>
             <IOSSwitch
@@ -191,41 +211,45 @@ export default function MultitrackRecordingStage({
               onChange={(clickEnabled) => onPracticeChange({ clickEnabled })}
             />
           </label>
-          <label>
-            <span>Count-in</span>
-            <div className="multitrack-recording-stage__stepper">
-              <Pressable
-                type="button"
-                intensity="icon"
-                onClick={() => onPracticeChange({ countInBars: Math.max(0, practice.countInBars - 1) })}
-              >
-                -
-              </Pressable>
-              <strong>{practice.countInBars}</strong>
-              <Pressable
-                type="button"
-                intensity="icon"
-                onClick={() => onPracticeChange({ countInBars: Math.min(8, practice.countInBars + 1) })}
-              >
-                +
-              </Pressable>
-            </div>
-          </label>
-          <label>
-            <span>BPM</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={40}
-              max={300}
-              value={practice.bpm}
-              onChange={(event) =>
-                onPracticeChange({
-                  bpm: Math.max(40, Math.min(300, Math.round(Number(event.target.value) || 120))),
-                })
-              }
-            />
-          </label>
+          {practice.clickEnabled ? (
+            <>
+              <label>
+                <span>Count-in</span>
+                <div className="multitrack-recording-stage__stepper">
+                  <Pressable
+                    type="button"
+                    intensity="icon"
+                    onClick={() => onPracticeChange({ countInBars: Math.max(0, practice.countInBars - 1) })}
+                  >
+                    -
+                  </Pressable>
+                  <strong>{practice.countInBars}</strong>
+                  <Pressable
+                    type="button"
+                    intensity="icon"
+                    onClick={() => onPracticeChange({ countInBars: Math.min(8, practice.countInBars + 1) })}
+                  >
+                    +
+                  </Pressable>
+                </div>
+              </label>
+              <label>
+                <span>BPM</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={40}
+                  max={300}
+                  value={practice.bpm}
+                  onChange={(event) =>
+                    onPracticeChange({
+                      bpm: Math.max(40, Math.min(300, Math.round(Number(event.target.value) || 120))),
+                    })
+                  }
+                />
+              </label>
+            </>
+          ) : null}
         </div>
 
         <div className="multitrack-recording-stage__actions">

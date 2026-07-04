@@ -161,57 +161,55 @@ export default function TimelineSectionEditor({
           <MeterPatternEditor section={section} onChange={onChange} />
         ) : (
           <>
-            <div className="practice-timeline-editor__field-row">
-              <div className="practice-timeline-editor__field practice-timeline-editor__field--half">
-                <span className="practice-timeline-editor__label">Bars</span>
-                <div className="practice-timeline-editor__stepper">
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    onClick={() => onChange({ bars: Math.max(1, section.bars - 1) })}
-                  >
-                    −
-                  </Pressable>
-                  <span className="practice-timeline-editor__stepper-value">{section.bars}</span>
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    onClick={() => onChange({ bars: Math.min(128, section.bars + 1) })}
-                  >
-                    +
-                  </Pressable>
-                </div>
+            <div className="practice-timeline-editor__field">
+              <span className="practice-timeline-editor__label">Bars</span>
+              <div className="practice-timeline-editor__stepper">
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  className="practice-timeline-editor__stepper-btn"
+                  onClick={() => onChange({ bars: Math.max(1, section.bars - 1) })}
+                >
+                  −
+                </Pressable>
+                <span className="practice-timeline-editor__stepper-value">{section.bars}</span>
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  className="practice-timeline-editor__stepper-btn"
+                  onClick={() => onChange({ bars: Math.min(128, section.bars + 1) })}
+                >
+                  +
+                </Pressable>
               </div>
+            </div>
 
-              <div className="practice-timeline-editor__field practice-timeline-editor__field--half">
-                <span className="practice-timeline-editor__label">Tempo ({timing.bpmSymbol})</span>
-                <div className="practice-timeline-editor__stepper">
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    onClick={() => onChange({ bpm: Math.max(40, section.bpm - 1) })}
-                  >
-                    −
-                  </Pressable>
-                  <EditableNumberValue
-                    value={section.bpm}
-                    min={40}
-                    max={300}
-                    ariaLabel="Type tempo"
-                    onCommit={(bpm) => onChange({ bpm })}
-                  />
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    onClick={() => onChange({ bpm: Math.min(300, section.bpm + 1) })}
-                  >
-                    +
-                  </Pressable>
-                </div>
+            <div className="practice-timeline-editor__field">
+              <span className="practice-timeline-editor__label">Tempo ({timing.bpmSymbol})</span>
+              <div className="practice-timeline-editor__stepper">
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  className="practice-timeline-editor__stepper-btn"
+                  onClick={() => onChange({ bpm: Math.max(40, section.bpm - 1) })}
+                >
+                  −
+                </Pressable>
+                <EditableNumberValue
+                  value={section.bpm}
+                  min={40}
+                  max={300}
+                  ariaLabel="Type tempo"
+                  onCommit={(bpm) => onChange({ bpm })}
+                />
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  className="practice-timeline-editor__stepper-btn"
+                  onClick={() => onChange({ bpm: Math.min(300, section.bpm + 1) })}
+                >
+                  +
+                </Pressable>
               </div>
             </div>
 

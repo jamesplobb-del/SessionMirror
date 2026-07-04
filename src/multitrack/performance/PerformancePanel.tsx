@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Film, Pause, Play, Trash2, Video } from 'lucide-react'
-import { assignMediaPlaybackSrc } from '../../utils/mediaPlayback'
+import { useEffect, useRef, useState } from 'react'
+import { Film, Pause, Play, RotateCcw, Video, X } from 'lucide-react'
 import { playTakeMediaAudible } from '../../utils/takePlaybackAudio'
-import { resolveTakePlaybackUrl } from '../../utils/takeStorage'
 import Pressable from '../../components/ui/Pressable'
+import TakeVideoPlayer from '../../components/TakeVideoPlayer'
 import type { MultitrackRecordingPhase, PerformancePanelState } from '../types'
 
 export default function PerformancePanel({ panel, isRecordingTarget, recordingPhase, onTap, onRemoveTake, onRegisterMedia }: {
@@ -14,36 +13,13 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
   onRemoveTake: () => void
   onRegisterMedia: (panelId: string, element: HTMLMediaElement | null) => void
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const mediaRef = useRef<HTMLMediaElement | null>(null)
   const [quickPlaying, setQuickPlaying] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-    const video = videoRef.current
-
-    if (!panel.take || !video) {
-      onRegisterMedia(panel.id, null)
-      return undefined
-    }
-
-    video.muted = true
-    video.volume = 1
-    video.preload = 'auto'
-    video.setAttribute('playsinline', 'true')
-    video.setAttribute('webkit-playsinline', 'true')
-
-    void resolveTakePlaybackUrl(panel.take.filePath, panel.take.videoUrl).then((url) => {
-      if (cancelled || !url) return
-      assignMediaPlaybackSrc(video, url)
-      video.load()
-      onRegisterMedia(panel.id, video)
-    })
-
-    return () => {
-      cancelled = true
-      onRegisterMedia(panel.id, null)
-    }
-  }, [onRegisterMedia, panel.id, panel.take])
+    onRegisterMedia(panel.id, panel.take ? mediaRef.current : null)
+    return () => onRegisterMedia(panel.id, null)
+  }, [onRegisterMedia, panel.id, panel.take?.id])
 
   useEffect(() => {
     setQuickPlaying(false)
@@ -59,22 +35,62 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
     )
   }
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    event.preventDefault()
-    onTap()
+  const toggleQuickPlayback = () => {
+    const media = mediaRef.current
+    if (!media) return
+    if (quickPlaying) {
+      media.pause()
+      setQuickPlaying(false)
+      return
+    }
+    try {
+      media.currentTime = 0
+    } catch {
+      /* media may still be loading */
+    }
+    void playTakeMediaAudible(media).then(setQuickPlaying)
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onTap}
-      onKeyDown={handleKeyDown}
+    <Pressable
+      type="button"
+      intensity="soft"
+      squish={false}
+      onClick={toggleQuickPlayback}
       className={`multitrack-panel multitrack-panel--performance ${isRecordingTarget ? 'multitrack-panel--recording' : ''}`}
-      aria-label="Record another take in this box"
+      aria-label={quickPlaying ? 'Pause take' : 'Play take'}
     >
-      <video ref={videoRef} className="multitrack-panel__media" playsInline preload="metadata" onEnded={() => setQuickPlaying(false)} />
+      <TakeVideoPlayer
+        filePath={panel.take.filePath}
+        videoUrl={panel.take.videoUrl}
+        mimeType={panel.take.videoMimeType}
+        videoRef={mediaRef}
+        videoSourceKey={panel.take.id}
+        className="multitrack-panel__media"
+        loadingClassName="multitrack-panel__media multitrack-panel__media--loading"
+        mirror={panel.take.mirrorPlayback !== false}
+        recordingOrientation={panel.take.recordingOrientation}
+        fit="cover"
+        eagerLoad
+        preload="auto"
+        manualPlayOnly
+        poster={panel.take.thumbnailUrl || undefined}
+        onLoadedMetadata={(event) => onRegisterMedia(panel.id, event.currentTarget)}
+        onCanPlay={(event) => onRegisterMedia(panel.id, event.currentTarget)}
+        onEnded={() => setQuickPlaying(false)}
+      />
+      <Pressable
+        type="button"
+        intensity="icon"
+        className="multitrack-panel__remove"
+        aria-label="Remove video"
+        onClick={(event) => {
+          event.stopPropagation()
+          onRemoveTake()
+        }}
+      >
+        <X className="h-3.5 w-3.5" />
+      </Pressable>
       <div className="multitrack-panel__overlay">
         <div className="multitrack-panel__label"><Film className="h-3.5 w-3.5" /><span>{panel.take.name || 'Performance'}</span></div>
         <div className="multitrack-panel__actions">
@@ -83,19 +99,7 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
             intensity="soft"
             onClick={(event) => {
               event.stopPropagation()
-              const video = videoRef.current
-              if (!video) return
-              if (quickPlaying) {
-                video.pause()
-                setQuickPlaying(false)
-                return
-              }
-              try {
-                video.currentTime = 0
-              } catch {
-                /* media may still be loading */
-              }
-              void playTakeMediaAudible(video).then(setQuickPlaying)
+              toggleQuickPlayback()
             }}
             aria-label={quickPlaying ? 'Pause take' : 'Play take'}
             className="multitrack-panel__action"
@@ -107,15 +111,15 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
             intensity="soft"
             onClick={(event) => {
               event.stopPropagation()
-              onRemoveTake()
+              onTap()
             }}
-            aria-label="Remove take"
+            aria-label="Record another take"
             className="multitrack-panel__action"
           >
-            <Trash2 className="h-4 w-4" />
+            <RotateCcw className="h-4 w-4" />
           </Pressable>
         </div>
       </div>
-    </div>
+    </Pressable>
   )
 }
