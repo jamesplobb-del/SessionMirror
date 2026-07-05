@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface UsePipInlineDecoderOptions {
   suspendPlayback: boolean
   isAutoPlayArmed: boolean
   isPlaying: boolean
   videoSourceKey: string
-  videoRef?: RefObject<HTMLMediaElement | null>
 }
 
 /** Gates PiP `<video>` mount — poster when idle, decoder when playing or auto-play armed. */
@@ -14,7 +13,6 @@ export function usePipInlineDecoder({
   isAutoPlayArmed,
   isPlaying,
   videoSourceKey,
-  videoRef,
 }: UsePipInlineDecoderOptions) {
   const [decoderActive, setDecoderActive] = useState(isAutoPlayArmed)
   const pendingPlayRef = useRef(false)
@@ -41,12 +39,11 @@ export function usePipInlineDecoder({
   }, [suspendPlayback])
 
   useEffect(() => {
-    if (isAutoPlayArmed || isPlaying) return
-    const media = videoRef?.current
-    if (media && !media.paused && !media.ended) return
-    setDecoderActive(false)
-    pendingPlayRef.current = false
-  }, [isAutoPlayArmed, isPlaying, videoRef, videoSourceKey])
+    if (!isPlaying && !isAutoPlayArmed) {
+      setDecoderActive(false)
+      pendingPlayRef.current = false
+    }
+  }, [isAutoPlayArmed, isPlaying])
 
   const requestDecoderForPlay = useCallback(() => {
     pendingPlayRef.current = true

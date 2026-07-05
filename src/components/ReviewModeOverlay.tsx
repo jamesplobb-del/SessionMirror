@@ -777,15 +777,7 @@ export default function ReviewModeOverlay({
     const onPlaying = () => {
       setIsPlaying(true)
     }
-    const syncPlaying = () => {
-      if (!video.paused && !video.ended) {
-        setIsPlaying(true)
-      }
-    }
     const onPause = () => {
-      if (!video.paused && !video.ended) {
-        return
-      }
       setIsPlaying(false)
       revealPlayOverlay(false)
       stopProgressLoop()
@@ -807,7 +799,6 @@ export default function ReviewModeOverlay({
     video.addEventListener('seeked', onSeeked)
     video.addEventListener('play', onPlay)
     video.addEventListener('playing', onPlaying)
-    video.addEventListener('timeupdate', syncPlaying)
     video.addEventListener('pause', onPause)
     video.addEventListener('ended', onEnded)
 
@@ -819,7 +810,6 @@ export default function ReviewModeOverlay({
       video.removeEventListener('seeked', onSeeked)
       video.removeEventListener('play', onPlay)
       video.removeEventListener('playing', onPlaying)
-      video.removeEventListener('timeupdate', syncPlaying)
       video.removeEventListener('pause', onPause)
       video.removeEventListener('ended', onEnded)
       stopProgressLoop()

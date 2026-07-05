@@ -181,13 +181,11 @@ function BestTakeBox({
     media.addEventListener('play', syncPlaying)
     media.addEventListener('pause', syncPlaying)
     media.addEventListener('ended', syncPlaying)
-    media.addEventListener('timeupdate', syncPlaying)
 
     return () => {
       media.removeEventListener('play', syncPlaying)
       media.removeEventListener('pause', syncPlaying)
       media.removeEventListener('ended', syncPlaying)
-      media.removeEventListener('timeupdate', syncPlaying)
     }
   }, [hasTake, videoRef, videoSourceKey])
 
@@ -211,7 +209,6 @@ function BestTakeBox({
     isAutoPlayArmed: false,
     isPlaying,
     videoSourceKey,
-    videoRef,
   })
 
   const handlePlayPauseClick = useCallback(
@@ -318,7 +315,7 @@ function BestTakeBox({
   const playbackFit =
     isFill && take?.recordingOrientation === 'landscape' ? 'contain' : 'cover'
 
-  const playbackAudible = (isPlaying || decoderActive) && !suspendPlayback && hasTake
+  const playbackAudible = isPlaying && !suspendPlayback && hasTake
 
   const shellClass = isFill
     ? 'relative h-full w-full min-h-0 overflow-hidden'

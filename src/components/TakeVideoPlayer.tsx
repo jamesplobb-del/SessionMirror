@@ -4,7 +4,6 @@ import { useCapacitorVideoSrc } from '../hooks/useCapacitorVideoSrc'
 import { NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
-import { hasTakePlaybackSpeakerRoute } from '../utils/takePlaybackSpeaker'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
@@ -88,9 +87,7 @@ export default function TakeVideoPlayer({
 
     loadedSrcRef.current = mediaSrc
     prepareInlineMediaElement(media, { preload: effectivePreload })
-    if (!hasTakePlaybackSpeakerRoute(media)) {
-      ensureMediaMuted(media)
-    }
+    ensureMediaMuted(media)
     media.load()
   }, [mediaSrc, mediaRef])
 
@@ -113,9 +110,7 @@ export default function TakeVideoPlayer({
     const media = mediaRef.current
     if (!media) return
 
-    const routed = hasTakePlaybackSpeakerRoute(media)
-
-    if (audible || routed) {
+    if (audible && mediaSrc) {
       // Output flows through the Web Audio speaker bus; keep the element unmuted
       // so iOS keeps decoding it (muted elements get throttled → 1s cutout).
       media.muted = false

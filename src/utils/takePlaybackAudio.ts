@@ -157,19 +157,6 @@ async function prepareLoudPlaybackBeforeStart(media: HTMLMediaElement): Promise<
   await resumePlaybackAudioContext()
 }
 
-function isVisibleVideoPlayback(media: HTMLMediaElement): boolean {
-  return media instanceof HTMLVideoElement
-}
-
-async function preparePlaybackRouteForMedia(media: HTMLMediaElement): Promise<boolean> {
-  const visibleVideo = isVisibleVideoPlayback(media)
-  if (visibleVideo) {
-    await finalizeTakePlaybackCleanup()
-  }
-  await preparePlaybackRoute({ suspendCamera: visibleVideo })
-  return visibleVideo
-}
-
 export function playTakeMediaFromUserGesture(
   media: HTMLMediaElement,
   callbacks: UserGesturePlaybackCallbacks = {},
@@ -178,15 +165,11 @@ export function playTakeMediaFromUserGesture(
 
   void (async () => {
     try {
-      const nativeVideoPlayback = await preparePlaybackRouteForMedia(media)
-      if (!nativeVideoPlayback) {
-        await prepareLoudPlaybackBeforeStart(media)
-      }
+      await preparePlaybackRoute({ suspendCamera: false })
+      await prepareLoudPlaybackBeforeStart(media)
       await media.play()
       attachPlaybackRouteEndedListener(media)
-      if (!nativeVideoPlayback) {
-        wireTakePlaybackAfterStart(media, true)
-      }
+      wireTakePlaybackAfterStart(media, true)
       reportTakePlaybackStarted(media)
       callbacks.onPlaying?.()
     } catch (error: unknown) {
@@ -233,11 +216,8 @@ export async function playTakeMedia(
 ): Promise<boolean> {
   prepareMediaForAudiblePlayback(media)
   try {
-    const nativeVideoPlayback = isVisibleVideoPlayback(media)
-    if (!nativeVideoPlayback) {
-      wireTakePlaybackAfterStart(media, true)
-    }
     await media.play()
+    wireTakePlaybackAfterStart(media, true)
     reportTakePlaybackStarted(media)
     return true
   } catch (error: unknown) {
@@ -268,32 +248,24 @@ export async function playTakeMediaAudible(
   options: PlayTakeMediaAudibleOptions = {},
 ): Promise<boolean> {
   prepareMediaForAudiblePlayback(media)
-  const nativeVideoPlayback = isVisibleVideoPlayback(media)
 
   if (!options.skipRoutePrep) {
     try {
-      await preparePlaybackRouteForMedia(media)
+      await preparePlaybackRoute({ suspendCamera: false })
     } catch {
       return false
     }
   }
 
-  if (!nativeVideoPlayback) {
-    await prepareLoudPlaybackBeforeStart(media)
-  }
+  await prepareLoudPlaybackBeforeStart(media)
 
   try {
     await media.play()
     attachPlaybackRouteEndedListener(media)
-    if (!nativeVideoPlayback) {
-      wireTakePlaybackAfterStart(media, true)
-    }
+    wireTakePlaybackAfterStart(media, true)
     reportTakePlaybackStarted(media)
     return true
   } catch {
-    if (nativeVideoPlayback) {
-      return false
-    }
     try {
       media.muted = true
       await media.play()
