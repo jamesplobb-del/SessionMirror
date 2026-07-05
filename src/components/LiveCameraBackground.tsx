@@ -35,6 +35,8 @@ interface LiveCameraBackgroundProps {
   /** Hands-free video take replaces the live camera fullscreen during playback. */
   handsFreePlaybackTakeId?: string | null
   handsFreePlaybackSrc?: string | null
+  /** PiP / review playback — release the live preview decoder so the take can decode. */
+  inlineTakePlaybackActive?: boolean
   onHandsFreePlaybackPlayingChange?: (playing: boolean) => void
   onHandsFreePlaybackComplete?: () => void
 }
@@ -55,11 +57,13 @@ function LiveCameraBackground({
   nativePreviewActive = false,
   handsFreePlaybackTakeId = null,
   handsFreePlaybackSrc = null,
+  inlineTakePlaybackActive = false,
   onHandsFreePlaybackPlayingChange,
   onHandsFreePlaybackComplete,
 }: LiveCameraBackgroundProps) {
   const handsFreePlaybackVideoRef = useRef<HTMLVideoElement>(null)
   const handsFreePlaybackSessionRef = useRef(false)
+  const deferredPreviewStreamRef = useRef<MediaStream | null>(null)
   const shellRef = useRef<HTMLDivElement>(null)
   const pinchPointersRef = useRef(new Map<number, { x: number; y: number }>())
   const pinchStartDistanceRef = useRef(0)
@@ -87,6 +91,7 @@ function LiveCameraBackground({
   useEffect(() => {
     if (nativePreviewActive) return
     if (handsFreePlaybackTakeId) return
+    if (inlineTakePlaybackActive) return
     if (modePreparing) return
     const video = previewRef.current
     if (!video || isAudioMode) {
@@ -105,11 +110,12 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive, handsFreePlaybackTakeId, modePreparing])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive, handsFreePlaybackTakeId, inlineTakePlaybackActive, modePreparing])
 
   useEffect(() => {
     if (nativePreviewActive) return
     if (handsFreePlaybackTakeId) return
+    if (inlineTakePlaybackActive) return
     if (isAudioMode || modePreparing || resumingPreview) return
 
     let reviveTimer: number | null = null
@@ -152,11 +158,12 @@ function LiveCameraBackground({
       video?.removeEventListener('stalled', scheduleRevive)
       video?.removeEventListener('suspend', scheduleRevive)
     }
-  }, [handsFreePlaybackTakeId, isAudioMode, modePreparing, nativePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, inlineTakePlaybackActive, isAudioMode, modePreparing, nativePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
 
   useEffect(() => {
     if (nativePreviewActive) return
     if (handsFreePlaybackTakeId) return
+    if (inlineTakePlaybackActive) return
     if (visuallySuppressed || isAudioMode || modePreparing) return
     const video = previewRef.current
     const stream = streamRef.current
@@ -167,7 +174,39 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [handsFreePlaybackTakeId, isAudioMode, modePreparing, nativePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, inlineTakePlaybackActive, isAudioMode, modePreparing, nativePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
+
+  useEffect(() => {
+    if (nativePreviewActive || isAudioMode || isRecording) return
+    if (!inlineTakePlaybackActive) return
+
+    const video = previewRef.current
+    if (!video) return
+
+    deferredPreviewStreamRef.current = (video.srcObject as MediaStream | null) ?? streamRef.current
+    video.pause()
+    video.srcObject = null
+
+    return () => {
+      const stream = streamRef.current ?? deferredPreviewStreamRef.current
+      deferredPreviewStreamRef.current = null
+      if (!video || !stream) return
+      if (video.srcObject !== stream) {
+        video.srcObject = stream
+      }
+      if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        void video.play().catch((err) => console.warn('Playback intercepted:', err))
+      }
+    }
+  }, [
+    inlineTakePlaybackActive,
+    isAudioMode,
+    isRecording,
+    nativePreviewActive,
+    previewRef,
+    streamRef,
+    streamGeneration,
+  ])
 
   useEffect(() => {
     const wantsPlayback =
@@ -579,5 +618,6 @@ export default memo(
     prev.visuallySuppressed === next.visuallySuppressed &&
     prev.nativePreviewActive === next.nativePreviewActive &&
     prev.handsFreePlaybackTakeId === next.handsFreePlaybackTakeId &&
-    prev.handsFreePlaybackSrc === next.handsFreePlaybackSrc,
+    prev.handsFreePlaybackSrc === next.handsFreePlaybackSrc &&
+    prev.inlineTakePlaybackActive === next.inlineTakePlaybackActive,
 )

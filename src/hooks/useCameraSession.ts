@@ -27,7 +27,10 @@ import {
   type RecordingTrackSnapshot,
 } from '../utils/recordingDiagnostics'
 import { AUTO_RECORD_PREROLL_MS } from '../utils/autoRecordPlayback'
-import { isAutoPlaybackHoldingMicWarmup } from '../utils/takePlaybackAudio'
+import {
+  isAutoPlaybackHoldingMicWarmup,
+  isInlineTakePlaybackDeferringCameraPreview,
+} from '../utils/takePlaybackAudio'
 import { releaseRecorderStream } from '../utils/recordingStream'
 import {
   applyViewportCssVarsOnResume,
@@ -1996,6 +1999,7 @@ export function useCameraSession({
     if (recordingMode !== 'video') return
 
     const revivePreview = () => {
+      if (isInlineTakePlaybackDeferringCameraPreview()) return
       if (resumeInFlightRef.current || !readyRef.current) return
       const stream = streamRef.current
       if (!stream || recordingModeRef.current !== 'video') return

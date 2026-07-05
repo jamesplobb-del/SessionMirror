@@ -19,6 +19,7 @@ import {
 } from './takePlaybackSpeaker'
 
 let autoPlaybackHoldCheck: (() => boolean) | null = null
+let inlineTakePlaybackPreviewHoldCheck: (() => boolean) | null = null
 
 export function registerTakePlaybackMicHandlers(_handlers: {
   suspendMic: () => void | Promise<void>
@@ -33,6 +34,15 @@ export function registerAutoPlaybackHold(check: () => boolean): void {
 
 export function isAutoPlaybackHoldingMicWarmup(): boolean {
   return autoPlaybackHoldCheck?.() ?? false
+}
+
+/** True while inline take playback should release the live camera preview decoder. */
+export function registerInlineTakePlaybackPreviewHold(check: () => boolean): void {
+  inlineTakePlaybackPreviewHoldCheck = check
+}
+
+export function isInlineTakePlaybackDeferringCameraPreview(): boolean {
+  return inlineTakePlaybackPreviewHoldCheck?.() ?? false
 }
 
 let takePlaybackStereoHeld = false

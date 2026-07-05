@@ -6,6 +6,7 @@ import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } fr
 import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
+import { hasTakePlaybackSpeakerRoute } from '../utils/takePlaybackSpeaker'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
   buildPlaybackShellStyle,
@@ -113,6 +114,14 @@ export default function TakeVideoPlayer({
     if (audible && mediaSrc) {
       // Output flows through the Web Audio speaker bus; keep the element unmuted
       // so iOS keeps decoding it (muted elements get throttled → 1s cutout).
+      media.muted = false
+      if (media.volume <= 0) {
+        media.volume = 1
+      }
+      return
+    }
+
+    if (hasTakePlaybackSpeakerRoute(media)) {
       media.muted = false
       if (media.volume <= 0) {
         media.volume = 1

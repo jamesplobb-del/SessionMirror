@@ -209,6 +209,7 @@ function BestTakeBox({
     isAutoPlayArmed: false,
     isPlaying,
     videoSourceKey,
+    mediaRef: videoRef,
   })
 
   const handlePlayPauseClick = useCallback(

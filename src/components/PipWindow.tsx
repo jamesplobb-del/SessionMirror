@@ -130,6 +130,7 @@ function PipWindow({
     isAutoPlayArmed,
     isPlaying,
     videoSourceKey,
+    mediaRef: videoRef,
   })
   const playbackAudible = (isAutoPlayArmed || isPlaying) && !suspendPlayback
 
