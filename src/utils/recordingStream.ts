@@ -1,41 +1,16 @@
 import type { RecordingMode } from '../types'
 
-/**
- * Clone the video track for MediaRecorder so preview `<video>` play()/srcObject
- * churn does not stall the encoded video track mid-take. Audio stays on the live
- * mic track — cloning audio caused iOS Web Audio / MediaRecorder instability.
- */
+/** Record from the live preview stream — cloning tracks can stall iOS video mid-take. */
 export function buildRecorderStream(
   source: MediaStream,
-  mode: RecordingMode,
+  _mode: RecordingMode,
 ): MediaStream {
-  if (mode === 'audio') {
-    return source
-  }
-
-  const videoTrack = source.getVideoTracks()[0]
-  if (!videoTrack) {
-    return source
-  }
-
-  const recordStream = new MediaStream()
-  source.getAudioTracks().forEach((track) => recordStream.addTrack(track))
-  recordStream.addTrack(videoTrack.clone())
-  return recordStream
+  return source
 }
 
 export function releaseRecorderStream(
-  recordStream: MediaStream | null,
-  previewStream: MediaStream | null,
+  _recordStream: MediaStream | null,
+  _previewStream: MediaStream | null,
 ): void {
-  if (!recordStream || recordStream === previewStream) return
-  recordStream.getTracks().forEach((track) => {
-    if (track.kind === 'video') {
-      try {
-        track.stop()
-      } catch {
-        /* ignore */
-      }
-    }
-  })
+  /* same stream as preview — never stop camera tracks here */
 }

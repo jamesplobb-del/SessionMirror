@@ -14,6 +14,14 @@ import {
   takeVideoShellClassName,
 } from '../utils/takeVideoPlayback'
 
+type FrameWatchVideo = HTMLVideoElement & {
+  requestVideoFrameCallback?: (
+    callback: (now: number, metadata: { presentedFrames?: number }) => void,
+  ) => number
+  cancelVideoFrameCallback?: (handle: number) => void
+  webkitDecodedFrameCount?: number
+}
+
 export interface TakeVideoPlayerProps
   extends Omit<
     VideoHTMLAttributes<HTMLVideoElement>,
@@ -102,6 +110,94 @@ export default function TakeVideoPlayer({
     if (mediaSrc) return
     loadedSrcRef.current = null
   }, [mediaSrc])
+
+  useEffect(() => {
+    if (isAudio || thumbnailPreview) return
+    const media = mediaRef.current as FrameWatchVideo | null
+    if (!media) return
+
+    let stopped = false
+    let frameCallbackId: number | null = null
+    let intervalId: number | null = null
+    let lastPresentedFrames =
+      media.webkitDecodedFrameCount ?? media.getVideoPlaybackQuality?.().totalVideoFrames ?? 0
+    let lastMediaTime = media.currentTime || 0
+    let lastFrameAt = performance.now()
+    let lastNudgeAt = 0
+
+    const readPresentedFrames = () =>
+      media.webkitDecodedFrameCount ?? media.getVideoPlaybackQuality?.().totalVideoFrames ?? lastPresentedFrames
+
+    const nudgeVideoDecoder = () => {
+      const now = performance.now()
+      if (now - lastNudgeAt < 1600) return
+      lastNudgeAt = now
+
+      const duration = Number.isFinite(media.duration) ? media.duration : 0
+      const current = media.currentTime || 0
+      const target = duration > 0
+        ? Math.min(Math.max(0, duration - 0.05), current + 0.015)
+        : current + 0.015
+
+      try {
+        media.currentTime = target
+        if (!media.paused && !media.ended) {
+          void media.play().catch(() => undefined)
+        }
+      } catch {
+        /* ignore decoder recovery failures */
+      }
+    }
+
+    const sample = () => {
+      if (stopped || media.paused || media.ended || media.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        lastMediaTime = media.currentTime || 0
+        lastPresentedFrames = readPresentedFrames()
+        lastFrameAt = performance.now()
+        return
+      }
+
+      const now = performance.now()
+      const currentTime = media.currentTime || 0
+      const presentedFrames = readPresentedFrames()
+      const timeAdvanced = currentTime - lastMediaTime > 0.18
+      const framesAdvanced = presentedFrames > lastPresentedFrames
+
+      if (framesAdvanced) {
+        lastPresentedFrames = presentedFrames
+        lastFrameAt = now
+      } else if (timeAdvanced && now - lastFrameAt > 1250) {
+        nudgeVideoDecoder()
+        lastFrameAt = now
+      }
+
+      lastMediaTime = currentTime
+    }
+
+    const scheduleFrameWatch = () => {
+      if (stopped || !media.requestVideoFrameCallback) return
+      frameCallbackId = media.requestVideoFrameCallback((_now, metadata) => {
+        if (typeof metadata.presentedFrames === 'number') {
+          lastPresentedFrames = metadata.presentedFrames
+          lastFrameAt = performance.now()
+        }
+        scheduleFrameWatch()
+      })
+    }
+
+    scheduleFrameWatch()
+    intervalId = window.setInterval(sample, 350)
+
+    return () => {
+      stopped = true
+      if (frameCallbackId !== null) {
+        media.cancelVideoFrameCallback?.(frameCallbackId)
+      }
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [isAudio, mediaRef, mediaSrc, thumbnailPreview, videoSourceKey])
 
   useEffect(() => {
     setVideoDimensions({ width: 0, height: 0 })

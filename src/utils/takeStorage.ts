@@ -47,22 +47,16 @@ export function normalizeBlobMime(mimeType: string): string {
   return mimeType
 }
 
-/**
- * iOS/mp4 MediaRecorder can emit more than one fMP4 fragment even without a
- * timeslice. Concatenating fragments corrupts A/V sync, so pick the largest
- * fragment (typically the complete take blob delivered on stop).
- */
 export function composeBufferedRecordingBlob(chunks: Blob[], mimeType: string): Blob {
   const writeMime = normalizeBlobMime(mimeType)
   if (chunks.length <= 1) {
     return new Blob(chunks, { type: writeMime })
   }
 
-  const primary = chunks.reduce(
-    (largest, chunk) => (chunk.size > largest.size ? chunk : largest),
-    chunks[0]!,
-  )
-  console.warn('[Recording] Multiple buffered MediaRecorder chunks — using largest fragment', {
+  // iOS delivers the final complete MP4 fragment last; choosing by size can
+  // select an earlier fragment whose video track stalls during playback.
+  const primary = chunks[chunks.length - 1]!
+  console.warn('[Recording] Multiple buffered MediaRecorder chunks — using final fragment', {
     chunkCount: chunks.length,
     chunkSizes: chunks.map((chunk) => chunk.size),
     selectedBytes: primary.size,
