@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties, type PointerEvent } from 'react'
+import { useEffect, useRef, type CSSProperties, type PointerEvent } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, FileImage, Maximize2, Minimize2, RotateCcw, Trash2, Upload, ZoomIn, ZoomOut } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import type { SheetMusicAsset, SheetMusicPanelState } from '../types'
@@ -10,6 +10,26 @@ const framePositions: Array<NonNullable<SheetMusicAsset['framePosition']>> = ['t
 export default function SheetMusicPanel({ panel, onAssetChange }: { panel: SheetMusicPanelState; onAssetChange: (asset: SheetMusicAsset | null) => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragRef = useRef<{ startClientX: number; startClientY: number; startX: number; startY: number } | null>(null)
+  const uploadedAssetUrlRef = useRef<string | null>(null)
+
+  // Revoke the uploaded file's blob URL once it's no longer the active asset
+  // (replaced, removed, or the panel unmounts) to avoid leaking memory.
+  useEffect(() => {
+    if (panel.asset && panel.asset.src === uploadedAssetUrlRef.current) return
+    if (uploadedAssetUrlRef.current) {
+      URL.revokeObjectURL(uploadedAssetUrlRef.current)
+      uploadedAssetUrlRef.current = null
+    }
+  }, [panel.asset])
+
+  useEffect(() => {
+    return () => {
+      if (uploadedAssetUrlRef.current) {
+        URL.revokeObjectURL(uploadedAssetUrlRef.current)
+        uploadedAssetUrlRef.current = null
+      }
+    }
+  }, [])
 
   if (!panel.asset) {
     return (
@@ -22,7 +42,10 @@ export default function SheetMusicPanel({ panel, onAssetChange }: { panel: Sheet
           onChange={(e) => {
             const file = e.target.files?.[0]
             if (!file) return
-            void loadSheetMusicFile(file).then(onAssetChange)
+            void loadSheetMusicFile(file).then((asset) => {
+              uploadedAssetUrlRef.current = asset.src
+              onAssetChange(asset)
+            })
             e.currentTarget.value = ''
           }}
         />

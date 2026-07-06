@@ -375,6 +375,7 @@ export default function App() {
 
 function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   usePhysicalOrientation()
+  const isNativeCameraPlatform = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
   const [takes, setTakes] = useState<Take[]>(bootSnapshot.takes)
   const [projects, setProjects] = useState<Project[]>(bootSnapshot.projects)
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
@@ -1006,6 +1007,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       captureProfile,
       captureTrackSnapshot,
       autoPerformanceStartSeconds,
+      mirrorPlayback,
     } = payload
 
     void logRecordingOutputVerification({
@@ -1042,6 +1044,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const savedTake: Take = {
         ...createTake(takeId, index, optimisticUrl, filePath, mimeType, mediaType),
         recordingOrientation: recordingOrientation ?? 'portrait',
+        ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
       }
       return [...prev, savedTake]
     })
@@ -1180,6 +1183,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const thumbnailTake: Take = {
         ...createTake(takeId, 1, playbackUrl, resolvedFilePath, mimeType, mediaType),
         recordingOrientation: recordingOrientation ?? 'portrait',
+        ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
       }
 
       const thumbnailPromise = normalizedBlob
@@ -1270,7 +1274,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     onBeforeForegroundRestart: handleBeforeForegroundRestart,
     onAfterForegroundRestart: resumeYoutubeReference,
     nativeExperimentalAudioEnabled: settings.nativeExperimentalAudioEnabled,
-    nativeCameraRecordingEnabled: settings.nativeCameraRecordingEnabled,
+    nativeCameraRecordingEnabled: isNativeCameraPlatform,
     micInputPreference: settings.micInputPreference,
   })
 
@@ -3027,11 +3031,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 visuallySuppressed={isSplitView}
                 nativeLivePreviewActive={nativeLivePreviewActive}
-                nativeCameraBridgeEnabled={
-                  settings.nativeCameraRecordingEnabled &&
-                  Capacitor.isNativePlatform() &&
-                  Capacitor.getPlatform() === 'ios'
-                }
+                nativeCameraBridgeEnabled={isNativeCameraPlatform}
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
                 handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
@@ -3605,9 +3605,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     isOpen={multitrackOpen}
                     takes={sortedTakes}
                     streamRef={streamRef}
+                    streamGeneration={streamGeneration}
                     tunerInstrument={settings.tunerInstrument}
                     hapticFeedback={settings.hapticFeedback}
                     isRecording={isRecording}
+                    nativeLivePreviewActive={nativeLivePreviewActive}
+                    nativeCameraBridgeEnabled={isNativeCameraPlatform}
                     onClose={handleCloseMultitrack}
                     onStartRecording={handleMultitrackStartRecording}
                     onStopRecording={handleMultitrackStopRecording}

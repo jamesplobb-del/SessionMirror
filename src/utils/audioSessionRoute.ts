@@ -121,6 +121,23 @@ export interface NativeCreatorStudioRenderResult {
   path: string
 }
 
+/**
+ * Top-left-origin percent rect for multitrack grid compositing — distinct from
+ * Creator Studio's center+scale `StudioTransform` convention. Do not conflate
+ * the two when reading/writing native render payloads.
+ */
+export interface NativeRectPercent {
+  xPercent: number
+  yPercent: number
+  widthPercent: number
+  heightPercent: number
+}
+
+export interface NativeMultitrackRenderResult {
+  success: boolean
+  path: string
+}
+
 export interface NativeExperimentalAudioSnapshot extends AudioRouteSnapshot {
   selectedAudioEngine: string
   enabled: boolean
@@ -174,6 +191,14 @@ export interface BestTakeAudioPluginType {
     audioGain?: number
     objects: Array<Record<string, unknown>>
   }): Promise<NativeCreatorStudioRenderResult>
+  /** Composites N synced videos into one grid + optional sheet-music overlay + mixed audio. */
+  renderMultitrackVideo(options: {
+    aspectRatio: string
+    durationSeconds: number
+    sources: Array<{ id: string; path: string; rect: NativeRectPercent }>
+    sheetMusic: { path: string; fileType: string; rect: NativeRectPercent } | null
+    backingAudio: { path: string; gain: number } | null
+  }): Promise<NativeMultitrackRenderResult>
   setNativeExperimentalAudioMode(options: {
     enabled: boolean
     selectedAudioEngine: string

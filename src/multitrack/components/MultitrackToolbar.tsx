@@ -4,10 +4,11 @@ import Pressable from '../../components/ui/Pressable'
 
 export default function MultitrackToolbar(props: {
   isPlaying: boolean; currentTime: number; duration: number; showLayoutPicker: boolean
+  isExporting?: boolean
   onTogglePlay: () => void; onRestart: () => void; onSeek: (t: number) => void; onToggleLayoutPicker: () => void
   onExport: () => void
 }) {
-  const { isPlaying, currentTime, duration, showLayoutPicker, onTogglePlay, onRestart, onSeek, onToggleLayoutPicker, onExport } = props
+  const { isPlaying, currentTime, duration, showLayoutPicker, isExporting = false, onTogglePlay, onRestart, onSeek, onToggleLayoutPicker, onExport } = props
   return (
     <footer className="multitrack-toolbar">
       <div className="multitrack-toolbar__transport">
@@ -18,7 +19,7 @@ export default function MultitrackToolbar(props: {
       <input type="range" min={0} max={duration || 1} step={0.05} value={currentTime} onChange={(e) => onSeek(Number(e.target.value))} className="multitrack-toolbar__scrub" />
       <div className="multitrack-toolbar__actions">
         <Pressable type="button" intensity="soft" onClick={onToggleLayoutPicker} className={`multitrack-toolbar__chip ${showLayoutPicker ? 'multitrack-toolbar__chip--active' : ''}`}><SlidersHorizontal className="h-4 w-4" />Layout</Pressable>
-        <Pressable type="button" intensity="soft" onClick={onExport} className="multitrack-toolbar__chip multitrack-toolbar__chip--export"><Share2 className="h-4 w-4" />Export</Pressable>
+        <Pressable type="button" intensity="soft" onClick={onExport} disabled={isExporting} className="multitrack-toolbar__chip multitrack-toolbar__chip--export"><Share2 className="h-4 w-4" />{isExporting ? 'Rendering…' : 'Export'}</Pressable>
       </div>
     </footer>
   )

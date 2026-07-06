@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core'
-import { Directory, Filesystem } from '@capacitor/filesystem'
 import type { Take } from '../types'
 import BestTakeAudioPlugin from '../utils/audioSessionRoute'
 import {
@@ -7,6 +6,7 @@ import {
   resolveNativeFileUri,
   shareTakeToSystem,
 } from '../utils/shareTakeVideo'
+import { extensionForBlob, writeBlobToNativeCache } from '../utils/nativeAssetCache'
 import { renderCreatorStudioPreviewModel, validateCreatorStudioExport } from './renderer'
 import { loadStudioAssetBlob } from './projectStorage'
 import type {
@@ -16,27 +16,6 @@ import type {
 } from './types'
 
 const CREATOR_STUDIO_EXPORT_DIR = 'creator-studio-export-assets'
-
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read asset'))
-    reader.onload = () => {
-      const result = String(reader.result ?? '')
-      resolve(result.includes(',') ? result.split(',')[1] : result)
-    }
-    reader.readAsDataURL(blob)
-  })
-}
-
-function extensionForBlob(blob: Blob, fallbackName: string): string {
-  if (blob.type === 'application/pdf') return 'pdf'
-  if (blob.type === 'image/png') return 'png'
-  if (blob.type === 'image/webp') return 'webp'
-  if (blob.type === 'image/heic') return 'heic'
-  const extension = fallbackName.split('.').pop()?.toLowerCase()
-  return extension && extension.length <= 5 ? extension : 'jpg'
-}
 
 async function writeStudioAssetToCache(
   takeId: string,
@@ -48,22 +27,7 @@ async function writeStudioAssetToCache(
   if (!blob) return null
 
   const extension = extensionForBlob(blob, fallbackName)
-  const path = `${CREATOR_STUDIO_EXPORT_DIR}/${takeId}-${objectId}.${extension}`
-  await Filesystem.mkdir({
-    path: CREATOR_STUDIO_EXPORT_DIR,
-    directory: Directory.Cache,
-    recursive: true,
-  })
-  await Filesystem.writeFile({
-    path,
-    directory: Directory.Cache,
-    data: await blobToBase64(blob),
-  })
-  const { uri } = await Filesystem.getUri({
-    path,
-    directory: Directory.Cache,
-  })
-  return uri
+  return writeBlobToNativeCache(CREATOR_STUDIO_EXPORT_DIR, `${takeId}-${objectId}.${extension}`, blob)
 }
 
 async function prepareNativeRenderObjects(

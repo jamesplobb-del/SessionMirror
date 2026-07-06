@@ -26,6 +26,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "shareMediaFile", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveVideoToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderCreatorStudioVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "renderMultitrackVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraBridge", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraBridge", returnType: CAPPluginReturnPromise),
@@ -470,21 +471,57 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         return UIImage(contentsOfFile: url.path)
     }
 
+    /// Undoes a track's `preferredTransform` (device-rotation metadata) so its
+    /// pixels are in upright, natural orientation — shared by both the
+    /// single-video Creator Studio transform and the multitrack grid transform.
+    private func normalizedTrackOrientation(_ track: AVAssetTrack) -> (transform: CGAffineTransform, orientedSize: CGSize) {
+        let preferred = track.preferredTransform
+        let naturalRect = CGRect(origin: .zero, size: track.naturalSize).applying(preferred)
+        let orientedSize = CGSize(width: abs(naturalRect.width), height: abs(naturalRect.height))
+        let normalize = preferred.concatenating(
+            CGAffineTransform(translationX: -naturalRect.origin.x, y: -naturalRect.origin.y)
+        )
+        return (normalize, orientedSize)
+    }
+
     private func creatorStudioVideoTransform(
         track: AVAssetTrack,
         renderSize: CGSize
     ) -> CGAffineTransform {
-        let preferred = track.preferredTransform
-        let naturalRect = CGRect(origin: .zero, size: track.naturalSize).applying(preferred)
-        let orientedSize = CGSize(width: abs(naturalRect.width), height: abs(naturalRect.height))
+        let (normalize, orientedSize) = normalizedTrackOrientation(track)
         let scale = max(renderSize.width / max(orientedSize.width, 1), renderSize.height / max(orientedSize.height, 1))
         let scaledSize = CGSize(width: orientedSize.width * scale, height: orientedSize.height * scale)
         let translate = CGAffineTransform(
             translationX: (renderSize.width - scaledSize.width) / 2,
             y: (renderSize.height - scaledSize.height) / 2
         )
-        let normalize = preferred.concatenating(
-            CGAffineTransform(translationX: -naturalRect.origin.x, y: -naturalRect.origin.y)
+        return normalize
+            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+            .concatenating(translate)
+    }
+
+    private func multitrackRectFrame(_ rectDict: [String: Any], renderSize: CGSize) -> CGRect {
+        let x = percentValue(rectDict["xPercent"], fallback: 0) / 100 * renderSize.width
+        let y = percentValue(rectDict["yPercent"], fallback: 0) / 100 * renderSize.height
+        let width = percentValue(rectDict["widthPercent"], fallback: 100) / 100 * renderSize.width
+        let height = percentValue(rectDict["heightPercent"], fallback: 100) / 100 * renderSize.height
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    /// Contain-fits (letterboxes) each source within its grid cell rather than
+    /// cover-cropping. AVFoundation's per-layer-instruction crop rectangle has
+    /// coordinate-space subtleties around `preferredTransform` that are hard to
+    /// verify without on-device testing, so v1 avoids any risk of one panel's
+    /// video bleeding into an adjacent cell by guaranteeing every source stays
+    /// fully within its own target rect. Revisit with true cover-fit + cropping
+    /// once verified live on device.
+    private func multitrackVideoTransform(track: AVAssetTrack, targetRect: CGRect) -> CGAffineTransform {
+        let (normalize, orientedSize) = normalizedTrackOrientation(track)
+        let scale = min(targetRect.width / max(orientedSize.width, 1), targetRect.height / max(orientedSize.height, 1))
+        let scaledSize = CGSize(width: orientedSize.width * scale, height: orientedSize.height * scale)
+        let translate = CGAffineTransform(
+            translationX: targetRect.origin.x + (targetRect.width - scaledSize.width) / 2,
+            y: targetRect.origin.y + (targetRect.height - scaledSize.height) / 2
         )
         return normalize
             .concatenating(CGAffineTransform(scaleX: scale, y: scale))
@@ -685,6 +722,194 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         } catch {
             call.reject("Creator Studio render failed", error.localizedDescription)
+        }
+    }
+
+    // MARK: - Multitrack grid export (N synced videos + optional sheet music + mixed audio)
+
+    @objc func renderMultitrackVideo(_ call: CAPPluginCall) {
+        let aspectRatio = call.getString("aspectRatio") ?? "9:16"
+        let renderSize = creatorStudioRenderSize(for: aspectRatio)
+        let durationHint = call.getDouble("durationSeconds") ?? 0
+        let sources = call.getArray("sources", JSObject.self) ?? []
+
+        guard !sources.isEmpty else {
+            call.reject("No performance videos to export")
+            return
+        }
+
+        let composition = AVMutableComposition()
+        var layerInstructions: [AVMutableVideoCompositionLayerInstruction] = []
+        var audioParameters: [AVMutableAudioMixInputParameters] = []
+        var longestDuration = CMTime.zero
+
+        for sourceAny in sources {
+            let source = sourceAny as [String: Any]
+            guard
+                let path = source["path"] as? String,
+                let sourceURL = fileURL(from: path),
+                let rectDict = source["rect"] as? [String: Any]
+            else { continue }
+
+            let asset = AVURLAsset(url: sourceURL)
+            guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+                print("[Multitrack] skipping unreadable source \(source["id"] ?? "?")")
+                continue
+            }
+
+            guard let compositionVideo = composition.addMutableTrack(
+                withMediaType: .video,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+            ) else { continue }
+
+            let sourceTimeRange = CMTimeRange(start: .zero, duration: asset.duration)
+            do {
+                try compositionVideo.insertTimeRange(sourceTimeRange, of: videoTrack, at: .zero)
+            } catch {
+                print("[Multitrack] failed to insert video source \(source["id"] ?? "?"): \(error.localizedDescription)")
+                continue
+            }
+            longestDuration = CMTimeMaximum(longestDuration, asset.duration)
+
+            let targetRect = multitrackRectFrame(rectDict, renderSize: renderSize)
+            let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideo)
+            layerInstruction.setTransform(
+                multitrackVideoTransform(track: videoTrack, targetRect: targetRect),
+                at: .zero
+            )
+            layerInstructions.append(layerInstruction)
+
+            for audioTrack in asset.tracks(withMediaType: .audio) {
+                guard let compositionAudio = composition.addMutableTrack(
+                    withMediaType: .audio,
+                    preferredTrackID: kCMPersistentTrackID_Invalid
+                ) else { continue }
+                do {
+                    try compositionAudio.insertTimeRange(sourceTimeRange, of: audioTrack, at: .zero)
+                    let parameters = AVMutableAudioMixInputParameters(track: compositionAudio)
+                    parameters.setVolume(1.0, at: .zero)
+                    audioParameters.append(parameters)
+                } catch {
+                    print("[Multitrack] failed to insert audio for source \(source["id"] ?? "?"): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        guard !layerInstructions.isEmpty else {
+            call.reject("None of the panel videos could be read")
+            return
+        }
+
+        if let backingDict = call.getObject("backingAudio"),
+           let backingPath = backingDict["path"] as? String,
+           let backingURL = fileURL(from: backingPath) {
+            let backingAsset = AVURLAsset(url: backingURL)
+            if let backingTrack = backingAsset.tracks(withMediaType: .audio).first {
+                // Backing audio never extends the export past the panels' own
+                // duration — trim it down if it's longer (e.g. a full song).
+                let backingDuration = min(backingAsset.duration, longestDuration)
+                let backingRange = CMTimeRange(start: .zero, duration: backingDuration)
+                if let compositionBacking = composition.addMutableTrack(
+                    withMediaType: .audio,
+                    preferredTrackID: kCMPersistentTrackID_Invalid
+                ) {
+                    do {
+                        try compositionBacking.insertTimeRange(backingRange, of: backingTrack, at: .zero)
+                        let gain = Float(backingDict["gain"] as? Double ?? 1.0)
+                        let parameters = AVMutableAudioMixInputParameters(track: compositionBacking)
+                        parameters.setVolume(gain, at: .zero)
+                        audioParameters.append(parameters)
+                    } catch {
+                        print("[Multitrack] failed to insert backing audio: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        let instruction = AVMutableVideoCompositionInstruction()
+        // Extend to the longest panel rather than crop to the shortest — a
+        // panel that finished recording early just goes black/silent past its
+        // own end instead of truncating footage from a longer panel.
+        instruction.timeRange = CMTimeRange(start: .zero, duration: longestDuration)
+        instruction.layerInstructions = layerInstructions
+
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.renderSize = renderSize
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.instructions = [instruction]
+
+        let parentLayer = CALayer()
+        parentLayer.frame = CGRect(origin: .zero, size: renderSize)
+        parentLayer.isGeometryFlipped = true
+        parentLayer.backgroundColor = UIColor.black.cgColor
+
+        let videoLayer = CALayer()
+        videoLayer.frame = parentLayer.bounds
+        parentLayer.addSublayer(videoLayer)
+
+        if let sheetMusicDict = call.getObject("sheetMusic"),
+           let sheetPath = sheetMusicDict["path"] as? String,
+           let sheetRectDict = sheetMusicDict["rect"] as? [String: Any],
+           let image = imageForCreatorStudioAsset(
+                path: sheetPath,
+                fileType: sheetMusicDict["fileType"] as? String ?? "image"
+           ) {
+            let overlayLayer = CALayer()
+            overlayLayer.frame = parentLayer.bounds
+            parentLayer.addSublayer(overlayLayer)
+
+            let sheetLayer = CALayer()
+            sheetLayer.contents = image.cgImage
+            sheetLayer.contentsGravity = .resizeAspect
+            sheetLayer.masksToBounds = true
+            sheetLayer.cornerRadius = 18
+            sheetLayer.borderColor = UIColor.white.withAlphaComponent(0.55).cgColor
+            sheetLayer.borderWidth = 2
+            sheetLayer.frame = multitrackRectFrame(sheetRectDict, renderSize: renderSize)
+            overlayLayer.addSublayer(sheetLayer)
+        }
+
+        videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
+            postProcessingAsVideoLayer: videoLayer,
+            in: parentLayer
+        )
+
+        guard let exportSession = AVAssetExportSession(
+            asset: composition,
+            presetName: AVAssetExportPresetHighestQuality
+        ) else {
+            call.reject("Could not create export session")
+            return
+        }
+
+        let audioMix = AVMutableAudioMix()
+        audioMix.inputParameters = audioParameters
+        exportSession.audioMix = audioMix
+        exportSession.videoComposition = videoComposition
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = true
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("besttake-multitrack-\(UUID().uuidString).mp4")
+        try? FileManager.default.removeItem(at: outputURL)
+        exportSession.outputURL = outputURL
+
+        print("[Multitrack] native render start sources=\(layerInstructions.count) aspect=\(aspectRatio) durationHint=\(durationHint)")
+        exportSession.exportAsynchronously {
+            DispatchQueue.main.async {
+                if exportSession.status == .completed {
+                    print("[Multitrack] native render complete path=\(outputURL.path)")
+                    call.resolve([
+                        "success": true,
+                        "path": outputURL.absoluteString
+                    ])
+                } else if let error = exportSession.error {
+                    print("[Multitrack] native render failed: \(error.localizedDescription)")
+                    call.reject("Multitrack render failed", error.localizedDescription)
+                } else {
+                    call.reject("Multitrack render failed")
+                }
+            }
         }
     }
 

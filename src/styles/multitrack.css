@@ -571,6 +571,28 @@
   transform: scaleX(-1);
 }
 
+.multitrack-recording-stage__preview--hidden {
+  visibility: hidden;
+}
+
+.multitrack-recording-stage__preview-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+  transform-origin: center center;
+  pointer-events: none;
+}
+
+.multitrack-recording-stage__preview-canvas--primed {
+  visibility: hidden;
+}
+
+.multitrack-recording-stage__preview-canvas--live {
+  visibility: visible;
+}
+
 .multitrack-recording-stage__review-video {
   position: absolute;
   inset: 0;

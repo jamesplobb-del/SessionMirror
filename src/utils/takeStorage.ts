@@ -30,6 +30,13 @@ export interface RecordingCompletePayload {
   autoPerformanceStartSeconds?: number
   /** Populated after post-save loudness analysis. */
   captureDiagnostics?: RecordingCaptureDiagnostics
+  /**
+   * Overrides the default video mirror-on-playback behavior. Native camera
+   * recordings are already saved in true (unmirrored) orientation, so they
+   * must NOT be CSS-mirrored again at playback — leave undefined to keep the
+   * default (mirrored) behavior for legacy WebKit-recorded takes.
+   */
+  mirrorPlayback?: boolean
 }
 
 function extensionForMime(mimeType: string): string {

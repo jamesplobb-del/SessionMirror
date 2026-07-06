@@ -32,6 +32,7 @@ export default function MultitrackBackingTrackPanel({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragRef = useRef<{ pointerId: number; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null)
+  const uploadedAudioUrlRef = useRef<string | null>(null)
   const [youtubeInputOpen, setYoutubeInputOpen] = useState(false)
   const [youtubeValue, setYoutubeValue] = useState('')
   const [youtubeError, setYoutubeError] = useState<string | null>(null)
@@ -43,6 +44,25 @@ export default function MultitrackBackingTrackPanel({
     if (backing.kind !== 'youtube') return
     setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, backing.volume)
   }, [backing, youtubeIframeRef])
+
+  // Revoke the uploaded MP3's blob URL once it's no longer the active backing
+  // track (cleared, replaced, or the panel unmounts) to avoid leaking memory.
+  useEffect(() => {
+    if (backing.kind === 'audio' && backing.src === uploadedAudioUrlRef.current) return
+    if (uploadedAudioUrlRef.current) {
+      URL.revokeObjectURL(uploadedAudioUrlRef.current)
+      uploadedAudioUrlRef.current = null
+    }
+  }, [backing])
+
+  useEffect(() => {
+    return () => {
+      if (uploadedAudioUrlRef.current) {
+        URL.revokeObjectURL(uploadedAudioUrlRef.current)
+        uploadedAudioUrlRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -178,9 +198,14 @@ export default function MultitrackBackingTrackPanel({
         onChange={(event) => {
           const file = event.currentTarget.files?.[0]
           if (!file) return
+          if (uploadedAudioUrlRef.current) {
+            URL.revokeObjectURL(uploadedAudioUrlRef.current)
+          }
+          const src = URL.createObjectURL(file)
+          uploadedAudioUrlRef.current = src
           onBackingChange({
             kind: 'audio',
-            src: URL.createObjectURL(file),
+            src,
             fileName: file.name,
             mimeType: file.type || 'audio/mpeg',
             volume,

@@ -535,6 +535,12 @@ export function useCameraSession({
           /* ignore */
         }
       }
+      // Keep the live audio track (and streamRef) around — the live pitch
+      // widget in camera mode taps this same shared stream. Contention with
+      // the native AVCaptureSession's own mic input only actually matters
+      // while a file is being written, so it's suspended narrowly around the
+      // native recording start/stop window instead (see
+      // suspendSharedMicForNativeRecording / restoreSharedMicAfterNativeRecording).
       if (!stream.getAudioTracks().some((track) => track.readyState === 'live')) {
         streamRef.current = null
       }
@@ -542,6 +548,25 @@ export function useCameraSession({
     detachAllPreviewTargets()
     setStreamGeneration((generation) => generation + 1)
   }, [detachAllPreviewTargets])
+
+  /**
+   * Stop the shared WebKit mic track right before native recording starts.
+   * A live WebKit getUserMedia audio track left running while
+   * AVCaptureMovieFileOutput is writing to disk contends for the same
+   * hardware input and starves the file's audio connection, silently
+   * dropping the audio track from the exported video entirely.
+   */
+  const suspendSharedMicForNativeRecording = useCallback(() => {
+    const stream = streamRef.current
+    if (!stream) return
+    for (const track of stream.getAudioTracks()) {
+      try {
+        track.stop()
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [])
 
   const acquireNativeVideoBridge = useCallback(async (): Promise<boolean> => {
     if (!isNativeVideoRecordingEnabled()) return false
@@ -638,6 +663,21 @@ export function useCameraSession({
     await applyMicInputPreference(requestedPreference)
     queuedMicPreferenceRef.current = null
   }, [])
+
+  /** Re-acquire a mic-only stream after native recording ends so the live pitch widget resumes. */
+  const restoreSharedMicAfterNativeRecording = useCallback(async () => {
+    try {
+      const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
+      if (!getUserMedia) return
+      await applyQueuedMicPreferenceBeforeAcquire('restore-after-native-recording')
+      const stream = await getUserMedia({ audio: getAudioCaptureConstraints(), video: false })
+      await tuneMusicRecordingStream(stream)
+      streamRef.current = stream
+      setStreamGeneration((generation) => generation + 1)
+    } catch (error) {
+      console.warn('[NativeExperimentalAudio] failed to restore mic for pitch widget', error)
+    }
+  }, [applyQueuedMicPreferenceBeforeAcquire])
 
   useEffect(() => {
     queuedMicPreferenceRef.current = micInputPreference
@@ -1421,6 +1461,8 @@ export function useCameraSession({
         elapsedRef.current = 0
       })
 
+      suspendSharedMicForNativeRecording()
+
       const result = await startNativeCameraRecording({
         useFrontCamera: true,
         audioSessionProfile: 'videoRecording',
@@ -1446,6 +1488,7 @@ export function useCameraSession({
   }, [
     acquireNativeVideoBridge,
     recoverAfterNativeExperimentalFailure,
+    suspendSharedMicForNativeRecording,
   ])
 
   const stopNativeExperimentalRecording = useCallback(() => {
@@ -1497,10 +1540,16 @@ export function useCameraSession({
         videoUrl,
         durationSeconds: Math.max(0.1, result.duration || elapsedRef.current),
         recordingOrientation: recordingOrientationRef.current,
+        // Native AVCaptureMovieFileOutput is unmirrored (see
+        // NativeCameraRecordingEngine.configureCaptureSession) to match the
+        // unmirrored live frame-bridge preview — don't re-mirror on playback.
+        mirrorPlayback: false,
         captureProfile: getActiveCaptureProfile(),
         captureTrackSnapshot: null,
         captureDiagnostics,
       })
+
+      void restoreSharedMicAfterNativeRecording()
     })().catch((error) => {
       console.warn('[NativeExperimentalAudio] native recording stop failed', error)
       isRecordingRef.current = false
@@ -1508,7 +1557,7 @@ export function useCameraSession({
       setIsRecording(false)
       void restoreWebKitPreviewAfterNativeRecording()
     })
-  }, [restoreWebKitPreviewAfterNativeRecording])
+  }, [restoreWebKitPreviewAfterNativeRecording, restoreSharedMicAfterNativeRecording])
 
   const startRecording = useCallback(() => {
     if (isRecording) return

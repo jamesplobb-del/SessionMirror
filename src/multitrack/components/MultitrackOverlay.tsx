@@ -6,7 +6,6 @@ import type { Take } from '../../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import { triggerLightHaptic } from '../../utils/haptics'
-import { shareTakeVideo } from '../../utils/shareTakeVideo'
 import { playTakeMediaAudible, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
 import { routeTakePlaybackToSpeaker } from '../../utils/takePlaybackSpeaker'
 import {
@@ -17,10 +16,11 @@ import {
   wakeYoutubeReference,
 } from '../../utils/playalong/youtubeBridge'
 import Pressable from '../../components/ui/Pressable'
+import { useActionSheet } from '../../context/ActionSheetContext'
 import { useMultitrackSession } from '../state/useMultitrackSession'
 import { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMultitrackRecording } from '../recording/useMultitrackRecording'
-import { buildMultitrackExportPlan, getPrimaryExportTake } from '../export/multitrackExport'
+import { exportMultitrackSession, type MultitrackExportFailureReason } from '../export/multitrackExport'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
 import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackLayoutPicker from './MultitrackLayoutPicker'
@@ -32,9 +32,14 @@ interface MultitrackOverlayProps {
   isOpen: boolean
   takes: Take[]
   streamRef: RefObject<MediaStream | null>
+  streamGeneration: number
   tunerInstrument: TunerInstrument
   hapticFeedback: boolean
   isRecording: boolean
+  /** Native iOS camera bridge is delivering live frames — feeds the recording stage's own preview canvas. */
+  nativeLivePreviewActive?: boolean
+  /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
+  nativeCameraBridgeEnabled?: boolean
   onClose: () => void
   onStartRecording: () => void
   onStopRecording: () => void
@@ -44,8 +49,40 @@ interface MultitrackOverlayProps {
   onOpenRecordingStage?: () => void
 }
 
+function describeMultitrackExportFailure(reason: MultitrackExportFailureReason): string {
+  switch (reason) {
+    case 'missing_takes':
+      return 'Record at least one panel before exporting.'
+    case 'missing_file':
+      return 'One of your panel videos could not be found on your device.'
+    case 'share_failed':
+      return 'The system share sheet could not be opened.'
+    case 'unsupported':
+      return 'Multitrack export is only available on iPhone/iPad.'
+    default:
+      return 'Could not render the multitrack video. Please try again.'
+  }
+}
+
 export default function MultitrackOverlay(props: MultitrackOverlayProps) {
-  const { isOpen, takes, streamRef, tunerInstrument, hapticFeedback, isRecording, onClose, onStartRecording, onStopRecording, onRecordingComplete, pendingRecordingTakeId, onClearPendingRecording, onOpenRecordingStage } = props
+  const {
+    isOpen,
+    takes,
+    streamRef,
+    streamGeneration,
+    tunerInstrument,
+    hapticFeedback,
+    isRecording,
+    nativeLivePreviewActive,
+    nativeCameraBridgeEnabled,
+    onClose,
+    onStartRecording,
+    onStopRecording,
+    onRecordingComplete,
+    pendingRecordingTakeId,
+    onClearPendingRecording,
+    onOpenRecordingStage,
+  } = props
   const shellRef = useRef<HTMLDivElement>(null)
   const masterMediaRef = useRef<HTMLMediaElement | null>(null)
   const backingAudioRef = useRef<HTMLAudioElement>(null)
@@ -54,8 +91,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [takePickerPanelId, setTakePickerPanelId] = useState<string | null>(null)
   const [activePanelId, setActivePanelId] = useState<string | null>(null)
   const [backingPlaying, setBackingPlaying] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const { session, layout, setLayout, assignTakeToPanel, assignSheetMusic, updatePractice, updateBacking } = useMultitrackSession()
   const sync = useMultitrackSync()
+  const { showAlert, showConfirm } = useActionSheet()
 
   const pauseBacking = useCallback(() => {
     const backing = session.backing
@@ -142,6 +181,33 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     void playBackingFromStart()
   }, [backingPlaying, pauseBacking, playBackingFromStart])
 
+  const handleExport = useCallback(() => {
+    if (isExporting) return
+
+    void (async () => {
+      if (session.backing.kind === 'youtube') {
+        const proceed = await showConfirm({
+          title: 'Backing track not included',
+          message: "YouTube audio can't be captured for export. Continue without the backing track?",
+          confirmLabel: 'Export anyway',
+        })
+        if (!proceed) return
+      }
+
+      sync.pause()
+      pauseBacking()
+      setIsExporting(true)
+      try {
+        const result = await exportMultitrackSession(session, layout, sync.state.duration)
+        if (!result.ok) {
+          await showAlert({ message: describeMultitrackExportFailure(result.reason), tone: 'error' })
+        }
+      } finally {
+        setIsExporting(false)
+      }
+    })()
+  }, [isExporting, layout, pauseBacking, session, showAlert, showConfirm, sync])
+
   const registerPanelMedia = useCallback((id: string, el: HTMLMediaElement | null) => {
     sync.registerMedia(id, el)
     if (el) {
@@ -218,6 +284,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onRegisterMedia={registerPanelMedia} />
             </div>
             <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying} currentTime={sync.state.currentTime} duration={sync.state.duration} showLayoutPicker={showLayoutPicker}
+              isExporting={isExporting}
               onTogglePlay={() => void (async () => {
                 if (sync.state.isPlaying || backingPlaying) {
                   sync.pause()
@@ -229,7 +296,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 await playBackingFromStart()
               })()} onRestart={() => void (async () => { sync.pause(); pauseBacking(); sync.setExcludePanelId(null); await sync.restart(); await playBackingFromStart() })()} onSeek={sync.seek}
               onToggleLayoutPicker={() => setShowLayoutPicker((v) => !v)}
-              onExport={() => void (async () => { sync.pause(); pauseBacking(); const plan = buildMultitrackExportPlan(session, sync.state.duration); if (plan) await shareTakeVideo(getPrimaryExportTake(plan)) })()} />
+              onExport={handleExport} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -239,6 +306,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             <MultitrackRecordingStage
               panelLabel={`Box ${session.panels.findIndex((panel) => panel.id === activePanel.id) + 1}`}
               streamRef={streamRef}
+              streamGeneration={streamGeneration}
+              nativeLivePreviewActive={nativeLivePreviewActive}
+              nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
               tunerInstrument={tunerInstrument}
               practice={session.practice}
               phase={recording.phase}

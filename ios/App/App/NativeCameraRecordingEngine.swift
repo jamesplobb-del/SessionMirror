@@ -437,8 +437,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         if let connection = movieOutput.connection(with: .video) {
-            if cameraPosition == .front {
-                applyFrontCameraMirroring(to: connection)
+            // Match the unmirrored live preview bridge (videoDataOutput below) —
+            // the recorded file must show the same orientation the user saw
+            // while recording, not a mirror-image flip.
+            if connection.isVideoMirroringSupported {
+                connection.automaticallyAdjustsVideoMirroring = false
+                connection.isVideoMirrored = false
             }
             if connection.isVideoOrientationSupported {
                 connection.videoOrientation = .portrait
