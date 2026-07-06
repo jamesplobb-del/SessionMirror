@@ -321,6 +321,8 @@ export function useCameraSession({
   const permissionRequestInFlightRef = useRef(false)
   const [ready, setReady] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  /** True from the moment a native recording stop begins until it fully settles (success or failure). */
+  const [isStopping, setIsStopping] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('video')
   const [streamGeneration, setStreamGeneration] = useState(0)
@@ -540,7 +542,12 @@ export function useCameraSession({
       // the native AVCaptureSession's own mic input only actually matters
       // while a file is being written, so it's suspended narrowly around the
       // native recording start/stop window instead (see
-      // suspendSharedMicForNativeRecording / restoreSharedMicAfterNativeRecording).
+      // suspendSharedMicForNativeRecording below). It is NOT reacquired after
+      // recording stops — doing that with a fresh getUserMedia() while the
+      // native camera bridge is still live caused visible camera freezes and
+      // pitch-widget instability, so the widget simply stays quiet for the
+      // rest of the session after the first take, self-healing only via
+      // whatever later reacquires the full stream (e.g. leaving camera mode).
       if (!stream.getAudioTracks().some((track) => track.readyState === 'live')) {
         streamRef.current = null
       }
@@ -663,21 +670,6 @@ export function useCameraSession({
     await applyMicInputPreference(requestedPreference)
     queuedMicPreferenceRef.current = null
   }, [])
-
-  /** Re-acquire a mic-only stream after native recording ends so the live pitch widget resumes. */
-  const restoreSharedMicAfterNativeRecording = useCallback(async () => {
-    try {
-      const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
-      if (!getUserMedia) return
-      await applyQueuedMicPreferenceBeforeAcquire('restore-after-native-recording')
-      const stream = await getUserMedia({ audio: getAudioCaptureConstraints(), video: false })
-      await tuneMusicRecordingStream(stream)
-      streamRef.current = stream
-      setStreamGeneration((generation) => generation + 1)
-    } catch (error) {
-      console.warn('[NativeExperimentalAudio] failed to restore mic for pitch widget', error)
-    }
-  }, [applyQueuedMicPreferenceBeforeAcquire])
 
   useEffect(() => {
     queuedMicPreferenceRef.current = micInputPreference
@@ -1498,6 +1490,7 @@ export function useCameraSession({
     }
 
     nativeExperimentalRecordingRef.current = false
+    setIsStopping(true)
 
     void (async () => {
       const stoppedTakeId = activeTakeIdRef.current ?? crypto.randomUUID()
@@ -1509,6 +1502,7 @@ export function useCameraSession({
 
       if (!result) {
         await restoreWebKitPreviewAfterNativeRecording()
+        setIsStopping(false)
         return
       }
 
@@ -1548,16 +1542,16 @@ export function useCameraSession({
         captureTrackSnapshot: null,
         captureDiagnostics,
       })
-
-      void restoreSharedMicAfterNativeRecording()
+      setIsStopping(false)
     })().catch((error) => {
       console.warn('[NativeExperimentalAudio] native recording stop failed', error)
       isRecordingRef.current = false
       activeTakeIdRef.current = null
       setIsRecording(false)
+      setIsStopping(false)
       void restoreWebKitPreviewAfterNativeRecording()
     })
-  }, [restoreWebKitPreviewAfterNativeRecording, restoreSharedMicAfterNativeRecording])
+  }, [restoreWebKitPreviewAfterNativeRecording])
 
   const startRecording = useCallback(() => {
     if (isRecording) return
@@ -2307,6 +2301,7 @@ export function useCameraSession({
     requestCameraAccess,
     ready,
     isRecording,
+    isStopping,
     elapsed,
     recordingMode,
     changeRecordingMode,
@@ -2339,5 +2334,6 @@ export function useCameraSession({
     isPreviewRecovering,
     nativeLivePreviewActive,
     nativeLivePreviewSeedUrl,
+    acquireNativeVideoBridge,
   }
 }

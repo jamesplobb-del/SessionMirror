@@ -53,11 +53,15 @@ function createInitialState(): ScaleRushState {
 function reducer(state: ScaleRushState, action: Action): ScaleRushState {
   switch (action.type) {
     case 'START': {
-      const target = getTargetNoteAtStep(action.config, 0)
+      const config: ScaleRushConfig = {
+        ...action.config,
+        sessionSeed: (Math.random() * 0x1_0000_0000) >>> 0,
+      }
+      const target = getTargetNoteAtStep(config, 0)
       return {
         ...createInitialState(),
         phase: 'playing',
-        config: action.config,
+        config,
         targetPitchClass: target.pitchClass,
         bestScore: loadBestScore(),
         startedAtMs: Date.now(),

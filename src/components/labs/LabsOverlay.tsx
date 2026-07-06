@@ -5,10 +5,11 @@ import type { RefObject } from 'react'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import Pressable from '../ui/Pressable'
+import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
 import LabsMenu from './LabsMenu'
 import ScaleRushScreen from './ScaleRushScreen'
 
-export type LabsRoute = 'menu' | 'scale-rush'
+export type LabsRoute = 'menu' | 'scale-rush' | 'staff-jumper'
 
 interface LabsOverlayProps {
   isOpen: boolean
@@ -61,9 +62,21 @@ export default function LabsOverlay({
           )}
 
           {route === 'menu' ? (
-            <LabsMenu onOpenScaleRush={() => onNavigate('scale-rush')} onBack={onClose} />
-          ) : (
+            <LabsMenu
+              onOpenScaleRush={() => onNavigate('scale-rush')}
+              onOpenStaffJumper={() => onNavigate('staff-jumper')}
+              onBack={onClose}
+            />
+          ) : route === 'scale-rush' ? (
             <ScaleRushScreen
+              streamRef={streamRef}
+              streamGeneration={streamGeneration}
+              tunerInstrument={tunerInstrument}
+              onRequestMicStream={onRequestMicStream}
+              onBack={() => onNavigate('menu')}
+            />
+          ) : (
+            <StaffJumperScreen
               streamRef={streamRef}
               streamGeneration={streamGeneration}
               tunerInstrument={tunerInstrument}

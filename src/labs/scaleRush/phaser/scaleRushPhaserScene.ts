@@ -32,10 +32,14 @@ function laneVisualForRow(row: CourseRow): LaneVisual {
 
 type TileVariant = 'ahead' | 'target' | 'landed' | 'start'
 
+/** Isometric grass-block layout (sprite origin 0.5, 1 at dirt base). */
+const PATH_BLOCK_TOP_FACE_Y = 0.52
+const PATH_BLOCK_LABEL_Y = 0.63
+const PATH_BLOCK_GLOW_Y = 0.61
+
 interface LaneLayout {
   laneH: number
-  pathTileW: number
-  pathTileH: number
+  pathBlockSize: number
   charH: number
   playerAnchorY: number
   laneW: number
@@ -123,17 +127,15 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
     const w = this.scale.width
     const h = this.scale.height
     const laneH = Phaser.Math.Clamp(Math.round(h * 0.108), 52, 76)
-    const pathTileW = Math.round(laneH * 0.88)
-    const pathTileH = Math.round(laneH * 0.82)
+    const pathBlockSize = Math.round(laneH * 0.86)
     const charH = Phaser.Math.Clamp(Math.round(h * 0.126), 56, 92)
     const playerAnchorY = Math.round(h * 0.76)
     const laneW = w + 52
-    const pathCorridorW = pathTileW * 1.35
+    const pathCorridorW = pathBlockSize * 1.22
 
     this.layout = {
       laneH,
-      pathTileW,
-      pathTileH,
+      pathBlockSize,
       charH,
       playerAnchorY,
       laneW,
@@ -230,7 +232,7 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
         this.playerLaneRoot,
       )
 
-      const feetY = -this.layout.pathTileH * 0.04
+      const feetY = -this.layout.pathBlockSize * PATH_BLOCK_TOP_FACE_Y
       this.playerSprite.setPosition(0, feetY)
       this.playerShadow.setPosition(2, feetY + 3)
 
@@ -405,7 +407,7 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
     depth: number,
     maxDepth: number,
   ) {
-    const { pathTileH, pathTileW } = this.layout
+    const { pathBlockSize } = this.layout
     const isStart = variant === 'start' || row.isStart
     const isTarget = !isStart && (variant === 'target' || row.isTarget)
     const isLanded = variant === 'landed'
@@ -414,17 +416,27 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
     const tile = this.add.container(0, 0)
     const grass = this.add.image(0, 0, 'sr-grass-path')
     grass.setOrigin(0.5, 1)
-    grass.setDisplaySize(pathTileW, pathTileH)
+    grass.setDisplaySize(pathBlockSize, pathBlockSize)
     tile.add(grass)
 
+    const topFaceY = -pathBlockSize * PATH_BLOCK_GLOW_Y
+    const labelY = -pathBlockSize * PATH_BLOCK_LABEL_Y
+
     if (isTarget) {
-      const glow = this.add.ellipse(0, -pathTileH * 0.48, pathTileW * 1.15, pathTileH * 0.7, 0xfde047, 0.28)
+      const glow = this.add.ellipse(
+        0,
+        topFaceY,
+        pathBlockSize * 0.62,
+        pathBlockSize * 0.28,
+        0xfde047,
+        0.3,
+      )
       tile.addAt(glow, 0)
       this.tweens.add({
         targets: glow,
-        alpha: { from: 0.18, to: 0.38 },
-        scaleX: { from: 0.96, to: 1.06 },
-        scaleY: { from: 0.96, to: 1.06 },
+        alpha: { from: 0.2, to: 0.42 },
+        scaleX: { from: 0.94, to: 1.08 },
+        scaleY: { from: 0.94, to: 1.08 },
         duration: 700,
         yoyo: true,
         repeat: -1,
@@ -433,15 +445,15 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
     }
 
     const label = isStart ? 'GO' : row.noteLabel
-    const fontSize = Math.max(13, Math.round(pathTileH * (isStart ? 0.22 : 0.3)))
+    const fontSize = Math.max(13, Math.round(pathBlockSize * (isStart ? 0.19 : 0.24)))
     const text = this.add
-      .text(0, -pathTileH * 0.68, label, {
+      .text(0, labelY, label, {
         fontFamily: 'system-ui, -apple-system, sans-serif',
         fontSize: `${fontSize}px`,
         fontStyle: 'bold',
         color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 3,
+        stroke: '#14532d',
+        strokeThickness: 4,
       })
       .setOrigin(0.5, 0.5)
     tile.add(text)

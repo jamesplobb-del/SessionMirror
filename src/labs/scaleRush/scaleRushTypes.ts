@@ -19,6 +19,8 @@ export interface ScaleRushConfig {
   transposition: ScaleRushTransposition
   /** v0.1 default: pitch-class match only (octave ignored). */
   pitchAccuracyStrict: boolean
+  /** Set when a run starts — drives post-scale pattern randomization. */
+  sessionSeed?: number
 }
 
 export interface ScaleRushState {

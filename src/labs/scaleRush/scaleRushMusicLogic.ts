@@ -163,6 +163,154 @@ export function buildScaleDegreePath(config: Pick<ScaleRushConfig, 'range' | 'en
   return [...ascending, ...descending]
 }
 
+/** Full up-and-down scale intro at the start of every run. */
+export function buildScaleIntroPath(config: Pick<ScaleRushConfig, 'range' | 'scaleMode'>): number[] {
+  return buildScaleDegreePath({ ...config, endless: false })
+}
+
+export function scaleIntroStepCount(config: Pick<ScaleRushConfig, 'range' | 'scaleMode'>): number {
+  return buildScaleIntroPath(config).length
+}
+
+const TRIAD_MAJOR = [0, 4, 7] as const
+const TRIAD_MINOR = [0, 3, 7] as const
+const TRIAD_DIM = [0, 3, 6] as const
+const SEVENTH_MAJ = [0, 4, 7, 11] as const
+const SEVENTH_MIN = [0, 3, 7, 10] as const
+const SEVENTH_DOM = [0, 4, 7, 10] as const
+const SEVENTH_DIM = [0, 3, 6, 9] as const
+
+type PatternKind =
+  | 'major-triad'
+  | 'minor-triad'
+  | 'dim-triad'
+  | 'maj7'
+  | 'min7'
+  | 'dom7'
+  | 'dim7'
+  | 'interval'
+  | 'random'
+
+const PATTERN_KINDS: PatternKind[] = [
+  'major-triad',
+  'minor-triad',
+  'dim-triad',
+  'maj7',
+  'min7',
+  'dom7',
+  'dim7',
+  'interval',
+  'random',
+  'random',
+]
+
+interface PatternCache {
+  notes: number[]
+  blockCount: number
+}
+
+const patternSequenceCache = new WeakMap<ScaleRushConfig, PatternCache>()
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let t = state
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function getPatternCache(config: ScaleRushConfig): PatternCache {
+  let cache = patternSequenceCache.get(config)
+  if (!cache) {
+    cache = { notes: [], blockCount: 0 }
+    patternSequenceCache.set(config, cache)
+  }
+  return cache
+}
+
+function intervalsToPitchClasses(rootPc: number, intervals: readonly number[]): number[] {
+  return intervals.map((interval) => (rootPc + interval) % 12)
+}
+
+function appendPatternBlock(config: ScaleRushConfig, cache: PatternCache): void {
+  const seed = config.sessionSeed ?? 1
+  const rng = mulberry32(seed + cache.blockCount * 9973)
+  const kind = PATTERN_KINDS[Math.floor(rng() * PATTERN_KINDS.length)]!
+
+  const degreePool =
+    kind === 'dom7'
+      ? [4]
+      : kind === 'dim-triad' || kind === 'dim7'
+        ? [6, 2]
+        : [0, 1, 2, 3, 4, 5, 6]
+
+  const rootDegree = degreePool[Math.floor(rng() * degreePool.length)]!
+  const rootPc = pitchClassForDegree(config.key, config.scaleMode, rootDegree)
+
+  let notes: number[] = []
+  switch (kind) {
+    case 'major-triad':
+      notes = intervalsToPitchClasses(rootPc, TRIAD_MAJOR)
+      break
+    case 'minor-triad':
+      notes = intervalsToPitchClasses(rootPc, TRIAD_MINOR)
+      break
+    case 'dim-triad':
+      notes = intervalsToPitchClasses(rootPc, TRIAD_DIM)
+      break
+    case 'maj7':
+      notes = intervalsToPitchClasses(rootPc, SEVENTH_MAJ)
+      break
+    case 'min7':
+      notes = intervalsToPitchClasses(rootPc, SEVENTH_MIN)
+      break
+    case 'dom7':
+      notes = intervalsToPitchClasses(rootPc, SEVENTH_DOM)
+      break
+    case 'dim7':
+      notes = intervalsToPitchClasses(rootPc, SEVENTH_DIM)
+      break
+    case 'interval': {
+      const startDegree = Math.floor(rng() * 7)
+      const startPc = pitchClassForDegree(config.key, config.scaleMode, startDegree)
+      const leap = [2, 3, 4, 5, 7][Math.floor(rng() * 5)]!
+      notes = [startPc, (startPc + leap) % 12]
+      break
+    }
+    case 'random': {
+      const count = rng() > 0.45 ? 2 : 1
+      for (let i = 0; i < count; i += 1) {
+        const degree = Math.floor(rng() * 7)
+        notes.push(pitchClassForDegree(config.key, config.scaleMode, degree))
+      }
+      break
+    }
+  }
+
+  if (notes.length > 1 && rng() > 0.55) {
+    notes.reverse()
+  }
+
+  if (rng() > 0.72 && notes.length > 0) {
+    const passingDegree = Math.floor(rng() * 7)
+    notes.push(pitchClassForDegree(config.key, config.scaleMode, passingDegree))
+  }
+
+  cache.notes.push(...notes)
+  cache.blockCount += 1
+}
+
+function patternPitchClassAt(config: ScaleRushConfig, patternIndex: number): number {
+  const cache = getPatternCache(config)
+  while (patternIndex >= cache.notes.length) {
+    appendPatternBlock(config, cache)
+  }
+  return cache.notes[patternIndex]!
+}
+
 function pitchClassForDegree(key: ScaleRushKey, scaleMode: ScaleRushScaleMode, degreeIndex: number): number {
   const pattern = scalePattern(scaleMode)
   const octave = Math.floor(degreeIndex / 7)
@@ -172,9 +320,13 @@ function pitchClassForDegree(key: ScaleRushKey, scaleMode: ScaleRushScaleMode, d
 }
 
 export function pitchClassForSequenceStep(config: ScaleRushConfig, stepIndex: number): number {
-  const path = buildScaleDegreePath(config)
-  const degreeIndex = path[stepIndex % path.length]!
-  return pitchClassForDegree(config.key, config.scaleMode, degreeIndex)
+  const introLen = scaleIntroStepCount(config)
+  if (stepIndex < introLen) {
+    const path = buildScaleIntroPath(config)
+    const degreeIndex = path[stepIndex]!
+    return pitchClassForDegree(config.key, config.scaleMode, degreeIndex)
+  }
+  return patternPitchClassAt(config, stepIndex - introLen)
 }
 
 export function pitchClassLabel(pitchClass: number, key: ScaleRushKey): string {

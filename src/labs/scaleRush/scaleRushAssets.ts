@@ -1,4 +1,4 @@
-import grassTileImg from '../../assets/scalerush/grass.png'
+import grassBlockImg from '../../assets/scalerush/grass-block.png'
 import grassLaneImg from '../../assets/scalerush/kenney/grass-lane.png'
 import waterLaneImg from '../../assets/scalerush/kenney/water-lane.png'
 import roadLaneImg from '../../assets/scalerush/kenney/road-lane.png'
@@ -9,15 +9,15 @@ import trumpetPlayerImg from '../../assets/scalerush/trumpet-player.png'
 
 export const SCALE_RUSH_ASSETS = {
   grassLane: grassLaneImg,
-  grassPath: grassTileImg,
+  grassPath: grassBlockImg,
   waterLane: waterLaneImg,
   roadLane: roadLaneImg,
   log: logImg,
   rock: rockImg,
   crate: crateImg,
   trumpetPlayer: trumpetPlayerImg,
-  /** @deprecated Legacy React course — use grassLane */
-  grass: grassLaneImg,
+  /** @deprecated Legacy React course — use grassPath */
+  grass: grassBlockImg,
   /** @deprecated Legacy React course — use waterLane */
   water: waterLaneImg,
 } as const
