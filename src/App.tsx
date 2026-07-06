@@ -32,7 +32,6 @@ import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
   registerAutoPlaybackHold,
-  registerInlineTakePlaybackPreviewHold,
   registerTakePlaybackMicHandlers,
   finalizeTakePlaybackCleanup,
   releaseTakePlaybackAudio,
@@ -405,15 +404,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   })
   const [autoPlaybackTakeId, setAutoPlaybackTakeId] = useState<string | null>(null)
   const [autoPlaybackPlaying, setAutoPlaybackPlaying] = useState(false)
-  const audioModeTakePlayingRef = useRef(false)
   const [audioModeTakePlaying, setAudioModeTakePlaying] = useState(false)
-  audioModeTakePlayingRef.current = audioModeTakePlaying
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
-  const benchmarkPipPlayingRef = useRef(false)
-  benchmarkPipPlayingRef.current = benchmarkPipPlaying
-  const challengerPipPlayingRef = useRef(false)
-  challengerPipPlayingRef.current = challengerPipPlaying
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
@@ -452,8 +445,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
-  const handsFreePlaybackPendingRef = useRef(false)
-  handsFreePlaybackPendingRef.current = handsFreePlaybackPending
   const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
   autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
@@ -470,8 +461,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const pitchUserDismissedRef = useRef(false)
 
   const isReviewOpen = reviewSlot !== null
-  const isReviewOpenRef = useRef(isReviewOpen)
-  isReviewOpenRef.current = isReviewOpen
   const isLabsOpen = labsRoute !== null
   const isExperimentalOpen =
     isLabsOpen || isCreatorStudioPickerOpen || creatorStudioTake !== null || multitrackOpen
@@ -1378,8 +1367,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   recordingModeRef.current = recordingMode
   cameraReadyRef.current = ready
-  const isRecordingRef = useRef(isRecording)
-  isRecordingRef.current = isRecording
 
   const autoPlaybackPlayingRef = useRef(autoPlaybackPlaying)
   autoPlaybackPlayingRef.current = autoPlaybackPlaying
@@ -1405,18 +1392,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       () =>
         pendingAutoPlaybackRef.current || autoPlaybackPlayingRef.current || handsFreePlaybackPending
     )
-    registerInlineTakePlaybackPreviewHold(() => {
-      if (isRecordingRef.current) return false
-      return (
-        isReviewOpenRef.current ||
-        benchmarkPipPlayingRef.current ||
-        challengerPipPlayingRef.current ||
-        autoPlaybackPlayingRef.current ||
-        pendingAutoPlaybackRef.current ||
-        handsFreePlaybackPendingRef.current ||
-        audioModeTakePlayingRef.current
-      )
-    })
     registerRecordingRouteRestoredHandler(() => {
       if (isPlaybackRouteHoldActive()) return
       stabilizeViewportAfterMediaInteraction()
@@ -3032,9 +3007,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 visuallySuppressed={isSplitView}
                 nativePreviewActive={false}
-                inlineTakePlaybackActive={
-                  !isRecording && (takePlaybackActive || isReviewOpen)
-                }
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
                 handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
                 onHandsFreePlaybackPlayingChange={handleHandsFreeBackgroundPlaybackChange}

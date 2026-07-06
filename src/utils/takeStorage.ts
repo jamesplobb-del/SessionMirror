@@ -47,6 +47,29 @@ export function normalizeBlobMime(mimeType: string): string {
   return mimeType
 }
 
+/**
+ * iOS/mp4 MediaRecorder can emit more than one fMP4 fragment even without a
+ * timeslice. Concatenating fragments corrupts A/V sync, so pick the largest
+ * fragment (typically the complete take blob delivered on stop).
+ */
+export function composeBufferedRecordingBlob(chunks: Blob[], mimeType: string): Blob {
+  const writeMime = normalizeBlobMime(mimeType)
+  if (chunks.length <= 1) {
+    return new Blob(chunks, { type: writeMime })
+  }
+
+  const primary = chunks.reduce(
+    (largest, chunk) => (chunk.size > largest.size ? chunk : largest),
+    chunks[0]!,
+  )
+  console.warn('[Recording] Multiple buffered MediaRecorder chunks — using largest fragment', {
+    chunkCount: chunks.length,
+    chunkSizes: chunks.map((chunk) => chunk.size),
+    selectedBytes: primary.size,
+  })
+  return new Blob([primary], { type: writeMime })
+}
+
 async function ensureTakesDirectory(): Promise<void> {
   await initAppFilesystem()
 }
@@ -398,14 +421,7 @@ export class StreamingTakeWriter {
     }
 
     if (this.useBufferedWrite) {
-      const writeMime = normalizeBlobMime(this.mimeType)
-      let blob: Blob
-      if (this.bufferChunks.length <= 1) {
-        blob = new Blob(this.bufferChunks, { type: writeMime })
-      } else {
-        const primary = this.bufferChunks[this.bufferChunks.length - 1]!
-        blob = new Blob([primary], { type: writeMime })
-      }
+      const blob = composeBufferedRecordingBlob(this.bufferChunks, this.mimeType)
       this.bufferChunks.length = 0
 
       if (blob.size === 0) {

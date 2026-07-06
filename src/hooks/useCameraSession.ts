@@ -16,8 +16,8 @@ import {
 } from '../utils/videoCapture'
 import { readRecordingOrientation } from '../utils/takeVideoTransform'
 import {
-  normalizeBlobMime,
   persistRecordingBlob,
+  composeBufferedRecordingBlob,
   StreamingTakeWriter,
   type RecordingCompletePayload,
 } from '../utils/takeStorage'
@@ -31,7 +31,7 @@ import {
   isAutoPlaybackHoldingMicWarmup,
   isInlineTakePlaybackDeferringCameraPreview,
 } from '../utils/takePlaybackAudio'
-import { releaseRecorderStream } from '../utils/recordingStream'
+import { buildRecorderStream, releaseRecorderStream } from '../utils/recordingStream'
 import {
   applyViewportCssVarsOnResume,
   CAMERA_PREVIEW_LAYOUT_RECOVERY_EVENT,
@@ -982,14 +982,10 @@ export function useCameraSession({
                 autoPerformanceStartSeconds,
               })
             } else {
-              const writeMime = normalizeBlobMime(recorderMimeTypeRef.current)
-              let blob: Blob
-              if (capturedChunks.length <= 1) {
-                blob = new Blob(capturedChunks, { type: writeMime })
-              } else {
-                const primary = capturedChunks[capturedChunks.length - 1]!
-                blob = new Blob([primary], { type: writeMime })
-              }
+              const blob = composeBufferedRecordingBlob(
+                capturedChunks as Blob[],
+                recorderMimeTypeRef.current,
+              )
               const persisted = await persistRecordingBlob(
                 blob,
                 stoppedTakeId,
@@ -1122,7 +1118,10 @@ export function useCameraSession({
         autoPerformanceActiveRef.current = false
         autoPreRollStartedAtRef.current = performance.now()
         autoPerformanceStartedAtRef.current = 0
-        recordStreamRef.current = streamRef.current
+        recordStreamRef.current = buildRecorderStream(
+          streamRef.current!,
+          recordingModeRef.current,
+        )
       } catch {
         autoPreRollActiveRef.current = false
         autoPreRollStartedAtRef.current = 0
@@ -1364,10 +1363,11 @@ export function useCameraSession({
         writerRef.current = writer
         activeTakeIdRef.current = takeId
 
-        const recorder = createMediaRecorder(currentStream, mimeType)
+        const recordStream = buildRecorderStream(currentStream, mode)
+        const recorder = createMediaRecorder(recordStream, mimeType)
         recorderRef.current = recorder
         bindRecordingHandlers(recorder, takeId)
-        recordStreamRef.current = currentStream
+        recordStreamRef.current = recordStream
 
         if (shouldUseRecordingTimeslice(mimeType)) {
           recorder.start(RECORDING_TIMESLICE_MS)
@@ -1437,7 +1437,10 @@ export function useCameraSession({
           armed.recorder.start()
         }
         isRecordingRef.current = true
-        recordStreamRef.current = streamRef.current
+        recordStreamRef.current = buildRecorderStream(
+          streamRef.current!,
+          recordingModeRef.current,
+        )
         setIsRecording(true)
         setElapsed(0)
         elapsedRef.current = 0
@@ -1999,6 +2002,7 @@ export function useCameraSession({
     if (recordingMode !== 'video') return
 
     const revivePreview = () => {
+      if (isRecordingRef.current || autoPreRollActiveRef.current) return
       if (isInlineTakePlaybackDeferringCameraPreview()) return
       if (resumeInFlightRef.current || !readyRef.current) return
       const stream = streamRef.current
