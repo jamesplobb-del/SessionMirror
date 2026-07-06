@@ -646,6 +646,37 @@ export function hasTakePlaybackSpeakerRoute(el: HTMLMediaElement): boolean {
   return speakerNodesByElement.has(el)
 }
 
+export function releaseTakePlaybackSpeakerRoute(el: HTMLMediaElement): void {
+  const nodes = speakerNodesByElement.get(el)
+  routedSpeakerElements.delete(el)
+  speakerNodesByElement.delete(el)
+  disarmPlaybackGraphKeepAlive(el)
+
+  if (!nodes) return
+
+  disconnectSpeakerMastering(nodes)
+  disconnectEnhancer(nodes)
+  disconnectPassthrough(nodes)
+
+  try {
+    nodes.keepAliveAnalyser?.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+
+  try {
+    nodes.gain.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+
+  try {
+    nodes.source.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+}
+
 export interface RouteTakePlaybackOptions {
   /** @deprecated Retained for call-site compatibility — all playback now uses the Web Audio bus. */
   allowNativeDirect?: boolean

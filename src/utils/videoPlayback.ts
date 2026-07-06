@@ -1,3 +1,5 @@
+import { releaseTakePlaybackSpeakerRoute } from './takePlaybackSpeaker'
+
 /** Stop playback and reset position. Never mute — routed elements must stay unmuted for iOS Web Audio. */
 export function resetVideoPlayback(media: HTMLMediaElement | null | undefined): void {
   if (!media) return
@@ -29,6 +31,7 @@ export function teardownVideosInContainer(container: HTMLElement | null | undefi
   container?.querySelectorAll('video, audio').forEach((element) => {
     const media = element as HTMLMediaElement
     media.pause()
+    releaseTakePlaybackSpeakerRoute(media)
     media.removeAttribute('src')
     if ('srcObject' in media) {
       media.srcObject = null

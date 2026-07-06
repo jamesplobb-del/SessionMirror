@@ -200,6 +200,7 @@ interface ReviewModeOverlayProps {
   onUpdateTake?: (id: string, updates: TakeUpdate) => void
   onDeleteTake?: (id: string) => void
   onFavoriteTake?: (id: string) => void
+  onPlaybackActiveChange?: (playing: boolean) => void
 }
 
 export default function ReviewModeOverlay({
@@ -233,6 +234,7 @@ export default function ReviewModeOverlay({
   onUpdateTake,
   onDeleteTake,
   onFavoriteTake,
+  onPlaybackActiveChange,
 }: ReviewModeOverlayProps) {
   const { showAlert, showConfirm } = useActionSheet()
   const audioPlayback = useAudioModePlayback()
@@ -376,6 +378,18 @@ export default function ReviewModeOverlay({
   const displayIsPlaying = activeAudioPlaybackItem && audioControllerActive
     ? audioPlayback.state.isPlaying
     : isPlaying
+
+  useEffect(() => {
+    if (!isOpen) {
+      onPlaybackActiveChange?.(false)
+      return
+    }
+    onPlaybackActiveChange?.(displayIsPlaying)
+  }, [displayIsPlaying, isOpen, onPlaybackActiveChange])
+
+  useEffect(() => {
+    return () => onPlaybackActiveChange?.(false)
+  }, [onPlaybackActiveChange])
 
   const practiceMarkers = useMemo(
     () => (activeTake?.id ? loadTakeMarkers(activeTake.id) : []),
@@ -1145,7 +1159,7 @@ export default function ReviewModeOverlay({
           />
         ) : isOpen ? (
           <>
-            {hasBenchmark && (
+            {hasBenchmark && activeSlot === 'benchmark' && (
               <div
                 className={`absolute inset-0 h-full w-full transition-all duration-200 ease-out ${
                   activeSlot === 'benchmark'
@@ -1183,7 +1197,7 @@ export default function ReviewModeOverlay({
               </div>
             )}
 
-            {hasChallenger && (
+            {hasChallenger && activeSlot === 'challenger' && (
               <div
                 className={`absolute inset-0 h-full w-full transition-all duration-200 ease-out ${
                   activeSlot === 'challenger'

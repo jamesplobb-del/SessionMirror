@@ -1,4 +1,4 @@
-import { useCallback, useRef, memo } from 'react'
+import { useCallback, useEffect, useRef, memo } from 'react'
 import { Camera, Mic } from 'lucide-react'
 import RecordOrbitIcon from './RecordOrbitIcon'
 import {
@@ -130,7 +130,12 @@ function RecordingModeCarousel({
 }: RecordingModeCarouselProps) {
   const notifyTutorial = useTutorialAction()
   const touchStartXRef = useRef(0)
+  const autoSoundRecordingRef = useRef(autoSoundRecording)
   const modeSwitchLocked = disabled || isRecording
+
+  useEffect(() => {
+    autoSoundRecordingRef.current = autoSoundRecording
+  }, [autoSoundRecording])
 
   const handleSlotActivate = useCallback(
     (mode: RecordingMode) => {
@@ -153,9 +158,9 @@ function RecordingModeCarousel({
   const handleRecordLongPress = useCallback(() => {
     if (isRecording || !onAutoSoundRecordingChange) return
     triggerLightHaptic(hapticFeedback)
-    onAutoSoundRecordingChange(!autoSoundRecording)
+    onAutoSoundRecordingChange(!autoSoundRecordingRef.current)
     notifyTutorial?.('hands-free-toggled')
-  }, [autoSoundRecording, hapticFeedback, isRecording, notifyTutorial, onAutoSoundRecordingChange])
+  }, [hapticFeedback, isRecording, notifyTutorial, onAutoSoundRecordingChange])
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
     touchStartXRef.current = event.touches[0]?.clientX ?? 0

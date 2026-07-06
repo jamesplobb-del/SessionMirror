@@ -32,6 +32,8 @@ interface LiveCameraBackgroundProps {
   visuallySuppressed?: boolean
   /** Native iOS preview is rendered below the transparent WebView. */
   nativePreviewActive?: boolean
+  /** Saved-take playback is using the video decoder; pause live preview until it ends. */
+  holdPreviewForTakePlayback?: boolean
   /** Hands-free video take replaces the live camera fullscreen during playback. */
   handsFreePlaybackTakeId?: string | null
   handsFreePlaybackSrc?: string | null
@@ -53,6 +55,7 @@ function LiveCameraBackground({
   variant = 'fullscreen',
   visuallySuppressed = false,
   nativePreviewActive = false,
+  holdPreviewForTakePlayback = false,
   handsFreePlaybackTakeId = null,
   handsFreePlaybackSrc = null,
   onHandsFreePlaybackPlayingChange,
@@ -75,6 +78,19 @@ function LiveCameraBackground({
     : 'camera-background-overlay'
   const webPreviewMode = nativePreviewActive ? 'audio' : recordingMode
 
+  useEffect(() => {
+    if (!holdPreviewForTakePlayback) return
+    const video = previewRef.current
+    if (!video) return
+
+    try {
+      video.pause()
+      video.srcObject = null
+    } catch {
+      /* ignore preview release failures */
+    }
+  }, [holdPreviewForTakePlayback, previewRef])
+
   const { resumingPreview, placeholderUrl, placeholderFading, showSlowIndicator } =
     useCameraPreviewResume({
       previewRef,
@@ -86,6 +102,7 @@ function LiveCameraBackground({
 
   useEffect(() => {
     if (nativePreviewActive) return
+    if (holdPreviewForTakePlayback) return
     if (handsFreePlaybackTakeId) return
     if (modePreparing) return
     const video = previewRef.current
@@ -105,10 +122,11 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive, handsFreePlaybackTakeId, modePreparing])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativePreviewActive, holdPreviewForTakePlayback, handsFreePlaybackTakeId, modePreparing])
 
   useEffect(() => {
     if (nativePreviewActive) return
+    if (holdPreviewForTakePlayback) return
     if (handsFreePlaybackTakeId) return
     if (isAudioMode || modePreparing || resumingPreview) return
 
@@ -152,10 +170,11 @@ function LiveCameraBackground({
       video?.removeEventListener('stalled', scheduleRevive)
       video?.removeEventListener('suspend', scheduleRevive)
     }
-  }, [handsFreePlaybackTakeId, isAudioMode, modePreparing, nativePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, holdPreviewForTakePlayback, isAudioMode, modePreparing, nativePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
 
   useEffect(() => {
     if (nativePreviewActive) return
+    if (holdPreviewForTakePlayback) return
     if (handsFreePlaybackTakeId) return
     if (visuallySuppressed || isAudioMode || modePreparing) return
     const video = previewRef.current
@@ -167,7 +186,7 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [handsFreePlaybackTakeId, isAudioMode, modePreparing, nativePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, holdPreviewForTakePlayback, isAudioMode, modePreparing, nativePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
 
   useEffect(() => {
     const wantsPlayback =

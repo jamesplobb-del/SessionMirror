@@ -6,7 +6,10 @@ import { iosBulletproofVideoProps, isAudioMimeType, withWebKitThumbnailHint } fr
 import { ensureMediaMuted, prepareInlineMediaElement } from '../utils/mediaPlayback'
 import { pauseVideoElement } from '../utils/videoPlayback'
 import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
-import { hasTakePlaybackSpeakerRoute } from '../utils/takePlaybackSpeaker'
+import {
+  hasTakePlaybackSpeakerRoute,
+  releaseTakePlaybackSpeakerRoute,
+} from '../utils/takePlaybackSpeaker'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import {
   buildPlaybackShellStyle,
@@ -124,6 +127,7 @@ export default function TakeVideoPlayer({
     let lastMediaTime = media.currentTime || 0
     let lastFrameAt = performance.now()
     let lastNudgeAt = 0
+    let stallRecoveries = 0
 
     const readPresentedFrames = () =>
       media.webkitDecodedFrameCount ?? media.getVideoPlaybackQuality?.().totalVideoFrames ?? lastPresentedFrames
@@ -132,12 +136,13 @@ export default function TakeVideoPlayer({
       const now = performance.now()
       if (now - lastNudgeAt < 1600) return
       lastNudgeAt = now
+      stallRecoveries += 1
 
       const duration = Number.isFinite(media.duration) ? media.duration : 0
       const current = media.currentTime || 0
-      const target = duration > 0
-        ? Math.min(Math.max(0, duration - 0.05), current + 0.015)
-        : current + 0.015
+      const maxTime = duration > 0 ? Math.max(0, duration - 0.08) : current + 0.25
+      const seekStep = stallRecoveries === 1 ? 0.04 : 0.22
+      const target = Math.min(maxTime, current + seekStep)
 
       try {
         media.currentTime = target
@@ -147,6 +152,24 @@ export default function TakeVideoPlayer({
       } catch {
         /* ignore decoder recovery failures */
       }
+
+      if (stallRecoveries < 3 || !mediaSrc) return
+
+      window.setTimeout(() => {
+        if (stopped || media.paused || media.ended) return
+        const resumeAt = Math.min(maxTime, (media.currentTime || current) + 0.02)
+        try {
+          media.pause()
+          media.load()
+          media.currentTime = resumeAt
+          void media.play().catch(() => undefined)
+          stallRecoveries = 0
+          lastFrameAt = performance.now()
+          lastMediaTime = media.currentTime || resumeAt
+        } catch {
+          /* ignore hard decoder recovery failures */
+        }
+      }, 80)
     }
 
     const sample = () => {
@@ -166,6 +189,7 @@ export default function TakeVideoPlayer({
       if (framesAdvanced) {
         lastPresentedFrames = presentedFrames
         lastFrameAt = now
+        stallRecoveries = 0
       } else if (timeAdvanced && now - lastFrameAt > 1250) {
         nudgeVideoDecoder()
         lastFrameAt = now
@@ -237,6 +261,9 @@ export default function TakeVideoPlayer({
       const media = mediaRef.current
       const wasActive = Boolean(media && !media.paused && !media.ended)
       pauseVideoElement(media)
+      if (media) {
+        releaseTakePlaybackSpeakerRoute(media)
+      }
       if (manualPlayOnly && wasActive) {
         void finalizeTakePlaybackCleanup()
       }

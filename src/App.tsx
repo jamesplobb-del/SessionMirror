@@ -32,6 +32,7 @@ import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
   registerAutoPlaybackHold,
+  registerInlineTakePlaybackPreviewHold,
   registerTakePlaybackMicHandlers,
   finalizeTakePlaybackCleanup,
   releaseTakePlaybackAudio,
@@ -407,6 +408,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [audioModeTakePlaying, setAudioModeTakePlaying] = useState(false)
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
+  const [reviewPlaybackPlaying, setReviewPlaybackPlaying] = useState(false)
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
@@ -2183,9 +2185,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const metronomeWidgetInteractive = showMetronomeWidget && !metronomeHudSuspended
 
   const takePlaybackActive =
-    autoPlaybackPlaying || audioModeTakePlaying || benchmarkPipPlaying || challengerPipPlaying
+    autoPlaybackPlaying ||
+    audioModeTakePlaying ||
+    benchmarkPipPlaying ||
+    challengerPipPlaying ||
+    reviewPlaybackPlaying
+  const shouldHoldCameraPreviewForTakePlayback =
+    recordingMode === 'video' &&
+    !isRecording &&
+    (takePlaybackActive || handsFreePlaybackPending || isReviewOpen)
   const nativeSessionPlaybackActive =
     autoPlaybackPlaying || (recordingMode === 'video' && takePlaybackActive)
+
+  useEffect(() => {
+    registerInlineTakePlaybackPreviewHold(() => shouldHoldCameraPreviewForTakePlayback)
+    return () => registerInlineTakePlaybackPreviewHold(() => false)
+  }, [shouldHoldCameraPreviewForTakePlayback])
 
   const selectedAudioEngine = settings.audioEnhancerEnabled ? 'Native + Enhanced' : 'Native'
 
@@ -2992,6 +3007,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 streamGeneration={streamGeneration}
                 recordingMode={recordingMode}
                 isRecording={isRecording}
+                holdPreviewForTakePlayback={shouldHoldCameraPreviewForTakePlayback}
                 resumeNonce={cameraResumeNonce}
                 modePreparing={
                   isPreviewRecovering ||
@@ -3484,6 +3500,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onUpdateTake={handleUpdateTake}
                         onDeleteTake={handleDeleteTake}
                         onFavoriteTake={handlePinBenchmark}
+                        onPlaybackActiveChange={setReviewPlaybackPlaying}
                       />
                     )}
                   </AnimatePresence>
