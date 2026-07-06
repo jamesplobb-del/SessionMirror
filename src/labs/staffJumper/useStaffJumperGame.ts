@@ -85,8 +85,6 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
     case 'MISS': {
       if (state.phase !== 'playing' || !state.config) return state
       const hearts = Math.max(0, state.hearts - 1)
-      const nextStep = state.sequenceStep + 1
-      const target = getTargetNoteAtStep(state.config, nextStep)
       const feedback = action.reason === 'timeout' ? 'timeout' : 'wrong'
       if (hearts <= 0) {
         const bestScore = saveBestScore(state.score)
@@ -109,8 +107,6 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         streak: 0,
         missCount: state.missCount + 1,
         missToken: state.missToken + 1,
-        sequenceStep: nextStep,
-        targetPitchClass: target.pitchClass,
         feedback,
         feedbackToken: state.feedbackToken + 1,
       }

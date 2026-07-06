@@ -1,6 +1,11 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
 import type { TunerInstrument } from '../../utils/pitchConfig'
-import { getStaffPositionForMidi } from './staffNotationMap'
+import {
+  getStaffPositionForMidi,
+  NOTE_SPACING_PX,
+  STAFF_FIRST_NOTE_X,
+  TREBLE_NOTE_YPX,
+} from './staffNotationMap'
 
 export const STAFF_JUMPER_MAJOR_KEYS = [
   'C',
@@ -53,6 +58,21 @@ export const RANGE_LABELS: Record<StaffJumperRange, string> = {
 
 export const STAFF_JUMPER_BEST_SCORE_KEY = 'sessionmirror:staff-jumper-best'
 
+export const STAFF_JUMPER_DIFFICULTIES = ['easy', 'medium', 'hard'] as const
+export type StaffJumperDifficulty = (typeof STAFF_JUMPER_DIFFICULTIES)[number]
+
+export const DIFFICULTY_LABELS: Record<StaffJumperDifficulty, string> = {
+  easy: 'Easy',
+  medium: 'Medium',
+  hard: 'Hard',
+}
+
+export const DIFFICULTY_DESCRIPTIONS: Record<StaffJumperDifficulty, string> = {
+  easy: 'Letter names shown on noteheads',
+  medium: 'No letter names — read the staff',
+  hard: 'Key signatures and accidentals',
+}
+
 const KEY_TO_PITCH_CLASS: Record<string, number> = {
   C: 0,
   'C#': 1,
@@ -87,6 +107,7 @@ export interface StaffJumperConfig {
   key: StaffJumperKey
   scaleMode: StaffJumperScaleMode
   range: StaffJumperRange
+  difficulty: StaffJumperDifficulty
   tunerInstrument: TunerInstrument
 }
 
@@ -116,6 +137,142 @@ export interface TargetNote {
   pitchClass: number
   noteLabel: string
   yPx: number
+  kind: 'ledger' | 'space' | 'line'
+  accidental: '#' | 'b' | null
+  showLabel: boolean
+}
+
+export interface KeySignatureMarker {
+  symbol: '#' | 'b'
+  yPx: number
+}
+
+/** Order of sharps on treble staff: F C G D A E B. */
+const SHARP_SIG_YPX = [
+  TREBLE_NOTE_YPX.F5!,
+  TREBLE_NOTE_YPX.C5!,
+  TREBLE_NOTE_YPX.G4!,
+  TREBLE_NOTE_YPX.D5!,
+  TREBLE_NOTE_YPX.A4!,
+  TREBLE_NOTE_YPX.E5!,
+  TREBLE_NOTE_YPX.B4!,
+] as const
+
+/** Order of flats on treble staff: B E A D G C F. */
+const FLAT_SIG_YPX = [
+  TREBLE_NOTE_YPX.B4!,
+  TREBLE_NOTE_YPX.E5!,
+  TREBLE_NOTE_YPX.A4!,
+  TREBLE_NOTE_YPX.D5!,
+  TREBLE_NOTE_YPX.G4!,
+  TREBLE_NOTE_YPX.C5!,
+  TREBLE_NOTE_YPX.F5!,
+] as const
+
+const MAJOR_SHARP_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
+  C: 0,
+  G: 1,
+  D: 2,
+  A: 3,
+  E: 4,
+  B: 5,
+  Gb: 6,
+}
+
+const MAJOR_FLAT_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
+  C: 0,
+  F: 1,
+  Bb: 2,
+  Eb: 3,
+  Ab: 4,
+  Db: 5,
+  Gb: 6,
+}
+
+const SHARP_PCS = [5, 0, 7, 2, 9, 4, 11] as const
+const FLAT_PCS = [11, 4, 9, 2, 7, 0, 5] as const
+
+function signatureMajorKey(key: StaffJumperKey, scaleMode: StaffJumperScaleMode): StaffJumperMajorKey {
+  if (scaleMode === 'major') return key as StaffJumperMajorKey
+  const minorPc = keyPitchClass(key)
+  const majorPc = (minorPc + 3) % 12
+  const majorByPc: Record<number, StaffJumperMajorKey> = {
+    0: 'C',
+    1: 'Db',
+    2: 'D',
+    3: 'Eb',
+    4: 'E',
+    5: 'F',
+    6: 'Gb',
+    7: 'G',
+    8: 'Ab',
+    9: 'A',
+    10: 'Bb',
+    11: 'B',
+  }
+  return majorByPc[majorPc] ?? 'C'
+}
+
+function keySignaturePitchClasses(key: StaffJumperKey, scaleMode: StaffJumperScaleMode): Set<number> {
+  const majorKey = signatureMajorKey(key, scaleMode)
+  const sharpCount = MAJOR_SHARP_COUNT[majorKey] ?? 0
+  const flatCount = MAJOR_FLAT_COUNT[majorKey] ?? 0
+  const pcs = new Set<number>()
+  if (sharpCount > 0) {
+    for (let index = 0; index < sharpCount; index += 1) {
+      pcs.add(SHARP_PCS[index]!)
+    }
+  } else if (flatCount > 0) {
+    for (let index = 0; index < flatCount; index += 1) {
+      pcs.add(FLAT_PCS[index]!)
+    }
+  }
+  return pcs
+}
+
+export function getKeySignatureMarkers(
+  key: StaffJumperKey,
+  scaleMode: StaffJumperScaleMode,
+): KeySignatureMarker[] {
+  const majorKey = signatureMajorKey(key, scaleMode)
+  const sharpCount = MAJOR_SHARP_COUNT[majorKey] ?? 0
+  const flatCount = MAJOR_FLAT_COUNT[majorKey] ?? 0
+  if (sharpCount > 0) {
+    return Array.from({ length: sharpCount }, (_, index) => ({
+      symbol: '#' as const,
+      yPx: SHARP_SIG_YPX[index]!,
+    }))
+  }
+  if (flatCount > 0) {
+    return Array.from({ length: flatCount }, (_, index) => ({
+      symbol: 'b' as const,
+      yPx: FLAT_SIG_YPX[index]!,
+    }))
+  }
+  return []
+}
+
+function accidentalForNote(
+  pitchClass: number,
+  key: StaffJumperKey,
+  scaleMode: StaffJumperScaleMode,
+  difficulty: StaffJumperDifficulty,
+): '#' | 'b' | null {
+  if (difficulty !== 'hard') return null
+  const normalized = ((pitchClass % 12) + 12) % 12
+  if (keySignaturePitchClasses(key, scaleMode).has(normalized)) return null
+  const label = pitchClassLabel(pitchClass, key)
+  if (label.includes('#')) return '#'
+  if (label.includes('b')) return 'b'
+  return null
+}
+
+export function showNoteLabels(difficulty: StaffJumperDifficulty): boolean {
+  return difficulty === 'easy'
+}
+
+export function showKeySignature(difficulty: StaffJumperDifficulty): boolean {
+  return difficulty === 'hard'
 }
 
 export function keysForScaleMode(scaleMode: StaffJumperScaleMode): readonly StaffJumperKey[] {
@@ -185,6 +342,9 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
     pitchClass,
     noteLabel: pitchClassLabel(pitchClass, config.key),
     yPx: staff.yPx,
+    kind: staff.kind,
+    accidental: accidentalForNote(pitchClass, config.key, config.scaleMode, config.difficulty),
+    showLabel: showNoteLabels(config.difficulty),
   }
 }
 
@@ -193,6 +353,7 @@ export interface PlatformSlot {
   note: TargetNote
   role: 'landed' | 'target' | 'future'
   opacity: number
+  xPx: number
 }
 
 export function getVisiblePlatforms(
@@ -201,14 +362,15 @@ export function getVisiblePlatforms(
   visibleCount = 6,
 ): PlatformSlot[] {
   const slots: PlatformSlot[] = []
-  const startStep = sequenceStep === 0 ? 0 : sequenceStep - 1
+  const hasLanded = sequenceStep > 0
+  const focusStep = hasLanded ? sequenceStep - 1 : 0
 
   for (let index = 0; index < visibleCount; index += 1) {
-    const step = startStep + index
+    const step = focusStep + index
     const note = getTargetNoteAtStep(config, step)
 
     let role: PlatformSlot['role']
-    if (sequenceStep === 0) {
+    if (!hasLanded) {
       role = index === 0 ? 'target' : 'future'
     } else if (index === 0) {
       role = 'landed'
@@ -218,10 +380,11 @@ export function getVisiblePlatforms(
       role = 'future'
     }
 
-    const distance = role === 'target' || role === 'landed' ? 0 : index - (sequenceStep === 0 ? 0 : 1)
-    const opacity = role === 'target' ? 1 : role === 'landed' ? 1 : Math.max(0.35, 1 - distance * 0.18)
+    const distance = role === 'target' || role === 'landed' ? 0 : index - (hasLanded ? 1 : 0)
+    const opacity = role === 'target' ? 1 : role === 'landed' ? 1 : Math.max(0.4, 1 - distance * 0.15)
+    const xPx = STAFF_FIRST_NOTE_X + step * NOTE_SPACING_PX
 
-    slots.push({ step, note, role, opacity })
+    slots.push({ step, note, role, opacity, xPx })
   }
 
   return slots

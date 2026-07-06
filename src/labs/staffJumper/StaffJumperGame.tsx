@@ -1,24 +1,29 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Pause } from 'lucide-react'
 import type { PitchReadout } from '../../utils/pitchUtils'
+import { STAFF_JUMPER_ASSETS } from './staffJumperAssets'
 import {
   computeAccuracy,
   getDetectedPitchClass,
+  getKeySignatureMarkers,
   getTargetNoteAtStep,
   getVisiblePlatforms,
   pitchClassLabel,
   pitchClassesMatch,
+  showKeySignature,
   type StaffJumperState,
 } from './staffJumperMusicLogic'
 import {
-  getStaffPositionForMidi,
+  getStaffScrollX,
+  noteheadHeightForKind,
   noteStemPointsDown,
+  PLAYER_ANCHOR_X_PX,
   STAFF_BOTTOM_Y,
-  STAFF_LINE_GAP,
+  STAFF_CANVAS_HEIGHT,
+  STAFF_CLEF_X,
   STAFF_LINE_Y_LIST,
   STAFF_LINE_YPX,
   STAFF_TOP_Y,
-  TREBLE_NOTE_YPX,
 } from './staffNotationMap'
 import Pressable from '../../components/ui/Pressable'
 
@@ -29,9 +34,9 @@ interface StaffJumperGameProps {
   onFallComplete: () => void
 }
 
-const PLATFORM_SPACING_PX = 88
-const PLAYER_OFFSET_PX = 110
-const STAFF_CANVAS_HEIGHT = STAFF_TOP_Y + STAFF_LINE_GAP * 6
+const PLAYER_HEIGHT_PX = 52
+const STAFF_WORLD_WIDTH_PX = 4800
+const VISIBLE_NOTE_COUNT = 6
 
 function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   return (
@@ -62,26 +67,49 @@ export default function StaffJumperGame({
   const isMatch = detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
 
+  const playfieldRef = useRef<HTMLDivElement>(null)
+  const [layout, setLayout] = useState({ scale: 1.65, baseY: 24 })
+
   const platforms = useMemo(
-    () => getVisiblePlatforms(config, state.sequenceStep, 6),
+    () => getVisiblePlatforms(config, state.sequenceStep, VISIBLE_NOTE_COUNT),
     [config, state.sequenceStep],
   )
 
-  const scrollOffset = state.sequenceStep * PLATFORM_SPACING_PX
+  const keySignature = useMemo(
+    () => (showKeySignature(config.difficulty) ? getKeySignatureMarkers(config.key, config.scaleMode) : []),
+    [config.difficulty, config.key, config.scaleMode],
+  )
+
+  const scrollX = getStaffScrollX(state.sequenceStep)
 
   const landedPlatform = platforms.find((p) => p.role === 'landed')
   const targetPlatform = platforms.find((p) => p.role === 'target')
-  const characterY =
-    landedPlatform?.note.yPx ??
-    (targetPlatform ? targetPlatform.note.yPx + STAFF_LINE_GAP : TREBLE_NOTE_YPX.C4!)
-  const characterX = landedPlatform
-    ? PLAYER_OFFSET_PX
-    : PLAYER_OFFSET_PX - PLATFORM_SPACING_PX * 0.35
+  const standNote = landedPlatform?.note ?? targetPlatform?.note ?? target
+  const headHeight = noteheadHeightForKind(standNote.kind)
+  const playerWorldY = standNote.yPx - headHeight / 2
+  const playerScreenY = layout.baseY + playerWorldY * layout.scale - PLAYER_HEIGHT_PX
+  const playerScreenX =
+    landedPlatform != null
+      ? PLAYER_ANCHOR_X_PX
+      : PLAYER_ANCHOR_X_PX - (state.sequenceStep === 0 ? 36 : 0)
 
   const prevAdvanceRef = useRef(state.advanceToken)
   const prevMissRef = useRef(state.missToken)
   const jumpActive = state.advanceToken > prevAdvanceRef.current
   const missActive = state.missToken > prevMissRef.current
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = playfieldRef.current
+      if (!el) return
+      const scale = (el.clientHeight * 0.78) / STAFF_CANVAS_HEIGHT
+      const baseY = (el.clientHeight - STAFF_CANVAS_HEIGHT * scale) / 2
+      setLayout({ scale, baseY })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
 
   useEffect(() => {
     prevAdvanceRef.current = state.advanceToken
@@ -99,102 +127,119 @@ export default function StaffJumperGame({
 
   return (
     <div className="sj-screen sj-screen--playing">
-      <div className="sj-playfield">
-        <div
-          className="sj-staff-scroll"
-          style={{
-            transform: `translateX(${-scrollOffset}px)`,
-            height: `${STAFF_CANVAS_HEIGHT}px`,
-          }}
-        >
+      <div className="sj-playfield" ref={playfieldRef}>
+        <div className="sj-staff-viewport">
           <div
-            className="sj-staff-band"
+            className="sj-staff-world"
             style={{
-              top: `${STAFF_TOP_Y}px`,
-              height: `${STAFF_BOTTOM_Y - STAFF_TOP_Y}px`,
+              transform: `translateX(${scrollX}px) translateY(${layout.baseY}px) scale(${layout.scale})`,
+              transformOrigin: '0 0',
+              height: `${STAFF_CANVAS_HEIGHT}px`,
+              width: `${STAFF_WORLD_WIDTH_PX}px`,
             }}
-          />
+          >
+            <div
+              className="sj-staff-band"
+              style={{
+                top: `${STAFF_TOP_Y}px`,
+                height: `${STAFF_BOTTOM_Y - STAFF_TOP_Y}px`,
+                width: `${STAFF_WORLD_WIDTH_PX}px`,
+              }}
+            />
 
-          <div className="sj-staff-lines">
-            {STAFF_LINE_Y_LIST.map((yPx) => (
-              <div key={yPx} className="sj-staff-line" style={{ top: `${yPx}px` }} />
-            ))}
-            {platforms
-              .filter((p) => getStaffPositionForMidi(p.note.midi).kind === 'ledger')
-              .map((p, index) => (
+            <div className="sj-staff-lines">
+              {STAFF_LINE_Y_LIST.map((yPx) => (
                 <div
-                  key={`ledger-${p.step}`}
-                  className="sj-staff-ledger"
-                  style={{
-                    top: `${p.note.yPx}px`,
-                    left: `${PLAYER_OFFSET_PX + index * PLATFORM_SPACING_PX}px`,
-                  }}
+                  key={yPx}
+                  className="sj-staff-line"
+                  style={{ top: `${yPx}px`, width: `${STAFF_WORLD_WIDTH_PX}px` }}
                 />
               ))}
-          </div>
+            </div>
 
-          <span
-            className="sj-treble-clef"
-            style={{ top: `${STAFF_LINE_YPX.B4}px` }}
-            aria-hidden
-          >
-            𝄞
-          </span>
+            <span className="sj-treble-clef" style={{ top: `${STAFF_LINE_YPX.B4}px`, left: `${STAFF_CLEF_X}px` }}>
+              𝄞
+            </span>
 
-          <div className="sj-platforms">
-            {platforms.map((slot, index) => {
-              const xPx = PLAYER_OFFSET_PX + index * PLATFORM_SPACING_PX
-              const missedStep = missActive ? state.sequenceStep - 1 : null
-              const isCrack = missedStep != null && slot.step === missedStep
-              const isShake = isCrack
-              return (
-                <div
-                  key={slot.step}
-                  className={[
-                    'sj-platform',
-                    slot.role === 'target' ? 'sj-platform--target' : '',
-                    slot.role === 'future' ? 'sj-platform--future' : '',
-                    isShake ? 'sj-platform--shake' : '',
-                    isCrack ? 'sj-platform--crack' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  style={{
-                    left: `${xPx}px`,
-                    top: `${slot.note.yPx}px`,
-                    opacity: slot.opacity,
-                  }}
-                >
-                  <div
-                    className={[
-                      'sj-note__glyph',
-                      noteStemPointsDown(slot.note.yPx)
-                        ? 'sj-note__glyph--stem-down'
-                        : 'sj-note__glyph--stem-up',
-                    ].join(' ')}
+            {keySignature.length > 0 && (
+              <div className="sj-key-signature" style={{ left: `${STAFF_CLEF_X + 54}px` }}>
+                {keySignature.map((marker, index) => (
+                  <span
+                    key={`${marker.symbol}-${marker.yPx}`}
+                    className="sj-key-signature__symbol"
+                    style={{ top: `${marker.yPx}px`, left: `${index * 14}px` }}
                   >
-                    <span className="sj-note__stem" aria-hidden />
-                    <span className="sj-note__head" aria-hidden />
-                  </div>
-                  <span className="sj-platform__label">{slot.note.noteLabel}</span>
-                </div>
-              )
-            })}
-          </div>
+                    {marker.symbol}
+                  </span>
+                ))}
+              </div>
+            )}
 
-          <div
-            className={[
-              'sj-character',
-              jumpActive ? 'sj-character--jump' : '',
-              state.isFalling ? 'sj-character--fall' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            style={{ left: `${characterX}px`, top: `${characterY}px` }}
-          >
-            <div className="sj-character__body" />
+            <div className="sj-noteheads">
+              {platforms.map((slot) => {
+                const shake = missActive && !state.isFalling && slot.role === 'target'
+                const crack = state.isFalling && slot.role === 'target'
+                const stemDown = noteStemPointsDown(slot.note.yPx)
+                return (
+                  <div
+                    key={slot.step}
+                    className={[
+                      'sj-note',
+                      `sj-note--${slot.note.kind}`,
+                      slot.role === 'target' ? 'sj-note--target' : '',
+                      slot.role === 'future' ? 'sj-note--future' : '',
+                      shake ? 'sj-note--shake' : '',
+                      crack ? 'sj-note--crack' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    style={{
+                      left: `${slot.xPx}px`,
+                      top: `${slot.note.yPx}px`,
+                      opacity: slot.opacity,
+                    }}
+                  >
+                    {slot.note.kind === 'ledger' && (
+                      <span className="sj-note__ledger" aria-hidden />
+                    )}
+                    {slot.note.accidental && (
+                      <span className="sj-note__accidental" aria-hidden>
+                        {slot.note.accidental}
+                      </span>
+                    )}
+                    <div
+                      className={[
+                        'sj-note__glyph',
+                        stemDown ? 'sj-note__glyph--stem-down' : 'sj-note__glyph--stem-up',
+                      ].join(' ')}
+                    >
+                      <span className="sj-note__stem" aria-hidden />
+                      <span className="sj-note__head" aria-hidden />
+                    </div>
+                    {slot.note.showLabel && (
+                      <span className="sj-note__label">{slot.note.noteLabel}</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
+
+        <img
+          src={STAFF_JUMPER_ASSETS.trumpetPlayer}
+          alt=""
+          className={[
+            'sj-player',
+            jumpActive ? 'sj-player--hop' : '',
+            missActive && !state.isFalling ? 'sj-player--stumble' : '',
+            state.isFalling ? 'sj-player--fall' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          style={{ left: `${playerScreenX}px`, top: `${playerScreenY}px` }}
+          draggable={false}
+        />
 
         <div className="sj-hud">
           <div className="sj-hud-top">
@@ -206,7 +251,7 @@ export default function StaffJumperGame({
               className="sj-hud-pause"
               aria-label="Pause"
             >
-              <Pause className="h-4 w-4" strokeWidth={3} />
+              <Pause className="h-4 w-4" strokeWidth={2.5} />
             </Pressable>
           </div>
 

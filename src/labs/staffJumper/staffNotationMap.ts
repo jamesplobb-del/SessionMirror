@@ -92,14 +92,59 @@ export function getNoteYpxForMidi(midi: number): number {
 
 export function getStaffPositionForMidi(midi: number): StaffVisualPosition {
   const noteId = midiToNoteId(midi)
+  const yPx = getNoteYpxForMidi(midi)
   return {
     noteId,
-    yPx: getNoteYpxForMidi(midi),
-    kind: kindForNoteId(noteId),
+    yPx,
+    kind: TREBLE_NOTE_YPX[noteId] != null ? kindForNoteId(noteId) : kindFromYpx(yPx),
   }
 }
+
+function kindFromYpx(yPx: number): StaffVisualPosition['kind'] {
+  for (const lineY of STAFF_LINE_Y_LIST) {
+    if (Math.abs(yPx - lineY) < 0.01) return 'line'
+  }
+  if (yPx > STAFF_BOTTOM_Y + STAFF_LINE_GAP / 2 || yPx < STAFF_TOP_Y - STAFF_LINE_GAP / 2) {
+    return 'ledger'
+  }
+  return 'space'
+}
+
+/** First notehead X in the scrolling staff world. */
+export const STAFF_FIRST_NOTE_X = 168
+
+/** Clef X in the scrolling staff world. */
+export const STAFF_CLEF_X = 28
+
+/** Space between noteheads when reading left-to-right. */
+export const NOTE_SPACING_PX = 96
+
+/** Player stands near the left third of the viewport. */
+export const PLAYER_ANCHOR_X_PX = 112
+
+/** Horizontal scroll offset so the focus note sits under the player anchor. */
+export function getStaffScrollX(sequenceStep: number): number {
+  const focusStep = sequenceStep > 0 ? sequenceStep - 1 : 0
+  return PLAYER_ANCHOR_X_PX - (STAFF_FIRST_NOTE_X + focusStep * NOTE_SPACING_PX)
+}
+
+/** Total canvas height for the staff coordinate system. */
+export const STAFF_CANVAS_HEIGHT = STAFF_TOP_Y + STAFF_LINE_GAP * 6
+
+/** Notehead fills the space between two staff lines (gap − 2px). */
+export const NOTEHEAD_SPACE_HEIGHT = STAFF_LINE_GAP - 2
+
+/** Notehead on a line — line passes through center. */
+export const NOTEHEAD_LINE_HEIGHT = 20
+
+/** Ledger line width through notehead center. */
+export const LEDGER_LINE_WIDTH_PX = 44
 
 /** Notes on or above the middle line (B4) take stems down. */
 export function noteStemPointsDown(yPx: number): boolean {
   return yPx <= STAFF_LINE_YPX.B4
+}
+
+export function noteheadHeightForKind(kind: StaffVisualPosition['kind']): number {
+  return kind === 'space' ? NOTEHEAD_SPACE_HEIGHT : NOTEHEAD_LINE_HEIGHT
 }

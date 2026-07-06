@@ -4,11 +4,15 @@ import './staff-jumper.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import {
   computeAccuracy,
+  DIFFICULTY_DESCRIPTIONS,
+  DIFFICULTY_LABELS,
   keysForScaleMode,
   RANGE_LABELS,
   SCALE_MODE_LABELS,
+  STAFF_JUMPER_DIFFICULTIES,
   STAFF_JUMPER_RANGES,
   scaleDisplayName,
+  type StaffJumperDifficulty,
   type StaffJumperKey,
   type StaffJumperRange,
   type StaffJumperScaleMode,
@@ -38,6 +42,7 @@ export default function StaffJumperScreen({
   const [draftScaleMode, setDraftScaleMode] = useState<StaffJumperScaleMode>('major')
   const [draftKey, setDraftKey] = useState<StaffJumperKey>('C')
   const [draftRange, setDraftRange] = useState<StaffJumperRange>('1-octave')
+  const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>('easy')
 
   const availableKeys = keysForScaleMode(draftScaleMode)
 
@@ -84,19 +89,45 @@ export default function StaffJumperScreen({
           </Pressable>
           <div>
             <h1 className="text-2xl font-bold text-stone-900">Staff Jumper</h1>
-            <p className="text-xs text-stone-400">v0.1 · Jump the staff with your instrument</p>
+            <p className="text-xs text-stone-400">Play your way through the staff</p>
           </div>
         </header>
 
         <p className="mb-1 text-sm font-medium text-stone-700">
-          Play each note to jump across the staff.
+          Travel through sheet music one note at a time.
         </p>
         <p className="mb-6 text-sm text-stone-500">
-          Concert pitch · treble clef only. Wrong notes and timeouts crack a platform. Three misses
-          and you fall off the staff. Any octave of the target note counts in v0.1.
+          Concert pitch · treble clef. Land on each notehead by playing the correct pitch. Three
+          misses and you fall off the staff.
         </p>
 
         <div className="space-y-5">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Difficulty
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {STAFF_JUMPER_DIFFICULTIES.map((level) => (
+                <Pressable
+                  key={level}
+                  type="button"
+                  intensity="soft"
+                  onClick={() => setDraftDifficulty(level)}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                    draftDifficulty === level
+                      ? 'border-stone-800 bg-stone-800 text-white'
+                      : 'border-stone-200 bg-white text-stone-700'
+                  }`}
+                >
+                  {DIFFICULTY_LABELS[level]}
+                </Pressable>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-stone-500">
+              {DIFFICULTY_DESCRIPTIONS[draftDifficulty]}
+            </p>
+          </div>
+
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Scale</p>
             <div className="flex flex-wrap gap-2">
@@ -108,7 +139,7 @@ export default function StaffJumperScreen({
                   onClick={() => setDraftScaleMode(mode)}
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
                     draftScaleMode === mode
-                      ? 'border-violet-600 bg-violet-600 text-white'
+                      ? 'border-stone-800 bg-stone-800 text-white'
                       : 'border-stone-200 bg-white text-stone-700'
                   }`}
                 >
@@ -129,7 +160,7 @@ export default function StaffJumperScreen({
                   onClick={() => setDraftKey(key)}
                   className={`min-w-[2.75rem] rounded-xl border px-3 py-2 text-sm font-semibold ${
                     draftKey === key
-                      ? 'border-violet-600 bg-violet-600 text-white'
+                      ? 'border-stone-800 bg-stone-800 text-white'
                       : 'border-stone-200 bg-white text-stone-700'
                   }`}
                 >
@@ -150,7 +181,7 @@ export default function StaffJumperScreen({
                   onClick={() => setDraftRange(range)}
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
                     draftRange === range
-                      ? 'border-violet-600 bg-violet-600 text-white'
+                      ? 'border-stone-800 bg-stone-800 text-white'
                       : 'border-stone-200 bg-white text-stone-700'
                   }`}
                 >
@@ -177,6 +208,7 @@ export default function StaffJumperScreen({
                 key: draftKey,
                 scaleMode: draftScaleMode,
                 range: draftRange,
+                difficulty: draftDifficulty,
                 tunerInstrument,
               })
             }
@@ -196,7 +228,8 @@ export default function StaffJumperScreen({
       <div className="sj-screen sj-screen--gameover">
         <h1 className="mb-2 text-2xl font-bold text-stone-900">Game Over</h1>
         <p className="mb-6 text-sm text-stone-500">
-          {scaleName} · {RANGE_LABELS[state.config.range]}
+          {scaleName} · {RANGE_LABELS[state.config.range]} ·{' '}
+          {DIFFICULTY_LABELS[state.config.difficulty]}
         </p>
         <dl className="space-y-3 text-sm text-stone-700">
           <div className="flex justify-between">
