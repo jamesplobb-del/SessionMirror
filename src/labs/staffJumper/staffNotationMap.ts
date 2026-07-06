@@ -51,8 +51,9 @@ function diatonicStepFromE4(midi: number): number {
 }
 
 function kindForStep(staffStep: number): StaffVisualPosition['kind'] {
-  if (staffStep < 0 || staffStep > 8) return 'ledger'
-  return staffStep % 2 === 0 ? 'line' : 'space'
+  const isSpaceParity = ((staffStep % 2) + 2) % 2 === 1
+  if (staffStep >= 0 && staffStep <= 8) return isSpaceParity ? 'space' : 'line'
+  return isSpaceParity ? 'space' : 'ledger'
 }
 
 /**
@@ -71,13 +72,25 @@ export function getStaffPositionForMidi(midi: number): StaffVisualPosition {
   }
 }
 
-/** Convert staffStep to a 0–1 vertical ratio within the playfield (0 = bottom). */
-export function staffStepToYRatio(staffStep: number, minStep: number, maxStep: number): number {
-  const padding = 1.5
-  const lo = minStep - padding
-  const hi = maxStep + padding
-  const range = hi - lo || 1
-  return 1 - (staffStep - lo) / range
+/**
+ * Fixed treble staff geometry (percent of playfield height).
+ * The staff never rescales based on the selected key/range — E4 always sits on the
+ * bottom line and F5 always sits on the top line, exactly like real sheet music.
+ */
+export const STAFF_TOP_PERCENT = 24 // F5 — top line
+export const STAFF_BOTTOM_PERCENT = 60 // E4 — bottom line
+
+/** The 5 real staff lines, by staffStep: E4, G4, B4, D5, F5. */
+export const STAFF_LINE_STEPS = [0, 2, 4, 6, 8] as const
+
+const STAFF_STEP_SPACING_PERCENT = (STAFF_BOTTOM_PERCENT - STAFF_TOP_PERCENT) / 8
+
+/**
+ * Hard-coded Y position (percent of playfield height) for a given staff step.
+ * staffBottomLineY - staffStep * stepSpacing — never guessed, never rescaled per note range.
+ */
+export function getStaffStepYPercent(staffStep: number): number {
+  return STAFF_BOTTOM_PERCENT - staffStep * STAFF_STEP_SPACING_PERCENT
 }
 
 export function isDiatonicMidi(midi: number): boolean {

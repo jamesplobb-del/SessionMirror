@@ -8,10 +8,15 @@ import {
   getVisiblePlatforms,
   pitchClassLabel,
   pitchClassesMatch,
-  staffRangeForConfig,
   type StaffJumperState,
 } from './staffJumperMusicLogic'
-import { staffStepToYRatio } from './staffNotationMap'
+import {
+  getStaffPositionForMidi,
+  getStaffStepYPercent,
+  STAFF_BOTTOM_PERCENT,
+  STAFF_LINE_STEPS,
+  STAFF_TOP_PERCENT,
+} from './staffNotationMap'
 import Pressable from '../../components/ui/Pressable'
 
 interface StaffJumperGameProps {
@@ -53,31 +58,21 @@ export default function StaffJumperGame({
   const isMatch = detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
 
-  const { minStep, maxStep } = useMemo(() => staffRangeForConfig(config), [config])
   const platforms = useMemo(
     () => getVisiblePlatforms(config, state.sequenceStep, 6),
     [config, state.sequenceStep],
   )
-
-  const staffLineSteps = useMemo(() => {
-    const lines: number[] = []
-    for (let step = minStep; step <= maxStep; step += 1) {
-      if (step % 2 === 0) lines.push(step)
-    }
-    return lines
-  }, [minStep, maxStep])
 
   const scrollOffset = state.sequenceStep * PLATFORM_SPACING_PX
 
   const landedPlatform = platforms.find((p) => p.role === 'landed')
   const targetPlatform = platforms.find((p) => p.role === 'target')
   const characterStep =
-    landedPlatform?.note.staffStep ??
-    (targetPlatform ? targetPlatform.note.staffStep - 2 : minStep - 2)
+    landedPlatform?.note.staffStep ?? (targetPlatform ? targetPlatform.note.staffStep - 2 : -4)
   const characterX = landedPlatform
     ? PLAYER_OFFSET_PX
     : PLAYER_OFFSET_PX - PLATFORM_SPACING_PX * 0.35
-  const characterY = staffStepToYRatio(characterStep, minStep, maxStep) * 100
+  const characterY = getStaffStepYPercent(characterStep)
 
   const prevAdvanceRef = useRef(state.advanceToken)
   const prevMissRef = useRef(state.missToken)
@@ -105,36 +100,48 @@ export default function StaffJumperGame({
           className="sj-staff-scroll"
           style={{ transform: `translateX(${-scrollOffset}px)` }}
         >
+          <div
+            className="sj-staff-band"
+            style={{
+              top: `${STAFF_TOP_PERCENT}%`,
+              height: `${STAFF_BOTTOM_PERCENT - STAFF_TOP_PERCENT}%`,
+            }}
+          />
+
           <div className="sj-staff-lines">
-            {staffLineSteps.map((step) => (
+            {STAFF_LINE_STEPS.map((step) => (
               <div
                 key={step}
                 className="sj-staff-line"
-                style={{ top: `${staffStepToYRatio(step, minStep, maxStep) * 100}%` }}
+                style={{ top: `${getStaffStepYPercent(step)}%` }}
               />
             ))}
             {platforms
-              .filter((p) => p.note.staffStep < minStep || p.note.staffStep > maxStep)
+              .filter((p) => getStaffPositionForMidi(p.note.midi).kind === 'ledger')
               .map((p, index) => (
                 <div
                   key={`ledger-${p.step}`}
                   className="sj-staff-ledger"
                   style={{
-                    top: `${staffStepToYRatio(p.note.staffStep, minStep, maxStep) * 100}%`,
+                    top: `${getStaffStepYPercent(p.note.staffStep)}%`,
                     left: `${PLAYER_OFFSET_PX + index * PLATFORM_SPACING_PX}px`,
                   }}
                 />
               ))}
           </div>
 
-          <span className="sj-treble-clef" style={{ top: '18%' }} aria-hidden>
+          <span
+            className="sj-treble-clef"
+            style={{ top: `${getStaffStepYPercent(4)}%` }}
+            aria-hidden
+          >
             𝄞
           </span>
 
           <div className="sj-platforms">
             {platforms.map((slot, index) => {
               const xPx = PLAYER_OFFSET_PX + index * PLATFORM_SPACING_PX
-              const yPercent = staffStepToYRatio(slot.note.staffStep, minStep, maxStep) * 100
+              const yPercent = getStaffStepYPercent(slot.note.staffStep)
               const missedStep = missActive ? state.sequenceStep - 1 : null
               const isCrack = missedStep != null && slot.step === missedStep
               const isShake = isCrack
@@ -156,7 +163,15 @@ export default function StaffJumperGame({
                     opacity: slot.opacity,
                   }}
                 >
-                  <div className="sj-platform__ledge" style={{ position: 'relative' }} />
+                  <div
+                    className={[
+                      'sj-note__glyph',
+                      slot.note.staffStep >= 4 ? 'sj-note__glyph--stem-down' : 'sj-note__glyph--stem-up',
+                    ].join(' ')}
+                  >
+                    <span className="sj-note__stem" aria-hidden />
+                    <span className="sj-note__head" aria-hidden />
+                  </div>
                   <span className="sj-platform__label">{slot.note.noteLabel}</span>
                 </div>
               )
