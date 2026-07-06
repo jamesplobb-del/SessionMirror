@@ -115,7 +115,7 @@ export interface TargetNote {
   midi: number
   pitchClass: number
   noteLabel: string
-  staffStep: number
+  yPx: number
 }
 
 export function keysForScaleMode(scaleMode: StaffJumperScaleMode): readonly StaffJumperKey[] {
@@ -184,7 +184,7 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
     midi,
     pitchClass,
     noteLabel: pitchClassLabel(pitchClass, config.key),
-    staffStep: staff.staffStep,
+    yPx: staff.yPx,
   }
 }
 
@@ -282,16 +282,4 @@ export function computeAccuracy(correct: number, misses: number): number {
   const total = correct + misses
   if (total === 0) return 100
   return Math.round((correct / total) * 1000) / 10
-}
-
-export function staffRangeForConfig(config: StaffJumperConfig): { minStep: number; maxStep: number } {
-  const sequence = buildScaleMidiSequence(config)
-  let minStep = Infinity
-  let maxStep = -Infinity
-  for (const midi of sequence) {
-    const { staffStep } = getStaffPositionForMidi(midi)
-    minStep = Math.min(minStep, staffStep)
-    maxStep = Math.max(maxStep, staffStep)
-  }
-  return { minStep, maxStep }
 }

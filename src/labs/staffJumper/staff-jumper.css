@@ -31,11 +31,14 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 
 .sj-staff-scroll {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
