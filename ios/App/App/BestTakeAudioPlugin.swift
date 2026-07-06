@@ -29,6 +29,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraPreview", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setNativeCameraPassthrough", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
@@ -856,7 +857,18 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func stopNativeCameraPreview(_ call: CAPPluginCall) {
         nativeCameraEngine.stopPreview()
+        DispatchQueue.main.async {
+            (self.bridge?.viewController as? PortraitBridgeViewController)?.setCameraPassthrough(false)
+        }
         call.resolve()
+    }
+
+    @objc func setNativeCameraPassthrough(_ call: CAPPluginCall) {
+        let enabled = call.getBool("enabled") ?? false
+        DispatchQueue.main.async {
+            (self.bridge?.viewController as? PortraitBridgeViewController)?.setCameraPassthrough(enabled)
+            call.resolve()
+        }
     }
 
     @objc func prepareCameraLikePlaybackSession(_ call: CAPPluginCall) {

@@ -10,6 +10,7 @@ import {
 } from '../utils/mediaPlayback'
 import { resetVideoPlayback } from '../utils/videoPlayback'
 import { playTakeMediaAudible } from '../utils/takePlaybackAudio'
+import { attachVideoDecoderStallRecovery } from '../utils/videoDecoderStallRecovery'
 
 interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
@@ -63,6 +64,7 @@ function LiveCameraBackground({
 }: LiveCameraBackgroundProps) {
   const handsFreePlaybackVideoRef = useRef<HTMLVideoElement>(null)
   const handsFreePlaybackSessionRef = useRef(false)
+  const handsFreeStallRecoveryRef = useRef<(() => void) | null>(null)
   const shellRef = useRef<HTMLDivElement>(null)
   const pinchPointersRef = useRef(new Map<number, { x: number; y: number }>())
   const pinchStartDistanceRef = useRef(0)
@@ -227,9 +229,15 @@ function LiveCameraBackground({
         return
       }
 
+      const stopStallRecovery = () => {
+        handsFreeStallRecoveryRef.current?.()
+        handsFreeStallRecoveryRef.current = null
+      }
+
       const onEnded = () => {
         if (!handsFreePlaybackSessionRef.current) return
         handsFreePlaybackSessionRef.current = false
+        stopStallRecovery()
         onHandsFreePlaybackPlayingChange?.(false)
         onHandsFreePlaybackComplete?.()
       }
@@ -241,10 +249,18 @@ function LiveCameraBackground({
       })
       if (cancelled || !handsFreePlaybackSessionRef.current) {
         media.removeEventListener('ended', onEnded)
+        stopStallRecovery()
         return
       }
 
       if (started) {
+        // Recover the picture if iOS's hardware decoder stalls while audio keeps
+        // running (frozen video). Mirrors TakeVideoPlayer's vault-path recovery.
+        stopStallRecovery()
+        handsFreeStallRecoveryRef.current = attachVideoDecoderStallRecovery(media, {
+          hasSource: () => Boolean(handsFreePlaybackSrc),
+          debugLabel: 'HandsFree',
+        })
         onHandsFreePlaybackPlayingChange?.(true)
       } else {
         media.removeEventListener('ended', onEnded)
@@ -256,6 +272,8 @@ function LiveCameraBackground({
     return () => {
       cancelled = true
       handsFreePlaybackSessionRef.current = false
+      handsFreeStallRecoveryRef.current?.()
+      handsFreeStallRecoveryRef.current = null
       const media = handsFreePlaybackVideoRef.current
       if (media) {
         resetVideoPlayback(media)

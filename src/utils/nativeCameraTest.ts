@@ -135,6 +135,16 @@ export async function stopNativeCameraPreview(): Promise<void> {
   }
 }
 
+/** Reveal or hide the native camera preview layer by toggling WebView transparency. */
+export async function setNativeCameraPassthrough(enabled: boolean): Promise<void> {
+  if (!isNativeCameraTestAvailable()) return
+  try {
+    await BestTakeAudioPlugin.setNativeCameraPassthrough({ enabled })
+  } catch (error) {
+    console.warn('[NativeCameraPreview] passthrough toggle failed', error)
+  }
+}
+
 export async function stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult | null> {
   if (!isNativeCameraTestAvailable()) return null
 

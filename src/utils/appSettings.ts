@@ -46,6 +46,12 @@ export interface AppSettings {
   audioEnhancerEnabled: boolean
   /** iOS-only AVAudioSession path for native input/output routing. */
   nativeExperimentalAudioEnabled: boolean
+  /**
+   * iOS-only: record video through the native AVFoundation camera engine instead of
+   * the WebKit MediaRecorder. Fixes frozen-video/continuing-audio playback caused by
+   * the WebKit encoder dropping frames and truncating the recorded video track.
+   */
+  nativeCameraRecordingEnabled: boolean
   /** Persisted enhancer preset and slider values. */
   audioEnhancerSettings: AudioEnhancerSettings
   /** Speaker-only loudness mastering preset for built-in iPhone speakers. */
@@ -75,6 +81,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   takeCardScale: 100,
   audioEnhancerEnabled: false,
   nativeExperimentalAudioEnabled: true,
+  nativeCameraRecordingEnabled: false,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
   speakerLoudnessPreset: 'phone',
   excludeYoutubeFromRecording: false,
@@ -183,6 +190,10 @@ export function loadAppSettings(): AppSettings {
           ? Boolean(parsed.audioEnhancerEnabled)
           : DEFAULT_APP_SETTINGS.audioEnhancerEnabled,
       nativeExperimentalAudioEnabled: true,
+      nativeCameraRecordingEnabled:
+        parsed.nativeCameraRecordingEnabled !== undefined
+          ? Boolean(parsed.nativeCameraRecordingEnabled)
+          : DEFAULT_APP_SETTINGS.nativeCameraRecordingEnabled,
       audioEnhancerSettings: parseAudioEnhancerSettings(
         parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),

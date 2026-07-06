@@ -1260,12 +1260,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     suspendMicForPlayback,
     resumeMicAfterPlayback,
     isPreviewRecovering,
+    nativePreviewActive,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     secondaryPreviewRef: splitPreviewRef,
     onBeforeForegroundRestart: handleBeforeForegroundRestart,
     onAfterForegroundRestart: resumeYoutubeReference,
     nativeExperimentalAudioEnabled: settings.nativeExperimentalAudioEnabled,
+    nativeCameraRecordingEnabled: settings.nativeCameraRecordingEnabled,
     micInputPreference: settings.micInputPreference,
   })
 
@@ -1301,6 +1303,21 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       recordingActive: isRecording,
     })
   }, [isRecording, ready, recordingMode])
+
+  // Make the web shell transparent only while the native camera preview is live, so
+  // the AVCaptureVideoPreviewLayer behind the WebView shows through. Never global —
+  // scoped to this flag so no other screen can leak the camera behind it.
+  useEffect(() => {
+    const root = document.documentElement
+    if (nativePreviewActive) {
+      root.classList.add('native-camera-passthrough')
+    } else {
+      root.classList.remove('native-camera-passthrough')
+    }
+    return () => {
+      root.classList.remove('native-camera-passthrough')
+    }
+  }, [nativePreviewActive])
 
   useEffect(() => {
     let firstTimer: number | null = null
@@ -3022,7 +3039,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   (recordingMode === 'audio' && audioPracticeTab === 'audio')
                 }
                 visuallySuppressed={isSplitView}
-                nativePreviewActive={false}
+                nativePreviewActive={nativePreviewActive}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
                 handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
                 onHandsFreePlaybackPlayingChange={handleHandsFreeBackgroundPlaybackChange}

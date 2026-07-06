@@ -16,14 +16,7 @@ import {
   shouldCorrectPlaybackOrientation,
   takeVideoShellClassName,
 } from '../utils/takeVideoPlayback'
-
-type FrameWatchVideo = HTMLVideoElement & {
-  requestVideoFrameCallback?: (
-    callback: (now: number, metadata: { presentedFrames?: number }) => void,
-  ) => number
-  cancelVideoFrameCallback?: (handle: number) => void
-  webkitDecodedFrameCount?: number
-}
+import { attachVideoDecoderStallRecovery } from '../utils/videoDecoderStallRecovery'
 
 export interface TakeVideoPlayerProps
   extends Omit<
@@ -116,111 +109,13 @@ export default function TakeVideoPlayer({
 
   useEffect(() => {
     if (isAudio || thumbnailPreview) return
-    const media = mediaRef.current as FrameWatchVideo | null
-    if (!media) return
+    const media = mediaRef.current
+    if (!(media instanceof HTMLVideoElement)) return
 
-    let stopped = false
-    let frameCallbackId: number | null = null
-    let intervalId: number | null = null
-    let lastPresentedFrames =
-      media.webkitDecodedFrameCount ?? media.getVideoPlaybackQuality?.().totalVideoFrames ?? 0
-    let lastMediaTime = media.currentTime || 0
-    let lastFrameAt = performance.now()
-    let lastNudgeAt = 0
-    let stallRecoveries = 0
-
-    const readPresentedFrames = () =>
-      media.webkitDecodedFrameCount ?? media.getVideoPlaybackQuality?.().totalVideoFrames ?? lastPresentedFrames
-
-    const nudgeVideoDecoder = () => {
-      const now = performance.now()
-      if (now - lastNudgeAt < 1600) return
-      lastNudgeAt = now
-      stallRecoveries += 1
-
-      const duration = Number.isFinite(media.duration) ? media.duration : 0
-      const current = media.currentTime || 0
-      const maxTime = duration > 0 ? Math.max(0, duration - 0.08) : current + 0.25
-      const seekStep = stallRecoveries === 1 ? 0.04 : 0.22
-      const target = Math.min(maxTime, current + seekStep)
-
-      try {
-        media.currentTime = target
-        if (!media.paused && !media.ended) {
-          void media.play().catch(() => undefined)
-        }
-      } catch {
-        /* ignore decoder recovery failures */
-      }
-
-      if (stallRecoveries < 3 || !mediaSrc) return
-
-      window.setTimeout(() => {
-        if (stopped || media.paused || media.ended) return
-        const resumeAt = Math.min(maxTime, (media.currentTime || current) + 0.02)
-        try {
-          media.pause()
-          media.load()
-          media.currentTime = resumeAt
-          void media.play().catch(() => undefined)
-          stallRecoveries = 0
-          lastFrameAt = performance.now()
-          lastMediaTime = media.currentTime || resumeAt
-        } catch {
-          /* ignore hard decoder recovery failures */
-        }
-      }, 80)
-    }
-
-    const sample = () => {
-      if (stopped || media.paused || media.ended || media.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-        lastMediaTime = media.currentTime || 0
-        lastPresentedFrames = readPresentedFrames()
-        lastFrameAt = performance.now()
-        return
-      }
-
-      const now = performance.now()
-      const currentTime = media.currentTime || 0
-      const presentedFrames = readPresentedFrames()
-      const timeAdvanced = currentTime - lastMediaTime > 0.18
-      const framesAdvanced = presentedFrames > lastPresentedFrames
-
-      if (framesAdvanced) {
-        lastPresentedFrames = presentedFrames
-        lastFrameAt = now
-        stallRecoveries = 0
-      } else if (timeAdvanced && now - lastFrameAt > 1250) {
-        nudgeVideoDecoder()
-        lastFrameAt = now
-      }
-
-      lastMediaTime = currentTime
-    }
-
-    const scheduleFrameWatch = () => {
-      if (stopped || !media.requestVideoFrameCallback) return
-      frameCallbackId = media.requestVideoFrameCallback((_now, metadata) => {
-        if (typeof metadata.presentedFrames === 'number') {
-          lastPresentedFrames = metadata.presentedFrames
-          lastFrameAt = performance.now()
-        }
-        scheduleFrameWatch()
-      })
-    }
-
-    scheduleFrameWatch()
-    intervalId = window.setInterval(sample, 350)
-
-    return () => {
-      stopped = true
-      if (frameCallbackId !== null) {
-        media.cancelVideoFrameCallback?.(frameCallbackId)
-      }
-      if (intervalId !== null) {
-        window.clearInterval(intervalId)
-      }
-    }
+    return attachVideoDecoderStallRecovery(media, {
+      hasSource: () => Boolean(mediaSrc),
+      debugLabel: 'Review',
+    })
   }, [isAudio, mediaRef, mediaSrc, thumbnailPreview, videoSourceKey])
 
   useEffect(() => {

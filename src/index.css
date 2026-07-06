@@ -2606,6 +2606,16 @@ html.physical-landscape-right .ui-orient-spin {
   background: transparent !important;
 }
 
+/* Native camera passthrough: clear the opaque shell so the AVFoundation preview
+   layer (rendered behind the WebView) is visible. Scoped to when native preview
+   is active — the app is otherwise opaque. */
+html.native-camera-passthrough,
+html.native-camera-passthrough body,
+html.native-camera-passthrough #root {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
 .camera-background--pinch-zoom {
   touch-action: none;
 }

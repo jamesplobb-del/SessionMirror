@@ -37,6 +37,33 @@ class PortraitBridgeViewController: CAPBridgeViewController {
         NativeCameraRecordingEngine.shared.layoutPreview(in: nativePreviewHostView)
     }
 
+    /// Reveal (or hide) the native AVCaptureVideoPreviewLayer that lives behind the
+    /// WebView by toggling WebView opacity. Only called once native preview has
+    /// actually started, so a native failure never leaves a transparent (black) shell.
+    func setCameraPassthrough(_ enabled: Bool) {
+        guard let webView = self.webView else { return }
+
+        if enabled {
+            _ = nativeCameraPreviewContainer
+            nativePreviewHostView.isHidden = false
+            webView.isOpaque = false
+            webView.backgroundColor = .clear
+            webView.scrollView.backgroundColor = .clear
+            if #available(iOS 15.0, *) {
+                webView.underPageBackgroundColor = .clear
+            }
+        } else {
+            webView.isOpaque = true
+            webView.backgroundColor = .black
+            webView.scrollView.backgroundColor = .black
+            if #available(iOS 15.0, *) {
+                webView.underPageBackgroundColor = .black
+            }
+            nativePreviewHostView.isHidden = true
+            view.bringSubviewToFront(webView)
+        }
+    }
+
     private func configureNativePreviewHostView() {
         nativePreviewHostView.backgroundColor = .black
         nativePreviewHostView.clipsToBounds = true

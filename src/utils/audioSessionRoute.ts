@@ -191,6 +191,7 @@ export interface BestTakeAudioPluginType {
     audioSessionProfile?: string
   }): Promise<NativeCameraSessionDiagnostics>
   stopNativeCameraPreview(): Promise<void>
+  setNativeCameraPassthrough(options: { enabled: boolean }): Promise<void>
   stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult>
   playNativeCameraTestPostProcess(options: { url: string }): Promise<NativeCameraPostProcessPlaybackResult>
   stopNativeCameraTestPostProcess(): Promise<void>

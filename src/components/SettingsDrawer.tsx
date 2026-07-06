@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type MouseEvent } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { ChevronRight, RotateCcw, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -540,6 +541,22 @@ export default function SettingsDrawer({
                 </Pressable>
               )}
 
+            </section>
+          )}
+
+          {Capacitor.getPlatform() === 'ios' && (
+            <section className="settings-group space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+                Video Recording (Beta)
+              </h3>
+
+              <SettingToggle
+                label="Native Video Recording"
+                description="Record video with the iOS camera engine instead of the web recorder. Fixes takes where the picture freezes partway through while the audio keeps playing. Turn off if the camera preview misbehaves."
+                checked={settings.nativeCameraRecordingEnabled}
+                onChange={(checked) => onUpdate({ nativeCameraRecordingEnabled: checked })}
+                hapticFeedback={settings.hapticFeedback}
+              />
             </section>
           )}
 

@@ -3,6 +3,7 @@
  * instead of the quiet earpiece (PlayAndRecord + muted element output).
  */
 
+import { Capacitor } from '@capacitor/core'
 import {
   createAudioEnhancerChain,
   disposeAudioEnhancerChain,
@@ -36,6 +37,7 @@ import {
   maybeTrimPreLimiterBusGain,
   type LoudnessMeasurement,
 } from './speakerLoudnessNormalization'
+import { isTabletViewport } from './deviceFormFactor'
 import {
   applySpeakerLoudnessPreset,
   applyMasteringMakeupTrim,
@@ -107,6 +109,18 @@ export function getSpeakerLoudnessPreset(): SpeakerLoudnessPreset {
 function shouldUseSpeakerMastering(nodes?: TakeSpeakerNodes): boolean {
   void nodes
   return !isHeadphoneOutputActive() && speakerLoudnessPreset !== 'off'
+}
+
+function shouldAnalyzePlaybackLoudness(el: HTMLMediaElement): boolean {
+  if (
+    Capacitor.isNativePlatform() &&
+    Capacitor.getPlatform() === 'ios' &&
+    !isTabletViewport() &&
+    el instanceof HTMLVideoElement
+  ) {
+    return false
+  }
+  return true
 }
 
 function shouldUseEnhancer(_nodes: TakeSpeakerNodes): boolean {
@@ -367,6 +381,12 @@ async function applyNormalizationToElement(
   const muted = nodes.lastMuted ?? false
   applyBusGainToNodes(nodes, el, volume, muted)
   syncMasteringMakeup(nodes)
+
+  if (!shouldAnalyzePlaybackLoudness(el)) {
+    logNormalizationState(nodes, 'video-analysis-skip')
+    logGainAudit(el, 'video-analysis-skip')
+    return
+  }
 
   const measurement = await analyzeMediaLoudness(el, ctx)
   if (generation !== normalizationGeneration) return

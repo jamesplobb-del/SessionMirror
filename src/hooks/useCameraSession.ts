@@ -38,9 +38,11 @@ import {
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import {
+  startNativeCameraPreview,
   startNativeCameraRecording,
   stopNativeCameraPreview,
   stopNativeCameraRecording,
+  setNativeCameraPassthrough,
 } from '../utils/nativeCameraTest'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
@@ -54,6 +56,8 @@ interface UseCameraSessionOptions {
   onBeforeForegroundRestart?: () => void
   onAfterForegroundRestart?: () => void
   nativeExperimentalAudioEnabled?: boolean
+  /** iOS-only: record video via native AVFoundation (fixes WebKit MediaRecorder frame-drop freeze). */
+  nativeCameraRecordingEnabled?: boolean
   micInputPreference?: MicInputPreference
 }
 
@@ -245,6 +249,7 @@ export function useCameraSession({
   onBeforeForegroundRestart,
   onAfterForegroundRestart,
   nativeExperimentalAudioEnabled = false,
+  nativeCameraRecordingEnabled = false,
   micInputPreference = 'headphone',
 }: UseCameraSessionOptions) {
   const previewRef = useRef<HTMLVideoElement>(null)
@@ -276,7 +281,9 @@ export function useCameraSession({
   const micInputPreferenceRef = useRef<MicInputPreference>(micInputPreference)
   const queuedMicPreferenceRef = useRef<MicInputPreference | null>(micInputPreference)
   const nativeExperimentalRecordingRef = useRef(false)
+  const nativeCameraRecordingEnabledRef = useRef(nativeCameraRecordingEnabled)
   const nativePreviewActiveRef = useRef(false)
+  const startNativePreviewForVideoRef = useRef<(() => Promise<void>) | null>(null)
   const ensureRecordableStreamRef = useRef<(() => Promise<MediaStream | null>) | null>(null)
   const requestCameraAccessRef = useRef<((requestedMode?: RecordingMode) => void) | null>(null)
   const armedAutoAudioRef = useRef<{
@@ -297,6 +304,7 @@ export function useCameraSession({
   onBeforeForegroundRestartRef.current = onBeforeForegroundRestart
   onAfterForegroundRestartRef.current = onAfterForegroundRestart
   nativeExperimentalAudioEnabledRef.current = nativeExperimentalAudioEnabled
+  nativeCameraRecordingEnabledRef.current = nativeCameraRecordingEnabled
   micInputPreferenceRef.current = micInputPreference
   queuedMicPreferenceRef.current = micInputPreference
 
@@ -310,6 +318,7 @@ export function useCameraSession({
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('video')
   const [streamGeneration, setStreamGeneration] = useState(0)
   const [isPreviewRecovering, setIsPreviewRecovering] = useState(false)
+  const [nativePreviewActive, setNativePreviewActive] = useState(false)
 
   recordingModeRef.current = recordingMode
   isRecordingRef.current = isRecording
@@ -478,19 +487,92 @@ export function useCameraSession({
     setIsPreviewRecovering(false)
   }, [])
 
-  useEffect(() => {
+  /** True when video capture should route through the native AVFoundation engine. */
+  const usesNativeVideoCapture = useCallback(
+    (mode: RecordingMode) =>
+      mode === 'video' &&
+      nativeCameraRecordingEnabledRef.current &&
+      Capacitor.isNativePlatform() &&
+      Capacitor.getPlatform() === 'ios',
+    [],
+  )
+
+  /**
+   * Start the native camera preview for video framing. The WebView is only made
+   * transparent (passthrough) once the preview has actually started, so a native
+   * failure falls back to the WebKit getUserMedia preview instead of black-screening.
+   */
+  const startNativePreviewForVideo = useCallback(async () => {
+    if (nativePreviewActiveRef.current) {
+      // Already running — re-assert visible state (handles effect re-runs).
+      await setNativeCameraPassthrough(true)
+      setNeedsPermission(false)
+      setReady(true)
+      return
+    }
+
+    nativePreviewActiveRef.current = true
+    setNativePreviewActive(true)
+
+    // Single-camera hardware: free the WebKit getUserMedia stream first.
+    releaseLiveStream()
+
+    const result = await startNativeCameraPreview({
+      useFrontCamera: true,
+      audioSessionProfile: 'videoRecording',
+    })
+
+    if (!nativePreviewActiveRef.current) {
+      // Mode changed / unmounted while starting — undo.
+      void stopNativeCameraPreview()
+      return
+    }
+
+    if (!result) {
+      console.warn('[NativeCameraPreview] falling back to WebKit preview')
+      nativePreviewActiveRef.current = false
+      setNativePreviewActive(false)
+      void setNativeCameraPassthrough(false)
+      void ensureRecordableStreamRef.current?.()
+      return
+    }
+
+    await setNativeCameraPassthrough(true)
+    setNeedsPermission(false)
+    setReady(true)
+    void syncNativeCameraSessionState({ previewActive: true, recordingActive: false })
+  }, [releaseLiveStream])
+
+  startNativePreviewForVideoRef.current = startNativePreviewForVideo
+
+  const stopNativePreviewForVideo = useCallback(async () => {
     if (!nativePreviewActiveRef.current) return
     nativePreviewActiveRef.current = false
-    void stopNativeCameraPreview()
-    if (recordingMode === 'video') {
-      void ensureRecordableStreamRef.current?.()
+    setNativePreviewActive(false)
+    await setNativeCameraPassthrough(false)
+    await stopNativeCameraPreview()
+    void syncNativeCameraSessionState({ previewActive: false, recordingActive: false })
+  }, [])
+
+  // Tear down the native preview (and restore the opaque WebView) whenever native
+  // video capture is no longer the active path — either because the user left video
+  // mode, or turned the Native Video Recording setting off. Then re-acquire WebKit.
+  useEffect(() => {
+    if (nativePreviewActiveRef.current && !usesNativeVideoCapture(recordingMode)) {
+      void (async () => {
+        await stopNativePreviewForVideo()
+        if (recordingMode === 'video') {
+          void ensureRecordableStreamRef.current?.()
+        }
+      })()
     }
-  }, [recordingMode])
+  }, [recordingMode, nativeCameraRecordingEnabled, stopNativePreviewForVideo, usesNativeVideoCapture])
 
   useEffect(() => {
     return () => {
       if (!nativePreviewActiveRef.current) return
       nativePreviewActiveRef.current = false
+      void setNativeCameraPassthrough(false)
       void stopNativeCameraPreview()
     }
   }, [])
@@ -534,6 +616,11 @@ export function useCameraSession({
     ) => {
       const epoch = captureSessionEpochRef.current
       setError(null)
+
+      if (usesNativeVideoCapture(mode)) {
+        await startNativePreviewForVideoRef.current?.()
+        return null
+      }
 
       const existing = streamRef.current
       if (
@@ -627,6 +714,7 @@ export function useCameraSession({
       normalizeReusableVideoPreview,
       stopStreamTracks,
       syncPreviewTargets,
+      usesNativeVideoCapture,
     ],
   )
 
@@ -647,6 +735,11 @@ export function useCameraSession({
   const requestCameraAccess = useCallback((requestedMode?: RecordingMode) => {
     const mode = requestedMode ?? recordingModeRef.current
     if (isRecordingRef.current) return
+
+    if (usesNativeVideoCapture(mode)) {
+      void startNativePreviewForVideoRef.current?.()
+      return
+    }
 
     const existing = streamRef.current
     if (existing && isStreamCompatibleForMode(existing, mode)) {
@@ -735,7 +828,7 @@ export function useCameraSession({
           window.setTimeout(() => requestCameraAccessRef.current?.(queuedMode), 0)
         }
       })
-  }, [detachAllPreviewTargets, normalizeReusableVideoPreview, stopStreamTracks, syncPreviewTargets])
+  }, [detachAllPreviewTargets, normalizeReusableVideoPreview, stopStreamTracks, syncPreviewTargets, usesNativeVideoCapture])
 
   requestCameraAccessRef.current = requestCameraAccess
 
@@ -773,6 +866,13 @@ export function useCameraSession({
       cancelScheduledRelease()
 
       const mode = recordingMode
+
+      if (usesNativeVideoCapture(mode)) {
+        previousRecordingModeRef.current = mode
+        await startNativePreviewForVideoRef.current?.()
+        return
+      }
+
       if (streamRef.current && isStreamCompatibleForMode(streamRef.current, mode)) {
         previousRecordingModeRef.current = mode
         if (mode === 'video') {
@@ -875,10 +975,12 @@ export function useCameraSession({
     cancelScheduledRelease,
     forceClearCameraState,
     nativeExperimentalAudioEnabled,
+    nativeCameraRecordingEnabled,
     normalizeReusableVideoPreview,
     recordingMode,
     releaseLiveStream,
     stopStreamTracks,
+    usesNativeVideoCapture,
   ])
 
   useEffect(() => {
@@ -1223,11 +1325,10 @@ export function useCameraSession({
     }, 200)
   }
 
-  const shouldUseNativeExperimentalRecording = useCallback(() => {
-    // Native Experimental is audio-session-only for now. Keep WebKit in charge
-    // of camera preview/recording so recording does not black out the screen.
-    return false
-  }, [])
+  const shouldUseNativeExperimentalRecording = useCallback(
+    () => usesNativeVideoCapture(recordingModeRef.current),
+    [usesNativeVideoCapture],
+  )
 
   const recoverAfterNativeExperimentalFailure = useCallback(() => {
     if (shouldUseNativeExperimentalRecording()) {
@@ -1248,9 +1349,16 @@ export function useCameraSession({
       recordingOrientationRef.current = readRecordingOrientation()
       recorderMimeTypeRef.current = 'video/mp4'
 
-      releaseLiveStream()
-      if (Capacitor.isNativePlatform()) {
-        await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
+      // When the native preview is already running, its AVCaptureSession owns the
+      // camera — reuse it directly. Only do the WebKit->native camera handoff when
+      // a WebKit getUserMedia preview is still holding the device.
+      if (!nativePreviewActiveRef.current) {
+        releaseLiveStream()
+        if (Capacitor.isNativePlatform()) {
+          await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
+        }
+      } else {
+        void syncNativeCameraSessionState({ previewActive: true, recordingActive: true })
       }
 
       let result = await startNativeCameraRecording({
@@ -1316,7 +1424,13 @@ export function useCameraSession({
         captureTrackSnapshot: null,
       })
 
-      void ensureRecordableStream()
+      // Native preview keeps its AVCaptureSession running after recording stops, so
+      // framing continues seamlessly. Only re-acquire the WebKit stream otherwise.
+      if (nativePreviewActiveRef.current) {
+        void syncNativeCameraSessionState({ previewActive: true, recordingActive: false })
+      } else {
+        void ensureRecordableStream()
+      }
     })().catch((error) => {
       console.warn('[NativeExperimentalAudio] native recording stop failed', error)
       isRecordingRef.current = false
@@ -1604,6 +1718,8 @@ export function useCameraSession({
     releaseLiveStream()
     if (nativePreviewActiveRef.current) {
       nativePreviewActiveRef.current = false
+      setNativePreviewActive(false)
+      void setNativeCameraPassthrough(false)
       void stopNativeCameraPreview()
     }
     void syncNativeCameraSessionState({
@@ -2064,5 +2180,6 @@ export function useCameraSession({
     suspendMicForPlayback,
     resumeMicAfterPlayback,
     isPreviewRecovering,
+    nativePreviewActive,
   }
 }

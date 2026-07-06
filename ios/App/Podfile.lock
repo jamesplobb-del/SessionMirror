@@ -1,5 +1,5 @@
 PODS:
-  - Capacitor (7.6.6):
+  - Capacitor (7.6.7):
     - CapacitorCordova
   - CapacitorApp (7.1.2):
     - Capacitor
@@ -12,7 +12,7 @@ PODS:
     - Capacitor
     - SQLCipher
     - ZIPFoundation
-  - CapacitorCordova (7.6.6)
+  - CapacitorCordova (7.6.7)
   - CapacitorFilesystem (7.1.8):
     - Capacitor
     - IONFilesystemLib (~> 1.1.1)
@@ -85,12 +85,12 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/status-bar"
 
 SPEC CHECKSUMS:
-  Capacitor: 961efd309ab0e390a8081b63c561186f61a6714d
+  Capacitor: 8ef25ba872436d2c5ac2a4791f7255529bdcd93b
   CapacitorApp: f01a913211780e0718dae9750442c3e23f96e106
   CapacitorCommunityKeepAwake: 05c75aab989f60e621870cf03b24a144a5544c30
   CapacitorCommunityMedia: d1538b56a3303298e7cf45a18b11e624fbcbdc8e
   CapacitorCommunitySqlite: 4813d82ad33001e612a39d313cb5d28066cbafda
-  CapacitorCordova: 3a4e0027a89a59421c918d19aee9d6ba1c7a3556
+  CapacitorCordova: 139e2ed3d91c54b5aeae7941135c9f9aefc6da1d
   CapacitorFilesystem: c63fc54df41e5a6761785a7f3c49dc696c22e296
   CapacitorHaptics: 1b145fa83c622e5383a3bac04ea81e2514f0b0f5
   CapacitorScreenOrientation: a128ea5394d31a12d77f7f6bcb497010945ecda8
@@ -102,6 +102,6 @@ SPEC CHECKSUMS:
   SQLCipher: eb79c64049cb002b4e9fcb30edb7979bf4706dfc
   ZIPFoundation: dfd3d681c4053ff7e2f7350bc4e53b5dba3f5351
 
-PODFILE CHECKSUM: 87c4954458d1bc9edfcf5fe161f9591349d508ef
+PODFILE CHECKSUM: 8fae048313dbb32c369ced46084fbf024d563cfa
 
 COCOAPODS: 1.16.2
