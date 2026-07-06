@@ -1,3 +1,6 @@
+/* ─────────────────────────────────────────────
+   Setup / Gameover screens
+───────────────────────────────────────────── */
 .sj-screen {
   display: flex;
   flex: 1 1 auto;
@@ -18,6 +21,9 @@
   max-height: 100%;
 }
 
+/* ─────────────────────────────────────────────
+   Playing screen wrapper
+───────────────────────────────────────────── */
 .sj-screen--playing {
   overflow: hidden;
   padding: 0;
@@ -33,6 +39,9 @@
   overflow: hidden;
 }
 
+/* ─────────────────────────────────────────────
+   Staff world (scrolls horizontally, scaled)
+───────────────────────────────────────────── */
 .sj-staff-viewport {
   position: absolute;
   inset: 0;
@@ -43,19 +52,19 @@
   position: absolute;
   top: 0;
   left: 0;
+  /* Smooth horizontal scroll — CSS transition only on translateX */
   transition: transform 0.5s cubic-bezier(0.25, 0.9, 0.35, 1);
   will-change: transform;
 }
 
+/* Soft white band behind the 5 lines */
 .sj-staff-band {
   position: absolute;
   left: 0;
   background: #fff;
   border-top: 1px solid #e7e5e4;
   border-bottom: 1px solid #e7e5e4;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.95) inset,
-    0 10px 32px rgba(23, 26, 34, 0.05);
+  box-shadow: 0 12px 40px rgba(23, 26, 34, 0.04);
   pointer-events: none;
 }
 
@@ -68,143 +77,154 @@
 .sj-staff-line {
   position: absolute;
   left: 0;
-  height: 1.5px;
+  height: 2px;
   background: #1c1917;
 }
 
+/* ─────────────────────────────────────────────
+   Treble clef
+───────────────────────────────────────────── */
 .sj-treble-clef {
   position: absolute;
-  transform: translateY(-54%);
-  font-size: 5.75rem;
+  /* Sized via inline fontSize (world px). Curl centered on G4. */
+  transform: translateY(-42%);
   line-height: 1;
   color: #1c1917;
   pointer-events: none;
   user-select: none;
 }
 
+/* ─────────────────────────────────────────────
+   Key signature
+───────────────────────────────────────────── */
 .sj-key-signature {
   position: absolute;
   top: 0;
-  height: 100%;
   pointer-events: none;
 }
 
 .sj-key-signature__symbol {
   position: absolute;
   transform: translate(-50%, -50%);
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: #1c1917;
   line-height: 1;
 }
 
+/* ─────────────────────────────────────────────
+   Noteheads container
+───────────────────────────────────────────── */
 .sj-noteheads {
   position: absolute;
   inset: 0;
 }
 
+/* ─────────────────────────────────────────────
+   Individual note
+
+   .sj-note is a ZERO-SIZE anchor placed at the
+   exact notehead center (world px).
+   Every child is positioned absolutely relative
+   to (0, 0) = notehead center.
+
+   This guarantees:
+   • Ledger line passes through the center.
+   • Notehead is centered on the note Y.
+   • Label appears below the head.
+───────────────────────────────────────────── */
 .sj-note {
   position: absolute;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transition: opacity 0.35s ease;
-  z-index: 2;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  /* No transform needed — positioned with left/top at the note center */
 }
 
+/* ── Notehead oval ──────────────────────────
+   Centered at (0,0) using transform.
+   Width / height are set inline from world-px constants.
+*/
+.sj-note__head {
+  position: absolute;
+  /* translate(-50%, -50%) centers the oval on the note Y */
+  transform: translate(-50%, -50%) rotate(-15deg);
+  border-radius: 50%;
+  background: #1c1917;
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(23, 26, 34, 0.10);
+}
+
+/* ── Ledger line ────────────────────────────
+   MUST pass through the notehead center.
+   translate(-50%, -50%) centers the 2px rule on (0,0).
+   Width is set inline.
+*/
 .sj-note__ledger {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 44px;
-  height: 1.5px;
+  height: 2px;
   background: #1c1917;
   transform: translate(-50%, -50%);
-  z-index: 0;
+  top: 0;
+  left: 0;
+  z-index: 1;
 }
 
+/* ── Accidental ─────────────────────────────*/
 .sj-note__accidental {
   position: absolute;
-  right: calc(100% + 4px);
-  top: 50%;
+  left: -34px;
   transform: translateY(-50%);
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   font-weight: 600;
   color: #1c1917;
   line-height: 1;
+  z-index: 3;
 }
 
-.sj-note__glyph {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-}
-
-.sj-note__head {
-  position: relative;
-  z-index: 2;
-  width: 1.55rem;
-  border-radius: 50%;
-  background: #1c1917;
-  transform: rotate(-14deg);
-  box-shadow: 0 1px 2px rgba(23, 26, 34, 0.12);
-}
-
-.sj-note--space .sj-note__head {
-  height: 26px;
-}
-
-.sj-note--line .sj-note__head,
-.sj-note--ledger .sj-note__head {
-  height: 20px;
-}
-
-.sj-note__stem {
+/* ── Note name label ─────────────────────── */
+.sj-note__label {
   position: absolute;
-  z-index: 1;
-  width: 1.5px;
-  height: 2.35rem;
-  border-radius: 1px;
+  top: 28px;        /* just below the notehead bottom edge: NOTEHEAD_H/2 + gap */
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #57534e;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+.sj-note--target .sj-note__label {
+  color: #b45309;
+}
+
+/* ── Note state modifiers ─────────────────── */
+
+/* Future notes: muted */
+.sj-note--future .sj-note__head {
+  background: #a8a29e;
+}
+
+/* Landed note: same dark as target */
+.sj-note--landed .sj-note__head {
   background: #1c1917;
 }
 
-.sj-note__glyph--stem-down .sj-note__stem {
-  top: 0.42rem;
-  right: 0.12rem;
-}
-
-.sj-note__glyph--stem-up .sj-note__stem {
-  bottom: 0.42rem;
-  left: 0.12rem;
-}
-
+/* Target: golden glow */
 .sj-note--target .sj-note__head {
   box-shadow:
     0 0 0 3px rgba(217, 119, 6, 0.28),
-    0 0 20px rgba(217, 119, 6, 0.35);
+    0 0 20px rgba(217, 119, 6, 0.38);
   animation: sj-note-glow 1.4s ease-in-out infinite;
 }
 
-.sj-note--future .sj-note__head,
-.sj-note--future .sj-note__stem {
-  background: #78716c;
-}
-
-.sj-note__label {
-  margin-top: 0.45rem;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: #57534e;
-}
-
+/* Wrong note: shake */
 .sj-note--shake {
-  animation: sj-note-shake 0.42s ease;
+  animation: sj-note-shake 0.40s ease;
 }
 
+/* Cracking note (last miss before fall) */
 .sj-note--crack .sj-note__head {
   background: linear-gradient(145deg, #fecaca 0%, #ef4444 55%, #b91c1c 100%);
   box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.3);
@@ -218,30 +238,29 @@
   background: linear-gradient(
     125deg,
     transparent 42%,
-    rgba(0, 0, 0, 0.35) 44%,
+    rgba(0, 0, 0, 0.38) 44%,
     transparent 46%,
     transparent 58%,
-    rgba(0, 0, 0, 0.35) 60%,
+    rgba(0, 0, 0, 0.38) 60%,
     transparent 62%
   );
 }
-
-.sj-note--crack .sj-note__stem {
-  background: #b91c1c;
-}
-
+/* ─────────────────────────────────────────────
+   Trumpet player character
+   Positioned in SCREEN pixels (not world coords).
+───────────────────────────────────────────── */
 .sj-player {
   position: absolute;
   z-index: 6;
-  width: 2.75rem;
-  height: 3.25rem;
+  width: 2.8rem;
+  height: 3.3rem;
   object-fit: contain;
   object-position: bottom center;
   transform: translateX(-50%);
-  filter: drop-shadow(0 3px 8px rgba(23, 26, 34, 0.18));
+  filter: drop-shadow(0 3px 8px rgba(23, 26, 34, 0.20));
   transition:
     left 0.5s cubic-bezier(0.25, 0.9, 0.35, 1),
-    top 0.5s cubic-bezier(0.25, 0.9, 0.35, 1);
+    top  0.5s cubic-bezier(0.25, 0.9, 0.35, 1);
   pointer-events: none;
   user-select: none;
 }
@@ -258,6 +277,9 @@
   animation: sj-player-fall 1.1s cubic-bezier(0.55, 0, 1, 0.45) forwards;
 }
 
+/* ─────────────────────────────────────────────
+   HUD
+───────────────────────────────────────────── */
 .sj-hud {
   position: absolute;
   inset: 0;
@@ -272,9 +294,7 @@
     max(0.65rem, env(safe-area-inset-left, 0px));
 }
 
-.sj-hud > * {
-  pointer-events: auto;
-}
+.sj-hud > * { pointer-events: auto; }
 
 .sj-hud-top {
   display: flex;
@@ -283,19 +303,10 @@
   gap: 0.5rem;
 }
 
-.sj-hud-hearts {
-  display: flex;
-  gap: 0.2rem;
-  font-size: 1.05rem;
-}
+.sj-hud-hearts { display: flex; gap: 0.2rem; font-size: 1.05rem; }
 
-.sj-hud-heart--full {
-  color: #ef4444;
-}
-
-.sj-hud-heart--empty {
-  color: #d6d3d1;
-}
+.sj-hud-heart--full  { color: #ef4444; }
+.sj-hud-heart--empty { color: #d6d3d1; }
 
 .sj-hud-pause {
   display: flex;
@@ -305,7 +316,7 @@
   height: 2.1rem;
   border-radius: 9999px;
   border: 1px solid rgba(231, 229, 228, 0.95);
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.85);
   color: #57534e;
   box-shadow: 0 2px 8px rgba(23, 26, 34, 0.06);
 }
@@ -315,22 +326,22 @@
   gap: 0.45rem;
   margin-top: 0.45rem;
   flex-wrap: wrap;
-  max-width: 70%;
+  max-width: 68%;
 }
 
 .sj-hud-panel {
   flex: 0 1 auto;
-  min-width: 4rem;
+  min-width: 3.8rem;
   border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.78);
-  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.80);
+  padding: 0.32rem 0.5rem;
   box-shadow: 0 2px 10px rgba(23, 26, 34, 0.06);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(16px);
 }
 
 .sj-hud-panel__label {
-  font-size: 0.58rem;
+  font-size: 0.56rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -338,34 +349,28 @@
 }
 
 .sj-hud-panel__value {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #1c1917;
 }
 
-.sj-hud-panel--target .sj-hud-panel__value {
-  color: #b45309;
-}
-
-.sj-hud-panel--detected .sj-hud-panel__value {
-  color: #0369a1;
-}
-
-.sj-hud-panel--match .sj-hud-panel__value {
-  color: #15803d;
-}
+.sj-hud-panel--target   .sj-hud-panel__value { color: #b45309; }
+.sj-hud-panel--detected .sj-hud-panel__value { color: #0369a1; }
+.sj-hud-panel--match    .sj-hud-panel__value { color: #15803d; }
 
 .sj-hud-bottom {
   margin-top: auto;
   display: flex;
   gap: 0.45rem;
-  max-width: 72%;
+  max-width: 70%;
 }
 
+/* ─────────────────────────────────────────────
+   Keyframe animations
+───────────────────────────────────────────── */
 @keyframes sj-note-glow {
-  0%,
-  100% {
+  0%, 100% {
     box-shadow:
       0 0 0 3px rgba(217, 119, 6, 0.22),
       0 0 16px rgba(217, 119, 6, 0.28);
@@ -373,55 +378,29 @@
   50% {
     box-shadow:
       0 0 0 4px rgba(217, 119, 6, 0.38),
-      0 0 24px rgba(217, 119, 6, 0.42);
+      0 0 26px rgba(217, 119, 6, 0.44);
   }
 }
 
 @keyframes sj-note-shake {
-  0%,
-  100% {
-    transform: translate(-50%, -50%);
-  }
-  25% {
-    transform: translate(calc(-50% - 3px), -50%);
-  }
-  75% {
-    transform: translate(calc(-50% + 3px), -50%);
-  }
+  0%, 100% { transform: translate(0, 0); }
+  25%       { transform: translate(-3px, 0); }
+  75%       { transform: translate( 3px, 0); }
 }
 
 @keyframes sj-player-hop {
-  0% {
-    transform: translateX(-50%) translateY(0);
-  }
-  45% {
-    transform: translateX(-50%) translateY(-14px);
-  }
-  100% {
-    transform: translateX(-50%) translateY(0);
-  }
+  0%   { transform: translateX(-50%) translateY(0); }
+  45%  { transform: translateX(-50%) translateY(-14px); }
+  100% { transform: translateX(-50%) translateY(0); }
 }
 
 @keyframes sj-player-stumble {
-  0%,
-  100% {
-    transform: translateX(-50%) rotate(0deg);
-  }
-  30% {
-    transform: translateX(calc(-50% - 4px)) rotate(-6deg);
-  }
-  70% {
-    transform: translateX(calc(-50% + 3px)) rotate(4deg);
-  }
+  0%, 100% { transform: translateX(-50%) rotate(0deg); }
+  30%       { transform: translateX(calc(-50% - 4px)) rotate(-6deg); }
+  70%       { transform: translateX(calc(-50% + 3px)) rotate( 4deg); }
 }
 
 @keyframes sj-player-fall {
-  0% {
-    transform: translateX(-50%) translateY(0) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-50%) translateY(120vh) rotate(18deg);
-    opacity: 0.2;
-  }
+  0%   { transform: translateX(-50%) translateY(0)     rotate(0deg);  opacity: 1;   }
+  100% { transform: translateX(-50%) translateY(120vh) rotate(18deg); opacity: 0.2; }
 }
