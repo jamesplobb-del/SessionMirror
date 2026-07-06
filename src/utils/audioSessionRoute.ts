@@ -185,10 +185,18 @@ export interface BestTakeAudioPluginType {
   startNativeCameraRecording(options?: {
     useFrontCamera?: boolean
     audioSessionProfile?: string
+    micInputPreference?: MicInputPreference
   }): Promise<NativeCameraRecordingStartResult>
+  startNativeCameraBridge(options?: {
+    useFrontCamera?: boolean
+    audioSessionProfile?: string
+    micInputPreference?: MicInputPreference
+  }): Promise<NativeCameraSessionDiagnostics>
+  stopNativeCameraBridge(): Promise<void>
   startNativeCameraPreview(options?: {
     useFrontCamera?: boolean
     audioSessionProfile?: string
+    micInputPreference?: MicInputPreference
   }): Promise<NativeCameraSessionDiagnostics>
   stopNativeCameraPreview(): Promise<void>
   setNativeCameraPassthrough(options: { enabled: boolean }): Promise<void>
@@ -202,6 +210,10 @@ export interface BestTakeAudioPluginType {
   addListener(
     eventName: 'playbackRouteEnded',
     listenerFunc: () => void,
+  ): Promise<PluginListenerHandle>
+  addListener(
+    eventName: 'nativeCameraPreviewFrame',
+    listenerFunc: (data: { jpegBase64?: string; dataUrl?: string; width?: number; height?: number }) => void,
   ): Promise<PluginListenerHandle>
 }
 

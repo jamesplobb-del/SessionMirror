@@ -1,17 +1,30 @@
 import AVFoundation
+import CoreMedia
 import Foundation
 import UIKit
 
 /// Debug-only AVCaptureSession recorder — bypasses WKWebView getUserMedia.
-final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingDelegate {
+final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     static let shared = NativeCameraRecordingEngine()
 
     private let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "SessionMirror.NativeCameraRecording")
+    private let frameBridgeQueue = DispatchQueue(label: "SessionMirror.NativeCameraFrameBridge")
+    private let frameEncodeQueue = DispatchQueue(label: "SessionMirror.NativeCameraFrameEncode", qos: .userInitiated)
     private var movieOutput: AVCaptureMovieFileOutput?
+    private var videoDataOutput: AVCaptureVideoDataOutput?
     private var isSessionConfigured = false
     private var isRecording = false
     private var isStarting = false
+    private var isFrameBridgeActive = false
+    private var lastBridgeFrameTime: CFTimeInterval = 0
+    private var pendingBridgeSample: CMSampleBuffer?
+    private var isBridgeEncoding = false
+    private let bridgeFramesPerSecond: Double = 60
+    private let bridgeMaxPixelDimension: CGFloat = 1080
+    private let bridgeJpegQuality: CGFloat = 0.75
+    private lazy var ciContext = CIContext(options: [.useSoftwareRenderer: false])
+    private lazy var bridgeColorSpace = CGColorSpaceCreateDeviceRGB()
     private var outputURL: URL?
     private var startCompletion: ((Result<[String: Any], Error>) -> Void)?
     private var pendingStartResult: [String: Any]?
@@ -19,10 +32,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var recordedVideoWidth: Int = 0
     private var recordedVideoHeight: Int = 0
     private var activeAudioProfile: NativeCameraAudioSessionProfile = .videoRecording
+    private var activeMicInputPreference: AudioRouteConfigurator.MicInputPreference = .auto
     private weak var previewContainer: UIView?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var isPreviewActive = false
+    private var isBridgePreviewActive = false
     private var previewUsesFrontCamera = true
+
+    /// Delivers JPEG base64 (no data-URL prefix) to the Capacitor plugin for canvas preview in the WebView.
+    var onPreviewFrame: ((_ jpegBase64: String, _ width: Int, _ height: Int) -> Void)?
 
     private override init() {
         super.init()
@@ -35,9 +53,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         return takesDir
     }
 
-    private func configureAudioSessionForRecording(profile: NativeCameraAudioSessionProfile) throws {
+    private func configureAudioSessionForRecording(
+        profile: NativeCameraAudioSessionProfile,
+        micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto
+    ) throws {
         activeAudioProfile = profile
+        activeMicInputPreference = micInputPreference
         try profile.apply(to: AVAudioSession.sharedInstance())
+        _ = try AudioRouteConfigurator.applyMicInputPreference(micInputPreference)
         _ = NativeCameraTestAudio.sessionDiagnostics(profile: profile)
     }
 
@@ -92,10 +115,71 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
+    var requiresActiveAudioSession: Bool {
+        session.isRunning && (isBridgePreviewActive || isPreviewActive || isRecording || isStarting)
+    }
+
+    func startBridgePreview(
+        useFrontCamera: Bool,
+        audioSessionProfile: NativeCameraAudioSessionProfile,
+        micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        requestCaptureAccess { [weak self] accessResult in
+            guard let self = self else { return }
+            switch accessResult {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success:
+                self.sessionQueue.async {
+                    do {
+                        try self.configureAudioSessionForRecording(
+                            profile: audioSessionProfile,
+                            micInputPreference: micInputPreference
+                        )
+                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera {
+                            let configuredOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
+                            self.movieOutput = configuredOutput
+                            self.isSessionConfigured = true
+                        }
+                        self.previewUsesFrontCamera = useFrontCamera
+                        if !self.session.isRunning {
+                            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startBridgePreview startRunning.begin")
+                            self.session.startRunning()
+                            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startBridgePreview startRunning.end")
+                        }
+                        self.resetVideoZoomIfNeeded(useFrontCamera: useFrontCamera)
+                        self.enableFrameBridge()
+                        self.isBridgePreviewActive = true
+                        self.isPreviewActive = false
+                        CameraSessionGuard.setPreviewActive(true)
+                        let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
+                        DispatchQueue.main.async {
+                            completion(.success(sessionInfo))
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            completion(.failure(error))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func stopBridgePreview() {
+        isBridgePreviewActive = false
+        if !isRecording && !isPreviewActive {
+            CameraSessionGuard.setPreviewActive(false)
+        }
+        stopPreview()
+    }
+
     func startPreview(
         in container: UIView,
         useFrontCamera: Bool,
         audioSessionProfile: NativeCameraAudioSessionProfile,
+        micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto,
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) {
         requestCaptureAccess { [weak self, weak container] accessResult in
@@ -106,7 +190,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             case .success:
                 self.sessionQueue.async {
                     do {
-                        try self.configureAudioSessionForRecording(profile: audioSessionProfile)
+                        try self.configureAudioSessionForRecording(
+                            profile: audioSessionProfile,
+                            micInputPreference: micInputPreference
+                        )
                         if !self.isSessionConfigured {
                             self.movieOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
                             self.isSessionConfigured = true
@@ -119,10 +206,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                         }
                         self.resetVideoZoomIfNeeded(useFrontCamera: useFrontCamera)
                         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
-                        DispatchQueue.main.async {
+                        // Let the capture pipeline deliver frames before exposing preview.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                            guard let self = self else { return }
                             if let container = container {
                                 self.attachPreviewLayer(to: container)
                                 self.isPreviewActive = true
+                                self.isBridgePreviewActive = false
+                                self.layoutPreview(in: container)
                             }
                             completion(.success(sessionInfo))
                         }
@@ -137,6 +228,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     }
 
     func stopPreview() {
+        disableFrameBridge()
+        isBridgePreviewActive = false
         DispatchQueue.main.async {
             self.previewLayer?.removeFromSuperlayer()
             self.previewLayer = nil
@@ -186,7 +279,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     private func attachPreviewLayer(to container: UIView) {
         previewContainer = container
-        let layer = previewLayer ?? AVCaptureVideoPreviewLayer(session: session)
+        let layer: AVCaptureVideoPreviewLayer
+        if let existing = previewLayer {
+            layer = existing
+            existing.session = session
+        } else {
+            layer = AVCaptureVideoPreviewLayer(session: session)
+            previewLayer = layer
+        }
         layer.videoGravity = .resizeAspectFill
         layer.frame = container.bounds
         if let connection = layer.connection {
@@ -199,12 +299,20 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             layer.removeFromSuperlayer()
             container.layer.insertSublayer(layer, at: 0)
         }
-        previewLayer = layer
+    }
+
+    private func refreshPreviewOnMainIfNeeded() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let container = self.previewContainer else { return }
+            self.attachPreviewLayer(to: container)
+            self.layoutPreview(in: container)
+        }
     }
 
     func start(
         useFrontCamera: Bool,
         audioSessionProfile: NativeCameraAudioSessionProfile,
+        micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto,
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) {
         requestCaptureAccess { [weak self] accessResult in
@@ -218,6 +326,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                         let result = try self.startOnSessionQueue(
                             useFrontCamera: useFrontCamera,
                             audioSessionProfile: audioSessionProfile,
+                            micInputPreference: micInputPreference,
                             completion: completion
                         )
                         print("[NativeCameraTest] start requested")
@@ -253,6 +362,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         movieOutput = nil
+        videoDataOutput = nil
         isSessionConfigured = false
 
         session.sessionPreset = .high
@@ -322,6 +432,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         session.addOutput(movieOutput)
         AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addMovieOutput.end")
 
+        if let audioConnection = movieOutput.connection(with: .audio) {
+            audioConnection.isEnabled = true
+        }
+
         if let connection = movieOutput.connection(with: .video) {
             if cameraPosition == .front {
                 applyFrontCameraMirroring(to: connection)
@@ -338,12 +452,94 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         recordedVideoWidth = Int(dimensions.width)
         recordedVideoHeight = Int(dimensions.height)
 
+        let videoDataOutput = AVCaptureVideoDataOutput()
+        videoDataOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+        ]
+        videoDataOutput.alwaysDiscardsLateVideoFrames = true
+        videoDataOutput.setSampleBufferDelegate(self, queue: frameBridgeQueue)
+        guard session.canAddOutput(videoDataOutput) else {
+            throw NSError(
+                domain: "NativeCameraTest",
+                code: 12,
+                userInfo: [NSLocalizedDescriptionKey: "Cannot add video data output"]
+            )
+        }
+        session.addOutput(videoDataOutput)
+        self.videoDataOutput = videoDataOutput
+
+        if let connection = videoDataOutput.connection(with: .video) {
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = .portrait
+            }
+            if connection.isVideoMirroringSupported {
+                connection.automaticallyAdjustsVideoMirroring = false
+                connection.isVideoMirrored = false
+            }
+        }
+
         return movieOutput
+    }
+
+    func enableFrameBridge() {
+        frameBridgeQueue.async {
+            self.isFrameBridgeActive = true
+            self.lastBridgeFrameTime = 0
+        }
+    }
+
+    func disableFrameBridge() {
+        frameBridgeQueue.async {
+            self.isFrameBridgeActive = false
+            self.pendingBridgeSample = nil
+            self.isBridgeEncoding = false
+        }
+    }
+
+    private func jpegPayload(from sampleBuffer: CMSampleBuffer, mirrored: Bool) -> (String, Int, Int)? {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
+
+        var ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        if mirrored {
+            ciImage = ciImage.transformed(by: CGAffineTransform(scaleX: -1, y: 1))
+                .transformed(by: CGAffineTransform(translationX: ciImage.extent.width, y: 0))
+        }
+
+        let extent = ciImage.extent
+        let sourceWidth = extent.width
+        let sourceHeight = extent.height
+        guard sourceWidth > 0, sourceHeight > 0 else { return nil }
+
+        let maxDim = max(sourceWidth, sourceHeight)
+        let scale = min(1, bridgeMaxPixelDimension / maxDim)
+        let outputWidth = Int(sourceWidth * scale)
+        let outputHeight = Int(sourceHeight * scale)
+
+        let scaledImage: CIImage
+        if scale < 1 {
+            scaledImage = ciImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        } else {
+            scaledImage = ciImage
+        }
+
+        let options: [CIImageRepresentationOption: Any] = [
+            .init(rawValue: kCGImageDestinationLossyCompressionQuality as String): bridgeJpegQuality,
+        ]
+        guard let jpeg = ciContext.jpegRepresentation(
+            of: scaledImage,
+            colorSpace: bridgeColorSpace,
+            options: options
+        ) else {
+            return nil
+        }
+
+        return (jpeg.base64EncodedString(), outputWidth, outputHeight)
     }
 
     private func startOnSessionQueue(
         useFrontCamera: Bool,
         audioSessionProfile: NativeCameraAudioSessionProfile,
+        micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto,
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) throws -> [String: Any] {
         if isRecording || isStarting {
@@ -362,7 +558,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         if !(isPreviewActive && session.isRunning && isSessionConfigured) {
-            try configureAudioSessionForRecording(profile: audioSessionProfile)
+            try configureAudioSessionForRecording(
+                profile: audioSessionProfile,
+                micInputPreference: micInputPreference
+            )
         }
 
         if !isSessionConfigured || movieOutput == nil || (isPreviewActive && previewUsesFrontCamera != useFrontCamera) {
@@ -377,6 +576,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             session.startRunning()
             AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startOnSessionQueue startRunning.end")
         }
+
+        enableFrameBridge()
+        previewUsesFrontCamera = useFrontCamera
 
         let takesDir = try takesDirectoryURL()
         let timestamp = Int(Date().timeIntervalSince1970 * 1000)
@@ -413,6 +615,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         startCompletion = completion
         pendingStartResult = result
         activeMovieOutput.startRecording(to: fileURL, recordingDelegate: self)
+        refreshPreviewOnMainIfNeeded()
 
         return result
     }
@@ -472,6 +675,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 if let result = result {
                     completion?(.success(result))
                 }
+                self.refreshPreviewOnMainIfNeeded()
             }
         }
     }
@@ -487,11 +691,16 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             self.isRecording = false
             self.isStarting = false
+            if self.isBridgePreviewActive {
+                self.enableFrameBridge()
+            } else {
+                self.disableFrameBridge()
+            }
             let startCompletion = self.startCompletion
             self.startCompletion = nil
             self.pendingStartResult = nil
 
-            if self.session.isRunning && !self.isPreviewActive {
+            if self.session.isRunning && !self.isPreviewActive && !self.isBridgePreviewActive {
                 AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.didFinishRecording stopRunning.begin")
                 self.session.stopRunning()
                 AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.didFinishRecording stopRunning.end")
@@ -575,5 +784,53 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         return result
+    }
+}
+
+extension NativeCameraRecordingEngine {
+    private func copySampleBuffer(_ sampleBuffer: CMSampleBuffer) -> CMSampleBuffer? {
+        var copied: CMSampleBuffer?
+        let status = CMSampleBufferCreateCopy(allocator: kCFAllocatorDefault, sampleBuffer: sampleBuffer, sampleBufferOut: &copied)
+        guard status == noErr else { return nil }
+        return copied
+    }
+
+    private func drainBridgeFrames() {
+        guard isFrameBridgeActive, !isBridgeEncoding, let sample = pendingBridgeSample else { return }
+
+        let now = CACurrentMediaTime()
+        guard now - lastBridgeFrameTime >= (1.0 / bridgeFramesPerSecond) else { return }
+
+        lastBridgeFrameTime = now
+        pendingBridgeSample = nil
+        isBridgeEncoding = true
+
+        frameEncodeQueue.async { [weak self] in
+            guard let self = self else { return }
+            let payload = self.jpegPayload(from: sample, mirrored: false)
+            let handler = self.onPreviewFrame
+
+            DispatchQueue.main.async {
+                if self.isFrameBridgeActive, let payload = payload {
+                    handler?(payload.0, payload.1, payload.2)
+                }
+                self.isBridgeEncoding = false
+                self.frameBridgeQueue.async {
+                    self.drainBridgeFrames()
+                }
+            }
+        }
+    }
+
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        guard isFrameBridgeActive else { return }
+        guard let copiedBuffer = copySampleBuffer(sampleBuffer) else { return }
+
+        pendingBridgeSample = copiedBuffer
+        drainBridgeFrames()
     }
 }

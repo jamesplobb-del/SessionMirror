@@ -26,6 +26,8 @@ class PortraitBridgeViewController: CAPBridgeViewController {
 
     override open func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .black
+        view.isOpaque = true
         configureWebViewForNativePreview()
     }
 
@@ -44,23 +46,40 @@ class PortraitBridgeViewController: CAPBridgeViewController {
         guard let webView = self.webView else { return }
 
         if enabled {
+            view.backgroundColor = .black
             _ = nativeCameraPreviewContainer
             nativePreviewHostView.isHidden = false
-            webView.isOpaque = false
-            webView.backgroundColor = .clear
-            webView.scrollView.backgroundColor = .clear
-            if #available(iOS 15.0, *) {
-                webView.underPageBackgroundColor = .clear
-            }
+            nativePreviewHostView.backgroundColor = .black
+            nativePreviewHostView.layoutIfNeeded()
+            NativeCameraRecordingEngine.shared.layoutPreview(in: nativePreviewHostView)
+            clearWebViewForPassthrough(webView)
+            view.bringSubviewToFront(webView)
         } else {
             webView.isOpaque = true
             webView.backgroundColor = .black
+            webView.layer.backgroundColor = UIColor.black.cgColor
+            webView.scrollView.isOpaque = true
             webView.scrollView.backgroundColor = .black
+            webView.scrollView.layer.backgroundColor = UIColor.black.cgColor
             if #available(iOS 15.0, *) {
                 webView.underPageBackgroundColor = .black
             }
             nativePreviewHostView.isHidden = true
             view.bringSubviewToFront(webView)
+        }
+    }
+
+    /// WKWebView scroll-view backgrounds default to white and block the native preview.
+    /// Only clear the web view chrome — do not recurse into content subviews or the HUD disappears.
+    private func clearWebViewForPassthrough(_ webView: WKWebView) {
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.layer.backgroundColor = UIColor.clear.cgColor
+        webView.scrollView.isOpaque = false
+        webView.scrollView.backgroundColor = .clear
+        webView.scrollView.layer.backgroundColor = UIColor.clear.cgColor
+        if #available(iOS 15.0, *) {
+            webView.underPageBackgroundColor = .clear
         }
     }
 

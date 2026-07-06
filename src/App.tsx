@@ -1151,11 +1151,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         audioAnalysisSource = playbackUrl
       }
 
-      const captureDiagnostics = await buildRecordingCaptureDiagnostics(
-        captureProfile ?? 'natural',
-        captureTrackSnapshot ?? null,
-        audioAnalysisSource
-      )
+      const captureDiagnostics =
+        payload.captureDiagnostics ??
+        (await buildRecordingCaptureDiagnostics(
+          captureProfile ?? 'natural',
+          captureTrackSnapshot ?? null,
+          audioAnalysisSource
+        ))
       logRecordingCaptureDiagnostics(takeId, captureDiagnostics)
 
       if (captureDiagnostics.playbackGainMetadata) {
@@ -1260,7 +1262,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     suspendMicForPlayback,
     resumeMicAfterPlayback,
     isPreviewRecovering,
-    nativePreviewActive,
+    nativeLivePreviewActive,
+    nativeLivePreviewSeedUrl,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     secondaryPreviewRef: splitPreviewRef,
@@ -1292,32 +1295,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
     if (isPlaybackRouteHoldActive()) return
     if (isRecording) return
+    if (nativeLivePreviewActive && recordingMode === 'video') {
+      lastMicPreferenceRouteRef.current = settings.micInputPreference
+      return
+    }
     lastMicPreferenceRouteRef.current = settings.micInputPreference
     void reacquireStreamForAudioRoute()
-  }, [isRecording, reacquireStreamForAudioRoute, ready, settings.micInputPreference])
+  }, [isRecording, nativeLivePreviewActive, recordingMode, reacquireStreamForAudioRoute, ready, settings.micInputPreference])
 
   useEffect(() => {
     if (isPlaybackRouteHoldActive()) return
     void syncNativeCameraSessionState({
-      previewActive: ready && recordingMode === 'video',
+      previewActive:
+        (ready && recordingMode === 'video') || nativeLivePreviewActive,
       recordingActive: isRecording,
     })
-  }, [isRecording, ready, recordingMode])
+  }, [isRecording, nativeLivePreviewActive, ready, recordingMode])
 
-  // Make the web shell transparent only while the native camera preview is live, so
-  // the AVCaptureVideoPreviewLayer behind the WebView shows through. Never global —
-  // scoped to this flag so no other screen can leak the camera behind it.
-  useEffect(() => {
-    const root = document.documentElement
-    if (nativePreviewActive) {
-      root.classList.add('native-camera-passthrough')
-    } else {
-      root.classList.remove('native-camera-passthrough')
-    }
-    return () => {
-      root.classList.remove('native-camera-passthrough')
-    }
-  }, [nativePreviewActive])
+  // Native live preview uses canvas frame bridge — WebView stays opaque (no passthrough).
 
   useEffect(() => {
     let firstTimer: number | null = null
@@ -2226,14 +2221,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [selectedAudioEngine])
 
   useEffect(() => {
-    document.documentElement.classList.remove('native-camera-preview-active')
-    return () => {
-      document.documentElement.classList.remove('native-camera-preview-active')
-    }
-  }, [])
-
-  useEffect(() => {
-    if (ready && recordingMode === 'video' && !takePlaybackActive) return
     void applyNativeExperimentalAudioMode({
       enabled: true,
       selectedAudioEngine,
@@ -3039,7 +3026,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   (recordingMode === 'audio' && audioPracticeTab === 'audio')
                 }
                 visuallySuppressed={isSplitView}
-                nativePreviewActive={nativePreviewActive}
+                nativeLivePreviewActive={nativeLivePreviewActive}
+                nativeCameraBridgeEnabled={
+                  settings.nativeCameraRecordingEnabled &&
+                  Capacitor.isNativePlatform() &&
+                  Capacitor.getPlatform() === 'ios'
+                }
+                nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
                 handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
                 onHandsFreePlaybackPlayingChange={handleHandsFreeBackgroundPlaybackChange}

@@ -107,10 +107,12 @@ function clampCssPreviewZoom(zoom: number): number {
   return Math.max(CSS_PREVIEW_ZOOM_MIN, Math.min(CSS_PREVIEW_ZOOM_MAX, zoom))
 }
 
-function syncCssPreviewZoomToVideos(): void {
+function syncCssPreviewZoomToTargets(): void {
   if (typeof document === 'undefined') return
   const value = String(cssPreviewZoom)
-  for (const element of document.querySelectorAll('video.camera-preview--mirror')) {
+  for (const element of document.querySelectorAll(
+    'video.camera-preview--mirror, canvas.camera-preview-canvas--live, canvas.camera-preview-canvas--primed',
+  )) {
     if (element instanceof HTMLElement) {
       element.style.setProperty('--camera-preview-zoom', value)
     }
@@ -123,13 +125,13 @@ export function getCssPreviewZoom(): number {
 
 export function setCssPreviewZoom(zoom: number): number {
   cssPreviewZoom = clampCssPreviewZoom(zoom)
-  syncCssPreviewZoomToVideos()
+  syncCssPreviewZoomToTargets()
   return cssPreviewZoom
 }
 
 export function resetCssPreviewZoom(): void {
   cssPreviewZoom = 1
-  syncCssPreviewZoomToVideos()
+  syncCssPreviewZoomToTargets()
 }
 
 function getZoomTrack(stream: MediaStream | null | undefined): ZoomCapableTrack | null {

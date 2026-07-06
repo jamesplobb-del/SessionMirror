@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import BestTakeAudioPlugin, { type NativePlaybackTestStartResult } from './audioSessionRoute'
+import type { MicInputPreference } from './appSettings'
 import {
   completePlaybackRouteRestore,
   preparePlaybackRoute,
@@ -64,6 +65,7 @@ export async function startNativeCameraRecording(
   options: {
     useFrontCamera?: boolean
     audioSessionProfile?: NativeCameraAudioSessionProfile
+    micInputPreference?: MicInputPreference
   } = {},
 ): Promise<NativeCameraRecordingStartResult | null> {
   if (!isNativeCameraTestAvailable()) {
@@ -73,11 +75,13 @@ export async function startNativeCameraRecording(
 
   const useFrontCamera = options.useFrontCamera ?? true
   const audioSessionProfile = options.audioSessionProfile ?? 'videoRecording'
+  const micInputPreference = options.micInputPreference
 
   try {
     const result = await BestTakeAudioPlugin.startNativeCameraRecording({
       useFrontCamera,
       audioSessionProfile,
+      micInputPreference,
     })
     console.log('[NativeCameraTest] session started (JS)')
     console.log('audioSessionProfile =', result.audioSessionProfile ?? audioSessionProfile)
@@ -96,21 +100,61 @@ export async function startNativeCameraRecording(
   }
 }
 
-export async function startNativeCameraPreview(
+export async function startNativeCameraBridge(
   options: {
     useFrontCamera?: boolean
     audioSessionProfile?: NativeCameraAudioSessionProfile
+    micInputPreference?: MicInputPreference
   } = {},
 ): Promise<NativeCameraSessionDiagnostics | null> {
   if (!isNativeCameraTestAvailable()) return null
 
   const useFrontCamera = options.useFrontCamera ?? true
   const audioSessionProfile = options.audioSessionProfile ?? 'videoRecording'
+  const micInputPreference = options.micInputPreference
+
+  try {
+    const result = await BestTakeAudioPlugin.startNativeCameraBridge({
+      useFrontCamera,
+      audioSessionProfile,
+      micInputPreference,
+    })
+    console.log('[NativeCameraBridge] started')
+    return result
+  } catch (error) {
+    console.warn('[NativeCameraBridge] start failed', error)
+    return null
+  }
+}
+
+export async function stopNativeCameraBridge(): Promise<void> {
+  if (!isNativeCameraTestAvailable()) return
+  try {
+    await BestTakeAudioPlugin.stopNativeCameraBridge()
+    console.log('[NativeCameraBridge] stopped')
+  } catch (error) {
+    console.warn('[NativeCameraBridge] stop failed', error)
+  }
+}
+
+export async function startNativeCameraPreview(
+  options: {
+    useFrontCamera?: boolean
+    audioSessionProfile?: NativeCameraAudioSessionProfile
+    micInputPreference?: MicInputPreference
+  } = {},
+): Promise<NativeCameraSessionDiagnostics | null> {
+  if (!isNativeCameraTestAvailable()) return null
+
+  const useFrontCamera = options.useFrontCamera ?? true
+  const audioSessionProfile = options.audioSessionProfile ?? 'videoRecording'
+  const micInputPreference = options.micInputPreference
 
   try {
     const result = await BestTakeAudioPlugin.startNativeCameraPreview({
       useFrontCamera,
       audioSessionProfile,
+      micInputPreference,
     })
     console.log('[NativeCameraPreview] started')
     console.log('audioSessionProfile =', result.audioSessionProfile ?? audioSessionProfile)

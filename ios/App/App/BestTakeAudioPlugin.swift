@@ -27,6 +27,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "saveVideoToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderCreatorStudioVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startNativeCameraBridge", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNativeCameraBridge", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPassthrough", returnType: CAPPluginReturnPromise),
@@ -44,6 +46,13 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     override public func load() {
         super.load()
+        nativeCameraEngine.onPreviewFrame = { [weak self] jpegBase64, width, height in
+            self?.notifyListeners("nativeCameraPreviewFrame", data: [
+                "jpegBase64": jpegBase64,
+                "width": width,
+                "height": height,
+            ])
+        }
         routeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
@@ -257,6 +266,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CameraSessionGuard.setRecordingActive(recordingActive)
 
         if !previewActive && !recordingActive && !CameraSessionGuard.playbackRouteActive {
+            if nativeCameraEngine.requiresActiveAudioSession {
+                call.resolve(CameraSessionGuard.snapshot())
+                return
+            }
             do {
                 try AudioRouteConfigurator.deactivateCaptureSessionIfIdle()
             } catch {
@@ -823,9 +836,35 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func startNativeCameraBridge(_ call: CAPPluginCall) {
+        let useFrontCamera = call.getBool("useFrontCamera") ?? true
+        let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
+        let micPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
+
+        nativeCameraEngine.startBridgePreview(
+            useFrontCamera: useFrontCamera,
+            audioSessionProfile: profile,
+            micInputPreference: micPreference,
+            completion: { result in
+                switch result {
+                case .success(let payload):
+                    call.resolve(payload)
+                case .failure(let error):
+                    call.reject("Native camera bridge failed", nil, error)
+                }
+            }
+        )
+    }
+
+    @objc func stopNativeCameraBridge(_ call: CAPPluginCall) {
+        nativeCameraEngine.stopBridgePreview()
+        call.resolve()
+    }
+
     @objc func startNativeCameraPreview(_ call: CAPPluginCall) {
         let useFrontCamera = call.getBool("useFrontCamera") ?? true
         let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
+        let micPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
 
         DispatchQueue.main.async {
             guard let viewController = self.bridge?.viewController else {
@@ -843,11 +882,14 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 in: container,
                 useFrontCamera: useFrontCamera,
                 audioSessionProfile: profile,
+                micInputPreference: micPreference,
                 completion: { result in
                     switch result {
                     case .success(let payload):
+                        (self.bridge?.viewController as? PortraitBridgeViewController)?.setCameraPassthrough(true)
                         call.resolve(payload)
                     case .failure(let error):
+                        (self.bridge?.viewController as? PortraitBridgeViewController)?.setCameraPassthrough(false)
                         call.reject("Native camera preview failed", nil, error)
                     }
                 }
@@ -978,10 +1020,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func startNativeCameraRecording(_ call: CAPPluginCall) {
         let useFrontCamera = call.getBool("useFrontCamera") ?? true
         let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
+        let micPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
 
         nativeCameraEngine.start(
             useFrontCamera: useFrontCamera,
             audioSessionProfile: profile,
+            micInputPreference: micPreference,
             completion: { result in
                 switch result {
                 case .success(let payload):

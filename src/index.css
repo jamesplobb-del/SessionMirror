@@ -2606,13 +2606,67 @@ html.physical-landscape-right .ui-orient-spin {
   background: transparent !important;
 }
 
-/* Native camera passthrough: clear the opaque shell so the AVFoundation preview
-   layer (rendered behind the WebView) is visible. Scoped to when native preview
-   is active — the app is otherwise opaque. */
+/* Native camera passthrough: only the camera plane is see-through so the
+   AVCaptureVideoPreviewLayer behind the WebView shows through. HUD, widgets,
+   and controls stay fully painted in the WebView — never make them transparent. */
 html.native-camera-passthrough,
 html.native-camera-passthrough body,
 html.native-camera-passthrough #root {
+  background-color: transparent !important;
+}
+
+html.native-camera-passthrough .app-shell {
+  background-color: transparent !important;
+}
+
+html.native-camera-passthrough .camera-background,
+html.native-camera-passthrough .camera-background--native-preview {
   background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.native-camera-passthrough .camera-background-overlay {
+  pointer-events: none;
+}
+
+/* Keep every UI layer visible and interactive during native recording. */
+html.native-camera-passthrough .app-ui-rotator,
+html.native-camera-passthrough .app-ui-overlay,
+html.native-camera-passthrough .pitch-display-layer,
+html.native-camera-passthrough .metronome-display-layer {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+html.native-camera-passthrough .app-ui-overlay--native-recording {
+  z-index: 10;
+  isolation: isolate;
+}
+
+html.native-camera-passthrough .app-ui-overlay--native-recording .hud-header,
+html.native-camera-passthrough .app-ui-overlay--native-recording .hud-header *,
+html.native-camera-passthrough .app-ui-overlay--native-recording .app-hud-bottom,
+html.native-camera-passthrough .app-ui-overlay--native-recording .control-deck,
+html.native-camera-passthrough .app-ui-overlay--native-recording .control-deck *,
+html.native-camera-passthrough .app-ui-overlay--native-recording .record-carousel-viewport,
+html.native-camera-passthrough .app-ui-overlay--native-recording .record-carousel-track,
+html.native-camera-passthrough .app-ui-overlay--native-recording .record-carousel-slot,
+html.native-camera-passthrough .app-ui-overlay--native-recording .record-carousel-auto-btn,
+html.native-camera-passthrough .app-ui-overlay--native-recording .app-pip-row-wrap,
+html.native-camera-passthrough .app-ui-overlay--native-recording .app-pip-row,
+html.native-camera-passthrough .app-ui-overlay--native-recording .pip-video-container,
+html.native-camera-passthrough .app-ui-overlay--native-recording .pip-drag-layer {
+  pointer-events: auto !important;
+}
+
+html.native-camera-passthrough .pitch-display-layer .pitch-widget-draggable,
+html.native-camera-passthrough .pitch-display-layer .pointer-events-auto,
+html.native-camera-passthrough .metronome-display-layer .metronome-widget-draggable,
+html.native-camera-passthrough .metronome-display-layer .pointer-events-auto {
+  pointer-events: auto !important;
+}
+
+.app-shell--native-camera-passthrough {
   background-color: transparent !important;
 }
 
@@ -2662,6 +2716,49 @@ video.camera-preview.camera-preview--hidden {
 
 .camera-background-overlay--audio-idle {
   transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.camera-preview-frozen-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  pointer-events: none;
+  transform: scaleX(-1);
+  transform-origin: center center;
+}
+
+.camera-preview-canvas {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+.camera-preview-canvas--primed {
+  visibility: hidden !important;
+  transform: scaleX(-1) scale(var(--camera-preview-zoom, 1)) !important;
+  transform-origin: center center !important;
+}
+
+.camera-preview-canvas--live {
+  visibility: visible !important;
+  transform: scaleX(-1) scale(var(--camera-preview-zoom, 1)) !important;
+  transform-origin: center center !important;
+}
+
+.camera-preview-canvas--embedded {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
 }
 
 .camera-preview-placeholder {

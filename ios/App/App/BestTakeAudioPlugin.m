@@ -19,6 +19,8 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(saveVideoToPhotos, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(renderCreatorStudioVideo, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setNativeExperimentalAudioMode, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(startNativeCameraBridge, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(stopNativeCameraBridge, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startNativeCameraPreview, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopNativeCameraPreview, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startNativeCameraRecording, CAPPluginReturnPromise);
