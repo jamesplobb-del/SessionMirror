@@ -58,4 +58,4 @@ export interface MultitrackSession {
   backing: MultitrackBackingTrack
 }
 
-export type MultitrackRecordingPhase = 'idle' | 'count-in' | 'recording'
+export type MultitrackRecordingPhase = 'idle' | 'count-in' | 'recording' | 'review'

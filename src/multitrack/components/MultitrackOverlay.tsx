@@ -36,6 +36,8 @@ interface MultitrackOverlayProps {
   tunerInstrument: TunerInstrument
   hapticFeedback: boolean
   isRecording: boolean
+  /** True while a native recording stop is still settling — a new recording must not start yet. */
+  isStopping: boolean
   /** Native iOS camera bridge is delivering live frames — feeds the recording stage's own preview canvas. */
   nativeLivePreviewActive?: boolean
   /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
@@ -44,6 +46,8 @@ interface MultitrackOverlayProps {
   onStartRecording: () => void
   onStopRecording: () => void
   onRecordingComplete: () => void
+  /** Fully discards a take (state, DB row, file, thumbnail) — used to throw away a retried recording. */
+  onDeleteTakes: (ids: string[]) => void
   pendingRecordingTakeId: string | null
   onClearPendingRecording: () => void
   onOpenRecordingStage?: () => void
@@ -73,12 +77,14 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     tunerInstrument,
     hapticFeedback,
     isRecording,
+    isStopping,
     nativeLivePreviewActive,
     nativeCameraBridgeEnabled,
     onClose,
     onStartRecording,
     onStopRecording,
     onRecordingComplete,
+    onDeleteTakes,
     pendingRecordingTakeId,
     onClearPendingRecording,
     onOpenRecordingStage,
@@ -92,6 +98,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [activePanelId, setActivePanelId] = useState<string | null>(null)
   const [backingPlaying, setBackingPlaying] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take } | null>(null)
   const { session, layout, setLayout, assignTakeToPanel, assignSheetMusic, updatePractice, updateBacking } = useMultitrackSession()
   const sync = useMultitrackSync()
   const { showAlert, showConfirm } = useActionSheet()
@@ -254,11 +261,24 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     if (!pendingRecordingTakeId || !targetPanelId) return
     const take = takes.find((t) => t.id === pendingRecordingTakeId)
     if (!take) return
-    assignTakeToPanel(targetPanelId, take)
+    setPendingReview({ panelId: targetPanelId, take })
     onRecordingComplete()
     onClearPendingRecording()
+  }, [activePanelId, onClearPendingRecording, onRecordingComplete, pendingRecordingTakeId, recording.targetPanelId, takes])
+
+  const handleConfirmTake = useCallback(() => {
+    if (!pendingReview) return
+    assignTakeToPanel(pendingReview.panelId, pendingReview.take)
+    setPendingReview(null)
     recording.cancel()
-  }, [activePanelId, assignTakeToPanel, onClearPendingRecording, onRecordingComplete, pendingRecordingTakeId, recording, takes])
+  }, [assignTakeToPanel, pendingReview, recording])
+
+  const handleRetryTake = useCallback(() => {
+    if (!pendingReview) return
+    onDeleteTakes([pendingReview.take.id])
+    setPendingReview(null)
+    recording.cancel()
+  }, [onDeleteTakes, pendingReview, recording])
 
   const activePanel = session.panels.find((panel) => panel.id === activePanelId)
 
@@ -314,7 +334,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               phase={recording.phase}
               countInRemaining={recording.countInRemaining}
               isRecording={isRecording}
-              reviewTake={activePanel.kind === 'performance' ? activePanel.take : null}
+              isStopping={isStopping}
+              reviewTake={
+                pendingReview && pendingReview.panelId === activePanel.id
+                  ? pendingReview.take
+                  : activePanel.kind === 'performance' ? activePanel.take : null
+              }
               backing={session.backing}
               backingAudioRef={backingAudioRef}
               backingYoutubeIframeRef={backingYoutubeIframeRef}
@@ -326,6 +351,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               }}
               onToggleBackingPlayback={toggleBackingPlayback}
               onRecord={() => {
+                if (isRecording || isStopping) return
                 recordingTargetPanelIdRef.current = activePanel.id
                 sync.setExcludePanelId(activePanel.id)
                 prepareBackingForRecord()
@@ -336,11 +362,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 sync.pause()
                 pauseBacking()
                 onStopRecording()
-                recording.cancel()
+                recording.enterReview()
               }}
               onUseExisting={() => setTakePickerPanelId(activePanel.id)}
+              onConfirmTake={handleConfirmTake}
+              onRetryTake={handleRetryTake}
               onClose={() => {
                 if (isRecording) onStopRecording()
+                if (pendingReview) {
+                  onDeleteTakes([pendingReview.take.id])
+                  setPendingReview(null)
+                }
                 sync.setExcludePanelId(null)
                 sync.pause()
                 pauseBacking()

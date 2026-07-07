@@ -30,7 +30,11 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
       <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label="Record performance take">
         <Video className="h-8 w-8 text-stone-400" />
         <span className="mt-2 text-sm font-medium text-stone-500">Tap to record</span>
-        {isRecordingTarget && recordingPhase !== 'idle' && <span className="mt-1 text-xs font-semibold text-red-500">{recordingPhase === 'count-in' ? 'Count-in…' : 'Recording…'}</span>}
+        {isRecordingTarget && recordingPhase !== 'idle' && (
+          <span className="mt-1 text-xs font-semibold text-red-500">
+            {recordingPhase === 'count-in' ? 'Count-in…' : recordingPhase === 'review' ? 'Reviewing…' : 'Recording…'}
+          </span>
+        )}
       </Pressable>
     )
   }

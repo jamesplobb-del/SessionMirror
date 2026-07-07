@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AudioLines, Camera, FileAudio, Grid2X2, Mic, Pause, Play, X } from 'lucide-react'
+import { AudioLines, Camera, Check, FileAudio, Grid2X2, Mic, Pause, Play, RotateCcw, X } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { Take } from '../../types'
 import IOSSwitch from '../../components/ui/IOSSwitch'
@@ -26,6 +26,8 @@ interface MultitrackRecordingStageProps {
   phase: MultitrackRecordingPhase
   countInRemaining: number
   isRecording: boolean
+  /** True while a native recording stop is still settling — a new recording must not start yet. */
+  isStopping: boolean
   reviewTake: Take | null
   backing: MultitrackBackingTrack
   backingAudioRef: RefObject<HTMLAudioElement | null>
@@ -41,6 +43,8 @@ interface MultitrackRecordingStageProps {
   onRecord: () => void
   onStop: () => void
   onUseExisting: () => void
+  onConfirmTake: () => void
+  onRetryTake: () => void
   onClose: () => void
 }
 
@@ -53,6 +57,7 @@ export default function MultitrackRecordingStage({
   phase,
   countInRemaining,
   isRecording,
+  isStopping,
   reviewTake,
   backing,
   backingAudioRef,
@@ -66,6 +71,8 @@ export default function MultitrackRecordingStage({
   onRecord,
   onStop,
   onUseExisting,
+  onConfirmTake,
+  onRetryTake,
   onClose,
 }: MultitrackRecordingStageProps) {
   const stageRef = useRef<HTMLDivElement>(null)
@@ -344,21 +351,41 @@ export default function MultitrackRecordingStage({
             Takes
           </Pressable>
           {reviewTake ? (
-            <Pressable type="button" intensity="soft" onClick={handleReview} disabled={busy} className="multitrack-recording-stage__review">
+            <Pressable
+              type="button"
+              intensity="soft"
+              onClick={handleReview}
+              disabled={phase === 'recording' || phase === 'count-in'}
+              className="multitrack-recording-stage__review"
+            >
               {reviewPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               {reviewPlaying ? 'Pause' : 'Review'}
             </Pressable>
           ) : null}
-          <Pressable
-            type="button"
-            intensity="normal"
-            haptic="medium"
-            className={`multitrack-recording-stage__record ${isRecording ? 'is-recording' : ''}`}
-            onClick={isRecording ? onStop : onRecord}
-          >
-            {isRecording ? <X className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            {isRecording ? 'Stop' : phase === 'count-in' ? 'Counting' : 'Record'}
-          </Pressable>
+          {phase === 'review' ? (
+            <>
+              <Pressable type="button" intensity="soft" onClick={onRetryTake} className="multitrack-recording-stage__retry">
+                <RotateCcw className="h-4 w-4" />
+                Retry
+              </Pressable>
+              <Pressable type="button" intensity="normal" haptic="medium" onClick={onConfirmTake} className="multitrack-recording-stage__confirm">
+                <Check className="h-5 w-5" />
+                Confirm
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              type="button"
+              intensity="normal"
+              haptic="medium"
+              className={`multitrack-recording-stage__record ${isRecording ? 'is-recording' : ''}`}
+              onClick={isRecording ? onStop : onRecord}
+              disabled={!isRecording && isStopping}
+            >
+              {isRecording ? <X className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              {isRecording ? 'Stop' : isStopping ? 'Please wait' : phase === 'count-in' ? 'Counting' : 'Record'}
+            </Pressable>
+          )}
         </div>
 
         {!streamRef.current && !nativeLivePreviewActive ? (

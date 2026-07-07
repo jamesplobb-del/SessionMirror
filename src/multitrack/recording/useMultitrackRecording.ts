@@ -31,6 +31,18 @@ export function useMultitrackRecording(options: {
     setTargetPanelId(null)
   }, [clearTimer])
 
+  /**
+   * Moves to the review phase after Stop — keeps `targetPanelId` and the
+   * active guard (still blocking a new recording) until the user explicitly
+   * confirms or retries the just-recorded take via `cancel()`.
+   */
+  const enterReview = useCallback(() => {
+    clearTimer()
+    sharedMetronomeEngine.stop()
+    setCountInRemaining(0)
+    setPhase('review')
+  }, [clearTimer])
+
   const beginCountIn = useCallback((panelId: string, settings?: {
     bpm?: number
     countInBars?: number
@@ -82,5 +94,5 @@ export function useMultitrackRecording(options: {
     })()
   }, [onCountInComplete, onCountInStart, onPerformanceStart, onPreparePlaybackDuringCountIn])
 
-  return { phase, targetPanelId, countInRemaining, beginCountIn, cancel }
+  return { phase, targetPanelId, countInRemaining, beginCountIn, cancel, enterReview }
 }

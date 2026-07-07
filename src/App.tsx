@@ -1246,6 +1246,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     requestCameraAccess,
     ready,
     isRecording,
+    isStopping,
     elapsed,
     recordingMode,
     changeRecordingMode,
@@ -1268,6 +1269,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     isPreviewRecovering,
     nativeLivePreviewActive,
     nativeLivePreviewSeedUrl,
+    acquireNativeVideoBridge,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     secondaryPreviewRef: splitPreviewRef,
@@ -1887,8 +1889,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleMultitrackOpenRecordingStage = useCallback(() => {
     handleRecordingModeChange('video')
+    if (isNativeCameraPlatform) {
+      // Warm the native camera bridge immediately on tap so the panel shows a
+      // live preview right away, instead of only once "Record" is pressed.
+      void acquireNativeVideoBridge()
+      return
+    }
     void requestCameraAccess('video')
-  }, [handleRecordingModeChange, requestCameraAccess])
+  }, [acquireNativeVideoBridge, handleRecordingModeChange, isNativeCameraPlatform, requestCameraAccess])
 
   const handleMultitrackStartRecording = useCallback(() => {
     multitrackRecordingActiveRef.current = true
@@ -3609,12 +3617,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     tunerInstrument={settings.tunerInstrument}
                     hapticFeedback={settings.hapticFeedback}
                     isRecording={isRecording}
+                    isStopping={isStopping}
                     nativeLivePreviewActive={nativeLivePreviewActive}
                     nativeCameraBridgeEnabled={isNativeCameraPlatform}
                     onClose={handleCloseMultitrack}
                     onStartRecording={handleMultitrackStartRecording}
                     onStopRecording={handleMultitrackStopRecording}
                     onRecordingComplete={handleMultitrackRecordingComplete}
+                    onDeleteTakes={handleDeleteTakes}
                     pendingRecordingTakeId={multitrackPendingRecordingTakeId}
                     onClearPendingRecording={handleClearMultitrackPendingRecording}
                     onOpenRecordingStage={handleMultitrackOpenRecordingStage}
