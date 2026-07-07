@@ -2752,6 +2752,33 @@ video.camera-preview.camera-preview--hidden {
   transform-origin: center center !important;
 }
 
+.camera-preview-priming-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--midnight-base);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.camera-preview-priming-veil--embedded {
+  position: absolute;
+}
+
+.camera-preview-priming-veil--fading {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-preview-priming-veil {
+    transition: none;
+  }
+}
+
 .camera-preview-canvas--embedded {
   position: absolute !important;
   inset: 0 !important;

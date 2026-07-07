@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, type PointerEvent, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
 import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
@@ -80,6 +80,8 @@ function LiveCameraBackground({
   const nativePreviewCanvasRef = useRef<HTMLCanvasElement>(null)
   const nativeFramePumpRef = useRef<ReturnType<typeof createNativePreviewFramePump> | null>(null)
   const nativeBridgePrimedRef = useRef(false)
+  /** True once a frame has actually been painted since the bridge was last (re)primed — gates revealing the canvas so a stale/frozen frame from before backgrounding is never shown as if live. */
+  const [nativeFrameFresh, setNativeFrameFresh] = useState(false)
   const pinchPointersRef = useRef(new Map<number, { x: number; y: number }>())
   const pinchStartDistanceRef = useRef(0)
   const pinchStartZoomRef = useRef(1)
@@ -117,7 +119,9 @@ function LiveCameraBackground({
     let removeListener: (() => void) | null = null
 
     if (!nativeFramePumpRef.current) {
-      nativeFramePumpRef.current = createNativePreviewFramePump(nativePreviewCanvasRef)
+      nativeFramePumpRef.current = createNativePreviewFramePump(nativePreviewCanvasRef, () => {
+        setNativeFrameFresh(true)
+      })
     }
     const pump = nativeFramePumpRef.current
 
@@ -152,6 +156,13 @@ function LiveCameraBackground({
 
   useEffect(() => {
     nativeBridgePrimedRef.current = nativeLivePreviewActive
+    if (!nativeLivePreviewActive) {
+      // Bridge just went inactive (backgrounded, mode switch, session
+      // recovery) — the canvas may still hold a stale frame. Require a fresh
+      // one to be painted before the next activation reveals it, instead of
+      // instantly showing whatever frozen pixels are already there.
+      setNativeFrameFresh(false)
+    }
   }, [nativeLivePreviewActive])
 
   useEffect(() => {
@@ -600,15 +611,27 @@ function LiveCameraBackground({
       onPointerLeave={handleCameraPinchPointerEnd}
     >
       {showNativeBridgeCanvas && (
-        <canvas
-          ref={nativePreviewCanvasRef}
-          className={`${isEmbedded ? 'camera-preview-canvas--embedded' : 'camera-preview-canvas'} ${
-            nativeLivePreviewActive
-              ? 'camera-preview-canvas--live'
-              : 'camera-preview-canvas--primed'
-          }`}
-          aria-hidden
-        />
+        <>
+          <canvas
+            ref={nativePreviewCanvasRef}
+            className={`${isEmbedded ? 'camera-preview-canvas--embedded' : 'camera-preview-canvas'} ${
+              nativeLivePreviewActive
+                ? 'camera-preview-canvas--live'
+                : 'camera-preview-canvas--primed'
+            }`}
+            aria-hidden
+          />
+          {nativeLivePreviewActive && (
+            <div
+              className={`camera-preview-priming-veil ${
+                isEmbedded ? 'camera-preview-priming-veil--embedded' : ''
+              } ${nativeFrameFresh ? 'camera-preview-priming-veil--fading' : ''}`}
+              aria-hidden
+            >
+              <div className="camera-preview-resume-spinner" />
+            </div>
+          )}
+        </>
       )}
 
       {showPlaceholder && (

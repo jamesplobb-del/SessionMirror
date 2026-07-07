@@ -94,6 +94,8 @@ export function drawCoverFrameOnCanvas(
 
 export function createNativePreviewFramePump(
   canvasRef: { current: HTMLCanvasElement | null },
+  /** Fires each time a decoded frame is actually painted onto the canvas — used to know when it's safe to reveal the canvas instead of a stale/frozen frame. */
+  onFrameDrawn?: () => void,
 ): {
   push: (event: NativeCameraPreviewFrameEvent) => void
   stop: () => void
@@ -125,6 +127,7 @@ export function createNativePreviewFramePump(
 
       pendingBitmap = null
       drawCoverFrameOnCanvas(canvas, bitmap, bitmap.width, bitmap.height)
+      onFrameDrawn?.()
     })
   }
 

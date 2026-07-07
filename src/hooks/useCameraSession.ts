@@ -1901,6 +1901,20 @@ export function useCameraSession({
       return
     }
 
+    const restartMode = recordingModeRef.current
+
+    // Fast path: native camera already believes it's live — this is the
+    // overwhelmingly common case on every foreground swipe-in. Never flip the
+    // "recovering" placeholder for it; that dark overlay fading in and out
+    // almost instantly is itself the flicker users notice. Just fire the
+    // cheap, idempotent native health check in the background and bail.
+    if (isNativeVideoRecordingEnabled() && restartMode === 'video' && nativePreviewActiveRef.current) {
+      void ensureNativeCameraSessionHealthy()
+      onBeforeForegroundRestartRef.current?.()
+      onAfterForegroundRestartRef.current?.()
+      return
+    }
+
     const restartToken = ++foregroundRestartTokenRef.current
     resumeInFlightRef.current = true
     setIsPreviewRecovering(true)
@@ -1931,13 +1945,6 @@ export function useCameraSession({
           }
           if (restartToken !== foregroundRestartTokenRef.current) return
           await acquireNativeVideoBridge()
-        } else {
-          // JS believes the native preview is already healthy — verify with the
-          // native side rather than trusting a possibly-stale ref (AVFoundation
-          // can silently stop the session after an interruption). Fire-and-forget:
-          // this is a defensive no-op almost every time, so it must never extend
-          // the visible "recovering" placeholder window below.
-          void ensureNativeCameraSessionHealthy()
         }
         onBeforeForegroundRestartRef.current?.()
         return

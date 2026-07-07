@@ -91,6 +91,17 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             name: AVAudioSession.mediaServicesWereResetNotification,
             object: nil
         )
+        // AVAudioSession interruptions (phone call, Siri, alarm, another app
+        // requesting audio focus) do NOT necessarily stop AVCaptureSession —
+        // video keeps "running" while the mic silently produces nothing until
+        // the AVAudioSession is explicitly reactivated. This is the #1 cause of
+        // "camera fine, microphone dead until app restart".
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioSessionInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
     }
 
     @objc private func handleAppDidBecomeActive() {
@@ -129,6 +140,18 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         ensureSessionHealthy(reason: "mediaServicesWereReset")
     }
 
+    @objc private func handleAudioSessionInterruption(_ notification: Notification) {
+        let typeRaw = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue
+        let type = typeRaw.flatMap { AVAudioSession.InterruptionType(rawValue: $0) }
+        print("[NativeCameraRecovery] AVAudioSession interruption type=\(String(describing: type))")
+        // Reapply on BOTH began and ended: "began" already means the mic is
+        // dead (something else took the audio session) even before iOS tells
+        // us it's over, and reapplying here — while it may get pre-empted
+        // again immediately — costs nothing. "ended" is the normal recovery
+        // point once the other audio session backs off.
+        ensureSessionHealthy(reason: type == .began ? "audioInterruptionBegan" : "audioInterruptionEnded")
+    }
+
     /// Defensive resync used after any interruption/error/lifecycle event: if the
     /// session SHOULD be running (preview, bridge preview, or recording was
     /// active) but AVFoundation left it stopped — or hardware objects were
@@ -153,10 +176,27 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 return
             }
 
-            // True no-op fast path: everything is already healthy, so touch
-            // NOTHING — re-applying the AVAudioSession category/route when it is
-            // already correct can itself cause an audible click/blip. Only do
-            // real recovery work below when something is actually broken.
+            // Always reapply the AVAudioSession category/route for our active
+            // profile. This is NOT the expensive part — AppDelegate already
+            // force-reactivates a generic session on every single foreground
+            // event unconditionally, so this costs nothing extra beyond
+            // stomping that generic session back to the profile we actually
+            // need. Skipping this when `session.isRunning` merely LOOKS fine
+            // is exactly how a pure AVAudioSession interruption (phone call,
+            // Siri, another app's audio) leaves the mic silently dead while
+            // the capture session itself keeps reporting isRunning == true.
+            do {
+                try self.configureAudioSessionForRecording(
+                    profile: self.activeAudioProfile,
+                    micInputPreference: self.activeMicInputPreference
+                )
+            } catch {
+                print("[NativeCameraRecovery][\(reason)] failed to reapply audio session: \(error.localizedDescription)")
+            }
+
+            // The heavier recovery below (rebuild/restart/preview reattach) is
+            // real, visible work — only do it when the capture session itself
+            // is actually broken.
             let isHealthy =
                 self.session.isRunning &&
                 self.isSessionConfigured &&
@@ -166,15 +206,6 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
 
             print("[NativeCameraRecovery][\(reason)] session unhealthy — running recovery (isRunning=\(self.session.isRunning) configured=\(self.isSessionConfigured) needsRebuild=\(self.needsFullReconfigureAfterMediaReset))")
-
-            do {
-                try self.configureAudioSessionForRecording(
-                    profile: self.activeAudioProfile,
-                    micInputPreference: self.activeMicInputPreference
-                )
-            } catch {
-                print("[NativeCameraRecovery][\(reason)] failed to reapply audio session: \(error.localizedDescription)")
-            }
 
             if self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured {
                 print("[NativeCameraRecovery][\(reason)] rebuilding capture session from scratch")
