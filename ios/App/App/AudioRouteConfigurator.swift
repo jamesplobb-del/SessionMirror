@@ -96,6 +96,17 @@ enum AudioRouteConfigurator {
             "availableInputs=\(snapshot["availableInputs"] ?? [])"
     }
 
+    /// Tracks whether WE last activated the shared session. Redundant
+    /// setCategory/setActive calls are not free: each one can bounce WebKit
+    /// (YouTube iframe / take <video>) audio and stall the camera pipeline.
+    private(set) static var appSessionActive = false
+
+    /// Call from the AVAudioSession interruption observer so ensureSessionActive
+    /// knows a reactivation is genuinely needed.
+    static func noteInterruptionBegan() {
+        appSessionActive = false
+    }
+
     static func debugSetCategory(
         _ session: AVAudioSession,
         category: AVAudioSession.Category,
@@ -103,6 +114,10 @@ enum AudioRouteConfigurator {
         options: AVAudioSession.CategoryOptions,
         caller: String
     ) throws {
+        if session.category == category && session.mode == mode && session.categoryOptions == options {
+            print("[AVAudioSessionTrace] setCategory skipped (already applied) caller=\(caller) category=\(category.rawValue) mode=\(mode.rawValue) options=\(optionNames(options))")
+            return
+        }
         print("[AVAudioSessionTrace] setCategory caller=\(caller) requestedCategory=\(category.rawValue) requestedMode=\(mode.rawValue) requestedOptions=\(optionNames(options)) before=\(routeSummary(session)) stack=\(compactStack())")
         try session.setCategory(category, mode: mode, options: options)
         print("[AVAudioSessionTrace] setCategory complete caller=\(caller) after=\(routeSummary(session))")
@@ -116,7 +131,21 @@ enum AudioRouteConfigurator {
     ) throws {
         print("[AVAudioSessionTrace] setActive caller=\(caller) active=\(active) options=\(options.rawValue) before=\(routeSummary(session)) stack=\(compactStack())")
         try session.setActive(active, options: options)
+        appSessionActive = active
         print("[AVAudioSessionTrace] setActive complete caller=\(caller) after=\(routeSummary(session))")
+    }
+
+    /// Activate only when we have not already activated (or were interrupted /
+    /// backgrounded since). Redundant setActive(true) calls interrupt WebKit media.
+    static func ensureSessionActive(
+        _ session: AVAudioSession,
+        caller: String
+    ) throws {
+        if appSessionActive {
+            print("[AVAudioSessionTrace] setActive skipped (already active) caller=\(caller)")
+            return
+        }
+        try debugSetActive(session, active: true, options: [], caller: caller)
     }
 
     static func debugSetPreferredInput(
@@ -255,7 +284,7 @@ enum AudioRouteConfigurator {
     /// change camera FOV or stall the JPEG preview pump.
     static func applyCoexistentPlaybackSpeakerRoute() throws -> [String: Any] {
         let session = AVAudioSession.sharedInstance()
-        try debugSetActive(session, active: true, options: [], caller: "applyCoexistentPlaybackSpeakerRoute")
+        try ensureSessionActive(session, caller: "applyCoexistentPlaybackSpeakerRoute")
         try preferBuiltInSpeakerIfSafe(session)
 
         var snapshot = routeSnapshot(for: session)
@@ -295,12 +324,12 @@ enum AudioRouteConfigurator {
                     session,
                     category: .playAndRecord,
                     mode: .default,
-                    options: [.allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+                    options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
                     caller: "applyWebPlaybackRoute.builtInSpeaker"
                 )
                 try session.setPreferredSampleRate(48_000)
                 try session.setPreferredIOBufferDuration(0.005)
-                try debugSetActive(session, active: true, options: [], caller: "applyWebPlaybackRoute.builtInSpeaker")
+                try ensureSessionActive(session, caller: "applyWebPlaybackRoute.builtInSpeaker")
                 try preferBuiltInSpeakerIfSafe(session)
             } else {
                 // Full-volume external playback. Do not use duckOthers; omit mixWithOthers so WebView audio is not softened.
@@ -370,8 +399,8 @@ enum AudioRouteConfigurator {
         if enableHQ {
             try configureHighQualitySession()
         } else {
-            try debugSetCategory(session, category: .playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .defaultToSpeaker], caller: "applyRecordingRoute.default")
-            try debugSetActive(session, active: true, options: .notifyOthersOnDeactivation, caller: "applyRecordingRoute.default")
+            try debugSetCategory(session, category: .playAndRecord, mode: .default, options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker], caller: "applyRecordingRoute.default")
+            try ensureSessionActive(session, caller: "applyRecordingRoute.default")
             try debugSetPreferredInput(session, input: nil, caller: "applyRecordingRoute.default")
         }
 
@@ -421,8 +450,8 @@ enum AudioRouteConfigurator {
 
         let session = AVAudioSession.sharedInstance()
         // A2DP output only — omit .allowBluetooth so iOS does not force HFP duplex.
-        try debugSetCategory(session, category: .playAndRecord, mode: .default, options: [.allowBluetoothA2DP, .defaultToSpeaker], caller: "configureHighQualitySession")
-        try debugSetActive(session, active: true, options: .notifyOthersOnDeactivation, caller: "configureHighQualitySession")
+        try debugSetCategory(session, category: .playAndRecord, mode: .default, options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker], caller: "configureHighQualitySession")
+        try ensureSessionActive(session, caller: "configureHighQualitySession")
 
         let availableInputs = session.availableInputs ?? []
         if let builtInMic = availableInputs.first(where: { $0.portType == .builtInMic }) {
@@ -469,8 +498,10 @@ enum AudioRouteConfigurator {
                 CameraSessionGuard.skipRouteChangeLog()
             } else {
                 let playbackFocused = playbackActive && !recordingActive
+                // Every branch stays mixable — dropping mixWithOthers here made
+                // playback-state flips interrupt WebKit media (YouTube pausing).
                 let options: AVAudioSession.CategoryOptions = playbackFocused
-                    ? [.allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                    ? [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
                     : micInputPreference == .headphone
                         ? [.mixWithOthers, .allowBluetoothHFP, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
                         : [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
@@ -479,7 +510,7 @@ enum AudioRouteConfigurator {
                 try debugSetCategory(session, category: .playAndRecord, mode: mode, options: options, caller: "applyNativeExperimentalAudioMode")
                 try session.setPreferredSampleRate(48_000)
                 try session.setPreferredIOBufferDuration(playbackFocused ? 0.005 : 0.0029)
-                try debugSetActive(session, active: true, options: [], caller: "applyNativeExperimentalAudioMode")
+                try ensureSessionActive(session, caller: "applyNativeExperimentalAudioMode")
 
                 if playbackFocused {
                     fallbackReason = micInputPreference == .iphone

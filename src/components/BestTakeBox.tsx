@@ -50,6 +50,8 @@ import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 
+const NATIVE_TAKE_BOX_OWNER = 'best-take-box'
+
 const emptyActionClass =
   'pip-empty-action pip-empty-action--interactive pointer-events-auto flex flex-1 items-center justify-center gap-1.5'
 
@@ -143,6 +145,8 @@ function BestTakeBox({
   const videoRef = externalVideoRef ?? internalVideoRef
   const playbackStageRef = useRef<HTMLDivElement>(null)
   const nativePlayInFlightRef = useRef(false)
+  /** True only while this instance holds the shared stereo-playback route (native path). */
+  const nativeRouteHeldRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
@@ -167,8 +171,14 @@ function BestTakeBox({
 
   useEffect(() => {
     setIsPlaying(false)
-    void stopNativeInlineTakeBoxPlayback({ notify: false })
-    void releaseInlineTakeBoxPlaybackRoute()
+    void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
+    // Only release the shared stereo route if this instance actually holds it —
+    // this effect also runs on mount/every source change, and an unconditional
+    // release here would decrement a hold owned by YouTube or another box.
+    if (nativeRouteHeldRef.current) {
+      nativeRouteHeldRef.current = false
+      void releaseInlineTakeBoxPlaybackRoute()
+    }
   }, [videoSourceKey, suspendPlayback])
 
   useEffect(() => {
@@ -213,15 +223,21 @@ function BestTakeBox({
   useEffect(() => {
     if (!useNativeTakePlayback) return
 
-    setNativeInlineTakeBoxEndedHandler(() => {
+    setNativeInlineTakeBoxEndedHandler(NATIVE_TAKE_BOX_OWNER, () => {
       setIsPlaying(false)
-      void releaseInlineTakeBoxPlaybackRoute()
+      if (nativeRouteHeldRef.current) {
+        nativeRouteHeldRef.current = false
+        void releaseInlineTakeBoxPlaybackRoute()
+      }
     })
 
     return () => {
-      setNativeInlineTakeBoxEndedHandler(null)
-      void stopNativeInlineTakeBoxPlayback({ notify: false })
-      void releaseInlineTakeBoxPlaybackRoute()
+      setNativeInlineTakeBoxEndedHandler(NATIVE_TAKE_BOX_OWNER, null)
+      void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
+      if (nativeRouteHeldRef.current) {
+        nativeRouteHeldRef.current = false
+        void releaseInlineTakeBoxPlaybackRoute()
+      }
       void teardownNativeInlineTakeBoxListener()
     }
   }, [useNativeTakePlayback])
@@ -258,8 +274,11 @@ function BestTakeBox({
   useEffect(() => {
     if (!suspendPlayback || !hasTake) return
     if (useNativeTakePlayback) {
-      void stopNativeInlineTakeBoxPlayback({ notify: false })
-      void releaseInlineTakeBoxPlaybackRoute()
+      void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
+      if (nativeRouteHeldRef.current) {
+        nativeRouteHeldRef.current = false
+        void releaseInlineTakeBoxPlaybackRoute()
+      }
       setIsPlaying(false)
       return
     }
@@ -281,8 +300,11 @@ function BestTakeBox({
 
       if (useNativeTakePlayback) {
         if (isPlaying) {
-          void stopNativeInlineTakeBoxPlayback({ notify: false })
-          void releaseInlineTakeBoxPlaybackRoute()
+          void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
+          if (nativeRouteHeldRef.current) {
+            nativeRouteHeldRef.current = false
+            void releaseInlineTakeBoxPlaybackRoute()
+          }
           setIsPlaying(false)
           return
         }
@@ -295,13 +317,16 @@ function BestTakeBox({
           nativePlayInFlightRef.current = true
           try {
             await prepareInlineTakeBoxPlaybackRoute()
+            nativeRouteHeldRef.current = true
             const started = await startNativeInlineTakeBoxPlayback({
               filePath: playbackFilePath,
               layout,
               mirror: mirrorPlayback,
               volume,
+              ownerId: NATIVE_TAKE_BOX_OWNER,
             })
             if (!started) {
+              nativeRouteHeldRef.current = false
               await releaseInlineTakeBoxPlaybackRoute()
             }
             setIsPlaying(started)
@@ -418,6 +443,11 @@ function BestTakeBox({
         dragSourceActive ? 'pip-drag-source--active' : ''
       } ${dragSourceArming ? 'pip-drag-source--arming' : ''}`
 
+  /** Inner clip — native AVPlayer targets this so the shell ring/border stay visible. */
+  const nativePlaybackStageClass = isFill
+    ? 'absolute inset-0 overflow-hidden'
+    : 'absolute inset-0 overflow-hidden rounded-xl'
+
   const pillLeft = showUploadBadge ? 36 : 8
 
   const cornerInset = isFill ? (splitViewActive ? 3 : 6) : 2
@@ -499,7 +529,7 @@ function BestTakeBox({
       )}
 
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
-        <div className={innerClass} ref={playbackStageRef}>
+        <div className={innerClass}>
           <span
             className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
               isFill ? 'px-2 py-0.5 text-[10px]' : ''
@@ -516,7 +546,7 @@ function BestTakeBox({
               aria-label="YouTube reference"
             />
           ) : hasTake ? (
-            <>
+            <div ref={playbackStageRef} className={nativePlaybackStageClass}>
               {!useNativeTakePlayback && (
                 <TakeVideoPlayer
                   filePath={playbackFilePath}
@@ -600,7 +630,7 @@ function BestTakeBox({
                   />
                 </div>
               )}
-            </>
+            </div>
           ) : (
             <div className={`pip-empty-state absolute inset-0 flex flex-col ${isFill ? 'pip-empty-state--split' : ''}`}>
               <div

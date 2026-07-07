@@ -13,6 +13,8 @@ final class InlineTakeBoxPlaybackController {
     private var endObserver: NSObjectProtocol?
     private weak var plugin: CAPPlugin?
     private var mirrored = false
+    private var ownerId = ""
+    private var cornerRadius: CGFloat = 0
 
     private init() {}
 
@@ -26,12 +28,18 @@ final class InlineTakeBoxPlaybackController {
         fileURL: URL,
         frameInWindow: CGRect,
         mirror: Bool,
-        volume: Float
+        volume: Float,
+        ownerId: String,
+        cornerRadius: CGFloat = 0
     ) throws -> [String: Any] {
-        stop(notify: false)
+        assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
+        // Preempting another box's playback: notify so its UI resets.
+        stop(notify: true)
 
         self.plugin = plugin
         self.mirrored = mirror
+        self.ownerId = ownerId
+        self.cornerRadius = max(0, cornerRadius)
 
         // Speaker route is primed from JS via prepareInlineTakeBoxPlaybackRoute().
 
@@ -50,6 +58,8 @@ final class InlineTakeBoxPlaybackController {
         view.backgroundColor = .black
         view.isUserInteractionEnabled = false
         view.clipsToBounds = true
+        view.layer.cornerRadius = self.cornerRadius
+        view.layer.masksToBounds = true
         view.accessibilityIdentifier = "inline-take-box-playback"
 
         let item = AVPlayerItem(url: fileURL)
@@ -89,11 +99,17 @@ final class InlineTakeBoxPlaybackController {
         ]
     }
 
-    func updateLayout(plugin: CAPPlugin, frameInWindow: CGRect) {
+    func updateLayout(plugin: CAPPlugin, frameInWindow: CGRect, cornerRadius: CGFloat? = nil) {
+        assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
         guard let webView = plugin.bridge?.webView,
               let host = webView.superview,
               let view = containerView,
               let layer = playerLayer else { return }
+
+        if let cornerRadius = cornerRadius {
+            self.cornerRadius = max(0, cornerRadius)
+            view.layer.cornerRadius = self.cornerRadius
+        }
 
         let frame = host.convert(frameInWindow, from: nil)
         view.frame = frame
@@ -102,14 +118,19 @@ final class InlineTakeBoxPlaybackController {
     }
 
     func setVolume(_ volume: Float) {
+        assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
         player?.volume = max(0, min(1, volume))
     }
 
     func pause() {
+        assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
         player?.pause()
     }
 
     func stop(notify: Bool = true) {
+        assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
+        let hadPlayer = player != nil
+        let endedOwnerId = ownerId
         if let endObserver = endObserver {
             NotificationCenter.default.removeObserver(endObserver)
             self.endObserver = nil
@@ -120,9 +141,11 @@ final class InlineTakeBoxPlaybackController {
         playerLayer = nil
         containerView?.removeFromSuperview()
         containerView = nil
+        ownerId = ""
+        cornerRadius = 0
 
-        if notify {
-            plugin?.notifyListeners("inlineTakeBoxPlaybackEnded", data: [:])
+        if notify && hadPlayer {
+            plugin?.notifyListeners("inlineTakeBoxPlaybackEnded", data: ["ownerId": endedOwnerId])
         }
     }
 

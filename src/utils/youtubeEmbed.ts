@@ -72,6 +72,18 @@ export function parseYoutubeEmbedUrl(input: string): string | null {
   return videoId ? buildYoutubeProxyUrl(videoId) : null
 }
 
+/** Best-effort clipboard read — works after user returns from YouTube with a copied link. */
+export async function readYoutubeUrlFromClipboard(): Promise<string | null> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) return null
+  try {
+    const text = (await navigator.clipboard.readText()).trim()
+    if (!text) return null
+    return parseYoutubeVideoId(text) ? text : null
+  } catch {
+    return null
+  }
+}
+
 /** Rebuild older proxy URLs to the current Netlify player page. */
 export function normalizeYoutubeEmbedUrl(embedUrl: string): string {
   if (

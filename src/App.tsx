@@ -39,6 +39,7 @@ import {
   releaseTakePlaybackAudio,
   playTakeMediaAudible,
 } from './utils/takePlaybackAudio'
+import { stopNativeInlineTakeBoxPlayback } from './utils/nativeInlineTakeBoxPlayback'
 import {
   prepareInlineMediaElement,
   assignMediaPlaybackSrc,
@@ -62,6 +63,7 @@ import {
   setYoutubeReferenceActive,
   startYoutubeProxyPlayback,
 } from './utils/playalong/youtubeBridge'
+import { isYoutubeDialogOpen } from './utils/youtubeDialogState'
 import {
   deleteTakeFile,
   NATIVE_AUDIO_MIME,
@@ -555,6 +557,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const challenger = challengerPipVideoRef.current
     teardownPipMedia(benchmark)
     teardownPipMedia(challenger)
+    // Native AVPlayer overlay path — notify:true lets the owning box reset its
+    // isPlaying state and release the stereo hold it acquired.
+    void stopNativeInlineTakeBoxPlayback({ notify: true })
     void releaseTakePlaybackAudio()
     stabilizeViewportAfterMediaInteraction()
     setBenchmarkPipPlaying(false)
@@ -2198,7 +2203,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         }
         youtubeTimer = window.setTimeout(() => {
           youtubeTimer = null
-          resumeYoutubeReference()
+          if (!isYoutubeDialogOpen()) {
+            resumeYoutubeReference()
+          }
         }, 700)
       }, 400)
     }
@@ -2964,6 +2971,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
         })
       }
+      if (next && isNativeCameraPlatform && recordingModeRef.current === 'video') {
+        void acquireNativeVideoBridge()
+      }
       if (!next) {
         window.requestAnimationFrame(() => {
           recoverCameraAfterSurfaceDismiss('split-close')
@@ -2971,7 +2981,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       return next
     })
-  }, [recoverCameraAfterSurfaceDismiss])
+  }, [acquireNativeVideoBridge, isNativeCameraPlatform, recoverCameraAfterSurfaceDismiss])
 
   const handleExitSplitView = useCallback(() => {
     setIsSplitView(false)
@@ -3376,6 +3386,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           isRecording={isRecording}
                           cameraReady={ready}
                           cameraResumeNonce={cameraResumeNonce}
+                          nativeLivePreviewActive={nativeLivePreviewActive}
+                          nativeCameraBridgeEnabled={isNativeCameraPlatform}
+                          nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
+                          holdPreviewForTakePlayback={false}
                           pitchStageActive={
                             showPitch &&
                             (mainAudioPitchSource !== null || mainVideoPitchSource !== null)

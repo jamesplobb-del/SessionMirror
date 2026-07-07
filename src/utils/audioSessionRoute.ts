@@ -174,11 +174,13 @@ export interface BestTakeAudioPluginType {
   startNativePlaybackTest(options: { url: string }): Promise<NativePlaybackTestStartResult>
   stopNativePlaybackTest(): Promise<void>
   startInlineTakeBoxPlayback(options: {
+    ownerId?: string
     url: string
     x: number
     y: number
     width: number
     height: number
+    cornerRadius?: number
     mirror?: boolean
     volume?: number
   }): Promise<NativePlaybackTestStartResult>
@@ -188,6 +190,7 @@ export interface BestTakeAudioPluginType {
     y: number
     width: number
     height: number
+    cornerRadius?: number
   }): Promise<void>
   setInlineTakeBoxPlaybackVolume(options: { volume: number }): Promise<void>
   prepareCameraLikePlaybackSession(options?: {
@@ -273,7 +276,7 @@ export interface BestTakeAudioPluginType {
   ): Promise<PluginListenerHandle>
   addListener(
     eventName: 'inlineTakeBoxPlaybackEnded',
-    listenerFunc: () => void,
+    listenerFunc: (data: { ownerId?: string }) => void,
   ): Promise<PluginListenerHandle>
   addListener(
     eventName: 'nativeCameraPreviewFrame',

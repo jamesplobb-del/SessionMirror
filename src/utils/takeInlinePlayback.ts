@@ -1,6 +1,6 @@
 import {
-  finalizeTakePlaybackCleanup,
-  playTakeMediaFromUserGesture,
+  finalizeInlineTakeBoxPlaybackCleanup,
+  playInlineTakeBoxFromUserGesture,
 } from './takePlaybackAudio'
 import { stabilizeViewportAfterMediaInteraction } from './viewportSync'
 
@@ -10,7 +10,13 @@ export interface InlineTakePlaybackCallbacks {
   onFailure?: () => void
 }
 
-/** Shared PiP / review play-pause — call from onClick inside a user gesture. */
+/**
+ * Shared PiP / review play-pause — call from onClick inside a user gesture.
+ *
+ * Uses the lightweight inline route (speaker hold only, no `playbackRouteActive`)
+ * so a live camera preview never has its AVAudioSession ownership contested —
+ * contesting it here previously caused decoder stalls/freezes during playback.
+ */
 export function toggleInlineTakePlayback(
   media: HTMLMediaElement | null | undefined,
   callbacks: InlineTakePlaybackCallbacks = {},
@@ -21,7 +27,7 @@ export function toggleInlineTakePlayback(
   if (!hasSource) return false
 
   if (media.paused || media.ended) {
-    playTakeMediaFromUserGesture(media, {
+    playInlineTakeBoxFromUserGesture(media, {
       onPlaying: callbacks.onPlaying,
       onFailure: callbacks.onFailure,
     })
@@ -29,7 +35,7 @@ export function toggleInlineTakePlayback(
   }
 
   media.pause()
-  void finalizeTakePlaybackCleanup()
+  void finalizeInlineTakeBoxPlaybackCleanup()
   stabilizeViewportAfterMediaInteraction()
   callbacks.onPaused?.()
   return true

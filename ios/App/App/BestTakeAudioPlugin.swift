@@ -1420,25 +1420,34 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let mirror = call.getBool("mirror") ?? false
         let volume = Float(call.getFloat("volume") ?? 1)
+        let ownerId = call.getString("ownerId") ?? ""
+        let cornerRadius = CGFloat(call.getFloat("cornerRadius") ?? 0)
 
-        do {
-            let payload = try InlineTakeBoxPlaybackController.shared.start(
-                plugin: self,
-                fileURL: fileURL,
-                frameInWindow: frame,
-                mirror: mirror,
-                volume: volume
-            )
-            call.resolve(payload)
-        } catch {
-            call.reject("Failed to start inline take box playback", nil, error)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            do {
+                let payload = try InlineTakeBoxPlaybackController.shared.start(
+                    plugin: self,
+                    fileURL: fileURL,
+                    frameInWindow: frame,
+                    mirror: mirror,
+                    volume: volume,
+                    ownerId: ownerId,
+                    cornerRadius: cornerRadius
+                )
+                call.resolve(payload)
+            } catch {
+                call.reject("Failed to start inline take box playback", nil, error)
+            }
         }
     }
 
     @objc func stopInlineTakeBoxPlayback(_ call: CAPPluginCall) {
         let notify = call.getBool("notify") ?? true
-        InlineTakeBoxPlaybackController.shared.stop(notify: notify)
-        call.resolve()
+        DispatchQueue.main.async {
+            InlineTakeBoxPlaybackController.shared.stop(notify: notify)
+            call.resolve()
+        }
     }
 
     @objc func updateInlineTakeBoxPlaybackLayout(_ call: CAPPluginCall) {
@@ -1446,14 +1455,24 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("layout x/y/width/height required")
             return
         }
-        InlineTakeBoxPlaybackController.shared.updateLayout(plugin: self, frameInWindow: frame)
-        call.resolve()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let cornerRadius = CGFloat(call.getFloat("cornerRadius") ?? 0)
+            InlineTakeBoxPlaybackController.shared.updateLayout(
+                plugin: self,
+                frameInWindow: frame,
+                cornerRadius: cornerRadius > 0 ? cornerRadius : nil
+            )
+            call.resolve()
+        }
     }
 
     @objc func setInlineTakeBoxPlaybackVolume(_ call: CAPPluginCall) {
         let volume = Float(call.getFloat("volume") ?? 1)
-        InlineTakeBoxPlaybackController.shared.setVolume(volume)
-        call.resolve()
+        DispatchQueue.main.async {
+            InlineTakeBoxPlaybackController.shared.setVolume(volume)
+            call.resolve()
+        }
     }
 
     // MARK: - Native camera recording A/B test (AVCaptureSession — bypasses WKWebView)

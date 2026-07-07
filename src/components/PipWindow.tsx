@@ -6,10 +6,24 @@ import Pressable from './ui/Pressable'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import {
-  finalizeTakePlaybackCleanup,
+  finalizeInlineTakeBoxPlaybackCleanup,
   playTakeMediaAudible,
 } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
+import {
+  isNativeInlineTakeBoxPlaybackAvailable,
+  measureInlineTakeBoxWindowRect,
+  setNativeInlineTakeBoxEndedHandler,
+  setNativeInlineTakeBoxVolume,
+  startNativeInlineTakeBoxPlayback,
+  stopNativeInlineTakeBoxPlayback,
+  teardownNativeInlineTakeBoxListener,
+  updateNativeInlineTakeBoxLayout,
+} from '../utils/nativeInlineTakeBoxPlayback'
+import {
+  prepareInlineTakeBoxPlaybackRoute,
+  releaseInlineTakeBoxPlaybackRoute,
+} from '../utils/playbackRouteCoordinator'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
@@ -112,10 +126,19 @@ function PipWindow({
   const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
   const autoPlaySessionRef = useRef(false)
+  const playbackStageRef = useRef<HTMLDivElement>(null)
+  const nativePlayInFlightRef = useRef(false)
+  const nativeRouteHeldRef = useRef(false)
+  const autoPlayViaNativeRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
 
   const hasMedia = Boolean(src || filePath)
+  const nativeOwnerId = `pip-${variant}`
+  const useNativePipPlayback =
+    isNativeInlineTakeBoxPlaybackAvailable() &&
+    Boolean(filePath) &&
+    !isAudioMimeType(mimeType)
   const isAudioMedia = isAudioMimeType(mimeType)
   const mediaSurfaceClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
   const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && hasMedia
@@ -126,11 +149,85 @@ function PipWindow({
   )
   const playbackAudible = (isAutoPlayArmed || isPlaying) && !suspendPlayback
 
+  const stopNativePipPlayback = useCallback(() => {
+    void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: nativeOwnerId })
+    if (nativeRouteHeldRef.current) {
+      nativeRouteHeldRef.current = false
+      void releaseInlineTakeBoxPlaybackRoute()
+    }
+    setIsPlaying(false)
+  }, [nativeOwnerId])
+
   useEffect(() => {
     setIsPlaying(false)
   }, [videoSourceKey, suspendPlayback])
 
   useEffect(() => {
+    if (!useNativePipPlayback) return
+    // Source changed — drop any native overlay for the previous take.
+    return () => {
+      void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: nativeOwnerId })
+      if (nativeRouteHeldRef.current) {
+        nativeRouteHeldRef.current = false
+        void releaseInlineTakeBoxPlaybackRoute()
+      }
+    }
+  }, [useNativePipPlayback, videoSourceKey])
+
+  useEffect(() => {
+    if (!useNativePipPlayback) return
+
+    setNativeInlineTakeBoxEndedHandler(nativeOwnerId, () => {
+      setIsPlaying(false)
+      if (nativeRouteHeldRef.current) {
+        nativeRouteHeldRef.current = false
+        void releaseInlineTakeBoxPlaybackRoute()
+      }
+      if (autoPlayViaNativeRef.current) {
+        autoPlayViaNativeRef.current = false
+        autoPlaySessionRef.current = false
+        onAutoPlayComplete?.()
+      }
+    })
+
+    return () => {
+      setNativeInlineTakeBoxEndedHandler(nativeOwnerId, null)
+      void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: nativeOwnerId })
+      if (nativeRouteHeldRef.current) {
+        nativeRouteHeldRef.current = false
+        void releaseInlineTakeBoxPlaybackRoute()
+      }
+      void teardownNativeInlineTakeBoxListener()
+    }
+  }, [nativeOwnerId, onAutoPlayComplete, useNativePipPlayback])
+
+  useEffect(() => {
+    if (!useNativePipPlayback || !isPlaying) return
+    const stage = playbackStageRef.current
+    if (!stage) return
+
+    const syncLayout = () => {
+      const rect = measureInlineTakeBoxWindowRect(stage)
+      if (rect) {
+        void updateNativeInlineTakeBoxLayout(rect)
+      }
+    }
+
+    syncLayout()
+    const observer = new ResizeObserver(syncLayout)
+    observer.observe(stage)
+    window.addEventListener('scroll', syncLayout, true)
+    window.addEventListener('resize', syncLayout)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', syncLayout, true)
+      window.removeEventListener('resize', syncLayout)
+    }
+  }, [isPlaying, useNativePipPlayback, layout, splitViewActive])
+
+  useEffect(() => {
+    if (useNativePipPlayback) return
     const media = videoRef.current
     if (!media) return
 
@@ -147,7 +244,7 @@ function PipWindow({
       media.removeEventListener('pause', syncPlaying)
       media.removeEventListener('ended', syncPlaying)
     }
-  }, [videoRef, videoSourceKey])
+  }, [useNativePipPlayback, videoRef, videoSourceKey])
 
   useEffect(() => {
     onPlaybackChange?.(isPlaying)
@@ -155,17 +252,55 @@ function PipWindow({
 
   useEffect(() => {
     if (!suspendPlayback) return
+    if (useNativePipPlayback) {
+      stopNativePipPlayback()
+      return
+    }
     const media = videoRef.current
     if (!media) return
     media.pause()
     setIsPlaying(false)
-  }, [suspendPlayback, videoRef, videoSourceKey])
+  }, [stopNativePipPlayback, suspendPlayback, useNativePipPlayback, videoRef, videoSourceKey])
 
   const handlePlayPauseClick = useCallback(
     (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback) return
+
+      if (useNativePipPlayback) {
+        if (isPlaying) {
+          stopNativePipPlayback()
+          return
+        }
+        if (nativePlayInFlightRef.current) return
+
+        const rect = measureInlineTakeBoxWindowRect(playbackStageRef.current)
+        if (!rect) return
+
+        void (async () => {
+          nativePlayInFlightRef.current = true
+          try {
+            await prepareInlineTakeBoxPlaybackRoute()
+            nativeRouteHeldRef.current = true
+            const started = await startNativeInlineTakeBoxPlayback({
+              filePath,
+              layout: rect,
+              mirror,
+              volume,
+              ownerId: nativeOwnerId,
+            })
+            if (!started) {
+              nativeRouteHeldRef.current = false
+              await releaseInlineTakeBoxPlaybackRoute()
+            }
+            setIsPlaying(started)
+          } finally {
+            nativePlayInFlightRef.current = false
+          }
+        })()
+        return
+      }
 
       const video = videoRef.current
       if (!video) return
@@ -177,7 +312,7 @@ function PipWindow({
           onPlaying: () => setIsPlaying(true),
           onFailure: () => {
             setIsPlaying(false)
-            void finalizeTakePlaybackCleanup()
+            void finalizeInlineTakeBoxPlaybackCleanup()
           },
         })
       } else {
@@ -188,7 +323,18 @@ function PipWindow({
         })
       }
     },
-    [suspendPlayback, variant, videoRef],
+    [
+      filePath,
+      isPlaying,
+      mirror,
+      nativeOwnerId,
+      stopNativePipPlayback,
+      suspendPlayback,
+      useNativePipPlayback,
+      variant,
+      videoRef,
+      volume,
+    ],
   )
 
 
@@ -207,6 +353,50 @@ function PipWindow({
 
     autoPlaySessionRef.current = true
     let cancelled = false
+
+    if (useNativePipPlayback) {
+      void (async () => {
+        if (nativePlayInFlightRef.current) return
+        const rect = measureInlineTakeBoxWindowRect(playbackStageRef.current)
+        if (!rect) {
+          autoPlaySessionRef.current = false
+          onAutoPlayComplete?.()
+          return
+        }
+        nativePlayInFlightRef.current = true
+        try {
+          await prepareInlineTakeBoxPlaybackRoute()
+          nativeRouteHeldRef.current = true
+          const started = await startNativeInlineTakeBoxPlayback({
+            filePath,
+            layout: rect,
+            mirror,
+            volume,
+            ownerId: nativeOwnerId,
+          })
+          if (cancelled || !autoPlaySessionRef.current) {
+            stopNativePipPlayback()
+            return
+          }
+          if (started) {
+            autoPlayViaNativeRef.current = true
+            setIsPlaying(true)
+          } else {
+            nativeRouteHeldRef.current = false
+            await releaseInlineTakeBoxPlaybackRoute()
+            autoPlaySessionRef.current = false
+            onAutoPlayComplete?.()
+          }
+        } finally {
+          nativePlayInFlightRef.current = false
+        }
+      })()
+
+      return () => {
+        cancelled = true
+        autoPlaySessionRef.current = false
+      }
+    }
 
     void (async () => {
       const media = videoRef.current
@@ -256,22 +446,33 @@ function PipWindow({
     }
   }, [
     autoPlayRequestId,
+    filePath,
+    mirror,
+    nativeOwnerId,
     onAutoPlayComplete,
     src,
+    stopNativePipPlayback,
     suspendPlayback,
     takeId,
+    useNativePipPlayback,
     videoRef,
+    volume,
   ])
 
   const handleVolume = useCallback(
     (value: number) => {
+      if (useNativePipPlayback) {
+        void setNativeInlineTakeBoxVolume(value)
+        setVolume(value)
+        return
+      }
       const video = videoRef.current
       if (!video) return
       video.volume = value
       updateTakePlaybackSpeakerGain(video, value, false)
       setVolume(value)
     },
-    [videoRef],
+    [useNativePipPlayback, videoRef],
   )
 
   const handleVideoAreaClick = useCallback(() => {
@@ -331,8 +532,8 @@ function PipWindow({
     : 'ui-orient-spin relative h-full w-full'
 
   const mediaStageClass = isFill
-    ? 'relative min-h-0 flex-1 w-full'
-    : 'relative h-full w-full'
+    ? 'relative min-h-0 flex-1 w-full overflow-hidden'
+    : 'relative h-full w-full overflow-hidden rounded-xl'
 
   return (
     <div className={shellClass}>
@@ -359,24 +560,26 @@ function PipWindow({
           {label}
         </span>
 
-        <div className={mediaStageClass}>
+        <div ref={playbackStageRef} className={mediaStageClass}>
         {hasMedia ? (
           <>
-              <TakeVideoPlayer
-                filePath={filePath}
-                videoUrl={src ?? ''}
-                mimeType={mimeType}
-                videoRef={videoRef}
-                videoSourceKey={videoSourceKey}
-                className="absolute inset-0 h-full w-full pointer-events-none"
-                loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
-                mirror={mirror}
-                recordingOrientation={recordingOrientation}
-                fit={playbackFit}
-                manualPlayOnly
-                audible={playbackAudible}
-              />
-              {!isPlaying && (
+              {!useNativePipPlayback && (
+                <TakeVideoPlayer
+                  filePath={filePath}
+                  videoUrl={src ?? ''}
+                  mimeType={mimeType}
+                  videoRef={videoRef}
+                  videoSourceKey={videoSourceKey}
+                  className="absolute inset-0 h-full w-full pointer-events-none"
+                  loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
+                  mirror={mirror}
+                  recordingOrientation={recordingOrientation}
+                  fit={playbackFit}
+                  manualPlayOnly
+                  audible={playbackAudible}
+                />
+              )}
+              {(useNativePipPlayback || !isPlaying) && (
                 <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
               )}
 

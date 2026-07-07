@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { syncFormFactorClass } from './deviceFormFactor'
 import { resetCameraPreviewZoom } from './videoCapture'
+import { isYoutubeDialogOpen } from './youtubeDialogState'
 
 export const CAMERA_PREVIEW_LAYOUT_RECOVERY_EVENT = 'sessionmirror:camera-preview-layout-recovery'
 
@@ -127,6 +128,15 @@ export function stabilizeViewportAfterMediaInteraction(): void {
 
 export function requestCameraPreviewLayoutRecovery(reason = 'layout-change'): void {
   if (typeof window === 'undefined') return
+  // While the YouTube paste sheet is open, skip camera churn — recovery runs on
+  // submit/close (reason youtube-submit / youtube-close).
+  if (
+    isYoutubeDialogOpen() &&
+    reason !== 'youtube-submit' &&
+    reason !== 'youtube-close'
+  ) {
+    return
+  }
   if (isKeyboardLikelyOpen()) {
     deferredCameraRecoveryReason = reason
     if (deferredCameraRecoveryTimer !== null) window.clearTimeout(deferredCameraRecoveryTimer)

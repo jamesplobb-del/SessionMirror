@@ -29,6 +29,10 @@ interface SplitCompareLayoutProps {
   isRecording: boolean
   cameraReady: boolean
   cameraResumeNonce?: number
+  nativeLivePreviewActive?: boolean
+  nativeCameraBridgeEnabled?: boolean
+  nativeLivePreviewSeedUrl?: string | null
+  holdPreviewForTakePlayback?: boolean
   pitchStageActive: boolean
   metronomeStageActive: boolean
   onUnpinBenchmark: () => void
@@ -74,6 +78,10 @@ export default function SplitCompareLayout({
   isRecording,
   cameraReady,
   cameraResumeNonce = 0,
+  nativeLivePreviewActive = false,
+  nativeCameraBridgeEnabled = false,
+  nativeLivePreviewSeedUrl = null,
+  holdPreviewForTakePlayback = false,
   pitchStageActive,
   metronomeStageActive,
   onUnpinBenchmark,
@@ -276,6 +284,10 @@ export default function SplitCompareLayout({
                   isRecording={isRecording}
                   resumeNonce={cameraResumeNonce}
                   modePreparing={!cameraReady && !isRecording && !cameraNeedsPermission}
+                  nativeLivePreviewActive={nativeLivePreviewActive}
+                  nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
+                  nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
+                  holdPreviewForTakePlayback={holdPreviewForTakePlayback}
                   pitchStageActive={pitchStageActive}
                   metronomeStageActive={metronomeStageActive}
                 />

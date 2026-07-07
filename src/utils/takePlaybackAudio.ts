@@ -133,11 +133,13 @@ export async function finalizeInlineTakeBoxPlaybackCleanup(): Promise<void> {
   await releaseTakePlaybackAudio()
 }
 
-/** App background / lifecycle — stop native overlay and release inline holds. */
+/** App background / lifecycle — stop native overlay and release inline holds.
+ * notify:true so the owning box resets its UI and releases the stereo hold it
+ * owns; an unconditional release here would steal YouTube's hold. */
 export async function suspendInlineTakeBoxPlaybackForLifecycle(): Promise<void> {
   const { stopNativeInlineTakeBoxPlayback } = await import('./nativeInlineTakeBoxPlayback')
-  await stopNativeInlineTakeBoxPlayback({ notify: false })
-  await finalizeInlineTakeBoxPlaybackCleanup()
+  await stopNativeInlineTakeBoxPlayback({ notify: true })
+  await releaseTakePlaybackAudio()
 }
 
 function attachInlineTakeBoxEndedListener(media: HTMLMediaElement): void {

@@ -18,11 +18,15 @@ enum NativeCameraAudioSessionProfile: String {
     func apply(to audioSession: AVAudioSession) throws {
         switch self {
         case .videoRecording:
+            // mixWithOthers is load-bearing: WKWebView media (take playback,
+            // YouTube iframe) honors the host session's mixability. Without it,
+            // WebKit audio interrupts the capture session (reason=2, mic drops)
+            // and our re-activations pause WebKit media in a ping-pong loop.
             try AudioRouteConfigurator.debugSetCategory(
                 audioSession,
                 category: .playAndRecord,
                 mode: .videoRecording,
-                options: [.defaultToSpeaker],
+                options: [.mixWithOthers, .defaultToSpeaker],
                 caller: "NativeCameraAudioSessionProfile.videoRecording"
             )
         case .playAndRecordDefault:
@@ -30,7 +34,7 @@ enum NativeCameraAudioSessionProfile: String {
                 audioSession,
                 category: .playAndRecord,
                 mode: .default,
-                options: [.defaultToSpeaker],
+                options: [.mixWithOthers, .defaultToSpeaker],
                 caller: "NativeCameraAudioSessionProfile.playAndRecordDefault"
             )
         case .recordVideoRecording:
@@ -42,10 +46,8 @@ enum NativeCameraAudioSessionProfile: String {
                 caller: "NativeCameraAudioSessionProfile.recordVideoRecording"
             )
         }
-        try AudioRouteConfigurator.debugSetActive(
+        try AudioRouteConfigurator.ensureSessionActive(
             audioSession,
-            active: true,
-            options: [],
             caller: "NativeCameraAudioSessionProfile.\(rawValue)"
         )
         if let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) {

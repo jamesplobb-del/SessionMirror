@@ -388,6 +388,7 @@ final class DroneEngine {
         let session = AVAudioSession.sharedInstance()
         do {
             let options: AVAudioSession.CategoryOptions = [
+                .mixWithOthers,
                 .allowBluetoothA2DP,
                 .allowAirPlay,
                 .defaultToSpeaker,
@@ -401,9 +402,8 @@ final class DroneEngine {
             )
             try session.setPreferredSampleRate(48_000)
             try session.setPreferredIOBufferDuration(0.005)
-            try AudioRouteConfigurator.debugSetActive(
+            try AudioRouteConfigurator.ensureSessionActive(
                 session,
-                active: true,
                 caller: "DroneEngine.prepareAudioSession"
             )
             audioSessionPrepared = true

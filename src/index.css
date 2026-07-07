@@ -2788,6 +2788,11 @@ video.camera-preview.camera-preview--hidden {
   pointer-events: none !important;
 }
 
+/* Split expand: native live feed replaces the idle panel tint. */
+.split-compare-layout__bottom .camera-background--embedded:has(.camera-preview-canvas--live) {
+  background: #000;
+}
+
 .camera-preview-placeholder {
   position: fixed;
   inset: 0;

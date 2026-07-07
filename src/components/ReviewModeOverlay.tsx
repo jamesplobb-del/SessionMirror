@@ -23,7 +23,7 @@ import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take, TakeUpdate } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
-import { finalizeTakePlaybackCleanup } from '../utils/takePlaybackAudio'
+import { finalizeInlineTakeBoxPlaybackCleanup } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { loadTakeMarkers } from '../practiceTimeline/recording/timelineMarkers'
@@ -547,7 +547,7 @@ export default function ReviewModeOverlay({
         challengerVideoRef.current,
         vaultVideoRef.current,
       )
-      void finalizeTakePlaybackCleanup()
+      void finalizeInlineTakeBoxPlaybackCleanup()
       pauseAllReviewVideosSafe()
       onClose()
     },
@@ -796,7 +796,7 @@ export default function ReviewModeOverlay({
       revealPlayOverlay(false)
       stopProgressLoop()
       if (!activeAudioPlaybackItem) {
-        void finalizeTakePlaybackCleanup()
+        void finalizeInlineTakeBoxPlaybackCleanup()
       }
     }
     const onEnded = () => {
@@ -804,7 +804,7 @@ export default function ReviewModeOverlay({
       revealPlayOverlay(false)
       stopProgressLoop()
       if (!activeAudioPlaybackItem) {
-        void finalizeTakePlaybackCleanup()
+        void finalizeInlineTakeBoxPlaybackCleanup()
       }
     }
 

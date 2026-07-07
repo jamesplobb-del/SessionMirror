@@ -41,6 +41,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             let wasSuspended = notification.userInfo?[AVAudioSessionInterruptionWasSuspendedKey] as? Bool
             let optionsRaw = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
             let options = optionsRaw.flatMap { AVAudioSession.InterruptionOptions(rawValue: $0) }
+            if type == .began {
+                AudioRouteConfigurator.noteInterruptionBegan()
+            }
             let snapshot = AudioRouteConfigurator.routeSnapshot(for: session)
             print(
                 "[AVAudioSessionInterruption] type=\(String(describing: type)) " +
@@ -88,13 +91,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 session,
                 category: .playAndRecord,
                 mode: .default,
-                options: [.allowBluetoothA2DP, .defaultToSpeaker],
+                options: [.mixWithOthers, .allowBluetoothA2DP, .defaultToSpeaker],
                 caller: "AppDelegate.configurePersistentAudioSession"
             )
-            try AudioRouteConfigurator.debugSetActive(
+            try AudioRouteConfigurator.ensureSessionActive(
                 session,
-                active: true,
-                options: [],
                 caller: "AppDelegate.configurePersistentAudioSession"
             )
             AudioRouteConfigurator.logRoute("launch passive session")
