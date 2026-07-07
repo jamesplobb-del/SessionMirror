@@ -1,3 +1,4 @@
+import { type RefObject } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { applyStrictPlaybackSrc } from './takeStorage'
 import { applyBulletproofVideoElement } from './mobileVideo'
@@ -122,6 +123,22 @@ export function waitForMediaReady(
     media.addEventListener('canplay', onReady)
     media.addEventListener('canplaythrough', onReady)
   })
+}
+
+/** Poll until a ref is populated — e.g. after gating decoder mount on first play tap. */
+export async function waitForMediaElement(
+  mediaRef: RefObject<HTMLMediaElement | null>,
+  options: { attempts?: number; intervalMs?: number } = {},
+): Promise<HTMLMediaElement | null> {
+  const { attempts = 40, intervalMs = 50 } = options
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const media = mediaRef.current
+    if (media) return media
+    await new Promise((resolve) => window.setTimeout(resolve, intervalMs))
+  }
+
+  return mediaRef.current
 }
 
 /** Poll until freshly saved native takes are readable by the media element. */

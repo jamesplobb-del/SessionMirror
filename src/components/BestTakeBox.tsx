@@ -28,12 +28,11 @@ import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { useTutorialAction } from '../context/TutorialContext'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
-import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { isAudioMimeType } from '../utils/mobileVideo'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
+import { waitForMediaElement, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 
 const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 
@@ -204,24 +203,12 @@ function BestTakeBox({
   const posterUrl =
     take?.thumbnailUrl ??
     (hasLibraryPlayback || take?.mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : null)
-  const { decoderActive, pendingPlayRef, requestDecoderForPlay } = usePipInlineDecoder({
-    suspendPlayback,
-    isAutoPlayArmed: false,
-    isPlaying,
-    videoSourceKey,
-    mediaRef: videoRef,
-  })
 
   const handlePlayPauseClick = useCallback(
     (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback || !hasTake) return
-
-      if (!decoderActive) {
-        requestDecoderForPlay()
-        return
-      }
 
       const video = videoRef.current
       if (!video) return
@@ -245,37 +232,10 @@ function BestTakeBox({
         })
       }
     },
-    [decoderActive, hasTake, requestDecoderForPlay, suspendPlayback, videoRef],
+    [hasTake, suspendPlayback, videoRef],
   )
 
-  useEffect(() => {
-    if (!decoderActive || !pendingPlayRef.current || suspendPlayback || !hasTake) return
 
-    let cancelled = false
-    void (async () => {
-      const media = videoRef.current
-      if (!media) return
-
-      const ready = await waitForMediaReadyWithRetry(media)
-      if (cancelled || !pendingPlayRef.current) return
-      pendingPlayRef.current = false
-      if (!ready) return
-
-      setIsPlaying(true)
-      toggleInlineTakePlayback(media, {
-        onPlaying: () => setIsPlaying(true),
-        onFailure: () => {
-          setIsPlaying(false)
-          void releaseTakePlaybackAudio()
-        },
-        onPaused: () => setIsPlaying(false),
-      })
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [decoderActive, hasTake, pendingPlayRef, suspendPlayback, videoRef, videoSourceKey])
 
   const handleVolume = useCallback(
     (value: number) => {
@@ -433,22 +393,21 @@ function BestTakeBox({
             />
           ) : hasTake ? (
             <>
-              {decoderActive ? (
-                <TakeVideoPlayer
-                  filePath={playbackFilePath}
-                  videoUrl={src ?? ''}
-                  mimeType={playbackMimeType}
-                  videoRef={videoRef}
-                  videoSourceKey={videoSourceKey}
-                  className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                  loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
-                  mirror={hasLibraryPlayback ? false : take!.mirrorPlayback !== false}
-                  recordingOrientation={take?.recordingOrientation}
-                  fit={playbackFit}
-                  manualPlayOnly
-                  audible={playbackAudible}
-                />
-              ) : (
+              <TakeVideoPlayer
+                filePath={playbackFilePath}
+                videoUrl={src ?? ''}
+                mimeType={playbackMimeType}
+                videoRef={videoRef}
+                videoSourceKey={videoSourceKey}
+                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
+                mirror={hasLibraryPlayback ? false : take!.mirrorPlayback !== false}
+                recordingOrientation={take?.recordingOrientation}
+                fit={playbackFit}
+                manualPlayOnly
+                audible={playbackAudible}
+              />
+              {!isPlaying && (
                 <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
               )}
 

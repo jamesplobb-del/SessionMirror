@@ -286,7 +286,20 @@ export async function playTakeMediaAudible(
       reportTakePlaybackStarted(media)
       return true
     } catch (error) {
-      console.log(error)
+      console.error('[Playback] playTakeMediaAudible failed — both play attempts rejected', {
+        errorName: error instanceof Error ? error.name : String(error),
+        errorMessage: error instanceof Error ? error.message : String(error),
+        src: media.src,
+        readyState: media.readyState,
+        networkState: media.networkState,
+        currentTime: media.currentTime,
+        duration: media.duration,
+        paused: media.paused,
+        muted: media.muted,
+        volume: media.volume,
+        mediaErrorCode: media.error?.code ?? null,
+        mediaErrorMessage: media.error?.message ?? null,
+      })
       options.onFailure?.(error)
       await completePlaybackRouteRestore()
       return false

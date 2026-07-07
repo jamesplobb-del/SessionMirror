@@ -251,7 +251,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func enableStereoPlayback(_ call: CAPPluginCall) {
         do {
-            let result = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
+            let result: [String: Any]
+            if CameraSessionGuard.isCameraOrRecordingActive && CameraSessionGuard.playbackRouteActive {
+                result = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
+            } else {
+                result = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
+            }
             call.resolve(result)
         } catch {
             call.reject("Failed to set stereo playback", nil, error)

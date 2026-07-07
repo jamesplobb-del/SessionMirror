@@ -12,7 +12,7 @@ export function registerRecordingRouteRestoredHandler(handler: () => void): void
 
 /**
  * Native Web playback route is attempted for both speaker and external output.
- * Swift still refuses the route while camera preview or recording is active.
+ * With a live camera preview, a coexistent speaker override is used instead.
  */
 function shouldAttemptNativeStereoRoute(): boolean {
   if (!Capacitor.isNativePlatform()) return false
@@ -37,6 +37,16 @@ function markNativeStereoUnavailable(error: unknown): void {
   )
 }
 
+function snapshotIndicatesNativeRouteEngaged(snapshot: {
+  routeApplied?: boolean
+  playbackRouteStyle?: string
+}): boolean {
+  if (snapshot.playbackRouteStyle === 'coexistent' || snapshot.playbackRouteStyle === 'full') {
+    return true
+  }
+  return snapshot.routeApplied !== false
+}
+
 /**
  * Refcounted hold for playback sessions. On built-in speaker this is a JS-only refcount —
  * no AVAudioSession category change.
@@ -50,9 +60,10 @@ export function engageStereoPlayback(): void {
 
   void (async () => {
     if (await isCameraSessionActive()) {
-      nativeRouteEngaged = false
-      console.info('[AudioRoute] Native stereo route skipped while camera preview is active')
-      return
+      if (holdCount <= 0) return
+      return BestTakeAudioPlugin.prepareCameraLikePlaybackSession({
+        allowWithActivePreview: true,
+      })
     }
     if (holdCount <= 0) return
 
@@ -60,8 +71,8 @@ export function engageStereoPlayback(): void {
   })()
     .then((snapshot) => {
       if (!snapshot) return
-      nativeRouteEngaged = snapshot.routeApplied !== false
-      if (snapshot.routeApplied === false) {
+      nativeRouteEngaged = snapshotIndicatesNativeRouteEngaged(snapshot)
+      if ('routeApplied' in snapshot && snapshot.routeApplied === false) {
         console.info('[AudioRoute] Web playback route unchanged', snapshot)
       }
     })
@@ -78,9 +89,10 @@ export function refreshStereoPlaybackRoute(): void {
 
   void (async () => {
     if (await isCameraSessionActive()) {
-      nativeRouteEngaged = false
-      console.info('[AudioRoute] Native stereo route refresh skipped while camera preview is active')
-      return
+      if (holdCount <= 0) return
+      return BestTakeAudioPlugin.prepareCameraLikePlaybackSession({
+        allowWithActivePreview: true,
+      })
     }
     if (holdCount <= 0) return
 
@@ -88,8 +100,8 @@ export function refreshStereoPlaybackRoute(): void {
   })()
     .then((snapshot) => {
       if (!snapshot) return
-      nativeRouteEngaged = snapshot.routeApplied !== false
-      if (snapshot.routeApplied === false) {
+      nativeRouteEngaged = snapshotIndicatesNativeRouteEngaged(snapshot)
+      if ('routeApplied' in snapshot && snapshot.routeApplied === false) {
         console.info('[AudioRoute] Web playback route unchanged', snapshot)
       }
     })

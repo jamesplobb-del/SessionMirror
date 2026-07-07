@@ -701,6 +701,11 @@ function LiveCameraBackground({
         }`}
       />
 
+      <div
+        className={`camera-recording-border ${isRecording ? 'camera-recording-border--active' : ''}`}
+        aria-hidden
+      />
+
       {showPreparingOverlay && (
         <div
           className={`${overlayClass} camera-background-overlay--preparing pointer-events-none`}

@@ -394,10 +394,35 @@ export function AudioModePlaybackProvider({
             prepareInlineMediaElement(player, { preload: 'auto' })
             player.muted = false
             player.volume = 1
+            logPlayback('[Diag] src assigned, calling load()', {
+              takeId: item.takeId ?? item.id,
+              resolvedSrc,
+              readyState: player.readyState,
+              networkState: player.networkState,
+              playerSrc: player.src,
+            })
             player.load()
             onPlaybackActiveChangeRef.current?.(true)
+          } else {
+            logPlayback('[Diag] src unchanged, skipping load()', {
+              takeId: item.takeId ?? item.id,
+              resolvedSrc,
+              readyState: player.readyState,
+              networkState: player.networkState,
+              playerSrc: player.src,
+            })
           }
           await waitForAudioModePlaybackReady(player)
+          logPlayback('[Diag] waitForReady resolved', {
+            takeId: item.takeId ?? item.id,
+            readyState: player.readyState,
+            networkState: player.networkState,
+            src: player.src,
+            duration: player.duration,
+            paused: player.paused,
+            mediaErrorCode: player.error?.code ?? null,
+            mediaErrorMessage: player.error?.message ?? null,
+          })
           if (currentSourceKeyRef.current !== sourceKeyFor(item)) {
             pipelineDetachRef.current?.()
             pipelineDetachRef.current = null
@@ -412,6 +437,19 @@ export function AudioModePlaybackProvider({
             }
             pendingStartTimeRef.current = null
           }
+          logPlayback('[Diag] calling playTakeMediaAudible', {
+            takeId: item.takeId ?? item.id,
+            src: player.src,
+            readyState: player.readyState,
+            networkState: player.networkState,
+            currentTime: player.currentTime,
+            duration: player.duration,
+            paused: player.paused,
+            muted: player.muted,
+            volume: player.volume,
+            mediaErrorCode: player.error?.code ?? null,
+            mediaErrorMessage: player.error?.message ?? null,
+          })
           const started = await playTakeMediaAudible(player, { skipRoutePrep: true })
           if (!started) {
             throw new Error('Audio mode playback did not start')

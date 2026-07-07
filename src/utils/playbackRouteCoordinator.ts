@@ -17,6 +17,7 @@ export interface PreparePlaybackRouteOptions {
 let playbackRouteActive = false
 let cameraWasSuspendedForPlayback = false
 let loudSessionAppliedForPlayback = false
+let coexistentSpeakerAppliedForPlayback = false
 let restoreInFlight: Promise<void> | null = null
 let cameraHandlers: {
   suspend: () => void | Promise<void>
@@ -54,11 +55,13 @@ export async function clearPlaybackRouteForLifecycle(
     playbackRouteActive ||
     cameraWasSuspendedForPlayback ||
     loudSessionAppliedForPlayback ||
+    coexistentSpeakerAppliedForPlayback ||
     restoreInFlight !== null
 
   playbackRouteActive = false
   cameraWasSuspendedForPlayback = false
   loudSessionAppliedForPlayback = false
+  coexistentSpeakerAppliedForPlayback = false
   restoreInFlight = null
 
   if (!hadRouteState) return
@@ -115,8 +118,8 @@ async function ensureCameraSuspendedForPlayback(): Promise<boolean> {
 async function applyLoudPlaybackSessionIfSpeaker(options: {
   allowWithActivePreview?: boolean
   failSoft?: boolean
-} = {}): Promise<boolean> {
-  if (isHeadphoneOutputActive()) return false
+} = {}): Promise<{ applied: boolean; coexistent: boolean }> {
+  if (isHeadphoneOutputActive()) return { applied: false, coexistent: false }
 
   if (!options.allowWithActivePreview) {
     const state = await readNativeCameraSessionState()
@@ -127,17 +130,18 @@ async function applyLoudPlaybackSessionIfSpeaker(options: {
 
   console.log('[PlaybackRoute] applying playback session')
   try {
-    await BestTakeAudioPlugin.prepareCameraLikePlaybackSession({
+    const snapshot = await BestTakeAudioPlugin.prepareCameraLikePlaybackSession({
       allowWithActivePreview: options.allowWithActivePreview === true,
     })
-    return true
+    const coexistent = snapshot.playbackRouteStyle === 'coexistent'
+    return { applied: true, coexistent }
   } catch (error) {
     if (options.failSoft) {
       console.warn(
         '[PlaybackRoute] loud session with preview failed, continuing on current route',
         error,
       )
-      return false
+      return { applied: false, coexistent: false }
     }
     throw error
   }
@@ -154,6 +158,7 @@ export async function preparePlaybackRoute(
   playbackRouteActive = true
   cameraWasSuspendedForPlayback = false
   loudSessionAppliedForPlayback = false
+  coexistentSpeakerAppliedForPlayback = false
   const diagSessionId = getActivePlaybackDiagSession()
   if (diagSessionId) {
     logRouteTransition(diagSessionId, 'preparePlaybackRoute-start', { suspendCamera })
@@ -164,38 +169,38 @@ export async function preparePlaybackRoute(
   try {
     if (suspendCamera) {
       cameraWasSuspendedForPlayback = await ensureCameraSuspendedForPlayback()
-      loudSessionAppliedForPlayback = await applyLoudPlaybackSessionIfSpeaker()
+      const loud = await applyLoudPlaybackSessionIfSpeaker()
+      loudSessionAppliedForPlayback = loud.applied && !loud.coexistent
+      coexistentSpeakerAppliedForPlayback = loud.applied && loud.coexistent
     } else {
       const jsVideoPreviewLive = cameraHandlers?.hasLivePreview?.() ?? false
       if (jsVideoPreviewLive) {
-        // Diagnostic-only: this is the exact ownership overlap. Native-side
-        // `playbackRouteActive` was just set true (above) while the camera
-        // preview/bridge ownership (`previewActive`/`isBridgePreviewActive`)
-        // was never told to suspend — it stays true for the entire review
-        // playback. There is no teardown handshake here; both owners are
-        // simultaneously "true" for as long as review playback runs, which
-        // is why every native route change gets skipped
-        // (CameraSessionGuard.shouldBlockRouteChanges()) and why a
-        // concurrent capture-session self-heal can rebuild mid-playback.
-        console.warn(
-          '[OwnershipConflict] preparePlaybackRoute: entering review playback with ' +
-            'playbackRouteActive=true AND jsVideoPreviewLive=true simultaneously — ' +
-            'camera preview/bridge ownership was never suspended, so native route ' +
-            'changes will be skipped for the whole playback window and any camera ' +
-            'session self-heal may rebuild the capture session mid-playback.',
-        )
-        console.log(
-          '[PlaybackRoute] skipping loud session — live video preview keeps camera FOV',
-        )
-      } else {
-        loudSessionAppliedForPlayback = await applyLoudPlaybackSessionIfSpeaker({
+        const loud = await applyLoudPlaybackSessionIfSpeaker({
+          allowWithActivePreview: true,
           failSoft: true,
         })
+        loudSessionAppliedForPlayback = loud.applied && !loud.coexistent
+        coexistentSpeakerAppliedForPlayback = loud.applied && loud.coexistent
+        if (coexistentSpeakerAppliedForPlayback) {
+          console.log(
+            '[PlaybackRoute] coexistent speaker route applied — camera preview stays live',
+          )
+        }
+      } else {
+        // JS confirms no live video preview. Pass allowWithActivePreview so the
+        // native mic capture session (audio mode) does not block loud playback.
+        const loud = await applyLoudPlaybackSessionIfSpeaker({
+          allowWithActivePreview: true,
+          failSoft: true,
+        })
+        loudSessionAppliedForPlayback = loud.applied && !loud.coexistent
+        coexistentSpeakerAppliedForPlayback = loud.applied && loud.coexistent
       }
     }
     if (diagSessionId) {
       logRouteTransition(diagSessionId, 'preparePlaybackRoute-complete', {
         loudSessionAppliedForPlayback,
+        coexistentSpeakerAppliedForPlayback,
         cameraWasSuspendedForPlayback,
       })
       void logAudioSessionSnapshot('preparePlaybackRoute-complete', diagSessionId, {
@@ -206,6 +211,7 @@ export async function preparePlaybackRoute(
     playbackRouteActive = false
     cameraWasSuspendedForPlayback = false
     loudSessionAppliedForPlayback = false
+    coexistentSpeakerAppliedForPlayback = false
     await BestTakeAudioPlugin.setPlaybackRouteActive({ active: false }).catch(() => {
       /* ignore */
     })
@@ -230,6 +236,7 @@ export async function completePlaybackRouteRestore(): Promise<void> {
     playbackRouteActive = false
     cameraWasSuspendedForPlayback = false
     loudSessionAppliedForPlayback = false
+    coexistentSpeakerAppliedForPlayback = false
 
     console.log('[PlaybackRoute] playback ended')
     if (shouldRestoreLoudSession) {
@@ -278,6 +285,7 @@ export function installPlaybackRouteEndedListener(
       playbackRouteActive = false
       cameraWasSuspendedForPlayback = false
       loudSessionAppliedForPlayback = false
+      coexistentSpeakerAppliedForPlayback = false
       restoreInFlight = null
 
       try {

@@ -250,6 +250,34 @@ enum AudioRouteConfigurator {
         return snapshot
     }
 
+    /// Minimal speaker routing for WKWebView playback while the native camera
+    /// capture session stays live. Avoids category/mode changes that would
+    /// change camera FOV or stall the JPEG preview pump.
+    static func applyCoexistentPlaybackSpeakerRoute() throws -> [String: Any] {
+        let session = AVAudioSession.sharedInstance()
+        try debugSetActive(session, active: true, options: [], caller: "applyCoexistentPlaybackSpeakerRoute")
+        try preferBuiltInSpeakerIfSafe(session)
+
+        var snapshot = routeSnapshot(for: session)
+        snapshot["success"] = true
+        snapshot["routeApplied"] = true
+        snapshot["webPlaybackActive"] = true
+        snapshot["playbackRouteStyle"] = "coexistent"
+        snapshot["recordingActive"] = CameraSessionGuard.recordingActive
+        snapshot["cameraPreviewActive"] = CameraSessionGuard.previewActive
+        snapshot["playbackRouteActive"] = CameraSessionGuard.playbackRouteActive
+        snapshot["nativeLoudnessProfile"] = "coexistent-speaker-override"
+
+        print(
+            "[WebPlaybackAudio] routeApplied=true style=coexistent webPlaybackActive=true " +
+            "recordingActive=\(CameraSessionGuard.recordingActive) cameraPreviewActive=\(CameraSessionGuard.previewActive) " +
+            "category=\(snapshot["category"] ?? "unknown") mode=\(snapshot["mode"] ?? "unknown") " +
+            "input=\(snapshot["currentInputRoute"] ?? "unknown") output=\(snapshot["currentOutputRoute"] ?? "unknown")"
+        )
+
+        return snapshot
+    }
+
     static func applyWebPlaybackRoute(webPlaybackActive: Bool = true) throws -> [String: Any] {
         let session = AVAudioSession.sharedInstance()
         var fallbackReason: String?
@@ -295,6 +323,7 @@ enum AudioRouteConfigurator {
         snapshot["success"] = true
         snapshot["routeApplied"] = routeApplied
         snapshot["webPlaybackActive"] = webPlaybackActive
+        snapshot["playbackRouteStyle"] = routeApplied ? "full" : "unchanged"
         snapshot["recordingActive"] = CameraSessionGuard.recordingActive
         snapshot["cameraPreviewActive"] = CameraSessionGuard.previewActive
         snapshot["playbackRouteActive"] = CameraSessionGuard.playbackRouteActive

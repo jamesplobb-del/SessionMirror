@@ -4,14 +4,13 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import Pressable from './ui/Pressable'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
+import { waitForMediaElement, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import {
   finalizeTakePlaybackCleanup,
   playTakeMediaAudible,
 } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
-import { usePipInlineDecoder } from '../hooks/usePipInlineDecoder'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
 import { isAudioMimeType } from '../utils/mobileVideo'
@@ -125,13 +124,6 @@ function PipWindow({
   const isAutoPlayArmed = Boolean(
     autoPlayRequestId && takeId && autoPlayRequestId === takeId,
   )
-  const { decoderActive, pendingPlayRef, requestDecoderForPlay } = usePipInlineDecoder({
-    suspendPlayback,
-    isAutoPlayArmed,
-    isPlaying,
-    videoSourceKey,
-    mediaRef: videoRef,
-  })
   const playbackAudible = (isAutoPlayArmed || isPlaying) && !suspendPlayback
 
   useEffect(() => {
@@ -175,11 +167,6 @@ function PipWindow({
       stopEventBubble(event)
       if (suspendPlayback) return
 
-      if (!decoderActive) {
-        requestDecoderForPlay()
-        return
-      }
-
       const video = videoRef.current
       if (!video) return
 
@@ -201,37 +188,9 @@ function PipWindow({
         })
       }
     },
-    [decoderActive, requestDecoderForPlay, suspendPlayback, variant, videoRef],
+    [suspendPlayback, variant, videoRef],
   )
 
-  useEffect(() => {
-    if (!decoderActive || !pendingPlayRef.current || suspendPlayback) return
-
-    let cancelled = false
-    void (async () => {
-      const media = videoRef.current
-      if (!media) return
-
-      const ready = await waitForMediaReadyWithRetry(media)
-      if (cancelled || !pendingPlayRef.current) return
-      pendingPlayRef.current = false
-      if (!ready) return
-
-      media.setAttribute('data-debug-playback-tag', `pip-${variant}`)
-      setIsPlaying(true)
-      toggleInlineTakePlayback(media, {
-        onPlaying: () => setIsPlaying(true),
-        onFailure: () => {
-          setIsPlaying(false)
-          void finalizeTakePlaybackCleanup()
-        },
-      })
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [decoderActive, pendingPlayRef, suspendPlayback, variant, videoRef, videoSourceKey])
 
   // Hands-free auto-playback — muted programmatic play (iOS allows muted autoplay).
   useEffect(() => {
@@ -241,7 +200,7 @@ function PipWindow({
       autoPlayRequestId === takeId &&
       Boolean(src)
 
-    if (!wantsAutoPlay || suspendPlayback || !decoderActive) {
+    if (!wantsAutoPlay || suspendPlayback) {
       autoPlaySessionRef.current = false
       return
     }
@@ -302,8 +261,6 @@ function PipWindow({
     suspendPlayback,
     takeId,
     videoRef,
-    videoSourceKey,
-    decoderActive,
   ])
 
   const handleVolume = useCallback(
@@ -405,7 +362,6 @@ function PipWindow({
         <div className={mediaStageClass}>
         {hasMedia ? (
           <>
-            {decoderActive ? (
               <TakeVideoPlayer
                 filePath={filePath}
                 videoUrl={src ?? ''}
@@ -420,9 +376,9 @@ function PipWindow({
                 manualPlayOnly
                 audible={playbackAudible}
               />
-            ) : (
-              <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
-            )}
+              {!isPlaying && (
+                <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
+              )}
 
             {onExpand && (
               dragSourceProps ? (

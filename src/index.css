@@ -5771,3 +5771,20 @@ html.dark .help-sheet__bullet {
 @import './styles/vault-ui.css';
 @import './styles/creator-studio.css';
 @import './styles/tablet.css';
+
+/* Premium Recording Border */
+.camera-recording-border {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 3px solid rgba(239, 68, 68, 0.85);
+  box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.3);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+  z-index: 20;
+}
+
+.camera-recording-border--active {
+  opacity: 1;
+}

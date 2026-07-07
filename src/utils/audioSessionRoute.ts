@@ -102,6 +102,8 @@ export interface CameraLikePlaybackSessionSnapshot {
   mode: string
   inputRoute: string
   outputRoute: string
+  /** `coexistent` = speaker override only (camera stays live); `full` = category/mode swap */
+  playbackRouteStyle?: 'coexistent' | 'full' | 'unchanged'
 }
 
 export interface CameraSessionStateSnapshot {

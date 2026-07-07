@@ -21,6 +21,16 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var isSessionConfigured = false
     private var isRecording = false
     private var isStarting = false
+    /// Set by stopBridgePreview / stopPreview when the session is intentionally
+    /// torn down for app-background. Guarantees a full configureCaptureSession
+    /// rebuild on the next startBridgePreview / startPreview / startRecording
+    /// regardless of whether session.isRunning has already flipped to false.
+    /// Using an explicit flag avoids the timing-dependency on session.isRunning
+    /// since both stopRunning() and the subsequent start call run on the same
+    /// serial sessionQueue, but the deactivation of the shared AVAudioSession
+    /// (which is what actually leaves the audio input stale) is a separate
+    /// path that doesn't change session.isRunning.
+    private var needsAudioPipelineRebuild = false
     private var isFrameBridgeActive = false
     /// A JS consumer (multitrack stage, thumbnail capture) asked for pump frames
     /// while the layer preview is the primary display path.
@@ -177,17 +187,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             let shouldBeActive = self.isPreviewActive || self.isBridgePreviewActive || self.isRecording
             guard shouldBeActive else { return }
 
-            // Review playback currently owns the AVAudioSession. Never
-            // reapply the audio session profile and never rebuild the
-            // capture session while that ownership window is open — both
-            // would race the live playback audio. Defer and replay once
-            // playback releases ownership (see runDeferredHealthCheckIfNeeded).
+            // Playback owns the AVAudioSession speaker route. Defer all health
+            // work until playback ends — restarting or reconfiguring the capture
+            // session mid-playback causes visible preview glitches on the JPEG
+            // bridge. A brief hold on the last frame during a quick take preview
+            // is preferable to stuttery recovery.
             if CameraSessionGuard.playbackRouteActive {
                 self.deferredHealthCheckReason = reason
-                print(
-                    "[NativeCameraRecovery][\(reason)] deferring health check — " +
-                    "playback owns the AVAudioSession (playbackRouteActive=true)"
-                )
                 return
             }
 
@@ -366,18 +372,18 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                             profile: audioSessionProfile,
                             micInputPreference: micInputPreference
                         )
-                        // `!session.isRunning` forces a full rebuild whenever the
-                        // session was stopped for app-background. Just calling
-                        // startRunning() on a stopped-but-still-"configured" session
-                        // leaves the audio AVCaptureDeviceInput stale after the shared
-                        // AVAudioSession was deactivated on background — video re-taps
-                        // fine but the mic silently delivers nothing (the classic
-                        // "camera recovers, audio dead after swipe-out/in" bug).
-                        // Rebuilding re-taps a live mic input every resume.
-                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || !self.session.isRunning {
+                        // Rebuild the capture session if needed. The explicit
+                        // needsAudioPipelineRebuild flag is set whenever the bridge/
+                        // preview is stopped for app-background. It is more reliable
+                        // than checking !session.isRunning because stopRunning() is
+                        // dispatched asynchronously on sessionQueue — the flag is set
+                        // synchronously on the tear-down path so it is always true by
+                        // the time this start path runs on the same queue.
+                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || self.needsAudioPipelineRebuild {
                             let configuredOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
                             self.movieOutput = configuredOutput
                             self.isSessionConfigured = true
+                            self.needsAudioPipelineRebuild = false
                         }
                         self.previewUsesFrontCamera = useFrontCamera
                         if !self.session.isRunning {
@@ -409,6 +415,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         if !isRecording && !isPreviewActive {
             CameraSessionGuard.setPreviewActive(false)
         }
+        // Mark that the audio pipeline will need a full rebuild on the next
+        // start. The shared AVAudioSession is deactivated by AppDelegate on
+        // app-background, which leaves any still-registered AVCaptureDeviceInput
+        // in a stale state. We detect this explicitly here rather than relying
+        // on session.isRunning (which can still be true momentarily because the
+        // sessionQueue processes stopRunning() asynchronously after this call).
+        if !isRecording {
+            needsAudioPipelineRebuild = true
+        }
         stopPreview()
     }
 
@@ -431,12 +446,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                             profile: audioSessionProfile,
                             micInputPreference: micInputPreference
                         )
-                        // See startBridgePreview: rebuild after a background stop so
-                        // the audio input is freshly tapped, not left stale from the
-                        // AVAudioSession deactivation that happens on app-background.
-                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || !self.session.isRunning {
+                        // See startBridgePreview: use the explicit needsAudioPipelineRebuild
+                        // flag rather than !session.isRunning for the same reasons.
+                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || self.needsAudioPipelineRebuild {
                             self.movieOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
                             self.isSessionConfigured = true
+                            self.needsAudioPipelineRebuild = false
                         }
                         self.previewUsesFrontCamera = useFrontCamera
                         if !self.session.isRunning {
@@ -479,6 +494,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         isBridgePreviewActive = false
         if !isRecording {
             CameraSessionGuard.setPreviewActive(false)
+            needsAudioPipelineRebuild = true
         }
         DispatchQueue.main.async {
             self.previewLayer?.removeFromSuperlayer()
@@ -866,18 +882,27 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
         }
 
-        if !(isPreviewActive && session.isRunning && isSessionConfigured) {
+        // Re-apply the AVAudioSession profile only when no preview is already
+        // holding a live, correctly-configured capture session. Calling
+        // setCategory / setActive while AVCaptureSession is running disrupts the
+        // audio pipeline silently: the movie file keeps writing but the audio
+        // connection drops. Layer-preview (isPreviewActive) and bridge-preview
+        // (isBridgePreviewActive) both establish the correct videoRecording
+        // profile in their own start paths, so we can skip this here.
+        let previewAlreadyActive = (isPreviewActive || isBridgePreviewActive) && session.isRunning && isSessionConfigured
+        if !previewAlreadyActive {
             try configureAudioSessionForRecording(
                 profile: audioSessionProfile,
                 micInputPreference: micInputPreference
             )
         }
 
-        if !isSessionConfigured || movieOutput == nil || (isPreviewActive && previewUsesFrontCamera != useFrontCamera) {
+        if !isSessionConfigured || movieOutput == nil || (isPreviewActive && previewUsesFrontCamera != useFrontCamera) || needsAudioPipelineRebuild {
             let configuredOutput = try configureCaptureSession(useFrontCamera: useFrontCamera)
             movieOutput = configuredOutput
             isSessionConfigured = true
             previewUsesFrontCamera = useFrontCamera
+            needsAudioPipelineRebuild = false
         }
 
         if !session.isRunning {

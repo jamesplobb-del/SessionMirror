@@ -92,7 +92,12 @@ enum NativeCameraTestAudio {
 
         print("[PlaybackRoute] applying playback session")
         print("[CameraLikePlayback] applying session")
-        let playbackSnapshot = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
+        let playbackSnapshot: [String: Any]
+        if CameraSessionGuard.isCameraOrRecordingActive {
+            playbackSnapshot = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
+        } else {
+            playbackSnapshot = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
+        }
         CameraSessionGuard.markPlaybackSessionPrepared()
 
         let category = (playbackSnapshot["category"] as? String) ?? audioSession.category.rawValue
@@ -109,12 +114,16 @@ enum NativeCameraTestAudio {
         print("[CameraLikePlayback] input route = \(inputRoute)")
         print("[CameraLikePlayback] output route = \(outputRoute)")
 
-        return [
+        var payload: [String: Any] = [
             "category": category,
             "mode": mode,
             "inputRoute": inputRoute,
             "outputRoute": outputRoute,
         ]
+        if let style = playbackSnapshot["playbackRouteStyle"] as? String {
+            payload["playbackRouteStyle"] = style
+        }
+        return payload
     }
 
     static func sessionDiagnostics(profile: NativeCameraAudioSessionProfile) -> [String: Any] {
