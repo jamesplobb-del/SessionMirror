@@ -41,6 +41,7 @@ import {
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import {
+  ensureNativeCameraSessionHealthy,
   startNativeCameraBridge,
   startNativeCameraRecording,
   stopNativeCameraBridge,
@@ -287,6 +288,10 @@ export function useCameraSession({
   const micInputPreferenceRef = useRef<MicInputPreference>(micInputPreference)
   const queuedMicPreferenceRef = useRef<MicInputPreference | null>(micInputPreference)
   const nativeExperimentalRecordingRef = useRef(false)
+  /** Settle promise of the in-flight native start — Stop awaits this so it never races didStartRecording. */
+  const nativeStartSettleRef = useRef<Promise<boolean> | null>(null)
+  /** While true (multitrack stage open), native failures must not tear down the bridge preview. */
+  const suppressBridgeRecoveryRef = useRef(false)
   const nativeCameraRecordingEnabledRef = useRef(nativeCameraRecordingEnabled)
   const nativePreviewActiveRef = useRef(false)
   const nativePreviewStartTokenRef = useRef(0)
@@ -1424,13 +1429,27 @@ export function useCameraSession({
   )
 
   const recoverAfterNativeExperimentalFailure = useCallback(() => {
+    // While the multitrack stage owns the bridge, a failed take must not tear
+    // down the live preview — just reset flags and let the stage recover.
+    if (suppressBridgeRecoveryRef.current) return
     void restoreWebKitPreviewAfterNativeRecording()
   }, [restoreWebKitPreviewAfterNativeRecording])
 
-  const startNativeExperimentalRecording = useCallback(() => {
-    if (isRecordingRef.current) return
+  const setSuppressNativeBridgeRecovery = useCallback((on: boolean) => {
+    suppressBridgeRecoveryRef.current = on
+  }, [])
 
-    void (async () => {
+  /**
+   * Starts native recording and resolves true only once AVCaptureMovieFileOutput
+   * has actually begun writing (didStartRecording). The settle promise is kept in
+   * nativeStartSettleRef so a Stop issued during the start window can wait it out
+   * instead of racing native state — the root cause of the multitrack
+   * "second box freezes everything" wedge.
+   */
+  const startNativeExperimentalRecording = useCallback((): Promise<boolean> => {
+    if (isRecordingRef.current) return Promise.resolve(true)
+
+    const settle = (async (): Promise<boolean> => {
       const takeId = crypto.randomUUID()
       activeTakeIdRef.current = takeId
       recordingOrientationRef.current = readRecordingOrientation()
@@ -1439,8 +1458,7 @@ export function useCameraSession({
       if (!nativePreviewActiveRef.current) {
         const warmed = await acquireNativeVideoBridge()
         if (!warmed) {
-          console.warn('[NativeExperimentalAudio] native bridge unavailable')
-          return
+          throw new Error('native camera bridge unavailable')
         }
       }
 
@@ -1461,21 +1479,23 @@ export function useCameraSession({
       })
 
       if (!result) {
-        activeTakeIdRef.current = null
-        nativeExperimentalRecordingRef.current = false
-        isRecordingRef.current = false
-        setIsRecording(false)
-        recoverAfterNativeExperimentalFailure()
-        return
+        throw new Error('native recording did not start')
       }
-    })().catch((error) => {
+      return true
+    })()
+
+    const settledSafe = settle.catch((error) => {
       console.warn('[NativeExperimentalAudio] native recording start failed', error)
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
       isRecordingRef.current = false
       setIsRecording(false)
+      nativeStartSettleRef.current = null
       recoverAfterNativeExperimentalFailure()
+      return false
     })
+    nativeStartSettleRef.current = settledSafe
+    return settledSafe
   }, [
     acquireNativeVideoBridge,
     recoverAfterNativeExperimentalFailure,
@@ -1483,15 +1503,31 @@ export function useCameraSession({
   ])
 
   const stopNativeExperimentalRecording = useCallback(() => {
-    if (!nativeExperimentalRecordingRef.current) {
-      setIsRecording(false)
-      return
-    }
-
-    nativeExperimentalRecordingRef.current = false
     setIsStopping(true)
 
     void (async () => {
+      // Serialize against an in-flight start: AVCaptureMovieFileOutput rejects
+      // stop() until didStartRecording fires (~0.5-1s). Stopping inside that
+      // window used to orphan the native recording and wedge every later take.
+      const startSettle = nativeStartSettleRef.current
+      if (startSettle) {
+        const started = await startSettle
+        nativeStartSettleRef.current = null
+        if (!started) {
+          // Start failed — its catch path already reset all flags.
+          setIsRecording(false)
+          setIsStopping(false)
+          return
+        }
+      }
+
+      if (!nativeExperimentalRecordingRef.current) {
+        setIsRecording(false)
+        setIsStopping(false)
+        return
+      }
+      nativeExperimentalRecordingRef.current = false
+
       const stoppedTakeId = activeTakeIdRef.current ?? crypto.randomUUID()
       activeTakeIdRef.current = null
 
@@ -1500,7 +1536,7 @@ export function useCameraSession({
       setIsRecording(false)
 
       if (!result) {
-        await restoreWebKitPreviewAfterNativeRecording()
+        recoverAfterNativeExperimentalFailure()
         setIsStopping(false)
         return
       }
@@ -1546,18 +1582,19 @@ export function useCameraSession({
       console.warn('[NativeExperimentalAudio] native recording stop failed', error)
       isRecordingRef.current = false
       activeTakeIdRef.current = null
+      nativeExperimentalRecordingRef.current = false
       setIsRecording(false)
       setIsStopping(false)
-      void restoreWebKitPreviewAfterNativeRecording()
+      recoverAfterNativeExperimentalFailure()
     })
-  }, [restoreWebKitPreviewAfterNativeRecording])
+  }, [recoverAfterNativeExperimentalFailure])
 
-  const startRecording = useCallback(() => {
-    if (isRecording) return
+  /** Resolves true once recording has actually started (native: didStartRecording confirmed). */
+  const startRecording = useCallback((): Promise<boolean> => {
+    if (isRecording) return Promise.resolve(true)
 
     if (shouldUseNativeExperimentalRecording()) {
-      startNativeExperimentalRecording()
-      return
+      return startNativeExperimentalRecording()
     }
 
     if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
@@ -1566,12 +1603,12 @@ export function useCameraSession({
       setIsRecording(true)
       setElapsed(0)
       elapsedRef.current = 0
-      return
+      return Promise.resolve(true)
     }
 
-    void (async () => {
+    return (async () => {
       const currentStream = await ensureRecordableStream()
-      if (!currentStream || isRecordingRef.current) return
+      if (!currentStream || isRecordingRef.current) return isRecordingRef.current
 
       const takeId = crypto.randomUUID()
       const mode = recordingModeRef.current
@@ -1605,6 +1642,7 @@ export function useCameraSession({
         setIsRecording(true)
         setElapsed(0)
         elapsedRef.current = 0
+        return true
       } catch {
         chunksRef.current = []
         const activeRecorder = recorderRef.current
@@ -1623,6 +1661,7 @@ export function useCameraSession({
         recordStreamRef.current = null
         isRecordingRef.current = false
         setIsRecording(false)
+        return false
       }
     })().catch(() => {
       chunksRef.current = []
@@ -1630,6 +1669,7 @@ export function useCameraSession({
       recordStreamRef.current = null
       isRecordingRef.current = false
       setIsRecording(false)
+      return false
     })
   }, [
     bindRecordingHandlers,
@@ -1712,7 +1752,10 @@ export function useCameraSession({
   }, [disarmAutoAudioRecorder])
 
   const stopRecording = useCallback(() => {
-    if (nativeExperimentalRecordingRef.current) {
+    // Route to the serialized native stop when a native recording is active OR
+    // a native start is still settling (bridge warm / didStartRecording window)
+    // — that stop path awaits the settle, so Stop is safe at any instant.
+    if (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current) {
       stopNativeExperimentalRecording()
       return
     }
@@ -1888,6 +1931,13 @@ export function useCameraSession({
           }
           if (restartToken !== foregroundRestartTokenRef.current) return
           await acquireNativeVideoBridge()
+        } else {
+          // JS believes the native preview is already healthy — verify with the
+          // native side rather than trusting a possibly-stale ref (AVFoundation
+          // can silently stop the session after an interruption). Fire-and-forget:
+          // this is a defensive no-op almost every time, so it must never extend
+          // the visible "recovering" placeholder window below.
+          void ensureNativeCameraSessionHealthy()
         }
         onBeforeForegroundRestartRef.current?.()
         return
@@ -2065,6 +2115,7 @@ export function useCameraSession({
     if (isNativeVideoRecordingEnabled() && mode === 'video') {
       if (nativePreviewActiveRef.current) {
         previewHealthyRef.current = true
+        await ensureNativeCameraSessionHealthy()
         return
       }
       await acquireNativeVideoBridge()
@@ -2334,5 +2385,6 @@ export function useCameraSession({
     nativeLivePreviewActive,
     nativeLivePreviewSeedUrl,
     acquireNativeVideoBridge,
+    setSuppressNativeBridgeRecovery,
   }
 }

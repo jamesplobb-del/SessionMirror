@@ -54,12 +54,41 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// Delivers mono Float32 PCM chunks (base64, sampleRate, sampleCount) for the JS pitch tracker.
     var onAudioTapChunk: ((_ pcmBase64: String, _ sampleRate: Double, _ sampleCount: Int) -> Void)?
 
+    /// True once a `mediaServicesWereReset` notification fires — hardware objects
+    /// (session, inputs, outputs) are invalidated and MUST be rebuilt from scratch
+    /// before `startRunning()` will do anything useful again.
+    private var needsFullReconfigureAfterMediaReset = false
+
     private override init() {
         super.init()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAppDidBecomeActive),
             name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSessionWasInterrupted(_:)),
+            name: .AVCaptureSessionWasInterrupted,
+            object: session
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSessionInterruptionEnded),
+            name: .AVCaptureSessionInterruptionEnded,
+            object: session
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSessionRuntimeError(_:)),
+            name: .AVCaptureSessionRuntimeError,
+            object: session
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMediaServicesWereReset),
+            name: AVAudioSession.mediaServicesWereResetNotification,
             object: nil
         )
     }
@@ -69,6 +98,109 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         // preview layer can come back frozen — re-attach it defensively.
         if isPreviewActive {
             refreshPreviewOnMainIfNeeded()
+        }
+        ensureSessionHealthy(reason: "appDidBecomeActive")
+    }
+
+    @objc private func handleSessionWasInterrupted(_ notification: Notification) {
+        let reasonValue = (notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? NSNumber)?.intValue
+        print("[NativeCameraRecovery] session interrupted, reason=\(reasonValue ?? -1)")
+    }
+
+    @objc private func handleSessionInterruptionEnded() {
+        print("[NativeCameraRecovery] session interruption ended — verifying session health")
+        ensureSessionHealthy(reason: "interruptionEnded")
+    }
+
+    @objc private func handleSessionRuntimeError(_ notification: Notification) {
+        let error = notification.userInfo?[AVCaptureSessionErrorKey] as? NSError
+        print("[NativeCameraRecovery] session runtime error: \(error?.localizedDescription ?? "unknown")")
+        // A runtime error (e.g. .mediaServicesWereReset, media contention) leaves
+        // the session in an unusable state — force a full teardown/rebuild next
+        // time something needs it, then try to recover immediately if we should
+        // currently be showing a preview/recording.
+        needsFullReconfigureAfterMediaReset = true
+        ensureSessionHealthy(reason: "runtimeError")
+    }
+
+    @objc private func handleMediaServicesWereReset() {
+        print("[NativeCameraRecovery] AVAudioSession media services were reset — full session rebuild required")
+        needsFullReconfigureAfterMediaReset = true
+        ensureSessionHealthy(reason: "mediaServicesWereReset")
+    }
+
+    /// Defensive resync used after any interruption/error/lifecycle event: if the
+    /// session SHOULD be running (preview, bridge preview, or recording was
+    /// active) but AVFoundation left it stopped — or hardware objects were
+    /// invalidated by a media-services reset — rebuild and restart it. Cheap and
+    /// idempotent when everything is already healthy, so callers can invoke it
+    /// freely from any lifecycle hook.
+    func ensureSessionHealthy(reason: String) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            let shouldBeActive = self.isPreviewActive || self.isBridgePreviewActive || self.isRecording
+            guard shouldBeActive else { return }
+
+            if self.isRecording {
+                // Never touch inputs/outputs mid-recording; AVFoundation will
+                // usually resume the movie file output on its own once the
+                // interruption clears. Just make sure the session is running.
+                if !self.session.isRunning {
+                    print("[NativeCameraRecovery][\(reason)] restarting session during active recording")
+                    self.session.startRunning()
+                }
+                return
+            }
+
+            // True no-op fast path: everything is already healthy, so touch
+            // NOTHING — re-applying the AVAudioSession category/route when it is
+            // already correct can itself cause an audible click/blip. Only do
+            // real recovery work below when something is actually broken.
+            let isHealthy =
+                self.session.isRunning &&
+                self.isSessionConfigured &&
+                !self.needsFullReconfigureAfterMediaReset
+            if isHealthy {
+                return
+            }
+
+            print("[NativeCameraRecovery][\(reason)] session unhealthy — running recovery (isRunning=\(self.session.isRunning) configured=\(self.isSessionConfigured) needsRebuild=\(self.needsFullReconfigureAfterMediaReset))")
+
+            do {
+                try self.configureAudioSessionForRecording(
+                    profile: self.activeAudioProfile,
+                    micInputPreference: self.activeMicInputPreference
+                )
+            } catch {
+                print("[NativeCameraRecovery][\(reason)] failed to reapply audio session: \(error.localizedDescription)")
+            }
+
+            if self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured {
+                print("[NativeCameraRecovery][\(reason)] rebuilding capture session from scratch")
+                do {
+                    let configuredOutput = try self.configureCaptureSession(useFrontCamera: self.previewUsesFrontCamera)
+                    self.movieOutput = configuredOutput
+                    self.isSessionConfigured = true
+                    self.needsFullReconfigureAfterMediaReset = false
+                } catch {
+                    print("[NativeCameraRecovery][\(reason)] rebuild failed: \(error.localizedDescription)")
+                    return
+                }
+            }
+
+            if !self.session.isRunning {
+                print("[NativeCameraRecovery][\(reason)] restarting stopped capture session")
+                self.session.startRunning()
+            }
+
+            if self.isPreviewActive {
+                self.resetVideoZoomIfNeeded(useFrontCamera: self.previewUsesFrontCamera)
+                self.refreshPreviewOnMainIfNeeded()
+            }
+            if self.isBridgePreviewActive {
+                self.enableFrameBridge()
+            }
         }
     }
 

@@ -1935,11 +1935,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void requestCameraAccess('video')
   }, [acquireNativeVideoBridge, handleRecordingModeChange, isNativeCameraPlatform, requestCameraAccess])
 
-  const handleMultitrackStartRecording = useCallback(() => {
+  const handleMultitrackStartRecording = useCallback((): Promise<boolean> => {
     multitrackRecordingActiveRef.current = true
     pauseYoutubeReference()
     pausePipVideos()
-    startRecording()
+    return startRecording()
   }, [pausePipVideos, pauseYoutubeReference, startRecording])
 
   const handleMultitrackStopRecording = useCallback(() => {

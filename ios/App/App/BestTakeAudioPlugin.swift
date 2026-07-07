@@ -36,6 +36,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setNativeCameraFrameBridgeEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPreviewZoom", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeAudioTapEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "ensureNativeCameraSessionHealthy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "enhanceTakeAudio", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraRecording", returnType: CAPPluginReturnPromise),
@@ -257,6 +258,16 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         notifyListeners("playbackRouteEnded", data: [:])
+    }
+
+    /// Defensive resync callable from JS on any foreground/idle-wake path. Cheap
+    /// and idempotent: only rebuilds/restarts the native capture session when it
+    /// should currently be active but AVFoundation left it stopped or invalid
+    /// (phone lock, Control Center camera takeover, mediaServicesWereReset, long
+    /// background idle). No-op if nothing native is active.
+    @objc func ensureNativeCameraSessionHealthy(_ call: CAPPluginCall) {
+        nativeCameraEngine.ensureSessionHealthy(reason: "js-request")
+        call.resolve(CameraSessionGuard.snapshot())
     }
 
     @objc func setCameraSessionState(_ call: CAPPluginCall) {

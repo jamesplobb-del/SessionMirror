@@ -169,6 +169,21 @@ export async function startNativeCameraPreview(
   }
 }
 
+/**
+ * Cheap, idempotent resync for the native capture session. Rebuilds/restarts
+ * it only if it should currently be active (preview/bridge/recording) but
+ * AVFoundation left it stopped or invalid — safe to call defensively on every
+ * foreground recovery, app-idle wake, or lifecycle swipe-in.
+ */
+export async function ensureNativeCameraSessionHealthy(): Promise<void> {
+  if (!isNativeCameraTestAvailable()) return
+  try {
+    await BestTakeAudioPlugin.ensureNativeCameraSessionHealthy()
+  } catch (error) {
+    console.warn('[NativeCameraRecovery] health check failed', error)
+  }
+}
+
 export async function stopNativeCameraPreview(): Promise<void> {
   if (!isNativeCameraTestAvailable()) return
   try {

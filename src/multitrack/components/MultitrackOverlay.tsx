@@ -43,7 +43,8 @@ interface MultitrackOverlayProps {
   /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
   nativeCameraBridgeEnabled?: boolean
   onClose: () => void
-  onStartRecording: () => void
+  /** Starts the camera; resolves true only once recording is confirmed. */
+  onStartRecording: () => Promise<boolean>
   onStopRecording: () => void
   onRecordingComplete: () => void
   /** Fully discards a take (state, DB row, file, thumbnail) — used to throw away a retried recording. */
@@ -230,7 +231,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     onCountInStart: (panelId) => {
       recordingTargetPanelIdRef.current = panelId
       sync.setExcludePanelId(panelId)
-      onStartRecording()
+      // Machine aborts the count-in with an error toast if this resolves false.
+      return onStartRecording()
     },
     onPreparePlaybackDuringCountIn: async () => {
       sync.setExcludePanelId(recordingTargetPanelIdRef.current)
@@ -241,7 +243,34 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       await sync.startPrepared()
       await startBackingPlayback()
     },
+    onError: (message) => {
+      setPendingReview(null)
+      pauseBacking()
+      sync.setExcludePanelId(null)
+      void showAlert({ message, tone: 'error' })
+    },
   })
+
+  // Watchdog: phase says 'recording' but the camera never confirmed — abort
+  // loudly instead of leaving a dead-end stage (no take will ever arrive).
+  useEffect(() => {
+    if (recording.phase !== 'recording' || isRecording) return
+    const timer = window.setTimeout(() => {
+      onStopRecording()
+      recording.fail('The camera never started recording. Please try again.')
+    }, 4000)
+    return () => window.clearTimeout(timer)
+  }, [isRecording, onStopRecording, recording])
+
+  // Watchdog: stopped into review but the take never arrived from the save
+  // pipeline — reset with an error instead of freezing on a blank review.
+  useEffect(() => {
+    if (recording.phase !== 'review' || pendingReview) return
+    const timer = window.setTimeout(() => {
+      recording.fail('The recording could not be saved. Please try again.')
+    }, 8000)
+    return () => window.clearTimeout(timer)
+  }, [pendingReview, recording])
 
   useEffect(() => {
     recordingTargetPanelIdRef.current = recording.targetPanelId

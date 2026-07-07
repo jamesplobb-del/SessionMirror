@@ -228,6 +228,8 @@ export interface BestTakeAudioPluginType {
   setNativeCameraFrameBridgeEnabled(options: { enabled: boolean }): Promise<void>
   setNativeCameraPreviewZoom(options: { zoom: number }): Promise<void>
   setNativeAudioTapEnabled(options: { enabled: boolean }): Promise<void>
+  /** Cheap, idempotent resync: rebuilds/restarts the native capture session if it should be active but AVFoundation left it stopped/invalid. */
+  ensureNativeCameraSessionHealthy(): Promise<CameraSessionStateSnapshot>
   enhanceTakeAudio(options: {
     url: string
     mediaType: 'video' | 'audio'
