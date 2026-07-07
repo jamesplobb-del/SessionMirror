@@ -190,28 +190,11 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             ? preference
             : (legacyEnable == true ? .iphone : .auto)
 
-        if CameraSessionGuard.shouldBlockDeviceMicChanges() {
-            CameraSessionGuard.skipDeviceMicLog()
-            var snapshot = AudioRouteConfigurator.routeSnapshot()
-            snapshot["success"] = true
-            snapshot["selectedMicPreference"] = resolvedPreference.rawValue
-            snapshot["queued"] = true
-            print("[MicInputPreference] queued selected=\(resolvedPreference.rawValue) reason=input preference blocked during preview/playback overlap")
-            call.resolve(snapshot)
-            return
-        }
-
-        if CameraSessionGuard.shouldBlockRouteChanges() {
-            CameraSessionGuard.skipRouteChangeLog()
-            var snapshot = AudioRouteConfigurator.routeSnapshot()
-            snapshot["success"] = true
-            snapshot["selectedMicPreference"] = resolvedPreference.rawValue
-            snapshot["queued"] = true
-            print("[MicInputPreference] queued selected=\(resolvedPreference.rawValue) reason=route change blocked while camera preview or recording is active")
-            call.resolve(snapshot)
-            return
-        }
-
+        // No queued/blocked early-return here anymore: setMicInputPreference
+        // decides internally — full apply when idle, input-only setPreferredInput
+        // when the camera preview / recording / playback route is live. The
+        // input-only path never touches setCategory/setActive, so it is safe
+        // to run while capture and WebView (YouTube) audio are active.
         do {
             let result = try AudioRouteConfigurator.setMicInputPreference(resolvedPreference)
             call.resolve(result)

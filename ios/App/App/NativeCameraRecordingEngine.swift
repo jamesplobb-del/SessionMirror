@@ -895,6 +895,22 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 profile: audioSessionProfile,
                 micInputPreference: micInputPreference
             )
+        } else {
+            // Preview already owns a healthy capture session — a full session
+            // reconfigure would silently drop the audio connection. But the mic
+            // preference may have changed while the preview was live (the toggle
+            // is queued/no-op during preview), so honor it here with an
+            // input-only setPreferredInput that never disturbs capture.
+            activeAudioProfile = audioSessionProfile
+            activeMicInputPreference = micInputPreference
+            do {
+                _ = try AudioRouteConfigurator.applyMicInputPreferenceInputOnly(
+                    micInputPreference,
+                    caller: "startOnSessionQueue.previewActive"
+                )
+            } catch {
+                print("[MicRouteProof] context=startOnSessionQueue.previewActive inputOnly apply failed: \(error.localizedDescription)")
+            }
         }
 
         if !isSessionConfigured || movieOutput == nil || (isPreviewActive && previewUsesFrontCamera != useFrontCamera) || needsAudioPipelineRebuild {
@@ -1007,6 +1023,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             print("[NativeCameraTest] recording started")
             print("[NativeCameraTest] fileURL = \(fileURL.absoluteString)")
+            AudioRouteConfigurator.logMicRouteProof(
+                context: "recordingStarted",
+                preference: self.activeMicInputPreference
+            )
 
             DispatchQueue.main.async {
                 if let result = result {

@@ -1,5 +1,4 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core'
-import { isPlaybackRouteHoldActive } from './playbackRouteCoordinator'
 import type { MicInputPreference } from './appSettings'
 
 /** Read-only snapshot of the current AVAudioSession route. */
@@ -299,7 +298,10 @@ export async function applyMicInputPreference(
   preference: MicInputPreference,
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
-  if (isPlaybackRouteHoldActive()) return
+  // No playback-hold early return: native setDeviceMicForRecording is now safe
+  // while playback/preview are live — it downgrades to an input-only
+  // setPreferredInput switch that never touches the session category or
+  // interrupts WebView (YouTube) audio.
   try {
     const snapshot = await BestTakeAudioPlugin.setDeviceMicForRecording({ preference })
     console.info('[AudioRoute] mic input preference', {

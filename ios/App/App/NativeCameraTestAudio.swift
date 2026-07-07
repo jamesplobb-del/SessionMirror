@@ -22,11 +22,16 @@ enum NativeCameraAudioSessionProfile: String {
             // YouTube iframe) honors the host session's mixability. Without it,
             // WebKit audio interrupts the capture session (reason=2, mic drops)
             // and our re-activations pause WebKit media in a ping-pong loop.
+            // allowBluetoothA2DP/allowAirPlay keep headphone output alive while
+            // recording — without them, playAndRecord silently yanks Bluetooth
+            // headphone playback (YouTube) to the receiver/speaker at capture
+            // start. defaultToSpeaker only applies when NO external output is
+            // attached, so headphones still win when connected.
             try AudioRouteConfigurator.debugSetCategory(
                 audioSession,
                 category: .playAndRecord,
                 mode: .videoRecording,
-                options: [.mixWithOthers, .defaultToSpeaker],
+                options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
                 caller: "NativeCameraAudioSessionProfile.videoRecording"
             )
         case .playAndRecordDefault:
@@ -34,7 +39,7 @@ enum NativeCameraAudioSessionProfile: String {
                 audioSession,
                 category: .playAndRecord,
                 mode: .default,
-                options: [.mixWithOthers, .defaultToSpeaker],
+                options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
                 caller: "NativeCameraAudioSessionProfile.playAndRecordDefault"
             )
         case .recordVideoRecording:

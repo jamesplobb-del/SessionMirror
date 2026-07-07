@@ -216,12 +216,19 @@ enum AudioRouteConfigurator {
         _ session: AVAudioSession,
         mode: AVAudioSession.Mode = .videoRecording
     ) throws {
-        guard routeUsesBluetoothHFP(session) || session.categoryOptions.contains(.allowBluetoothHFP) else {
+        // Only reset when the LIVE route is actually on HFP. The mere presence
+        // of the allowBluetoothHFP category option is harmless (iOS keeps A2DP
+        // output for playback), and bouncing the session for it interrupted
+        // WebView (YouTube) audio and Bluetooth headphone playback.
+        guard routeUsesBluetoothHFP(session) else {
             return
         }
 
         print("[MicInputPreference] resetting session away from BluetoothHFP before iPhone mic")
         try debugSetPreferredInput(session, input: nil, caller: "resetSessionAwayFromBluetoothHFPIfNeeded.clearPreferredInput")
+        // Re-issuing setCategory without allowBluetoothHFP reroutes an active
+        // session in place; a setActive(false)/setActive(true) bounce is not
+        // required and interrupts other audio (WebView, other apps).
         try debugSetCategory(
             session,
             category: .playAndRecord,
@@ -231,8 +238,7 @@ enum AudioRouteConfigurator {
         )
         try session.setPreferredSampleRate(48_000)
         try session.setPreferredIOBufferDuration(0.0029)
-        try debugSetActive(session, active: false, options: .notifyOthersOnDeactivation, caller: "resetSessionAwayFromBluetoothHFPIfNeeded.deactivate")
-        try debugSetActive(session, active: true, options: [], caller: "resetSessionAwayFromBluetoothHFPIfNeeded.activate")
+        try ensureSessionActive(session, caller: "resetSessionAwayFromBluetoothHFPIfNeeded")
     }
 
     @discardableResult
@@ -275,8 +281,73 @@ enum AudioRouteConfigurator {
             "preferredInput=\(snapshot["preferredInputSet"] ?? "auto") " +
             "fallback=\(fallbackReason ?? "none")"
         )
+        logMicRouteProof(context: "applyMicInputPreference", preference: preference)
 
         return snapshot
+    }
+
+    /// Input-only mic switch that is safe while the camera preview, recording,
+    /// or a playback route hold is live: it ONLY calls setPreferredInput and
+    /// never touches setCategory/setMode/setActive, so the capture session,
+    /// WebView (YouTube) audio, and the current output route (headphones)
+    /// are never interrupted.
+    @discardableResult
+    static func applyMicInputPreferenceInputOnly(
+        _ preference: MicInputPreference,
+        caller: String,
+        session: AVAudioSession = .sharedInstance()
+    ) throws -> [String: Any] {
+        var fallbackReason: String?
+
+        switch preference {
+        case .auto:
+            try debugSetPreferredInput(session, input: nil, caller: "\(caller).inputOnly.auto")
+        case .iphone, .headphone:
+            let availableInputs = session.availableInputs ?? []
+            if let input = preferredInputPort(for: preference, availableInputs: availableInputs) {
+                try debugSetPreferredInput(session, input: input, caller: "\(caller).inputOnly.\(preference.rawValue)")
+            } else {
+                // Don't clear an existing preferred input here; the desired port
+                // may just not be listed under the current category options
+                // (e.g. HFP mic without allowBluetoothHFP). Leave routing as-is.
+                fallbackReason = "\(preference.rawValue) input unavailable under current session options; left route unchanged"
+            }
+        }
+
+        var snapshot = routeSnapshot(for: session)
+        snapshot["success"] = true
+        snapshot["selectedMicPreference"] = preference.rawValue
+        snapshot["inputOnly"] = true
+        if let preferredInput = session.preferredInput {
+            snapshot["preferredInputSet"] = preferredInput.portType.rawValue
+        } else {
+            snapshot["preferredInputSet"] = "auto"
+        }
+        if let fallbackReason = fallbackReason {
+            snapshot["fallbackReason"] = fallbackReason
+        }
+
+        logMicRouteProof(context: "\(caller).inputOnly", preference: preference, fallback: fallbackReason)
+        return snapshot
+    }
+
+    /// Single-line proof of the effective input/output route after a mic
+    /// preference change or at record start. Grep for [MicRouteProof].
+    static func logMicRouteProof(
+        context: String,
+        preference: MicInputPreference? = nil,
+        fallback: String? = nil
+    ) {
+        let session = AVAudioSession.sharedInstance()
+        let inputs = session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ",")
+        let outputs = session.currentRoute.outputs.map { $0.portType.rawValue }.joined(separator: ",")
+        let preferred = session.preferredInput?.portType.rawValue ?? "auto"
+        print(
+            "[MicRouteProof] context=\(context) preference=\(preference?.rawValue ?? "n/a") " +
+            "input=\(inputs.isEmpty ? "none" : inputs) output=\(outputs.isEmpty ? "none" : outputs) " +
+            "preferredInput=\(preferred) category=\(session.category.rawValue) mode=\(session.mode.rawValue) " +
+            "options=\(session.categoryOptions.rawValue) fallback=\(fallback ?? "none")"
+        )
     }
 
     /// Minimal speaker routing for WKWebView playback while the native camera
@@ -417,18 +488,18 @@ enum AudioRouteConfigurator {
     }
 
     static func setMicInputPreference(_ preference: MicInputPreference) throws -> [String: Any] {
-        if CameraSessionGuard.shouldBlockDeviceMicChanges() {
-            CameraSessionGuard.skipDeviceMicLog()
-            var snapshot = routeSnapshot()
-            snapshot["success"] = true
-            snapshot["selectedMicPreference"] = preference.rawValue
-            snapshot["queued"] = true
-            print("[MicInputPreference] queued selected=\(preference.rawValue) reason=input preference blocked during preview/playback overlap")
-            return snapshot
-        }
-
         let session = AVAudioSession.sharedInstance()
         UserDefaults.standard.set(preference == .iphone, forKey: highQualityDefaultsKey)
+
+        if CameraSessionGuard.shouldBlockDeviceMicChanges() {
+            // Camera preview / recording / playback hold is live. A full apply
+            // (category churn + HFP reset) is unsafe here, but an input-only
+            // setPreferredInput switch never disturbs capture or output routing
+            // — apply it immediately instead of silently queueing the setting.
+            print("[MicInputPreference] live input-only apply selected=\(preference.rawValue) (preview/playback active)")
+            return try applyMicInputPreferenceInputOnly(preference, caller: "setMicInputPreference.live", session: session)
+        }
+
         return try applyMicInputPreference(preference, session: session)
     }
 
@@ -480,6 +551,13 @@ enum AudioRouteConfigurator {
         }
     }
 
+    /// Recording/playback state of the last successful full experimental-mode
+    /// apply. When a later call arrives with the SAME state (i.e. only the mic
+    /// preference changed), we skip setCategory entirely — flipping the
+    /// allowBluetoothHFP option was a real setCategory that bounced WebView
+    /// (YouTube) audio — and do an input-only setPreferredInput instead.
+    private static var lastExperimentalStateKey: String?
+
     static func applyNativeExperimentalAudioMode(
         enabled: Bool,
         selectedAudioEngine: String,
@@ -493,11 +571,45 @@ enum AudioRouteConfigurator {
         var fallbackReason: String?
 
         if enabled {
+            let playbackFocused = playbackActive && !recordingActive
+            let mode: AVAudioSession.Mode = playbackFocused ? .default : .videoRecording
+            let stateKey = "rec=\(recordingActive) playFocused=\(playbackFocused)"
+
             if CameraSessionGuard.shouldBlockRouteChanges() {
                 fallbackReason = "route change blocked while camera preview or recording is active"
                 CameraSessionGuard.skipRouteChangeLog()
+                // The mic preference is still safe to honor while the camera is
+                // live: input-only, no category/setActive churn.
+                if !playbackFocused {
+                    let micSnapshot = try applyMicInputPreferenceInputOnly(
+                        micInputPreference,
+                        caller: "applyNativeExperimentalAudioMode.blocked",
+                        session: session
+                    )
+                    if let micFallback = micSnapshot["fallbackReason"] as? String {
+                        fallbackReason = "\(fallbackReason ?? ""); \(micFallback)"
+                    }
+                }
+            } else if lastExperimentalStateKey == stateKey,
+                      session.category == .playAndRecord,
+                      session.mode == mode {
+                // Same recording/playback state as the last full apply — only
+                // the mic preference can have changed. Skip setCategory (an
+                // HFP-option flip alone is not worth interrupting WebView
+                // audio) and switch the input only.
+                if playbackFocused {
+                    fallbackReason = micInputPreference == .iphone
+                        ? "mic preference deferred during playback"
+                        : nil
+                } else {
+                    let micSnapshot = try applyMicInputPreferenceInputOnly(
+                        micInputPreference,
+                        caller: "applyNativeExperimentalAudioMode.micOnly",
+                        session: session
+                    )
+                    fallbackReason = micSnapshot["fallbackReason"] as? String
+                }
             } else {
-                let playbackFocused = playbackActive && !recordingActive
                 // Every branch stays mixable — dropping mixWithOthers here made
                 // playback-state flips interrupt WebKit media (YouTube pausing).
                 let options: AVAudioSession.CategoryOptions = playbackFocused
@@ -505,12 +617,12 @@ enum AudioRouteConfigurator {
                     : micInputPreference == .headphone
                         ? [.mixWithOthers, .allowBluetoothHFP, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
                         : [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
-                let mode: AVAudioSession.Mode = playbackFocused ? .default : .videoRecording
 
                 try debugSetCategory(session, category: .playAndRecord, mode: mode, options: options, caller: "applyNativeExperimentalAudioMode")
                 try session.setPreferredSampleRate(48_000)
                 try session.setPreferredIOBufferDuration(playbackFocused ? 0.005 : 0.0029)
                 try ensureSessionActive(session, caller: "applyNativeExperimentalAudioMode")
+                lastExperimentalStateKey = stateKey
 
                 if playbackFocused {
                     fallbackReason = micInputPreference == .iphone
@@ -531,6 +643,7 @@ enum AudioRouteConfigurator {
                 }
             }
         } else {
+            lastExperimentalStateKey = nil
             if CameraSessionGuard.shouldBlockRouteChanges() {
                 fallbackReason = "restore blocked while camera preview or recording is active"
                 CameraSessionGuard.skipRouteChangeLog()

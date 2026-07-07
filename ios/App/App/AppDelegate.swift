@@ -62,8 +62,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
             queue: .main
-        ) { _ in
-            AudioRouteConfigurator.logRoute("route-change event (passive)")
+        ) { notification in
+            let reasonRaw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+            let reason = reasonRaw.flatMap { AVAudioSession.RouteChangeReason(rawValue: $0) }
+            AudioRouteConfigurator.logRoute("route-change event (passive) reason=\(String(describing: reason))")
+            AudioRouteConfigurator.logMicRouteProof(context: "routeChange.\(String(describing: reason))")
         }
     }
 
