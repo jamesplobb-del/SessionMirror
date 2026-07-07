@@ -173,6 +173,23 @@ export interface BestTakeAudioPluginType {
   /** Debug A/B — AVPlayer file playback, bypasses WKWebView Web Audio. iOS only. */
   startNativePlaybackTest(options: { url: string }): Promise<NativePlaybackTestStartResult>
   stopNativePlaybackTest(): Promise<void>
+  startInlineTakeBoxPlayback(options: {
+    url: string
+    x: number
+    y: number
+    width: number
+    height: number
+    mirror?: boolean
+    volume?: number
+  }): Promise<NativePlaybackTestStartResult>
+  stopInlineTakeBoxPlayback(options?: { notify?: boolean }): Promise<void>
+  updateInlineTakeBoxPlaybackLayout(options: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }): Promise<void>
+  setInlineTakeBoxPlaybackVolume(options: { volume: number }): Promise<void>
   prepareCameraLikePlaybackSession(options?: {
     allowWithActivePreview?: boolean
   }): Promise<CameraLikePlaybackSessionSnapshot>
@@ -252,6 +269,10 @@ export interface BestTakeAudioPluginType {
   ): Promise<PluginListenerHandle>
   addListener(
     eventName: 'playbackRouteEnded',
+    listenerFunc: () => void,
+  ): Promise<PluginListenerHandle>
+  addListener(
+    eventName: 'inlineTakeBoxPlaybackEnded',
     listenerFunc: () => void,
   ): Promise<PluginListenerHandle>
   addListener(

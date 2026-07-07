@@ -164,7 +164,6 @@ function handleProxyPlaybackMessage(data: unknown): void {
 
   if (payload.state === 'playing') {
     logPlaybackGainAuditYoutubeStart()
-    refreshYoutubeStereoRoute(false)
     const now = Date.now()
     if (now - lastPlayingMaintainAt < PLAYING_MAINTAIN_COOLDOWN_MS) return
     lastPlayingMaintainAt = now
@@ -243,7 +242,6 @@ export function maintainYoutubeProxyLoudness(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
-  refreshYoutubeStereoRoute(false)
   setYoutubeProxyVolumeFromUi(iframe, uiVolume)
 }
 

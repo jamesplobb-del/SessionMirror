@@ -17,6 +17,9 @@ export interface PerformancePanelState {
   kind: 'performance'
   id: string
   take: Take | null
+  /** Mixer state — playback balance only (export stays unity gain for now). */
+  volume?: number
+  muted?: boolean
 }
 
 export interface SheetMusicPanelState {

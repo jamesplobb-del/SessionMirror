@@ -23,6 +23,7 @@
 		DRONEENG2FED79650016851F /* DroneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEENG1FED79650016851F /* DroneEngine.swift */; };
 		DRONEPLG2FED79650016851F /* DronePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG1FED79650016851F /* DronePlugin.swift */; };
 		DRONEPLG4FED79650016851F /* DronePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG3FED79650016851F /* DronePlugin.m */; };
+		INLINEBOX2FED79650016851F /* InlineTakeBoxPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */; };
 		NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */; };
 		NATIVECAM2FED79650016851F /* NativeCameraRecordingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */; };
 		PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */; };
@@ -50,6 +51,7 @@
 		DRONEPLG1FED79650016851F /* DronePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DronePlugin.swift; sourceTree = "<group>"; };
 		DRONEPLG3FED79650016851F /* DronePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DronePlugin.m; sourceTree = "<group>"; };
 		ENTITLE1FED79650016851F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTakeBoxPlaybackController.swift; sourceTree = "<group>"; };
 		NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraTestAudio.swift; sourceTree = "<group>"; };
 		NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraRecordingEngine.swift; sourceTree = "<group>"; };
 		PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitBridgeViewController.swift; sourceTree = "<group>"; };
@@ -110,6 +112,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */,
 				BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */,
+				INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */,
 				NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */,
 				NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */,
 				CAMGUARD1FED79650016851F /* CameraSessionGuard.swift */,
@@ -270,6 +273,7 @@
 				PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */,
 				BESTTAKE2FED79650016851F /* BestTakeAudioPlugin.swift in Sources */,
 				BESTTAKE4FED79650016851F /* BestTakeAudioPlugin.m in Sources */,
+				INLINEBOX2FED79650016851F /* InlineTakeBoxPlaybackController.swift in Sources */,
 				NATIVECAM2FED79650016851F /* NativeCameraRecordingEngine.swift in Sources */,
 				NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */,
 				CAMGUARD2FED79650016851F /* CameraSessionGuard.swift in Sources */,

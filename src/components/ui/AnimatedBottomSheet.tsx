@@ -30,6 +30,11 @@ interface AnimatedBottomSheetProps {
   elevatedLight?: boolean
   /** Elevated Take Vault — audio-mode light colorway. */
   vaultTheme?: boolean
+  /**
+   * Override the stacking layer (Tailwind z classes for backdrop and sheet)
+   * for hosts above the default elevated layer (e.g. multitrack at z-135).
+   */
+  zClass?: { backdrop: string; sheet: string }
 }
 
 export default function AnimatedBottomSheet({
@@ -44,6 +49,7 @@ export default function AnimatedBottomSheet({
   elevated = false,
   elevatedLight = false,
   vaultTheme = false,
+  zClass,
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSheetSlideDistance)
   const enterNotifiedRef = useRef(false)
@@ -132,7 +138,7 @@ export default function AnimatedBottomSheet({
         <>
           <motion.button
             type="button"
-            className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none ${backdropClass} ${elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
+            className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none ${backdropClass} ${zClass ? zClass.backdrop : elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: backdropOpacity }}
@@ -147,7 +153,7 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             ref={sheetRef}
-            className={`animated-bottom-sheet native-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-[2rem] transform-gpu ${sheetSurfaceClass} ${elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
+            className={`animated-bottom-sheet native-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-[2rem] transform-gpu ${sheetSurfaceClass} ${zClass ? zClass.sheet : elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}

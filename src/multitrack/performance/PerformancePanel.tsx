@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Film, Pause, Play, RotateCcw, Video, X } from 'lucide-react'
+import { Film, MoreHorizontal, Pause, Play, Video, X } from 'lucide-react'
 import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
 import Pressable from '../../components/ui/Pressable'
 import TakeVideoPlayer from '../../components/TakeVideoPlayer'
@@ -27,9 +27,9 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
 
   if (!panel.take) {
     return (
-      <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label="Record performance take">
+      <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label="Add to this tile">
         <Video className="h-8 w-8 text-stone-400" />
-        <span className="mt-2 text-sm font-medium text-stone-500">Tap to record</span>
+        <span className="mt-2 text-sm font-medium text-stone-500">Tap to add</span>
         {isRecordingTarget && recordingPhase !== 'idle' && (
           <span className="mt-1 text-xs font-semibold text-red-500">
             {recordingPhase === 'count-in' ? 'Count-in…' : recordingPhase === 'review' ? 'Reviewing…' : 'Recording…'}
@@ -121,10 +121,10 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
               event.stopPropagation()
               onTap()
             }}
-            aria-label="Record another take"
+            aria-label="Tile options"
             className="multitrack-panel__action"
           >
-            <RotateCcw className="h-4 w-4" />
+            <MoreHorizontal className="h-4 w-4" />
           </Pressable>
         </div>
       </div>

@@ -10,7 +10,9 @@ import { engageStereoPlayback, releaseStereoPlayback } from './stereoPlaybackRou
 import {
   attachPlaybackRouteEndedListener,
   completePlaybackRouteRestore,
+  prepareInlineTakeBoxPlaybackRoute,
   preparePlaybackRoute,
+  releaseInlineTakeBoxPlaybackRoute,
 } from './playbackRouteCoordinator'
 import { stabilizeViewportAfterMediaInteraction } from './viewportSync'
 import {
@@ -125,6 +127,27 @@ export async function finalizeTakePlaybackCleanup(): Promise<void> {
   await releaseTakePlaybackAudio()
 }
 
+/** BestTakeBox inline cleanup — no playbackRouteActive ownership to release. */
+export async function finalizeInlineTakeBoxPlaybackCleanup(): Promise<void> {
+  await releaseInlineTakeBoxPlaybackRoute()
+  await releaseTakePlaybackAudio()
+}
+
+/** App background / lifecycle — stop native overlay and release inline holds. */
+export async function suspendInlineTakeBoxPlaybackForLifecycle(): Promise<void> {
+  const { stopNativeInlineTakeBoxPlayback } = await import('./nativeInlineTakeBoxPlayback')
+  await stopNativeInlineTakeBoxPlayback({ notify: false })
+  await finalizeInlineTakeBoxPlaybackCleanup()
+}
+
+function attachInlineTakeBoxEndedListener(media: HTMLMediaElement): void {
+  const onEnd = () => {
+    media.removeEventListener('ended', onEnd)
+    void finalizeInlineTakeBoxPlaybackCleanup()
+  }
+  media.addEventListener('ended', onEnd, { once: true })
+}
+
 export interface UserGesturePlaybackCallbacks {
   onPlaying?: () => void
   onFailure?: (error: unknown) => void
@@ -186,6 +209,30 @@ export function playTakeMediaFromUserGesture(
       console.log(error)
       callbacks.onFailure?.(error)
       await completePlaybackRouteRestore()
+    }
+  })()
+}
+
+/** BestTakeBox web fallback — lightweight speaker route, no playbackRouteActive. */
+export function playInlineTakeBoxFromUserGesture(
+  media: HTMLMediaElement,
+  callbacks: UserGesturePlaybackCallbacks = {},
+): void {
+  prepareMediaForAudiblePlayback(media)
+
+  void (async () => {
+    try {
+      await prepareInlineTakeBoxPlaybackRoute()
+      await prepareLoudPlaybackBeforeStart(media)
+      await media.play()
+      attachInlineTakeBoxEndedListener(media)
+      wireTakePlaybackAfterStart(media, true)
+      reportTakePlaybackStarted(media)
+      callbacks.onPlaying?.()
+    } catch (error: unknown) {
+      console.log(error)
+      callbacks.onFailure?.(error)
+      await finalizeInlineTakeBoxPlaybackCleanup()
     }
   })()
 }

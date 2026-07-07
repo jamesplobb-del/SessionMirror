@@ -19,8 +19,6 @@ function pickSyncMaster(elements: HTMLMediaElement[]): HTMLMediaElement | null {
 }
 
 function primeElementForPlayback(element: HTMLMediaElement): void {
-  element.muted = false
-  element.volume = 1
   element.preload = 'auto'
   element.setAttribute('playsinline', 'true')
   routeTakePlaybackToSpeaker(element, 1, false)
@@ -29,10 +27,46 @@ function primeElementForPlayback(element: HTMLMediaElement): void {
 export function useMultitrackSync() {
   const mediaMapRef = useRef<Map<string, HTMLMediaElement>>(new Map())
   const excludePanelIdRef = useRef<string | null>(null)
+  /** Mixer state (per-panel playback balance). */
+  const panelVolumeRef = useRef<Map<string, number>>(new Map())
+  const panelMutedRef = useRef<Set<string>>(new Set())
+  /** Per-take monitor mutes ("You'll hear" chips) — cleared after each recording. */
+  const monitorMutedRef = useRef<Set<string>>(new Set())
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const rafRef = useRef<number | null>(null)
+
+  const applyMixState = useCallback((panelId: string, element: HTMLMediaElement) => {
+    element.volume = panelVolumeRef.current.get(panelId) ?? 1
+    element.muted =
+      panelMutedRef.current.has(panelId) || monitorMutedRef.current.has(panelId)
+  }, [])
+
+  /** Playback helpers (playTakeMediaAudible) force unmute at start — reassert the mix after. */
+  const applyMixStateToAll = useCallback(() => {
+    for (const [panelId, element] of mediaMapRef.current.entries()) {
+      applyMixState(panelId, element)
+    }
+  }, [applyMixState])
+
+  const setPanelVolume = useCallback((panelId: string, volume: number) => {
+    panelVolumeRef.current.set(panelId, Math.max(0, Math.min(1, volume)))
+    const element = mediaMapRef.current.get(panelId)
+    if (element) applyMixState(panelId, element)
+  }, [applyMixState])
+
+  const setPanelMuted = useCallback((panelId: string, muted: boolean) => {
+    if (muted) panelMutedRef.current.add(panelId)
+    else panelMutedRef.current.delete(panelId)
+    const element = mediaMapRef.current.get(panelId)
+    if (element) applyMixState(panelId, element)
+  }, [applyMixState])
+
+  const setMonitorMutedPanelIds = useCallback((panelIds: string[]) => {
+    monitorMutedRef.current = new Set(panelIds)
+    applyMixStateToAll()
+  }, [applyMixStateToAll])
 
   const getElements = useCallback((excludePanelId: string | null = excludePanelIdRef.current) => {
     const entries = [...mediaMapRef.current.entries()]
@@ -60,6 +94,7 @@ export function useMultitrackSync() {
   const registerMedia = useCallback((panelId: string, element: HTMLMediaElement | null) => {
     if (element) {
       mediaMapRef.current.set(panelId, element)
+      applyMixState(panelId, element)
       element.addEventListener('loadedmetadata', refreshDuration)
       element.addEventListener('durationchange', refreshDuration)
     } else {
@@ -116,10 +151,11 @@ export function useMultitrackSync() {
     const starts = await Promise.all(
       elements.map((el) => playTakeMediaAudible(el, { skipRoutePrep: true })),
     )
+    applyMixStateToAll()
     const playing = starts.some(Boolean)
     setIsPlaying(playing)
     return playing
-  }, [])
+  }, [applyMixStateToAll])
 
   const prepareAtStart = useCallback(async (startTime = 0) => {
     const elements = getElements()
@@ -166,10 +202,11 @@ export function useMultitrackSync() {
     const starts = await Promise.all(
       elements.map((el) => playTakeMediaAudible(el, { skipRoutePrep: true })),
     )
+    applyMixStateToAll()
     const playing = starts.some(Boolean)
     setIsPlaying(playing)
     return playing
-  }, [getElements])
+  }, [applyMixStateToAll, getElements])
 
   const play = useCallback(async () => {
     const master = getMaster()
@@ -237,6 +274,9 @@ export function useMultitrackSync() {
   return {
     registerMedia,
     setExcludePanelId,
+    setPanelVolume,
+    setPanelMuted,
+    setMonitorMutedPanelIds,
     prepareAtStart,
     startPrepared,
     playAllFromUserGesture,

@@ -35,6 +35,7 @@ import {
   registerInlineTakePlaybackPreviewHold,
   registerTakePlaybackMicHandlers,
   finalizeTakePlaybackCleanup,
+  suspendInlineTakeBoxPlaybackForLifecycle,
   releaseTakePlaybackAudio,
   playTakeMediaAudible,
 } from './utils/takePlaybackAudio'
@@ -611,6 +612,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(0)
       pausePipVideos()
+      void suspendInlineTakeBoxPlaybackForLifecycle()
       void finalizeTakePlaybackCleanup()
       void clearPlaybackRouteForLifecycle('app-background')
     }
@@ -1307,6 +1309,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     nativeLivePreviewActive,
     nativeLivePreviewSeedUrl,
     acquireNativeVideoBridge,
+    setSuppressNativeBridgeRecovery,
   } = useCameraSession({
     onRecordingComplete: handleSaveTake,
     secondaryPreviewRef: splitPreviewRef,
@@ -1927,8 +1930,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setCreatorStudioTake(null)
     setShowPitch(false)
     setMultitrackOpen(true)
+    // While multitrack owns the camera, a failed take must never tear down
+    // the live bridge preview (black stage) — recovery is suppressed until close.
+    setSuppressNativeBridgeRecovery(true)
     deferHudMediaPause()
-  }, [deferHudMediaPause, markOverlayClosed, settings.hapticFeedback])
+  }, [deferHudMediaPause, markOverlayClosed, setSuppressNativeBridgeRecovery, settings.hapticFeedback])
 
   const handleMultitrackOpenRecordingStage = useCallback(() => {
     handleRecordingModeChange('video')
@@ -1949,8 +1955,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [pausePipVideos, pauseYoutubeReference, startRecording])
 
   const handleMultitrackStopRecording = useCallback(() => {
-    if (isRecording) stopRecording()
-  }, [isRecording, stopRecording])
+    // No isRecording gate: the serialized native stop is safe at any instant
+    // (it awaits an in-flight start), and the old stale-state gate could
+    // silently no-op a legitimate Stop.
+    stopRecording()
+  }, [stopRecording])
 
   const handleClearMultitrackPendingRecording = useCallback(() => {
     setMultitrackPendingRecordingTakeId(null)
@@ -1966,8 +1975,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     multitrackRecordingActiveRef.current = false
     setMultitrackPendingRecordingTakeId(null)
     setMultitrackOpen(false)
+    setSuppressNativeBridgeRecovery(false)
     recoverCameraAfterSurfaceDismiss('multitrack-close')
-  }, [isRecording, recoverCameraAfterSurfaceDismiss, settings.hapticFeedback, stopRecording])
+  }, [isRecording, recoverCameraAfterSurfaceDismiss, setSuppressNativeBridgeRecovery, settings.hapticFeedback, stopRecording])
 
   const handleCloseCreatorStudioPicker = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)

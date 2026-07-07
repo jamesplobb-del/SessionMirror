@@ -4,7 +4,7 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import Pressable from './ui/Pressable'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
-import { waitForMediaElement, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
+import { waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import {
   finalizeTakePlaybackCleanup,
   playTakeMediaAudible,

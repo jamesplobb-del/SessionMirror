@@ -11,6 +11,46 @@ import type { MultitrackBackingTrack } from '../types'
 
 const BACKING_AUDIO_ACCEPT = 'audio/*,audio/mpeg,audio/mp4,audio/wav,.mp3,.m4a,.wav,.aac'
 
+/**
+ * Always-mounted home for the backing <audio>/<iframe> elements so playback
+ * survives the settings sheet closing (the panel UI is on-demand, the sound
+ * is not). Render exactly one of these per multitrack overlay.
+ */
+export function MultitrackBackingMediaHost({
+  backing,
+  audioRef,
+  youtubeIframeRef,
+}: {
+  backing: MultitrackBackingTrack
+  audioRef: RefObject<HTMLAudioElement | null>
+  youtubeIframeRef: RefObject<HTMLIFrameElement | null>
+}) {
+  return (
+    <div className="multitrack-backing-media-host" aria-hidden>
+      <audio ref={audioRef} className="hidden" preload="metadata" />
+      {backing.kind === 'youtube' ? (
+        <div className="multitrack-backing-strip__youtube-host">
+          <iframe
+            key={normalizeYoutubeEmbedUrl(backing.embedUrl)}
+            ref={youtubeIframeRef}
+            src={normalizeYoutubeEmbedUrl(backing.embedUrl)}
+            title="Multitrack YouTube backing"
+            className="h-full w-full border-0"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+            allowFullScreen
+            onLoad={() => {
+              const iframe = youtubeIframeRef.current
+              registerYoutubeIframe(iframe)
+              wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume: backing.volume })
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function MultitrackBackingTrackPanel({
   backing,
   audioRef,
@@ -20,6 +60,7 @@ export default function MultitrackBackingTrackPanel({
   onBackingChange,
   onTogglePlayback,
   onDismiss,
+  renderMedia = true,
 }: {
   backing: MultitrackBackingTrack
   audioRef: RefObject<HTMLAudioElement | null>
@@ -29,6 +70,12 @@ export default function MultitrackBackingTrackPanel({
   onBackingChange: (backing: MultitrackBackingTrack) => void
   onTogglePlayback: () => void
   onDismiss?: () => void
+  /**
+   * When the panel lives in an on-demand sheet, the host must own the actual
+   * <audio>/<iframe> elements (see MultitrackBackingMediaHost) so playback
+   * survives the sheet closing — pass false to skip rendering them here.
+   */
+  renderMedia?: boolean
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragRef = useRef<{ pointerId: number; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null)
@@ -170,25 +217,29 @@ export default function MultitrackBackingTrackPanel({
           <X className="h-3.5 w-3.5" />
         </Pressable>
       ) : null}
-      <audio ref={audioRef} className="hidden" preload="metadata" />
-      {backing.kind === 'youtube' ? (
-        <div className="multitrack-backing-strip__youtube-host" aria-hidden>
-          <iframe
-            key={normalizeYoutubeEmbedUrl(backing.embedUrl)}
-            ref={youtubeIframeRef}
-            src={normalizeYoutubeEmbedUrl(backing.embedUrl)}
-            title="Multitrack YouTube backing"
-            className="h-full w-full border-0"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-            allowFullScreen
-            onLoad={() => {
-              const iframe = youtubeIframeRef.current
-              registerYoutubeIframe(iframe)
-              wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume: backing.volume })
-            }}
-          />
-        </div>
+      {renderMedia ? (
+        <>
+          <audio ref={audioRef} className="hidden" preload="metadata" />
+          {backing.kind === 'youtube' ? (
+            <div className="multitrack-backing-strip__youtube-host" aria-hidden>
+              <iframe
+                key={normalizeYoutubeEmbedUrl(backing.embedUrl)}
+                ref={youtubeIframeRef}
+                src={normalizeYoutubeEmbedUrl(backing.embedUrl)}
+                title="Multitrack YouTube backing"
+                className="h-full w-full border-0"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowFullScreen
+                onLoad={() => {
+                  const iframe = youtubeIframeRef.current
+                  registerYoutubeIframe(iframe)
+                  wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume: backing.volume })
+                }}
+              />
+            </div>
+          ) : null}
+        </>
       ) : null}
       <input
         ref={fileInputRef}

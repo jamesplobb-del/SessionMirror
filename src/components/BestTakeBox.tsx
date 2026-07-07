@@ -17,13 +17,28 @@ import Pressable from './ui/Pressable'
 import YoutubeUrlDialog from './YoutubeUrlDialog'
 import { stopEventBubble, touchBubbleBlockProps } from '../utils/eventBubbling'
 import {
-  releaseTakePlaybackAudio,
+  finalizeInlineTakeBoxPlaybackCleanup,
+  playInlineTakeBoxFromUserGesture,
 } from '../utils/takePlaybackAudio'
 import {
   maintainYoutubeProxyLoudness,
   pauseYoutubeProxy,
 } from '../utils/playalong/youtubeBridge'
-import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
+import {
+  isNativeInlineTakeBoxPlaybackAvailable,
+  measureInlineTakeBoxWindowRect,
+  setNativeInlineTakeBoxEndedHandler,
+  setNativeInlineTakeBoxVolume,
+  startNativeInlineTakeBoxPlayback,
+  stopNativeInlineTakeBoxPlayback,
+  teardownNativeInlineTakeBoxListener,
+  updateNativeInlineTakeBoxLayout,
+} from '../utils/nativeInlineTakeBoxPlayback'
+import {
+  prepareInlineTakeBoxPlaybackRoute,
+  releaseInlineTakeBoxPlaybackRoute,
+} from '../utils/playbackRouteCoordinator'
+import { waitForMediaElement, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { useTutorialAction } from '../context/TutorialContext'
 import type { Take } from '../types'
@@ -32,7 +47,6 @@ import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interac
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { isAudioMimeType } from '../utils/mobileVideo'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { waitForMediaElement, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 
 const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 
@@ -127,6 +141,8 @@ function BestTakeBox({
   const videoSourceKey = src || playbackFilePath || youtubeEmbedUrl || 'empty'
   const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
+  const playbackStageRef = useRef<HTMLDivElement>(null)
+  const nativePlayInFlightRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
@@ -134,6 +150,9 @@ function BestTakeBox({
 
   const hasLibraryPlayback = Boolean(librarySrc || libraryPlayback?.filePath)
   const hasTake = Boolean(hasLibraryPlayback || take?.videoUrl || take?.filePath)
+  const useNativeTakePlayback =
+    isNativeInlineTakeBoxPlaybackAvailable() && Boolean(playbackFilePath)
+  const mirrorPlayback = !hasLibraryPlayback && take?.mirrorPlayback !== false
   const hasYoutube = Boolean(youtubeEmbedUrl)
   const hasReference = hasTake || hasYoutube
   const isFill = layout === 'fill'
@@ -148,6 +167,8 @@ function BestTakeBox({
 
   useEffect(() => {
     setIsPlaying(false)
+    void stopNativeInlineTakeBoxPlayback({ notify: false })
+    void releaseInlineTakeBoxPlaybackRoute()
   }, [videoSourceKey, suspendPlayback])
 
   useEffect(() => {
@@ -170,6 +191,7 @@ function BestTakeBox({
   }, [hasYoutube, suspendPlayback, youtubeEmbedUrl, youtubeIframeRef])
 
   useEffect(() => {
+    if (useNativeTakePlayback) return
     const media = videoRef.current
     if (!media || !hasTake) return
 
@@ -186,7 +208,48 @@ function BestTakeBox({
       media.removeEventListener('pause', syncPlaying)
       media.removeEventListener('ended', syncPlaying)
     }
-  }, [hasTake, videoRef, videoSourceKey])
+  }, [hasTake, useNativeTakePlayback, videoRef, videoSourceKey])
+
+  useEffect(() => {
+    if (!useNativeTakePlayback) return
+
+    setNativeInlineTakeBoxEndedHandler(() => {
+      setIsPlaying(false)
+      void releaseInlineTakeBoxPlaybackRoute()
+    })
+
+    return () => {
+      setNativeInlineTakeBoxEndedHandler(null)
+      void stopNativeInlineTakeBoxPlayback({ notify: false })
+      void releaseInlineTakeBoxPlaybackRoute()
+      void teardownNativeInlineTakeBoxListener()
+    }
+  }, [useNativeTakePlayback])
+
+  useEffect(() => {
+    if (!useNativeTakePlayback || !isPlaying) return
+    const stage = playbackStageRef.current
+    if (!stage) return
+
+    const syncLayout = () => {
+      const layout = measureInlineTakeBoxWindowRect(stage)
+      if (layout) {
+        void updateNativeInlineTakeBoxLayout(layout)
+      }
+    }
+
+    syncLayout()
+    const observer = new ResizeObserver(syncLayout)
+    observer.observe(stage)
+    window.addEventListener('scroll', syncLayout, true)
+    window.addEventListener('resize', syncLayout)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', syncLayout, true)
+      window.removeEventListener('resize', syncLayout)
+    }
+  }, [isPlaying, useNativeTakePlayback, layout, splitViewActive])
 
   useEffect(() => {
     onPlaybackChange?.(isPlaying)
@@ -194,11 +257,17 @@ function BestTakeBox({
 
   useEffect(() => {
     if (!suspendPlayback || !hasTake) return
+    if (useNativeTakePlayback) {
+      void stopNativeInlineTakeBoxPlayback({ notify: false })
+      void releaseInlineTakeBoxPlaybackRoute()
+      setIsPlaying(false)
+      return
+    }
     const media = videoRef.current
     if (!media) return
     media.pause()
     setIsPlaying(false)
-  }, [hasTake, suspendPlayback, videoRef, videoSourceKey])
+  }, [hasTake, suspendPlayback, useNativeTakePlayback, videoRef, videoSourceKey])
 
   const posterUrl =
     take?.thumbnailUrl ??
@@ -210,42 +279,97 @@ function BestTakeBox({
       stopEventBubble(event)
       if (suspendPlayback || !hasTake) return
 
-      const video = videoRef.current
-      if (!video) return
+      if (useNativeTakePlayback) {
+        if (isPlaying) {
+          void stopNativeInlineTakeBoxPlayback({ notify: false })
+          void releaseInlineTakeBoxPlaybackRoute()
+          setIsPlaying(false)
+          return
+        }
+        if (nativePlayInFlightRef.current) return
 
-      if (video.paused) {
-        setIsPlaying(true)
-        toggleInlineTakePlayback(video, {
+        const layout = measureInlineTakeBoxWindowRect(playbackStageRef.current)
+        if (!layout) return
+
+        void (async () => {
+          nativePlayInFlightRef.current = true
+          try {
+            await prepareInlineTakeBoxPlaybackRoute()
+            const started = await startNativeInlineTakeBoxPlayback({
+              filePath: playbackFilePath,
+              layout,
+              mirror: mirrorPlayback,
+              volume,
+            })
+            if (!started) {
+              await releaseInlineTakeBoxPlaybackRoute()
+            }
+            setIsPlaying(started)
+          } finally {
+            nativePlayInFlightRef.current = false
+          }
+        })()
+        return
+      }
+
+      if (isPlaying) {
+        const video = videoRef.current
+        video?.pause()
+        void finalizeInlineTakeBoxPlaybackCleanup()
+        setIsPlaying(false)
+        return
+      }
+
+      void (async () => {
+        const media = (await waitForMediaElement(videoRef)) ?? videoRef.current
+        if (!media) {
+          setIsPlaying(false)
+          return
+        }
+
+        const hasSource = Boolean(media.src || media.currentSrc || media.readyState > 0)
+        if (!hasSource) {
+          const ready = await waitForMediaReadyWithRetry(media)
+          if (!ready) {
+            setIsPlaying(false)
+            return
+          }
+        }
+
+        playInlineTakeBoxFromUserGesture(media, {
           onPlaying: () => setIsPlaying(true),
           onFailure: () => {
             setIsPlaying(false)
-            void releaseTakePlaybackAudio()
-          },
-          onPaused: () => setIsPlaying(false),
-        })
-      } else {
-        toggleInlineTakePlayback(video, {
-          onPaused: () => {
-            setIsPlaying(false)
-            void releaseTakePlaybackAudio()
+            void finalizeInlineTakeBoxPlaybackCleanup()
           },
         })
-      }
+      })()
     },
-    [hasTake, suspendPlayback, videoRef],
+    [
+      hasTake,
+      isPlaying,
+      mirrorPlayback,
+      playbackFilePath,
+      suspendPlayback,
+      useNativeTakePlayback,
+      videoRef,
+      volume,
+    ],
   )
-
-
 
   const handleVolume = useCallback(
     (value: number) => {
       setVolume(value)
+      if (useNativeTakePlayback && isPlaying) {
+        void setNativeInlineTakeBoxVolume(value)
+        return
+      }
       const video = videoRef.current
       if (!video) return
       video.volume = value
       updateTakePlaybackSpeakerGain(video, value, false)
     },
-    [videoRef],
+    [isPlaying, useNativeTakePlayback, videoRef],
   )
 
   const handleFileChange = useCallback(
@@ -375,7 +499,7 @@ function BestTakeBox({
       )}
 
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
-        <div className={innerClass}>
+        <div className={innerClass} ref={playbackStageRef}>
           <span
             className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
               isFill ? 'px-2 py-0.5 text-[10px]' : ''
@@ -393,20 +517,22 @@ function BestTakeBox({
             />
           ) : hasTake ? (
             <>
-              <TakeVideoPlayer
-                filePath={playbackFilePath}
-                videoUrl={src ?? ''}
-                mimeType={playbackMimeType}
-                videoRef={videoRef}
-                videoSourceKey={videoSourceKey}
-                className="absolute inset-0 h-full w-full object-cover pointer-events-none"
-                loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
-                mirror={hasLibraryPlayback ? false : take!.mirrorPlayback !== false}
-                recordingOrientation={take?.recordingOrientation}
-                fit={playbackFit}
-                manualPlayOnly
-                audible={playbackAudible}
-              />
+              {!useNativeTakePlayback && (
+                <TakeVideoPlayer
+                  filePath={playbackFilePath}
+                  videoUrl={src ?? ''}
+                  mimeType={playbackMimeType}
+                  videoRef={videoRef}
+                  videoSourceKey={videoSourceKey}
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                  loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
+                  mirror={mirrorPlayback}
+                  recordingOrientation={take?.recordingOrientation}
+                  fit={playbackFit}
+                  manualPlayOnly
+                  audible={playbackAudible}
+                />
+              )}
               {!isPlaying && (
                 <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
               )}

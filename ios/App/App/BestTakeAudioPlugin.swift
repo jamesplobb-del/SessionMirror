@@ -18,6 +18,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getPlaybackOutputProfile", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativePlaybackTest", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativePlaybackTest", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startInlineTakeBoxPlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopInlineTakeBoxPlayback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateInlineTakeBoxPlaybackLayout", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setInlineTakeBoxPlaybackVolume", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareCameraLikePlaybackSession", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setCameraSessionState", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getCameraSessionState", returnType: CAPPluginReturnPromise),
@@ -252,7 +256,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func enableStereoPlayback(_ call: CAPPluginCall) {
         do {
             let result: [String: Any]
-            if CameraSessionGuard.isCameraOrRecordingActive && CameraSessionGuard.playbackRouteActive {
+            // YouTube and other iframe playback use this path without
+            // playbackRouteActive — coexistent speaker override is safe
+            // whenever the camera capture session is live.
+            if CameraSessionGuard.isCameraOrRecordingActive {
                 result = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
             } else {
                 result = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
@@ -1387,6 +1394,65 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             finishPlaybackRouteIfNeeded()
             print("[NativePlaybackTest] stopped")
         }
+        call.resolve()
+    }
+
+    // MARK: - BestTakeBox inline preview (AVPlayer overlay — bypasses WKWebView video decode)
+
+    private func inlineTakeBoxFrame(from call: CAPPluginCall) -> CGRect? {
+        guard let x = call.getDouble("x"),
+              let y = call.getDouble("y"),
+              let width = call.getDouble("width"),
+              let height = call.getDouble("height"),
+              width > 0,
+              height > 0 else {
+            return nil
+        }
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    @objc func startInlineTakeBoxPlayback(_ call: CAPPluginCall) {
+        guard let fileURL = resolvePluginFileURL(from: call) else { return }
+        guard let frame = inlineTakeBoxFrame(from: call) else {
+            call.reject("layout x/y/width/height required")
+            return
+        }
+
+        let mirror = call.getBool("mirror") ?? false
+        let volume = Float(call.getFloat("volume") ?? 1)
+
+        do {
+            let payload = try InlineTakeBoxPlaybackController.shared.start(
+                plugin: self,
+                fileURL: fileURL,
+                frameInWindow: frame,
+                mirror: mirror,
+                volume: volume
+            )
+            call.resolve(payload)
+        } catch {
+            call.reject("Failed to start inline take box playback", nil, error)
+        }
+    }
+
+    @objc func stopInlineTakeBoxPlayback(_ call: CAPPluginCall) {
+        let notify = call.getBool("notify") ?? true
+        InlineTakeBoxPlaybackController.shared.stop(notify: notify)
+        call.resolve()
+    }
+
+    @objc func updateInlineTakeBoxPlaybackLayout(_ call: CAPPluginCall) {
+        guard let frame = inlineTakeBoxFrame(from: call) else {
+            call.reject("layout x/y/width/height required")
+            return
+        }
+        InlineTakeBoxPlaybackController.shared.updateLayout(plugin: self, frameInWindow: frame)
+        call.resolve()
+    }
+
+    @objc func setInlineTakeBoxPlaybackVolume(_ call: CAPPluginCall) {
+        let volume = Float(call.getFloat("volume") ?? 1)
+        InlineTakeBoxPlaybackController.shared.setVolume(volume)
         call.resolve()
     }
 

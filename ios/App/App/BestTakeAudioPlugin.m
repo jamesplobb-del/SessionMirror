@@ -10,6 +10,10 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(getPlaybackOutputProfile, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startNativePlaybackTest, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopNativePlaybackTest, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(startInlineTakeBoxPlayback, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(stopInlineTakeBoxPlayback, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(updateInlineTakeBoxPlaybackLayout, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setInlineTakeBoxPlaybackVolume, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(prepareCameraLikePlaybackSession, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setCameraSessionState, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(getCameraSessionState, CAPPluginReturnPromise);

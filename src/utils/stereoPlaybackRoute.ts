@@ -59,14 +59,7 @@ export function engageStereoPlayback(): void {
   if (!shouldAttemptNativeStereoRoute()) return
 
   void (async () => {
-    if (await isCameraSessionActive()) {
-      if (holdCount <= 0) return
-      return BestTakeAudioPlugin.prepareCameraLikePlaybackSession({
-        allowWithActivePreview: true,
-      })
-    }
     if (holdCount <= 0) return
-
     return BestTakeAudioPlugin.enableStereoPlayback()
   })()
     .then((snapshot) => {
@@ -86,16 +79,12 @@ export function refreshStereoPlaybackRoute(): void {
   if (!Capacitor.isNativePlatform()) return
   if (holdCount <= 0) return
   if (!shouldAttemptNativeStereoRoute()) return
+  // Coexistent speaker route is stable while camera + YouTube are both live.
+  // Re-applying setActive during iframe playback interrupts the YouTube player.
+  if (nativeRouteEngaged) return
 
   void (async () => {
-    if (await isCameraSessionActive()) {
-      if (holdCount <= 0) return
-      return BestTakeAudioPlugin.prepareCameraLikePlaybackSession({
-        allowWithActivePreview: true,
-      })
-    }
     if (holdCount <= 0) return
-
     return BestTakeAudioPlugin.enableStereoPlayback()
   })()
     .then((snapshot) => {
@@ -122,6 +111,14 @@ export async function releaseStereoPlayback(): Promise<void> {
   nativeRouteEngaged = false
 
   if (!wasNativeEngaged) return
+
+  const cameraActive = await isCameraSessionActive()
+  if (cameraActive) {
+    // Camera preview owns the session — restoring a generic recording route
+    // would stomp the live capture profile and can pause YouTube mid-playback.
+    recordingRouteRestoredHandler?.()
+    return
+  }
 
   try {
     await BestTakeAudioPlugin.enableRecordingRoute()
