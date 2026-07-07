@@ -41,15 +41,13 @@ import {
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import {
-  startNativeCameraPreview,
+  startNativeCameraBridge,
   startNativeCameraRecording,
   stopNativeCameraBridge,
   stopNativeCameraPreview,
   stopNativeCameraRecording,
   setNativeCameraPassthrough,
-  setNativeCameraPassthroughClass,
 } from '../utils/nativeCameraTest'
-import { resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
@@ -520,7 +518,6 @@ export function useCameraSession({
     setNativeLivePreviewActive(false)
     setNativeLivePreviewSeedUrl(null)
     nativePreviewActiveRef.current = false
-    setNativeCameraPassthroughClass(false)
     await setNativeCameraPassthrough(false)
     await stopNativeCameraBridge()
     await stopNativeCameraPreview()
@@ -594,25 +591,16 @@ export function useCameraSession({
         await new Promise((resolve) => window.setTimeout(resolve, IOS_NATIVE_BRIDGE_HANDOFF_MS))
       }
 
-      // Layer preview: the native AVCaptureVideoPreviewLayer renders behind the
-      // (now transparent) webview at device frame rate — the Swift side flips
-      // passthrough on success; the CSS class opens the visual hole.
-      const result = await startNativeCameraPreview({
+      const result = await startNativeCameraBridge({
         useFrontCamera: true,
         audioSessionProfile: 'videoRecording',
         micInputPreference: micInputPreferenceRef.current,
       })
 
       if (!result) {
-        setNativeCameraPassthroughClass(false)
         setReady(false)
         return false
       }
-
-      setNativeCameraPassthroughClass(true)
-      // The session-category switch can leave the shared WebAudio context
-      // suspended — nudge it so the metronome click stays audible in camera mode.
-      void resumePlaybackAudioContext()
 
       nativePreviewActiveRef.current = true
       setNativeLivePreviewActive(true)
@@ -631,9 +619,6 @@ export function useCameraSession({
     setNativeLivePreviewActive(false)
     setNativeLivePreviewSeedUrl(null)
     nativePreviewActiveRef.current = false
-    setNativeCameraPassthroughClass(false)
-    await setNativeCameraPassthrough(false)
-    await stopNativeCameraPreview()
     await stopNativeCameraBridge()
     void syncNativeCameraSessionState({ previewActive: false, recordingActive: false })
   }, [])
@@ -656,9 +641,6 @@ export function useCameraSession({
       nativePreviewStartTokenRef.current += 1
       if (!nativePreviewActiveRef.current) return
       nativePreviewActiveRef.current = false
-      setNativeCameraPassthroughClass(false)
-      void setNativeCameraPassthrough(false)
-      void stopNativeCameraPreview()
       void stopNativeCameraBridge()
     }
   }, [])
@@ -1850,9 +1832,6 @@ export function useCameraSession({
     setNativeLivePreviewSeedUrl(null)
     if (nativePreviewActiveRef.current) {
       nativePreviewActiveRef.current = false
-      setNativeCameraPassthroughClass(false)
-      void setNativeCameraPassthrough(false)
-      void stopNativeCameraPreview()
       void stopNativeCameraBridge()
     }
     void syncNativeCameraSessionState({
