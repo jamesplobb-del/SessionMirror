@@ -1,8 +1,43 @@
 import { Capacitor } from '@capacitor/core'
+import BestTakeAudioPlugin from './audioSessionRoute'
+
+const isNative = Capacitor.isNativePlatform()
+const isIOS = isNative && Capacitor.getPlatform() === 'ios'
+
+/**
+ * Cache the Capacitor haptics module once (Android / non-iOS native). The old
+ * per-tap dynamic import often resolved after the gesture, so haptics arrived
+ * late or were dropped. iOS uses the native pre-warmed Taptic path instead.
+ */
+type CapacitorHapticsModule = typeof import('@capacitor/haptics')
+let capacitorHapticsPromise: Promise<CapacitorHapticsModule> | null = null
+function loadCapacitorHaptics(): Promise<CapacitorHapticsModule> {
+  if (!capacitorHapticsPromise) {
+    capacitorHapticsPromise = import('@capacitor/haptics')
+  }
+  return capacitorHapticsPromise
+}
+
+if (isNative && !isIOS) {
+  // Warm the module immediately so the first Android tap isn't a cold import.
+  void loadCapacitorHaptics()
+}
+
+/** Keep the native Taptic Engine primed (call after playback / long idle). */
+export function warmHaptics(): void {
+  if (isIOS) {
+    void BestTakeAudioPlugin.prepareHaptics().catch(() => {})
+  }
+}
 
 function runImpact(style: 'light' | 'medium' | 'heavy'): void {
-  if (Capacitor.isNativePlatform()) {
-    void import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) =>
+  if (isIOS) {
+    void BestTakeAudioPlugin.hapticImpact({ style }).catch(() => {})
+    return
+  }
+
+  if (isNative) {
+    void loadCapacitorHaptics().then(({ Haptics, ImpactStyle }) =>
       Haptics.impact({
         style:
           style === 'heavy'
@@ -19,8 +54,13 @@ function runImpact(style: 'light' | 'medium' | 'heavy'): void {
 }
 
 function runNotification(type: 'success' | 'warning' | 'error'): void {
-  if (Capacitor.isNativePlatform()) {
-    void import('@capacitor/haptics').then(({ Haptics, NotificationType }) =>
+  if (isIOS) {
+    void BestTakeAudioPlugin.hapticNotification({ type }).catch(() => {})
+    return
+  }
+
+  if (isNative) {
+    void loadCapacitorHaptics().then(({ Haptics, NotificationType }) =>
       Haptics.notification({
         type:
           type === 'success'
@@ -103,9 +143,9 @@ export async function triggerSelectionHaptic(): Promise<void> {
   triggerLightHaptic()
 }
 
-/** Medium pulse when a long-press action fires (e.g. quick settings). */
+/** Deliberate pulse when a long-press action fires (e.g. quick settings reveal). */
 export async function triggerLongPressHaptic(): Promise<void> {
-  triggerMediumHaptic()
+  triggerHeavyHaptic()
 }
 
 /** Slightly stronger pulse when drag begins. */

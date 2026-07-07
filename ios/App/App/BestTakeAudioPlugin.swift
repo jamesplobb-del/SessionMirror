@@ -42,6 +42,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stopNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hapticImpact", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hapticNotification", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "prepareHaptics", returnType: CAPPluginReturnPromise),
     ]
 
     private let nativeCameraEngine = NativeCameraRecordingEngine.shared
@@ -49,6 +52,25 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     private var nativeTestPlayer: AVPlayer?
     private var nativeTestEndObserver: NSObjectProtocol?
     private var playbackRouteRestorePending = false
+
+    // MARK: - Haptics
+    // Pre-instantiated feedback generators kept warm via prepare() so every
+    // tap fires crisply and immediately. Dynamically importing a JS haptics
+    // module per tap (the old path) let the Taptic Engine idle between taps,
+    // which is what made haptics feel weak / dropped ("dwindling").
+    private lazy var impactGenerators: [String: UIImpactFeedbackGenerator] = {
+        var generators: [String: UIImpactFeedbackGenerator] = [
+            "light": UIImpactFeedbackGenerator(style: .light),
+            "medium": UIImpactFeedbackGenerator(style: .medium),
+            "heavy": UIImpactFeedbackGenerator(style: .heavy),
+        ]
+        if #available(iOS 13.0, *) {
+            generators["soft"] = UIImpactFeedbackGenerator(style: .soft)
+            generators["rigid"] = UIImpactFeedbackGenerator(style: .rigid)
+        }
+        return generators
+    }()
+    private lazy var notificationGenerator = UINotificationFeedbackGenerator()
 
     override public func load() {
         super.load()
@@ -74,6 +96,59 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             AudioRouteConfigurator.logRoute("route-change event")
             guard let self = self else { return }
             self.notifyListeners("audioRouteChanged", data: AudioRouteConfigurator.routeSnapshot())
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.warmHaptics()
+        }
+    }
+
+    // MARK: - Haptics
+
+    private func warmHaptics() {
+        for generator in impactGenerators.values {
+            generator.prepare()
+        }
+        notificationGenerator.prepare()
+    }
+
+    @objc func hapticImpact(_ call: CAPPluginCall) {
+        let style = call.getString("style") ?? "medium"
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                call.resolve()
+                return
+            }
+            let generator = self.impactGenerators[style] ?? self.impactGenerators["medium"]
+            generator?.impactOccurred()
+            // Re-prime immediately so the next tap is just as crisp.
+            generator?.prepare()
+            call.resolve()
+        }
+    }
+
+    @objc func hapticNotification(_ call: CAPPluginCall) {
+        let typeRaw = call.getString("type") ?? "success"
+        let type: UINotificationFeedbackGenerator.FeedbackType
+        switch typeRaw {
+        case "warning": type = .warning
+        case "error": type = .error
+        default: type = .success
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                call.resolve()
+                return
+            }
+            self.notificationGenerator.notificationOccurred(type)
+            self.notificationGenerator.prepare()
+            call.resolve()
+        }
+    }
+
+    @objc func prepareHaptics(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { [weak self] in
+            self?.warmHaptics()
+            call.resolve()
         }
     }
 

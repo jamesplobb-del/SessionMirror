@@ -69,11 +69,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
+        CameraSessionGuard.markForegroundActivation()
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
+        CameraSessionGuard.markForegroundActivation()
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
     }

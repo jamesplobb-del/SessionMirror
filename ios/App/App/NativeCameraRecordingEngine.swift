@@ -30,8 +30,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var pendingBridgeSample: CMSampleBuffer?
     private var isBridgeEncoding = false
     private let bridgeFramesPerSecond: Double = 60
-    private let bridgeMaxPixelDimension: CGFloat = 1080
-    private let bridgeJpegQuality: CGFloat = 0.75
+    // Preview-only pump sizing. The recorded movie file uses a separate
+    // full-resolution AVCaptureMovieFileOutput and is UNAFFECTED by these.
+    // 1080px/0.75 JPEG base64 at 60fps saturates the Capacitor/WKWebView bridge
+    // and stutters; 720px/0.6 is ample for an on-screen phone preview and cuts
+    // per-frame payload ~2.5x, letting the bridge sustain a far smoother rate.
+    private let bridgeMaxPixelDimension: CGFloat = 720
+    private let bridgeJpegQuality: CGFloat = 0.6
     private lazy var ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private lazy var bridgeColorSpace = CGColorSpaceCreateDeviceRGB()
     private var outputURL: URL?
@@ -361,7 +366,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                             profile: audioSessionProfile,
                             micInputPreference: micInputPreference
                         )
-                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera {
+                        // `!session.isRunning` forces a full rebuild whenever the
+                        // session was stopped for app-background. Just calling
+                        // startRunning() on a stopped-but-still-"configured" session
+                        // leaves the audio AVCaptureDeviceInput stale after the shared
+                        // AVAudioSession was deactivated on background — video re-taps
+                        // fine but the mic silently delivers nothing (the classic
+                        // "camera recovers, audio dead after swipe-out/in" bug).
+                        // Rebuilding re-taps a live mic input every resume.
+                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || !self.session.isRunning {
                             let configuredOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
                             self.movieOutput = configuredOutput
                             self.isSessionConfigured = true
@@ -418,7 +431,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                             profile: audioSessionProfile,
                             micInputPreference: micInputPreference
                         )
-                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera {
+                        // See startBridgePreview: rebuild after a background stop so
+                        // the audio input is freshly tapped, not left stale from the
+                        // AVAudioSession deactivation that happens on app-background.
+                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || !self.session.isRunning {
                             self.movieOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
                             self.isSessionConfigured = true
                         }

@@ -1389,13 +1389,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         void refreshCameraSession()
       }, 140)
 
+      // Do NOT re-sync ownership state here with a manually-built payload:
+      // this callback fires 720ms after being scheduled and closes over
+      // `ready`/`recordingMode`/`isRecording` from whenever this effect
+      // instance was created, not their live values. A stale `ready`
+      // snapshot previously reported previewActive:false to native while
+      // the camera bridge was genuinely live, which native read as "fully
+      // idle" and used to deactivate the AVAudioSession moments after
+      // `applicationDidBecomeActive` had just reactivated it. The dedicated
+      // effect above (driven by `ready`/`nativeLivePreviewActive`/
+      // `isRecording`/`recordingMode` as React deps) is the single source of
+      // truth for native ownership sync and always runs with current values.
       secondTimer = window.setTimeout(() => {
-        void refreshCameraSession().finally(() => {
-          void syncNativeCameraSessionState({
-            previewActive: ready && recordingMode === 'video',
-            recordingActive: isRecording,
-          })
-        })
+        void refreshCameraSession()
       }, 720)
     }
 

@@ -508,6 +508,10 @@ enum AudioRouteConfigurator {
     static func deactivateCaptureSessionIfIdle() throws {
         guard !CameraSessionGuard.isCameraOrRecordingActive else { return }
         guard !CameraSessionGuard.playbackRouteActive else { return }
+        guard !CameraSessionGuard.isWithinForegroundGracePeriod else {
+            print("[AudioRoute] skipped idle deactivation — within foreground grace period (ownership handshake still settling)")
+            return
+        }
 
         let session = AVAudioSession.sharedInstance()
         try debugSetActive(

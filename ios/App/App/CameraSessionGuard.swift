@@ -11,6 +11,25 @@ enum CameraSessionGuard {
         previewActive || recordingActive
     }
 
+    /// Timestamp of the most recent `applicationDidBecomeActive` /
+    /// `applicationWillEnterForeground`. The JS↔native ownership handshake
+    /// (camera bridge reacquire, playback-route release, Web Audio context
+    /// resume) is asynchronous and takes several hundred ms to settle after
+    /// resume — during that window a snapshot of "everything looks idle" can
+    /// be stale rather than true. Without this grace period,
+    /// `deactivateCaptureSessionIfIdle()` can immediately undo the session
+    /// reactivation `AppDelegate` just performed on the same lifecycle event.
+    private(set) static var lastForegroundActivationAt: CFAbsoluteTime = 0
+    private static let foregroundGracePeriodSeconds: CFAbsoluteTime = 1.5
+
+    static func markForegroundActivation() {
+        lastForegroundActivationAt = CFAbsoluteTimeGetCurrent()
+    }
+
+    static var isWithinForegroundGracePeriod: Bool {
+        CFAbsoluteTimeGetCurrent() - lastForegroundActivationAt < foregroundGracePeriodSeconds
+    }
+
     static func setPreviewActive(_ active: Bool) {
         previewActive = active
         logOwnershipTransition(caller: "setPreviewActive(\(active))")
