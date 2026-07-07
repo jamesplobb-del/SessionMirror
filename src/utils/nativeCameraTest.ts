@@ -189,6 +189,38 @@ export async function setNativeCameraPassthrough(enabled: boolean): Promise<void
   }
 }
 
+/**
+ * Web-side half of passthrough: the CSS class makes html/body/.app-shell and the
+ * camera background transparent so the native preview layer shows through.
+ */
+export function setNativeCameraPassthroughClass(enabled: boolean): void {
+  if (typeof document === 'undefined') return
+  document.documentElement.classList.toggle('native-camera-passthrough', enabled)
+}
+
+/**
+ * On-demand JPEG frame pump while the layer preview is the display path
+ * (multitrack stage canvas, thumbnail capture).
+ */
+export async function setNativeCameraFrameBridgeEnabled(enabled: boolean): Promise<void> {
+  if (!isNativeCameraTestAvailable()) return
+  try {
+    await BestTakeAudioPlugin.setNativeCameraFrameBridgeEnabled({ enabled })
+  } catch (error) {
+    console.warn('[NativeCameraPreview] frame bridge toggle failed', error)
+  }
+}
+
+/** Preview-only zoom on the native layer (recordings stay unzoomed). */
+export async function setNativeCameraPreviewZoom(zoom: number): Promise<void> {
+  if (!isNativeCameraTestAvailable()) return
+  try {
+    await BestTakeAudioPlugin.setNativeCameraPreviewZoom({ zoom })
+  } catch (error) {
+    console.warn('[NativeCameraPreview] zoom failed', error)
+  }
+}
+
 export async function stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult | null> {
   if (!isNativeCameraTestAvailable()) return null
 

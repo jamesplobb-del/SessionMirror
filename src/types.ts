@@ -29,6 +29,8 @@ export interface Take {
   mirrorPlayback?: boolean
   /** Device orientation when the take was recorded. */
   recordingOrientation?: 'portrait' | 'landscape'
+  /** Audio Enhancer baked into the file after recording — playback skips the live chain. */
+  enhancerBaked?: boolean
   /** Optional pitch contour from offline or live analysis */
   pitchSeries?: PitchSample[]
   /** Non-destructive loudness metadata — does not alter the saved file. */

@@ -28,6 +28,7 @@ function mapTakeRow(row: SqlRow): VaultTake {
       String(row.recording_orientation ?? 'portrait') === 'landscape'
         ? 'landscape'
         : 'portrait',
+    enhancerBaked: Number(row.enhancer_baked ?? 0) === 1,
   }
 }
 
@@ -97,13 +98,14 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
     rating: 0,
     notes: '',
     recordingOrientation: input.recordingOrientation ?? 'portrait',
+    enhancerBaked: false,
   }
 
   await db.run(
     `INSERT INTO takes (
       id, project_id, file_path, duration, is_best_take, created_at,
-      name, mime_type, media_type, rating, notes, recording_orientation
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      name, mime_type, media_type, rating, notes, recording_orientation, enhancer_baked
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       take.id,
       take.projectId,
@@ -117,6 +119,7 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
       take.rating,
       take.notes,
       take.recordingOrientation ?? 'portrait',
+      0,
     ],
   )
 
@@ -146,6 +149,13 @@ export async function updateVaultTake(takeId: string, updates: VaultTakeUpdate):
 
   values.push(takeId)
   await db.run(`UPDATE takes SET ${fields.join(', ')} WHERE id = ?`, values)
+  await persistWebStore()
+}
+
+/** Flip after the native renderer atomically replaced the file with the enhanced version. */
+export async function setTakeEnhancerBaked(takeId: string, baked: boolean): Promise<void> {
+  const db = getVaultDatabase()
+  await db.run('UPDATE takes SET enhancer_baked = ? WHERE id = ?', [baked ? 1 : 0, takeId])
   await persistWebStore()
 }
 

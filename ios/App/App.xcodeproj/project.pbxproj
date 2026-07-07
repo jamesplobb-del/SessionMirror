@@ -14,6 +14,7 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		AUDIOENH2FED79650016851F /* AudioEnhancerRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUDIOENH1FED79650016851F /* AudioEnhancerRenderer.swift */; };
 		AUDIOROUTE2FED79650016851F /* AudioRouteConfigurator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUDIOROUTE1FED79650016851F /* AudioRouteConfigurator.swift */; };
 		BESTTAKE2FED79650016851F /* BestTakeAudioPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */; };
 		BESTTAKE4FED79650016851F /* BestTakeAudioPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = BESTTAKE3FED79650016851F /* BestTakeAudioPlugin.m */; };
@@ -39,6 +40,7 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		54B30F73516ACD7E3398CC08 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
+		AUDIOENH1FED79650016851F /* AudioEnhancerRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEnhancerRenderer.swift; sourceTree = "<group>"; };
 		AUDIOROUTE1FED79650016851F /* AudioRouteConfigurator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRouteConfigurator.swift; sourceTree = "<group>"; };
 		BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BestTakeAudioPlugin.swift; sourceTree = "<group>"; };
 		BESTTAKE3FED79650016851F /* BestTakeAudioPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BestTakeAudioPlugin.m; sourceTree = "<group>"; };
@@ -112,6 +114,7 @@
 				NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */,
 				CAMGUARD1FED79650016851F /* CameraSessionGuard.swift */,
 				AUDIOROUTE1FED79650016851F /* AudioRouteConfigurator.swift */,
+				AUDIOENH1FED79650016851F /* AudioEnhancerRenderer.swift */,
 				BESTTAKE3FED79650016851F /* BestTakeAudioPlugin.m */,
 				DRONEENG1FED79650016851F /* DroneEngine.swift */,
 				DRONEPLG1FED79650016851F /* DronePlugin.swift */,
@@ -271,6 +274,7 @@
 				NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */,
 				CAMGUARD2FED79650016851F /* CameraSessionGuard.swift in Sources */,
 				AUDIOROUTE2FED79650016851F /* AudioRouteConfigurator.swift in Sources */,
+				AUDIOENH2FED79650016851F /* AudioEnhancerRenderer.swift in Sources */,
 				DRONEENG2FED79650016851F /* DroneEngine.swift in Sources */,
 				DRONEPLG2FED79650016851F /* DronePlugin.swift in Sources */,
 				DRONEPLG4FED79650016851F /* DronePlugin.m in Sources */,

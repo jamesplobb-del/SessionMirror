@@ -36,6 +36,7 @@ export function vaultTakeToUiTake(
     mediaType: vaultTake.mediaType,
     mirrorPlayback: vaultTake.mediaType === 'video',
     recordingOrientation: vaultTake.recordingOrientation ?? 'portrait',
+    enhancerBaked: vaultTake.enhancerBaked,
   }
 }
 

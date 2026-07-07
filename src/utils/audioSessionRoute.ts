@@ -225,6 +225,14 @@ export interface BestTakeAudioPluginType {
   }): Promise<NativeCameraSessionDiagnostics>
   stopNativeCameraPreview(): Promise<void>
   setNativeCameraPassthrough(options: { enabled: boolean }): Promise<void>
+  setNativeCameraFrameBridgeEnabled(options: { enabled: boolean }): Promise<void>
+  setNativeCameraPreviewZoom(options: { zoom: number }): Promise<void>
+  setNativeAudioTapEnabled(options: { enabled: boolean }): Promise<void>
+  enhanceTakeAudio(options: {
+    url: string
+    mediaType: 'video' | 'audio'
+    params: Record<string, number>
+  }): Promise<{ enhanced: boolean; duration: number }>
   stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult>
   playNativeCameraTestPostProcess(options: { url: string }): Promise<NativeCameraPostProcessPlaybackResult>
   stopNativeCameraTestPostProcess(): Promise<void>
@@ -239,6 +247,10 @@ export interface BestTakeAudioPluginType {
   addListener(
     eventName: 'nativeCameraPreviewFrame',
     listenerFunc: (data: { jpegBase64?: string; dataUrl?: string; width?: number; height?: number }) => void,
+  ): Promise<PluginListenerHandle>
+  addListener(
+    eventName: 'nativeAudioPitchFrame',
+    listenerFunc: (data: { pcmBase64?: string; sampleRate?: number; sampleCount?: number }) => void,
   ): Promise<PluginListenerHandle>
 }
 

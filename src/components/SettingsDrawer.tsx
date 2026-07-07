@@ -397,7 +397,7 @@ export default function SettingsDrawer({
             <div data-tutorial="settings-enhancer">
               <SettingToggle
                 label="Audio Enhancer"
-                description="Applies smart EQ, compression, and reverb presets during take playback. Off keeps the original flat mix."
+                description="Bakes smart EQ, compression, and reverb presets into new recordings, and enhances playback of older takes. Off keeps the original flat mix."
                 checked={hudQuickSettings.audioEnhancerEnabled}
                 onChange={onAudioEnhancerChange}
               />

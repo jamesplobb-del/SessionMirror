@@ -11,6 +11,7 @@ export {
   listProjects,
   saveTake,
   setProjectBestTake,
+  setTakeEnhancerBaked,
   toggleBestTake,
   updateVaultTake,
 } from './vaultRepository'

@@ -33,6 +33,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPassthrough", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setNativeCameraFrameBridgeEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setNativeCameraPreviewZoom", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setNativeAudioTapEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enhanceTakeAudio", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
@@ -52,6 +56,13 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 "jpegBase64": jpegBase64,
                 "width": width,
                 "height": height,
+            ])
+        }
+        nativeCameraEngine.onAudioTapChunk = { [weak self] pcmBase64, sampleRate, sampleCount in
+            self?.notifyListeners("nativeAudioPitchFrame", data: [
+                "pcmBase64": pcmBase64,
+                "sampleRate": sampleRate,
+                "sampleCount": sampleCount,
             ])
         }
         routeObserver = NotificationCenter.default.addObserver(
@@ -1135,6 +1146,47 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             (self.bridge?.viewController as? PortraitBridgeViewController)?.setCameraPassthrough(enabled)
             call.resolve()
+        }
+    }
+
+    @objc func setNativeCameraFrameBridgeEnabled(_ call: CAPPluginCall) {
+        let enabled = call.getBool("enabled") ?? false
+        nativeCameraEngine.setFrameBridgeExternallyRequested(enabled)
+        call.resolve()
+    }
+
+    @objc func setNativeCameraPreviewZoom(_ call: CAPPluginCall) {
+        let zoom = call.getDouble("zoom") ?? 1
+        nativeCameraEngine.setPreviewZoom(CGFloat(zoom))
+        call.resolve()
+    }
+
+    @objc func setNativeAudioTapEnabled(_ call: CAPPluginCall) {
+        let enabled = call.getBool("enabled") ?? false
+        nativeCameraEngine.setAudioTapEnabled(enabled)
+        call.resolve()
+    }
+
+    @objc func enhanceTakeAudio(_ call: CAPPluginCall) {
+        guard let fileURL = resolvePluginFileURL(from: call) else { return }
+        guard let paramsDict = call.getObject("params"),
+              let params = AudioEnhancerParams.parse(paramsDict) else {
+            call.reject("Invalid enhancer params")
+            return
+        }
+        let isVideo = (call.getString("mediaType") ?? "video") == "video"
+
+        AudioEnhancerRenderer.enhanceInPlace(
+            fileURL: fileURL,
+            isVideo: isVideo,
+            params: params
+        ) { result in
+            switch result {
+            case .success(let payload):
+                call.resolve(payload)
+            case .failure(let error):
+                call.reject("Audio enhancement failed", nil, error)
+            }
         }
     }
 

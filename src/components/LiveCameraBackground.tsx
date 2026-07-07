@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, type PointerEvent, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useRef, type PointerEvent, type RefObject } from 'react'
 import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
@@ -11,11 +11,6 @@ import {
 import { resetVideoPlayback } from '../utils/videoPlayback'
 import { playTakeMediaAudible } from '../utils/takePlaybackAudio'
 import { attachVideoDecoderStallRecovery } from '../utils/videoDecoderStallRecovery'
-import {
-  createNativePreviewFramePump,
-  subscribeNativeCameraPreviewFrames,
-} from '../utils/nativeCameraFrameBridge'
-import { drawPreviewFrameOnCanvas, paintPreviewVideoOnCanvas } from '../utils/capturePreviewFrame'
 
 interface LiveCameraBackgroundProps {
   previewRef: RefObject<HTMLVideoElement | null>
@@ -36,11 +31,10 @@ interface LiveCameraBackgroundProps {
   variant?: 'fullscreen' | 'embedded'
   /** Keep the preview element mounted but off-screen (split view uses embedded preview). */
   visuallySuppressed?: boolean
-  /** Native iOS live preview via canvas frame bridge (opaque WebView). */
+  /** Native iOS live preview via AVCaptureVideoPreviewLayer behind the transparent WebView. */
   nativeLivePreviewActive?: boolean
-  /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
+  /** Legacy pump-mode props — kept in the interface for App.tsx compatibility; layer mode ignores them. */
   nativeCameraBridgeEnabled?: boolean
-  /** Seamless handoff: last WebKit frame shown until native bridge delivers. */
   nativeLivePreviewSeedUrl?: string | null
   /** Saved-take playback is using the video decoder; pause live preview until it ends. */
   holdPreviewForTakePlayback?: boolean
@@ -65,8 +59,6 @@ function LiveCameraBackground({
   variant = 'fullscreen',
   visuallySuppressed = false,
   nativeLivePreviewActive = false,
-  nativeCameraBridgeEnabled = false,
-  nativeLivePreviewSeedUrl = null,
   holdPreviewForTakePlayback = false,
   handsFreePlaybackTakeId = null,
   handsFreePlaybackSrc = null,
@@ -77,9 +69,6 @@ function LiveCameraBackground({
   const handsFreePlaybackSessionRef = useRef(false)
   const handsFreeStallRecoveryRef = useRef<(() => void) | null>(null)
   const shellRef = useRef<HTMLDivElement>(null)
-  const nativePreviewCanvasRef = useRef<HTMLCanvasElement>(null)
-  const nativeFramePumpRef = useRef<ReturnType<typeof createNativePreviewFramePump> | null>(null)
-  const nativeBridgePrimedRef = useRef(false)
   const pinchPointersRef = useRef(new Map<number, { x: number; y: number }>())
   const pinchStartDistanceRef = useRef(0)
   const pinchStartZoomRef = useRef(1)
@@ -94,65 +83,9 @@ function LiveCameraBackground({
     : 'camera-background-overlay'
   const webPreviewMode = nativeLivePreviewActive ? 'audio' : recordingMode
 
-  const showNativeBridgeCanvas = nativeCameraBridgeEnabled || nativeLivePreviewActive
-
-  useLayoutEffect(() => {
-    if (!nativeLivePreviewActive) return
-    const canvas = nativePreviewCanvasRef.current
-    if (!canvas) return
-
-    const video = previewRef.current
-    if (video && paintPreviewVideoOnCanvas(canvas, video)) {
-      return
-    }
-    if (nativeLivePreviewSeedUrl) {
-      drawPreviewFrameOnCanvas(canvas, nativeLivePreviewSeedUrl)
-    }
-  }, [nativeLivePreviewActive, nativeLivePreviewSeedUrl, previewRef])
-
-  useEffect(() => {
-    if (!nativeCameraBridgeEnabled) return
-
-    let cancelled = false
-    let removeListener: (() => void) | null = null
-
-    if (!nativeFramePumpRef.current) {
-      nativeFramePumpRef.current = createNativePreviewFramePump(nativePreviewCanvasRef)
-    }
-    const pump = nativeFramePumpRef.current
-
-    void (async () => {
-      const subscription = await subscribeNativeCameraPreviewFrames((event) => {
-        if (cancelled || !nativeBridgePrimedRef.current) return
-        pump.push(event)
-      })
-      if (!subscription) return
-      if (cancelled) {
-        void subscription.remove()
-        return
-      }
-      removeListener = () => {
-        void subscription.remove()
-      }
-    })()
-
-    return () => {
-      cancelled = true
-      removeListener?.()
-      nativeBridgePrimedRef.current = false
-      pump.stop()
-      nativeFramePumpRef.current = null
-      const canvas = nativePreviewCanvasRef.current
-      const ctx = canvas?.getContext('2d')
-      if (canvas && ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
-      }
-    }
-  }, [nativeCameraBridgeEnabled])
-
-  useEffect(() => {
-    nativeBridgePrimedRef.current = nativeLivePreviewActive
-  }, [nativeLivePreviewActive])
+  // Native preview is an AVCaptureVideoPreviewLayer BEHIND the transparent
+  // webview (html.native-camera-passthrough opens the visual hole) — no JPEG
+  // pump or canvas painting here anymore; anything painted would occlude it.
 
   useEffect(() => {
     if (!holdPreviewForTakePlayback) return
@@ -480,14 +413,10 @@ function LiveCameraBackground({
     if (!pinchZoomEnabled) return
     const zoom = String(getCssPreviewZoom())
     const video = previewRef.current
-    const canvas = nativePreviewCanvasRef.current
     if (video) {
       video.style.setProperty('--camera-preview-zoom', zoom)
     }
-    if (canvas) {
-      canvas.style.setProperty('--camera-preview-zoom', zoom)
-    }
-  }, [pinchZoomEnabled, previewRef, streamGeneration, nativeLivePreviewActive])
+  }, [pinchZoomEnabled, previewRef, streamGeneration])
 
   useEffect(() => {
     if (!pinchZoomEnabled) return
@@ -599,18 +528,6 @@ function LiveCameraBackground({
       onPointerCancel={handleCameraPinchPointerEnd}
       onPointerLeave={handleCameraPinchPointerEnd}
     >
-      {showNativeBridgeCanvas && (
-        <canvas
-          ref={nativePreviewCanvasRef}
-          className={`${isEmbedded ? 'camera-preview-canvas--embedded' : 'camera-preview-canvas'} ${
-            nativeLivePreviewActive
-              ? 'camera-preview-canvas--live'
-              : 'camera-preview-canvas--primed'
-          }`}
-          aria-hidden
-        />
-      )}
-
       {showPlaceholder && (
         <div
           className={`camera-preview-placeholder ${

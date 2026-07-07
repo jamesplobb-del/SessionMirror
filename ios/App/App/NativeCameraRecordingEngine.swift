@@ -3,8 +3,8 @@ import CoreMedia
 import Foundation
 import UIKit
 
-/// Debug-only AVCaptureSession recorder — bypasses WKWebView getUserMedia.
-final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
+/// Native AVCaptureSession recorder — bypasses WKWebView getUserMedia.
+final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     static let shared = NativeCameraRecordingEngine()
 
     private let session = AVCaptureSession()
@@ -13,10 +13,18 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private let frameEncodeQueue = DispatchQueue(label: "SessionMirror.NativeCameraFrameEncode", qos: .userInitiated)
     private var movieOutput: AVCaptureMovieFileOutput?
     private var videoDataOutput: AVCaptureVideoDataOutput?
+    private var audioDataOutput: AVCaptureAudioDataOutput?
+    private let audioTapQueue = DispatchQueue(label: "SessionMirror.NativeAudioTap")
+    private var isAudioTapEnabled = false
+    private var tapAccumulator: [Float] = []
     private var isSessionConfigured = false
     private var isRecording = false
     private var isStarting = false
     private var isFrameBridgeActive = false
+    /// A JS consumer (multitrack stage, thumbnail capture) asked for pump frames
+    /// while the layer preview is the primary display path.
+    private var isFrameBridgeExternallyRequested = false
+    private var previewZoom: CGFloat = 1
     private var lastBridgeFrameTime: CFTimeInterval = 0
     private var pendingBridgeSample: CMSampleBuffer?
     private var isBridgeEncoding = false
@@ -42,8 +50,25 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// Delivers JPEG base64 (no data-URL prefix) to the Capacitor plugin for canvas preview in the WebView.
     var onPreviewFrame: ((_ jpegBase64: String, _ width: Int, _ height: Int) -> Void)?
 
+    /// Delivers mono Float32 PCM chunks (base64, sampleRate, sampleCount) for the JS pitch tracker.
+    var onAudioTapChunk: ((_ pcmBase64: String, _ sampleRate: Double, _ sampleCount: Int) -> Void)?
+
     private override init() {
         super.init()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleAppDidBecomeActive() {
+        // AVFoundation auto-resumes the session after interruptions, but the
+        // preview layer can come back frozen — re-attach it defensively.
+        if isPreviewActive {
+            refreshPreviewOnMainIfNeeded()
+        }
     }
 
     private func takesDirectoryURL() throws -> URL {
@@ -194,7 +219,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                             profile: audioSessionProfile,
                             micInputPreference: micInputPreference
                         )
-                        if !self.isSessionConfigured {
+                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera {
                             self.movieOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
                             self.isSessionConfigured = true
                         }
@@ -205,6 +230,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                             AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startPreview startRunning.end")
                         }
                         self.resetVideoZoomIfNeeded(useFrontCamera: useFrontCamera)
+                        // Layer preview is the display path — the JPEG pump only runs
+                        // while a JS consumer explicitly asks for frames.
+                        if !self.isFrameBridgeExternallyRequested {
+                            self.disableFrameBridge()
+                        }
+                        CameraSessionGuard.setPreviewActive(true)
                         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
                         // Let the capture pipeline deliver frames before exposing preview.
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
@@ -229,7 +260,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     func stopPreview() {
         disableFrameBridge()
+        isFrameBridgeExternallyRequested = false
         isBridgePreviewActive = false
+        if !isRecording {
+            CameraSessionGuard.setPreviewActive(false)
+        }
         DispatchQueue.main.async {
             self.previewLayer?.removeFromSuperlayer()
             self.previewLayer = nil
@@ -247,7 +282,26 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     func layoutPreview(in container: UIView) {
         guard previewContainer === container else { return }
-        previewLayer?.frame = container.bounds
+        // bounds + position instead of frame: frame is undefined once the
+        // pinch-zoom transform is applied to the layer.
+        previewLayer?.bounds = container.bounds
+        previewLayer?.position = CGPoint(x: container.bounds.midX, y: container.bounds.midY)
+    }
+
+    /// Preview-only pinch zoom (mirrors the CSS `--camera-preview-zoom` behavior):
+    /// scales the rendered layer, never `videoZoomFactor`, so recordings stay unzoomed.
+    func setPreviewZoom(_ zoom: CGFloat) {
+        let clamped = max(1, min(3, zoom))
+        previewZoom = clamped
+        DispatchQueue.main.async {
+            guard let layer = self.previewLayer else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.setAffineTransform(
+                clamped > 1.001 ? CGAffineTransform(scaleX: clamped, y: clamped) : .identity
+            )
+            CATransaction.commit()
+        }
     }
 
     private func applyFrontCameraMirroring(to connection: AVCaptureConnection) {
@@ -288,7 +342,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             previewLayer = layer
         }
         layer.videoGravity = .resizeAspectFill
-        layer.frame = container.bounds
+        layer.bounds = container.bounds
+        layer.position = CGPoint(x: container.bounds.midX, y: container.bounds.midY)
         if let connection = layer.connection {
             if connection.isVideoOrientationSupported {
                 connection.videoOrientation = .portrait
@@ -298,6 +353,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         if layer.superlayer !== container.layer {
             layer.removeFromSuperlayer()
             container.layer.insertSublayer(layer, at: 0)
+        }
+        if previewZoom > 1.001 {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.setAffineTransform(CGAffineTransform(scaleX: previewZoom, y: previewZoom))
+            CATransaction.commit()
         }
     }
 
@@ -363,6 +424,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
         movieOutput = nil
         videoDataOutput = nil
+        audioDataOutput = nil
         isSessionConfigured = false
 
         session.sessionPreset = .high
@@ -472,6 +534,21 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         session.addOutput(videoDataOutput)
         self.videoDataOutput = videoDataOutput
 
+        // Audio tap for the JS pitch tracker. iOS 16+ allows an audio data output
+        // alongside AVCaptureMovieFileOutput (same coexistence rule the video data
+        // output above relies on); degrade silently on older systems.
+        let audioTapOutput = AVCaptureAudioDataOutput()
+        audioTapOutput.setSampleBufferDelegate(self, queue: audioTapQueue)
+        if session.canAddOutput(audioTapOutput) {
+            session.addOutput(audioTapOutput)
+            self.audioDataOutput = audioTapOutput
+        } else {
+            self.audioDataOutput = nil
+            AudioRouteConfigurator.debugCaptureEvent(
+                "NativeCameraRecordingEngine.configureCaptureSession audioTapOutput.unavailable"
+            )
+        }
+
         if let connection = videoDataOutput.connection(with: .video) {
             if connection.isVideoOrientationSupported {
                 connection.videoOrientation = .portrait
@@ -489,6 +566,17 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         frameBridgeQueue.async {
             self.isFrameBridgeActive = true
             self.lastBridgeFrameTime = 0
+        }
+    }
+
+    /// On-demand pump control for JS consumers (multitrack stage, thumbnail capture)
+    /// while the layer preview is the primary display path.
+    func setFrameBridgeExternallyRequested(_ enabled: Bool) {
+        isFrameBridgeExternallyRequested = enabled
+        if enabled {
+            enableFrameBridge()
+        } else if !isBridgePreviewActive {
+            disableFrameBridge()
         }
     }
 
@@ -581,7 +669,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startOnSessionQueue startRunning.end")
         }
 
-        enableFrameBridge()
+        // In layer-preview mode the pump only runs when a JS consumer asked for it.
+        if isBridgePreviewActive || isFrameBridgeExternallyRequested {
+            enableFrameBridge()
+        }
         previewUsesFrontCamera = useFrontCamera
 
         let takesDir = try takesDirectoryURL()
@@ -695,7 +786,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             self.isRecording = false
             self.isStarting = false
-            if self.isBridgePreviewActive {
+            if self.isBridgePreviewActive || self.isFrameBridgeExternallyRequested {
                 self.enableFrameBridge()
             } else {
                 self.disableFrameBridge()
@@ -831,10 +922,94 @@ extension NativeCameraRecordingEngine {
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
+        // Shared delegate method: audio tap samples arrive on audioTapQueue,
+        // video pump frames on frameBridgeQueue.
+        if output === audioDataOutput {
+            handleAudioTapSample(sampleBuffer)
+            return
+        }
+
         guard isFrameBridgeActive else { return }
         guard let copiedBuffer = copySampleBuffer(sampleBuffer) else { return }
 
         pendingBridgeSample = copiedBuffer
         drainBridgeFrames()
+    }
+
+    /// Toggle PCM chunk delivery to JS. The output itself stays attached to the
+    /// session permanently; only emission is gated (queue-confined state).
+    func setAudioTapEnabled(_ enabled: Bool) {
+        audioTapQueue.async {
+            self.isAudioTapEnabled = enabled
+            if !enabled {
+                self.tapAccumulator.removeAll()
+            }
+        }
+    }
+
+    /// Runs on audioTapQueue (the tap output's delegate queue).
+    private func handleAudioTapSample(_ sampleBuffer: CMSampleBuffer) {
+        guard isAudioTapEnabled else { return }
+        guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbdPointer = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) else {
+            return
+        }
+        let asbd = asbdPointer.pointee
+
+        var blockBuffer: CMBlockBuffer?
+        var bufferList = AudioBufferList()
+        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: nil,
+            bufferListOut: &bufferList,
+            bufferListSize: MemoryLayout<AudioBufferList>.size,
+            blockBufferAllocator: kCFAllocatorDefault,
+            blockBufferMemoryAllocator: kCFAllocatorDefault,
+            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
+            blockBufferOut: &blockBuffer
+        )
+        guard status == noErr else { return }
+        // blockBuffer must stay alive while we read the pointers below.
+        defer { _ = blockBuffer }
+
+        let buffers = UnsafeMutableAudioBufferListPointer(&bufferList)
+        guard let firstBuffer = buffers.first, let rawData = firstBuffer.mData else { return }
+
+        let channelCount = max(1, Int(asbd.mChannelsPerFrame))
+        let isFloat = (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0
+        let isSignedInt = (asbd.mFormatFlags & kAudioFormatFlagIsSignedInteger) != 0
+        // For non-interleaved formats the first buffer holds channel 0 only.
+        let isNonInterleaved = (asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved) != 0
+        let stride = isNonInterleaved ? 1 : channelCount
+
+        var mono: [Float]
+        if isFloat && asbd.mBitsPerChannel == 32 {
+            let sampleCount = Int(firstBuffer.mDataByteSize) / MemoryLayout<Float>.size
+            let samples = rawData.bindMemory(to: Float.self, capacity: sampleCount)
+            let frames = sampleCount / stride
+            mono = [Float](repeating: 0, count: frames)
+            for frame in 0..<frames {
+                mono[frame] = samples[frame * stride]
+            }
+        } else if isSignedInt && asbd.mBitsPerChannel == 16 {
+            let sampleCount = Int(firstBuffer.mDataByteSize) / MemoryLayout<Int16>.size
+            let samples = rawData.bindMemory(to: Int16.self, capacity: sampleCount)
+            let frames = sampleCount / stride
+            mono = [Float](repeating: 0, count: frames)
+            for frame in 0..<frames {
+                mono[frame] = Float(samples[frame * stride]) / 32768.0
+            }
+        } else {
+            return
+        }
+
+        tapAccumulator.append(contentsOf: mono)
+        let chunkSize = 2048
+        while tapAccumulator.count >= chunkSize {
+            let chunk = Array(tapAccumulator.prefix(chunkSize))
+            tapAccumulator.removeFirst(chunkSize)
+            let payload = chunk.withUnsafeBufferPointer { Data(buffer: $0) }
+            onAudioTapChunk?(payload.base64EncodedString(), asbd.mSampleRate, chunkSize)
+        }
     }
 }

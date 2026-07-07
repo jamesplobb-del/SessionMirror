@@ -111,6 +111,7 @@ import {
   setProjectBenchmarkBinding,
   setProjectBestTake,
   setProjectLibraryBenchmark,
+  setTakeEnhancerBaked,
   uiTakesFromVaultRowsFast,
   hydrateVaultTakeRowsProgressive,
   updateLibraryItemName,
@@ -128,7 +129,8 @@ import {
 } from './utils/libraryStorage'
 import type { BenchmarkBinding } from './types/library'
 import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
-import { applyNativeExperimentalAudioMode } from './utils/audioSessionRoute'
+import BestTakeAudioPlugin, { applyNativeExperimentalAudioMode } from './utils/audioSessionRoute'
+import { buildNativeEnhancerParams } from './utils/audioEnhancer'
 import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
 import { setActiveCaptureProfile } from './utils/audioCapture'
 import {
@@ -430,6 +432,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   } = useAudioPracticeTab()
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
+  const audioEnhancerEnabledRef = useRef(settings.audioEnhancerEnabled)
+  audioEnhancerEnabledRef.current = settings.audioEnhancerEnabled
+  const audioEnhancerSettingsRef = useRef(settings.audioEnhancerSettings)
+  audioEnhancerSettingsRef.current = settings.audioEnhancerSettings
   const pendingChallengerIdRef = useRef<string | null>(null)
   const reloadTakesGenerationRef = useRef(0)
   const takesRef = useRef<Take[]>([])
@@ -1144,6 +1150,37 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           recordingOrientation,
           name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
         })
+      }
+
+      // Bake the Audio Enhancer into the saved file (native offline render).
+      // Non-blocking: playback of the take uses the live WebAudio enhancer
+      // until enhancerBaked flips, so audio is never double-enhanced and
+      // never un-enhanced. On any native failure the original file survives.
+      if (
+        audioEnhancerEnabledRef.current &&
+        isNativeCameraPlatform &&
+        resolvedFilePath
+      ) {
+        void (async () => {
+          try {
+            const fileUri = await resolveNativeFileUri(resolvedFilePath)
+            if (!fileUri) return
+            await BestTakeAudioPlugin.enhanceTakeAudio({
+              url: fileUri,
+              mediaType: mediaType === 'audio' ? 'audio' : 'video',
+              params: buildNativeEnhancerParams(audioEnhancerSettingsRef.current),
+            })
+            await setTakeEnhancerBaked(takeId, true)
+            setTakes((current) =>
+              current.map((take) =>
+                take.id === takeId ? { ...take, enhancerBaked: true } : take
+              )
+            )
+            console.info('[AudioEnhancer] baked into take', takeId)
+          } catch (error) {
+            console.warn('[AudioEnhancer] bake failed; take keeps live playback enhancement', error)
+          }
+        })()
       }
 
       let audioAnalysisSource: Blob | string | null = normalizedBlob ?? blob ?? null
@@ -2255,11 +2292,29 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   })
 
   useEffect(() => {
+    // A take whose file already has the enhancement baked in (native offline
+    // render after recording) must NOT also pass through the live WebAudio
+    // enhancer — that would double-process. When any take likely to be
+    // playing right now is baked, bypass the live chain; unbaked/legacy takes
+    // keep the live preview enhancement.
+    const bakedTakeActive =
+      handsFreeBackgroundTake?.enhancerBaked === true ||
+      (autoPlaybackTakeId !== null &&
+        takes.find((take) => take.id === autoPlaybackTakeId)?.enhancerBaked === true) ||
+      challengerTake?.enhancerBaked === true
+    const liveChainEnabled = settings.audioEnhancerEnabled && !bakedTakeActive
     setTakePlaybackEnhancerState(
-      settings.audioEnhancerEnabled,
-      settings.audioEnhancerEnabled ? settings.audioEnhancerSettings : undefined
+      liveChainEnabled,
+      liveChainEnabled ? settings.audioEnhancerSettings : undefined
     )
-  }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings])
+  }, [
+    autoPlaybackTakeId,
+    challengerTake,
+    handsFreeBackgroundTake,
+    settings.audioEnhancerEnabled,
+    settings.audioEnhancerSettings,
+    takes,
+  ])
 
   useEffect(() => {
     setSpeakerLoudnessPreset(settings.speakerLoudnessPreset)

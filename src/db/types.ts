@@ -24,6 +24,8 @@ export interface VaultTake {
   rating: number
   notes: string
   recordingOrientation?: 'portrait' | 'landscape'
+  /** Audio Enhancer was baked into the file after recording — playback must skip the live chain. */
+  enhancerBaked: boolean
 }
 
 export interface SaveTakeInput {

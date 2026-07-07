@@ -123,15 +123,29 @@ export function getCssPreviewZoom(): number {
   return cssPreviewZoom
 }
 
+/**
+ * Mirror the CSS preview zoom onto the native AVCaptureVideoPreviewLayer
+ * (layer transform only — recordings stay unzoomed). Lazy import keeps this
+ * module free of a static Capacitor dependency; harmless no-op when the
+ * native layer isn't active.
+ */
+function syncNativePreviewZoom(zoom: number): void {
+  void import('./nativeCameraTest')
+    .then(({ setNativeCameraPreviewZoom }) => setNativeCameraPreviewZoom(zoom))
+    .catch(() => {})
+}
+
 export function setCssPreviewZoom(zoom: number): number {
   cssPreviewZoom = clampCssPreviewZoom(zoom)
   syncCssPreviewZoomToTargets()
+  syncNativePreviewZoom(cssPreviewZoom)
   return cssPreviewZoom
 }
 
 export function resetCssPreviewZoom(): void {
   cssPreviewZoom = 1
   syncCssPreviewZoomToTargets()
+  syncNativePreviewZoom(1)
 }
 
 function getZoomTrack(stream: MediaStream | null | undefined): ZoomCapableTrack | null {

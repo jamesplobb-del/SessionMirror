@@ -41,13 +41,15 @@ import {
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import {
-  startNativeCameraBridge,
+  startNativeCameraPreview,
   startNativeCameraRecording,
   stopNativeCameraBridge,
   stopNativeCameraPreview,
   stopNativeCameraRecording,
   setNativeCameraPassthrough,
+  setNativeCameraPassthroughClass,
 } from '../utils/nativeCameraTest'
+import { resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
@@ -518,6 +520,7 @@ export function useCameraSession({
     setNativeLivePreviewActive(false)
     setNativeLivePreviewSeedUrl(null)
     nativePreviewActiveRef.current = false
+    setNativeCameraPassthroughClass(false)
     await setNativeCameraPassthrough(false)
     await stopNativeCameraBridge()
     await stopNativeCameraPreview()
@@ -537,17 +540,16 @@ export function useCameraSession({
           /* ignore */
         }
       }
-      // Keep the live audio track (and streamRef) around — the live pitch
-      // widget in camera mode taps this same shared stream. Contention with
-      // the native AVCaptureSession's own mic input only actually matters
-      // while a file is being written, so it's suspended narrowly around the
-      // native recording start/stop window instead (see
-      // suspendSharedMicForNativeRecording below). It is NOT reacquired after
-      // recording stops — doing that with a fresh getUserMedia() while the
-      // native camera bridge is still live caused visible camera freezes and
-      // pitch-widget instability, so the widget simply stays quiet for the
-      // rest of the session after the first take, self-healing only via
-      // whatever later reacquires the full stream (e.g. leaving camera mode).
+      // Keep any live audio track (and streamRef) around for legacy WebKit
+      // consumers. The camera-mode pitch widget no longer depends on this
+      // stream at all — while the native preview session is active it pulls
+      // PCM from the native audio tap (see nativeAudioPitchTap.ts /
+      // useLivePitchTracker's native-tap graph), which shares the capture
+      // session's mic and therefore has no WebKit/native contention. The
+      // WebKit track is still suspended narrowly around the recording window
+      // (see suspendSharedMicForNativeRecording below) and never reacquired
+      // while the native session is live — a fresh getUserMedia() here caused
+      // camera freezes.
       if (!stream.getAudioTracks().some((track) => track.readyState === 'live')) {
         streamRef.current = null
       }
@@ -592,16 +594,25 @@ export function useCameraSession({
         await new Promise((resolve) => window.setTimeout(resolve, IOS_NATIVE_BRIDGE_HANDOFF_MS))
       }
 
-      const result = await startNativeCameraBridge({
+      // Layer preview: the native AVCaptureVideoPreviewLayer renders behind the
+      // (now transparent) webview at device frame rate — the Swift side flips
+      // passthrough on success; the CSS class opens the visual hole.
+      const result = await startNativeCameraPreview({
         useFrontCamera: true,
         audioSessionProfile: 'videoRecording',
         micInputPreference: micInputPreferenceRef.current,
       })
 
       if (!result) {
+        setNativeCameraPassthroughClass(false)
         setReady(false)
         return false
       }
+
+      setNativeCameraPassthroughClass(true)
+      // The session-category switch can leave the shared WebAudio context
+      // suspended — nudge it so the metronome click stays audible in camera mode.
+      void resumePlaybackAudioContext()
 
       nativePreviewActiveRef.current = true
       setNativeLivePreviewActive(true)
@@ -620,6 +631,9 @@ export function useCameraSession({
     setNativeLivePreviewActive(false)
     setNativeLivePreviewSeedUrl(null)
     nativePreviewActiveRef.current = false
+    setNativeCameraPassthroughClass(false)
+    await setNativeCameraPassthrough(false)
+    await stopNativeCameraPreview()
     await stopNativeCameraBridge()
     void syncNativeCameraSessionState({ previewActive: false, recordingActive: false })
   }, [])
@@ -642,6 +656,9 @@ export function useCameraSession({
       nativePreviewStartTokenRef.current += 1
       if (!nativePreviewActiveRef.current) return
       nativePreviewActiveRef.current = false
+      setNativeCameraPassthroughClass(false)
+      void setNativeCameraPassthrough(false)
+      void stopNativeCameraPreview()
       void stopNativeCameraBridge()
     }
   }, [])
@@ -1833,6 +1850,9 @@ export function useCameraSession({
     setNativeLivePreviewSeedUrl(null)
     if (nativePreviewActiveRef.current) {
       nativePreviewActiveRef.current = false
+      setNativeCameraPassthroughClass(false)
+      void setNativeCameraPassthrough(false)
+      void stopNativeCameraPreview()
       void stopNativeCameraBridge()
     }
     void syncNativeCameraSessionState({

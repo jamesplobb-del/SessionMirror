@@ -239,6 +239,38 @@ export function disposeAudioEnhancerChain(nodes: AudioEnhancerNodes): void {
   disconnect(nodes.output)
 }
 
+/**
+ * Flatten enhancer settings into the parameter dict the native offline
+ * renderer (AudioEnhancerRenderer.swift) consumes when baking the enhancement
+ * into a recorded take. Mirrors applyAudioEnhancerSettings above — keep the
+ * two in sync so what you hear in playback preview matches what gets baked.
+ */
+export function buildNativeEnhancerParams(
+  settings: AudioEnhancerSettings,
+): Record<string, number> {
+  const tuning = PROFILE_TUNING[settings.preset] ?? DEFAULT_PROFILE_TUNING
+  const comp = clampPercent(settings.compression) / 100
+  const reverbMix = clampPercent(settings.reverb) / 100
+
+  return {
+    lowHz: tuning.lowHz,
+    lowGainDb: clampDb(settings.eq.low),
+    midHz: tuning.midHz,
+    midQ: tuning.midQ,
+    midGainDb: clampDb(settings.eq.mid),
+    highHz: tuning.highHz,
+    highGainDb: clampDb(settings.eq.high),
+    thresholdDb: -12 - comp * 24,
+    ratio: 1.5 + comp * 6.5,
+    attackSec: 0.004 + (1 - comp) * 0.014,
+    releaseSec: 0.09 + comp * 0.2,
+    makeupDb: tuning.makeupDb + comp * 2.4,
+    // Product of the JS reverbSend gain × wetGain — the native graph applies
+    // it as a single wet-path gain after a wet-only reverb.
+    reverbWetLevel: reverbMix * 0.55 * (0.22 + reverbMix * 0.42),
+  }
+}
+
 export function parseAudioEnhancerSettings(value: unknown): AudioEnhancerSettings {
   if (!value || typeof value !== 'object') {
     return { ...DEFAULT_AUDIO_ENHANCER_SETTINGS }

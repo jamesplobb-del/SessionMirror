@@ -13,6 +13,7 @@ import {
   createNativePreviewFramePump,
   subscribeNativeCameraPreviewFrames,
 } from '../../utils/nativeCameraFrameBridge'
+import { setNativeCameraFrameBridgeEnabled } from '../../utils/nativeCameraTest'
 import type { MultitrackBackingTrack, MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
 import MultitrackBackingTrackPanel from '../backing/MultitrackBackingTrackPanel'
@@ -107,9 +108,10 @@ export default function MultitrackRecordingStage({
     }
   }, [streamRef, streamGeneration, nativeLivePreviewActive])
 
-  // Native iOS camera bridge — paints JPEG frames pushed from
-  // NativeCameraRecordingEngine onto a dedicated canvas. Multiple concurrent
-  // subscribers are safe; this mirrors LiveCameraBackground's own subscription.
+  // Native iOS camera preview — the stage sits on an opaque overlay, so the
+  // main passthrough layer can't show through here. Request the JPEG frame
+  // pump on demand (it's off by default now that the main camera background
+  // uses the native preview layer) and paint frames onto the stage canvas.
   useEffect(() => {
     if (!nativeCameraBridgeEnabled) return
 
@@ -120,6 +122,8 @@ export default function MultitrackRecordingStage({
       nativeFramePumpRef.current = createNativePreviewFramePump(nativePreviewCanvasRef)
     }
     const pump = nativeFramePumpRef.current
+
+    void setNativeCameraFrameBridgeEnabled(true)
 
     void (async () => {
       const subscription = await subscribeNativeCameraPreviewFrames((event) => {
@@ -139,6 +143,7 @@ export default function MultitrackRecordingStage({
     return () => {
       cancelled = true
       removeListener?.()
+      void setNativeCameraFrameBridgeEnabled(false)
       nativeBridgePrimedRef.current = false
       pump.stop()
       nativeFramePumpRef.current = null
