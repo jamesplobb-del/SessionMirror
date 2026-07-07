@@ -168,6 +168,22 @@ export async function preparePlaybackRoute(
     } else {
       const jsVideoPreviewLive = cameraHandlers?.hasLivePreview?.() ?? false
       if (jsVideoPreviewLive) {
+        // Diagnostic-only: this is the exact ownership overlap. Native-side
+        // `playbackRouteActive` was just set true (above) while the camera
+        // preview/bridge ownership (`previewActive`/`isBridgePreviewActive`)
+        // was never told to suspend — it stays true for the entire review
+        // playback. There is no teardown handshake here; both owners are
+        // simultaneously "true" for as long as review playback runs, which
+        // is why every native route change gets skipped
+        // (CameraSessionGuard.shouldBlockRouteChanges()) and why a
+        // concurrent capture-session self-heal can rebuild mid-playback.
+        console.warn(
+          '[OwnershipConflict] preparePlaybackRoute: entering review playback with ' +
+            'playbackRouteActive=true AND jsVideoPreviewLive=true simultaneously — ' +
+            'camera preview/bridge ownership was never suspended, so native route ' +
+            'changes will be skipped for the whole playback window and any camera ' +
+            'session self-heal may rebuild the capture session mid-playback.',
+        )
         console.log(
           '[PlaybackRoute] skipping loud session — live video preview keeps camera FOV',
         )

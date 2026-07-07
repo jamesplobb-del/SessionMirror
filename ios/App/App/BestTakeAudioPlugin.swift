@@ -245,6 +245,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         guard playbackRouteRestorePending else { return }
         playbackRouteRestorePending = false
         CameraSessionGuard.setPlaybackRouteActive(false)
+        nativeCameraEngine.runDeferredHealthCheckIfNeeded()
 
         print("[PlaybackRoute] playback ended")
         print("[PlaybackRoute] restoring camera session")
@@ -310,6 +311,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func setPlaybackRouteActive(_ call: CAPPluginCall) {
         let active = call.getBool("active") ?? false
         CameraSessionGuard.setPlaybackRouteActive(active)
+        if !active {
+            // Playback just released AVAudioSession ownership — replay any
+            // capture-session health check that was deferred while playback
+            // owned the session, instead of leaving it unrecovered.
+            nativeCameraEngine.runDeferredHealthCheckIfNeeded()
+        }
         call.resolve(CameraSessionGuard.snapshot())
     }
 

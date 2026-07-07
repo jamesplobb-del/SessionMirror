@@ -13,16 +13,46 @@ enum CameraSessionGuard {
 
     static func setPreviewActive(_ active: Bool) {
         previewActive = active
+        logOwnershipTransition(caller: "setPreviewActive(\(active))")
     }
 
     static func setRecordingActive(_ active: Bool) {
         recordingActive = active
+        logOwnershipTransition(caller: "setRecordingActive(\(active))")
     }
 
     static func setPlaybackRouteActive(_ active: Bool) {
         playbackRouteActive = active
         if !active {
             playbackSessionPrepared = false
+        }
+        logOwnershipTransition(caller: "setPlaybackRouteActive(\(active))")
+    }
+
+    /// Diagnostic-only: surfaces the exact race the review-playback glitching
+    /// traces back to — preview ownership (`previewActive`/`recordingActive`)
+    /// and playback ownership (`playbackRouteActive`) becoming true
+    /// SIMULTANEOUSLY, with no teardown handshake between them. When both are
+    /// true, `shouldBlockRouteChanges()` is true for the entire overlap
+    /// window, so every AVAudioSession route change playback tries to make is
+    /// silently skipped, and any capture-session self-heal
+    /// (`ensureSessionHealthy`) that runs during that window will rebuild the
+    /// AVCaptureSession while playback is actively pulling on the same
+    /// AVAudioSession. This does not change behavior — logging only.
+    private static func logOwnershipTransition(caller: String) {
+        if isCameraOrRecordingActive && playbackRouteActive {
+            print(
+                "[OwnershipConflict][\(caller)] preview/recording ownership and playback " +
+                "ownership are BOTH active — previewActive=\(previewActive) " +
+                "recordingActive=\(recordingActive) playbackRouteActive=\(playbackRouteActive). " +
+                "Every route change is being skipped and any concurrent session " +
+                "self-heal will rebuild the capture session mid-playback."
+            )
+        } else {
+            print(
+                "[OwnershipTransition][\(caller)] previewActive=\(previewActive) " +
+                "recordingActive=\(recordingActive) playbackRouteActive=\(playbackRouteActive)"
+            )
         }
     }
 

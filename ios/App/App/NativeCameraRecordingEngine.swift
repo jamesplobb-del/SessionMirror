@@ -59,6 +59,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// before `startRunning()` will do anything useful again.
     private var needsFullReconfigureAfterMediaReset = false
 
+    /// Set when `ensureSessionHealthy` is asked to run while review playback
+    /// owns the `AVAudioSession` (`CameraSessionGuard.playbackRouteActive`).
+    /// Recovery is deferred rather than skipped outright — as soon as
+    /// playback releases ownership, `runDeferredHealthCheckIfNeeded()` replays
+    /// the most recent deferred reason.
+    private var deferredHealthCheckReason: String?
+
     private override init() {
         super.init()
         NotificationCenter.default.addObserver(
@@ -165,6 +172,20 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             let shouldBeActive = self.isPreviewActive || self.isBridgePreviewActive || self.isRecording
             guard shouldBeActive else { return }
 
+            // Review playback currently owns the AVAudioSession. Never
+            // reapply the audio session profile and never rebuild the
+            // capture session while that ownership window is open — both
+            // would race the live playback audio. Defer and replay once
+            // playback releases ownership (see runDeferredHealthCheckIfNeeded).
+            if CameraSessionGuard.playbackRouteActive {
+                self.deferredHealthCheckReason = reason
+                print(
+                    "[NativeCameraRecovery][\(reason)] deferring health check — " +
+                    "playback owns the AVAudioSession (playbackRouteActive=true)"
+                )
+                return
+            }
+
             if self.isRecording {
                 // Never touch inputs/outputs mid-recording; AVFoundation will
                 // usually resume the movie file output on its own once the
@@ -232,6 +253,20 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             if self.isBridgePreviewActive {
                 self.enableFrameBridge()
             }
+        }
+    }
+
+    /// Called once review playback releases AVAudioSession ownership
+    /// (`CameraSessionGuard.setPlaybackRouteActive(false)`). Replays whatever
+    /// health check was deferred while playback owned the session, so a
+    /// media reset / runtime error that happened mid-playback still gets
+    /// recovered — just after playback is done with the session, not during.
+    func runDeferredHealthCheckIfNeeded() {
+        sessionQueue.async { [weak self] in
+            guard let self = self, let reason = self.deferredHealthCheckReason else { return }
+            self.deferredHealthCheckReason = nil
+            print("[NativeCameraRecovery] replaying deferred health check (\(reason)) after playback released the session")
+            self.ensureSessionHealthy(reason: "\(reason)+afterPlaybackReleased")
         }
     }
 
