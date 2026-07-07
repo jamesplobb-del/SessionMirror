@@ -17,6 +17,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private let audioTapQueue = DispatchQueue(label: "SessionMirror.NativeAudioTap")
     private var isAudioTapEnabled = false
     private var tapAccumulator: [Float] = []
+    private var didLogFirstTapSample = false
     private var isSessionConfigured = false
     private var isRecording = false
     private var isStarting = false
@@ -542,8 +543,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         if session.canAddOutput(audioTapOutput) {
             session.addOutput(audioTapOutput)
             self.audioDataOutput = audioTapOutput
+            print("[PitchTap] audio data output ADDED to capture session")
         } else {
             self.audioDataOutput = nil
+            print("[PitchTap] audio data output UNAVAILABLE — canAddOutput=false (movie-file-output conflict). Pitch widget will have no native audio source.")
             AudioRouteConfigurator.debugCaptureEvent(
                 "NativeCameraRecordingEngine.configureCaptureSession audioTapOutput.unavailable"
             )
@@ -939,8 +942,10 @@ extension NativeCameraRecordingEngine {
     /// Toggle PCM chunk delivery to JS. The output itself stays attached to the
     /// session permanently; only emission is gated (queue-confined state).
     func setAudioTapEnabled(_ enabled: Bool) {
+        print("[PitchTap] setAudioTapEnabled(\(enabled)) — audioDataOutput attached: \(self.audioDataOutput != nil), session running: \(self.session.isRunning)")
         audioTapQueue.async {
             self.isAudioTapEnabled = enabled
+            self.didLogFirstTapSample = false
             if !enabled {
                 self.tapAccumulator.removeAll()
             }
@@ -950,6 +955,10 @@ extension NativeCameraRecordingEngine {
     /// Runs on audioTapQueue (the tap output's delegate queue).
     private func handleAudioTapSample(_ sampleBuffer: CMSampleBuffer) {
         guard isAudioTapEnabled else { return }
+        if !didLogFirstTapSample {
+            didLogFirstTapSample = true
+            print("[PitchTap] FIRST audio sample received from capture session — tap is delivering")
+        }
         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
               let asbdPointer = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) else {
             return

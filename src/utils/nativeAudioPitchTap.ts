@@ -29,8 +29,9 @@ export async function acquireNativeAudioTap(): Promise<void> {
   if (tapRefCount === 1) {
     try {
       await BestTakeAudioPlugin.setNativeAudioTapEnabled({ enabled: true })
+      console.info('[PitchTap] JS enabled native audio tap')
     } catch (error) {
-      console.warn('[NativeAudioTap] enable failed', error)
+      console.warn('[PitchTap] JS enable failed', error)
     }
   }
 }
@@ -65,10 +66,15 @@ export function subscribeNativeAudioPitchFrames(
   onChunk: (chunk: NativeAudioPitchChunk) => void,
 ): Promise<PluginListenerHandle> | null {
   if (!isNativeCameraTestAvailable()) return null
+  let loggedFirst = false
   return BestTakeAudioPlugin.addListener('nativeAudioPitchFrame', (event) => {
     if (!event.pcmBase64 || !event.sampleRate) return
     const samples = decodePcmBase64(event.pcmBase64)
     if (!samples || samples.length === 0) return
+    if (!loggedFirst) {
+      loggedFirst = true
+      console.info(`[PitchTap] JS received first PCM frame (${samples.length} samples @ ${event.sampleRate}Hz)`)
+    }
     onChunk({ samples, sampleRate: event.sampleRate })
   })
 }
