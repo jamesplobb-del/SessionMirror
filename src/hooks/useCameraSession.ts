@@ -51,7 +51,8 @@ import {
   setNativeCameraPassthrough,
   getAudioHardwareRtl,
 } from '../utils/nativeCameraTest'
-import { applyMicInputPreference } from '../utils/audioSessionRoute'
+import BestTakeAudioPlugin, { applyMicInputPreference } from '../utils/audioSessionRoute'
+import { resolveMicPreferenceForLiveCapture } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
 import { isAppInForeground } from '../utils/appForeground'
@@ -660,22 +661,41 @@ export function useCameraSession({
     }, CAMERA_RELEASE_DELAY_MS)
   }, [cancelScheduledRelease, forceClearCameraState])
 
-  const applyQueuedMicPreferenceBeforeAcquire = useCallback(async (reason: string) => {
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return
+  const applyQueuedMicPreferenceBeforeAcquire = useCallback(
+    async (reason: string, options?: { liveCapture?: boolean }) => {
+      if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return
 
-    const requestedPreference = queuedMicPreferenceRef.current ?? micInputPreferenceRef.current
-    console.info('[AudioRoute] applying queued mic preference before getUserMedia', {
-      requestedMicPreference: requestedPreference,
-      reason,
-    })
+      const basePreference = queuedMicPreferenceRef.current ?? micInputPreferenceRef.current
+      const requestedPreference = options?.liveCapture
+        ? resolveMicPreferenceForLiveCapture(basePreference)
+        : basePreference
+      const needsRecordingRoute =
+        options?.liveCapture || recordingModeRef.current === 'audio'
 
-    await syncNativeCameraSessionState({
-      previewActive: nativePreviewActiveRef.current,
-      recordingActive: false,
-    })
-    await applyMicInputPreference(requestedPreference)
-    queuedMicPreferenceRef.current = null
-  }, [])
+      console.info('[AudioRoute] applying queued mic preference before getUserMedia', {
+        requestedMicPreference: requestedPreference,
+        reason,
+        liveCapture: options?.liveCapture ?? false,
+      })
+
+      await syncNativeCameraSessionState({
+        previewActive: nativePreviewActiveRef.current,
+        recordingActive: false,
+      })
+
+      if (needsRecordingRoute && !nativePreviewActiveRef.current) {
+        try {
+          await BestTakeAudioPlugin.enableRecordingRoute()
+        } catch (error) {
+          console.warn('[AudioRoute] enableRecordingRoute failed before getUserMedia', error)
+        }
+      }
+
+      await applyMicInputPreference(requestedPreference)
+      queuedMicPreferenceRef.current = null
+    },
+    [],
+  )
 
   useEffect(() => {
     queuedMicPreferenceRef.current = micInputPreference
@@ -688,7 +708,7 @@ export function useCameraSession({
     async (
       mode: RecordingMode,
       cancelled?: () => boolean,
-      options?: { forceNew?: boolean },
+      options?: { forceNew?: boolean; liveCapture?: boolean },
     ) => {
       const epoch = captureSessionEpochRef.current
       setError(null)
@@ -734,7 +754,9 @@ export function useCameraSession({
           return null
         }
 
-        await applyQueuedMicPreferenceBeforeAcquire(`acquire-${mode}`)
+        await applyQueuedMicPreferenceBeforeAcquire(`acquire-${mode}`, {
+          liveCapture: options?.liveCapture,
+        })
         if (isCaptureSessionStale(epoch, mode, cancelled)) return null
 
         logGetUserMediaEvent('before', `useCameraSession.acquireStream.${mode}`, { constraints })
@@ -2239,23 +2261,28 @@ export function useCameraSession({
   }, [recoverCameraPreviewLayout])
 
   /** Re-open getUserMedia after AVAudioSession route changes (e.g. device mic vs BT HFP). */
-  const reacquireStreamForAudioRoute = useCallback(async () => {
-    if (isRecordingRef.current || resumeInFlightRef.current) return
+  const reacquireStreamForAudioRoute = useCallback(
+    async (options?: { liveCapture?: boolean }) => {
+      if (isRecordingRef.current || resumeInFlightRef.current) return
 
-    if (isNativeVideoRecordingEnabled() && recordingModeRef.current === 'video') {
-      await applyMicInputPreference(micInputPreferenceRef.current)
-      return
-    }
+      if (isNativeVideoRecordingEnabled() && recordingModeRef.current === 'video') {
+        await applyMicInputPreference(micInputPreferenceRef.current)
+        return
+      }
 
-    cancelScheduledRelease()
-    releaseLiveStream()
+      cancelScheduledRelease()
+      releaseLiveStream()
 
-    if (Capacitor.isNativePlatform()) {
-      await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
-    }
+      if (Capacitor.isNativePlatform()) {
+        await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
+      }
 
-    await acquireStream(recordingModeRef.current)
-  }, [acquireStream, cancelScheduledRelease, isNativeVideoRecordingEnabled, releaseLiveStream])
+      await acquireStream(recordingModeRef.current, undefined, {
+        liveCapture: options?.liveCapture,
+      })
+    },
+    [acquireStream, cancelScheduledRelease, isNativeVideoRecordingEnabled, releaseLiveStream],
+  )
 
   const suspendMicForPlayback = useCallback(async () => {
     const stream = streamRef.current
