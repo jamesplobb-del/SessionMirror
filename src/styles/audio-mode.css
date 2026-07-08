@@ -124,24 +124,6 @@ html.app-audio-mode #root {
   text-align: center;
 }
 
-.audio-mode-split-entry {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  align-self: center;
-  margin: 0.35rem 0 0.55rem;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.08);
-  padding: 0.45rem 0.8rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.92);
-}
-
 .audio-mode-take-stack {
   display: flex;
   flex: 0 1 auto;
