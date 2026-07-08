@@ -909,6 +909,14 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             )
             layerInstructions.append(layerInstruction)
 
+            // Mixer state from Play All — muted panels export silent, others at
+            // their set gain. Unset volume defaults to unity (untouched panels
+            // export exactly as before).
+            let sourceMuted = (source["muted"] as? NSNumber)?.boolValue ?? false
+            let sourceVolume = sourceMuted
+                ? 0
+                : Float((source["volume"] as? NSNumber)?.doubleValue ?? 1.0)
+
             for audioTrack in asset.tracks(withMediaType: .audio) {
                 guard let compositionAudio = composition.addMutableTrack(
                     withMediaType: .audio,
@@ -917,7 +925,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 do {
                     try compositionAudio.insertTimeRange(sourceTimeRange, of: audioTrack, at: offsetInsertTime)
                     let parameters = AVMutableAudioMixInputParameters(track: compositionAudio)
-                    parameters.setVolume(1.0, at: .zero)
+                    parameters.setVolume(sourceVolume, at: .zero)
                     audioParameters.append(parameters)
                 } catch {
                     print("[Multitrack] failed to insert audio for source \(source["id"] ?? "?"): \(error.localizedDescription)")
@@ -1062,34 +1070,42 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 shareURL = fileURL
             }
 
-            guard let viewController = self.bridge?.viewController else {
-                call.reject("Unable to present share sheet")
-                return
-            }
-
-            let activityViewController = UIActivityViewController(
-                activityItems: [title, shareURL],
-                applicationActivities: nil
-            )
-            activityViewController.popoverPresentationController?.sourceView = viewController.view
-            activityViewController.popoverPresentationController?.sourceRect = CGRect(
-                x: viewController.view.bounds.midX,
-                y: viewController.view.bounds.maxY - 1,
-                width: 1,
-                height: 1
-            )
-            activityViewController.completionWithItemsHandler = { _, completed, _, error in
-                if let error = error {
-                    call.reject("Share failed", error.localizedDescription)
+            // amplifiedExportURL's completion arrives on a background queue (the
+            // AVAssetExportSession queue, or synchronously on the Capacitor
+            // bridge queue for the unity-gain fast path). UIKit presentation MUST
+            // happen on the main thread — presenting the share sheet off-main was
+            // producing "UI API called on a background thread" / "Failed to
+            // request default share mode" and a broken share sheet.
+            DispatchQueue.main.async {
+                guard let viewController = self.bridge?.viewController else {
+                    call.reject("Unable to present share sheet")
                     return
                 }
-                call.resolve([
-                    "success": true,
-                    "completed": completed
-                ])
-            }
 
-            viewController.present(activityViewController, animated: true)
+                let activityViewController = UIActivityViewController(
+                    activityItems: [title, shareURL],
+                    applicationActivities: nil
+                )
+                activityViewController.popoverPresentationController?.sourceView = viewController.view
+                activityViewController.popoverPresentationController?.sourceRect = CGRect(
+                    x: viewController.view.bounds.midX,
+                    y: viewController.view.bounds.maxY - 1,
+                    width: 1,
+                    height: 1
+                )
+                activityViewController.completionWithItemsHandler = { _, completed, _, error in
+                    if let error = error {
+                        call.reject("Share failed", error.localizedDescription)
+                        return
+                    }
+                    call.resolve([
+                        "success": true,
+                        "completed": completed
+                    ])
+                }
+
+                viewController.present(activityViewController, animated: true)
+            }
         }
     }
 

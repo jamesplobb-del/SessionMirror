@@ -56,6 +56,8 @@ export async function exportMultitrackSession(
     trimStartSec?: number
     trimEndSec?: number
     timelineOffsetMs?: number
+    volume?: number
+    muted?: boolean
   }> = []
   for (const panel of performancePanels) {
     const rect = panelRects[panel.id]
@@ -69,6 +71,11 @@ export async function exportMultitrackSession(
       ...(panel.trimStartSec ? { trimStartSec: panel.trimStartSec } : null),
       ...(panel.trimEndSec !== undefined ? { trimEndSec: panel.trimEndSec } : null),
       ...(panel.take?.timelineOffsetMs ? { timelineOffsetMs: panel.take.timelineOffsetMs } : null),
+      // Carry the mixer state through so the exported video matches what the
+      // user hears on Play All (unset volume defaults to unity gain on the
+      // native side, so untouched panels export exactly as before).
+      ...(panel.volume !== undefined ? { volume: panel.volume } : null),
+      ...(panel.muted ? { muted: true } : null),
     })
   }
   if (sources.length === 0) return { ok: false, reason: 'missing_takes' }

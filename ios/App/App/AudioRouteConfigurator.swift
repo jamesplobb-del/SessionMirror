@@ -355,6 +355,27 @@ enum AudioRouteConfigurator {
     /// change camera FOV or stall the JPEG preview pump.
     static func applyCoexistentPlaybackSpeakerRoute() throws -> [String: Any] {
         let session = AVAudioSession.sharedInstance()
+
+        // The camera engine configures the session in `.videoRecording` mode,
+        // which is capture-optimized and suppresses simultaneous Web Audio
+        // playback — that's why the first-take metronome count-in click was
+        // inaudible (there's no reference media to keep re-pulling the speaker
+        // route, unlike overdubs). Move to `.playAndRecord` / `.default`, which
+        // records the mic AND lets loud playback (the click) reach the speaker.
+        // This runs during the count-in, before any recorded performance
+        // content (the count-in region is trimmed off the saved take), so a
+        // mode switch here can't affect the kept audio. Idempotent via
+        // debugSetCategory's already-applied guard.
+        if session.mode == .videoRecording {
+            try debugSetCategory(
+                session,
+                category: .playAndRecord,
+                mode: .default,
+                options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+                caller: "applyCoexistentPlaybackSpeakerRoute.playbackMode"
+            )
+        }
+
         try ensureSessionActive(session, caller: "applyCoexistentPlaybackSpeakerRoute")
         try preferBuiltInSpeakerIfSafe(session)
 

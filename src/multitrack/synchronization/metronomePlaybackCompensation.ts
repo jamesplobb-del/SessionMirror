@@ -1,24 +1,62 @@
+import { Capacitor } from '@capacitor/core'
+import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
 import { getAudioOutputLatencyMs } from '../../utils/nativeCameraTest'
 
 /**
  * WKWebView HTMLMediaElement audio reaches the speaker later than Web Audio
  * scheduled clicks, even after play() resolves and currentTime advances.
- * Empirically ~100–130ms on iPhone; tune here if needed.
  */
-export const WEBKIT_MEDIA_RENDER_OVERHEAD_MS = 165
+export const WEBKIT_MEDIA_RENDER_OVERHEAD_MS = 240
 
-/** Delay the metronome's first click so it lands when reference audio is audible. */
+/**
+ * AVAudioSession outputLatency ignores most Bluetooth A2DP codec delay.
+ */
+export const BLUETOOTH_A2DP_EXTRA_LATENCY_MS = 200
+
+/** Extra head start after pipeline estimate — reference should lead beat 1, not lag it. */
+export const METRONOME_SETTLE_AFTER_REFERENCE_MS = 340
+
+async function getBluetoothExtraLatencyMs(): Promise<number> {
+  if (!Capacitor.isNativePlatform()) return 0
+  try {
+    const profile = await BestTakeAudioPlugin.getPlaybackOutputProfile()
+    if (profile.usesA2DPOutput || profile.usesBluetoothOutput) {
+      return BLUETOOTH_A2DP_EXTRA_LATENCY_MS
+    }
+    const port = profile.outputPort ?? profile.portType ?? ''
+    if (port.includes('Bluetooth') || port.includes('A2DP')) {
+      return BLUETOOTH_A2DP_EXTRA_LATENCY_MS
+    }
+  } catch {
+    /* read-only probe */
+  }
+  return 0
+}
+
+/** Used by getMetronomeCountInDelaySec when reference takes are playing. */
 export async function getMetronomeDelayAfterReferenceSec(): Promise<number> {
-  const outputMs = await getAudioOutputLatencyMs()
-  return (WEBKIT_MEDIA_RENDER_OVERHEAD_MS + outputMs) / 1000
+  const [outputMs, btExtra] = await Promise.all([
+    getAudioOutputLatencyMs(),
+    getBluetoothExtraLatencyMs(),
+  ])
+  return (
+    WEBKIT_MEDIA_RENDER_OVERHEAD_MS +
+    outputMs +
+    btExtra +
+    METRONOME_SETTLE_AFTER_REFERENCE_MS
+  ) / 1000
 }
 
 /**
- * How far ahead of the click-grid timeline a chased media element's currentTime
- * should sit so its AUDIBLE output aligns with the AUDIBLE clicks. Hardware
- * output latency cancels (click and media share the same output route), leaving
- * only the WKWebView media pipeline overhead.
+ * Delay before count-in click 1. Full pipeline compensation when reference
+ * takes and/or backing are playing; shorter route settle for the first empty box.
  */
-export function getReferenceChaseLeadSec(): number {
-  return WEBKIT_MEDIA_RENDER_OVERHEAD_MS / 1000
+export async function getMetronomeCountInDelaySec(options: {
+  hasAudibleReferences: boolean
+}): Promise<number> {
+  if (options.hasAudibleReferences) {
+    return getMetronomeDelayAfterReferenceSec()
+  }
+  const outputMs = await getAudioOutputLatencyMs()
+  return (outputMs + 250) / 1000
 }

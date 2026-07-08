@@ -294,14 +294,14 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           panel.take !== null &&
           panel.id !== recordingTargetPanelIdRef.current,
       ),
-    onAnchoredReferenceStart: async (anchor) => {
-      const started = await sync.startAnchoredToClick(anchor.firstClickCtxTime)
-      if (!monitorMutesRef.current.has('backing')) {
-        const backingStarted = await startBackingPlayback()
-        return started || backingStarted
-      }
-      return started
-    },
+    hasAudibleReferences: () =>
+      session.backing.kind !== 'none' ||
+      session.panels.some(
+        (panel) =>
+          panel.kind === 'performance' &&
+          panel.take !== null &&
+          panel.id !== recordingTargetPanelIdRef.current,
+      ),
     onStartReferencePlayback: async () => {
       const started = await sync.startPrepared()
       if (!monitorMutesRef.current.has('backing')) {
@@ -329,10 +329,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       sharedMetronomeEngine.stop()
     },
     onPerformanceStart: async () => {
-      // References are already rolling from click-anchored chase — restarting
-      // them here was causing seek storms / glitchy audio on overdubs.
-      if (sync.state.isPlaying) return
-      await sync.startPrepared()
+      // Safety net if reference stalled mid count-in.
+      if (!sync.state.isPlaying) {
+        await sync.startPrepared()
+      }
       if (!monitorMutesRef.current.has('backing')) {
         await startBackingPlayback()
       }
@@ -532,18 +532,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       onOpenRecordingStage?.()
       setActivePanelId(panelId)
       recordingTargetPanelIdRef.current = panelId
-      // Pre-warm reference media while the musician gets ready so Record →
+      // Pre-warm reference media and the click route for every box so Record →
       // count-in doesn't wait on route prep / decode.
-      const hasReference = session.panels.some(
-        (panel) => panel.kind === 'performance' && panel.take !== null && panel.id !== panelId,
-      )
-      if (hasReference || session.backing.kind !== 'none') {
-        sync.setExcludePanelId(panelId)
-        void sync.prepareAtStart(0).then(() => prepareBackingAtStart()).catch(() => {})
-      }
+      sync.setExcludePanelId(panelId)
+      void sync.prepareAtStart(0).then(() => prepareBackingAtStart()).catch(() => {})
       void ensureNativeCameraSessionHealthy()
     },
-    [hapticFeedback, onOpenRecordingStage, prepareBackingAtStart, session.backing.kind, session.panels, sync],
+    [hapticFeedback, onOpenRecordingStage, prepareBackingAtStart, sync],
   )
 
 

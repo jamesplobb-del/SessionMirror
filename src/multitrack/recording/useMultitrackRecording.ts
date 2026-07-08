@@ -1,16 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
-import { getMetronomeDelayAfterReferenceSec } from '../synchronization/metronomePlaybackCompensation'
-import { preparePlaybackRoute } from '../../utils/playbackRouteCoordinator'
-import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
+import { getMetronomeCountInDelaySec } from '../synchronization/metronomePlaybackCompensation'
 import type { MultitrackRecordingPhase } from '../types'
-
-export interface CountInClickAnchor {
-  /** AudioContext time of the count-in's first click — sample-accurate timeline 0. */
-  firstClickCtxTime: number
-  /** Same instant on the performance.now() clock (for stamping recording offsets). */
-  firstClickPerfMs: number
-}
 
 export function useMultitrackRecording(options: {
   /**
@@ -23,38 +14,30 @@ export function useMultitrackRecording(options: {
   /** Load/prime reference media paused at timeline 0 — must finish before the click begins. */
   onArmPlayback?: () => Promise<void>
   /**
-   * Click-anchored reference start: the metronome has just been started and
-   * `anchor` pins the exact first-click moment. Start reference takes slaved
-   * onto that click grid (plus backing). Resolves true once playback is
-   * confirmed or when there is nothing to play.
-   */
-  onAnchoredReferenceStart?: (anchor: CountInClickAnchor) => Promise<boolean>
-  /**
-   * Start reference playback WITHOUT a click grid (click disabled). Resolves
-   * true once playback is confirmed, or when there is nothing to play.
+   * Start reference playback (other takes + backing). Resolves true once
+   * playback is confirmed, or when there is nothing to play.
    */
   onStartReferencePlayback?: () => Promise<boolean>
   /** Prime audio session + metronome graph before count-in (first take / after idle). */
   onPrepareCountInAudio?: () => Promise<boolean>
   onPerformanceStart?: () => Promise<void>
   onCountInComplete?: (panelId: string) => void
-  /** Recording failed (start failure or watchdog) — surface to the user; machine has reset to idle. */
   onError?: (message: string) => void
-  /** When true, a false from reference start aborts the take. */
   requiresReferencePlayback?: () => boolean
-  /** Reset stale arming/count-in after app background — returns whether state was cleared. */
+  /** Other takes and/or backing will play before count-in — uses full latency delay. */
+  hasAudibleReferences?: () => boolean
   recoverFromInterrupt?: () => void
 }) {
   const {
     onCountInStart,
     onArmPlayback,
-    onAnchoredReferenceStart,
     onStartReferencePlayback,
     onPrepareCountInAudio,
     onPerformanceStart,
     onCountInComplete,
     onError,
     requiresReferencePlayback,
+    hasAudibleReferences,
     recoverFromInterrupt,
   } = options
   const [phase, setPhase] = useState<MultitrackRecordingPhase>('idle')
@@ -98,7 +81,6 @@ export function useMultitrackRecording(options: {
     }
   }, [cancel, phase, recoverFromInterrupt])
 
-  /** Reset to idle AND tell the user why — used for start failures and watchdogs. */
   const fail = useCallback(
     (message: string) => {
       cancel()
@@ -107,11 +89,6 @@ export function useMultitrackRecording(options: {
     [cancel],
   )
 
-  /**
-   * Moves to the review phase after Stop — keeps `targetPanelId` and the
-   * active guard (still blocking a new recording) until the user explicitly
-   * confirms or retries the just-recorded take via `cancel()`.
-   */
   const enterReview = useCallback(() => {
     clearTimer()
     clearPulseUnsub()
@@ -120,47 +97,41 @@ export function useMultitrackRecording(options: {
     setPhase('review')
   }, [clearPulseUnsub, clearTimer])
 
-  /** Visual-only count-in (click disabled) — setTimeout paced. */
+  /** Visual-only count-in (click disabled). Shows N … 2 … 1, one full beat on 1. */
   const runVisualCountIn = useCallback(
     async (countInBeats: number, beatMs: number) => {
       if (countInBeats <= 0) return
       setPhase('count-in')
-      await new Promise<void>((resolve) => {
-        let remaining = countInBeats
-        const tick = () => {
-          if (!activeRef.current) {
-            clearTimer()
-            resolve()
-            return
-          }
-          setCountInRemaining(remaining)
-          if (remaining <= 1) {
-            timerRef.current = window.setTimeout(() => {
-              clearTimer()
-              resolve()
-            }, beatMs)
-            return
-          }
-          remaining -= 1
-          timerRef.current = window.setTimeout(tick, beatMs)
-        }
-        tick()
-      })
+      for (let beat = countInBeats; beat >= 1; beat -= 1) {
+        if (!activeRef.current) return
+        setCountInRemaining(beat)
+        await new Promise<void>((resolve) => {
+          timerRef.current = window.setTimeout(resolve, beatMs)
+        })
+      }
     },
-    [clearTimer],
+    [],
   )
 
-  /**
-   * Pulse-locked UI countdown — subscribes BEFORE the metronome starts.
-   * Shows countInBeats … 2 … 1 on successive pulses, then resolves on the
-   * NEXT pulse (the downbeat) so musicians see a full beat on "1" before "NOW".
-   */
-  const armPulseCountdown = useCallback(
-    (countInBeats: number) => {
-      if (countInBeats <= 0) return Promise.resolve()
+  /** Pulse-locked count-in (all boxes). Subscribe before start so beat 1 is never missed. */
+  const runCountIn = useCallback(
+    async (
+      countInBeats: number,
+      beatMs: number,
+      clickEnabled: boolean,
+      firstBeatDelaySec: number | undefined,
+    ) => {
+      if (countInBeats <= 0) return
+
       setPhase('count-in')
       setCountInRemaining(countInBeats)
-      return new Promise<void>((resolve) => {
+
+      if (!clickEnabled) {
+        await runVisualCountIn(countInBeats, beatMs)
+        return
+      }
+
+      await new Promise<void>((resolve) => {
         let pulsesHeard = 0
         pulseUnsubRef.current = sharedMetronomeEngine.subscribePulse(() => {
           if (!activeRef.current) {
@@ -173,16 +144,22 @@ export function useMultitrackRecording(options: {
           if (remaining > 0) {
             setCountInRemaining(remaining)
           }
-          // After countInBeats pulses we've shown "1"; the following pulse is
-          // the downbeat that starts the performance.
           if (pulsesHeard > countInBeats) {
+            clearPulseUnsub()
+            resolve()
+          }
+        })
+
+        void sharedMetronomeEngine.start({ firstBeatDelaySec }).then((started) => {
+          if (!started && activeRef.current) {
+            fail("The metronome couldn't start. Try again.")
             clearPulseUnsub()
             resolve()
           }
         })
       })
     },
-    [clearPulseUnsub],
+    [clearPulseUnsub, fail, runVisualCountIn],
   )
 
   const beginCountIn = useCallback((panelId: string, settings?: {
@@ -231,18 +208,28 @@ export function useMultitrackRecording(options: {
       const [cameraOk] = await Promise.all([cameraPromise])
       if (!cameraOk || !activeRef.current) return
 
-      const wantsReference = requiresReferencePlayback?.() === true
+      // Start references first, then stamp how far into the file the camera
+      // already rolled — this is what Play All / export use to line up takes.
+      let T_audioStart = 0
+      const referenceStarted = (await onStartReferencePlayback?.()) ?? true
+      T_audioStart = performance.now()
+
+      if (requiresReferencePlayback?.() && referenceStarted === false) {
+        if (activeRef.current) {
+          fail("Reference playback couldn't start. Check your takes and try again.")
+        }
+        return
+      }
+
+      if (T_cameraStart > 0 && T_audioStart > 0) {
+        trimStartMsRef.current = Math.max(0, Math.round(T_audioStart - T_cameraStart))
+      }
+
+      const audibleReferences =
+        hasAudibleReferences?.() ??
+        (requiresReferencePlayback?.() === true && referenceStarted)
 
       if (clickEnabled) {
-        // ── Click-anchored flow (first take AND overdubs) ──────────────────
-        // The metronome's first click is the ONLY sample-accurate event in the
-        // system, so it defines timeline 0. Start the click grid FIRST, stamp
-        // the take's offset from the exact scheduled click time, then chase
-        // reference playback onto that grid. This removes every source of
-        // variable latency (media spin-up, awaits, native calls) from the
-        // recorded timing — the old approach stamped offsets from fuzzy
-        // "reference started" wall times, baking a different error into each
-        // take, which is why earlier takes drifted late against new count-ins.
         sharedMetronomeEngine.applySectionConfig(
           {
             bpm,
@@ -253,75 +240,16 @@ export function useMultitrackRecording(options: {
           },
           { resetBeat: true },
         )
-
         const audioReady = (await onPrepareCountInAudio?.()) ?? true
-        if (!audioReady) {
-          if (activeRef.current) fail("The metronome couldn't start. Try again.")
+        if (!audioReady && activeRef.current) {
+          fail("The metronome couldn't start. Try again.")
           return
         }
-
-        // Overdubs need lead time for reference play() to spin up before click 1.
-        // First take has no references — use the metronome's minimal lead so the
-        // click is audible immediately (a long reference delay was silencing it).
-        const firstBeatDelaySec = wantsReference
-          ? await getMetronomeDelayAfterReferenceSec()
-          : 0.05
-        if (!activeRef.current) return
-
-        // First take has no reference media to wake the loud playback route —
-        // prime it immediately before the click grid starts.
-        if (!wantsReference) {
-          try {
-            await preparePlaybackRoute({ suspendCamera: false })
-            await resumePlaybackAudioContext()
-          } catch {
-            if (activeRef.current) fail("The metronome couldn't start. Try again.")
-            return
-          }
-        }
-
-        const countDone = armPulseCountdown(countInBeats)
-
-        const started = await sharedMetronomeEngine.start({ firstBeatDelaySec })
-        if (!started) {
-          clearPulseUnsub()
-          if (activeRef.current) fail("The metronome couldn't start. Try again.")
-          return
-        }
-
-        const anchor = sharedMetronomeEngine.getLastStartInfo()
-        if (anchor && T_cameraStart > 0) {
-          trimStartMsRef.current = Math.max(
-            0,
-            Math.round(anchor.firstClickPerfMs - T_cameraStart),
-          )
-        }
-
-        const referenceStarted = anchor
-          ? ((await onAnchoredReferenceStart?.(anchor)) ?? true)
-          : ((await onStartReferencePlayback?.()) ?? true)
-        if (wantsReference && referenceStarted === false) {
-          clearPulseUnsub()
-          if (activeRef.current) {
-            fail("Reference playback couldn't start. Check your takes and try again.")
-          }
-          return
-        }
-
-        await countDone
+        const firstBeatDelaySec = await getMetronomeCountInDelaySec({
+          hasAudibleReferences: audibleReferences,
+        })
+        await runCountIn(countInBeats, beatMs, clickEnabled, firstBeatDelaySec)
       } else {
-        // ── No click: references define the start (previous behavior) ──────
-        const referenceStarted = (await onStartReferencePlayback?.()) ?? true
-        const T_audioStart = performance.now()
-        if (wantsReference && referenceStarted === false) {
-          if (activeRef.current) {
-            fail("Reference playback couldn't start. Check your takes and try again.")
-          }
-          return
-        }
-        if (T_cameraStart > 0) {
-          trimStartMsRef.current = Math.max(0, Math.round(T_audioStart - T_cameraStart))
-        }
         await runVisualCountIn(countInBeats, beatMs)
       }
       if (!activeRef.current) return
@@ -332,10 +260,7 @@ export function useMultitrackRecording(options: {
       onCountInComplete?.(panelId)
     })()
   }, [
-    armPulseCountdown,
-    clearPulseUnsub,
     fail,
-    onAnchoredReferenceStart,
     onArmPlayback,
     onCountInComplete,
     onCountInStart,
@@ -343,6 +268,8 @@ export function useMultitrackRecording(options: {
     onPrepareCountInAudio,
     onStartReferencePlayback,
     requiresReferencePlayback,
+    hasAudibleReferences,
+    runCountIn,
     runVisualCountIn,
   ])
 

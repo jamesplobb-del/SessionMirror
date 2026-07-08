@@ -56,22 +56,24 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   const setLayout = useCallback((layoutId: string) => {
     const preset = getLayoutPreset(layoutId)
     setSession((prev) => {
-      const nextPanels = createPanelsForLayout(preset)
-      for (let i = 0; i < nextPanels.length; i += 1) {
-        const existing = prev.panels[i]
-        if (!existing || existing.kind !== 'performance' || nextPanels[i].kind !== 'performance') continue
-        if (existing.kind === 'performance' && nextPanels[i].kind === 'performance') {
-          nextPanels[i] = {
-            kind: 'performance',
-            id: nextPanels[i].id,
-            take: existing.take,
-            volume: existing.volume,
-            muted: existing.muted,
-            trimStartSec: existing.trimStartSec,
-            trimEndSec: existing.trimEndSec,
-          }
+      const prevById = new Map(
+        prev.panels
+          .filter((panel) => panel.kind === 'performance')
+          .map((panel) => [panel.id, panel] as const),
+      )
+      const nextPanels = createPanelsForLayout(preset).map((panel) => {
+        if (panel.kind !== 'performance') return panel
+        const existing = prevById.get(panel.id)
+        if (!existing || existing.kind !== 'performance') return panel
+        return {
+          ...panel,
+          take: existing.take,
+          volume: existing.volume,
+          muted: existing.muted,
+          trimStartSec: existing.trimStartSec,
+          trimEndSec: existing.trimEndSec,
         }
-      }
+      })
       return { ...prev, layoutId, panels: nextPanels }
     })
   }, [])
