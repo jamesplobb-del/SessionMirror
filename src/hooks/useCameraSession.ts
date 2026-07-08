@@ -52,7 +52,7 @@ import {
   getAudioHardwareRtl,
 } from '../utils/nativeCameraTest'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
-import { resolveMicPreferenceForLiveCapture } from '../utils/liveMicRoute'
+import { resolveMicPreferenceForLiveCapture, resolveNativeBridgeMicPreference } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
 import { isAppInForeground } from '../utils/appForeground'
@@ -615,7 +615,7 @@ export function useCameraSession({
       const result = await startNativeCameraBridge({
         useFrontCamera: true,
         audioSessionProfile: 'videoRecording',
-        micInputPreference: micInputPreferenceRef.current,
+        micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
       })
 
       if (!result) {
@@ -1603,7 +1603,7 @@ export function useCameraSession({
       const result = await startNativeCameraRecording({
         useFrontCamera: true,
         audioSessionProfile: 'videoRecording',
-        micInputPreference: micInputPreferenceRef.current,
+        micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
       })
 
       if (!result) {
@@ -2413,9 +2413,11 @@ export function useCameraSession({
         recordingModeRef.current === 'audio' &&
         !options?.liveCapture
       ) {
-        await stopNativeVideoBridge()
-        if (Capacitor.isNativePlatform()) {
-          await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
+        if (nativePreviewActiveRef.current) {
+          await applyMicInputPreference(
+            resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
+          )
+          return
         }
         await acquireNativeVideoBridge()
         return

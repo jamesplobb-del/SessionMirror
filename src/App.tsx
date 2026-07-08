@@ -1403,7 +1403,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
     if (nativeLivePreviewActive && recordingMode === 'audio') {
       lastMicPreferenceRouteRef.current = settings.micInputPreference
-      void reacquireStreamForAudioRoute()
       return
     }
     lastMicPreferenceRouteRef.current = settings.micInputPreference

@@ -337,9 +337,44 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     ) throws {
         activeAudioProfile = profile
         activeMicInputPreference = micInputPreference
-        try profile.apply(to: AVAudioSession.sharedInstance())
-        _ = try AudioRouteConfigurator.applyMicInputPreference(micInputPreference)
+        let session = AVAudioSession.sharedInstance()
+        try profile.apply(to: session)
+
+        // videoRecording profile already pins built-in mic for split-route capture.
+        // Re-applying .headphone when HFP is unavailable falls back to Auto and
+        // can reopen Bluetooth HFP on the next capture-session reconfigure.
+        switch micInputPreference {
+        case .iphone:
+            _ = try AudioRouteConfigurator.applyMicInputPreference(.iphone, session: session)
+        case .headphone:
+            let headphoneInputPorts: Set<AVAudioSession.Port> = [
+                .bluetoothHFP,
+                .bluetoothLE,
+                .headsetMic,
+            ]
+            let hasHeadphoneInput = (session.availableInputs ?? []).contains {
+                headphoneInputPorts.contains($0.portType)
+            }
+            if hasHeadphoneInput {
+                _ = try AudioRouteConfigurator.applyMicInputPreference(.headphone, session: session)
+            }
+        case .auto:
+            break
+        }
+
         _ = NativeCameraTestAudio.sessionDiagnostics(profile: profile)
+    }
+
+    private func preferredAudioCaptureDevice() -> AVCaptureDevice? {
+        switch activeMicInputPreference {
+        case .iphone:
+            if let builtIn = AVCaptureDevice.default(.builtInMicrophone, for: .audio, position: .unspecified) {
+                return builtIn
+            }
+        case .auto, .headphone:
+            break
+        }
+        return AVCaptureDevice.default(for: .audio)
     }
 
     private func restoreAudioSessionAfterTest() {
@@ -760,7 +795,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         session.addInput(videoInput)
         AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addVideoInput.end", details: "device=\(videoDevice.localizedName)")
 
-        guard let audioDevice = AVCaptureDevice.default(for: .audio) else {
+        guard let audioDevice = preferredAudioCaptureDevice() else {
             throw NSError(
                 domain: "NativeCameraTest",
                 code: 6,

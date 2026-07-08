@@ -3,6 +3,25 @@ import type { MicInputPreference } from './appSettings'
 import { isHeadphoneOutputActive } from './headphoneOutput'
 import { applyMicInputPreference } from './audioSessionRoute'
 
+/** Built-in mic for native AVCapture split-route (mic in, headphones/A2DP out). */
+export function resolveNativeBridgeMicPreference(
+  preference: MicInputPreference,
+): MicInputPreference {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+    return preference
+  }
+  // Headphones connected: never request HFP headset mic on the native bridge.
+  if (isHeadphoneOutputActive()) {
+    return 'iphone'
+  }
+  // Without HFP inputs available, .headphone falls back to Auto and undoes the
+  // profile's built-in mic pin on the next session reconfigure.
+  if (preference === 'headphone') {
+    return 'iphone'
+  }
+  return preference
+}
+
 /**
  * Live pitch/tuner capture should mirror the no-headphones path: built-in mic
  * while output stays on headphones/A2DP. The headset HFP mic is unreliable for
