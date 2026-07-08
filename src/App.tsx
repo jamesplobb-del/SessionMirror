@@ -29,7 +29,7 @@ import { useAppSettings } from './hooks/useAppSettings'
 import { useAppShellPolicies } from './hooks/useAppShellPolicies'
 import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
-import { pausePitchGraphsForMedia, releaseAllLiveMicPitchGraphs } from './hooks/useLivePitchTracker'
+import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
   registerAutoPlaybackHold,
   registerInlineTakePlaybackPreviewHold,
@@ -140,8 +140,6 @@ import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/
 import BestTakeAudioPlugin, { applyNativeExperimentalAudioMode } from './utils/audioSessionRoute'
 import { buildNativeEnhancerParams } from './utils/audioEnhancer'
 import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
-import { isHeadphoneOutputActive, subscribeHeadphoneOutput } from './utils/headphoneOutput'
-import { prepareLiveMicCaptureRoute } from './utils/liveMicRoute'
 import { setActiveCaptureProfile } from './utils/audioCapture'
 import {
   buildRecordingCaptureDiagnostics,
@@ -462,9 +460,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
   const queuedAutoPlayRef = useRef<{ url: string; takeId: string } | null>(null)
   const recordingModeRef = useRef<RecordingMode>('video')
-  const audioPracticeTabRef = useRef(audioPracticeTab)
-  audioPracticeTabRef.current = audioPracticeTab
-  const isRecordingRef = useRef(false)
   const cameraReadyRef = useRef(false)
   const pitchCommitTimerRef = useRef<number | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
@@ -483,8 +478,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const youtubeIframeRef = useRef<HTMLIFrameElement>(null)
   const youtubeUrlRef = useRef<string | null>(null)
   const lastMicPreferenceRouteRef = useRef(settings.micInputPreference)
-  const lastTunerLiveCaptureHeadphonesRef = useRef<boolean | null>(null)
-  const tunerMicRefreshInFlightRef = useRef(false)
   const [youtubeHostEl, setYoutubeHostEl] = useState<HTMLElement | null>(null)
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
@@ -1408,6 +1401,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       lastMicPreferenceRouteRef.current = settings.micInputPreference
       return
     }
+    if (nativeLivePreviewActive && recordingMode === 'audio') {
+      lastMicPreferenceRouteRef.current = settings.micInputPreference
+      void reacquireStreamForAudioRoute()
+      return
+    }
     lastMicPreferenceRouteRef.current = settings.micInputPreference
     void reacquireStreamForAudioRoute()
   }, [isRecording, nativeLivePreviewActive, recordingMode, reacquireStreamForAudioRoute, ready, settings.micInputPreference])
@@ -1416,7 +1414,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (isPlaybackRouteHoldActive()) return
     void syncNativeCameraSessionState({
       previewActive:
-        recordingMode === 'video' && (ready || nativeLivePreviewActive),
+        (recordingMode === 'video' && (ready || nativeLivePreviewActive)) ||
+        (recordingMode === 'audio' && nativeLivePreviewActive),
       recordingActive: isRecording && recordingMode === 'video',
     })
   }, [isRecording, nativeLivePreviewActive, ready, recordingMode])
@@ -1496,7 +1495,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   recordingModeRef.current = recordingMode
   cameraReadyRef.current = ready
-  isRecordingRef.current = isRecording
 
   const autoPlaybackPlayingRef = useRef(autoPlaybackPlaying)
   autoPlaybackPlayingRef.current = autoPlaybackPlaying
@@ -2092,6 +2090,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [requestCameraAccess])
 
   const micStreamIsLiveForTuner = useCallback(() => {
+    if (isNativeCameraPreviewActive()) return true
     return Boolean(
       streamRef.current?.getAudioTracks().some(
         (track) => track.readyState === 'live' && track.enabled,
@@ -2100,39 +2099,21 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const handleRequestTunerMicStream = useCallback(async () => {
-    if (isRecording || tunerMicRefreshInFlightRef.current) return
+    if (isRecording) return
 
-    const headphonesNow = isHeadphoneOutputActive()
-    const isFirstTunerPrep = lastTunerLiveCaptureHeadphonesRef.current === null
-    const headphonesJustChanged =
-      !isFirstTunerPrep && lastTunerLiveCaptureHeadphonesRef.current !== headphonesNow
-    lastTunerLiveCaptureHeadphonesRef.current = headphonesNow
-
-    await prepareLiveMicCaptureRoute(settings.micInputPreference)
-
-    const needsReacquire =
-      !micStreamIsLiveForTuner() ||
-      headphonesJustChanged ||
-      (headphonesNow && isFirstTunerPrep)
-
-    if (needsReacquire) {
-      tunerMicRefreshInFlightRef.current = true
-      releaseAllLiveMicPitchGraphs()
-      try {
-        await reacquireStreamForAudioRoute({ liveCapture: true })
-      } finally {
-        tunerMicRefreshInFlightRef.current = false
-      }
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+      await acquireNativeVideoBridge()
       return
     }
 
-    requestCameraAccess('audio')
+    if (!micStreamIsLiveForTuner()) {
+      requestCameraAccess('audio')
+    }
   }, [
+    acquireNativeVideoBridge,
     isRecording,
     micStreamIsLiveForTuner,
-    reacquireStreamForAudioRoute,
     requestCameraAccess,
-    settings.micInputPreference,
   ])
 
   const schedulePitchTrackerCommit = useCallback(
@@ -2505,40 +2486,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     isRecording,
     quickSettingsOpen,
     streamGeneration,
+    nativeLivePreviewActive,
   ])
-
-  // Re-open WebKit mic once when headphones plug/unplug on the tuner tab.
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return
-
-    let debounceTimer: number | null = null
-
-    const refreshTunerMicForRoute = () => {
-      if (recordingModeRef.current !== 'audio') return
-      if (audioPracticeTabRef.current !== 'tuner') return
-      if (isRecordingRef.current) return
-      if (isPlaybackRouteHoldActive()) return
-      if (tunerMicRefreshInFlightRef.current) return
-
-      lastTunerLiveCaptureHeadphonesRef.current = null
-      void handleRequestTunerMicStream()
-    }
-
-    const scheduleRefresh = () => {
-      if (debounceTimer !== null) window.clearTimeout(debounceTimer)
-      debounceTimer = window.setTimeout(() => {
-        debounceTimer = null
-        refreshTunerMicForRoute()
-      }, 500)
-    }
-
-    const unsubscribeHeadphones = subscribeHeadphoneOutput(scheduleRefresh)
-
-    return () => {
-      if (debounceTimer !== null) window.clearTimeout(debounceTimer)
-      unsubscribeHeadphones()
-    }
-  }, [handleRequestTunerMicStream])
 
   const pitchAudioHudLock =
     showPitch &&
@@ -3554,6 +3503,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       <AudioTunerTab
                         streamRef={streamRef}
                         streamGeneration={streamGeneration}
+                        nativeLivePreviewActive={nativeLivePreviewActive}
                         ready={ready}
                         isRecording={isRecording}
                         tunerInstrument={settings.tunerInstrument}

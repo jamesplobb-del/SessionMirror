@@ -406,7 +406,7 @@ function LivePitchTunerAudio({
       realtimeMode: true,
       suppressUntilRef: droneAnalysisSuppressUntilRef,
       allowStandaloneMicFallback: liveMicOnly,
-      preferNativeAudioTap: false,
+      preferNativeAudioTap: true,
     }),
     [liveMicOnly, micStreamRef, tunerInstrument],
   )

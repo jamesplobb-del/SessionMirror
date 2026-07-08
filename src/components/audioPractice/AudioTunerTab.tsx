@@ -7,6 +7,7 @@ import type { DroneWaveform } from '../../utils/droneEngine'
 interface AudioTunerTabProps {
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
+  nativeLivePreviewActive: boolean
   ready: boolean
   isRecording: boolean
   tunerInstrument: TunerInstrument
@@ -17,7 +18,11 @@ interface AudioTunerTabProps {
   onRequestMicStream: () => void | Promise<void>
 }
 
-function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
+function micStreamIsLive(
+  stream: MediaStream | null | undefined,
+  nativeLivePreviewActive: boolean,
+): boolean {
+  if (nativeLivePreviewActive) return true
   return Boolean(
     stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled),
   )
@@ -26,6 +31,7 @@ function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
 export default function AudioTunerTab({
   streamRef,
   streamGeneration,
+  nativeLivePreviewActive,
   ready: _ready,
   isRecording,
   tunerInstrument,
@@ -64,12 +70,12 @@ export default function AudioTunerTab({
     ],
   )
 
-  const micStreamLive = micStreamIsLive(streamRef.current)
+  const micStreamLive = micStreamIsLive(streamRef.current, nativeLivePreviewActive)
   const liveMicReady = true
 
   useEffect(() => {
     void onRequestMicStream()
-  }, [onRequestMicStream, streamGeneration])
+  }, [onRequestMicStream, streamGeneration, nativeLivePreviewActive])
 
   useEffect(() => {
     if (micStreamLive) {
@@ -80,7 +86,7 @@ export default function AudioTunerTab({
     let cancelled = false
     const poll = window.setInterval(() => {
       if (cancelled) return
-      if (micStreamIsLive(streamRef.current)) {
+      if (micStreamIsLive(streamRef.current, nativeLivePreviewActive)) {
         setMicLiveEpoch((epoch) => epoch + 1)
       }
     }, 160)
@@ -89,7 +95,7 @@ export default function AudioTunerTab({
       cancelled = true
       window.clearInterval(poll)
     }
-  }, [micStreamLive, streamGeneration, streamRef])
+  }, [micStreamLive, nativeLivePreviewActive, streamGeneration, streamRef])
 
   return (
     <section className="audio-practice-tuner-shell flex min-h-0 flex-1 flex-col" aria-label="Tuner">
@@ -98,7 +104,7 @@ export default function AudioTunerTab({
         mediaRef={mediaRef}
         enabled
         isPlaying={isRecording}
-        mediaKey={`tuner-tab-${streamGeneration}-${micLiveEpoch}`}
+        mediaKey={`tuner-tab-${streamGeneration}-${micLiveEpoch}-${nativeLivePreviewActive ? 'native' : 'webkit'}`}
         label="Pitch Analysis"
         liveMicEnabled={liveMicReady}
         micStreamRef={streamRef}
