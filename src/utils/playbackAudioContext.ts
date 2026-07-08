@@ -3,12 +3,22 @@ import { APP_FOREGROUND_RECOVERY_EVENT } from './appForeground'
 let playbackContext: AudioContext | null = null
 let playbackContextWatchAttached = false
 
+/**
+ * iOS WKWebView contexts can sit in a non-standard 'interrupted' state (e.g.
+ * after a native AVCaptureSession reconfigures the audio session). Treat any
+ * non-running, non-closed state as resumable — checking only 'suspended'
+ * leaves the context wedged and rendering silence.
+ */
+function needsResume(ctx: AudioContext): boolean {
+  return ctx.state !== 'running' && ctx.state !== 'closed'
+}
+
 function attachPlaybackContextWatch(ctx: AudioContext): void {
   if (playbackContextWatchAttached) return
   playbackContextWatchAttached = true
 
   ctx.addEventListener('statechange', () => {
-    if (ctx.state === 'suspended') {
+    if (needsResume(ctx)) {
       void ctx.resume().catch(() => {})
     }
   })
@@ -44,7 +54,7 @@ export async function getPlaybackAudioContext(): Promise<AudioContext> {
 
   attachPlaybackContextWatch(playbackContext)
 
-  if (playbackContext.state === 'suspended') {
+  if (needsResume(playbackContext)) {
     await playbackContext.resume().catch(() => {})
   }
 
@@ -63,7 +73,7 @@ export function primePlaybackAudioContextSync(): AudioContext {
 
   attachPlaybackContextWatch(playbackContext)
 
-  if (playbackContext.state === 'suspended') {
+  if (needsResume(playbackContext)) {
     void playbackContext.resume().catch((error: unknown) => {
       console.warn('Playback AudioContext resume blocked:', error)
     })

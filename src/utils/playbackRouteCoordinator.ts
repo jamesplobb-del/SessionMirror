@@ -234,6 +234,30 @@ export async function preparePlaybackRoute(
   }
 }
 
+/**
+ * Re-apply the loud/coexistent playback session even when a route hold is
+ * already active. Needed right before a count-in: the pre-warm path sets
+ * playbackRouteActive BEFORE the native camera starts, and the capture
+ * session's audio configuration then blows away the playback session — after
+ * which preparePlaybackRoute() no-ops on the stale flag and the metronome's
+ * Web Audio clicks render into a dead session (silent first-take count-in).
+ */
+export async function reassertPlaybackRouteForCountIn(): Promise<void> {
+  if (!isIosNative()) return
+
+  if (!playbackRouteActive) {
+    await preparePlaybackRoute({ suspendCamera: false })
+    return
+  }
+
+  const loud = await applyLoudPlaybackSessionIfSpeaker({
+    allowWithActivePreview: true,
+    failSoft: true,
+  })
+  loudSessionAppliedForPlayback = loud.applied && !loud.coexistent
+  coexistentSpeakerAppliedForPlayback = loud.applied && loud.coexistent
+}
+
 export async function completePlaybackRouteRestore(): Promise<void> {
   if (!isIosNative()) return
   if (!playbackRouteActive) return

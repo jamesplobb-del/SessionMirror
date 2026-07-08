@@ -20,11 +20,13 @@ import {
 import Pressable from '../../components/ui/Pressable'
 import AnimatedBottomSheet from '../../components/ui/AnimatedBottomSheet'
 import { ensureNativeCameraSessionHealthy } from '../../utils/nativeCameraTest'
-import { completePlaybackRouteRestore, preparePlaybackRoute } from '../../utils/playbackRouteCoordinator'
+import {
+  completePlaybackRouteRestore,
+  reassertPlaybackRouteForCountIn,
+} from '../../utils/playbackRouteCoordinator'
 import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
 import { APP_FOREGROUND_RECOVERY_EVENT } from '../../utils/appForeground'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
-import { getReferenceChaseLeadSec } from '../synchronization/metronomePlaybackCompensation'
 import { useActionSheet } from '../../context/ActionSheetContext'
 import { useMultitrackSession } from '../state/useMultitrackSession'
 import { useMultitrackSync } from '../synchronization/useMultitrackSync'
@@ -293,11 +295,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           panel.id !== recordingTargetPanelIdRef.current,
       ),
     onAnchoredReferenceStart: async (anchor) => {
-      // References chase the metronome's click grid — timeline 0 IS click 1.
-      const started = await sync.startAnchoredToClick(
-        anchor.firstClickCtxTime,
-        getReferenceChaseLeadSec(),
-      )
+      const started = await sync.startAnchoredToClick(anchor.firstClickCtxTime)
       if (!monitorMutesRef.current.has('backing')) {
         const backingStarted = await startBackingPlayback()
         return started || backingStarted
@@ -314,7 +312,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     },
     onPrepareCountInAudio: async () => {
       try {
-        await preparePlaybackRoute({ suspendCamera: false })
+        // Re-apply (not just ensure) the playback session: the camera start
+        // that just happened reconfigures the AVAudioSession and silences the
+        // Web Audio click graph while the stale route hold no-ops prepare.
+        await reassertPlaybackRouteForCountIn()
       } catch {
         return false
       }
@@ -325,9 +326,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       sync.pause()
       pauseBacking()
       sync.setExcludePanelId(null)
+      sharedMetronomeEngine.stop()
     },
     onPerformanceStart: async () => {
-      // Safety net if reference stalled mid count-in — idempotent against playing elements.
+      // References are already rolling from click-anchored chase — restarting
+      // them here was causing seek storms / glitchy audio on overdubs.
+      if (sync.state.isPlaying) return
       await sync.startPrepared()
       if (!monitorMutesRef.current.has('backing')) {
         await startBackingPlayback()

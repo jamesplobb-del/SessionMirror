@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
 import { getMetronomeDelayAfterReferenceSec } from '../synchronization/metronomePlaybackCompensation'
+import { preparePlaybackRoute } from '../../utils/playbackRouteCoordinator'
+import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
 import type { MultitrackRecordingPhase } from '../types'
 
 export interface CountInClickAnchor {
@@ -124,20 +126,22 @@ export function useMultitrackRecording(options: {
       if (countInBeats <= 0) return
       setPhase('count-in')
       await new Promise<void>((resolve) => {
-        let beat = countInBeats
+        let remaining = countInBeats
         const tick = () => {
           if (!activeRef.current) {
             clearTimer()
             resolve()
             return
           }
-          setCountInRemaining(beat)
-          beat -= 1
-          if (beat <= 0) {
-            clearTimer()
-            resolve()
+          setCountInRemaining(remaining)
+          if (remaining <= 1) {
+            timerRef.current = window.setTimeout(() => {
+              clearTimer()
+              resolve()
+            }, beatMs)
             return
           }
+          remaining -= 1
           timerRef.current = window.setTimeout(tick, beatMs)
         }
         tick()
@@ -147,9 +151,9 @@ export function useMultitrackRecording(options: {
   )
 
   /**
-   * Pulse-locked UI countdown — subscribes BEFORE the metronome starts so beat
-   * 1 is never missed. Returns a promise that resolves when the count-in
-   * completes (or immediately for zero beats).
+   * Pulse-locked UI countdown — subscribes BEFORE the metronome starts.
+   * Shows countInBeats … 2 … 1 on successive pulses, then resolves on the
+   * NEXT pulse (the downbeat) so musicians see a full beat on "1" before "NOW".
    */
   const armPulseCountdown = useCallback(
     (countInBeats: number) => {
@@ -157,16 +161,21 @@ export function useMultitrackRecording(options: {
       setPhase('count-in')
       setCountInRemaining(countInBeats)
       return new Promise<void>((resolve) => {
-        let beatsLeft = countInBeats
+        let pulsesHeard = 0
         pulseUnsubRef.current = sharedMetronomeEngine.subscribePulse(() => {
           if (!activeRef.current) {
             clearPulseUnsub()
             resolve()
             return
           }
-          setCountInRemaining(beatsLeft)
-          beatsLeft -= 1
-          if (beatsLeft <= 0) {
+          pulsesHeard += 1
+          const remaining = countInBeats - pulsesHeard + 1
+          if (remaining > 0) {
+            setCountInRemaining(remaining)
+          }
+          // After countInBeats pulses we've shown "1"; the following pulse is
+          // the downbeat that starts the performance.
+          if (pulsesHeard > countInBeats) {
             clearPulseUnsub()
             resolve()
           }
@@ -251,9 +260,25 @@ export function useMultitrackRecording(options: {
           return
         }
 
-        // Lead before click 1: enough time for reference play() to spin up.
-        const firstBeatDelaySec = await getMetronomeDelayAfterReferenceSec()
+        // Overdubs need lead time for reference play() to spin up before click 1.
+        // First take has no references — use the metronome's minimal lead so the
+        // click is audible immediately (a long reference delay was silencing it).
+        const firstBeatDelaySec = wantsReference
+          ? await getMetronomeDelayAfterReferenceSec()
+          : 0.05
         if (!activeRef.current) return
+
+        // First take has no reference media to wake the loud playback route —
+        // prime it immediately before the click grid starts.
+        if (!wantsReference) {
+          try {
+            await preparePlaybackRoute({ suspendCamera: false })
+            await resumePlaybackAudioContext()
+          } catch {
+            if (activeRef.current) fail("The metronome couldn't start. Try again.")
+            return
+          }
+        }
 
         const countDone = armPulseCountdown(countInBeats)
 

@@ -694,19 +694,24 @@ class SharedMetronomeEngine {
       this.debugLog('audio context recreated')
     }
 
-    if (ctx.state === 'suspended') {
+    // iOS WKWebView can report 'interrupted' (non-standard) after a native
+    // capture session reconfigures the audio session — treat any non-running
+    // state as resumable, not just 'suspended'.
+    let audioState: AudioContextState = ctx.state
+    if (audioState !== 'running') {
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
           await ctx.resume()
         } catch {
           /* iOS may block until audio session is ready */
         }
-        if (ctx.state !== 'suspended') break
+        audioState = ctx.state
+        if (audioState === 'running') break
         await new Promise((resolve) => window.setTimeout(resolve, 50 * (attempt + 1)))
       }
 
-      if (ctx.state === 'suspended') {
-        this.debugLog('audio context resume blocked')
+      if (audioState !== 'running') {
+        this.debugLog(`audio context resume blocked (state=${audioState})`)
         return null
       }
 

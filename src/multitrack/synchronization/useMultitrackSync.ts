@@ -49,14 +49,11 @@ export function useMultitrackSync() {
    */
   const pendingStartRef = useRef<Set<string>>(new Set())
   /**
-   * Chase mode (recording overdubs): the transport is anchored to the
-   * metronome's sample-accurate first click and is the unconditional master —
-   * every element (including the longest) is slaved onto the click grid and the
-   * transport never re-anchors to element playback. `chaseLeadSecRef` advances
-   * media currentTime so its AUDIBLE output lines up with the AUDIBLE clicks.
+   * Chase mode (recording overdubs): transport is anchored to the metronome's
+   * first click. References are positioned once at timeline 0 and free-run —
+   * no per-frame seeks (those stall iOS video decoders and sound glitchy).
    */
   const chaseModeRef = useRef(false)
-  const chaseLeadSecRef = useRef(0)
   const isPlayingRef = useRef(false)
   /** Fired when every clip has finished naturally (not on manual pause). */
   const onAllEndedRef = useRef<(() => void) | null>(null)
@@ -445,27 +442,34 @@ export function useMultitrackSync() {
   }, [applyMixStateToAll, getEntries])
 
   /**
-   * Start reference playback for an overdub, slaved to the metronome's click
+   * Start reference playback for an overdub, timed to the metronome's click
    * grid. `firstClickCtxTime` is the sample-accurate AudioContext time of the
-   * count-in's first click — that instant IS timeline 0. Elements are started
-   * immediately and the rAF loop chases them onto the grid (start-latency
-   * corrections land during the references' own count-in silence). `leadSec`
-   * advances media so its audible output matches the audible clicks.
+   * count-in's first click — that instant IS timeline 0. Each reference is
+   * seeked once to its timeline-0 media position, then started and left to
+   * free-run (no per-frame chase seeks).
    */
-  const startAnchoredToClick = useCallback(async (firstClickCtxTime: number, leadSec: number) => {
+  const startAnchoredToClick = useCallback(async (firstClickCtxTime: number) => {
     const entries = getEntries()
     if (entries.length === 0) {
-      setIsPlaying(false)
-      return false
+      return true
     }
 
     chaseModeRef.current = true
-    chaseLeadSecRef.current = Math.max(0, leadSec)
     transportLockedRef.current = true
     preparedStartRef.current = 0
     multitrackTransport.startAtClockTime(firstClickCtxTime)
 
     const playNow = entries.filter(([panelId]) => !pendingStartRef.current.has(panelId))
+
+    for (const [panelId, el] of playNow) {
+      try {
+        const win = clipWindowFor(panelId, el)
+        el.currentTime = Math.max(win.trimStart, win.trimStart + win.offset)
+      } catch {
+        /* metadata may not be ready yet */
+      }
+    }
+
     const startResults = await Promise.allSettled(
       playNow.map(([, el]) =>
         playTakeMediaAudible(el, { skipRoutePrep: true, attachEndedRouteRestore: false }),
@@ -489,7 +493,7 @@ export function useMultitrackSync() {
     }
     setIsPlaying(playing)
     return playing
-  }, [applyMixStateToAll, getEntries])
+  }, [applyMixStateToAll, clipWindowFor, getEntries])
 
   const play = useCallback(async () => {
     const masterEntry = getMasterEntry()
@@ -500,7 +504,26 @@ export function useMultitrackSync() {
   }, [currentTime, getEntries, getMasterEntry, playElements, trimFor, offsetFor])
 
   const playAllFromUserGesture = useCallback(async () => {
-    syncAllTo(0)
+    // Full reset — chase mode from recording leaves transport in a state that
+    // blocks normal grouped playback if we only seek without clearing it.
+    chaseModeRef.current = false
+    pendingStartRef.current.clear()
+    transportLockedRef.current = false
+    multitrackTransport.arm(0)
+
+    for (const [panelId, el] of getEntries()) {
+      try {
+        const win = clipWindowFor(panelId, el)
+        const rawTarget = win.trimStart + win.offset
+        const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
+        el.currentTime = Math.min(Math.max(rawTarget, win.trimStart), upper)
+        el.pause()
+      } catch {
+        /* ignore */
+      }
+    }
+    setCurrentTime(0)
+
     try {
       return await playElements(getEntries(), 0)
     } catch (error) {
@@ -508,7 +531,7 @@ export function useMultitrackSync() {
       setIsPlaying(false)
       return false
     }
-  }, [getEntries, playElements, syncAllTo])
+  }, [clipWindowFor, getEntries, playElements])
 
   const pause = useCallback(() => {
     chaseModeRef.current = false
@@ -519,14 +542,31 @@ export function useMultitrackSync() {
   }, [])
 
   const restart = useCallback(async () => {
-    syncAllTo(0)
+    chaseModeRef.current = false
+    pendingStartRef.current.clear()
+    transportLockedRef.current = false
+    multitrackTransport.arm(0)
+
+    for (const [panelId, el] of getEntries()) {
+      try {
+        const win = clipWindowFor(panelId, el)
+        const rawTarget = win.trimStart + win.offset
+        const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
+        el.currentTime = Math.min(Math.max(rawTarget, win.trimStart), upper)
+        el.pause()
+      } catch {
+        /* ignore */
+      }
+    }
+    setCurrentTime(0)
+
     try {
       await playElements(getEntries(), 0)
     } catch (error) {
       console.error('[useMultitrackSync] restart failed', error)
       setIsPlaying(false)
     }
-  }, [getEntries, playElements, syncAllTo])
+  }, [clipWindowFor, getEntries, playElements])
 
   const seek = useCallback((time: number) => syncAllTo(time), [syncAllTo])
 
@@ -604,9 +644,22 @@ export function useMultitrackSync() {
           return
         }
 
-        // In chase mode media currentTime leads the timeline so its audible
-        // output aligns with the audible clicks.
-        const slaveTime = chasing ? timeline + chaseLeadSecRef.current : timeline
+        // In chase mode references free-run from their one-time start position —
+        // only enforce trim-end pauses; never seek (seeks stall iOS decoders).
+        if (chasing) {
+          for (const [panelId, el] of entries) {
+            try {
+              const trim = trimFor(panelId)
+              if (trim.end !== null && !el.paused && el.currentTime >= trim.end) {
+                el.pause()
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
 
         for (const [panelId, el] of entries) {
           try {
@@ -614,9 +667,9 @@ export function useMultitrackSync() {
 
             // Delayed entry: start clips whose entry point the timeline just crossed.
             if (pending.has(panelId)) {
-              if (slaveTime >= win.entersAt - 0.02) {
+              if (timeline >= win.entersAt - 0.02) {
                 pending.delete(panelId)
-                el.currentTime = Math.max(win.trimStart, slaveTime + win.trimStart + win.offset)
+                el.currentTime = Math.max(win.trimStart, timeline + win.trimStart + win.offset)
                 void playTakeMediaAudible(el, {
                   skipRoutePrep: true,
                   attachEndedRouteRestore: false,
@@ -631,14 +684,17 @@ export function useMultitrackSync() {
               el.pause()
               continue
             }
+
+            const deviation = Math.abs(el.currentTime - win.trimStart - win.offset - timeline)
+
             // Slave every non-reference element to the transport with a tight tolerance.
             if (
               (!masterEntry || el !== masterEntry[1]) &&
               !el.paused &&
               !el.ended &&
-              Math.abs(el.currentTime - win.trimStart - win.offset - slaveTime) > SLAVE_TOLERANCE_SEC
+              deviation > SLAVE_TOLERANCE_SEC
             ) {
-              el.currentTime = Math.max(win.trimStart, slaveTime + win.trimStart + win.offset)
+              el.currentTime = Math.max(win.trimStart, timeline + win.trimStart + win.offset)
             }
           } catch {
             /* ignore */
