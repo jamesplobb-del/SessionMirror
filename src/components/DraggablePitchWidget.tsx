@@ -3,6 +3,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, type Component
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
 import { getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
+import { iosDragRelease } from '../utils/motionPresets'
 
 type TunerProps = Omit<
   ComponentProps<typeof LivePitchTuner>,
@@ -211,7 +212,7 @@ export default function DraggablePitchWidget({
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
-      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+      transition={iosDragRelease}
       style={{
         x: dragX,
         y: dragY,

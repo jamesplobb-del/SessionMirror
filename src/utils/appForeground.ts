@@ -10,6 +10,17 @@ let lifecycleRegistered = false
 const listeners = new Set<(foreground: boolean) => void>()
 let recoverySequence = 0
 let recoveryTimer: number | null = null
+/**
+ * visibilitychange, pageshow, focus, and native appStateChange commonly all
+ * fire within milliseconds of the SAME real resume (well-documented iOS
+ * WKWebView overlap) — without this guard each one independently re-dispatched
+ * APP_FOREGROUND_RECOVERY_EVENT, cascading into every listener's resume work
+ * (AudioContext.resume(), camera health checks, metronome recovery, ...) 2-4x
+ * over per actual backgrounding cycle. Reset on background so a genuinely
+ * separate resume is never suppressed.
+ */
+let lastForegroundDispatchAt = 0
+const FOREGROUND_DISPATCH_DEDUPE_MS = 250
 
 function setAppInForeground(foreground: boolean) {
   if (appInForeground === foreground) return
@@ -30,6 +41,7 @@ function dispatchLifecycleEvent(eventName: string, reason: string): void {
 
 function dispatchBackground(reason: string): void {
   recoverySequence += 1
+  lastForegroundDispatchAt = 0
   if (recoveryTimer !== null) {
     window.clearTimeout(recoveryTimer)
     recoveryTimer = null
@@ -39,7 +51,12 @@ function dispatchBackground(reason: string): void {
 
 function dispatchForeground(reason: string): void {
   recoverySequence += 1
-  dispatchLifecycleEvent(APP_FOREGROUND_RECOVERY_EVENT, reason)
+
+  const now = Date.now()
+  if (now - lastForegroundDispatchAt >= FOREGROUND_DISPATCH_DEDUPE_MS) {
+    lastForegroundDispatchAt = now
+    dispatchLifecycleEvent(APP_FOREGROUND_RECOVERY_EVENT, reason)
+  }
 
   if (recoveryTimer !== null) {
     window.clearTimeout(recoveryTimer)

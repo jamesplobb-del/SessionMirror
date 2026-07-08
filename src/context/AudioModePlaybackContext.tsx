@@ -512,8 +512,25 @@ export function AudioModePlaybackProvider({
           readyState: currentPlayer.readyState,
           networkState: currentPlayer.networkState,
         })
-        void playTakeMediaAudible(currentPlayer, { skipRoutePrep: true })
-          .then((started) => {
+        void (async () => {
+          try {
+            // Tier 1: a transient stalled/waiting/suspend blip often resolves
+            // with a plain play() — no route/graph rebuild needed. Only
+            // escalate to the full rebuild (tier 2) if this doesn't actually
+            // get the element progressing again; the full rebuild reconnects
+            // the Web Audio route/graph (routeTakePlaybackToSpeaker), which is
+            // audible as a brief glitch and was firing even for blips that
+            // would have recovered on their own.
+            let started = false
+            try {
+              await currentPlayer.play()
+              started = !currentPlayer.paused
+            } catch {
+              started = false
+            }
+            if (!started) {
+              started = await playTakeMediaAudible(currentPlayer, { skipRoutePrep: true })
+            }
             if (started && desiredPlayingRef.current) {
               onPlaybackActiveChangeRef.current?.(true)
               startProgressLoop()
@@ -526,10 +543,10 @@ export function AudioModePlaybackProvider({
               isPlaying: false,
               currentTime: currentPlayer.currentTime,
             }))
-          })
-          .finally(() => {
+          } finally {
             resumeInFlightRef.current = false
-          })
+          }
+        })()
       }, 180)
     },
     [startProgressLoop, state.currentItem],

@@ -90,7 +90,7 @@ import { lockPortraitOrientation, syncAppOrientationLock } from './utils/lockPor
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
-import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
+import { iosFade, iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete } from './utils/onboardingTutorial'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
@@ -183,6 +183,7 @@ import {
 } from './utils/audioPlaybackDiagnostics'
 import { tuneMusicRecordingStream, tunePlaybackIsolationStream } from './utils/audioCapture'
 import AppBootGate from './components/ui/AppBootGate'
+import AnimatedTabPanel from './components/ui/AnimatedTabPanel'
 import AudioPracticeTopTabs from './components/audioPractice/AudioPracticeTopTabs'
 import AudioModeHome from './components/audioPractice/AudioModeHome'
 import AudioMetronomeTab from './components/audioPractice/AudioMetronomeTab'
@@ -3443,46 +3444,64 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       : undefined,
                   }}
                 >
-                  {recordingMode !== 'audio' && (
-                    <HudHeader
-                      sessionName={activeProject?.name ?? 'BestTake'}
-                      onOpenVault={handleOpenVault}
-                      className={
-                        quickSettingsOpen || isReviewOpen || isSplitView
-                          ? 'hud-header-hidden'
-                          : undefined
-                      }
-                    />
-                  )}
+                  <AnimatePresence initial={false}>
+                    {recordingMode !== 'audio' && (
+                      <motion.div
+                        key="video-hud-header"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={iosFade}
+                        style={motionGpuLayer}
+                      >
+                        <HudHeader
+                          sessionName={activeProject?.name ?? 'BestTake'}
+                          onOpenVault={handleOpenVault}
+                          className={
+                            quickSettingsOpen || isReviewOpen || isSplitView
+                              ? 'hud-header-hidden'
+                              : undefined
+                          }
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                  {recordingMode === 'audio' && !quickSettingsOpen && !practiceSessionActive && (
-                    <div data-tutorial="audio-mode-tabs">
-                      <AudioPracticeTopTabs
-                        activeTab={audioPracticeTab}
-                        onTabChange={setAudioPracticeTab}
-                      />
-                    </div>
-                  )}
+                  <AnimatePresence initial={false}>
+                    {recordingMode === 'audio' && !quickSettingsOpen && !practiceSessionActive && (
+                      <motion.div
+                        key="audio-mode-top-tabs"
+                        data-tutorial="audio-mode-tabs"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={iosFade}
+                        style={motionGpuLayer}
+                      >
+                        <AudioPracticeTopTabs
+                          activeTab={audioPracticeTab}
+                          onTabChange={setAudioPracticeTab}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                  {recordingMode === 'audio' &&
-                    audioPracticeTab === 'metronome' &&
-                    !quickSettingsOpen && (
-                      <div
-                        key="audio-practice-metronome-layer"
+                  {recordingMode === 'audio' && !quickSettingsOpen && (
+                    <div className="relative flex min-h-0 flex-1">
+                      <AnimatedTabPanel
+                        panelKey="audio-practice-metronome-layer"
+                        active={audioPracticeTab === 'metronome'}
                         className="audio-practice-metronome-layer flex min-h-0 flex-1 flex-col"
-                        data-tutorial="audio-metronome-tab"
+                        dataTutorial="audio-metronome-tab"
                       >
                         <AudioMetronomeTab key="audio-metronome-tab" />
-                      </div>
-                    )}
+                      </AnimatedTabPanel>
 
-                  {recordingMode === 'audio' &&
-                    isAudioPracticeTimelineTab &&
-                    !quickSettingsOpen && (
-                      <div
-                        key="audio-practice-timeline-layer"
+                      <AnimatedTabPanel
+                        panelKey="audio-practice-timeline-layer"
+                        active={isAudioPracticeTimelineTab}
                         className="audio-practice-timeline-layer flex min-h-0 flex-1 flex-col"
-                        data-tutorial="audio-practice-tab"
+                        dataTutorial="audio-practice-tab"
                       >
                         <PracticeTimelineView
                           isRecording={isRecording}
@@ -3490,37 +3509,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           onStopRecording={toggleRecording}
                           onPracticeSessionActiveChange={setPracticeSessionActive}
                         />
-                      </div>
-                    )}
+                      </AnimatedTabPanel>
 
-                  {recordingMode === 'audio' && isAudioPracticeTunerTab && !quickSettingsOpen && (
-                    <div
-                      key="audio-practice-tuner-layer"
-                      className="audio-practice-tuner-layer flex min-h-0 flex-1 flex-col"
-                      data-tutorial="audio-tuner-tab"
-                    >
-                      <AudioTunerTab
-                        streamRef={streamRef}
-                        streamGeneration={streamGeneration}
-                        nativeLivePreviewActive={nativeLivePreviewActive}
-                        ready={ready}
-                        isRecording={isRecording}
-                        tunerInstrument={settings.tunerInstrument}
-                        liveMicTunerEnabled={settings.liveMicTunerEnabled}
-                        droneVolume={settings.droneVolume}
-                        droneWaveform={settings.droneWaveform}
-                        hapticFeedback={settings.hapticFeedback}
-                        onRequestMicStream={handleRequestTunerMicStream}
-                      />
-                    </div>
-                  )}
+                      <AnimatedTabPanel
+                        panelKey="audio-practice-tuner-layer"
+                        active={isAudioPracticeTunerTab}
+                        className="audio-practice-tuner-layer flex min-h-0 flex-1 flex-col"
+                        dataTutorial="audio-tuner-tab"
+                      >
+                        <AudioTunerTab
+                          streamRef={streamRef}
+                          streamGeneration={streamGeneration}
+                          nativeLivePreviewActive={nativeLivePreviewActive}
+                          ready={ready}
+                          isRecording={isRecording}
+                          tunerInstrument={settings.tunerInstrument}
+                          liveMicTunerEnabled={settings.liveMicTunerEnabled}
+                          droneVolume={settings.droneVolume}
+                          droneWaveform={settings.droneWaveform}
+                          hapticFeedback={settings.hapticFeedback}
+                          onRequestMicStream={handleRequestTunerMicStream}
+                        />
+                      </AnimatedTabPanel>
 
-                  {recordingMode === 'audio' &&
-                    audioPracticeTab === 'audio' &&
-                    !quickSettingsOpen &&
-                    settings.showTakeCards &&
-                    !isSplitView && (
-                      <div className="audio-mode-home-layer min-h-0 flex-1">
+                      <AnimatedTabPanel
+                        panelKey="audio-mode-home-layer"
+                        active={
+                          audioPracticeTab === 'audio' && settings.showTakeCards && !isSplitView
+                        }
+                        className="audio-mode-home-layer min-h-0 flex-1"
+                      >
                         <div data-tutorial="audio-take-cards">
                           <AudioModeHome
                             isRecording={isRecording}
@@ -3536,8 +3554,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             hapticFeedback={settings.hapticFeedback}
                           />
                         </div>
-                      </div>
-                    )}
+                      </AnimatedTabPanel>
+                    </div>
+                  )}
 
                   {!quickSettingsOpen &&
                     settings.showTakeCards &&

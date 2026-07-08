@@ -13,6 +13,7 @@ import {
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
 import { triggerLightHaptic, triggerMetronomeToggleHaptic } from '../utils/haptics'
+import { iosDragRelease } from '../utils/motionPresets'
 import { usePinchResize } from '../hooks/usePinchResize'
 import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
 import {
@@ -410,7 +411,7 @@ export default function DraggableMetronomeWidget({
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
-      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+      transition={iosDragRelease}
       style={{
         x: dragX,
         y: dragY,

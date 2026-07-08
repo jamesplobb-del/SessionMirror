@@ -49,6 +49,13 @@ export const iosDragGhostTransition = {
   mass: 0.45,
 }
 
+/** Draggable widget release-to-rest spring (metronome/pitch floating widgets). */
+export const iosDragRelease = {
+  type: 'spring' as const,
+  stiffness: 420,
+  damping: 32,
+}
+
 export const iosSheetDragTransition = {
   bounceStiffness: 520,
   bounceDamping: 42,

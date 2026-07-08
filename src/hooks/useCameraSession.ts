@@ -1749,7 +1749,15 @@ export function useCameraSession({
       return Promise.resolve(true)
     }
 
-    return (async () => {
+    // Audio-mode start is async (stream acquisition can take 700ms+ via the
+    // native-bridge handoff) and isRecordingRef.current doesn't flip true
+    // until deep inside it — toggleRecording's guard already checks
+    // nativeStartSettleRef for the video path, so populate it here too, the
+    // same way, to close the rapid-double-tap window for audio. Cleared via
+    // .finally() (not a stop-consumer step, since plain-audio stopRecording
+    // has none) — without this the ref would stay truthy forever after the
+    // first successful audio recording and block every start after it.
+    const settledSafe = (async () => {
       const currentStream = await ensureAudioRecordingStream()
       if (!currentStream || isRecordingRef.current) return isRecordingRef.current
 
@@ -1813,6 +1821,10 @@ export function useCameraSession({
       isRecordingRef.current = false
       setIsRecording(false)
       return false
+    })
+    nativeStartSettleRef.current = settledSafe
+    return settledSafe.finally(() => {
+      nativeStartSettleRef.current = null
     })
   }, [
     bindRecordingHandlers,

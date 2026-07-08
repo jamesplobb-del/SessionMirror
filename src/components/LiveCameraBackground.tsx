@@ -82,6 +82,16 @@ function LiveCameraBackground({
   const nativeBridgePrimedRef = useRef(false)
   /** True once a frame has actually been painted since the bridge was last (re)primed — gates revealing the canvas so a stale/frozen frame from before backgrounding is never shown as if live. */
   const [nativeFrameFresh, setNativeFrameFresh] = useState(false)
+  /**
+   * Mirrors whether `nativeFrameFresh` has already been signaled true for the
+   * current priming cycle. The frame pump paints on every native frame
+   * (~60/sec) — without this guard, `setNativeFrameFresh(true)` (and the
+   * closure call itself) fired on every single one of those frames instead of
+   * once when the canvas actually becomes safe to reveal, competing with
+   * concurrent sheet/overlay animations for main-thread time for no visual
+   * benefit. Reset alongside `setNativeFrameFresh(false)` below.
+   */
+  const frameFreshSignaledRef = useRef(false)
   const pinchPointersRef = useRef(new Map<number, { x: number; y: number }>())
   const pinchStartDistanceRef = useRef(0)
   const pinchStartZoomRef = useRef(1)
@@ -120,6 +130,8 @@ function LiveCameraBackground({
 
     if (!nativeFramePumpRef.current) {
       nativeFramePumpRef.current = createNativePreviewFramePump(nativePreviewCanvasRef, () => {
+        if (frameFreshSignaledRef.current) return
+        frameFreshSignaledRef.current = true
         setNativeFrameFresh(true)
       })
     }
@@ -161,6 +173,7 @@ function LiveCameraBackground({
       // recovery) — the canvas may still hold a stale frame. Require a fresh
       // one to be painted before the next activation reveals it, instead of
       // instantly showing whatever frozen pixels are already there.
+      frameFreshSignaledRef.current = false
       setNativeFrameFresh(false)
     }
   }, [nativeLivePreviewActive])

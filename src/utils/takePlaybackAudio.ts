@@ -226,11 +226,27 @@ export function playInlineTakeBoxFromUserGesture(
     try {
       await prepareInlineTakeBoxPlaybackRoute()
       await prepareLoudPlaybackBeforeStart(media)
-      await media.play()
-      attachInlineTakeBoxEndedListener(media)
-      wireTakePlaybackAfterStart(media, true)
-      reportTakePlaybackStarted(media)
-      callbacks.onPlaying?.()
+      try {
+        await media.play()
+        attachInlineTakeBoxEndedListener(media)
+        wireTakePlaybackAfterStart(media, true)
+        reportTakePlaybackStarted(media)
+        callbacks.onPlaying?.()
+      } catch {
+        // First play() rejection was previously fatal — the button silently
+        // reverted to "Play" with no explanation, so the user had to notice
+        // and tap again. Mirror playTakeMediaAudible's muted-retry fallback
+        // (the same rejection is often transient/autoplay-policy-shaped and
+        // resolves once muted) before giving up for real.
+        media.muted = true
+        await media.play()
+        media.muted = false
+        media.volume = 1
+        attachInlineTakeBoxEndedListener(media)
+        wireTakePlaybackAfterStart(media, true)
+        reportTakePlaybackStarted(media)
+        callbacks.onPlaying?.()
+      }
     } catch (error: unknown) {
       console.log(error)
       callbacks.onFailure?.(error)

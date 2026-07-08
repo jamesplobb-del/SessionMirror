@@ -6,7 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import { triggerDragStartHaptic, triggerSelectionHaptic } from '../utils/haptics'
+import { triggerDragStartHaptic, triggerLightHaptic, triggerSelectionHaptic } from '../utils/haptics'
 
 const LONG_PRESS_MS = 200
 const DRAG_THRESHOLD_PX = 8
@@ -194,8 +194,14 @@ export function useDragToPin({
       // Chrome buttons (X/pin/unpin) layered over the drag surface must never
       // arm a drag — bail defensively on any interactive-element ancestor,
       // not just <button>, so this holds regardless of the exact element the
-      // button library renders.
-      if ((event.target as HTMLElement).closest('button, a, label, input, [role="button"], [data-drag-ignore]')) return
+      // button library renders. The drag surface itself carries role="button"
+      // for accessibility, and Element.closest() matches the starting element
+      // before ascending — exclude currentTarget or every press on the drag
+      // surface would bail out here before the gesture ever starts.
+      const interactiveAncestor = (event.target as HTMLElement).closest(
+        'button, a, label, input, [role="button"], [data-drag-ignore]',
+      )
+      if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return
 
       clearLongPressTimer()
       startRef.current = { x: event.clientX, y: event.clientY }
@@ -307,13 +313,20 @@ export function useDragToPin({
         !draggingRef.current &&
         distance < DRAG_THRESHOLD_PX
       ) {
-        onTap?.()
+        if (onTap) {
+          // The drag-layer variant (role="button" div) has no Pressable
+          // wrapper to supply tap haptics, unlike the plain-onExpand fallback
+          // — give the tap-to-open-fullscreen gesture the same feedback here.
+          if (hapticFeedback) triggerLightHaptic()
+          onTap()
+        }
       }
 
       reset()
     },
     [
       clearLongPressTimer,
+      hapticFeedback,
       onDelete,
       onPin,
       onTap,
