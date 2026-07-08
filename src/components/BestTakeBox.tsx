@@ -440,7 +440,7 @@ function BestTakeBox({
 
   const shellClass = isFill
     ? 'relative h-full w-full min-h-0 overflow-hidden'
-    : 'pip-video-container group relative aspect-video'
+    : `pip-video-container${hasYoutube ? ' pip-video-container--youtube' : ''} group relative aspect-video`
 
   const innerClass = isFill
     ? `group relative z-0 h-full w-full overflow-hidden ${mediaStageClass} ring-1 ring-amber-400/50 ${
@@ -541,14 +541,16 @@ function BestTakeBox({
 
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
-          <span
-            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
-              isFill ? 'px-2 py-0.5 text-[10px]' : ''
-            }`}
-            style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
-          >
-            Best Take
-          </span>
+          {!(hasYoutube && !isFill) ? (
+            <span
+              className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
+                isFill ? 'px-2 py-0.5 text-[10px]' : ''
+              }`}
+              style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
+            >
+              Best Take
+            </span>
+          ) : null}
 
           {hasYoutube ? (
             <div
