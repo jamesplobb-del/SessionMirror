@@ -451,6 +451,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const audioEnhancerSettingsRef = useRef(settings.audioEnhancerSettings)
   audioEnhancerSettingsRef.current = settings.audioEnhancerSettings
   const pendingChallengerIdRef = useRef<string | null>(null)
+  /** User closed the current-take box — skip auto-fill until the next recording. */
+  const challengerUserDismissedRef = useRef(false)
   const reloadTakesGenerationRef = useRef(0)
   const takesRef = useRef<Take[]>([])
   const pendingAutoPlaybackRef = useRef(false)
@@ -900,7 +902,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setChallengerId((current) => {
         if (!showTakeCardsRef.current) return null
         if (current && rows.some((row) => row.id === current)) return current
-        if (current && pendingChallengerIdRef.current === current) return current
+
+        const pendingId = pendingChallengerIdRef.current
+        if (pendingId && rows.some((row) => row.id === pendingId)) {
+          challengerUserDismissedRef.current = false
+          return pendingId
+        }
+
+        if (challengerUserDismissedRef.current) return null
+
         return defaultChallengerId
       })
 
@@ -940,6 +950,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setTakes([])
       setBenchmarkId(null)
       setChallengerId(null)
+      challengerUserDismissedRef.current = false
       setLibraryItems([])
       setBenchmarkBinding(null)
       await reloadProjectTakes(projectId)
@@ -954,6 +965,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setTakes([])
     setBenchmarkId(null)
     setChallengerId(null)
+    challengerUserDismissedRef.current = false
   }, [])
 
   const handleDeleteProject = useCallback(
@@ -1079,6 +1091,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const projectId = activeProjectIdRef.current
 
     if (showTakeCardsRef.current || shouldAutoPlay) {
+      challengerUserDismissedRef.current = false
       pendingChallengerIdRef.current = takeId
       setChallengerId(takeId)
     }
@@ -1396,8 +1409,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (isPlaybackRouteHoldActive()) return
     void syncNativeCameraSessionState({
       previewActive:
-        (ready && recordingMode === 'video') || nativeLivePreviewActive,
-      recordingActive: isRecording,
+        recordingMode === 'video' && (ready || nativeLivePreviewActive),
+      recordingActive: isRecording && recordingMode === 'video',
     })
   }, [isRecording, nativeLivePreviewActive, ready, recordingMode])
 
@@ -2070,6 +2083,28 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     requestCameraAccess('audio')
   }, [requestCameraAccess])
 
+  const micStreamIsLiveForTuner = useCallback(() => {
+    return Boolean(
+      streamRef.current?.getAudioTracks().some(
+        (track) => track.readyState === 'live' && track.enabled,
+      ),
+    )
+  }, [])
+
+  const handleRequestTunerMicStream = useCallback(() => {
+    if (isRecording) return
+    if (!micStreamIsLiveForTuner()) {
+      void reacquireStreamForAudioRoute()
+      return
+    }
+    requestCameraAccess('audio')
+  }, [
+    isRecording,
+    micStreamIsLiveForTuner,
+    reacquireStreamForAudioRoute,
+    requestCameraAccess,
+  ])
+
   const schedulePitchTrackerCommit = useCallback(
     (enabled: boolean) => {
       if (pitchCommitTimerRef.current !== null) {
@@ -2433,8 +2468,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     if (!isAudioPracticeTunerTab || quickSettingsOpen || isRecording) return
 
-    requestCameraAccess('audio')
-  }, [isAudioPracticeTunerTab, isRecording, quickSettingsOpen, requestCameraAccess, streamGeneration])
+    handleRequestTunerMicStream()
+  }, [
+    handleRequestTunerMicStream,
+    isAudioPracticeTunerTab,
+    isRecording,
+    quickSettingsOpen,
+    streamGeneration,
+  ])
 
   const pitchAudioHudLock =
     showPitch &&
@@ -2509,7 +2550,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
     setChallengerId((current) => {
       if (current && takes.some((take) => take.id === current)) return current
-      if (current && pendingChallengerIdRef.current === current) return current
+
+      const pendingId = pendingChallengerIdRef.current
+      if (pendingId && takes.some((take) => take.id === pendingId)) {
+        challengerUserDismissedRef.current = false
+        return pendingId
+      }
+
+      if (challengerUserDismissedRef.current) return null
+
       const candidate = takes.find((take) => take.id !== benchmarkId)
       return candidate?.id ?? null
     })
@@ -2656,6 +2705,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handlePinChallenger = useCallback(
     (id: string) => {
       pausePipVideos()
+      challengerUserDismissedRef.current = false
       setChallengerId(id)
     },
     [pausePipVideos]
@@ -2904,6 +2954,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void releaseTakePlaybackAudio()
     stabilizeViewportAfterMediaInteraction()
     setChallengerPipPlaying(false)
+    challengerUserDismissedRef.current = true
+    pendingChallengerIdRef.current = null
     setChallengerId(null)
   }, [
     autoPlaybackTakeId,
@@ -3446,9 +3498,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         droneVolume={settings.droneVolume}
                         droneWaveform={settings.droneWaveform}
                         hapticFeedback={settings.hapticFeedback}
-                        onRequestMicStream={() => {
-                          requestCameraAccess('audio')
-                        }}
+                        onRequestMicStream={handleRequestTunerMicStream}
                       />
                     </div>
                   )}

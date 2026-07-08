@@ -278,13 +278,15 @@ export interface PitchTrackerOptions {
   suppressUntilRef?: RefObject<number>
   /** Last-resort live tuner fallback when the app-owned shared mic stream has not attached. */
   allowStandaloneMicFallback?: boolean
+  /** Camera-mode widget only — pull PCM from the native AVCapture audio tap. */
+  preferNativeAudioTap?: boolean
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
   return Boolean(
     stream &&
       stream.active &&
-      stream.getAudioTracks().some((track) => track.readyState === 'live'),
+      stream.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled),
   )
 }
 
@@ -1364,6 +1366,7 @@ export function useLivePitchTracker(
   const tunerInstrument = options.tunerInstrument ?? 'voice'
   const suppressUntilRef = options.suppressUntilRef
   const allowStandaloneMicFallback = options.allowStandaloneMicFallback ?? false
+  const preferNativeAudioTap = options.preferNativeAudioTap ?? false
   const profile = getTunerProfile(tunerInstrument)
   const profileRef = useRef(profile)
   profileRef.current = profile
@@ -1389,6 +1392,8 @@ export function useLivePitchTracker(
   realtimeModeRef.current = realtimeMode
   const micStreamRefStable = useRef(micStreamRef)
   micStreamRefStable.current = micStreamRef
+  const preferNativeAudioTapRef = useRef(preferNativeAudioTap)
+  preferNativeAudioTapRef.current = preferNativeAudioTap
   const mediaRefStable = useRef(mediaRef)
   mediaRefStable.current = mediaRef
   const framesSinceAttachAttemptRef = useRef(0)
@@ -1601,7 +1606,11 @@ export function useLivePitchTracker(
           // from its audio tap instead of WebKit getUserMedia — the native
           // session starves WebKit mic tracks, which is exactly why the old
           // path went silent after the first take.
-          if (!nativeTapUnavailableRef.current && isNativeCameraPreviewActive()) {
+          if (
+            !nativeTapUnavailableRef.current &&
+            preferNativeAudioTapRef.current &&
+            isNativeCameraPreviewActive()
+          ) {
             const graph = await createNativeTapPitchGraph(profileRef.current)
             if (cancelled) {
               safeDisposeMicGraph(graph)
@@ -2274,6 +2283,7 @@ export function useLivePitchTracker(
     suppressUntilRef,
     tunerInstrument,
     allowStandaloneMicFallback,
+    preferNativeAudioTap,
   ])
 
   return { readout, inTuneGlow }

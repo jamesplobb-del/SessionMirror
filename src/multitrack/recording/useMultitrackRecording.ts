@@ -1,27 +1,26 @@
 import { useCallback, useRef, useState } from 'react'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
+import { getAudioHardwareRtl } from '../../utils/nativeCameraTest'
 import {
-  beatDurationSec,
+  beatsToMs,
   buildTakeTimingMetadata,
   getRecordingBeatSchedule,
+  micStartLeadMs,
   type MultitrackTakeTimingMetadata,
 } from '../synchronization/multitrackBeatSchedule'
 import type { MultitrackRecordingPhase } from '../types'
 
 export function useMultitrackRecording(options: {
+  /** Arm the recording target (exclude panel, refs) — runs on every Record tap. */
+  onPrepareRecording?: (panelId: string) => void
   /**
-   * Fires at count-in start and must actually start the camera. The returned
-   * promise resolves true only once recording is confirmed (native
-   * didStartRecording) — a false/reject aborts the count-in with an error
-   * instead of marching into a dead-end 'recording' phase.
+   * Start the microphone / camera roll. Track 1: immediately on Record.
+   * Overdub: on session beat 5 (scheduled with RTL lead).
    */
-  onCountInStart?: (panelId: string) => Promise<boolean> | boolean | void
+  onStartMicRecording?: () => Promise<boolean> | boolean | void
   /** Load/prime reference media paused at timeline 0 — must finish before the click begins. */
   onArmPlayback?: () => Promise<void>
-  /**
-   * Start Track 1 reference playback on overdub beat 5. Resolves true once
-   * playback is confirmed, or when there is nothing to play.
-   */
+  /** Start Track 1 reference on overdub session beat 5. */
   onStartReferencePlayback?: () => Promise<boolean>
   /** Prime audio session + metronome graph before count-in. */
   onPrepareCountInAudio?: () => Promise<boolean>
@@ -29,12 +28,12 @@ export function useMultitrackRecording(options: {
   onCountInComplete?: (panelId: string) => void
   onError?: (message: string) => void
   requiresReferencePlayback?: () => boolean
-  /** Take id on panel a — stored as referenceTrackId for overdub takes. */
   getReferenceTakeId?: () => string | null
   recoverFromInterrupt?: () => void
 }) {
   const {
-    onCountInStart,
+    onPrepareRecording,
+    onStartMicRecording,
     onArmPlayback,
     onStartReferencePlayback,
     onPrepareCountInAudio,
@@ -103,20 +102,38 @@ export function useMultitrackRecording(options: {
     setPhase('review')
   }, [clearPulseUnsub, clearTimer])
 
-  /** Visual-only count-in (click disabled). Intervals are BPM-derived, not arbitrary. */
+  const startMic = useCallback(async () => {
+    const started = (await onStartMicRecording?.()) ?? true
+    if (started === false && activeRef.current) {
+      fail("Recording couldn't start. Check the camera and try again.")
+      return false
+    }
+    return true
+  }, [fail, onStartMicRecording])
+
+  /** Visual-only count-in (click disabled). Intervals are BPM-derived. */
   const runVisualBeatCountIn = useCallback(
     async (
-      countInBeats: number,
-      performanceStartBeat: number,
-      referenceStartBeat: number | null,
-      beatMs: number,
+      schedule: ReturnType<typeof getRecordingBeatSchedule>,
+      bpm: number,
+      rtlMs: number,
       onReferenceBeat?: () => Promise<boolean>,
     ) => {
+      const { countInBeats, micStartBeat, performanceStartBeat, referenceStartBeat } = schedule
       if (countInBeats <= 0) return
+      const beatMs = beatsToMs(1, bpm)
       setPhase('count-in')
+
       for (let beat = 1; beat < performanceStartBeat; beat += 1) {
         if (!activeRef.current) return
         setCountInRemaining(Math.max(1, countInBeats - beat + 1))
+
+        if (schedule.isOverdub && beat === micStartBeat - 1) {
+          timerRef.current = window.setTimeout(() => {
+            void startMic()
+          }, micStartLeadMs(bpm, rtlMs))
+        }
+
         if (onReferenceBeat && referenceStartBeat !== null && beat === referenceStartBeat) {
           const started = await onReferenceBeat()
           if (requiresReferencePlayback?.() && started === false && activeRef.current) {
@@ -124,64 +141,76 @@ export function useMultitrackRecording(options: {
             return
           }
         }
+
         await new Promise<void>((resolve) => {
           timerRef.current = window.setTimeout(resolve, beatMs)
         })
       }
+      setCountInRemaining(0)
     },
-    [fail, requiresReferencePlayback],
+    [fail, requiresReferencePlayback, startMic],
   )
 
-  /**
-   * Pulse-locked count-in tied to the metronome engine. Reference playback
-   * (overdub only) starts on beat 5; performance enters on beat 5 (Track 1)
-   * or beat 9 (overdub boxes 2–6).
-   */
   const runBeatScheduledCountIn = useCallback(
     async (
-      countInBeats: number,
-      performanceStartBeat: number,
-      referenceStartBeat: number | null,
+      schedule: ReturnType<typeof getRecordingBeatSchedule>,
+      bpm: number,
+      rtlMs: number,
       clickEnabled: boolean,
       onReferenceBeat?: () => Promise<boolean>,
     ) => {
+      const { countInBeats, micStartBeat, performanceStartBeat, referenceStartBeat } = schedule
       if (countInBeats <= 0) return
 
       setPhase('count-in')
       setCountInRemaining(countInBeats)
 
-      const beatMs = beatDurationSec(sharedMetronomeEngine.getSnapshot().bpm) * 1000
-
       if (!clickEnabled) {
-        await runVisualBeatCountIn(
-          countInBeats,
-          performanceStartBeat,
-          referenceStartBeat,
-          beatMs,
-          referenceStartBeat !== null ? onReferenceBeat : undefined,
-        )
+        await runVisualBeatCountIn(schedule, bpm, rtlMs, onReferenceBeat)
         return
       }
 
       await new Promise<void>((resolve) => {
+        let pulsesHeard = 0
+        let micStarted = false
         let referenceStarted = false
 
-        pulseUnsubRef.current = sharedMetronomeEngine.subscribePulse((beatIndex) => {
+        const scheduleMicOnBeat = () => {
+          if (micStarted || micStartBeat <= 1) return
+          micStarted = true
+          const leadMs = micStartLeadMs(bpm, rtlMs)
+          timerRef.current = window.setTimeout(() => {
+            void startMic().then((ok) => {
+              if (!ok && activeRef.current) {
+                clearPulseUnsub()
+                resolve()
+              }
+            })
+          }, leadMs)
+        }
+
+        pulseUnsubRef.current = sharedMetronomeEngine.subscribePulse(() => {
           if (!activeRef.current) {
             clearPulseUnsub()
             resolve()
             return
           }
 
-          const beatNumber = beatIndex + 1
+          pulsesHeard += 1
 
-          if (beatNumber <= countInBeats) {
-            setCountInRemaining(countInBeats - beatNumber + 1)
+          if (pulsesHeard <= countInBeats) {
+            setCountInRemaining(countInBeats - pulsesHeard + 1)
+          } else {
+            setCountInRemaining(0)
+          }
+
+          if (micStartBeat > 1 && pulsesHeard === micStartBeat - 1) {
+            scheduleMicOnBeat()
           }
 
           if (
             referenceStartBeat !== null &&
-            beatNumber === referenceStartBeat &&
+            pulsesHeard === referenceStartBeat &&
             !referenceStarted
           ) {
             referenceStarted = true
@@ -194,7 +223,8 @@ export function useMultitrackRecording(options: {
             })
           }
 
-          if (beatNumber === performanceStartBeat) {
+          if (pulsesHeard === performanceStartBeat) {
+            setCountInRemaining(0)
             clearPulseUnsub()
             resolve()
           }
@@ -209,7 +239,7 @@ export function useMultitrackRecording(options: {
         })
       })
     },
-    [clearPulseUnsub, fail, requiresReferencePlayback, runVisualBeatCountIn],
+    [clearPulseUnsub, fail, requiresReferencePlayback, runVisualBeatCountIn, startMic],
   )
 
   const beginCountIn = useCallback((panelId: string, settings?: {
@@ -226,22 +256,19 @@ export function useMultitrackRecording(options: {
     setTargetPanelId(panelId)
     setCountInRemaining(0)
     setPhase('arming')
-    timingRef.current = buildTakeTimingMetadata(panelId, bpm, getReferenceTakeId?.())
 
     void (async () => {
       sharedMetronomeEngine.stop()
+      onPrepareRecording?.(panelId)
 
-      const startResult = onCountInStart?.(panelId)
-      const cameraPromise = Promise.resolve(startResult ?? true)
-        .then((started) => {
-          if (started !== false) return true
-          if (activeRef.current) fail("Recording couldn't start. Check the camera and try again.")
-          return false
-        })
-        .catch(() => {
-          if (activeRef.current) fail("Recording couldn't start. Check the camera and try again.")
-          return false
-        })
+      const rtlMs = await getAudioHardwareRtl()
+      timingRef.current = buildTakeTimingMetadata(panelId, bpm, getReferenceTakeId?.(), rtlMs)
+
+      // Track 1: mic rolls from the instant Record is tapped (captures all 4 counts).
+      if (!schedule.isOverdub) {
+        const micOk = await startMic()
+        if (!micOk || !activeRef.current) return
+      }
 
       try {
         await onArmPlayback?.()
@@ -250,8 +277,7 @@ export function useMultitrackRecording(options: {
         return
       }
 
-      const cameraOk = await cameraPromise
-      if (!cameraOk || !activeRef.current) return
+      if (!activeRef.current) return
 
       if (clickEnabled) {
         sharedMetronomeEngine.applySectionConfig(
@@ -272,17 +298,18 @@ export function useMultitrackRecording(options: {
       }
 
       await runBeatScheduledCountIn(
-        schedule.countInBeats,
-        schedule.performanceStartBeat,
-        schedule.referenceStartBeat,
+        schedule,
+        bpm,
+        rtlMs,
         clickEnabled,
         schedule.referenceStartBeat !== null ? onStartReferencePlayback : undefined,
       )
       if (!activeRef.current) return
 
+      setCountInRemaining(0)
+      setPhase('recording')
       await onPerformanceStart?.()
       if (!activeRef.current) return
-      setPhase('recording')
       onCountInComplete?.(panelId)
     })()
   }, [
@@ -290,11 +317,12 @@ export function useMultitrackRecording(options: {
     getReferenceTakeId,
     onArmPlayback,
     onCountInComplete,
-    onCountInStart,
     onPerformanceStart,
     onPrepareCountInAudio,
+    onPrepareRecording,
     onStartReferencePlayback,
     runBeatScheduledCountIn,
+    startMic,
   ])
 
   return {

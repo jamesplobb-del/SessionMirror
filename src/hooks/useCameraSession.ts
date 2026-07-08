@@ -1426,7 +1426,8 @@ export function useCameraSession({
   }
 
   const shouldUseNativeExperimentalRecording = useCallback(
-    () => isNativeVideoRecordingEnabled(),
+    () =>
+      isNativeVideoRecordingEnabled() && recordingModeRef.current === 'video',
     [isNativeVideoRecordingEnabled],
   )
 
@@ -1871,13 +1872,17 @@ export function useCameraSession({
 
       recordingModeRef.current = mode
 
+      if (mode === 'audio' && nativePreviewActiveRef.current) {
+        void stopNativeVideoBridge()
+      }
+
       if (!softAudioHandoff) {
         setReady(false)
       }
       setStreamGeneration((generation) => generation + 1)
       setRecordingMode(mode)
     },
-    [cancelScheduledRelease, detachAllPreviewTargets, isRecording, stopStreamTracks],
+    [cancelScheduledRelease, detachAllPreviewTargets, isRecording, stopNativeVideoBridge, stopStreamTracks],
   )
 
   const suspendCameraForBackground = useCallback(() => {

@@ -290,13 +290,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const track1TakeId = track1Panel?.kind === 'performance' ? track1Panel.take?.id ?? null : null
 
   const recording = useMultitrackRecording({
-    onCountInStart: (panelId) => {
+    onPrepareRecording: (panelId) => {
       recordingTargetPanelIdRef.current = panelId
       sync.setExcludePanelId(panelId)
       const overdub = isOverdubPanel(panelId)
       sync.setReferencePanelIds(overdub ? [TRACK1_PANEL_ID] : null)
-      return onStartRecording()
     },
+    onStartMicRecording: () => onStartRecording(),
     onArmPlayback: async () => {
       sync.setExcludePanelId(recordingTargetPanelIdRef.current)
       const overdub = isOverdubPanel(recordingTargetPanelIdRef.current ?? '')

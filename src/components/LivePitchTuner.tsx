@@ -406,6 +406,7 @@ function LivePitchTunerAudio({
       realtimeMode: true,
       suppressUntilRef: droneAnalysisSuppressUntilRef,
       allowStandaloneMicFallback: liveMicOnly,
+      preferNativeAudioTap: false,
     }),
     [liveMicOnly, micStreamRef, tunerInstrument],
   )
@@ -524,6 +525,7 @@ export default function LivePitchTuner({
       continuousScroll: liveMicWidget || widgetContinuousScroll,
       tunerInstrument,
       realtimeMode: isWidget,
+      preferNativeAudioTap: liveMicWidget,
     },
   )
   if (isAudio) {

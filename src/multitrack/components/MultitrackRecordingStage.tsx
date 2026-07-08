@@ -302,9 +302,9 @@ export default function MultitrackRecordingStage({
         <div className="multitrack-recording-stage__count multitrack-recording-stage__count--arming">
           …
         </div>
-      ) : phase === 'count-in' ? (
+      ) : phase === 'count-in' && countInRemaining > 0 ? (
         <div className="multitrack-recording-stage__count">
-          {countInRemaining > 0 ? Math.max(1, countInRemaining) : 'NOW'}
+          {countInRemaining}
         </div>
       ) : null}
 
@@ -399,7 +399,7 @@ export default function MultitrackRecordingStage({
         )}
         {phase === 'arming' ? (
           <p className="multitrack-recording-stage__hint">Loading reference…</p>
-        ) : phase === 'count-in' ? (
+        ) : phase === 'count-in' && countInRemaining > 0 ? (
           <p className="multitrack-recording-stage__hint">Counting in… tap the button to stop</p>
         ) : isStopping ? (
           <p className="multitrack-recording-stage__hint">Saving…</p>
