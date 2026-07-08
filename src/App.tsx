@@ -3806,6 +3806,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     hapticFeedback={settings.hapticFeedback}
                     isRecording={isRecording}
                     isStopping={isStopping}
+                    elapsed={elapsed}
                     nativeLivePreviewActive={nativeLivePreviewActive}
                     nativeCameraBridgeEnabled={isNativeCameraPlatform}
                     onClose={handleCloseMultitrack}

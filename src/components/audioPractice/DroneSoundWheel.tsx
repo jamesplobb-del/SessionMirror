@@ -40,24 +40,20 @@ function polarPoint(radius: number, angle: number): { x: number; y: number } {
 }
 
 function segmentPath(index: number): string {
-  const halfStep = SEGMENT_PAD_ANGLE / 2
+  // Add a small angular gap between segments
+  const gap = 0.08
+  const halfStep = (SEGMENT_PAD_ANGLE - gap) / 2
   const mid = noteAngle(index)
   const start = mid - halfStep
   const end = mid + halfStep
-  const innerStart = polarPoint(INNER_NOTE_RADIUS, start)
-  const innerEnd = polarPoint(INNER_NOTE_RADIUS, end)
-  const outerStart = polarPoint(DIAL_OUTER_RADIUS, start)
-  const outerEnd = polarPoint(DIAL_OUTER_RADIUS, end)
-  const largeArc = end - start > Math.PI ? 1 : 0
-
-  return [
-    `M ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
-    `L ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
-    `A ${DIAL_OUTER_RADIUS} ${DIAL_OUTER_RADIUS} 0 ${largeArc} 1 ${outerEnd.x.toFixed(2)} ${outerEnd.y.toFixed(2)}`,
-    `L ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
-    `A ${INNER_NOTE_RADIUS} ${INNER_NOTE_RADIUS} 0 ${largeArc} 0 ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
-    'Z',
-  ].join(' ')
+  
+  // Draw stroke along the middle of what used to be the wedge
+  const r = (INNER_NOTE_RADIUS + DIAL_OUTER_RADIUS) / 2
+  
+  const p1 = polarPoint(r, start)
+  const p2 = polarPoint(r, end)
+  
+  return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${r} ${r} 0 0 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
 }
 
 function pitchClassFromWheelPoint(rect: DOMRect, clientX: number, clientY: number): number | null {
@@ -186,12 +182,7 @@ export default function DroneSoundWheel({
           viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`}
           aria-hidden
         >
-          <circle
-            className="drone-sound-wheel__ring-circle"
-            cx={DIAL_CENTER}
-            cy={DIAL_CENTER}
-            r={DIAL_OUTER_RADIUS}
-          />
+
           {DRONE_NOTE_STRIP.map(({ pitchClass }, index) => {
             const active = activeNotes.includes(pitchClass)
             const glissando = glissandoPitch === pitchClass

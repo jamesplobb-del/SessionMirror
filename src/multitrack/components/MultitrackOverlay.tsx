@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { ChevronLeft, FileMusic, FolderOpen, Music4, Share2, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
 import type { Take } from '../../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -42,6 +42,8 @@ interface MultitrackOverlayProps {
   isRecording: boolean
   /** True while a native recording stop is still settling — a new recording must not start yet. */
   isStopping: boolean
+  /** Recording elapsed seconds from the camera session (stage top-bar timer). */
+  elapsed: number
   /** Native iOS camera bridge is delivering live frames — feeds the recording stage's own preview canvas. */
   nativeLivePreviewActive?: boolean
   /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
@@ -83,6 +85,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     hapticFeedback,
     isRecording,
     isStopping,
+    elapsed,
     nativeLivePreviewActive,
     nativeCameraBridgeEnabled,
     onClose,
@@ -258,7 +261,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     },
     onPerformanceStart: async () => {
       await sync.startPrepared()
-      await startBackingPlayback()
+      // Backing muted from the monitor chips = silent for this take only.
+      if (!monitorMutesRef.current.has('backing')) {
+        await startBackingPlayback()
+      }
     },
     onError: (message) => {
       setPendingReview(null)
@@ -317,7 +323,18 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     assignTakeToPanel(pendingReview.panelId, pendingReview.take)
     setPendingReview(null)
     recording.cancel()
-  }, [assignTakeToPanel, pendingReview, recording])
+    // One-time discoverability nudge: recordings auto-save to the vault.
+    try {
+      if (!window.localStorage.getItem('sm.multitrack.vaultTipShown')) {
+        window.localStorage.setItem('sm.multitrack.vaultTipShown', '1')
+        void showAlert({
+          message: 'Saved! Every multitrack recording also lands in your Take Vault automatically.',
+        })
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, [assignTakeToPanel, pendingReview, recording, showAlert])
 
   const handleRetryTake = useCallback(() => {
     if (!pendingReview) return
@@ -367,6 +384,57 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       : session.backing.kind === 'audio'
         ? session.backing.fileName
         : session.backing.label || 'YouTube'
+
+  // ── Monitor mix ("You'll hear" chips) ────────────────────────────────────
+  // Per-take mute set: panel ids plus the 'backing'/'click' sentinels. All-on
+  // by default; reset whenever the stage opens for a different tile.
+  const [monitorMutes, setMonitorMutes] = useState<Set<string>>(() => new Set())
+  const monitorMutesRef = useRef(monitorMutes)
+  monitorMutesRef.current = monitorMutes
+
+  useEffect(() => {
+    setMonitorMutes(new Set())
+  }, [activePanelId])
+
+  // Apply panel monitor mutes to the live sync elements while the stage is open.
+  useEffect(() => {
+    if (!activePanelId) {
+      sync.setMonitorMutedPanelIds([])
+      return
+    }
+    sync.setMonitorMutedPanelIds(
+      [...monitorMutes].filter((id) => id !== 'backing' && id !== 'click'),
+    )
+  }, [activePanelId, monitorMutes, sync])
+
+  const toggleMonitorSource = useCallback((id: string) => {
+    setMonitorMutes((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const monitorSources = useMemo(() => {
+    const sources: Array<{ id: string; label: string; muted: boolean }> = []
+    session.panels.forEach((panel, index) => {
+      if (panel.kind !== 'performance' || !panel.take) return
+      if (panel.id === activePanelId) return
+      sources.push({
+        id: panel.id,
+        label: panel.take.name || `Box ${index + 1}`,
+        muted: monitorMutes.has(panel.id),
+      })
+    })
+    if (session.backing.kind !== 'none') {
+      sources.push({ id: 'backing', label: backingChipLabel, muted: monitorMutes.has('backing') })
+    }
+    if (session.practice.clickEnabled) {
+      sources.push({ id: 'click', label: 'Click', muted: monitorMutes.has('click') })
+    }
+    return sources
+  }, [activePanelId, backingChipLabel, monitorMutes, session.backing.kind, session.panels, session.practice.clickEnabled])
 
   return createPortal(
     <>
@@ -450,27 +518,27 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               countInRemaining={recording.countInRemaining}
               isRecording={isRecording}
               isStopping={isStopping}
+              elapsed={elapsed}
               reviewTake={
                 pendingReview && pendingReview.panelId === activePanel.id
                   ? pendingReview.take
                   : activePanel.kind === 'performance' ? activePanel.take : null
               }
-              backing={session.backing}
-              backingAudioRef={backingAudioRef}
-              backingYoutubeIframeRef={backingYoutubeIframeRef}
-              backingPlaying={backingPlaying}
+              monitorSources={monitorSources}
+              onToggleMonitorSource={toggleMonitorSource}
               onPracticeChange={updatePractice}
-              onBackingChange={(backing) => {
-                pauseBacking()
-                updateBacking(backing)
-              }}
-              onToggleBackingPlayback={toggleBackingPlayback}
               onRecord={() => {
                 if (isRecording || isStopping) return
                 recordingTargetPanelIdRef.current = activePanel.id
                 sync.setExcludePanelId(activePanel.id)
-                prepareBackingForRecord()
-                recording.beginCountIn(activePanel.id, session.practice)
+                if (!monitorMutesRef.current.has('backing')) {
+                  prepareBackingForRecord()
+                }
+                recording.beginCountIn(activePanel.id, {
+                  ...session.practice,
+                  clickEnabled:
+                    session.practice.clickEnabled && !monitorMutesRef.current.has('click'),
+                })
               }}
               onStop={() => {
                 sync.setExcludePanelId(null)
@@ -489,6 +557,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   setPendingReview(null)
                 }
                 sync.setExcludePanelId(null)
+                sync.setMonitorMutedPanelIds([])
                 sync.pause()
                 pauseBacking()
                 recording.cancel()

@@ -1127,3 +1127,519 @@
   padding: 0.75rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Multitrack pivot — "3 taps to first recording"
+   Canvas: header Share · mix strip · tile sheets · layout strip · mixer.
+   Stage: minimal top bar · monitor chips · big record button · count-in sheet.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Canvas header ── */
+.multitrack-overlay__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.multitrack-overlay__header h1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.multitrack-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.35rem;
+  padding: 0 0.95rem;
+  border-radius: 9999px;
+  background: #1c1917;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.multitrack-share-btn:disabled {
+  opacity: 0.35;
+}
+
+/* ── Mix strip (project audio sources) ── */
+.multitrack-mix-strip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.1rem 0.1rem 0.35rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.multitrack-mix-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.multitrack-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2rem;
+  padding: 0 0.7rem;
+  border-radius: 9999px;
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  color: #57534e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.multitrack-source-chip--active {
+  border-color: #1c1917;
+  color: #1c1917;
+}
+
+.multitrack-source-chip__label {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.multitrack-source-chip__dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 9999px;
+  background: #22c55e;
+}
+
+.multitrack-source-chip__state {
+  font-size: 0.6875rem;
+  color: #a8a29e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.multitrack-source-chip--active .multitrack-source-chip__state {
+  color: #22c55e;
+}
+
+/* ── Toolbar row 2: layout strip + mixer ── */
+.multitrack-toolbar__row2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.multitrack-layout-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.multitrack-layout-strip__item {
+  width: 2.6rem;
+  height: 2.1rem;
+  border-radius: 0.55rem;
+  border: 1px solid #e7e5e4;
+  background: #fafaf9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+}
+
+.multitrack-layout-strip__item--active {
+  border-color: #1c1917;
+  background: #1c1917;
+}
+
+.multitrack-layout-strip__glyph {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+}
+
+.multitrack-layout-strip__cell {
+  border-radius: 2px;
+  background: #d6d3d1;
+  min-width: 3px;
+  min-height: 3px;
+}
+
+.multitrack-layout-strip__item--active .multitrack-layout-strip__cell {
+  background: #fff;
+}
+
+/* ── Bottom sheets (light canvas + dark stage variants) ── */
+.multitrack-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.25rem 1rem calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  overflow-y: auto;
+}
+
+.multitrack-sheet__title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #1c1917;
+}
+
+.multitrack-sheet--dark .multitrack-sheet__title {
+  color: #fafaf9;
+}
+
+.multitrack-sheet__empty {
+  font-size: 0.8125rem;
+  color: #a8a29e;
+  padding: 0.5rem 0 1rem;
+}
+
+.multitrack-sheet__primary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.multitrack-sheet__primary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 5.25rem;
+  border-radius: 1rem;
+  border: 1px solid #e7e5e4;
+  background: #fafaf9;
+  color: #1c1917;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.multitrack-sheet__primary--record {
+  background: #1c1917;
+  border-color: #1c1917;
+  color: #fff;
+}
+
+.multitrack-sheet__more-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.multitrack-sheet__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.35rem;
+  padding: 0 0.85rem;
+  border-radius: 9999px;
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  color: #57534e;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.multitrack-sheet__more--danger {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+/* ── Mixer rows ── */
+.multitrack-mixer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+}
+
+.multitrack-mixer-row__mute {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  color: #57534e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.multitrack-mixer-row__mute.is-muted {
+  background: #1c1917;
+  border-color: #1c1917;
+  color: #fff;
+}
+
+.multitrack-mixer-row__name {
+  flex: 0 0 auto;
+  width: 6.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.multitrack-mixer-row__slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: #1c1917;
+}
+
+/* ── Stage: top bar ── */
+.multitrack-recording-stage__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.multitrack-recording-stage__title {
+  flex: 1;
+  text-align: center;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.multitrack-recording-stage__header-spacer {
+  width: 2.25rem;
+  flex-shrink: 0;
+}
+
+.multitrack-recording-stage__rec {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.multitrack-recording-stage__rec-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 9999px;
+  background: #ef4444;
+  animation: multitrack-rec-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes multitrack-rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── Stage: monitor mix chips ── */
+.multitrack-monitor-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.25rem 1rem 0;
+}
+
+.multitrack-monitor-row__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.multitrack-monitor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.6rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  max-width: 10rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.multitrack-monitor-chip--muted {
+  color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+  text-decoration: line-through;
+}
+
+.multitrack-headphone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.multitrack-headphone-chip--on {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+}
+
+.multitrack-headphone-chip--warn {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
+/* ── Stage: bottom controls ── */
+.multitrack-recording-stage__actions--live {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  width: 100%;
+}
+
+.multitrack-recording-stage__side-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 4rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.multitrack-recording-stage__side-btn:disabled {
+  opacity: 0.35;
+}
+
+.multitrack-recording-stage__record-big {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 9999px;
+  border: 4px solid rgba(255, 255, 255, 0.92);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.multitrack-recording-stage__record-big:disabled {
+  opacity: 0.4;
+}
+
+.multitrack-recording-stage__record-glyph {
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 9999px;
+  background: #ef4444;
+  transition: border-radius 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+.multitrack-recording-stage__record-big.is-recording .multitrack-recording-stage__record-glyph {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.3rem;
+}
+
+.multitrack-recording-stage__actions--review {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.multitrack-recording-stage__retry,
+.multitrack-recording-stage__preview-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.9rem;
+  padding: 0 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.multitrack-recording-stage__confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.9rem;
+  padding: 0 1.4rem;
+  border-radius: 9999px;
+  background: #22c55e;
+  color: #052e16;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.multitrack-recording-stage__hint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  padding-top: 0.4rem;
+}
+
+/* ── Count-in settings sheet (dark) ── */
+.multitrack-countin-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.multitrack-countin-sheet__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e7e5e4;
+}
+
+.multitrack-countin-sheet__row input[type='number'] {
+  width: 4.5rem;
+  height: 2.25rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  text-align: center;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+/* ── Persistent backing media host (invisible) ── */
+.multitrack-backing-media-host {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0.01;
+  pointer-events: none;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+}
