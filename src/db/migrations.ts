@@ -8,6 +8,7 @@ const TAKE_COLUMN_MIGRATIONS = [
   "ALTER TABLE takes ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
   "ALTER TABLE takes ADD COLUMN recording_orientation TEXT NOT NULL DEFAULT 'portrait'",
   'ALTER TABLE takes ADD COLUMN enhancer_baked INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE takes ADD COLUMN timeline_offset_ms INTEGER NOT NULL DEFAULT 0',
 ] as const
 
 /** Idempotent column adds for existing installs. */

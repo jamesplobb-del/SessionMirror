@@ -139,6 +139,17 @@ export interface NativeMultitrackRenderResult {
   path: string
 }
 
+export interface NativeTakeAlignmentResult {
+  refinedOffsetMs: number
+  residualMs: number
+  confidence: number
+  applied: boolean
+}
+
+export interface NativeWaveformPeaksResult {
+  peaks: number[]
+}
+
 export interface NativeExperimentalAudioSnapshot extends AudioRouteSnapshot {
   selectedAudioEngine: string
   enabled: boolean
@@ -216,7 +227,13 @@ export interface BestTakeAudioPluginType {
   renderMultitrackVideo(options: {
     aspectRatio: string
     durationSeconds: number
-    sources: Array<{ id: string; path: string; rect: NativeRectPercent }>
+    sources: Array<{
+      id: string
+      path: string
+      rect: NativeRectPercent
+      trimStartSec?: number
+      trimEndSec?: number
+    }>
     sheetMusic: { path: string; fileType: string; rect: NativeRectPercent } | null
     backingAudio: { path: string; gain: number } | null
   }): Promise<NativeMultitrackRenderResult>
@@ -256,7 +273,17 @@ export interface BestTakeAudioPluginType {
     mediaType: 'video' | 'audio'
     params: Record<string, number>
   }): Promise<{ enhanced: boolean; duration: number }>
-  stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult>
+  stopNativeCameraRecording(options?: { trimStartMs?: number }): Promise<NativeCameraRecordingStopResult>
+  getAudioHardwareRtl(): Promise<{ rtlMs: number }>
+  getAudioOutputLatencyMs(): Promise<{ latencyMs: number }>
+  computeTakeAlignment(options: {
+    path: string
+    bpm: number
+    countInBeats: number
+    deterministicOffsetMs: number
+    searchMs?: number
+  }): Promise<NativeTakeAlignmentResult>
+  extractWaveformPeaks(options: { path: string; barCount: number }): Promise<NativeWaveformPeaksResult>
   playNativeCameraTestPostProcess(options: { url: string }): Promise<NativeCameraPostProcessPlaybackResult>
   stopNativeCameraTestPostProcess(): Promise<void>
   /** Native pre-warmed Taptic Engine impact. iOS only. */

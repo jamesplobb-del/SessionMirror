@@ -68,7 +68,9 @@ async function copyTakeToExportCache(relativeFilePath: string): Promise<string> 
 }
 
 /** Native file:// URI for Media.saveVideo — never pass capacitor:// playback URLs. */
-export async function resolveNativeFileUri(take: Take): Promise<string | null> {
+export async function resolveNativeFileUri(
+  take: Pick<Take, 'filePath' | 'videoUrl'>,
+): Promise<string | null> {
   if (take.filePath) {
     try {
       await Filesystem.stat({

@@ -67,6 +67,8 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
             take: existing.take,
             volume: existing.volume,
             muted: existing.muted,
+            trimStartSec: existing.trimStartSec,
+            trimEndSec: existing.trimEndSec,
           }
         }
       }
@@ -99,6 +101,20 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     }))
   }, [])
 
+  const setPanelTrim = useCallback(
+    (panelId: string, trimStartSec: number, trimEndSec: number | undefined) => {
+      setSession((prev) => ({
+        ...prev,
+        panels: prev.panels.map((panel) =>
+          panel.id === panelId && panel.kind === 'performance'
+            ? { ...panel, trimStartSec, trimEndSec }
+            : panel,
+        ),
+      }))
+    },
+    [],
+  )
+
   const assignSheetMusic = useCallback((panelId: string, asset: SheetMusicAsset | null) => {
     setSession((prev) => ({
       ...prev,
@@ -121,6 +137,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     assignTakeToPanel,
     setPanelVolume,
     setPanelMuted,
+    setPanelTrim,
     assignSheetMusic,
     updatePractice,
     updateBacking,

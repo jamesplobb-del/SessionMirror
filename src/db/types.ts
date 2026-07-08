@@ -26,6 +26,7 @@ export interface VaultTake {
   recordingOrientation?: 'portrait' | 'landscape'
   /** Audio Enhancer was baked into the file after recording — playback must skip the live chain. */
   enhancerBaked: boolean
+  timelineOffsetMs?: number
 }
 
 export interface SaveTakeInput {
@@ -37,6 +38,7 @@ export interface SaveTakeInput {
   mimeType?: string
   mediaType?: MediaType
   recordingOrientation?: 'portrait' | 'landscape'
+  timelineOffsetMs?: number
 }
 
 export interface VaultLibraryItem {
@@ -55,4 +57,6 @@ export interface BenchmarkBindingRow {
   refId: string | null
 }
 
-export type VaultTakeUpdate = Partial<Pick<VaultTake, 'name' | 'rating' | 'notes'>>
+export type VaultTakeUpdate = Partial<
+  Pick<VaultTake, 'name' | 'rating' | 'notes' | 'timelineOffsetMs'>
+>

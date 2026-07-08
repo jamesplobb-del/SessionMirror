@@ -87,6 +87,32 @@ export function safePlayMedia(
     })
 }
 
+/**
+ * Wait until playback is actually advancing — `play()` resolving only means the
+ * pipeline accepted the request, not that audio has reached the speaker.
+ */
+export async function waitForMediaProgressing(
+  media: HTMLMediaElement,
+  options: { timeoutMs?: number; minAdvanceSec?: number } = {},
+): Promise<boolean> {
+  const { timeoutMs = 2500, minAdvanceSec = 0.015 } = options
+  if (media.paused) return false
+
+  const startAt = media.currentTime
+  const deadline = performance.now() + timeoutMs
+
+  while (performance.now() < deadline) {
+    if (!media.paused && media.currentTime - startAt >= minAdvanceSec) {
+      return true
+    }
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
+  }
+
+  return !media.paused && media.currentTime > startAt
+}
+
 /** Wait until media has enough data to play (hands-free auto-playback after recording). */
 export function waitForMediaReady(
   media: HTMLMediaElement,

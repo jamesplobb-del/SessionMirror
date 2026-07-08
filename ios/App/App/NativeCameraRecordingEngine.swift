@@ -53,6 +53,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var startCompletion: ((Result<[String: Any], Error>) -> Void)?
     private var pendingStartResult: [String: Any]?
     private var stopCompletion: ((Result<[String: Any], Error>) -> Void)?
+    private var pendingTrimStartMs: Int = 0
     private var recordedVideoWidth: Int = 0
     private var recordedVideoHeight: Int = 0
     private var activeAudioProfile: NativeCameraAudioSessionProfile = .videoRecording
@@ -124,6 +125,48 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             name: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance()
         )
+        // Diagnostic only (reported "quality degrades after extended use" has
+        // no confirmed root cause yet) — surfaces thermal throttling in the
+        // Xcode console so a repro session tells us whether the OS is
+        // silently dropping frame rate/format under thermal pressure, without
+        // guessing at a fix blind.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThermalStateChange),
+            name: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleThermalStateChange() {
+        let state: String
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: state = "nominal"
+        case .fair: state = "fair"
+        case .serious: state = "serious"
+        case .critical: state = "critical"
+        @unknown default: state = "unknown"
+        }
+        print("[CameraQuality] thermalState changed -> \(state)")
+        logActiveFormatDiagnostics(reason: "thermalStateChange:\(state)")
+    }
+
+    /// Diagnostic snapshot of the live format/AF-AE state — call after any
+    /// suspected quality change to compare against a healthy baseline.
+    private func logActiveFormatDiagnostics(reason: String) {
+        sessionQueue.async { [weak self] in
+            guard let self = self, let input = self.session.inputs.compactMap({ $0 as? AVCaptureDeviceInput }).first(where: { $0.device.hasMediaType(.video) }) else {
+                return
+            }
+            let device = input.device
+            let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+            print(
+                "[CameraQuality][\(reason)] format=\(dims.width)x\(dims.height)" +
+                " minFrameDuration=\(device.activeVideoMinFrameDuration.seconds)" +
+                " focusMode=\(device.focusMode.rawValue) exposureMode=\(device.exposureMode.rawValue)" +
+                " lowLightBoostActive=\(device.isLowLightBoostSupported ? String(device.isLowLightBoostEnabled) : "unsupported")"
+            )
+        }
     }
 
     @objc private func handleAppDidBecomeActive() {
@@ -541,6 +584,30 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         connection.isVideoMirrored = true
     }
 
+    /// Re-asserts continuous autofocus/exposure/white-balance and low-light
+    /// boost. AVFoundation does not guarantee these survive every session
+    /// reconfigure or a long background/foreground cycle — if the device
+    /// drifts to a locked/fixed mode (or thermal throttling changes the
+    /// active format), preview and recordings can look progressively softer
+    /// or show motion blur without any explicit code change. Called both at
+    /// initial session configure and on every preview warm so long-running
+    /// sessions keep re-requesting the sharpest available mode instead of
+    /// silently degrading.
+    private func applyContinuousFocusAndExposure(to device: AVCaptureDevice) {
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+        }
+        if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+            device.whiteBalanceMode = .continuousAutoWhiteBalance
+        }
+        if device.isLowLightBoostSupported {
+            device.automaticallyEnablesLowLightBoostWhenAvailable = true
+        }
+    }
+
     private func resetVideoZoomIfNeeded(useFrontCamera: Bool) {
         let cameraPosition: AVCaptureDevice.Position = useFrontCamera ? .front : .back
         guard let videoDevice = AVCaptureDevice.default(
@@ -556,6 +623,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             if videoDevice.videoZoomFactor > 1.01 {
                 videoDevice.videoZoomFactor = 1.0
             }
+            applyContinuousFocusAndExposure(to: videoDevice)
             videoDevice.unlockForConfiguration()
         } catch {
             /* preview may still be usable */
@@ -675,6 +743,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
         try videoDevice.lockForConfiguration()
         videoDevice.videoZoomFactor = 1.0
+        applyContinuousFocusAndExposure(to: videoDevice)
         videoDevice.unlockForConfiguration()
 
         AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession createVideoInput.begin", details: "device=\(videoDevice.localizedName)")
@@ -792,6 +861,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
         }
 
+        logActiveFormatDiagnostics(reason: "sessionConfigured")
         return movieOutput
     }
 
@@ -973,9 +1043,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         return result
     }
 
-    func stop(completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    func stop(trimStartMs: Int = 0, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
+            self.pendingTrimStartMs = trimStartMs
 
             guard (self.isRecording || self.isStarting), let movieOutput = self.movieOutput else {
                 DispatchQueue.main.async {
@@ -1076,22 +1147,91 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 return
             }
 
-            do {
-                let info = try self.buildStopResult(for: outputFileURL)
-                print("[NativeCameraTest] recording stopped")
-                print("[NativeCameraTest] file saved")
-                for (key, value) in info.sorted(by: { $0.key < $1.key }) {
-                    print("[NativeCameraTest] \(key) = \(value)")
+            let trimStartMs = self.pendingTrimStartMs
+            self.pendingTrimStartMs = 0
+
+            if trimStartMs > 0 {
+                self.trimVideo(sourceURL: outputFileURL, trimStartMs: trimStartMs) { trimResult in
+                    self.sessionQueue.async {
+                        switch trimResult {
+                        case .success(let trimmedURL):
+                            do {
+                                try FileManager.default.removeItem(at: outputFileURL)
+                                try FileManager.default.moveItem(at: trimmedURL, to: outputFileURL)
+                                self.finalizeStopResult(for: outputFileURL, completion: completion)
+                            } catch {
+                                self.restoreAudioSessionAfterTest()
+                                DispatchQueue.main.async {
+                                    completion?(.failure(error))
+                                }
+                            }
+                        case .failure(let trimError):
+                            print("[NativeCameraTest] Trim failed: \(trimError.localizedDescription). Falling back to untrimmed.")
+                            self.finalizeStopResult(for: outputFileURL, completion: completion)
+                        }
+                    }
                 }
-                self.restoreAudioSessionAfterTest()
-                DispatchQueue.main.async {
-                    completion?(.success(info))
-                }
-            } catch {
-                self.restoreAudioSessionAfterTest()
-                DispatchQueue.main.async {
-                    completion?(.failure(error))
-                }
+            } else {
+                self.finalizeStopResult(for: outputFileURL, completion: completion)
+            }
+        }
+    }
+
+    private func trimVideo(sourceURL: URL, trimStartMs: Int, completion: @escaping (Result<URL, Error>) -> Void) {
+        let asset = AVURLAsset(url: sourceURL)
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {
+            completion(.failure(NSError(
+                domain: "NativeCameraTest",
+                code: 20,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create AVAssetExportSession for passthrough trim"]
+            )))
+            return
+        }
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("trimmed-\(UUID().uuidString).mp4")
+        try? FileManager.default.removeItem(at: outputURL)
+
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = true
+
+        let startTime = CMTime(value: Int64(trimStartMs), timescale: 1000)
+        let duration = CMTimeSubtract(asset.duration, startTime)
+        exportSession.timeRange = CMTimeRange(start: startTime, duration: duration)
+
+        print("[NativeCameraTest] Trimming video: starting at \(trimStartMs)ms, new duration: \(CMTimeGetSeconds(duration))s")
+        exportSession.exportAsynchronously {
+            if exportSession.status == .completed {
+                completion(.success(outputURL))
+            } else if let error = exportSession.error {
+                completion(.failure(error))
+            } else {
+                completion(.failure(NSError(
+                    domain: "NativeCameraTest",
+                    code: 21,
+                    userInfo: [NSLocalizedDescriptionKey: "AVAssetExportSession failed without error"]
+                )))
+            }
+        }
+    }
+
+    private func finalizeStopResult(for fileURL: URL, completion: ((Result<[String: Any], Error>) -> Void)?) {
+        do {
+            let info = try self.buildStopResult(for: fileURL)
+            print("[NativeCameraTest] recording stopped")
+            print("[NativeCameraTest] file saved")
+            for (key, value) in info.sorted(by: { $0.key < $1.key }) {
+                print("[NativeCameraTest] \(key) = \(value)")
+            }
+            self.restoreAudioSessionAfterTest()
+            DispatchQueue.main.async {
+                completion?(.success(info))
+            }
+        } catch {
+            self.restoreAudioSessionAfterTest()
+            DispatchQueue.main.async {
+                completion?(.failure(error))
             }
         }
     }

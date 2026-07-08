@@ -1045,6 +1045,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       captureTrackSnapshot,
       autoPerformanceStartSeconds,
       mirrorPlayback,
+      timelineOffsetMs,
     } = payload
 
     void logRecordingOutputVerification({
@@ -1082,6 +1083,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         ...createTake(takeId, index, optimisticUrl, filePath, mimeType, mediaType),
         recordingOrientation: recordingOrientation ?? 'portrait',
         ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
+        timelineOffsetMs,
       }
       return [...prev, savedTake]
     })
@@ -1179,6 +1181,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           mimeType,
           mediaType,
           recordingOrientation,
+          timelineOffsetMs,
           name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
         })
       }
@@ -2011,11 +2014,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return startRecording()
   }, [pausePipVideos, pauseYoutubeReference, startRecording, settings.excludeYoutubeFromRecording])
 
-  const handleMultitrackStopRecording = useCallback(() => {
+  const handleMultitrackStopRecording = useCallback((options?: { rawOffsetMs?: number }) => {
     // No isRecording gate: the serialized native stop is safe at any instant
     // (it awaits an in-flight start), and the old stale-state gate could
     // silently no-op a legitimate Stop.
-    stopRecording()
+    stopRecording(options)
   }, [stopRecording])
 
   const handleClearMultitrackPendingRecording = useCallback(() => {

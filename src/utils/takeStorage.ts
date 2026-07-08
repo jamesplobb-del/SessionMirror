@@ -30,6 +30,7 @@ export interface RecordingCompletePayload {
   autoPerformanceStartSeconds?: number
   /** Populated after post-save loudness analysis. */
   captureDiagnostics?: RecordingCaptureDiagnostics
+  timelineOffsetMs?: number
   /**
    * Overrides the default video mirror-on-playback behavior. Native camera
    * recordings are already saved in true (unmirrored) orientation, so they

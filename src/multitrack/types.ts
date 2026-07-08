@@ -20,6 +20,9 @@ export interface PerformancePanelState {
   /** Mixer state — playback balance only (export stays unity gain for now). */
   volume?: number
   muted?: boolean
+  /** Trim: timeline 0 maps to trimStartSec into the take; trimEndSec caps it. */
+  trimStartSec?: number
+  trimEndSec?: number
 }
 
 export interface SheetMusicPanelState {
@@ -61,4 +64,4 @@ export interface MultitrackSession {
   backing: MultitrackBackingTrack
 }
 
-export type MultitrackRecordingPhase = 'idle' | 'count-in' | 'recording' | 'review'
+export type MultitrackRecordingPhase = 'idle' | 'arming' | 'count-in' | 'recording' | 'review'

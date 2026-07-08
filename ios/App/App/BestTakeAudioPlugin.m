@@ -41,4 +41,8 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(hapticImpact, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(hapticNotification, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(prepareHaptics, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(getAudioHardwareRtl, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(getAudioOutputLatencyMs, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(computeTakeAlignment, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(extractWaveformPeaks, CAPPluginReturnPromise);
 )

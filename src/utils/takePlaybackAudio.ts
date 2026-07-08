@@ -300,6 +300,14 @@ export async function playTakeMediaMuted(
 export interface PlayTakeMediaAudibleOptions extends PlaybackAttemptOptions {
   /** When playback route was already prepared (e.g. hands-free auto-playback). */
   skipRoutePrep?: boolean
+  /**
+   * Attach the per-element 'ended' listener that restores the recording route
+   * (default true). Multitrack sync passes false: with several clips of
+   * different lengths playing together, the FIRST clip to end must not tear
+   * down the shared audio session under the still-playing (or still-recording)
+   * rest — the sync engine owns route restoration for grouped playback.
+   */
+  attachEndedRouteRestore?: boolean
 }
 
 export async function playTakeMediaAudible(
@@ -318,9 +326,11 @@ export async function playTakeMediaAudible(
 
   await prepareLoudPlaybackBeforeStart(media)
 
+  const attachEnded = options.attachEndedRouteRestore !== false
+
   try {
     await media.play()
-    attachPlaybackRouteEndedListener(media)
+    if (attachEnded) attachPlaybackRouteEndedListener(media)
     wireTakePlaybackAfterStart(media, true)
     reportTakePlaybackStarted(media)
     return true
@@ -330,7 +340,7 @@ export async function playTakeMediaAudible(
       await media.play()
       media.muted = false
       media.volume = 1
-      attachPlaybackRouteEndedListener(media)
+      if (attachEnded) attachPlaybackRouteEndedListener(media)
       wireTakePlaybackAfterStart(media, true)
       reportTakePlaybackStarted(media)
       return true

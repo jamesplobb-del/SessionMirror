@@ -48,6 +48,7 @@ import {
   stopNativeCameraPreview,
   stopNativeCameraRecording,
   setNativeCameraPassthrough,
+  getAudioHardwareRtl,
 } from '../utils/nativeCameraTest'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
@@ -1502,10 +1503,16 @@ export function useCameraSession({
     suspendSharedMicForNativeRecording,
   ])
 
-  const stopNativeExperimentalRecording = useCallback(() => {
+  const stopNativeExperimentalRecording = useCallback((options?: { rawOffsetMs?: number }) => {
     setIsStopping(true)
 
     void (async () => {
+      let timelineOffsetMs: number | undefined
+      if (options?.rawOffsetMs !== undefined) {
+        const rtlMs = await getAudioHardwareRtl()
+        timelineOffsetMs = Math.round(options.rawOffsetMs - rtlMs)
+        console.log(`[useCameraSession] rawOffsetMs=${options.rawOffsetMs} rtlMs=${rtlMs} timelineOffsetMs=${timelineOffsetMs}`)
+      }
       // Serialize against an in-flight start: AVCaptureMovieFileOutput rejects
       // stop() until didStartRecording fires (~0.5-1s). Stopping inside that
       // window used to orphan the native recording and wedge every later take.
@@ -1568,6 +1575,7 @@ export function useCameraSession({
         filePath: result.filePath,
         videoUrl,
         durationSeconds: Math.max(0.1, result.duration || elapsedRef.current),
+        timelineOffsetMs,
         recordingOrientation: recordingOrientationRef.current,
         // Native AVCaptureMovieFileOutput is unmirrored (see
         // NativeCameraRecordingEngine.configureCaptureSession) to match the
@@ -1591,7 +1599,7 @@ export function useCameraSession({
 
   /** Resolves true once recording has actually started (native: didStartRecording confirmed). */
   const startRecording = useCallback((): Promise<boolean> => {
-    if (isRecording) return Promise.resolve(true)
+    if (isRecordingRef.current) return Promise.resolve(true)
 
     if (shouldUseNativeExperimentalRecording()) {
       return startNativeExperimentalRecording()
@@ -1674,7 +1682,6 @@ export function useCameraSession({
   }, [
     bindRecordingHandlers,
     ensureRecordableStream,
-    isRecording,
     shouldUseNativeExperimentalRecording,
     startNativeExperimentalRecording,
   ])
@@ -1751,12 +1758,12 @@ export function useCameraSession({
     }
   }, [disarmAutoAudioRecorder])
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback((options?: { rawOffsetMs?: number }) => {
     // Route to the serialized native stop when a native recording is active OR
     // a native start is still settling (bridge warm / didStartRecording window)
     // — that stop path awaits the settle, so Stop is safe at any instant.
     if (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current) {
-      stopNativeExperimentalRecording()
+      stopNativeExperimentalRecording(options)
       return
     }
 
@@ -1820,12 +1827,16 @@ export function useCameraSession({
   }, [cancelAutoPreRollCapture, stopNativeExperimentalRecording])
 
   const toggleRecording = useCallback(() => {
-    if (isRecording) {
+    // Gate on the ref, not the async React state: audio recording starts inside
+    // an async IIFE, so isRecordingRef flips true before the isRecording state
+    // commits. Using the stale state here caused a "stop" tap to be read as a
+    // second "start" and silently no-op — the reported audio stop failure.
+    if (isRecordingRef.current || nativeExperimentalRecordingRef.current || nativeStartSettleRef.current) {
       stopRecording()
     } else {
-      startRecording()
+      void startRecording()
     }
-  }, [isRecording, startRecording, stopRecording])
+  }, [startRecording, stopRecording])
 
   const changeRecordingMode = useCallback(
     (mode: RecordingMode) => {

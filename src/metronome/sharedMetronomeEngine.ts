@@ -114,6 +114,15 @@ class SharedMetronomeEngine {
   private startInFlight = false
   private playbackWatchCtx: AudioContext | null = null
   private onPlaybackStateChange: (() => void) | null = null
+  /**
+   * Exact time of the first click scheduled by the most recent start(), on both
+   * the Web Audio clock (for slaving media playback) and performance.now()
+   * (for stamping recording offsets). This is the multitrack timeline anchor.
+   */
+  private lastStartInfo: { firstClickCtxTime: number; firstClickPerfMs: number } | null = null
+
+  getLastStartInfo = (): { firstClickCtxTime: number; firstClickPerfMs: number } | null =>
+    this.lastStartInfo
 
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener)
@@ -819,6 +828,23 @@ class SharedMetronomeEngine {
     void this.start({ recovered: true, fromStale: true })
   }
 
+  /**
+   * Reset stale scheduler / foreground-recovery state and ensure the Web Audio
+   * graph is running before a multitrack count-in (especially first take, where
+   * reference playback does not wake the context).
+   */
+  prepareForCountIn = async (): Promise<boolean> => {
+    this.resumeOnForeground = false
+    this.recoveringForeground = false
+    if (this.foregroundTimer !== null) {
+      window.clearTimeout(this.foregroundTimer)
+      this.foregroundTimer = null
+    }
+    this.sanityReset()
+    const ctx = await this.prepareAudioContextForStart()
+    return !!(ctx && ctx.state === 'running')
+  }
+
   private hardStop(options?: { background?: boolean }): void {
     if (this.snapshot.playing && !options?.background) {
       this.debugLog('stop')
@@ -839,6 +865,8 @@ class SharedMetronomeEngine {
   start = async (options?: {
     recovered?: boolean
     fromStale?: boolean
+    /** Extra lead before the first click (e.g. wait for HTMLMediaElement to reach the speaker). */
+    firstBeatDelaySec?: number
   }): Promise<boolean> => {
     if (typeof window === 'undefined') return false
     if (this.startInFlight) return false
@@ -866,7 +894,14 @@ class SharedMetronomeEngine {
       }
 
       this.tickCounter = 0
-      this.nextBeatTime = ctx.currentTime + START_LEAD_SEC
+      const leadSec = Math.max(START_LEAD_SEC, options?.firstBeatDelaySec ?? START_LEAD_SEC)
+      this.nextBeatTime = ctx.currentTime + leadSec
+      // Capture the sample-accurate first-click moment on both clocks BEFORE the
+      // scheduler runs — this is the anchor multitrack timing derives from.
+      this.lastStartInfo = {
+        firstClickCtxTime: this.nextBeatTime,
+        firstClickPerfMs: performance.now() + leadSec * 1000,
+      }
       this.schedulerSession += 1
       this.patchState({ playing: true, beatIndex: 0, subTickIndex: 0, beatPulseId: 0 })
       this.debugLog(options?.recovered ? 'start (recovered)' : 'start')

@@ -32,7 +32,13 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
         <span className="mt-2 text-sm font-medium text-stone-500">Tap to add</span>
         {isRecordingTarget && recordingPhase !== 'idle' && (
           <span className="mt-1 text-xs font-semibold text-red-500">
-            {recordingPhase === 'count-in' ? 'Count-in…' : recordingPhase === 'review' ? 'Reviewing…' : 'Recording…'}
+            {recordingPhase === 'arming'
+              ? 'Loading…'
+              : recordingPhase === 'count-in'
+                ? 'Count-in…'
+                : recordingPhase === 'review'
+                  ? 'Reviewing…'
+                  : 'Recording…'}
           </span>
         )}
       </Pressable>

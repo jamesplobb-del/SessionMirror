@@ -35,6 +35,8 @@ export interface Take {
   pitchSeries?: PitchSample[]
   /** Non-destructive loudness metadata — does not alter the saved file. */
   playbackGainMetadata?: PlaybackGainMetadata
+  /** Playback alignment offset in milliseconds. positive = delayed, negative = early */
+  timelineOffsetMs?: number
 }
 
 export type SortMode = 'newest' | 'highest-rated'

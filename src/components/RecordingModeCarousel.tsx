@@ -75,8 +75,14 @@ function ModeSlot({
   const longPressHandlers = useLongPress({
     onClick: onActivate,
     onLongPress: () => onLongPress?.(),
-    // Hands-free toggle must work in camera mode even when preview is still warming.
-    disabled: !isCenter || !onLongPress || isRecording,
+    // NOTE: `disabled` here gates BOTH the long-press gesture AND the plain
+    // tap (useLongPress's onPointerUp returns early on disabled, before ever
+    // calling onClick). It must NOT include `isRecording` — that made the
+    // center record button's tap-to-stop silently do nothing while recording.
+    // The long-press action (hands-free toggle) already has its own
+    // `isRecording` guard in handleRecordLongPress below, so this only needs
+    // to gate on whether the slot/long-press affordance exists at all.
+    disabled: !isCenter || !onLongPress,
     hapticFeedback,
   })
 

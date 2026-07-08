@@ -25,6 +25,8 @@ interface PersistedMultitrackSession {
   /** Mixer state per panel slot, aligned with panelTakeIds. */
   panelVolumes?: (number | null)[]
   panelMutes?: boolean[]
+  /** Trim per panel slot: [startSec, endSec|null]. */
+  panelTrims?: ([number, number | null] | null)[]
   practice: MultitrackPracticeSettings
   backing: { kind: 'youtube'; embedUrl: string; label: string; volume: number } | null
 }
@@ -44,6 +46,11 @@ export function saveMultitrackSession(session: MultitrackSession): void {
       ),
       panelMutes: performancePanels.map((panel) =>
         panel.kind === 'performance' ? panel.muted === true : false,
+      ),
+      panelTrims: performancePanels.map((panel) =>
+        panel.kind === 'performance' && (panel.trimStartSec || panel.trimEndSec !== undefined)
+          ? [panel.trimStartSec ?? 0, panel.trimEndSec ?? null]
+          : null,
       ),
       practice: session.practice,
       backing: session.backing.kind === 'youtube' ? session.backing : null,
@@ -72,12 +79,19 @@ export function loadMultitrackSession(takes: Take[]): MultitrackSession | null {
       const takeId = persisted.panelTakeIds?.[performanceIndex] ?? null
       const volume = persisted.panelVolumes?.[performanceIndex]
       const muted = persisted.panelMutes?.[performanceIndex]
+      const trim = persisted.panelTrims?.[performanceIndex]
       panels[i] = {
         ...panel,
         // Takes deleted since last session are silently dropped.
         take: takeId ? takeById.get(takeId) ?? null : null,
         ...(typeof volume === 'number' ? { volume } : null),
         ...(muted === true ? { muted: true } : null),
+        ...(Array.isArray(trim)
+          ? {
+              trimStartSec: typeof trim[0] === 'number' ? trim[0] : 0,
+              ...(typeof trim[1] === 'number' ? { trimEndSec: trim[1] } : null),
+            }
+          : null),
       }
       performanceIndex += 1
     }

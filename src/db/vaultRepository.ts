@@ -29,6 +29,7 @@ function mapTakeRow(row: SqlRow): VaultTake {
         ? 'landscape'
         : 'portrait',
     enhancerBaked: Number(row.enhancer_baked ?? 0) === 1,
+    timelineOffsetMs: Number(row.timeline_offset_ms ?? 0),
   }
 }
 
@@ -99,13 +100,14 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
     notes: '',
     recordingOrientation: input.recordingOrientation ?? 'portrait',
     enhancerBaked: false,
+    timelineOffsetMs: input.timelineOffsetMs ?? 0,
   }
 
   await db.run(
     `INSERT INTO takes (
       id, project_id, file_path, duration, is_best_take, created_at,
-      name, mime_type, media_type, rating, notes, recording_orientation, enhancer_baked
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      name, mime_type, media_type, rating, notes, recording_orientation, enhancer_baked, timeline_offset_ms
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       take.id,
       take.projectId,
@@ -120,6 +122,7 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
       take.notes,
       take.recordingOrientation ?? 'portrait',
       0,
+      take.timelineOffsetMs ?? 0,
     ],
   )
 
@@ -143,6 +146,10 @@ export async function updateVaultTake(takeId: string, updates: VaultTakeUpdate):
   if (updates.notes !== undefined) {
     fields.push('notes = ?')
     values.push(updates.notes)
+  }
+  if (updates.timelineOffsetMs !== undefined) {
+    fields.push('timeline_offset_ms = ?')
+    values.push(Math.round(updates.timelineOffsetMs))
   }
 
   if (fields.length === 0) return

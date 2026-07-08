@@ -27,6 +27,8 @@
 		NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */; };
 		NATIVECAM2FED79650016851F /* NativeCameraRecordingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */; };
 		PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */; };
+		NATIVEDEC2FED79650016851F /* NativeAudioDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEDEC1FED79650016851F /* NativeAudioDecoder.swift */; };
+		TAKEALGN2FED79650016851F /* TakeAlignmentEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -55,6 +57,8 @@
 		NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraTestAudio.swift; sourceTree = "<group>"; };
 		NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraRecordingEngine.swift; sourceTree = "<group>"; };
 		PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitBridgeViewController.swift; sourceTree = "<group>"; };
+		NATIVEDEC1FED79650016851F /* NativeAudioDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioDecoder.swift; sourceTree = "<group>"; };
+		TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeAlignmentEngine.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -118,6 +122,8 @@
 				CAMGUARD1FED79650016851F /* CameraSessionGuard.swift */,
 				AUDIOROUTE1FED79650016851F /* AudioRouteConfigurator.swift */,
 				AUDIOENH1FED79650016851F /* AudioEnhancerRenderer.swift */,
+				NATIVEDEC1FED79650016851F /* NativeAudioDecoder.swift */,
+				TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */,
 				BESTTAKE3FED79650016851F /* BestTakeAudioPlugin.m */,
 				DRONEENG1FED79650016851F /* DroneEngine.swift */,
 				DRONEPLG1FED79650016851F /* DronePlugin.swift */,
@@ -279,6 +285,8 @@
 				CAMGUARD2FED79650016851F /* CameraSessionGuard.swift in Sources */,
 				AUDIOROUTE2FED79650016851F /* AudioRouteConfigurator.swift in Sources */,
 				AUDIOENH2FED79650016851F /* AudioEnhancerRenderer.swift in Sources */,
+				NATIVEDEC2FED79650016851F /* NativeAudioDecoder.swift in Sources */,
+				TAKEALGN2FED79650016851F /* TakeAlignmentEngine.swift in Sources */,
 				DRONEENG2FED79650016851F /* DroneEngine.swift in Sources */,
 				DRONEPLG2FED79650016851F /* DronePlugin.swift in Sources */,
 				DRONEPLG4FED79650016851F /* DronePlugin.m in Sources */,

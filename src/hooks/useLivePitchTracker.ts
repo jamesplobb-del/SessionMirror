@@ -1710,17 +1710,47 @@ export function useLivePitchTracker(
       const graph = graphRef.current
       if (graph && isMediaPitchGraph(graph)) return
 
-      if (graph && !isMediaPitchGraph(graph)) {
-        if (graph.context.state === 'suspended') {
-          void graph.context.resume().catch(() => {})
+      if (graph && !isMediaPitchGraph(graph) && graph.nativeTap) {
+        // Native-tap graphs pull PCM via manual buffer copy from the native
+        // plugin (see createNativeTapPitchGraph) — the AnalyserNode is never
+        // connected to anything, so the AudioContext drives no actual audio
+        // and iOS is free to auto-suspend it as "silent" while the tap keeps
+        // working perfectly. This handler runs on EVERY pointerdown/touchstart
+        // across the whole app (see the listeners below), so gating health on
+        // `context.state === 'running'` here — which a previous fix briefly
+        // did — meant nearly every tap anywhere in the app (including in
+        // Take Vault, Settings, etc.) tore down and rebuilt the entire native
+        // audio tap (real native-bridge round-trips) for no reason. Only a
+        // truly closed context indicates the graph needs rebuilding.
+        if (graph.context.state !== 'closed') return
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+        if (!isAttaching.current) {
+          void tryAttach()
         }
+        return
+      }
 
-        // Native-tap graphs never go stale via WebKit stream churn.
-        if (graph.nativeTap) {
-          if (graph.context.state !== 'closed') return
-          safeDisposeMicGraph(graph)
-          graphRef.current = null
-        } else {
+      if (graph && !isMediaPitchGraph(graph)) {
+        void (async () => {
+          if (graph.context.state === 'suspended') {
+            // iOS frequently resolves resume() without error yet leaves the
+            // context stuck 'suspended' when it's called outside a direct
+            // user-gesture callback (visibilitychange/appStateChange are not
+            // gestures). Previously this fire-and-forget resume() was never
+            // awaited, so the very next line's "!== 'closed'" check always
+            // passed for a still-suspended context and recovery silently
+            // gave up — the exact "tuner stops working after backgrounding"
+            // symptom. Now we wait for the attempt and verify it actually
+            // reached 'running' before treating the graph as healthy. This
+            // WebKit getUserMedia path genuinely does need 'running' — unlike
+            // the native-tap path above, its analyser IS fed by a real
+            // MediaStreamAudioSourceNode in the standard WebAudio graph.
+            await graph.context.resume().catch(() => {})
+          }
+          if (cancelled || graphRef.current !== graph) return
+
+          const isHealthy = graph.context.state === 'running'
           const sharedStream = micStreamRefStable.current?.current
           const graphStreamLive = micStreamIsLive(graph.stream)
           const graphMatchesShared =
@@ -1728,13 +1758,18 @@ export function useLivePitchTracker(
             !micStreamIsLive(sharedStream) ||
             graph.stream === sharedStream
 
-          if (graphStreamLive && graphMatchesShared && graph.context.state !== 'closed') {
+          if (isHealthy && graphStreamLive && graphMatchesShared) {
             return
           }
 
           safeDisposeMicGraph(graph)
           graphRef.current = null
-        }
+
+          if (!isAttaching.current) {
+            void tryAttach()
+          }
+        })()
+        return
       }
 
       if (!isAttaching.current) {

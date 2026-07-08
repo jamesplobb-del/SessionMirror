@@ -49,13 +49,27 @@ export async function exportMultitrackSession(
 
   const { panelRects, musicRect } = computeMultitrackLayoutRects(layout, session.sheetMusic.asset)
 
-  const sources: Array<{ id: string; path: string; rect: LayoutRectPercent }> = []
+  const sources: Array<{
+    id: string
+    path: string
+    rect: LayoutRectPercent
+    trimStartSec?: number
+    trimEndSec?: number
+    timelineOffsetMs?: number
+  }> = []
   for (const panel of performancePanels) {
     const rect = panelRects[panel.id]
     if (!rect) continue
     const path = await resolveNativeFileUri(panel.take as Take)
     if (!path) return { ok: false, reason: 'missing_file' }
-    sources.push({ id: panel.id, path, rect })
+    sources.push({
+      id: panel.id,
+      path,
+      rect,
+      ...(panel.trimStartSec ? { trimStartSec: panel.trimStartSec } : null),
+      ...(panel.trimEndSec !== undefined ? { trimEndSec: panel.trimEndSec } : null),
+      ...(panel.take?.timelineOffsetMs ? { timelineOffsetMs: panel.take.timelineOffsetMs } : null),
+    })
   }
   if (sources.length === 0) return { ok: false, reason: 'missing_takes' }
 

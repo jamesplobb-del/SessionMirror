@@ -1,4 +1,4 @@
-﻿import AVFoundation
+import AVFoundation
 import Capacitor
 import PDFKit
 import Photos
@@ -49,6 +49,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "hapticImpact", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "hapticNotification", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareHaptics", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getAudioHardwareRtl", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getAudioOutputLatencyMs", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "computeTakeAlignment", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "extractWaveformPeaks", returnType: CAPPluginReturnPromise),
     ]
 
     private let nativeCameraEngine = NativeCameraRecordingEngine.shared
@@ -861,14 +865,41 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 preferredTrackID: kCMPersistentTrackID_Invalid
             ) else { continue }
 
-            let sourceTimeRange = CMTimeRange(start: .zero, duration: asset.duration)
+            // Per-source trim: timeline 0 maps to trimStartSec inside the take,
+            // and trimEndSec (if set) caps its contribution.
+            let trimStartSec = (source["trimStartSec"] as? NSNumber)?.doubleValue ?? 0
+            let trimEndSec = (source["trimEndSec"] as? NSNumber)?.doubleValue
+            let timelineOffsetMs = (source["timelineOffsetMs"] as? NSNumber)?.doubleValue ?? 0
+            
+            // Must match live playback semantics (useMultitrackSync):
+            // media time = timeline + trimStart + offset. Positive offset skips
+            // the take's head (content plays earlier); negative offset delays
+            // the clip's entry onto the timeline.
+            var offsetInsertTime = CMTime.zero
+            var adjustedTrimStart = trimStartSec
+            if timelineOffsetMs > 0 {
+                adjustedTrimStart += timelineOffsetMs / 1000.0
+            } else if timelineOffsetMs < 0 {
+                offsetInsertTime = CMTime(value: Int64(-timelineOffsetMs), timescale: 1000)
+            }
+            
+            let assetSeconds = CMTimeGetSeconds(asset.duration)
+            let clampedEnd = min(trimEndSec ?? assetSeconds, assetSeconds)
+            let clampedStart = max(0, min(adjustedTrimStart, max(0, clampedEnd - 0.05)))
+            let trimmedSeconds = max(0.05, clampedEnd - clampedStart)
+            let sourceTimeRange = CMTimeRange(
+                start: CMTime(seconds: clampedStart, preferredTimescale: 600),
+                duration: CMTime(seconds: trimmedSeconds, preferredTimescale: 600)
+            )
             do {
-                try compositionVideo.insertTimeRange(sourceTimeRange, of: videoTrack, at: .zero)
+                try compositionVideo.insertTimeRange(sourceTimeRange, of: videoTrack, at: offsetInsertTime)
             } catch {
                 print("[Multitrack] failed to insert video source \(source["id"] ?? "?"): \(error.localizedDescription)")
                 continue
             }
-            longestDuration = CMTimeMaximum(longestDuration, asset.duration)
+            
+            let endOnTimeline = CMTimeAdd(offsetInsertTime, sourceTimeRange.duration)
+            longestDuration = CMTimeMaximum(longestDuration, endOnTimeline)
 
             let targetRect = multitrackRectFrame(rectDict, renderSize: renderSize)
             let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideo)
@@ -884,7 +915,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     preferredTrackID: kCMPersistentTrackID_Invalid
                 ) else { continue }
                 do {
-                    try compositionAudio.insertTimeRange(sourceTimeRange, of: audioTrack, at: .zero)
+                    try compositionAudio.insertTimeRange(sourceTimeRange, of: audioTrack, at: offsetInsertTime)
                     let parameters = AVMutableAudioMixInputParameters(track: compositionAudio)
                     parameters.setVolume(1.0, at: .zero)
                     audioParameters.append(parameters)
@@ -1494,7 +1525,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stopNativeCameraRecording(_ call: CAPPluginCall) {
-        nativeCameraEngine.stop(completion: { result in
+        let trimStartMs = call.getInt("trimStartMs") ?? 0
+        nativeCameraEngine.stop(trimStartMs: trimStartMs, completion: { result in
             switch result {
             case .success(let payload):
                 call.resolve(payload)
@@ -1527,5 +1559,76 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             print("[NativeCameraTest] post-process playback stopped")
         }
         call.resolve()
+    }
+
+    @objc func computeTakeAlignment(_ call: CAPPluginCall) {
+        guard let path = call.getString("path"), let sourceURL = fileURL(from: path) else {
+            call.reject("Missing or invalid path")
+            return
+        }
+        let bpm = call.getDouble("bpm") ?? 0
+        let countInBeats = call.getInt("countInBeats") ?? 0
+        let deterministicOffsetMs = call.getDouble("deterministicOffsetMs") ?? 0
+        let searchMs = call.getDouble("searchMs") ?? 250
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let (samples, sampleRate) = try NativeAudioDecoder.readMonoPCM(url: sourceURL)
+                let result = TakeAlignmentEngine.compute(
+                    samples: samples,
+                    sampleRate: sampleRate,
+                    bpm: bpm,
+                    countInBeats: countInBeats,
+                    deterministicOffsetMs: deterministicOffsetMs,
+                    searchMs: searchMs
+                )
+                DispatchQueue.main.async {
+                    call.resolve([
+                        "refinedOffsetMs": result.refinedOffsetMs,
+                        "residualMs": result.residualMs,
+                        "confidence": result.confidence,
+                        "applied": result.applied,
+                    ])
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    call.reject("Alignment failed", error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    @objc func extractWaveformPeaks(_ call: CAPPluginCall) {
+        guard let path = call.getString("path"), let sourceURL = fileURL(from: path) else {
+            call.reject("Missing or invalid path")
+            return
+        }
+        let barCount = call.getInt("barCount") ?? 72
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let (samples, _) = try NativeAudioDecoder.readMonoPCM(url: sourceURL)
+                let peaks = TakeAlignmentEngine.extractWaveformPeaks(samples: samples, barCount: barCount)
+                DispatchQueue.main.async {
+                    call.resolve(["peaks": peaks])
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    call.reject("Waveform extract failed", error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    @objc func getAudioHardwareRtl(_ call: CAPPluginCall) {
+        let session = AVAudioSession.sharedInstance()
+        let rtl = (session.outputLatency + session.inputLatency + session.ioBufferDuration) * 1000.0
+        call.resolve(["rtlMs": rtl])
+    }
+
+    @objc func getAudioOutputLatencyMs(_ call: CAPPluginCall) {
+        let session = AVAudioSession.sharedInstance()
+        let latencyMs = (session.outputLatency + session.ioBufferDuration) * 1000.0
+        call.resolve(["latencyMs": latencyMs])
     }
 }

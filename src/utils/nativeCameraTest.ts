@@ -236,11 +236,11 @@ export async function setNativeCameraPreviewZoom(zoom: number): Promise<void> {
   }
 }
 
-export async function stopNativeCameraRecording(): Promise<NativeCameraRecordingStopResult | null> {
+export async function stopNativeCameraRecording(options?: { trimStartMs?: number }): Promise<NativeCameraRecordingStopResult | null> {
   if (!isNativeCameraTestAvailable()) return null
 
   try {
-    const result = await BestTakeAudioPlugin.stopNativeCameraRecording()
+    const result = await BestTakeAudioPlugin.stopNativeCameraRecording(options)
     console.log('[NativeCameraTest] recording stopped (JS)')
     console.log('audioSessionProfile =', result.audioSessionProfile)
     console.log('category =', result.category)
@@ -265,6 +265,30 @@ export async function stopNativeCameraRecording(): Promise<NativeCameraRecording
     return null
   }
 }
+
+export async function getAudioHardwareRtl(): Promise<number> {
+  if (!isNativeCameraTestAvailable()) return 0
+  try {
+    const result = await BestTakeAudioPlugin.getAudioHardwareRtl()
+    return result.rtlMs ?? 0
+  } catch (error) {
+    console.warn('[Playback] getAudioHardwareRtl failed', error)
+    return 0
+  }
+}
+
+/** Speaker output latency (no input path) — used to delay Web Audio clicks behind HTMLMediaElement reference. */
+export async function getAudioOutputLatencyMs(): Promise<number> {
+  if (!isNativeCameraTestAvailable()) return 40
+  try {
+    const result = await BestTakeAudioPlugin.getAudioOutputLatencyMs()
+    return result.latencyMs ?? 40
+  } catch (error) {
+    console.warn('[Playback] getAudioOutputLatencyMs failed', error)
+    return 40
+  }
+}
+
 
 /** Play native camera test clip via dedicated post-process plugin method (AVPlayer). */
 export async function playNativeCameraTestClipPostProcess(

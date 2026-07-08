@@ -191,7 +191,11 @@ export function useDragToPin({
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
       if (!enabled || !sourceTakeId) return
-      if ((event.target as HTMLElement).closest('button, label, input')) return
+      // Chrome buttons (X/pin/unpin) layered over the drag surface must never
+      // arm a drag — bail defensively on any interactive-element ancestor,
+      // not just <button>, so this holds regardless of the exact element the
+      // button library renders.
+      if ((event.target as HTMLElement).closest('button, a, label, input, [role="button"], [data-drag-ignore]')) return
 
       clearLongPressTimer()
       startRef.current = { x: event.clientX, y: event.clientY }
