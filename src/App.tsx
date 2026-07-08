@@ -62,6 +62,10 @@ import {
   registerYoutubeStereoGuard,
   setYoutubeReferenceActive,
   startYoutubeProxyPlayback,
+  maintainYoutubeReferenceDuringRecording,
+  cancelYoutubeRecordingMaintain,
+  scheduleYoutubeRecordingMaintain,
+  setYoutubeRecordingMaintain,
 } from './utils/playalong/youtubeBridge'
 import { isYoutubeDialogOpen } from './utils/youtubeDialogState'
 import {
@@ -146,7 +150,10 @@ import {
   preparePlaybackRoute,
   registerPlaybackCameraHandlers,
 } from './utils/playbackRouteCoordinator'
-import { syncNativeCameraSessionState } from './utils/cameraSessionState'
+import {
+  syncNativeCameraSessionState,
+  isNativeCameraPreviewActive,
+} from './utils/cameraSessionState'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem, nativeDataFileExists } from './utils/filesystemInit'
 import {
@@ -1233,7 +1240,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const thumbnailPromise = normalizedBlob
         ? generateThumbnailFromBlob(
             normalizedBlob,
-            thumbnailTake.mirrorPlayback !== false,
+            thumbnailTake.mirrorPlayback === true,
             thumbnailTake.recordingOrientation
           ).then((dataUrl) =>
             persistTakeThumbnail(takeId, dataUrl, thumbnailTake.recordingOrientation ?? 'portrait')
@@ -1333,9 +1340,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     registerYoutubeStereoGuard(
-      () => !isRecording && !autoPlaybackPlaying && !audioModeTakePlaying && !handsFreePlaybackPending
+      () => !autoPlaybackPlaying && !audioModeTakePlaying && !handsFreePlaybackPending
     )
-  }, [audioModeTakePlaying, autoPlaybackPlaying, handsFreePlaybackPending, isRecording])
+  }, [audioModeTakePlaying, autoPlaybackPlaying, handsFreePlaybackPending])
 
   // Re-open WebKit capture so iOS applies the queued mic preference before getUserMedia.
   useEffect(() => {
@@ -1594,6 +1601,31 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [isRecording, pauseYoutubeReference, settings.excludeYoutubeFromRecording, streamGeneration])
 
   useEffect(() => {
+    if (isRecording && !settings.excludeYoutubeFromRecording && youtubeUrlRef.current) {
+      setYoutubeRecordingMaintain(true)
+      startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
+      maintainYoutubeReferenceDuringRecording(youtubeIframeRef.current, 1)
+      scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1)
+    } else {
+      setYoutubeRecordingMaintain(false)
+      cancelYoutubeRecordingMaintain()
+    }
+    return () => {
+      setYoutubeRecordingMaintain(false)
+      cancelYoutubeRecordingMaintain()
+    }
+  }, [isRecording, settings.excludeYoutubeFromRecording])
+
+  useEffect(() => {
+    if (!isRecording || settings.excludeYoutubeFromRecording || !youtubeUrl) return
+    if (!youtubeHostEl) return
+    window.requestAnimationFrame(() => {
+      maintainYoutubeReferenceDuringRecording(youtubeIframeRef.current, 1)
+      scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1)
+    })
+  }, [isRecording, settings.excludeYoutubeFromRecording, youtubeHostEl, youtubeUrl])
+
+  useEffect(() => {
     return () => {
       stopAutoPlaybackAudio()
       if (autoPlaybackReleaseTimerRef.current !== null) {
@@ -1691,7 +1723,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     autoMonitoringAllowed &&
     !isRecording &&
     !autoRecordStartSuppressed &&
-    !handsFreePlaybackPending
+    !handsFreePlaybackPending &&
+    (Boolean(streamRef.current?.getAudioTracks().some(t => t.readyState === 'live' && t.enabled)) || isNativeCameraPreviewActive())
 
   const wasVaultOpenRef = useRef(false)
   const vaultEnterLoadDoneRef = useRef(false)
@@ -1954,10 +1987,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleMultitrackStartRecording = useCallback((): Promise<boolean> => {
     multitrackRecordingActiveRef.current = true
-    pauseYoutubeReference()
+    if (settings.excludeYoutubeFromRecording) {
+      pauseYoutubeReference()
+    }
     pausePipVideos()
     return startRecording()
-  }, [pausePipVideos, pauseYoutubeReference, startRecording])
+  }, [pausePipVideos, pauseYoutubeReference, startRecording, settings.excludeYoutubeFromRecording])
 
   const handleMultitrackStopRecording = useCallback(() => {
     // No isRecording gate: the serialized native stop is safe at any instant
@@ -3589,9 +3624,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         }
                         challengerMediaType={challengerTake?.mediaType}
                         benchmarkMirror={
-                          libraryBenchmarkPlayback ? false : benchmarkTake?.mirrorPlayback !== false
+                          libraryBenchmarkPlayback ? false : benchmarkTake?.mirrorPlayback === true
                         }
-                        challengerMirror={challengerTake?.mirrorPlayback !== false}
+                        challengerMirror={challengerTake?.mirrorPlayback === true}
                         benchmarkRecordingOrientation={benchmarkTake?.recordingOrientation}
                         challengerRecordingOrientation={challengerTake?.recordingOrientation}
                         liveMicTunerEnabled={settings.liveMicTunerEnabled}

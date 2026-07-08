@@ -25,7 +25,7 @@ export interface Take {
   notes: string
   /** Defaults to video for legacy takes. */
   mediaType?: MediaType
-  /** Recorded takes mirror on playback; uploads show true perspective. */
+  /** Opt-in: mirror playback display. Native recordings are saved unmirrored and play back true-perspective by default. */
   mirrorPlayback?: boolean
   /** Device orientation when the take was recorded. */
   recordingOrientation?: 'portrait' | 'landscape'

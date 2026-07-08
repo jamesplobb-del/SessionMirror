@@ -268,7 +268,7 @@ export async function captureAndPersistTakeThumbnail(
 
   return regenerateTakeThumbnailFromVideo(take.id, take.filePath, {
     videoUrl: take.videoUrl,
-    mirrorPreview: take.mirrorPlayback !== false,
+    mirrorPreview: take.mirrorPlayback === true,
     recordingOrientation: take.recordingOrientation ?? 'portrait',
   })
 }

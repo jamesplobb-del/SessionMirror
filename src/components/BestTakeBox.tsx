@@ -23,6 +23,7 @@ import {
 import {
   maintainYoutubeProxyLoudness,
   pauseYoutubeProxy,
+  startYoutubeProxyPlayback,
 } from '../utils/playalong/youtubeBridge'
 import {
   isNativeInlineTakeBoxPlaybackAvailable,
@@ -148,6 +149,8 @@ function BestTakeBox({
   /** True only while this instance holds the shared stereo-playback route (native path). */
   const nativeRouteHeldRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isPlayArmed, setIsPlayArmed] = useState(false)
+  const [isYoutubePlaying, setIsYoutubePlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
   const notifyTutorial = useTutorialAction()
@@ -156,7 +159,7 @@ function BestTakeBox({
   const hasTake = Boolean(hasLibraryPlayback || take?.videoUrl || take?.filePath)
   const useNativeTakePlayback =
     isNativeInlineTakeBoxPlaybackAvailable() && Boolean(playbackFilePath)
-  const mirrorPlayback = !hasLibraryPlayback && take?.mirrorPlayback !== false
+  const mirrorPlayback = !hasLibraryPlayback && take?.mirrorPlayback === true
   const hasYoutube = Boolean(youtubeEmbedUrl)
   const hasReference = hasTake || hasYoutube
   const isFill = layout === 'fill'
@@ -171,6 +174,7 @@ function BestTakeBox({
 
   useEffect(() => {
     setIsPlaying(false)
+    setIsPlayArmed(false)
     void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
     // Only release the shared stereo route if this instance actually holds it —
     // this effect also runs on mount/every source change, and an unconditional
@@ -198,7 +202,34 @@ function BestTakeBox({
   useEffect(() => {
     if (!hasYoutube || !suspendPlayback) return
     pauseYoutubeProxy(youtubeIframeRef?.current)
+    setIsYoutubePlaying(false)
   }, [hasYoutube, suspendPlayback, youtubeEmbedUrl, youtubeIframeRef])
+
+  useEffect(() => {
+    if (!hasYoutube) {
+      setIsYoutubePlaying(false)
+      return
+    }
+
+    const onMessage = (event: MessageEvent) => {
+      if (typeof event.data !== 'string') return
+      let payload: { event?: string; state?: string }
+      try {
+        payload = JSON.parse(event.data)
+      } catch {
+        return
+      }
+      if (payload.event !== 'youtube-state') return
+      if (payload.state === 'playing') {
+        setIsYoutubePlaying(true)
+      } else if (payload.state === 'paused' || payload.state === 'ended') {
+        setIsYoutubePlaying(false)
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [hasYoutube])
 
   useEffect(() => {
     if (useNativeTakePlayback) return
@@ -225,6 +256,7 @@ function BestTakeBox({
 
     setNativeInlineTakeBoxEndedHandler(NATIVE_TAKE_BOX_OWNER, () => {
       setIsPlaying(false)
+      setIsPlayArmed(false)
       if (nativeRouteHeldRef.current) {
         nativeRouteHeldRef.current = false
         void releaseInlineTakeBoxPlaybackRoute()
@@ -306,6 +338,7 @@ function BestTakeBox({
             void releaseInlineTakeBoxPlaybackRoute()
           }
           setIsPlaying(false)
+          setIsPlayArmed(false)
           return
         }
         if (nativePlayInFlightRef.current) return
@@ -313,6 +346,7 @@ function BestTakeBox({
         const layout = measureInlineTakeBoxWindowRect(playbackStageRef.current)
         if (!layout) return
 
+        setIsPlayArmed(true)
         void (async () => {
           nativePlayInFlightRef.current = true
           try {
@@ -327,9 +361,11 @@ function BestTakeBox({
             })
             if (!started) {
               nativeRouteHeldRef.current = false
+              setIsPlayArmed(false)
               await releaseInlineTakeBoxPlaybackRoute()
             }
             setIsPlaying(started)
+            if (!started) setIsPlayArmed(false)
           } finally {
             nativePlayInFlightRef.current = false
           }
@@ -342,8 +378,11 @@ function BestTakeBox({
         video?.pause()
         void finalizeInlineTakeBoxPlaybackCleanup()
         setIsPlaying(false)
+        setIsPlayArmed(false)
         return
       }
+
+      setIsPlayArmed(true)
 
       void (async () => {
         const media = (await waitForMediaElement(videoRef)) ?? videoRef.current
@@ -365,6 +404,7 @@ function BestTakeBox({
           onPlaying: () => setIsPlaying(true),
           onFailure: () => {
             setIsPlaying(false)
+            setIsPlayArmed(false)
             void finalizeInlineTakeBoxPlaybackCleanup()
           },
         })
@@ -380,6 +420,29 @@ function BestTakeBox({
       videoRef,
       volume,
     ],
+  )
+
+  const handleYoutubePlayPause = useCallback(
+    (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      stopEventBubble(event)
+      if (suspendPlayback || !hasYoutube) return
+
+      const iframe = youtubeIframeRef?.current
+      if (!iframe) return
+
+      notifyTutorial?.('media-touched')
+
+      if (isYoutubePlaying) {
+        pauseYoutubeProxy(iframe)
+        setIsYoutubePlaying(false)
+        return
+      }
+
+      startYoutubeProxyPlayback(iframe, volume)
+      setIsYoutubePlaying(true)
+    },
+    [hasYoutube, isYoutubePlaying, notifyTutorial, suspendPlayback, volume, youtubeIframeRef],
   )
 
   const handleVolume = useCallback(
@@ -425,7 +488,7 @@ function BestTakeBox({
   const playbackFit =
     isFill && take?.recordingOrientation === 'landscape' ? 'contain' : 'cover'
 
-  const playbackAudible = isPlaying && !suspendPlayback && hasTake
+  const playbackAudible = (isPlayArmed || isPlaying) && !suspendPlayback && hasTake
 
   const shellClass = isFill
     ? 'relative h-full w-full min-h-0 overflow-hidden'
@@ -540,11 +603,39 @@ function BestTakeBox({
           </span>
 
           {hasYoutube ? (
-            <div
-              ref={onYoutubeHostChange}
-              className="youtube-embed-host pointer-events-auto absolute inset-0 z-[1] overflow-hidden"
-              aria-label="YouTube reference"
-            />
+            <>
+              <div
+                ref={onYoutubeHostChange}
+                className={`youtube-embed-host absolute inset-0 z-[1] overflow-hidden ${
+                  isFill ? 'pointer-events-auto' : 'youtube-embed-host--pip-guard pointer-events-none'
+                }`}
+                aria-label="YouTube reference"
+              />
+              {!isFill && !suspendPlayback && (
+                <div className="absolute inset-0 z-[5] pointer-events-none">
+                  <Pressable
+                    type="button"
+                    intensity="icon"
+                    squish={false}
+                    haptic="light"
+                    onPointerDown={stopEventBubble}
+                    onTouchStart={stopEventBubble}
+                    onTouchEnd={stopEventBubble}
+                    onClick={handleYoutubePlayPause}
+                    className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+                    aria-label={isYoutubePlaying ? 'Pause YouTube reference' : 'Play YouTube reference'}
+                  >
+                    <span className={pipTouchIconClass}>
+                      {isYoutubePlaying ? (
+                        <Pause className="h-3 w-3 fill-white" />
+                      ) : (
+                        <Play className="h-3 w-3 fill-white" />
+                      )}
+                    </span>
+                  </Pressable>
+                </div>
+              )}
+            </>
           ) : hasTake ? (
             <div ref={playbackStageRef} className={nativePlaybackStageClass}>
               {!useNativeTakePlayback && (

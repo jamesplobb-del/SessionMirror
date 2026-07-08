@@ -75,7 +75,7 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
         videoSourceKey={panel.take.id}
         className="multitrack-panel__media"
         loadingClassName="multitrack-panel__media multitrack-panel__media--loading"
-        mirror={panel.take.mirrorPlayback !== false}
+        mirror={panel.take.mirrorPlayback === true}
         recordingOrientation={panel.take.recordingOrientation}
         fit="cover"
         eagerLoad

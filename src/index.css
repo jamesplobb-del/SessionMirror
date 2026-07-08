@@ -259,6 +259,18 @@ body.settings-branch-open * {
   border: 0;
 }
 
+/* Pip layout — block iframe taps (open-in-YouTube) and use app play control */
+.pip-video-container .youtube-embed-host--pip-guard iframe,
+.pip-video-container .youtube-embed-host--pip-guard .youtube-embed-iframe {
+  pointer-events: none;
+  width: 168%;
+  height: 168%;
+  left: 50%;
+  top: 50%;
+  inset: auto;
+  transform: translate(-50%, -50%);
+}
+
 .review-timeline-overlay {
   bottom: 0;
 }
@@ -2577,6 +2589,10 @@ html.physical-landscape-right .ui-orient-spin {
     0 0 0 5px rgba(56, 189, 248, 0.08),
     0 0 24px rgba(56, 189, 248, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.record-carousel-slot--not-ready:not(.record-carousel-slot--recording) {
+  opacity: 0.72;
 }
 
 .record-carousel-slot--inactive {

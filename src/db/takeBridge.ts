@@ -34,7 +34,7 @@ export function vaultTakeToUiTake(
     rating: vaultTake.rating,
     notes: vaultTake.notes,
     mediaType: vaultTake.mediaType,
-    mirrorPlayback: vaultTake.mediaType === 'video',
+    mirrorPlayback: false,
     recordingOrientation: vaultTake.recordingOrientation ?? 'portrait',
     enhancerBaked: vaultTake.enhancerBaked,
   }
@@ -72,7 +72,7 @@ async function hydrateVaultTakeRow(
           filePath: row.filePath,
           videoUrl,
           mediaType: row.mediaType,
-          mirrorPreview: true,
+          mirrorPreview: (row as any).mirrorPlayback === true,
         },
       )
     } catch {

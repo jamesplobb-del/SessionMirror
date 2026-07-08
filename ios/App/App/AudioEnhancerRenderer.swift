@@ -83,7 +83,8 @@ enum AudioEnhancerRendererError: LocalizedError {
 }
 
 final class AudioEnhancerRenderer {
-    private static let workQueue = DispatchQueue(label: "SessionMirror.AudioEnhancerRenderer", qos: .userInitiated)
+    /// Post-record offline bake — not user-interactive; matches AVAssetExportSession QoS.
+    private static let workQueue = DispatchQueue(label: "SessionMirror.AudioEnhancerRenderer", qos: .utility)
 
     /// Enhance the audio of a recorded take in place. Video takes keep their
     /// video track byte-for-byte (passthrough remux); audio-only takes are
@@ -95,11 +96,13 @@ final class AudioEnhancerRenderer {
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) {
         workQueue.async {
-            do {
-                let result = try performEnhance(fileURL: fileURL, isVideo: isVideo, params: params)
-                DispatchQueue.main.async { completion(.success(result)) }
-            } catch {
-                DispatchQueue.main.async { completion(.failure(error)) }
+            Task(priority: .utility) {
+                do {
+                    let result = try await performEnhance(fileURL: fileURL, isVideo: isVideo, params: params)
+                    DispatchQueue.main.async { completion(.success(result)) }
+                } catch {
+                    DispatchQueue.main.async { completion(.failure(error)) }
+                }
             }
         }
     }
@@ -110,7 +113,7 @@ final class AudioEnhancerRenderer {
         fileURL: URL,
         isVideo: Bool,
         params: AudioEnhancerParams
-    ) throws -> [String: Any] {
+    ) async throws -> [String: Any] {
         let tempDir = FileManager.default.temporaryDirectory
         let sourceAudioURL = tempDir.appendingPathComponent("enhancer-src-\(UUID().uuidString).m4a")
         let renderedAudioURL = tempDir.appendingPathComponent("enhancer-out-\(UUID().uuidString).m4a")
@@ -122,13 +125,13 @@ final class AudioEnhancerRenderer {
         // Step A — get an AVAudioFile-readable audio source.
         let inputFile: AVAudioFile
         if isVideo {
-            try extractAudioTrack(from: fileURL, to: sourceAudioURL)
+            try await extractAudioTrack(from: fileURL, to: sourceAudioURL)
             inputFile = try AVAudioFile(forReading: sourceAudioURL)
         } else if let direct = try? AVAudioFile(forReading: fileURL) {
             inputFile = direct
         } else {
             // Container quirk fallback: extract via passthrough export.
-            try extractAudioTrack(from: fileURL, to: sourceAudioURL)
+            try await extractAudioTrack(from: fileURL, to: sourceAudioURL)
             inputFile = try AVAudioFile(forReading: sourceAudioURL)
         }
 
@@ -147,7 +150,7 @@ final class AudioEnhancerRenderer {
         if isVideo {
             let remuxedURL = tempDir.appendingPathComponent("enhancer-mux-\(UUID().uuidString).mp4")
             defer { try? FileManager.default.removeItem(at: remuxedURL) }
-            try remuxVideo(originalURL: fileURL, enhancedAudioURL: renderedAudioURL, outputURL: remuxedURL)
+            try await remuxVideo(originalURL: fileURL, enhancedAudioURL: renderedAudioURL, outputURL: remuxedURL)
             _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: remuxedURL)
         } else {
             _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: renderedAudioURL)
@@ -163,7 +166,7 @@ final class AudioEnhancerRenderer {
 
     // MARK: - Step A: extraction
 
-    private static func extractAudioTrack(from sourceURL: URL, to outputURL: URL) throws {
+    private static func extractAudioTrack(from sourceURL: URL, to outputURL: URL) async throws {
         let asset = AVURLAsset(url: sourceURL)
         guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
             throw AudioEnhancerRendererError.noAudioTrack
@@ -188,14 +191,8 @@ final class AudioEnhancerRenderer {
         export.outputURL = outputURL
         export.outputFileType = .m4a
 
-        let semaphore = DispatchSemaphore(value: 0)
-        export.exportAsynchronously { semaphore.signal() }
-        semaphore.wait()
-
-        guard export.status == .completed else {
-            throw AudioEnhancerRendererError.extractionFailed(
-                export.error?.localizedDescription ?? "status \(export.status.rawValue)"
-            )
+        try await awaitExportCompletion(export) { detail in
+            AudioEnhancerRendererError.extractionFailed(detail)
         }
     }
 
@@ -374,7 +371,7 @@ final class AudioEnhancerRenderer {
 
     // MARK: - Step C: remux
 
-    private static func remuxVideo(originalURL: URL, enhancedAudioURL: URL, outputURL: URL) throws {
+    private static func remuxVideo(originalURL: URL, enhancedAudioURL: URL, outputURL: URL) async throws {
         let videoAsset = AVURLAsset(url: originalURL)
         let audioAsset = AVURLAsset(url: enhancedAudioURL)
 
@@ -414,14 +411,14 @@ final class AudioEnhancerRenderer {
         )
 
         // Passthrough copies samples without re-encoding the video.
-        try runExport(composition: composition, preset: AVAssetExportPresetPassthrough, outputURL: outputURL)
+        try await runExport(composition: composition, preset: AVAssetExportPresetPassthrough, outputURL: outputURL)
     }
 
     private static func runExport(
         composition: AVMutableComposition,
         preset: String,
         outputURL: URL
-    ) throws {
+    ) async throws {
         guard let export = AVAssetExportSession(asset: composition, presetName: preset) else {
             throw AudioEnhancerRendererError.exportFailed("Cannot create export session (\(preset))")
         }
@@ -429,7 +426,7 @@ final class AudioEnhancerRenderer {
         guard export.supportedFileTypes.contains(.mp4) else {
             if preset == AVAssetExportPresetPassthrough {
                 print("[AudioEnhancer] passthrough cannot write mp4 for this composition; retrying with re-encode")
-                try runExport(composition: composition, preset: AVAssetExportPresetHighestQuality, outputURL: outputURL)
+                try await runExport(composition: composition, preset: AVAssetExportPresetHighestQuality, outputURL: outputURL)
                 return
             }
             throw AudioEnhancerRendererError.exportFailed("mp4 unsupported for preset \(preset)")
@@ -438,24 +435,43 @@ final class AudioEnhancerRenderer {
         export.outputURL = outputURL
         export.outputFileType = .mp4
 
-        let semaphore = DispatchSemaphore(value: 0)
-        export.exportAsynchronously { semaphore.signal() }
-        semaphore.wait()
-
-        if export.status != .completed {
+        do {
+            try await awaitExportCompletion(export) { detail in
+                AudioEnhancerRendererError.exportFailed(detail)
+            }
+        } catch {
             if preset == AVAssetExportPresetPassthrough {
-                print("[AudioEnhancer] passthrough export failed (\(export.error?.localizedDescription ?? "unknown")); retrying with re-encode")
+                let reason = export.error?.localizedDescription ?? (error as? LocalizedError)?.errorDescription ?? "unknown"
+                print("[AudioEnhancer] passthrough export failed (\(reason)); retrying with re-encode")
                 try? FileManager.default.removeItem(at: outputURL)
-                try runExport(composition: composition, preset: AVAssetExportPresetHighestQuality, outputURL: outputURL)
+                try await runExport(composition: composition, preset: AVAssetExportPresetHighestQuality, outputURL: outputURL)
                 return
             }
-            throw AudioEnhancerRendererError.exportFailed(
-                export.error?.localizedDescription ?? "status \(export.status.rawValue)"
-            )
+            throw error
         }
     }
 
     // MARK: - Helpers
+
+    /// Suspend until AVAssetExportSession finishes without blocking a queue thread.
+    private static func awaitExportCompletion(
+        _ export: AVAssetExportSession,
+        mapFailure: @escaping (String) -> AudioEnhancerRendererError
+    ) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            export.exportAsynchronously {
+                switch export.status {
+                case .completed:
+                    continuation.resume()
+                case .failed, .cancelled:
+                    let detail = export.error?.localizedDescription ?? "status \(export.status.rawValue)"
+                    continuation.resume(throwing: mapFailure(detail))
+                default:
+                    continuation.resume(throwing: mapFailure("status \(export.status.rawValue)"))
+                }
+            }
+        }
+    }
 
     /// WebAudio biquad Q → AudioUnit parametric bandwidth in octaves.
     private static func qToOctaveBandwidth(_ q: Float) -> Float {

@@ -221,8 +221,8 @@ export default function ReviewModeOverlay({
   challengerMimeType = 'video/mp4',
   benchmarkMediaType,
   challengerMediaType,
-  benchmarkMirror = true,
-  challengerMirror = true,
+  benchmarkMirror = false,
+  challengerMirror = false,
   benchmarkRecordingOrientation,
   challengerRecordingOrientation,
   liveMicTunerEnabled = true,
@@ -1146,7 +1146,7 @@ export default function ReviewModeOverlay({
               (vaultTake.mediaType === 'audio' ? NATIVE_AUDIO_MIME : NATIVE_VIDEO_MIME)
             }
             mediaType={vaultTake.mediaType}
-            mirror={vaultTake.mirrorPlayback !== false}
+            mirror={vaultTake.mirrorPlayback === true}
             recordingOrientation={vaultTake.recordingOrientation}
             videoRef={vaultVideoRef}
             playbackAudible={isPlaying}

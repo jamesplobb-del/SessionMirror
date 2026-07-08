@@ -19,7 +19,7 @@ export function createTake(
     rating: 0,
     notes: '',
     mediaType,
-    mirrorPlayback: mediaType === 'video',
+    mirrorPlayback: false,
   }
 }
 
@@ -46,6 +46,7 @@ export function mergeHydratedTakes(local: Take[], hydrated: Take[]): Take[] {
       ...remote,
       videoUrl: remote.videoUrl || prior.videoUrl,
       thumbnailUrl: remote.thumbnailUrl || prior.thumbnailUrl,
+      mirrorPlayback: prior.mirrorPlayback !== undefined ? prior.mirrorPlayback : remote.mirrorPlayback,
     }
   })
 

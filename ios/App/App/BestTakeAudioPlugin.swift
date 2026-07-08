@@ -1409,6 +1409,19 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             do {
+                // JS awaits enableStereoPlayback before calling here, but re-assert
+                // the live session right before AVPlayer starts so take audio is not
+                // silent when YouTube/WebKit already owns the mixable capture session.
+                if CameraSessionGuard.isCameraOrRecordingActive {
+                    _ = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
+                } else {
+                    try AudioRouteConfigurator.ensureSessionActive(
+                        AVAudioSession.sharedInstance(),
+                        caller: "startInlineTakeBoxPlayback"
+                    )
+                }
+                AudioRouteConfigurator.logMicRouteProof(context: "inlineTakeBoxPlaybackStart")
+
                 let payload = try InlineTakeBoxPlaybackController.shared.start(
                     plugin: self,
                     fileURL: fileURL,

@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
 import { isHeadphoneOutputActive } from './headphoneOutput'
-import { engageStereoPlayback, releaseStereoPlayback } from './stereoPlaybackRoute'
+import { engageStereoPlaybackAsync, releaseStereoPlayback } from './stereoPlaybackRoute'
 import {
   getActivePlaybackDiagSession,
   logAudioSessionSnapshot,
@@ -154,7 +154,7 @@ async function applyLoudPlaybackSessionIfSpeaker(options: {
  */
 export async function prepareInlineTakeBoxPlaybackRoute(): Promise<void> {
   if (!isIosNative()) return
-  engageStereoPlayback()
+  await engageStereoPlaybackAsync()
 }
 
 export async function releaseInlineTakeBoxPlaybackRoute(): Promise<void> {

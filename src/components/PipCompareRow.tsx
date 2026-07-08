@@ -218,7 +218,7 @@ export default memo(function PipCompareRow({
           label="Current Take"
           variant="challenger"
           emptyMessage="Load a take from the vault."
-          mirror={challengerTake?.mirrorPlayback !== false}
+          mirror={challengerTake?.mirrorPlayback === true}
           recordingOrientation={challengerTake?.recordingOrientation}
           suspendPlayback={suspendPipPlayback}
           videoRef={challengerPipVideoRef}

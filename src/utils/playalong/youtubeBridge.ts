@@ -16,6 +16,8 @@ const YOUTUBE_BOOST_DELAYS_MS = [
 
 const YOUTUBE_WAKE_RETRY_MS = [0, 200, 450, 900, 1600, 2800, 4500]
 
+const YOUTUBE_RECORD_MAINTAIN_RETRY_MS = [0, 200, 450, 900, 1600, 2800, 4500, 7000, 10000]
+
 const STEREO_REFRESH_MIN_MS = 3000
 const PLAYING_MAINTAIN_COOLDOWN_MS = 5000
 
@@ -24,10 +26,12 @@ let playbackListenerInstalled = false
 let activeYoutubeIframe: HTMLIFrameElement | null = null
 let loudnessBurstGeneration = 0
 let wakeRetryGeneration = 0
+let recordMaintainGeneration = 0
 let pendingYoutubeWake = false
 let lastStereoRefreshAt = 0
 let lastPlayingMaintainAt = 0
 let headphoneProfileListenerInstalled = false
+export let maintainDuringRecording = false
 
 /** Skip stereo while recording or during hands-free auto-playback. */
 export function registerYoutubeStereoGuard(guard: () => boolean): void {
@@ -101,6 +105,7 @@ export function releaseYoutubeReferenceRoute(): void {
 function cancelScheduledLoudnessWork(): void {
   loudnessBurstGeneration += 1
   wakeRetryGeneration += 1
+  recordMaintainGeneration += 1
 }
 
 /** Reset audio state when swapping or clearing a YouTube reference. */
@@ -168,7 +173,54 @@ function handleProxyPlaybackMessage(data: unknown): void {
     if (now - lastPlayingMaintainAt < PLAYING_MAINTAIN_COOLDOWN_MS) return
     lastPlayingMaintainAt = now
     boostYoutubeProxyAudio(iframe, 1)
+    return
   }
+
+  if (payload.state === 'paused' && maintainDuringRecording && mayUseYoutubeStereoRoute()) {
+    const now = Date.now()
+    if (now - lastPlayingMaintainAt < PLAYING_MAINTAIN_COOLDOWN_MS) return
+    lastPlayingMaintainAt = now
+    console.info('[YoutubeRecordMaintain] auto-resume after paused')
+    boostYoutubeProxyAudio(iframe, 1)
+    postToYoutubeIframe(iframe, 'playVideo')
+  }
+}
+
+export function setYoutubeRecordingMaintain(active: boolean): void {
+  maintainDuringRecording = active
+}
+
+export function maintainYoutubeReferenceDuringRecording(
+  iframe: HTMLIFrameElement | null | undefined,
+  uiVolume = 1
+): void {
+  if (!iframe) return
+  console.info('[YoutubeRecordMaintain] maintain fired')
+  ensureYoutubePlaybackListener()
+  registerYoutubeIframe(iframe)
+  postYoutubeVolumeProfile(iframe)
+  refreshYoutubeStereoRoute(false)
+  boostYoutubeProxyAudio(iframe, uiVolume)
+  postToYoutubeIframe(iframe, 'playVideo')
+}
+
+/** Retry maintain while recording — native record start can interrupt WKWebView audio once. */
+export function scheduleYoutubeRecordingMaintain(
+  iframe: HTMLIFrameElement | null | undefined,
+  uiVolume = 1,
+): void {
+  const generation = recordMaintainGeneration
+  for (const delay of YOUTUBE_RECORD_MAINTAIN_RETRY_MS) {
+    window.setTimeout(() => {
+      if (generation !== recordMaintainGeneration) return
+      if (!maintainDuringRecording) return
+      maintainYoutubeReferenceDuringRecording(iframe, uiVolume)
+    }, delay)
+  }
+}
+
+export function cancelYoutubeRecordingMaintain(): void {
+  recordMaintainGeneration += 1
 }
 
 /** Listen for ready/playing from the Netlify proxy player. */

@@ -56,7 +56,7 @@ function ModeSlot({
 }: ModeSlotProps) {
   const isCenter = position === 'center'
   const isVideo = mode === 'video'
-  const slotDisabled = isCenter ? isVideo && !ready && !isRecording : modeSwitchLocked
+  const recordStartBlocked = isCenter && isVideo && !ready && !isRecording
 
   const ariaLabel = isCenter
     ? isRecording
@@ -75,7 +75,8 @@ function ModeSlot({
   const longPressHandlers = useLongPress({
     onClick: onActivate,
     onLongPress: () => onLongPress?.(),
-    disabled: !isCenter || !onLongPress || slotDisabled,
+    // Hands-free toggle must work in camera mode even when preview is still warming.
+    disabled: !isCenter || !onLongPress || isRecording,
     hapticFeedback,
   })
 
@@ -89,7 +90,7 @@ function ModeSlot({
   return (
     <button
       type="button"
-      disabled={slotDisabled}
+      disabled={!isCenter && modeSwitchLocked}
       aria-label={ariaLabel}
       aria-pressed={isCenter}
       {...(isCenter ? { 'data-tutorial': 'record-controls' } : {})}
@@ -100,7 +101,9 @@ function ModeSlot({
       } ${isCenter && isVideo ? 'record-carousel-slot--orbit' : ''} ${
         isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
         isCenter && isRecording ? 'record-carousel-slot--recording' : ''
-      } ${longPressActive ? 'record-carousel-slot--hands-free' : ''}`}
+      } ${longPressActive ? 'record-carousel-slot--hands-free' : ''} ${
+        recordStartBlocked ? 'record-carousel-slot--not-ready' : ''
+      }`}
     >
       {isCenter && isVideo ? (
         <RecordOrbitIcon recording={isRecording} />
@@ -140,6 +143,7 @@ function RecordingModeCarousel({
   const handleSlotActivate = useCallback(
     (mode: RecordingMode) => {
       if (mode === value) {
+        if (!isRecording && mode === 'video' && !ready) return
         if (isRecording) {
           triggerRecordStopHaptic(hapticFeedback)
         } else {

@@ -7,6 +7,13 @@ import {
   getPlaybackAudioContext,
   isSharedPlaybackContext,
 } from '../utils/playbackAudioContext'
+import {
+  acquireNativeAudioTap,
+  releaseNativeAudioTap,
+  subscribeNativeAudioPitchFrames,
+} from '../utils/nativeAudioPitchTap'
+import { isNativeCameraPreviewActive } from '../utils/cameraSessionState'
+import type { PluginListenerHandle } from '@capacitor/core'
 
 const POLL_INTERVAL_MS = 32
 const MIN_RECORDING_MS = 400
@@ -354,7 +361,10 @@ export function useAutoSoundRecording({
     if (!shouldMonitor) return
 
     const stream = streamRef.current
-    if (!isStreamAudioLive(stream)) {
+    const isWebKitLive = isStreamAudioLive(stream)
+    const isNativeLive = isNativeCameraPreviewActive()
+
+    if (!isWebKitLive && !isNativeLive) {
       return
     }
 
@@ -362,66 +372,135 @@ export function useAutoSoundRecording({
     const calibrationSamples: number[] = []
     let calibrated = false
     const setupEpoch = monitorEpoch
+    let nativeTapListener: PluginListenerHandle | null = null
+    let acquiredNativeTap = false
 
     const setup = async () => {
       teardownMonitor()
 
       const streamAtSetup = streamRef.current
-      if (!isStreamAudioLive(streamAtSetup)) {
+      const webKitLive = isStreamAudioLive(streamAtSetup)
+      const nativeLive = isNativeCameraPreviewActive()
+      const path = webKitLive ? 'webkit' : nativeLive ? 'native-tap' : 'none'
+
+      console.info('[AutoSound] monitor setup', { path })
+
+      if (path === 'none') {
         onMonitorStalledRef.current?.()
         return
       }
 
-      const audioContext = await getPlaybackAudioContext()
-      if (cancelled || setupEpoch !== monitorEpoch) {
-        return
+      const isNativePath = path === 'native-tap'
+      let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
+
+      if (isNativePath) {
+        await acquireNativeAudioTap()
+        acquiredNativeTap = true
+        if (cancelled || setupEpoch !== monitorEpoch) {
+          void releaseNativeAudioTap()
+          return
+        }
+        nativeTapListener = await subscribeNativeAudioPitchFrames((chunk) => {
+          if (cancelled) return
+          nativeFrameRef = { buffer: chunk.samples, timestamp: performance.now() }
+        }) ?? null
+        
+        lastTickAtRef.current = performance.now()
+        monitorWarmUntilRef.current = performance.now() + MONITOR_WARMUP_MS
+        void warmRecorderRef.current()
+      } else {
+        const audioContext = await getPlaybackAudioContext()
+        if (cancelled || setupEpoch !== monitorEpoch) {
+          return
+        }
+
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume().catch(() => {})
+        }
+
+        if (cancelled || setupEpoch !== monitorEpoch) {
+          return
+        }
+
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 128
+        analyser.smoothingTimeConstant = 0.08
+
+        const source = audioContext.createMediaStreamSource(streamAtSetup!)
+        source.connect(analyser)
+
+        audioContextRef.current = audioContext
+        analyserRef.current = analyser
+        sourceRef.current = source
+        sampleBufferRef.current = new Float32Array(analyser.fftSize)
+        lastTickAtRef.current = performance.now()
+
+        monitorWarmUntilRef.current = performance.now() + MONITOR_WARMUP_MS
+        void warmRecorderRef.current()
       }
 
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume().catch(() => {})
-      }
-
-      if (cancelled || setupEpoch !== monitorEpoch) {
-        return
-      }
-
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 128
-      analyser.smoothingTimeConstant = 0.08
-
-      const source = audioContext.createMediaStreamSource(streamAtSetup!)
-      source.connect(analyser)
-
-      audioContextRef.current = audioContext
-      analyserRef.current = analyser
-      sourceRef.current = source
-      sampleBufferRef.current = new Float32Array(analyser.fftSize)
-      lastTickAtRef.current = performance.now()
-
-      monitorWarmUntilRef.current = performance.now() + MONITOR_WARMUP_MS
-      void warmRecorderRef.current()
+      let lastLevelsLog = 0
 
       const tick = () => {
-        if (cancelled || !analyserRef.current || !sampleBufferRef.current) return
+        if (cancelled) return
+        
+        if (!isNativePath) {
+          if (!analyserRef.current || !sampleBufferRef.current) return
+        }
 
         lastTickAtRef.current = performance.now()
         const now = lastTickAtRef.current
         if (now < cooldownUntilRef.current && !isRecordingRef.current) return
 
-        const ctx = audioContextRef.current
-        if (ctx?.state === 'suspended') {
-          void ctx.resume().catch(() => {})
+        if (!isNativePath) {
+          const ctx = audioContextRef.current
+          if (ctx?.state === 'suspended') {
+            void ctx.resume().catch(() => {})
+          }
         }
 
-        if (!isStreamAudioLive(streamRef.current)) {
-          if (isAppInForeground()) {
-            onMonitorStalledRef.current?.()
+        if (isNativePath) {
+          if (!isNativeCameraPreviewActive()) {
+            if (isAppInForeground()) {
+              onMonitorStalledRef.current?.()
+            }
+            return
           }
-          return
+        } else {
+          if (!isStreamAudioLive(streamRef.current)) {
+            if (isAppInForeground()) {
+              onMonitorStalledRef.current?.()
+            }
+            return
+          }
         }
 
         const profile = profileRef.current
-        const metrics = readAnalyserMetrics(analyserRef.current, sampleBufferRef.current)
+        let metrics = { rms: 0, peak: 0 }
+
+        if (isNativePath) {
+          const frame = nativeFrameRef
+          if (frame && now - frame.timestamp < 1000) {
+            const buf = frame.buffer
+            let sum = 0
+            let p = 0
+            for (let i = 0; i < buf.length; i++) {
+              const val = buf[i]
+              sum += val * val
+              const abs = Math.abs(val)
+              if (abs > p) p = abs
+            }
+            metrics = { rms: Math.sqrt(sum / buf.length), peak: p }
+          }
+        } else {
+          metrics = readAnalyserMetrics(analyserRef.current!, sampleBufferRef.current!)
+        }
+        
+        if (now - lastLevelsLog > 1000) {
+          lastLevelsLog = now
+          // console.debug('[AutoSound] levels', { rms: metrics.rms.toFixed(4), peak: metrics.peak.toFixed(4) })
+        }
+
         const gateLevel = profile.usePeak
           ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
           : metrics.rms
@@ -495,6 +574,7 @@ export function useAutoSoundRecording({
               now - attackSinceRef.current >= profile.attackHoldMs &&
               !startLatchRef.current
             ) {
+              console.info('[AutoSound] triggerAutoStart')
               triggerAutoStart()
             }
             loudSinceRef.current = null
@@ -508,6 +588,7 @@ export function useAutoSoundRecording({
                 now - loudSinceRef.current >= profile.holdMs &&
                 !startLatchRef.current
               ) {
+                console.info('[AutoSound] triggerAutoStart')
                 triggerAutoStart()
               }
             } else {
@@ -557,20 +638,24 @@ export function useAutoSoundRecording({
         if (cancelled || isRecordingRef.current) return
 
         const now = performance.now()
-        const ctx = audioContextRef.current
         const tickStale = now - lastTickAtRef.current > STALL_RECOVERY_MS
-        const contextSuspended = ctx?.state === 'suspended'
-        const streamDead = !isStreamAudioLive(streamRef.current)
+        
+        let streamDead = false
+        if (isNativePath) {
+          streamDead = !isNativeCameraPreviewActive() || (now - (nativeFrameRef?.timestamp ?? 0) > 2000)
+        } else {
+          streamDead = !isStreamAudioLive(streamRef.current)
+          const ctx = audioContextRef.current
+          if (ctx?.state === 'suspended') {
+            void ctx?.resume().catch(() => {})
+          }
+        }
 
         if (streamDead) {
           if (isAppInForeground()) {
             onMonitorStalledRef.current?.()
           }
           return
-        }
-
-        if (contextSuspended) {
-          void ctx?.resume().catch(() => {})
         }
 
         if (tickStale) {
@@ -584,6 +669,12 @@ export function useAutoSoundRecording({
     return () => {
       cancelled = true
       teardownMonitor()
+      if (nativeTapListener) {
+        nativeTapListener.remove().catch(() => {})
+      }
+      if (acquiredNativeTap) {
+        void releaseNativeAudioTap()
+      }
     }
   }, [shouldMonitor, streamGeneration, streamRef, monitorEpoch])
 

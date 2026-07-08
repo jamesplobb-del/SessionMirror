@@ -241,7 +241,7 @@ export default function SplitCompareLayout({
                 label="Current Take"
                 variant="challenger"
                 emptyMessage="Record a take to compare."
-                mirror={challengerTake.mirrorPlayback !== false}
+                mirror={challengerTake.mirrorPlayback === true}
                 recordingOrientation={challengerTake.recordingOrientation}
                 suspendPlayback={suspendPipPlayback}
                 videoRef={challengerPipVideoRef}

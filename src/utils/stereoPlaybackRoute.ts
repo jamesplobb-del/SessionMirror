@@ -47,6 +47,30 @@ function snapshotIndicatesNativeRouteEngaged(snapshot: {
   return snapshot.routeApplied !== false
 }
 
+/** In-flight native route apply — concurrent callers (YouTube + take play) share one. */
+let engageInFlight: Promise<void> | null = null
+
+async function ensureNativeStereoRouteEngaged(): Promise<void> {
+  if (!shouldAttemptNativeStereoRoute()) return
+  if (nativeRouteEngaged && !engageInFlight) return
+
+  if (!engageInFlight) {
+    engageInFlight = (async () => {
+      const snapshot = await BestTakeAudioPlugin.enableStereoPlayback()
+      nativeRouteEngaged = snapshotIndicatesNativeRouteEngaged(snapshot)
+      if ('routeApplied' in snapshot && snapshot.routeApplied === false) {
+        console.info('[AudioRoute] Web playback route unchanged', snapshot)
+      }
+    })().catch((error) => {
+      markNativeStereoUnavailable(error)
+    }).finally(() => {
+      engageInFlight = null
+    })
+  }
+
+  await engageInFlight
+}
+
 /**
  * Refcounted hold for playback sessions. On built-in speaker this is a JS-only refcount —
  * no AVAudioSession category change.
@@ -55,23 +79,17 @@ export function engageStereoPlayback(): void {
   if (!Capacitor.isNativePlatform()) return
 
   holdCount += 1
-  if (holdCount > 1) return
   if (!shouldAttemptNativeStereoRoute()) return
+  void ensureNativeStereoRouteEngaged()
+}
 
-  void (async () => {
-    if (holdCount <= 0) return
-    return BestTakeAudioPlugin.enableStereoPlayback()
-  })()
-    .then((snapshot) => {
-      if (!snapshot) return
-      nativeRouteEngaged = snapshotIndicatesNativeRouteEngaged(snapshot)
-      if ('routeApplied' in snapshot && snapshot.routeApplied === false) {
-        console.info('[AudioRoute] Web playback route unchanged', snapshot)
-      }
-    })
-    .catch((error) => {
-      markNativeStereoUnavailable(error)
-    })
+/** Awaitable variant — callers that start AVPlayer / media.play() must use this. */
+export async function engageStereoPlaybackAsync(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return
+
+  holdCount += 1
+  if (!shouldAttemptNativeStereoRoute()) return
+  await ensureNativeStereoRouteEngaged()
 }
 
 /** Re-apply native Web playback route while a YouTube/playback hold is active. */
@@ -83,20 +101,7 @@ export function refreshStereoPlaybackRoute(): void {
   // Re-applying setActive during iframe playback interrupts the YouTube player.
   if (nativeRouteEngaged) return
 
-  void (async () => {
-    if (holdCount <= 0) return
-    return BestTakeAudioPlugin.enableStereoPlayback()
-  })()
-    .then((snapshot) => {
-      if (!snapshot) return
-      nativeRouteEngaged = snapshotIndicatesNativeRouteEngaged(snapshot)
-      if ('routeApplied' in snapshot && snapshot.routeApplied === false) {
-        console.info('[AudioRoute] Web playback route unchanged', snapshot)
-      }
-    })
-    .catch((error) => {
-      markNativeStereoUnavailable(error)
-    })
+  void ensureNativeStereoRouteEngaged()
 }
 
 /** Restore recording route only when native stereo was actually engaged. */
