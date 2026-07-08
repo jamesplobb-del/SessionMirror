@@ -51,7 +51,7 @@ import {
   setNativeCameraPassthrough,
   getAudioHardwareRtl,
 } from '../utils/nativeCameraTest'
-import BestTakeAudioPlugin, { applyMicInputPreference } from '../utils/audioSessionRoute'
+import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { resolveMicPreferenceForLiveCapture } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
@@ -669,8 +669,6 @@ export function useCameraSession({
       const requestedPreference = options?.liveCapture
         ? resolveMicPreferenceForLiveCapture(basePreference)
         : basePreference
-      const needsRecordingRoute =
-        options?.liveCapture || recordingModeRef.current === 'audio'
 
       console.info('[AudioRoute] applying queued mic preference before getUserMedia', {
         requestedMicPreference: requestedPreference,
@@ -682,15 +680,6 @@ export function useCameraSession({
         previewActive: nativePreviewActiveRef.current,
         recordingActive: false,
       })
-
-      if (needsRecordingRoute && !nativePreviewActiveRef.current) {
-        try {
-          await BestTakeAudioPlugin.enableRecordingRoute()
-        } catch (error) {
-          console.warn('[AudioRoute] enableRecordingRoute failed before getUserMedia', error)
-        }
-      }
-
       await applyMicInputPreference(requestedPreference)
       queuedMicPreferenceRef.current = null
     },

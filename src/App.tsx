@@ -483,6 +483,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const youtubeIframeRef = useRef<HTMLIFrameElement>(null)
   const youtubeUrlRef = useRef<string | null>(null)
   const lastMicPreferenceRouteRef = useRef(settings.micInputPreference)
+  const lastTunerLiveCaptureHeadphonesRef = useRef<boolean | null>(null)
+  const tunerMicRefreshInFlightRef = useRef(false)
   const [youtubeHostEl, setYoutubeHostEl] = useState<HTMLElement | null>(null)
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
@@ -2098,16 +2100,29 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const handleRequestTunerMicStream = useCallback(async () => {
-    if (isRecording) return
+    if (isRecording || tunerMicRefreshInFlightRef.current) return
+
+    const headphonesNow = isHeadphoneOutputActive()
+    const isFirstTunerPrep = lastTunerLiveCaptureHeadphonesRef.current === null
+    const headphonesJustChanged =
+      !isFirstTunerPrep && lastTunerLiveCaptureHeadphonesRef.current !== headphonesNow
+    lastTunerLiveCaptureHeadphonesRef.current = headphonesNow
 
     await prepareLiveMicCaptureRoute(settings.micInputPreference)
 
-    const needsFreshCapture =
-      !micStreamIsLiveForTuner() || isHeadphoneOutputActive()
+    const needsReacquire =
+      !micStreamIsLiveForTuner() ||
+      headphonesJustChanged ||
+      (headphonesNow && isFirstTunerPrep)
 
-    if (needsFreshCapture) {
+    if (needsReacquire) {
+      tunerMicRefreshInFlightRef.current = true
       releaseAllLiveMicPitchGraphs()
-      void reacquireStreamForAudioRoute({ liveCapture: true })
+      try {
+        await reacquireStreamForAudioRoute({ liveCapture: true })
+      } finally {
+        tunerMicRefreshInFlightRef.current = false
+      }
       return
     }
 
@@ -2492,11 +2507,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     streamGeneration,
   ])
 
-  // Re-open WebKit mic capture when headphones plug/unplug while the tuner is open.
+  // Re-open WebKit mic once when headphones plug/unplug on the tuner tab.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
-    let removeRouteListener: (() => void) | undefined
     let debounceTimer: number | null = null
 
     const refreshTunerMicForRoute = () => {
@@ -2504,11 +2518,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (audioPracticeTabRef.current !== 'tuner') return
       if (isRecordingRef.current) return
       if (isPlaybackRouteHoldActive()) return
+      if (tunerMicRefreshInFlightRef.current) return
 
-      releaseAllLiveMicPitchGraphs()
-      void prepareLiveMicCaptureRoute(settings.micInputPreference).then(() => {
-        void reacquireStreamForAudioRoute({ liveCapture: true })
-      })
+      lastTunerLiveCaptureHeadphonesRef.current = null
+      void handleRequestTunerMicStream()
     }
 
     const scheduleRefresh = () => {
@@ -2516,23 +2529,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       debounceTimer = window.setTimeout(() => {
         debounceTimer = null
         refreshTunerMicForRoute()
-      }, 200)
+      }, 500)
     }
-
-    void BestTakeAudioPlugin.addListener('audioRouteChanged', scheduleRefresh).then((handle) => {
-      removeRouteListener = () => {
-        void handle.remove()
-      }
-    })
 
     const unsubscribeHeadphones = subscribeHeadphoneOutput(scheduleRefresh)
 
     return () => {
       if (debounceTimer !== null) window.clearTimeout(debounceTimer)
-      removeRouteListener?.()
       unsubscribeHeadphones()
     }
-  }, [reacquireStreamForAudioRoute, settings.micInputPreference])
+  }, [handleRequestTunerMicStream])
 
   const pitchAudioHudLock =
     showPitch &&

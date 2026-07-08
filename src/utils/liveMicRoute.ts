@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import type { MicInputPreference } from './appSettings'
 import { isHeadphoneOutputActive } from './headphoneOutput'
-import BestTakeAudioPlugin, { applyMicInputPreference } from './audioSessionRoute'
+import { applyMicInputPreference } from './audioSessionRoute'
 
 /**
  * Live pitch/tuner capture should mirror the no-headphones path: built-in mic
@@ -20,17 +20,10 @@ export function resolveMicPreferenceForLiveCapture(
   return 'iphone'
 }
 
-/** Restore playAndRecord and pin the built-in mic before live WebKit capture. */
+/** Input-only route prep for live WebKit capture — never reconfigures session category. */
 export async function prepareLiveMicCaptureRoute(
   preference: MicInputPreference,
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
-
-  try {
-    await BestTakeAudioPlugin.enableRecordingRoute()
-  } catch (error) {
-    console.warn('[AudioRoute] enableRecordingRoute failed before live mic capture', error)
-  }
-
   await applyMicInputPreference(resolveMicPreferenceForLiveCapture(preference))
 }
