@@ -122,6 +122,7 @@ export function registerYoutubeIframe(iframe: HTMLIFrameElement | null | undefin
   activeYoutubeIframe = iframe ?? null
   postYoutubeVolumeProfile(iframe)
   if (pendingYoutubeWake && iframe) {
+    pendingYoutubeWake = false
     wakeYoutubeReference(iframe)
   }
 }

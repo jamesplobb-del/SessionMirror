@@ -21,8 +21,10 @@ import {
   playInlineTakeBoxFromUserGesture,
 } from '../utils/takePlaybackAudio'
 import {
+  ensureYoutubePlaybackListener,
   maintainYoutubeProxyLoudness,
   pauseYoutubeProxy,
+  startYoutubeProxyPlayback,
 } from '../utils/playalong/youtubeBridge'
 import {
   isNativeInlineTakeBoxPlaybackAvailable,
@@ -41,6 +43,8 @@ import {
 import { waitForMediaElement, waitForMediaReadyWithRetry } from '../utils/mediaPlayback'
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { useTutorialAction } from '../context/TutorialContext'
+import { triggerLightHaptic } from '../utils/haptics'
+import { parseYoutubeVideoId } from '../utils/youtubeEmbed'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
@@ -144,11 +148,14 @@ function BestTakeBox({
   const internalVideoRef = useRef<HTMLMediaElement>(null)
   const videoRef = externalVideoRef ?? internalVideoRef
   const playbackStageRef = useRef<HTMLDivElement>(null)
+  const youtubeHostLocalRef = useRef<HTMLDivElement | null>(null)
+  const lastYoutubeTapAtRef = useRef(0)
   const nativePlayInFlightRef = useRef(false)
   /** True only while this instance holds the shared stereo-playback route (native path). */
   const nativeRouteHeldRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayArmed, setIsPlayArmed] = useState(false)
+  const [isYoutubePlaying, setIsYoutubePlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
   const notifyTutorial = useTutorialAction()
@@ -161,8 +168,31 @@ function BestTakeBox({
   const hasYoutube = Boolean(youtubeEmbedUrl)
   const hasReference = hasTake || hasYoutube
   const isFill = layout === 'fill'
+  const youtubeVideoId = youtubeEmbedUrl ? parseYoutubeVideoId(youtubeEmbedUrl) : null
+  const youtubePosterUrl = youtubeVideoId
+    ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
+    : null
+  const showYoutubePipOverlay = hasYoutube && !isFill && !suspendPlayback
 
   const showUploadBadge = Boolean(onUpload) && hasTake && !hasLibraryPlayback
+
+  const handleYoutubeHostRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (youtubeHostLocalRef.current === el) return
+      youtubeHostLocalRef.current = el
+      onYoutubeHostChange?.(el)
+    },
+    [onYoutubeHostChange],
+  )
+
+  const resolveYoutubeIframe = useCallback(() => {
+    if (youtubeIframeRef?.current) return youtubeIframeRef.current
+    return (
+      youtubeHostLocalRef.current?.querySelector<HTMLIFrameElement>(
+        'iframe.youtube-embed-iframe, iframe',
+      ) ?? null
+    )
+  }, [youtubeIframeRef])
 
   useEffect(() => {
     if (youtubeDialogOpen) {
@@ -200,7 +230,34 @@ function BestTakeBox({
   useEffect(() => {
     if (!hasYoutube || !suspendPlayback) return
     pauseYoutubeProxy(youtubeIframeRef?.current)
+    setIsYoutubePlaying(false)
   }, [hasYoutube, suspendPlayback, youtubeEmbedUrl, youtubeIframeRef])
+
+  useEffect(() => {
+    if (!hasYoutube || isFill) {
+      setIsYoutubePlaying(false)
+      return
+    }
+
+    const onMessage = (event: MessageEvent) => {
+      if (typeof event.data !== 'string') return
+      let payload: { event?: string; state?: string }
+      try {
+        payload = JSON.parse(event.data)
+      } catch {
+        return
+      }
+      if (payload.event !== 'youtube-state') return
+      if (payload.state === 'playing') {
+        setIsYoutubePlaying(true)
+      } else if (payload.state === 'paused' || payload.state === 'ended') {
+        setIsYoutubePlaying(false)
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [hasYoutube, isFill])
 
   useEffect(() => {
     if (useNativeTakePlayback) return
@@ -393,6 +450,44 @@ function BestTakeBox({
     ],
   )
 
+  const handleYoutubePipPointerDown = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      if (event.button !== 0) return
+
+      const now = performance.now()
+      if (now - lastYoutubeTapAtRef.current < 450) return
+      lastYoutubeTapAtRef.current = now
+
+      if (suspendPlayback || !hasYoutube || isFill) return
+
+      const iframe = resolveYoutubeIframe()
+      if (!iframe) return
+
+      triggerLightHaptic()
+      notifyTutorial?.('media-touched')
+      ensureYoutubePlaybackListener()
+
+      if (isYoutubePlaying) {
+        pauseYoutubeProxy(iframe)
+        setIsYoutubePlaying(false)
+        return
+      }
+
+      startYoutubeProxyPlayback(iframe, volume)
+      setIsYoutubePlaying(true)
+    },
+    [
+      hasYoutube,
+      isFill,
+      isYoutubePlaying,
+      notifyTutorial,
+      resolveYoutubeIframe,
+      suspendPlayback,
+      volume,
+    ],
+  )
+
   const handleVolume = useCallback(
     (value: number) => {
       setVolume(value)
@@ -440,7 +535,7 @@ function BestTakeBox({
 
   const shellClass = isFill
     ? 'relative h-full w-full min-h-0 overflow-hidden'
-    : `pip-video-container${hasYoutube ? ' pip-video-container--youtube' : ''} group relative aspect-video`
+    : 'pip-video-container group relative aspect-video'
 
   const innerClass = isFill
     ? `group relative z-0 h-full w-full overflow-hidden ${mediaStageClass} ring-1 ring-amber-400/50 ${
@@ -541,23 +636,59 @@ function BestTakeBox({
 
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
-          {!(hasYoutube && !isFill) ? (
-            <span
-              className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
-                isFill ? 'px-2 py-0.5 text-[10px]' : ''
-              }`}
-              style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
-            >
-              Best Take
-            </span>
-          ) : null}
+          <span
+            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
+              isFill ? 'px-2 py-0.5 text-[10px]' : ''
+            }`}
+            style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
+          >
+            Best Take
+          </span>
 
           {hasYoutube ? (
-            <div
-              ref={onYoutubeHostChange}
-              className="youtube-embed-host pointer-events-auto absolute inset-0 z-[1] overflow-hidden"
-              aria-label="YouTube reference"
-            />
+            <>
+              <div
+                ref={handleYoutubeHostRef}
+                className={`youtube-embed-host absolute inset-0 z-[1] overflow-hidden ${
+                  isFill
+                    ? 'pointer-events-auto'
+                    : `youtube-embed-host--pip-guard ${
+                        isYoutubePlaying
+                          ? 'youtube-embed-host--pip-active'
+                          : 'youtube-embed-host--pip-dormant'
+                      }`
+                }`}
+                aria-hidden={showYoutubePipOverlay && !isYoutubePlaying}
+                aria-label="YouTube reference"
+              />
+              {showYoutubePipOverlay && (
+                <>
+                  {!isYoutubePlaying && (
+                    <div className="absolute inset-0 z-[2]">
+                      <PipMediaPoster posterUrl={youtubePosterUrl} />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onPointerDown={handleYoutubePipPointerDown}
+                    className={`youtube-pip-interaction-layer absolute inset-0 z-[30] flex cursor-pointer items-center justify-center border-0 p-0 ${
+                      isYoutubePlaying ? 'bg-transparent' : 'bg-black/35'
+                    }`}
+                    aria-label={
+                      isYoutubePlaying ? 'Pause YouTube reference' : 'Play YouTube reference'
+                    }
+                  >
+                    <span className={pipTouchIconClass}>
+                      {isYoutubePlaying ? (
+                        <Pause className="h-3 w-3 fill-white" />
+                      ) : (
+                        <Play className="h-3 w-3 fill-white" />
+                      )}
+                    </span>
+                  </button>
+                </>
+              )}
+            </>
           ) : hasTake ? (
             <div ref={playbackStageRef} className={nativePlaybackStageClass}>
               {!useNativeTakePlayback && (

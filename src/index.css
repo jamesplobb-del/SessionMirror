@@ -200,13 +200,6 @@ video.media-display-enhance:not(.camera-preview) {
   -webkit-touch-callout: none;
 }
 
-/* YouTube embed UI needs more room than take playback in the small pip card */
-.pip-video-container--youtube {
-  width: calc(13rem * var(--pip-scale, 1));
-  min-width: calc(13rem * var(--pip-scale, 1));
-  min-height: calc(13rem * 9 / 16 * var(--pip-scale, 1));
-}
-
 .pip-drag-source--active {
   opacity: 0.45;
   transform: scale(0.96);
@@ -266,15 +259,30 @@ body.settings-branch-open * {
   border: 0;
 }
 
-/* Nudge the paused-state title above the visible clip so it doesn't sit on the play button */
-.pip-video-container--youtube .youtube-embed-host iframe,
-.pip-video-container--youtube .youtube-embed-host .youtube-embed-iframe {
-  inset: auto;
-  left: 0;
-  width: 100%;
-  height: 118%;
-  top: 50%;
-  transform: translateY(-48%);
+/* Pip overlay — hide dormant iframe so WKWebView cannot sit above our play control */
+.pip-video-container .youtube-embed-host--pip-guard,
+.pip-video-container .youtube-embed-host--pip-guard iframe,
+.pip-video-container .youtube-embed-host--pip-guard .youtube-embed-iframe {
+  pointer-events: none !important;
+}
+
+.pip-video-container .youtube-embed-host--pip-dormant {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.pip-video-container .youtube-embed-host--pip-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pip-video-container .youtube-pip-interaction-layer {
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .review-timeline-overlay {
@@ -1228,8 +1236,14 @@ body.settings-branch-open * {
   background: linear-gradient(180deg, #0b1220 0%, #0f172a 52%, #020617 100%);
 }
 
-.youtube-headphones-tip {
-  top: max(1rem, calc(env(safe-area-inset-top, 0px) + 0.65rem));
+.youtube-headphones-tip,
+.youtube-expand-tip {
+  width: 100%;
+}
+
+.youtube-tips-stack {
+  padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
 }
 
 .audio-practice-metronome-shell,

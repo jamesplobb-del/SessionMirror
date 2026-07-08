@@ -2,7 +2,6 @@ import { useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { normalizeYoutubeEmbedUrl } from '../utils/youtubeEmbed'
 import {
-  registerYoutubeIframe,
   scheduleYoutubeReferenceWake,
   wakeYoutubeReference,
 } from '../utils/playalong/youtubeBridge'
@@ -37,7 +36,6 @@ export default function YoutubeBenchmarkPlayer({
       title="YouTube reference"
       onLoad={() => {
         const el = iframeRef.current
-        registerYoutubeIframe(el)
         wakeYoutubeReference(el)
         scheduleYoutubeReferenceWake(el)
       }}

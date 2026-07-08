@@ -51,11 +51,6 @@
     max-width: none;
   }
 
-  .app-pip-row > .app-pip-slot:has(.pip-video-container--youtube) {
-    flex: 0 0 calc(var(--ipad-pip-width) * 1.18);
-    width: calc(var(--ipad-pip-width) * 1.18);
-  }
-
   .app-pip-row .app-pip-slot > .pip-video-container {
     width: 100%;
     min-width: 0;

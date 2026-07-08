@@ -13,7 +13,7 @@ import {
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Headphones, X } from 'lucide-react'
+import { Headphones, Maximize2, X } from 'lucide-react'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import CameraPermissionPrompt from './components/CameraPermissionPrompt'
 import HudHeader from './components/HudHeader'
@@ -197,6 +197,7 @@ import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './conte
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 350
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
 const YOUTUBE_HEADPHONES_TIP_MS = 3200
+const YOUTUBE_EXPAND_TIP_MS = 4500
 
 function waitMs(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -428,6 +429,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [showYoutubeHeadphonesTip, setShowYoutubeHeadphonesTip] = useState(false)
   const [youtubeHeadphonesTipNonce, setYoutubeHeadphonesTipNonce] = useState(0)
+  const [showYoutubeExpandTip, setShowYoutubeExpandTip] = useState(false)
+  const [youtubeExpandTipNonce, setYoutubeExpandTipNonce] = useState(0)
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
@@ -552,6 +555,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }, YOUTUBE_HEADPHONES_TIP_MS)
     return () => window.clearTimeout(timer)
   }, [showYoutubeHeadphonesTip, youtubeHeadphonesTipNonce])
+
+  useEffect(() => {
+    if (!showYoutubeExpandTip) return
+    const timer = window.setTimeout(() => {
+      setShowYoutubeExpandTip(false)
+    }, YOUTUBE_EXPAND_TIP_MS)
+    return () => window.clearTimeout(timer)
+  }, [showYoutubeExpandTip, youtubeExpandTipNonce])
+
+  useEffect(() => {
+    if (isSplitView) {
+      setShowYoutubeExpandTip(false)
+    }
+  }, [isSplitView])
 
   const teardownPipMedia = useCallback((media: HTMLMediaElement | null | undefined) => {
     if (!media) return
@@ -1267,7 +1284,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [youtubeUrl])
 
   const handleYoutubeHostChange = useCallback((el: HTMLDivElement | null) => {
-    setYoutubeHostEl(el)
+    setYoutubeHostEl((current) => (current === el ? current : el))
   }, [])
 
   const pauseYoutubeReference = useCallback(() => {
@@ -2988,6 +3005,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setYoutubeUrl(embedUrl)
     setYoutubeHeadphonesTipNonce((current) => current + 1)
     setShowYoutubeHeadphonesTip(true)
+    setYoutubeExpandTipNonce((current) => current + 1)
+    setShowYoutubeExpandTip(true)
   }, [])
 
   const handleClearYoutube = useCallback(() => {
@@ -2995,6 +3014,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     prepareNewYoutubeReference()
     setYoutubeUrl(null)
     setYoutubeHostEl(null)
+    setShowYoutubeHeadphonesTip(false)
+    setShowYoutubeExpandTip(false)
     stabilizeViewportAfterMediaInteraction()
   }, [])
 
@@ -3091,40 +3112,87 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               )}
 
               <AnimatePresence>
-                {showYoutubeHeadphonesTip && (
+                {(showYoutubeHeadphonesTip || (showYoutubeExpandTip && !isSplitView)) && (
                   <motion.div
-                    key={`youtube-headphones-tip-${youtubeHeadphonesTipNonce}`}
-                    className="youtube-headphones-tip pointer-events-none fixed inset-x-0 z-[130] flex justify-center px-4"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
+                    key="youtube-tips-stack"
+                    className="youtube-tips-stack pointer-events-none fixed inset-0 z-[130] flex flex-col items-center justify-center gap-2 px-4"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
                     transition={iosHudDim}
                     style={motionGpuLayer}
                   >
-                    <div className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border border-[rgba(255,255,255,0.24)] bg-[rgba(20,24,31,0.86)] px-4 py-3 text-white shadow-[0_18px_36px_rgba(8,10,14,0.24)] backdrop-blur-xl">
-                      <div className="mt-0.5 rounded-full bg-white/12 p-2">
-                        <Headphones className="h-4 w-4" aria-hidden />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
-                          YouTube Tip
-                        </p>
-                        <p className="mt-1 text-sm leading-snug text-white/92">
-                          Headphones work best for YouTube play-alongs.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          triggerLightHaptic()
-                          setShowYoutubeHeadphonesTip(false)
-                        }}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/6 text-white/72"
-                        aria-label="Dismiss YouTube tip"
+                    {showYoutubeHeadphonesTip && (
+                      <motion.div
+                        key={`youtube-headphones-tip-${youtubeHeadphonesTipNonce}`}
+                        className="youtube-headphones-tip pointer-events-none flex w-full justify-center"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        transition={iosHudDim}
                       >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
+                        <div className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border border-[rgba(255,255,255,0.24)] bg-[rgba(20,24,31,0.86)] px-4 py-3 text-white shadow-[0_18px_36px_rgba(8,10,14,0.24)] backdrop-blur-xl">
+                          <div className="mt-0.5 rounded-full bg-white/12 p-2">
+                            <Headphones className="h-4 w-4" aria-hidden />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
+                              YouTube Tip
+                            </p>
+                            <p className="mt-1 text-sm leading-snug text-white/92">
+                              Headphones work best for YouTube play-alongs.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerLightHaptic()
+                              setShowYoutubeHeadphonesTip(false)
+                            }}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/6 text-white/72"
+                            aria-label="Dismiss YouTube tip"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {showYoutubeExpandTip && !isSplitView && (
+                      <motion.div
+                        key={`youtube-expand-tip-${youtubeExpandTipNonce}`}
+                        className="youtube-expand-tip pointer-events-none flex w-full justify-center"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        transition={iosHudDim}
+                      >
+                        <div className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border border-[rgba(255,255,255,0.24)] bg-[rgba(20,24,31,0.86)] px-4 py-3 text-white shadow-[0_18px_36px_rgba(8,10,14,0.24)] backdrop-blur-xl">
+                          <div className="mt-0.5 rounded-full bg-white/12 p-2">
+                            <Maximize2 className="h-4 w-4" aria-hidden />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
+                              YouTube Tip
+                            </p>
+                            <p className="mt-1 text-sm leading-snug text-white/92">
+                              Expand view is recommended for YouTube play-along.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerLightHaptic()
+                              setShowYoutubeExpandTip(false)
+                            }}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/6 text-white/72"
+                            aria-label="Dismiss expand view tip"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
