@@ -23,7 +23,6 @@ import {
 import {
   maintainYoutubeProxyLoudness,
   pauseYoutubeProxy,
-  startYoutubeProxyPlayback,
 } from '../utils/playalong/youtubeBridge'
 import {
   isNativeInlineTakeBoxPlaybackAvailable,
@@ -150,7 +149,6 @@ function BestTakeBox({
   const nativeRouteHeldRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayArmed, setIsPlayArmed] = useState(false)
-  const [isYoutubePlaying, setIsYoutubePlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
   const notifyTutorial = useTutorialAction()
@@ -202,34 +200,7 @@ function BestTakeBox({
   useEffect(() => {
     if (!hasYoutube || !suspendPlayback) return
     pauseYoutubeProxy(youtubeIframeRef?.current)
-    setIsYoutubePlaying(false)
   }, [hasYoutube, suspendPlayback, youtubeEmbedUrl, youtubeIframeRef])
-
-  useEffect(() => {
-    if (!hasYoutube) {
-      setIsYoutubePlaying(false)
-      return
-    }
-
-    const onMessage = (event: MessageEvent) => {
-      if (typeof event.data !== 'string') return
-      let payload: { event?: string; state?: string }
-      try {
-        payload = JSON.parse(event.data)
-      } catch {
-        return
-      }
-      if (payload.event !== 'youtube-state') return
-      if (payload.state === 'playing') {
-        setIsYoutubePlaying(true)
-      } else if (payload.state === 'paused' || payload.state === 'ended') {
-        setIsYoutubePlaying(false)
-      }
-    }
-
-    window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
-  }, [hasYoutube])
 
   useEffect(() => {
     if (useNativeTakePlayback) return
@@ -422,29 +393,6 @@ function BestTakeBox({
     ],
   )
 
-  const handleYoutubePlayPause = useCallback(
-    (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation()
-      stopEventBubble(event)
-      if (suspendPlayback || !hasYoutube) return
-
-      const iframe = youtubeIframeRef?.current
-      if (!iframe) return
-
-      notifyTutorial?.('media-touched')
-
-      if (isYoutubePlaying) {
-        pauseYoutubeProxy(iframe)
-        setIsYoutubePlaying(false)
-        return
-      }
-
-      startYoutubeProxyPlayback(iframe, volume)
-      setIsYoutubePlaying(true)
-    },
-    [hasYoutube, isYoutubePlaying, notifyTutorial, suspendPlayback, volume, youtubeIframeRef],
-  )
-
   const handleVolume = useCallback(
     (value: number) => {
       setVolume(value)
@@ -603,39 +551,11 @@ function BestTakeBox({
           </span>
 
           {hasYoutube ? (
-            <>
-              <div
-                ref={onYoutubeHostChange}
-                className={`youtube-embed-host absolute inset-0 z-[1] overflow-hidden ${
-                  isFill ? 'pointer-events-auto' : 'youtube-embed-host--pip-guard pointer-events-none'
-                }`}
-                aria-label="YouTube reference"
-              />
-              {!isFill && !suspendPlayback && (
-                <div className="absolute inset-0 z-[5] pointer-events-none">
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    squish={false}
-                    haptic="light"
-                    onPointerDown={stopEventBubble}
-                    onTouchStart={stopEventBubble}
-                    onTouchEnd={stopEventBubble}
-                    onClick={handleYoutubePlayPause}
-                    className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
-                    aria-label={isYoutubePlaying ? 'Pause YouTube reference' : 'Play YouTube reference'}
-                  >
-                    <span className={pipTouchIconClass}>
-                      {isYoutubePlaying ? (
-                        <Pause className="h-3 w-3 fill-white" />
-                      ) : (
-                        <Play className="h-3 w-3 fill-white" />
-                      )}
-                    </span>
-                  </Pressable>
-                </div>
-              )}
-            </>
+            <div
+              ref={onYoutubeHostChange}
+              className="youtube-embed-host pointer-events-auto absolute inset-0 z-[1] overflow-hidden"
+              aria-label="YouTube reference"
+            />
           ) : hasTake ? (
             <div ref={playbackStageRef} className={nativePlaybackStageClass}>
               {!useNativeTakePlayback && (

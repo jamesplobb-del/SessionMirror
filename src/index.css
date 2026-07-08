@@ -259,18 +259,6 @@ body.settings-branch-open * {
   border: 0;
 }
 
-/* Pip layout — block iframe taps (open-in-YouTube) and use app play control */
-.pip-video-container .youtube-embed-host--pip-guard iframe,
-.pip-video-container .youtube-embed-host--pip-guard .youtube-embed-iframe {
-  pointer-events: none;
-  width: 168%;
-  height: 168%;
-  left: 50%;
-  top: 50%;
-  inset: auto;
-  transform: translate(-50%, -50%);
-}
-
 .review-timeline-overlay {
   bottom: 0;
 }
