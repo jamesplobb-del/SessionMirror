@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { motion } from 'framer-motion'
-import { Pause, Play, Star, X } from 'lucide-react'
+import { Maximize2, Pause, Play, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import AudioModeHeroMic from './AudioModeHeroMic'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
@@ -302,6 +302,8 @@ interface AudioModeHomeProps {
   challengerTake: Take | null
   benchmarkTake: Take | null
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
+  hasYoutubeReference?: boolean
+  onOpenSplitLayout?: () => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onPinCurrentAsBest?: () => void
@@ -316,6 +318,8 @@ function AudioModeHome({
   challengerTake,
   benchmarkTake,
   libraryBenchmarkPlayback,
+  hasYoutubeReference = false,
+  onOpenSplitLayout,
   onExpandBenchmark,
   onExpandChallenger,
   onPinCurrentAsBest,
@@ -338,6 +342,20 @@ function AudioModeHome({
         <h2>{status}</h2>
         <p>{hint}</p>
       </motion.div>
+
+      {onOpenSplitLayout && (
+        <Pressable
+          type="button"
+          intensity="soft"
+          haptic="light"
+          onClick={onOpenSplitLayout}
+          className="audio-mode-split-entry pointer-events-auto"
+          aria-label="Open expand layout for YouTube play-along"
+        >
+          <Maximize2 className="h-4 w-4" aria-hidden />
+          <span>{hasYoutubeReference ? 'Open expand view' : 'Expand layout for YouTube play-along'}</span>
+        </Pressable>
+      )}
 
       <div className="audio-mode-take-stack">
         <AudioModeTakeCard

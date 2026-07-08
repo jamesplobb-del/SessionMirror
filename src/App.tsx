@@ -1643,6 +1643,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [isRecording, settings.excludeYoutubeFromRecording, youtubeHostEl, youtubeUrl])
 
   useEffect(() => {
+    if (!youtubeUrl || !youtubeHostEl) return
+    const frameId = window.requestAnimationFrame(() => {
+      startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [isSplitView, youtubeHostEl, youtubeUrl])
+
+  useEffect(() => {
     return () => {
       stopAutoPlaybackAudio()
       if (autoPlaybackReleaseTimerRef.current !== null) {
@@ -1900,6 +1908,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       if (mode === 'audio') {
         requestCameraAccess('audio')
+        if (youtubeUrlRef.current) {
+          setIsSplitView(true)
+        }
       }
       if (mode === 'video') {
         scheduleAfterPaint(() => {
@@ -3003,10 +3014,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     prepareNewYoutubeReference()
     setYoutubeUrl(embedUrl)
+    if (recordingModeRef.current === 'audio') {
+      setIsSplitView(true)
+    }
     setYoutubeHeadphonesTipNonce((current) => current + 1)
     setShowYoutubeHeadphonesTip(true)
     setYoutubeExpandTipNonce((current) => current + 1)
     setShowYoutubeExpandTip(true)
+  }, [])
+
+  const handleOpenAudioSplitLayout = useCallback(() => {
+    setIsSplitView(true)
+    if (youtubeUrlRef.current) {
+      window.requestAnimationFrame(() => {
+        startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
+      })
+    }
   }, [])
 
   const handleClearYoutube = useCallback(() => {
@@ -3452,6 +3475,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                             challengerTake={challengerTake}
+                            hasYoutubeReference={Boolean(youtubeUrl)}
+                            onOpenSplitLayout={handleOpenAudioSplitLayout}
                             onExpandBenchmark={handleExpandBenchmark}
                             onExpandChallenger={handleExpandChallenger}
                             onPinCurrentAsBest={handlePinCurrentAsBest}
