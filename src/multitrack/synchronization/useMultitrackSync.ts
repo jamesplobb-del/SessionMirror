@@ -27,6 +27,7 @@ function primeElementForPlayback(element: HTMLMediaElement): void {
 export function useMultitrackSync() {
   const mediaMapRef = useRef<Map<string, HTMLMediaElement>>(new Map())
   const excludePanelIdRef = useRef<string | null>(null)
+  const referencePanelIdsRef = useRef<string[] | null>(null)
   /** Mixer state (per-panel playback balance). */
   const panelVolumeRef = useRef<Map<string, number>>(new Map())
   const panelMutedRef = useRef<Set<string>>(new Set())
@@ -118,7 +119,12 @@ export function useMultitrackSync() {
   }, [])
 
   const getEntries = useCallback((excludePanelId: string | null = excludePanelIdRef.current) => {
-    return [...mediaMapRef.current.entries()].filter(([panelId]) => panelId !== excludePanelId)
+    const referenceOnly = referencePanelIdsRef.current
+    return [...mediaMapRef.current.entries()].filter(([panelId]) => {
+      if (panelId === excludePanelId) return false
+      if (referenceOnly && !referenceOnly.includes(panelId)) return false
+      return true
+    })
   }, [])
 
 
@@ -199,6 +205,11 @@ export function useMultitrackSync() {
 
   const setExcludePanelId = useCallback((panelId: string | null) => {
     excludePanelIdRef.current = panelId
+  }, [])
+
+  /** During overdub recording, only these panels are armed/played as reference (MVP: Track 1). */
+  const setReferencePanelIds = useCallback((panelIds: string[] | null) => {
+    referencePanelIdsRef.current = panelIds
   }, [])
 
   const registerMedia = useCallback((panelId: string, element: HTMLMediaElement | null) => {
@@ -506,6 +517,7 @@ export function useMultitrackSync() {
   const playAllFromUserGesture = useCallback(async () => {
     // Full reset — chase mode from recording leaves transport in a state that
     // blocks normal grouped playback if we only seek without clearing it.
+    referencePanelIdsRef.current = null
     chaseModeRef.current = false
     pendingStartRef.current.clear()
     transportLockedRef.current = false
@@ -542,6 +554,7 @@ export function useMultitrackSync() {
   }, [])
 
   const restart = useCallback(async () => {
+    referencePanelIdsRef.current = null
     chaseModeRef.current = false
     pendingStartRef.current.clear()
     transportLockedRef.current = false
@@ -712,6 +725,7 @@ export function useMultitrackSync() {
   return {
     registerMedia,
     setExcludePanelId,
+    setReferencePanelIds,
     setPanelVolume,
     setPanelMuted,
     setPanelTrim,

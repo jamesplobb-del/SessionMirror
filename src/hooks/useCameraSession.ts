@@ -21,6 +21,7 @@ import {
   composeBufferedRecordingBlob,
   StreamingTakeWriter,
   type RecordingCompletePayload,
+  type MultitrackRecordingStopOptions,
 } from '../utils/takeStorage'
 import { tuneMusicRecordingStream, getActiveCaptureProfile } from '../utils/audioCapture'
 import {
@@ -1503,12 +1504,15 @@ export function useCameraSession({
     suspendSharedMicForNativeRecording,
   ])
 
-  const stopNativeExperimentalRecording = useCallback((options?: { rawOffsetMs?: number }) => {
+  const stopNativeExperimentalRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     setIsStopping(true)
 
     void (async () => {
       let timelineOffsetMs: number | undefined
-      if (options?.rawOffsetMs !== undefined) {
+      if (options?.timelineOffsetMs !== undefined) {
+        timelineOffsetMs = Math.round(options.timelineOffsetMs)
+        console.log(`[useCameraSession] beat-based timelineOffsetMs=${timelineOffsetMs}`)
+      } else if (options?.rawOffsetMs !== undefined) {
         const rtlMs = await getAudioHardwareRtl()
         timelineOffsetMs = Math.round(options.rawOffsetMs - rtlMs)
         console.log(`[useCameraSession] rawOffsetMs=${options.rawOffsetMs} rtlMs=${rtlMs} timelineOffsetMs=${timelineOffsetMs}`)
@@ -1576,6 +1580,11 @@ export function useCameraSession({
         videoUrl,
         durationSeconds: Math.max(0.1, result.duration || elapsedRef.current),
         timelineOffsetMs,
+        recordingBpm: options?.recordingBpm,
+        performanceStartBeats: options?.performanceStartBeats,
+        performanceStartOffsetBeats: options?.performanceStartOffsetBeats,
+        referenceTrackId: options?.referenceTrackId,
+        referenceStartBeat: options?.referenceStartBeat,
         recordingOrientation: recordingOrientationRef.current,
         // Native AVCaptureMovieFileOutput is unmirrored (see
         // NativeCameraRecordingEngine.configureCaptureSession) to match the
@@ -1758,7 +1767,7 @@ export function useCameraSession({
     }
   }, [disarmAutoAudioRecorder])
 
-  const stopRecording = useCallback((options?: { rawOffsetMs?: number }) => {
+  const stopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     // Route to the serialized native stop when a native recording is active OR
     // a native start is still settling (bridge warm / didStartRecording window)
     // — that stop path awaits the settle, so Stop is safe at any instant.

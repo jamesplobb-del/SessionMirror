@@ -37,6 +37,16 @@ export interface Take {
   playbackGainMetadata?: PlaybackGainMetadata
   /** Playback alignment offset in milliseconds. positive = delayed, negative = early */
   timelineOffsetMs?: number
+  /** BPM used when this take was recorded — enables beat-based alignment. */
+  recordingBpm?: number
+  /** Number of count-in beats before the performance starts in this file. */
+  performanceStartBeats?: number
+  /** Beats from file start to the musical performance entry (alignment). */
+  performanceStartOffsetBeats?: number
+  /** Overdub takes: id of the reference take (Track 1). */
+  referenceTrackId?: string
+  /** Overdub takes: count-in beat when the reference started. */
+  referenceStartBeat?: number
 }
 
 export type SortMode = 'newest' | 'highest-rated'

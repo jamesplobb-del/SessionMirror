@@ -78,6 +78,7 @@ import {
   resolveNativeFileUri,
   sanitizeNativeVideoSrc,
   type RecordingCompletePayload,
+  type MultitrackRecordingStopOptions,
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
@@ -1046,6 +1047,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       autoPerformanceStartSeconds,
       mirrorPlayback,
       timelineOffsetMs,
+      recordingBpm,
+      performanceStartBeats,
+      performanceStartOffsetBeats,
+      referenceTrackId,
+      referenceStartBeat,
     } = payload
 
     void logRecordingOutputVerification({
@@ -1084,6 +1090,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         recordingOrientation: recordingOrientation ?? 'portrait',
         ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
         timelineOffsetMs,
+        ...(recordingBpm !== undefined ? { recordingBpm } : null),
+        ...(performanceStartBeats !== undefined ? { performanceStartBeats } : null),
+        ...(performanceStartOffsetBeats !== undefined ? { performanceStartOffsetBeats } : null),
+        ...(referenceTrackId !== undefined ? { referenceTrackId } : null),
+        ...(referenceStartBeat !== undefined ? { referenceStartBeat } : null),
       }
       return [...prev, savedTake]
     })
@@ -2014,7 +2025,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return startRecording()
   }, [pausePipVideos, pauseYoutubeReference, startRecording, settings.excludeYoutubeFromRecording])
 
-  const handleMultitrackStopRecording = useCallback((options?: { rawOffsetMs?: number }) => {
+  const handleMultitrackStopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     // No isRecording gate: the serialized native stop is safe at any instant
     // (it awaits an in-flight start), and the old stale-state gate could
     // silently no-op a legitimate Stop.

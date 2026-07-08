@@ -31,6 +31,11 @@ export interface RecordingCompletePayload {
   /** Populated after post-save loudness analysis. */
   captureDiagnostics?: RecordingCaptureDiagnostics
   timelineOffsetMs?: number
+  recordingBpm?: number
+  performanceStartBeats?: number
+  performanceStartOffsetBeats?: number
+  referenceTrackId?: string
+  referenceStartBeat?: number
   /**
    * Overrides the default video mirror-on-playback behavior. Native camera
    * recordings are already saved in true (unmirrored) orientation, so they
@@ -38,6 +43,19 @@ export interface RecordingCompletePayload {
    * default (mirrored) behavior for legacy WebKit-recorded takes.
    */
   mirrorPlayback?: boolean
+}
+
+/** Options passed when stopping a multitrack recording take. */
+export interface MultitrackRecordingStopOptions {
+  /** Legacy latency-based offset — RTL is subtracted before save. */
+  rawOffsetMs?: number
+  /** Beat-based offset — stored as-is (derived from BPM × performanceStartOffsetBeats). */
+  timelineOffsetMs?: number
+  recordingBpm?: number
+  performanceStartBeats?: number
+  performanceStartOffsetBeats?: number
+  referenceTrackId?: string
+  referenceStartBeat?: number
 }
 
 function extensionForMime(mimeType: string): string {

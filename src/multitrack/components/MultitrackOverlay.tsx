@@ -33,6 +33,14 @@ import { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMultitrackRecording } from '../recording/useMultitrackRecording'
 import { computeTakeAlignment } from '../../utils/nativeAlignment'
 import { updateVaultTake } from '../../db/vaultRepository'
+import {
+  isOverdubPanel,
+  timelineOffsetMsForTake,
+  TRACK1_PANEL_ID,
+  TRACK1_COUNT_IN_BEATS,
+  OVERDUB_COUNT_IN_BEATS,
+} from '../synchronization/multitrackBeatSchedule'
+import type { MultitrackRecordingStopOptions } from '../../utils/takeStorage'
 import { exportMultitrackSession, type MultitrackExportFailureReason } from '../export/multitrackExport'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
@@ -64,7 +72,7 @@ interface MultitrackOverlayProps {
   onClose: () => void
   /** Starts the camera; resolves true only once recording is confirmed. */
   onStartRecording: () => Promise<boolean>
-  onStopRecording: (options?: { rawOffsetMs?: number }) => void
+  onStopRecording: (options?: MultitrackRecordingStopOptions) => void
   onRecordingComplete: () => void
   /** Fully discards a take (state, DB row, file, thumbnail) — used to throw away a retried recording. */
   onDeleteTakes: (ids: string[]) => void
@@ -276,45 +284,41 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
    */
   const alignedOffsetRef = useRef<Map<string, number>>(new Map())
 
+  const track1Panel = session.panels.find(
+    (panel) => panel.id === TRACK1_PANEL_ID && panel.kind === 'performance',
+  )
+  const track1TakeId = track1Panel?.kind === 'performance' ? track1Panel.take?.id ?? null : null
+
   const recording = useMultitrackRecording({
     onCountInStart: (panelId) => {
       recordingTargetPanelIdRef.current = panelId
       sync.setExcludePanelId(panelId)
+      const overdub = isOverdubPanel(panelId)
+      sync.setReferencePanelIds(overdub ? [TRACK1_PANEL_ID] : null)
       return onStartRecording()
     },
     onArmPlayback: async () => {
       sync.setExcludePanelId(recordingTargetPanelIdRef.current)
+      const overdub = isOverdubPanel(recordingTargetPanelIdRef.current ?? '')
+      sync.setReferencePanelIds(overdub ? [TRACK1_PANEL_ID] : null)
       await sync.prepareAtStart(0)
       await prepareBackingAtStart()
     },
-    requiresReferencePlayback: () =>
-      session.panels.some(
-        (panel) =>
-          panel.kind === 'performance' &&
-          panel.take !== null &&
-          panel.id !== recordingTargetPanelIdRef.current,
-      ),
-    hasAudibleReferences: () =>
-      session.backing.kind !== 'none' ||
-      session.panels.some(
-        (panel) =>
-          panel.kind === 'performance' &&
-          panel.take !== null &&
-          panel.id !== recordingTargetPanelIdRef.current,
-      ),
+    requiresReferencePlayback: () => {
+      const targetId = recordingTargetPanelIdRef.current
+      return (
+        targetId !== null &&
+        isOverdubPanel(targetId) &&
+        track1Panel?.kind === 'performance' &&
+        track1Panel.take !== null
+      )
+    },
+    getReferenceTakeId: () => track1TakeId,
     onStartReferencePlayback: async () => {
-      const started = await sync.startPrepared()
-      if (!monitorMutesRef.current.has('backing')) {
-        const backingStarted = await startBackingPlayback()
-        return started || backingStarted
-      }
-      return started
+      return sync.startPrepared()
     },
     onPrepareCountInAudio: async () => {
       try {
-        // Re-apply (not just ensure) the playback session: the camera start
-        // that just happened reconfigures the AVAudioSession and silences the
-        // Web Audio click graph while the stale route hold no-ops prepare.
         await reassertPlaybackRouteForCountIn()
       } catch {
         return false
@@ -326,13 +330,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       sync.pause()
       pauseBacking()
       sync.setExcludePanelId(null)
+      sync.setReferencePanelIds(null)
       sharedMetronomeEngine.stop()
     },
     onPerformanceStart: async () => {
-      // Safety net if reference stalled mid count-in.
-      if (!sync.state.isPlaying) {
-        await sync.startPrepared()
-      }
       if (!monitorMutesRef.current.has('backing')) {
         await startBackingPlayback()
       }
@@ -341,6 +342,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       setPendingReview(null)
       pauseBacking()
       sync.setExcludePanelId(null)
+      sync.setReferencePanelIds(null)
       void showAlert({ message, tone: 'error' })
     },
   })
@@ -417,7 +419,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     // correlating the recorded count-in clicks against the ideal beat grid. Runs
     // off the main path; only applied when the correlation is confident.
     const practice = session.practice
-    const countInBeats = Math.max(0, Math.round(practice.countInBars * 4))
+    const countInBeats = targetPanelId && isOverdubPanel(targetPanelId)
+      ? OVERDUB_COUNT_IN_BEATS
+      : TRACK1_COUNT_IN_BEATS
     if (practice.clickEnabled && countInBeats >= 2 && take.videoUrl) {
       const alignTakeId = take.id
       void (async () => {
@@ -512,13 +516,18 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       sync.setPanelMuted(panel.id, panel.muted === true)
       sync.setPanelTrim(panel.id, panel.trimStartSec ?? 0, panel.trimEndSec ?? null)
       const takeId = panel.take?.id
+      const beatOffset =
+        panel.take != null
+          ? timelineOffsetMsForTake(panel.take, session.practice.bpm)
+          : undefined
       const offset =
         (takeId ? alignedOffsetRef.current.get(takeId) : undefined) ??
+        beatOffset ??
         panel.take?.timelineOffsetMs ??
         0
       sync.setPanelOffset(panel.id, offset)
     }
-  }, [session.panels, sync])
+  }, [session.panels, session.practice.bpm, sync])
 
   const tileSheetPanel = session.panels.find(
     (panel) => panel.id === tileSheetPanelId && panel.kind === 'performance',
@@ -532,9 +541,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       onOpenRecordingStage?.()
       setActivePanelId(panelId)
       recordingTargetPanelIdRef.current = panelId
-      // Pre-warm reference media and the click route for every box so Record →
-      // count-in doesn't wait on route prep / decode.
+      const overdub = isOverdubPanel(panelId)
       sync.setExcludePanelId(panelId)
+      sync.setReferencePanelIds(overdub ? [TRACK1_PANEL_ID] : null)
       void sync.prepareAtStart(0).then(() => prepareBackingAtStart()).catch(() => {})
       void ensureNativeCameraSessionHealthy()
     },
@@ -753,9 +762,22 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               }}
               onStop={() => {
                 sync.setExcludePanelId(null)
+                sync.setReferencePanelIds(null)
                 sync.pause()
                 pauseBacking()
-                onStopRecording({ rawOffsetMs: recording.getTrimStartMs() })
+                const timing = recording.getRecordingTiming()
+                onStopRecording(
+                  timing
+                    ? {
+                        timelineOffsetMs: timing.timelineOffsetMs,
+                        recordingBpm: timing.recordingBpm,
+                        performanceStartBeats: timing.performanceStartBeat,
+                        performanceStartOffsetBeats: timing.performanceStartOffsetBeats,
+                        referenceTrackId: timing.referenceTrackId ?? undefined,
+                        referenceStartBeat: timing.referenceStartBeat ?? undefined,
+                      }
+                    : undefined,
+                )
                 recording.enterReview()
               }}
               onUseExisting={() => setTakePickerPanelId(activePanel.id)}
@@ -768,6 +790,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   setPendingReview(null)
                 }
                 sync.setExcludePanelId(null)
+                sync.setReferencePanelIds(null)
                 sync.setMonitorMutedPanelIds([])
                 sync.pause()
                 pauseBacking()

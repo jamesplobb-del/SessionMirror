@@ -1,6 +1,11 @@
 import { useCallback, useRef, useState } from 'react'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
-import { getMetronomeCountInDelaySec } from '../synchronization/metronomePlaybackCompensation'
+import {
+  beatDurationSec,
+  buildTakeTimingMetadata,
+  getRecordingBeatSchedule,
+  type MultitrackTakeTimingMetadata,
+} from '../synchronization/multitrackBeatSchedule'
 import type { MultitrackRecordingPhase } from '../types'
 
 export function useMultitrackRecording(options: {
@@ -14,18 +19,18 @@ export function useMultitrackRecording(options: {
   /** Load/prime reference media paused at timeline 0 — must finish before the click begins. */
   onArmPlayback?: () => Promise<void>
   /**
-   * Start reference playback (other takes + backing). Resolves true once
+   * Start Track 1 reference playback on overdub beat 5. Resolves true once
    * playback is confirmed, or when there is nothing to play.
    */
   onStartReferencePlayback?: () => Promise<boolean>
-  /** Prime audio session + metronome graph before count-in (first take / after idle). */
+  /** Prime audio session + metronome graph before count-in. */
   onPrepareCountInAudio?: () => Promise<boolean>
   onPerformanceStart?: () => Promise<void>
   onCountInComplete?: (panelId: string) => void
   onError?: (message: string) => void
   requiresReferencePlayback?: () => boolean
-  /** Other takes and/or backing will play before count-in — uses full latency delay. */
-  hasAudibleReferences?: () => boolean
+  /** Take id on panel a — stored as referenceTrackId for overdub takes. */
+  getReferenceTakeId?: () => string | null
   recoverFromInterrupt?: () => void
 }) {
   const {
@@ -37,7 +42,7 @@ export function useMultitrackRecording(options: {
     onCountInComplete,
     onError,
     requiresReferencePlayback,
-    hasAudibleReferences,
+    getReferenceTakeId,
     recoverFromInterrupt,
   } = options
   const [phase, setPhase] = useState<MultitrackRecordingPhase>('idle')
@@ -46,11 +51,11 @@ export function useMultitrackRecording(options: {
   const activeRef = useRef(false)
   const pulseUnsubRef = useRef<(() => void) | null>(null)
   const timerRef = useRef<number | null>(null)
-  const trimStartMsRef = useRef<number>(0)
+  const timingRef = useRef<MultitrackTakeTimingMetadata | null>(null)
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
 
-  const getTrimStartMs = useCallback(() => trimStartMsRef.current, [])
+  const getRecordingTiming = useCallback(() => timingRef.current, [])
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -72,6 +77,7 @@ export function useMultitrackRecording(options: {
     setCountInRemaining(0)
     setPhase('idle')
     setTargetPanelId(null)
+    timingRef.current = null
   }, [clearPulseUnsub, clearTimer])
 
   const recover = useCallback(() => {
@@ -97,60 +103,104 @@ export function useMultitrackRecording(options: {
     setPhase('review')
   }, [clearPulseUnsub, clearTimer])
 
-  /** Visual-only count-in (click disabled). Shows N … 2 … 1, one full beat on 1. */
-  const runVisualCountIn = useCallback(
-    async (countInBeats: number, beatMs: number) => {
+  /** Visual-only count-in (click disabled). Intervals are BPM-derived, not arbitrary. */
+  const runVisualBeatCountIn = useCallback(
+    async (
+      countInBeats: number,
+      performanceStartBeat: number,
+      referenceStartBeat: number | null,
+      beatMs: number,
+      onReferenceBeat?: () => Promise<boolean>,
+    ) => {
       if (countInBeats <= 0) return
       setPhase('count-in')
-      for (let beat = countInBeats; beat >= 1; beat -= 1) {
+      for (let beat = 1; beat < performanceStartBeat; beat += 1) {
         if (!activeRef.current) return
-        setCountInRemaining(beat)
+        setCountInRemaining(Math.max(1, countInBeats - beat + 1))
+        if (onReferenceBeat && referenceStartBeat !== null && beat === referenceStartBeat) {
+          const started = await onReferenceBeat()
+          if (requiresReferencePlayback?.() && started === false && activeRef.current) {
+            fail("Reference playback couldn't start. Check your takes and try again.")
+            return
+          }
+        }
         await new Promise<void>((resolve) => {
           timerRef.current = window.setTimeout(resolve, beatMs)
         })
       }
     },
-    [],
+    [fail, requiresReferencePlayback],
   )
 
-  /** Pulse-locked count-in (all boxes). Subscribe before start so beat 1 is never missed. */
-  const runCountIn = useCallback(
+  /**
+   * Pulse-locked count-in tied to the metronome engine. Reference playback
+   * (overdub only) starts on beat 5; performance enters on beat 5 (Track 1)
+   * or beat 9 (overdub boxes 2–6).
+   */
+  const runBeatScheduledCountIn = useCallback(
     async (
       countInBeats: number,
-      beatMs: number,
+      performanceStartBeat: number,
+      referenceStartBeat: number | null,
       clickEnabled: boolean,
-      firstBeatDelaySec: number | undefined,
+      onReferenceBeat?: () => Promise<boolean>,
     ) => {
       if (countInBeats <= 0) return
 
       setPhase('count-in')
       setCountInRemaining(countInBeats)
 
+      const beatMs = beatDurationSec(sharedMetronomeEngine.getSnapshot().bpm) * 1000
+
       if (!clickEnabled) {
-        await runVisualCountIn(countInBeats, beatMs)
+        await runVisualBeatCountIn(
+          countInBeats,
+          performanceStartBeat,
+          referenceStartBeat,
+          beatMs,
+          referenceStartBeat !== null ? onReferenceBeat : undefined,
+        )
         return
       }
 
       await new Promise<void>((resolve) => {
-        let pulsesHeard = 0
-        pulseUnsubRef.current = sharedMetronomeEngine.subscribePulse(() => {
+        let referenceStarted = false
+
+        pulseUnsubRef.current = sharedMetronomeEngine.subscribePulse((beatIndex) => {
           if (!activeRef.current) {
             clearPulseUnsub()
             resolve()
             return
           }
-          pulsesHeard += 1
-          const remaining = countInBeats - pulsesHeard + 1
-          if (remaining > 0) {
-            setCountInRemaining(remaining)
+
+          const beatNumber = beatIndex + 1
+
+          if (beatNumber <= countInBeats) {
+            setCountInRemaining(countInBeats - beatNumber + 1)
           }
-          if (pulsesHeard > countInBeats) {
+
+          if (
+            referenceStartBeat !== null &&
+            beatNumber === referenceStartBeat &&
+            !referenceStarted
+          ) {
+            referenceStarted = true
+            void onReferenceBeat?.().then((started) => {
+              if (requiresReferencePlayback?.() && started === false && activeRef.current) {
+                fail("Reference playback couldn't start. Check your takes and try again.")
+                clearPulseUnsub()
+                resolve()
+              }
+            })
+          }
+
+          if (beatNumber === performanceStartBeat) {
             clearPulseUnsub()
             resolve()
           }
         })
 
-        void sharedMetronomeEngine.start({ firstBeatDelaySec }).then((started) => {
+        void sharedMetronomeEngine.start().then((started) => {
           if (!started && activeRef.current) {
             fail("The metronome couldn't start. Try again.")
             clearPulseUnsub()
@@ -159,7 +209,7 @@ export function useMultitrackRecording(options: {
         })
       })
     },
-    [clearPulseUnsub, fail, runVisualCountIn],
+    [clearPulseUnsub, fail, requiresReferencePlayback, runVisualBeatCountIn],
   )
 
   const beginCountIn = useCallback((panelId: string, settings?: {
@@ -169,31 +219,26 @@ export function useMultitrackRecording(options: {
   }) => {
     if (activeRef.current) return
     const bpm = Math.max(40, Math.min(300, Math.round(settings?.bpm ?? 120)))
-    const countInBars = Math.max(0, Math.min(8, Math.round(settings?.countInBars ?? 1)))
-    const countInBeats = countInBars * 4
-    const beatMs = 60_000 / bpm
     const clickEnabled = settings?.clickEnabled !== false
+    const schedule = getRecordingBeatSchedule(panelId)
 
     activeRef.current = true
     setTargetPanelId(panelId)
     setCountInRemaining(0)
     setPhase('arming')
+    timingRef.current = buildTakeTimingMetadata(panelId, bpm, getReferenceTakeId?.())
 
     void (async () => {
-      trimStartMsRef.current = 0
       sharedMetronomeEngine.stop()
 
       const startResult = onCountInStart?.(panelId)
-      let T_cameraStart = 0
       const cameraPromise = Promise.resolve(startResult ?? true)
         .then((started) => {
-          T_cameraStart = performance.now()
           if (started !== false) return true
           if (activeRef.current) fail("Recording couldn't start. Check the camera and try again.")
           return false
         })
         .catch(() => {
-          T_cameraStart = performance.now()
           if (activeRef.current) fail("Recording couldn't start. Check the camera and try again.")
           return false
         })
@@ -205,29 +250,8 @@ export function useMultitrackRecording(options: {
         return
       }
 
-      const [cameraOk] = await Promise.all([cameraPromise])
+      const cameraOk = await cameraPromise
       if (!cameraOk || !activeRef.current) return
-
-      // Start references first, then stamp how far into the file the camera
-      // already rolled — this is what Play All / export use to line up takes.
-      let T_audioStart = 0
-      const referenceStarted = (await onStartReferencePlayback?.()) ?? true
-      T_audioStart = performance.now()
-
-      if (requiresReferencePlayback?.() && referenceStarted === false) {
-        if (activeRef.current) {
-          fail("Reference playback couldn't start. Check your takes and try again.")
-        }
-        return
-      }
-
-      if (T_cameraStart > 0 && T_audioStart > 0) {
-        trimStartMsRef.current = Math.max(0, Math.round(T_audioStart - T_cameraStart))
-      }
-
-      const audibleReferences =
-        hasAudibleReferences?.() ??
-        (requiresReferencePlayback?.() === true && referenceStarted)
 
       if (clickEnabled) {
         sharedMetronomeEngine.applySectionConfig(
@@ -245,13 +269,15 @@ export function useMultitrackRecording(options: {
           fail("The metronome couldn't start. Try again.")
           return
         }
-        const firstBeatDelaySec = await getMetronomeCountInDelaySec({
-          hasAudibleReferences: audibleReferences,
-        })
-        await runCountIn(countInBeats, beatMs, clickEnabled, firstBeatDelaySec)
-      } else {
-        await runVisualCountIn(countInBeats, beatMs)
       }
+
+      await runBeatScheduledCountIn(
+        schedule.countInBeats,
+        schedule.performanceStartBeat,
+        schedule.referenceStartBeat,
+        clickEnabled,
+        schedule.referenceStartBeat !== null ? onStartReferencePlayback : undefined,
+      )
       if (!activeRef.current) return
 
       await onPerformanceStart?.()
@@ -261,16 +287,14 @@ export function useMultitrackRecording(options: {
     })()
   }, [
     fail,
+    getReferenceTakeId,
     onArmPlayback,
     onCountInComplete,
     onCountInStart,
     onPerformanceStart,
     onPrepareCountInAudio,
     onStartReferencePlayback,
-    requiresReferencePlayback,
-    hasAudibleReferences,
-    runCountIn,
-    runVisualCountIn,
+    runBeatScheduledCountIn,
   ])
 
   return {
@@ -282,6 +306,6 @@ export function useMultitrackRecording(options: {
     recover,
     enterReview,
     fail,
-    getTrimStartMs,
+    getRecordingTiming,
   }
 }
