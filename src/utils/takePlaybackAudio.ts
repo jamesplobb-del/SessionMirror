@@ -352,6 +352,8 @@ export async function playTakeMediaMuted(
 export interface PlayTakeMediaAudibleOptions extends PlaybackAttemptOptions {
   /** When playback route was already prepared (e.g. hands-free auto-playback). */
   skipRoutePrep?: boolean
+  /** Fullscreen camera-mode playback should suspend the live preview route first. */
+  suspendCameraForRoute?: boolean
   /**
    * Attach the per-element 'ended' listener that restores the recording route
    * (default true). Multitrack sync passes false: with several clips of
@@ -370,7 +372,9 @@ export async function playTakeMediaAudible(
 
   if (!options.skipRoutePrep) {
     try {
-      await preparePlaybackRoute({ suspendCamera: false })
+      await preparePlaybackRoute({
+        suspendCamera: options.suspendCameraForRoute === true,
+      })
     } catch {
       return false
     }

@@ -107,7 +107,16 @@ function LiveCameraBackground({
     isAudioMode && !pitchStageActive && !metronomeStageActive && !audioPracticeOverlayActive
   const isEmbedded = variant === 'embedded'
   const previewWorkSuppressed = visuallySuppressed && !isEmbedded
-  const activeNativeLivePreview = nativeLivePreviewActive && !previewWorkSuppressed
+  const showHandsFreeTakePlayback =
+    recordingMode === 'video' &&
+    Boolean(handsFreePlaybackTakeId) &&
+    Boolean(handsFreePlaybackSrc) &&
+    !isAudioMode &&
+    !visuallySuppressed
+  const nativePreviewSuppressedForPlayback =
+    holdPreviewForTakePlayback || showHandsFreeTakePlayback
+  const activeNativeLivePreview =
+    nativeLivePreviewActive && !previewWorkSuppressed && !nativePreviewSuppressedForPlayback
   const overlayClass = isEmbedded
     ? 'camera-background-overlay camera-background-overlay--embedded'
     : 'camera-background-overlay'
@@ -378,6 +387,7 @@ function LiveCameraBackground({
       )
 
       const started = await playTakeMediaAudible(media, {
+        suspendCameraForRoute: true,
         onFailure: () => onHandsFreePlaybackPlayingChange?.(false),
       })
       if (cancelled || !handsFreePlaybackSessionRef.current) {
@@ -429,13 +439,6 @@ function LiveCameraBackground({
     recordingMode,
     visuallySuppressed,
   ])
-
-  const showHandsFreeTakePlayback =
-    recordingMode === 'video' &&
-    Boolean(handsFreePlaybackTakeId) &&
-    Boolean(handsFreePlaybackSrc) &&
-    !isAudioMode &&
-    !visuallySuppressed
 
   const pinchZoomEnabled =
     !isEmbedded &&

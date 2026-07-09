@@ -2480,8 +2480,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const nativeSessionPlaybackActive =
     autoPlaybackPlaying || (recordingMode === 'video' && takePlaybackActive)
   const nativeExperimentalRecordingActive = isRecording && recordingMode === 'video'
+  const handsFreeBackgroundPlaybackActive =
+    recordingMode === 'video' && autoPlaybackTakeId !== null && autoPlaybackPlaying
   const shouldDeferNativeExperimentalAudioMode =
-    isRecording && recordingMode === 'audio'
+    (isRecording && recordingMode === 'audio') || handsFreeBackgroundPlaybackActive
 
   useEffect(() => {
     registerInlineTakePlaybackPreviewHold(() => shouldHoldCameraPreviewForTakePlayback)
