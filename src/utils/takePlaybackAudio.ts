@@ -159,9 +159,11 @@ function prepareMediaForAudiblePlayback(media: HTMLMediaElement): void {
   prepareInlineMediaElement(media)
   media.muted = false
   media.volume = 1
+  media.preload = 'auto'
 
   if (
-    media.readyState < HTMLMediaElement.HAVE_METADATA &&
+    media.readyState < HTMLMediaElement.HAVE_CURRENT_DATA &&
+    media.currentTime <= 0.05 &&
     (media.src || media.currentSrc)
   ) {
     try {
@@ -170,6 +172,38 @@ function prepareMediaForAudiblePlayback(media: HTMLMediaElement): void {
       /* ignore */
     }
   }
+}
+
+function waitForFirstMediaFrame(media: HTMLMediaElement): Promise<void> {
+  if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    let settled = false
+    let timeoutId: number | null = null
+
+    const cleanup = () => {
+      media.removeEventListener('loadeddata', settle)
+      media.removeEventListener('canplay', settle)
+      media.removeEventListener('error', settle)
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+
+    const settle = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve()
+    }
+
+    media.addEventListener('loadeddata', settle, { once: true })
+    media.addEventListener('canplay', settle, { once: true })
+    media.addEventListener('error', settle, { once: true })
+    timeoutId = window.setTimeout(settle, 700)
+  })
 }
 
 /** Defer one frame so routing/gain is wired after play() resolves. */
@@ -202,6 +236,7 @@ export function playTakeMediaFromUserGesture(
     try {
       await preparePlaybackRoute({ suspendCamera: false })
       await prepareLoudPlaybackBeforeStart(media)
+      await waitForFirstMediaFrame(media)
       await media.play()
       attachPlaybackRouteEndedListener(media)
       wireTakePlaybackAfterStart(media, true)
@@ -226,6 +261,7 @@ export function playInlineTakeBoxFromUserGesture(
     try {
       await prepareInlineTakeBoxPlaybackRoute()
       await prepareLoudPlaybackBeforeStart(media)
+      await waitForFirstMediaFrame(media)
       try {
         await media.play()
         attachInlineTakeBoxEndedListener(media)
@@ -341,6 +377,7 @@ export async function playTakeMediaAudible(
   }
 
   await prepareLoudPlaybackBeforeStart(media)
+  await waitForFirstMediaFrame(media)
 
   const attachEnded = options.attachEndedRouteRestore !== false
 

@@ -93,8 +93,63 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// the most recent deferred reason.
     private var deferredHealthCheckReason: String?
 
+    /// Diagnostic-only: logs movie audio connection state + time-since-last-
+    /// tap-sample every 2s during an active recording. Two prior fixes (audio
+    /// tap encode queue, preview bridge fps) both failed to resolve
+    /// audioTrackCount=0 on long takes, so instead of guessing a third
+    /// mitigation blind, this pinpoints WHEN during a take the audio
+    /// connection actually goes dark.
+    private var recordingDiagnosticsTimer: DispatchSourceTimer?
+    private var lastAudioTapSampleTime: CFTimeInterval = 0
+    private var recordingDiagnosticsStartTime: CFTimeInterval = 0
+    // Written from the same AVCaptureAudioDataOutput that powers live pitch.
+    // If AVCaptureMovieFileOutput finalizes a long take without an audio track,
+    // we mux this backup audio into the saved MP4 before returning it to JS.
+    private var audioFallbackWriter: AVAssetWriter?
+    private var audioFallbackInput: AVAssetWriterInput?
+    private var audioFallbackURL: URL?
+    private var audioFallbackCaptureActive = false
+    private var audioFallbackStarted = false
+    private var audioFallbackSampleCount = 0
+
+    private func startRecordingDiagnosticsTimer() {
+        recordingDiagnosticsTimer?.cancel()
+        recordingDiagnosticsStartTime = CACurrentMediaTime()
+        lastAudioTapSampleTime = recordingDiagnosticsStartTime
+        let timer = DispatchSource.makeTimerSource(queue: sessionQueue)
+        timer.schedule(deadline: .now() + 2, repeating: 2)
+        timer.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            let elapsed = CACurrentMediaTime() - self.recordingDiagnosticsStartTime
+            let sinceLastTapSample = CACurrentMediaTime() - self.lastAudioTapSampleTime
+            if let movieOutput = self.movieOutput, let audioConnection = movieOutput.connection(with: .audio) {
+                print(
+                    "[RecordingHealthCheck] t=\(String(format: "%.1f", elapsed))s " +
+                    "movieAudioConnection enabled=\(audioConnection.isEnabled) active=\(audioConnection.isActive) " +
+                    "sessionRunning=\(self.session.isRunning) " +
+                    "sinceLastTapSample=\(String(format: "%.2f", sinceLastTapSample))s"
+                )
+            } else {
+                print("[RecordingHealthCheck] t=\(String(format: "%.1f", elapsed))s movieAudioConnection MISSING")
+            }
+        }
+        timer.resume()
+        recordingDiagnosticsTimer = timer
+    }
+
+    private func stopRecordingDiagnosticsTimer() {
+        recordingDiagnosticsTimer?.cancel()
+        recordingDiagnosticsTimer = nil
+    }
+
     private override init() {
         super.init()
+        // The app owns AVAudioSession because recording, playback routing, and
+        // live pitch tracking all share it. If AVCaptureSession auto-configures
+        // it during startRunning(), iOS strips our mix/A2DP/AirPlay options and
+        // long movie recordings can finalize with audioTrackCount=0 while the
+        // capture connection still reports enabled/active.
+        session.automaticallyConfiguresApplicationAudioSession = false
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAppDidBecomeActive),
@@ -1152,6 +1207,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         let filename = "native-camera-test-\(timestamp).mp4"
         let fileURL = takesDir.appendingPathComponent(filename)
         outputURL = fileURL
+        beginAudioFallbackCapture(for: fileURL)
 
         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
         let route = sessionInfo["outputRoute"] as? String ?? "unknown"
@@ -1232,6 +1288,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             self.isRecording = true
             self.isStarting = false
+            self.startRecordingDiagnosticsTimer()
 
             let completion = self.startCompletion
             let result = self.pendingStartResult
@@ -1276,6 +1333,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             self.isRecording = false
             self.isStarting = false
+            self.stopRecordingDiagnosticsTimer()
             if self.isBridgePreviewActive || self.isFrameBridgeExternallyRequested {
                 self.enableFrameBridge()
             } else {
@@ -1307,29 +1365,319 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             let trimStartMs = self.pendingTrimStartMs
             self.pendingTrimStartMs = 0
 
-            if trimStartMs > 0 {
-                self.trimVideo(sourceURL: outputFileURL, trimStartMs: trimStartMs) { trimResult in
-                    self.sessionQueue.async {
-                        switch trimResult {
-                        case .success(let trimmedURL):
-                            do {
-                                try FileManager.default.removeItem(at: outputFileURL)
-                                try FileManager.default.moveItem(at: trimmedURL, to: outputFileURL)
-                                self.finalizeStopResult(for: outputFileURL, completion: completion)
-                            } catch {
-                                self.restoreAudioSessionAfterTest()
-                                DispatchQueue.main.async {
-                                    completion?(.failure(error))
-                                }
+            self.finishAudioFallbackCapture { fallbackAudioURL, fallbackSampleCount in
+                self.sessionQueue.async {
+                    if fallbackSampleCount > 0 {
+                        print("[NativeCameraTest] fallback audio captured samples=\(fallbackSampleCount) url=\(fallbackAudioURL?.absoluteString ?? "none")")
+                    } else {
+                        print("[NativeCameraTest] fallback audio captured no samples")
+                    }
+                    self.finishStopPostProcessing(
+                        outputFileURL: outputFileURL,
+                        trimStartMs: trimStartMs,
+                        fallbackAudioURL: fallbackAudioURL,
+                        completion: completion
+                    )
+                }
+            }
+        }
+    }
+
+    private func finishStopPostProcessing(
+        outputFileURL: URL,
+        trimStartMs: Int,
+        fallbackAudioURL: URL?,
+        completion: ((Result<[String: Any], Error>) -> Void)?
+    ) {
+        let muxFallbackAndFinalize: () -> Void = {
+            self.muxFallbackAudioIfNeeded(
+                into: outputFileURL,
+                fallbackAudioURL: fallbackAudioURL,
+                audioTrimStartMs: trimStartMs
+            ) { muxResult in
+                self.sessionQueue.async {
+                    if case .failure(let muxError) = muxResult {
+                        print("[NativeCameraTest] fallback audio mux failed: \(muxError.localizedDescription). Keeping original video.")
+                    }
+                    self.finalizeStopResult(for: outputFileURL, completion: completion)
+                }
+            }
+        }
+
+        if trimStartMs > 0 {
+            trimVideo(sourceURL: outputFileURL, trimStartMs: trimStartMs) { trimResult in
+                self.sessionQueue.async {
+                    switch trimResult {
+                    case .success(let trimmedURL):
+                        do {
+                            try FileManager.default.removeItem(at: outputFileURL)
+                            try FileManager.default.moveItem(at: trimmedURL, to: outputFileURL)
+                            muxFallbackAndFinalize()
+                        } catch {
+                            self.restoreAudioSessionAfterTest()
+                            DispatchQueue.main.async {
+                                completion?(.failure(error))
                             }
-                        case .failure(let trimError):
-                            print("[NativeCameraTest] Trim failed: \(trimError.localizedDescription). Falling back to untrimmed.")
-                            self.finalizeStopResult(for: outputFileURL, completion: completion)
                         }
+                    case .failure(let trimError):
+                        print("[NativeCameraTest] Trim failed: \(trimError.localizedDescription). Falling back to untrimmed.")
+                        muxFallbackAndFinalize()
                     }
                 }
+            }
+        } else {
+            muxFallbackAndFinalize()
+        }
+    }
+
+    private func beginAudioFallbackCapture(for movieURL: URL) {
+        let fallbackURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("native-camera-audio-\(UUID().uuidString).m4a")
+
+        audioTapQueue.async {
+            self.audioFallbackWriter?.cancelWriting()
+            if let oldURL = self.audioFallbackURL {
+                try? FileManager.default.removeItem(at: oldURL)
+            }
+            try? FileManager.default.removeItem(at: fallbackURL)
+            self.audioFallbackWriter = nil
+            self.audioFallbackInput = nil
+            self.audioFallbackURL = fallbackURL
+            self.audioFallbackCaptureActive = true
+            self.audioFallbackStarted = false
+            self.audioFallbackSampleCount = 0
+            print("[NativeCameraTest] fallback audio armed for \(movieURL.lastPathComponent)")
+        }
+    }
+
+    private func finishAudioFallbackCapture(completion: @escaping (_ audioURL: URL?, _ sampleCount: Int) -> Void) {
+        audioTapQueue.async {
+            self.audioFallbackCaptureActive = false
+            guard let writer = self.audioFallbackWriter,
+                  let input = self.audioFallbackInput,
+                  let url = self.audioFallbackURL else {
+                let sampleCount = self.audioFallbackSampleCount
+                self.audioFallbackWriter = nil
+                self.audioFallbackInput = nil
+                self.audioFallbackURL = nil
+                self.audioFallbackStarted = false
+                self.audioFallbackSampleCount = 0
+                completion(nil, sampleCount)
+                return
+            }
+
+            let sampleCount = self.audioFallbackSampleCount
+            self.audioFallbackWriter = nil
+            self.audioFallbackInput = nil
+            self.audioFallbackURL = nil
+            self.audioFallbackStarted = false
+            self.audioFallbackSampleCount = 0
+
+            guard writer.status == .writing else {
+                writer.cancelWriting()
+                try? FileManager.default.removeItem(at: url)
+                completion(nil, sampleCount)
+                return
+            }
+
+            input.markAsFinished()
+            writer.finishWriting {
+                if writer.status == .completed, sampleCount > 0 {
+                    completion(url, sampleCount)
+                } else {
+                    if let error = writer.error {
+                        print("[NativeCameraTest] fallback audio writer failed: \(error.localizedDescription)")
+                    }
+                    try? FileManager.default.removeItem(at: url)
+                    completion(nil, sampleCount)
+                }
+            }
+        }
+    }
+
+    private func appendAudioFallbackSample(_ sampleBuffer: CMSampleBuffer) {
+        guard audioFallbackCaptureActive, CMSampleBufferDataIsReady(sampleBuffer) else { return }
+        guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbdPointer = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription),
+              let fallbackURL = audioFallbackURL else {
+            return
+        }
+
+        let writer: AVAssetWriter
+        let input: AVAssetWriterInput
+        if let existingWriter = audioFallbackWriter, let existingInput = audioFallbackInput {
+            writer = existingWriter
+            input = existingInput
+        } else {
+            do {
+                let asbd = asbdPointer.pointee
+                let sampleRate = asbd.mSampleRate > 0 ? asbd.mSampleRate : 48_000
+                let channelCount = max(1, Int(asbd.mChannelsPerFrame))
+                let newWriter = try AVAssetWriter(outputURL: fallbackURL, fileType: .m4a)
+                let outputSettings: [String: Any] = [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: sampleRate,
+                    AVNumberOfChannelsKey: channelCount,
+                    AVEncoderBitRateKey: 128_000,
+                ]
+                let newInput = AVAssetWriterInput(
+                    mediaType: .audio,
+                    outputSettings: outputSettings,
+                    sourceFormatHint: formatDescription
+                )
+                newInput.expectsMediaDataInRealTime = true
+                guard newWriter.canAdd(newInput) else {
+                    print("[NativeCameraTest] fallback audio writer cannot add input")
+                    audioFallbackCaptureActive = false
+                    return
+                }
+                newWriter.add(newInput)
+                audioFallbackWriter = newWriter
+                audioFallbackInput = newInput
+                writer = newWriter
+                input = newInput
+            } catch {
+                print("[NativeCameraTest] fallback audio writer create failed: \(error.localizedDescription)")
+                audioFallbackCaptureActive = false
+                return
+            }
+        }
+
+        if !audioFallbackStarted {
+            let startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            guard writer.startWriting() else {
+                print("[NativeCameraTest] fallback audio writer start failed: \(writer.error?.localizedDescription ?? "unknown")")
+                audioFallbackCaptureActive = false
+                return
+            }
+            writer.startSession(atSourceTime: startTime)
+            audioFallbackStarted = true
+            print("[NativeCameraTest] fallback audio writer started")
+        }
+
+        guard writer.status == .writing else { return }
+        if input.isReadyForMoreMediaData {
+            if input.append(sampleBuffer) {
+                audioFallbackSampleCount += CMSampleBufferGetNumSamples(sampleBuffer)
             } else {
-                self.finalizeStopResult(for: outputFileURL, completion: completion)
+                print("[NativeCameraTest] fallback audio append failed: \(writer.error?.localizedDescription ?? "unknown")")
+            }
+        }
+    }
+
+    private func muxFallbackAudioIfNeeded(
+        into videoURL: URL,
+        fallbackAudioURL: URL?,
+        audioTrimStartMs: Int,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        guard let fallbackAudioURL = fallbackAudioURL else {
+            completion(.success(()))
+            return
+        }
+
+        let cleanup: () -> Void = {
+            try? FileManager.default.removeItem(at: fallbackAudioURL)
+        }
+
+        let videoAsset = AVURLAsset(url: videoURL)
+        if !videoAsset.tracks(withMediaType: .audio).isEmpty {
+            cleanup()
+            completion(.success(()))
+            return
+        }
+
+        let audioAsset = AVURLAsset(url: fallbackAudioURL)
+        guard let videoTrack = videoAsset.tracks(withMediaType: .video).first,
+              let audioTrack = audioAsset.tracks(withMediaType: .audio).first else {
+            cleanup()
+            completion(.success(()))
+            return
+        }
+
+        let videoDuration = videoAsset.duration
+        guard CMTimeCompare(videoDuration, .zero) > 0 else {
+            cleanup()
+            completion(.success(()))
+            return
+        }
+
+        let composition = AVMutableComposition()
+        guard let compositionVideo = composition.addMutableTrack(
+            withMediaType: .video,
+            preferredTrackID: kCMPersistentTrackID_Invalid
+        ), let compositionAudio = composition.addMutableTrack(
+            withMediaType: .audio,
+            preferredTrackID: kCMPersistentTrackID_Invalid
+        ) else {
+            cleanup()
+            completion(.success(()))
+            return
+        }
+
+        do {
+            try compositionVideo.insertTimeRange(
+                CMTimeRange(start: .zero, duration: videoDuration),
+                of: videoTrack,
+                at: .zero
+            )
+            compositionVideo.preferredTransform = videoTrack.preferredTransform
+
+            let requestedAudioStart = CMTime(value: Int64(audioTrimStartMs), timescale: 1000)
+            let audioStart = CMTimeCompare(requestedAudioStart, audioAsset.duration) < 0 ? requestedAudioStart : .zero
+            let availableAudioDuration = CMTimeSubtract(audioAsset.duration, audioStart)
+            let audioDuration = CMTimeMinimum(videoDuration, availableAudioDuration)
+            guard CMTimeCompare(audioDuration, .zero) > 0 else {
+                cleanup()
+                completion(.success(()))
+                return
+            }
+            try compositionAudio.insertTimeRange(
+                CMTimeRange(start: audioStart, duration: audioDuration),
+                of: audioTrack,
+                at: .zero
+            )
+        } catch {
+            cleanup()
+            completion(.failure(error))
+            return
+        }
+
+        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+            cleanup()
+            completion(.success(()))
+            return
+        }
+
+        let muxedURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("muxed-\(UUID().uuidString).mp4")
+        try? FileManager.default.removeItem(at: muxedURL)
+        exportSession.outputURL = muxedURL
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = true
+
+        print("[NativeCameraTest] muxing fallback audio into silent movie file")
+        exportSession.exportAsynchronously {
+            cleanup()
+            if exportSession.status == .completed {
+                do {
+                    try FileManager.default.removeItem(at: videoURL)
+                    try FileManager.default.moveItem(at: muxedURL, to: videoURL)
+                    print("[NativeCameraTest] fallback audio mux complete")
+                    completion(.success(()))
+                } catch {
+                    completion(.failure(error))
+                }
+            } else if let error = exportSession.error {
+                try? FileManager.default.removeItem(at: muxedURL)
+                completion(.failure(error))
+            } else {
+                try? FileManager.default.removeItem(at: muxedURL)
+                completion(.failure(NSError(
+                    domain: "NativeCameraTest",
+                    code: 22,
+                    userInfo: [NSLocalizedDescriptionKey: "Fallback audio mux failed without error"]
+                )))
             }
         }
     }
@@ -1468,6 +1816,10 @@ extension NativeCameraRecordingEngine {
     }
 
     private func effectiveBridgeFrameInterval() -> CFTimeInterval {
+        // Reverted: throttling this during plain recording (not just
+        // play-along) made preview very laggy and did NOT fix the
+        // audioTrackCount=0 bug on long takes, so the preview pump was not
+        // the cause — back to only throttling during YouTube play-along.
         if CameraSessionGuard.youtubePlayAlongActive,
            CameraSessionGuard.recordingActive,
            !isFrameBridgeExternallyRequested {
@@ -1537,6 +1889,8 @@ extension NativeCameraRecordingEngine {
 
     /// Runs on audioTapQueue (the tap output's delegate queue).
     private func handleAudioTapSample(_ sampleBuffer: CMSampleBuffer) {
+        appendAudioFallbackSample(sampleBuffer)
+        lastAudioTapSampleTime = CACurrentMediaTime()
         guard isAudioTapEnabled else { return }
         if !didLogFirstTapSample {
             didLogFirstTapSample = true

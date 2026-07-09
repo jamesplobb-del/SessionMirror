@@ -231,9 +231,9 @@ interface NativeTapBinding {
   latest: Float32Array | null
   sampleRate: number
   receivedAny: boolean
+  lastFrameAt: number
   dispose: () => void
 }
-
 interface MicPitchGraph {
   context: AudioContext
   source: MediaStreamAudioSourceNode | null
@@ -253,6 +253,12 @@ function isMediaPitchGraph(graph: ActivePitchGraph): graph is PitchGraph {
   return 'media' in graph
 }
 
+function nativeTapIsStale(binding: NativeTapBinding, now = performance.now()): boolean {
+  if (!binding.receivedAny || binding.lastFrameAt <= 0) return false
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false
+  return now - binding.lastFrameAt > NATIVE_TAP_STALE_MS
+}
+
 const MIC_PITCH_ATTACH_DEFER_MS = 400
 /** Economy mic tick (~14fps) for audio-mode HUD — keeps vault/settings responsive. */
 const MIC_ECONOMY_TICK_MS = 72
@@ -260,6 +266,8 @@ const MIC_ECONOMY_TICK_MS = 72
 const READOUT_PUBLISH_ECONOMY_MS = 100
 /** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
 const REALTIME_MIC_FRAME_SIZE = 2048
+/** Native tap can survive while its AVCapture output stops delivering; rebuild when stale. */
+const NATIVE_TAP_STALE_MS = 2600
 
 export type PitchTrackerSource = 'media' | 'microphone'
 
@@ -397,6 +405,7 @@ async function createNativeTapPitchGraph(profile: PitchTunerProfile): Promise<Mi
     latest: null,
     sampleRate: 48_000,
     receivedAny: false,
+    lastFrameAt: 0,
     dispose: () => {},
   }
 
@@ -405,6 +414,7 @@ async function createNativeTapPitchGraph(profile: PitchTunerProfile): Promise<Mi
     binding.latest = chunk.samples
     binding.sampleRate = chunk.sampleRate
     binding.receivedAny = true
+    binding.lastFrameAt = performance.now()
   })
 
   let disposed = false
@@ -1458,6 +1468,7 @@ export function useLivePitchTracker(
     inTuneBandFrameRef.current = 0
     inTuneGlowEligibleRef.current = false
     lastPublishedGlowRef.current = 0
+    nativeTapUnavailableRef.current = false
     setInTuneGlow(0)
   }, [mediaKey])
 
@@ -1731,7 +1742,10 @@ export function useLivePitchTracker(
         // Take Vault, Settings, etc.) tore down and rebuilt the entire native
         // audio tap (real native-bridge round-trips) for no reason. Only a
         // truly closed context indicates the graph needs rebuilding.
-        if (graph.context.state !== 'closed') return
+        if (graph.context.state !== 'closed' && !nativeTapIsStale(graph.nativeTap)) return
+        if (nativeTapIsStale(graph.nativeTap)) {
+          console.warn('[PitchTracker] native audio tap stale during recovery; rebuilding')
+        }
         safeDisposeMicGraph(graph)
         graphRef.current = null
         if (!isAttaching.current) {
@@ -2024,8 +2038,29 @@ export function useLivePitchTracker(
         void graph.context.resume()
       }
 
-      const nativeTap = !isMediaPitchGraph(graph) ? graph.nativeTap : undefined
-      if (nativeTap) {
+      let analysisSampleRate = graph.context.sampleRate
+
+      if (!isMediaPitchGraph(graph) && graph.nativeTap) {
+        const nativeTap = graph.nativeTap
+        if (nativeTapIsStale(nativeTap, frameNow)) {
+          console.warn('[PitchTracker] native audio tap stale; reacquiring')
+          safeDisposeMicGraph(graph)
+          graphRef.current = null
+          historyRef.current = []
+          readoutSmoothedHzRef.current = null
+          needleCentsRef.current = null
+          goodFrameCountRef.current = 0
+          lastStableCentsRef.current = null
+          lastNoteRef.current = '—'
+          lastPitchAtRef.current = 0
+          publishReadout(emptyReadout, true)
+          if (!isAttaching.current) {
+            void tryAttachRef.current?.()
+          }
+          tickRef.current = requestAnimationFrame(tick)
+          return
+        }
+
         // Native capture-session tap: copy the latest PCM chunk. Before the
         // first chunk arrives the buffer stays zeroed — the RMS gate below
         // treats that as silence, which renders as an idle (not broken) tuner.
@@ -2038,6 +2073,7 @@ export function useLivePitchTracker(
             graph.buffer.set(latest.subarray(0, Math.min(latest.length, graph.buffer.length)))
           }
         }
+        analysisSampleRate = nativeTap.sampleRate
       } else {
         graph.analyser.getFloatTimeDomainData(graph.buffer)
       }
@@ -2106,8 +2142,7 @@ export function useLivePitchTracker(
         } else {
           const [rawPitch, clarity] = graph.detector.findPitch(
             graph.buffer,
-            // Native tap chunks carry the capture session's real sample rate.
-            nativeTap ? nativeTap.sampleRate : graph.context.sampleRate,
+            analysisSampleRate,
           )
 
           const pitch = normalizeInstrumentFrequency(

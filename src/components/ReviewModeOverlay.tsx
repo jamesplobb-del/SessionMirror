@@ -130,6 +130,7 @@ function ReviewTakeLayer({
             mirror={false}
             audible={playbackAudible}
             manualPlayOnly
+            preload="auto"
           />
         )}
         {useSharedAudioPlayer && (
@@ -156,6 +157,7 @@ function ReviewTakeLayer({
         fit="contain"
         audible={playbackAudible}
         manualPlayOnly
+        preload="auto"
         style={{
           WebkitTouchCallout: 'default',
           userSelect: 'auto',
