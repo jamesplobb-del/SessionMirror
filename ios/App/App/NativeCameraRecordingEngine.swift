@@ -15,6 +15,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var videoDataOutput: AVCaptureVideoDataOutput?
     private var audioDataOutput: AVCaptureAudioDataOutput?
     private let audioTapQueue = DispatchQueue(label: "SessionMirror.NativeAudioTap")
+    /// Base64 encoding + the JS bridge notify are real work (~every 43ms during
+    /// live pitch tracking) — keep them off audioTapQueue, which is the exact
+    /// queue AVCaptureAudioDataOutput uses to hand off buffers. AVFoundation
+    /// expects that queue to return fast; doing bridge work on it for a
+    /// sustained recording risks the OS silently throttling/dropping the
+    /// shared audio input (observed: long takes finish with audioTrackCount=0
+    /// in the movie file despite the connection reporting active the whole
+    /// time and zero interruption/route-change events).
+    private let audioTapEncodeQueue = DispatchQueue(label: "SessionMirror.NativeAudioTapEncode", qos: .utility)
     private var isAudioTapEnabled = false
     private var tapAccumulator: [Float] = []
     private var didLogFirstTapSample = false
@@ -1588,11 +1597,16 @@ extension NativeCameraRecordingEngine {
 
         tapAccumulator.append(contentsOf: mono)
         let chunkSize = 2048
+        let sampleRate = asbd.mSampleRate
         while tapAccumulator.count >= chunkSize {
             let chunk = Array(tapAccumulator.prefix(chunkSize))
             tapAccumulator.removeFirst(chunkSize)
-            let payload = chunk.withUnsafeBufferPointer { Data(buffer: $0) }
-            onAudioTapChunk?(payload.base64EncodedString(), asbd.mSampleRate, chunkSize)
+            // Encode + bridge notify happen off audioTapQueue — see comment on
+            // audioTapEncodeQueue's declaration.
+            audioTapEncodeQueue.async { [weak self] in
+                let payload = chunk.withUnsafeBufferPointer { Data(buffer: $0) }
+                self?.onAudioTapChunk?(payload.base64EncodedString(), sampleRate, chunkSize)
+            }
         }
     }
 }
