@@ -10,6 +10,7 @@ enum CameraSessionGuard {
     private(set) static var recordingMode = "video"
 
     static func setRecordingMode(_ mode: String) {
+        if recordingMode == mode { return }
         recordingMode = mode
     }
 
@@ -37,11 +38,18 @@ enum CameraSessionGuard {
     }
 
     static func setPreviewActive(_ active: Bool) {
+        if previewActive == active { return }
         previewActive = active
         logOwnershipTransition(caller: "setPreviewActive(\(active))")
     }
 
     static func setRecordingActive(_ active: Bool) {
+        if recordingActive == active {
+            if !active {
+                youtubePlayAlongActive = false
+            }
+            return
+        }
         recordingActive = active
         if !active {
             youtubePlayAlongActive = false
@@ -50,6 +58,7 @@ enum CameraSessionGuard {
     }
 
     static func setYoutubePlayAlongActive(_ active: Bool) {
+        if youtubePlayAlongActive == active { return }
         youtubePlayAlongActive = active
         if !active {
             logOwnershipTransition(caller: "setYoutubePlayAlongActive(false)")

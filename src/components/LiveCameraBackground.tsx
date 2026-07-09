@@ -11,7 +11,7 @@ import {
 import { resetVideoPlayback } from '../utils/videoPlayback'
 import { playTakeMediaAudible } from '../utils/takePlaybackAudio'
 import { attachVideoDecoderStallRecovery } from '../utils/videoDecoderStallRecovery'
-import { attachAutoPlaybackTailSkip } from '../utils/autoRecordPlayback'
+import { applyAutoPlaybackLeadIn, attachAutoPlaybackTailSkip } from '../utils/autoRecordPlayback'
 import {
   createNativePreviewFramePump,
   subscribeNativeCameraPreviewFrames,
@@ -48,6 +48,7 @@ interface LiveCameraBackgroundProps {
   /** Hands-free video take replaces the live camera fullscreen during playback. */
   handsFreePlaybackTakeId?: string | null
   handsFreePlaybackSrc?: string | null
+  handsFreePlaybackPerformanceStartSeconds?: number
   handsFreePlaybackTailSkipSeconds?: number
   onHandsFreePlaybackPlayingChange?: (playing: boolean) => void
   onHandsFreePlaybackComplete?: () => void
@@ -72,6 +73,7 @@ function LiveCameraBackground({
   holdPreviewForTakePlayback = false,
   handsFreePlaybackTakeId = null,
   handsFreePlaybackSrc = null,
+  handsFreePlaybackPerformanceStartSeconds,
   handsFreePlaybackTailSkipSeconds = 0,
   onHandsFreePlaybackPlayingChange,
   onHandsFreePlaybackComplete,
@@ -350,6 +352,8 @@ function LiveCameraBackground({
         return
       }
 
+      await applyAutoPlaybackLeadIn(media, undefined, handsFreePlaybackPerformanceStartSeconds)
+
       const stopStallRecovery = () => {
         handsFreeStallRecoveryRef.current?.()
         handsFreeStallRecoveryRef.current = null
@@ -416,6 +420,7 @@ function LiveCameraBackground({
     }
   }, [
     handsFreePlaybackSrc,
+    handsFreePlaybackPerformanceStartSeconds,
     handsFreePlaybackTailSkipSeconds,
     handsFreePlaybackTakeId,
     isAudioMode,
@@ -790,5 +795,7 @@ export default memo(
     prev.nativeLivePreviewSeedUrl === next.nativeLivePreviewSeedUrl &&
     prev.holdPreviewForTakePlayback === next.holdPreviewForTakePlayback &&
     prev.handsFreePlaybackTakeId === next.handsFreePlaybackTakeId &&
-    prev.handsFreePlaybackSrc === next.handsFreePlaybackSrc,
+    prev.handsFreePlaybackSrc === next.handsFreePlaybackSrc &&
+    prev.handsFreePlaybackPerformanceStartSeconds ===
+      next.handsFreePlaybackPerformanceStartSeconds,
 )

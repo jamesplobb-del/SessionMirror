@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
 import { AUTO_RECORD_MAX_IDLE_PREROLL_MS } from '../utils/autoRecordPlayback'
@@ -19,6 +19,9 @@ const POLL_INTERVAL_MS = 32
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 120
 const MONITOR_WARMUP_MS = 280
+const NATIVE_MONITOR_WARMUP_MS = 900
+const NATIVE_ARMING_QUIET_HOLD_MS = 220
+const NATIVE_ARMING_MAX_DELAY_MS = 1600
 const POST_PLAYBACK_WARMUP_MS = 0
 const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
@@ -115,6 +118,9 @@ export function useAutoSoundRecording({
   const autoTriggeredRef = useRef(false)
   const startLatchRef = useRef(false)
   const monitorWarmUntilRef = useRef(0)
+  const nativeStartArmedRef = useRef(false)
+  const nativeQuietSinceRef = useRef<number | null>(null)
+  const nativeArmBypassAtRef = useRef(0)
   const startLatchTimerRef = useRef<number | null>(null)
   const cooldownUntilRef = useRef(0)
   const quietRmsEmaRef = useRef(0)
@@ -296,6 +302,9 @@ export function useAutoSoundRecording({
     recordingStartedAtRef.current = null
     autoTriggeredRef.current = false
     monitorWarmUntilRef.current = 0
+    nativeStartArmedRef.current = false
+    nativeQuietSinceRef.current = null
+    nativeArmBypassAtRef.current = 0
     pendingPerformanceGateRef.current = false
     quietRmsEmaRef.current = 0
     effectiveGateRef.current = profileRef.current.gate
@@ -392,6 +401,12 @@ export function useAutoSoundRecording({
 
       const isNativePath = path === 'native-tap'
       let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
+      const setupStartedAt = performance.now()
+      nativeStartArmedRef.current = !isNativePath
+      nativeQuietSinceRef.current = null
+      nativeArmBypassAtRef.current = isNativePath
+        ? setupStartedAt + NATIVE_ARMING_MAX_DELAY_MS
+        : 0
 
       if (isNativePath) {
         await acquireNativeAudioTap()
@@ -406,7 +421,7 @@ export function useAutoSoundRecording({
         }) ?? null
         
         lastTickAtRef.current = performance.now()
-        monitorWarmUntilRef.current = performance.now() + MONITOR_WARMUP_MS
+        monitorWarmUntilRef.current = performance.now() + NATIVE_MONITOR_WARMUP_MS
         void warmRecorderRef.current()
       } else {
         const audioContext = await getPlaybackAudioContext()
@@ -460,7 +475,7 @@ export function useAutoSoundRecording({
         }
 
         if (isNativePath) {
-          if (!isNativeCameraPreviewActive()) {
+          if (!isNativeCameraPreviewActive() && !isRecordingRef.current) {
             if (isAppInForeground()) {
               onMonitorStalledRef.current?.()
             }
@@ -557,6 +572,29 @@ export function useAutoSoundRecording({
             loudSinceRef.current = null
             attackSinceRef.current = null
             return
+          }
+
+          if (isNativePath && !nativeStartArmedRef.current) {
+            const quietEnough = gateLevel < effectiveGateRef.current * 0.85
+            if (quietEnough) {
+              if (nativeQuietSinceRef.current === null) {
+                nativeQuietSinceRef.current = now
+              } else if (now - nativeQuietSinceRef.current >= NATIVE_ARMING_QUIET_HOLD_MS) {
+                nativeStartArmedRef.current = true
+              }
+            } else {
+              nativeQuietSinceRef.current = null
+            }
+
+            if (!nativeStartArmedRef.current && now >= nativeArmBypassAtRef.current) {
+              nativeStartArmedRef.current = true
+            }
+
+            if (!nativeStartArmedRef.current) {
+              loudSinceRef.current = null
+              attackSinceRef.current = null
+              return
+            }
           }
 
           const currentGate = effectiveGateRef.current
@@ -754,11 +792,11 @@ export function useAutoSoundRecording({
     setHandsFreeRecording(false)
   }, [isRecording])
 
-  const restartHandsFreeMonitor = () => {
+  const restartHandsFreeMonitor = useCallback(() => {
     if (!isAppInForeground()) return
-    bumpMonitorEpoch()
+    setMonitorEpoch((epoch) => epoch + 1)
     void warmRecorderRef.current()
-  }
+  }, [])
 
   return {
     teardownMonitor,

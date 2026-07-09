@@ -1140,6 +1140,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         ...(recordingBpm !== undefined ? { recordingBpm } : null),
         ...(performanceStartBeats !== undefined ? { performanceStartBeats } : null),
         ...(performanceStartOffsetBeats !== undefined ? { performanceStartOffsetBeats } : null),
+        ...(autoPerformanceStartSeconds !== undefined
+          ? { performanceStartSeconds: autoPerformanceStartSeconds }
+          : null),
         ...(referenceTrackId !== undefined ? { referenceTrackId } : null),
         ...(referenceStartBeat !== undefined ? { referenceStartBeat } : null),
       }
@@ -1680,6 +1683,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       void refreshCameraSession()
     },
   })
+  const refreshCameraSessionRef = useRef(refreshCameraSession)
+  refreshCameraSessionRef.current = refreshCameraSession
+  const restartHandsFreeMonitorRef = useRef(restartHandsFreeMonitor)
+  restartHandsFreeMonitorRef.current = restartHandsFreeMonitor
+  const autoSoundRecordingEnabledRef = useRef(settings.autoSoundRecording)
+  autoSoundRecordingEnabledRef.current = settings.autoSoundRecording
 
   useEffect(() => {
     if (!isRecording) return
@@ -1784,10 +1793,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         const refresh =
           recordingModeRef.current === 'video' && Capacitor.isNativePlatform()
             ? Promise.resolve()
-            : refreshCameraSession()
+            : Promise.resolve(refreshCameraSessionRef.current())
         void refresh.finally(() => {
-          if (settings.autoSoundRecording) {
-            restartHandsFreeMonitor()
+          if (autoSoundRecordingEnabledRef.current) {
+            restartHandsFreeMonitorRef.current()
           }
         })
       }, 400)
@@ -1820,7 +1829,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [refreshCameraSession, restartHandsFreeMonitor, settings.autoSoundRecording])
+  }, [])
 
   const recoverCameraAfterSurfaceDismiss = useCallback(
     (reason: string) => {
@@ -2369,6 +2378,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setTakes((current) => current.map((take) => refreshedById.get(take.id) ?? take))
     })()
   }, [benchmarkId, challengerId])
+  const refreshStaleTakeThumbnailsRef = useRef(refreshStaleTakeThumbnails)
+  refreshStaleTakeThumbnailsRef.current = refreshStaleTakeThumbnails
+  const refreshStaleTakePlaybackUrlsRef = useRef(refreshStaleTakePlaybackUrls)
+  refreshStaleTakePlaybackUrlsRef.current = refreshStaleTakePlaybackUrls
+  const resumeYoutubeReferenceRef = useRef(resumeYoutubeReference)
+  resumeYoutubeReferenceRef.current = resumeYoutubeReference
 
   useEffect(() => {
     let debounceTimer: number | null = null
@@ -2380,15 +2395,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       debounceTimer = window.setTimeout(() => {
         debounceTimer = null
-        refreshStaleTakePlaybackUrls()
-        refreshStaleTakeThumbnails()
+        refreshStaleTakePlaybackUrlsRef.current()
+        refreshStaleTakeThumbnailsRef.current()
         if (youtubeTimer !== null) {
           window.clearTimeout(youtubeTimer)
         }
         youtubeTimer = window.setTimeout(() => {
           youtubeTimer = null
           if (!isYoutubeDialogOpen()) {
-            resumeYoutubeReference()
+            resumeYoutubeReferenceRef.current()
           }
         }, 700)
       }, 400)
@@ -2424,7 +2439,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (debounceTimer !== null) window.clearTimeout(debounceTimer)
       if (youtubeTimer !== null) window.clearTimeout(youtubeTimer)
     }
-  }, [refreshStaleTakePlaybackUrls, refreshStaleTakeThumbnails, resumeYoutubeReference])
+  }, [])
 
   const mainAudioPitchSource = useMemo((): MainAudioPitchSource | null => {
     // Audio mode uses the dedicated Tuner tab — no floating pitch overlay.
@@ -2464,6 +2479,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     (takePlaybackActive || handsFreePlaybackPending || isReviewOpen)
   const nativeSessionPlaybackActive =
     autoPlaybackPlaying || (recordingMode === 'video' && takePlaybackActive)
+  const nativeExperimentalRecordingActive = isRecording && recordingMode === 'video'
+  const shouldDeferNativeExperimentalAudioMode =
+    isRecording && recordingMode === 'audio'
 
   useEffect(() => {
     registerInlineTakePlaybackPreviewHold(() => shouldHoldCameraPreviewForTakePlayback)
@@ -2477,20 +2495,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [selectedAudioEngine])
 
   useEffect(() => {
+    // Audio-mode hands-free uses the WebKit recorder path; re-applying the
+    // idle/native playback session mid-take can interrupt the active recorder.
+    if (shouldDeferNativeExperimentalAudioMode) return
     void applyNativeExperimentalAudioMode({
       enabled: true,
       selectedAudioEngine,
       micInputPreference: settings.micInputPreference,
-      recordingActive: isRecording && recordingMode === 'video',
+      recordingActive: nativeExperimentalRecordingActive,
       playbackActive: nativeSessionPlaybackActive,
     })
   }, [
-    isRecording,
+    nativeExperimentalRecordingActive,
     nativeSessionPlaybackActive,
-    ready,
-    recordingMode,
     selectedAudioEngine,
     settings.micInputPreference,
+    shouldDeferNativeExperimentalAudioMode,
   ])
 
   useAppShellPolicies({
@@ -3418,6 +3438,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
                 handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
+                handsFreePlaybackPerformanceStartSeconds={
+                  handsFreeBackgroundTake?.performanceStartSeconds
+                }
                 handsFreePlaybackTailSkipSeconds={settings.soundSilenceSeconds}
                 onHandsFreePlaybackPlayingChange={handleHandsFreeBackgroundPlaybackChange}
                 onHandsFreePlaybackComplete={handleChallengerAutoPlayComplete}

@@ -44,6 +44,7 @@ import {
   createSpeakerLoudnessChain,
   disposeSpeakerLoudnessChain,
   readSpeakerLoudnessMeters,
+  TARGET_COMPRESSOR_REDUCTION_DB,
   type SpeakerLoudnessNodes,
   type SpeakerLoudnessPreset,
 } from './speakerLoudnessMastering'
@@ -278,7 +279,8 @@ function balanceSpeakerChainDynamics(
   const meters = readSpeakerLoudnessMeters(nodes.speakerMastering)
   if (meters.postDSPRMS < 1e-5 && meters.preDSPRMS < 1e-5) return
 
-  if (!meters.limiterTooHot) return
+  const compressorTooHot = meters.compressorReduction > TARGET_COMPRESSOR_REDUCTION_DB.max
+  if (!meters.limiterTooHot && !compressorTooHot) return
 
   const currentBus = nodes.gain.gain.value
   const currentTrim = nodes.limiterTrim ?? 1

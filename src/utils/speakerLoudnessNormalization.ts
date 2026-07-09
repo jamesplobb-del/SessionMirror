@@ -3,8 +3,12 @@
  * Bus GainNode staging = clamped total gain (pre-mastering), then limiter trim.
  */
 
-import type { SpeakerLoudnessPreset } from './speakerLoudnessMastering'
-import { readSpeakerLoudnessMeters, type SpeakerLoudnessNodes } from './speakerLoudnessMastering'
+import {
+  readSpeakerLoudnessMeters,
+  TARGET_COMPRESSOR_REDUCTION_DB,
+  type SpeakerLoudnessNodes,
+  type SpeakerLoudnessPreset,
+} from './speakerLoudnessMastering'
 
 const DEBUG_STORAGE_KEY = 'sessionmirror:speaker-loudness-debug'
 const MAX_ANALYSIS_SECONDS = 45
@@ -402,8 +406,9 @@ export function maybeTrimPreLimiterBusGain(
 } {
   const meters = readSpeakerLoudnessMeters(mastering)
   const limiterTooHot = meters.limiterTooHot
+  const compressorTooHot = meters.compressorReduction > TARGET_COMPRESSOR_REDUCTION_DB.max
 
-  if (!limiterTooHot) {
+  if (!limiterTooHot && !compressorTooHot) {
     return { busGain: currentBusGain, trim: currentTrim, trimmed: false, limiterTooHot: false }
   }
 

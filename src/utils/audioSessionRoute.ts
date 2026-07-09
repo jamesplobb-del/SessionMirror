@@ -317,6 +317,10 @@ export interface BestTakeAudioPluginType {
 }
 
 const BestTakeAudioPlugin = registerPlugin<BestTakeAudioPluginType>('BestTakeAudioPlugin')
+let lastNativeExperimentalAudioModeKey: string | null = null
+let inFlightNativeExperimentalAudioModeKey: string | null = null
+let inFlightNativeExperimentalAudioModePromise: Promise<void> | null = null
+let inFlightNativeExperimentalAudioModeToken = 0
 
 /**
  * Use the phone's built-in mic for recording instead of the (worse) Bluetooth
@@ -361,27 +365,58 @@ export async function applyNativeExperimentalAudioMode(options: {
 }): Promise<void> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return
 
-  try {
-    const snapshot = await BestTakeAudioPlugin.setNativeExperimentalAudioMode(options)
-    console.info('[AudioEngine] Native Experimental diagnostics', {
-      selectedAudioEngine: snapshot.selectedAudioEngine,
-      enabled: snapshot.enabled,
-      category: snapshot.category,
-      mode: snapshot.mode,
-      options: snapshot.options,
-      currentInputRoute: snapshot.currentInputRoute ?? snapshot.inputPort,
-      currentOutputRoute: snapshot.currentOutputRoute ?? snapshot.outputPort,
-      availableInputs: snapshot.availableInputs ?? snapshot.availableInputPorts,
-      recordingActive: snapshot.recordingActive,
-      playbackActive: snapshot.playbackActive,
-      nativeLoudnessProfile: snapshot.nativeLoudnessProfile,
-      selectedMicPreference: snapshot.selectedMicPreference,
-      preferredInput: snapshot.preferredInput,
-      fallbackReason: snapshot.fallbackReason,
-    })
-  } catch (error) {
-    console.warn('[AudioEngine] Native Experimental failed:', error)
+  const stateKey = JSON.stringify({
+    enabled: options.enabled,
+    selectedAudioEngine: options.selectedAudioEngine,
+    micInputPreference: options.micInputPreference ?? null,
+    recordingActive: options.recordingActive === true,
+    playbackActive: options.playbackActive === true,
+  })
+  if (stateKey === lastNativeExperimentalAudioModeKey) return
+  if (
+    stateKey === inFlightNativeExperimentalAudioModeKey &&
+    inFlightNativeExperimentalAudioModePromise
+  ) {
+    await inFlightNativeExperimentalAudioModePromise
+    return
   }
+
+  inFlightNativeExperimentalAudioModeKey = stateKey
+  const requestToken = ++inFlightNativeExperimentalAudioModeToken
+  const applyPromise = (async () => {
+    try {
+      const snapshot = await BestTakeAudioPlugin.setNativeExperimentalAudioMode(options)
+      lastNativeExperimentalAudioModeKey = stateKey
+      console.info('[AudioEngine] Native Experimental diagnostics', {
+        selectedAudioEngine: snapshot.selectedAudioEngine,
+        enabled: snapshot.enabled,
+        category: snapshot.category,
+        mode: snapshot.mode,
+        options: snapshot.options,
+        currentInputRoute: snapshot.currentInputRoute ?? snapshot.inputPort,
+        currentOutputRoute: snapshot.currentOutputRoute ?? snapshot.outputPort,
+        availableInputs: snapshot.availableInputs ?? snapshot.availableInputPorts,
+        recordingActive: snapshot.recordingActive,
+        playbackActive: snapshot.playbackActive,
+        nativeLoudnessProfile: snapshot.nativeLoudnessProfile,
+        selectedMicPreference: snapshot.selectedMicPreference,
+        preferredInput: snapshot.preferredInput,
+        fallbackReason: snapshot.fallbackReason,
+      })
+    } catch (error) {
+      console.warn('[AudioEngine] Native Experimental failed:', error)
+    } finally {
+      if (
+        inFlightNativeExperimentalAudioModeKey === stateKey &&
+        inFlightNativeExperimentalAudioModeToken === requestToken
+      ) {
+        inFlightNativeExperimentalAudioModeKey = null
+        inFlightNativeExperimentalAudioModePromise = null
+      }
+    }
+  })()
+  inFlightNativeExperimentalAudioModePromise = applyPromise
+  await applyPromise
 }
 
 export default BestTakeAudioPlugin

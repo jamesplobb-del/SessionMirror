@@ -43,6 +43,8 @@ export interface Take {
   performanceStartBeats?: number
   /** Beats from file start to the musical performance entry (alignment). */
   performanceStartOffsetBeats?: number
+  /** Seconds from file start to the hands-free performance trigger. */
+  performanceStartSeconds?: number
   /** Overdub takes: id of the reference take (Track 1). */
   referenceTrackId?: string
   /** Overdub takes: count-in beat when the reference started. */

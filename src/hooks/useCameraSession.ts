@@ -1295,8 +1295,12 @@ export function useCameraSession({
                 ? Math.max(0.1, (performance.now() - recordingStartedAtRef.current) / 1000)
                 : elapsedRef.current
           const autoPerformanceStartSeconds =
-            preRollStartedAt > 0 && performanceStartedAt > preRollStartedAt
-              ? Math.max(0, (performanceStartedAt - preRollStartedAt) / 1000)
+            performanceStartedAt > 0 && (preRollStartedAt > 0 || recordingStartedAtRef.current > 0)
+              ? Math.max(
+                  0,
+                  (performanceStartedAt - (preRollStartedAt || recordingStartedAtRef.current)) /
+                    1000,
+                )
               : undefined
           const captureTrackSnapshot: RecordingTrackSnapshot | null =
             snapshotCaptureAudioTrack(
@@ -1582,6 +1586,7 @@ export function useCameraSession({
       if (!result) {
         throw new Error('native recording did not start')
       }
+      recordingStartedAtRef.current = performance.now()
       return true
     })()
 
@@ -1590,6 +1595,9 @@ export function useCameraSession({
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
       isRecordingRef.current = false
+      recordingStartedAtRef.current = 0
+      autoPerformanceActiveRef.current = false
+      autoPerformanceStartedAtRef.current = 0
       setIsRecording(false)
       nativeStartSettleRef.current = null
       recoverAfterNativeExperimentalFailure()
@@ -1677,6 +1685,13 @@ export function useCameraSession({
           playbackGainMetadata: computePlaybackGainMetadata(levels),
         }
       }
+      const autoPerformanceStartSeconds =
+        autoPerformanceStartedAtRef.current > 0 && recordingStartedAtRef.current > 0
+          ? Math.max(
+              0,
+              (autoPerformanceStartedAtRef.current - recordingStartedAtRef.current) / 1000,
+            )
+          : undefined
 
       onCompleteRef.current({
         takeId: stoppedTakeId,
@@ -1699,13 +1714,19 @@ export function useCameraSession({
         captureProfile: getActiveCaptureProfile(),
         captureTrackSnapshot: null,
         captureDiagnostics,
+        autoPerformanceStartSeconds,
       })
+      recordingStartedAtRef.current = 0
+      autoPerformanceActiveRef.current = false
+      autoPerformanceStartedAtRef.current = 0
       setIsStopping(false)
     })().catch((error) => {
       console.warn('[NativeExperimentalAudio] native recording stop failed', error)
       isRecordingRef.current = false
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
+      autoPerformanceActiveRef.current = false
+      autoPerformanceStartedAtRef.current = 0
       setIsRecording(false)
       setIsStopping(false)
       recoverAfterNativeExperimentalFailure()
@@ -1880,6 +1901,10 @@ export function useCameraSession({
       return
     }
 
+    if (!isRecordingRef.current && !autoPreRollActiveRef.current) {
+      autoPerformanceActiveRef.current = true
+      autoPerformanceStartedAtRef.current = performance.now()
+    }
     startRecording()
   }, [startAutoAudioRecording, startRecording])
 
