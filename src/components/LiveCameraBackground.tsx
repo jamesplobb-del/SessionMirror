@@ -11,6 +11,7 @@ import {
 import { resetVideoPlayback } from '../utils/videoPlayback'
 import { playTakeMediaAudible } from '../utils/takePlaybackAudio'
 import { attachVideoDecoderStallRecovery } from '../utils/videoDecoderStallRecovery'
+import { attachAutoPlaybackTailSkip } from '../utils/autoRecordPlayback'
 import {
   createNativePreviewFramePump,
   subscribeNativeCameraPreviewFrames,
@@ -47,6 +48,7 @@ interface LiveCameraBackgroundProps {
   /** Hands-free video take replaces the live camera fullscreen during playback. */
   handsFreePlaybackTakeId?: string | null
   handsFreePlaybackSrc?: string | null
+  handsFreePlaybackTailSkipSeconds?: number
   onHandsFreePlaybackPlayingChange?: (playing: boolean) => void
   onHandsFreePlaybackComplete?: () => void
 }
@@ -70,6 +72,7 @@ function LiveCameraBackground({
   holdPreviewForTakePlayback = false,
   handsFreePlaybackTakeId = null,
   handsFreePlaybackSrc = null,
+  handsFreePlaybackTailSkipSeconds = 0,
   onHandsFreePlaybackPlayingChange,
   onHandsFreePlaybackComplete,
 }: LiveCameraBackgroundProps) {
@@ -322,6 +325,7 @@ function LiveCameraBackground({
 
     handsFreePlaybackSessionRef.current = true
     let cancelled = false
+    let stopTailSkip: (() => void) | null = null
 
     void (async () => {
       const media = handsFreePlaybackVideoRef.current
@@ -354,18 +358,28 @@ function LiveCameraBackground({
       const onEnded = () => {
         if (!handsFreePlaybackSessionRef.current) return
         handsFreePlaybackSessionRef.current = false
+        media.removeEventListener('ended', onEnded)
+        stopTailSkip?.()
+        stopTailSkip = null
         stopStallRecovery()
         onHandsFreePlaybackPlayingChange?.(false)
         onHandsFreePlaybackComplete?.()
       }
 
       media.addEventListener('ended', onEnded, { once: true })
+      stopTailSkip = attachAutoPlaybackTailSkip(
+        media,
+        handsFreePlaybackTailSkipSeconds,
+        onEnded,
+      )
 
       const started = await playTakeMediaAudible(media, {
         onFailure: () => onHandsFreePlaybackPlayingChange?.(false),
       })
       if (cancelled || !handsFreePlaybackSessionRef.current) {
         media.removeEventListener('ended', onEnded)
+        stopTailSkip?.()
+        stopTailSkip = null
         stopStallRecovery()
         return
       }
@@ -381,6 +395,8 @@ function LiveCameraBackground({
         onHandsFreePlaybackPlayingChange?.(true)
       } else {
         media.removeEventListener('ended', onEnded)
+        stopTailSkip?.()
+        stopTailSkip = null
         handsFreePlaybackSessionRef.current = false
         onHandsFreePlaybackComplete?.()
       }
@@ -389,6 +405,8 @@ function LiveCameraBackground({
     return () => {
       cancelled = true
       handsFreePlaybackSessionRef.current = false
+      stopTailSkip?.()
+      stopTailSkip = null
       handsFreeStallRecoveryRef.current?.()
       handsFreeStallRecoveryRef.current = null
       const media = handsFreePlaybackVideoRef.current
@@ -398,6 +416,7 @@ function LiveCameraBackground({
     }
   }, [
     handsFreePlaybackSrc,
+    handsFreePlaybackTailSkipSeconds,
     handsFreePlaybackTakeId,
     isAudioMode,
     onHandsFreePlaybackComplete,

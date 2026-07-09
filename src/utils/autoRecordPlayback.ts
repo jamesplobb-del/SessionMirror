@@ -7,6 +7,8 @@ export const AUTO_RECORD_MAX_IDLE_PREROLL_MS = 20_000
 /** Auto-playback: begin this many seconds before the first detected attack. */
 export const AUTO_PLAYBACK_LEAD_IN_S = 1
 
+const AUTO_PLAYBACK_TAIL_SKIP_POLL_MS = 50
+const MIN_AUTO_PLAYBACK_AUDIBLE_S = 0.25
 const ANALYSIS_WINDOW_S = 0.02
 const BASELINE_WINDOW_S = 0.75
 const MIN_ONSET_RMS_DB = -32
@@ -162,4 +164,45 @@ export async function applyAutoPlaybackLeadIn(
     }
     media.addEventListener('loadedmetadata', onMeta, { once: true })
   })
+}
+
+export function attachAutoPlaybackTailSkip(
+  media: HTMLMediaElement,
+  trailingSilenceSeconds: number,
+  onTailReached: () => void,
+): () => void {
+  const skipSeconds = Math.max(0, trailingSilenceSeconds)
+  if (skipSeconds <= 0.05) return () => {}
+
+  let stopped = false
+  let intervalId: number | null = null
+  const startedAt = Math.max(0, media.currentTime || 0)
+
+  const check = () => {
+    if (stopped || media.paused || media.ended) return
+    if (!Number.isFinite(media.duration) || media.duration <= 0) return
+
+    const earliestEnd = startedAt + MIN_AUTO_PLAYBACK_AUDIBLE_S
+    const skipEnd = media.duration - skipSeconds
+    const endAt = Math.min(media.duration, Math.max(earliestEnd, skipEnd))
+    if (media.currentTime < endAt) return
+
+    stopped = true
+    media.pause()
+    onTailReached()
+  }
+
+  intervalId = window.setInterval(check, AUTO_PLAYBACK_TAIL_SKIP_POLL_MS)
+  media.addEventListener('timeupdate', check)
+  media.addEventListener('durationchange', check)
+
+  return () => {
+    stopped = true
+    if (intervalId !== null) {
+      window.clearInterval(intervalId)
+      intervalId = null
+    }
+    media.removeEventListener('timeupdate', check)
+    media.removeEventListener('durationchange', check)
+  }
 }

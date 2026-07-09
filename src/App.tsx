@@ -185,7 +185,10 @@ import {
   isAppInForeground,
 } from './utils/appForeground'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
-import { applyAutoPlaybackLeadIn } from './utils/autoRecordPlayback'
+import {
+  applyAutoPlaybackLeadIn,
+  attachAutoPlaybackTailSkip,
+} from './utils/autoRecordPlayback'
 import {
   attachPlaybackPipelineInstrumentation,
   createPlaybackDiagSession,
@@ -749,6 +752,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         takeId,
         path: 'auto-playback',
       })
+      let detachTailSkip: (() => void) | null = null
+      let autoPlaybackComplete = false
 
       void (async () => {
         if (Capacitor.isNativePlatform()) {
@@ -838,22 +843,31 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
         await applyAutoPlaybackLeadIn(audio, undefined, performanceStartSeconds)
 
-        audio.onended = () => {
+        const completeAutoPlayback = () => {
+          if (autoPlaybackComplete) return
+          autoPlaybackComplete = true
+          detachTailSkip?.()
+          detachTailSkip = null
           detachPipeline()
           setActivePlaybackDiagSession(null)
           finishAutoPlayback()
         }
-        audio.onerror = () => {
-          detachPipeline()
-          setActivePlaybackDiagSession(null)
-          finishAutoPlayback()
-        }
+
+        detachTailSkip = attachAutoPlaybackTailSkip(
+          audio,
+          settings.soundSilenceSeconds,
+          completeAutoPlayback,
+        )
+        audio.onended = completeAutoPlayback
+        audio.onerror = completeAutoPlayback
 
         const started = await playTakeMediaAudible(audio, {
           skipRoutePrep: true,
           onFailure: () => setAutoPlaybackPlaying(false),
         })
         if (autoPlaybackGenerationRef.current !== playbackGeneration) {
+          detachTailSkip?.()
+          detachTailSkip = null
           detachPipeline()
           setActivePlaybackDiagSession(null)
           return
@@ -875,7 +889,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         }
       })()
     },
-    [finishAutoPlayback, teardownAutoPlaybackMedia]
+    [finishAutoPlayback, settings.soundSilenceSeconds, teardownAutoPlaybackMedia]
   )
 
   playAutoTakeAudioRef.current = playAutoTakeAudio
@@ -3404,6 +3418,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
                 handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
+                handsFreePlaybackTailSkipSeconds={settings.soundSilenceSeconds}
                 onHandsFreePlaybackPlayingChange={handleHandsFreeBackgroundPlaybackChange}
                 onHandsFreePlaybackComplete={handleChallengerAutoPlayComplete}
               />
