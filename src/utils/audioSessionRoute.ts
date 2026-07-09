@@ -209,6 +209,8 @@ export interface BestTakeAudioPluginType {
   setCameraSessionState(options: {
     previewActive: boolean
     recordingActive: boolean
+    recordingMode?: 'video' | 'audio'
+    youtubePlayAlongActive?: boolean
   }): Promise<CameraSessionStateSnapshot>
   getCameraSessionState(): Promise<CameraSessionStateSnapshot>
   setPlaybackRouteActive(options: { active: boolean }): Promise<CameraSessionStateSnapshot>

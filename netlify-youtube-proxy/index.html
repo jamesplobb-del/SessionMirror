@@ -38,11 +38,104 @@
       let volumeBoostTimer = null
       let volumeProfile = 'speaker'
       let requestedVolume = 100
+      let iframeReady = false
+      let lastStateChangeAt = null
+      let bufferingCount = 0
+      let isSeeking = false
+      let seekClearTimer = null
+      let lastReportedCurrentTime = null
 
       function notifyParent(state) {
         try {
           window.parent.postMessage(
             JSON.stringify({ event: 'youtube-state', state }),
+            '*',
+          )
+        } catch {
+          // ignore
+        }
+      }
+
+      function markSeeking() {
+        isSeeking = true
+        if (seekClearTimer !== null) {
+          window.clearTimeout(seekClearTimer)
+        }
+        seekClearTimer = window.setTimeout(() => {
+          isSeeking = false
+          seekClearTimer = null
+        }, 900)
+      }
+
+      function readVideoId() {
+        if (!ytPlayer || typeof ytPlayer.getVideoData !== 'function') return videoId
+        try {
+          const data = ytPlayer.getVideoData()
+          return (data && data.video_id) || videoId
+        } catch {
+          return videoId
+        }
+      }
+
+      function readNetworkStateHint(playerState, loadedFraction) {
+        if (playerState === YT.PlayerState.BUFFERING) return 'buffering'
+        if (
+          typeof loadedFraction === 'number' &&
+          loadedFraction < 0.98 &&
+          playerState === YT.PlayerState.PLAYING
+        ) {
+          return 'loading_while_playing'
+        }
+        return null
+      }
+
+      function postStatus() {
+        if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return
+        try {
+          const playerState = ytPlayer.getPlayerState()
+          const currentTime =
+            typeof ytPlayer.getCurrentTime === 'function' ? ytPlayer.getCurrentTime() : null
+          if (
+            lastReportedCurrentTime != null &&
+            currentTime != null &&
+            Math.abs(currentTime - lastReportedCurrentTime) > 1.25
+          ) {
+            markSeeking()
+          }
+          if (currentTime != null) {
+            lastReportedCurrentTime = currentTime
+          }
+
+          const videoLoadedFraction =
+            typeof ytPlayer.getVideoLoadedFraction === 'function'
+              ? ytPlayer.getVideoLoadedFraction()
+              : null
+
+          window.parent.postMessage(
+            JSON.stringify({
+              event: 'youtube-status',
+              playerState,
+              currentTime,
+              duration:
+                typeof ytPlayer.getDuration === 'function' ? ytPlayer.getDuration() : null,
+              isMuted: typeof ytPlayer.isMuted === 'function' ? ytPlayer.isMuted() : null,
+              volume: typeof ytPlayer.getVolume === 'function' ? ytPlayer.getVolume() : null,
+              playbackRate:
+                typeof ytPlayer.getPlaybackRate === 'function'
+                  ? ytPlayer.getPlaybackRate()
+                  : null,
+              iframeReady,
+              lastStateChangeAt,
+              bufferingCount,
+              videoId: readVideoId(),
+              isSeeking,
+              videoLoadedFraction,
+              playbackQuality:
+                typeof ytPlayer.getPlaybackQuality === 'function'
+                  ? ytPlayer.getPlaybackQuality()
+                  : null,
+              networkState: readNetworkStateHint(playerState, videoLoadedFraction),
+            }),
             '*',
           )
         } catch {
@@ -90,15 +183,25 @@
       }
 
       function invokePlayerCommand(func, args) {
+        if (func === 'getStatus') {
+          postStatus()
+          return
+        }
         if (!ytPlayer) return
         const fn = ytPlayer[func]
         if (typeof fn !== 'function') return
         if (func === 'setVolume' && Array.isArray(args) && args.length > 0) {
           requestedVolume = Number(args[0]) || 0
         }
+        if (func === 'seekTo') {
+          markSeeking()
+        }
         fn.apply(ytPlayer, args || [])
         if (func === 'playVideo' || func === 'unMute' || func === 'setVolume') {
           burstMaxVolume()
+        }
+        if (func === 'playVideo' || func === 'pauseVideo' || func === 'seekTo') {
+          window.setTimeout(postStatus, 120)
         }
       }
 
@@ -144,14 +247,23 @@
           },
           events: {
             onReady() {
+              iframeReady = true
+              lastStateChangeAt = Date.now()
               notifyParent('ready')
               burstMaxVolume()
+              postStatus()
             },
             onStateChange(event) {
               const state = event.data
+              lastStateChangeAt = Date.now()
               if (state === YT.PlayerState.PLAYING) {
                 notifyParent('playing')
                 startVolumeBoostLoop()
+                postStatus()
+              } else if (state === YT.PlayerState.BUFFERING) {
+                bufferingCount += 1
+                notifyParent('buffering')
+                postStatus()
               } else if (
                 state === YT.PlayerState.PAUSED ||
                 state === YT.PlayerState.ENDED ||
@@ -161,6 +273,7 @@
                 if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.ENDED) {
                   notifyParent('paused')
                 }
+                postStatus()
               }
             },
           },

@@ -318,7 +318,6 @@ export function useCameraSession({
     takeId: string
     mimeType: string
   } | null>(null)
-  const warmAutoAudioInFlightRef = useRef(false)
   const autoAudioDisarmInFlightRef = useRef<Promise<void> | null>(null)
   const autoPreRollActiveRef = useRef(false)
   const autoPerformanceActiveRef = useRef(false)
@@ -326,6 +325,8 @@ export function useCameraSession({
   const autoPerformanceStartedAtRef = useRef(0)
   const recordingOrientationRef = useRef<'portrait' | 'landscape'>('portrait')
   const recordingStartedAtRef = useRef<number>(0)
+  const activeRecordingIdRef = useRef<string | null>(null)
+  const recordingStartMsRef = useRef<number>(0)
   const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
   onCompleteRef.current = onRecordingComplete
   onBeforeForegroundRestartRef.current = onBeforeForegroundRestart
@@ -533,8 +534,7 @@ export function useCameraSession({
     [],
   )
 
-  /** Audio mode on iOS uses the same native capture bridge as camera mode. */
-  const isNativeAudioBridgeEnabled = isNativeVideoRecordingEnabled
+  const isNativeAudioBridgeEnabled = useCallback(() => false, [])
 
   const restoreWebKitPreviewAfterNativeRecording = useCallback(async () => {
     nativePreviewStartTokenRef.current += 1
@@ -598,6 +598,9 @@ export function useCameraSession({
   }, [])
 
   const acquireNativeVideoBridge = useCallback(async (): Promise<boolean> => {
+    if (recordingModeRef.current !== 'video') {
+      return false
+    }
     if (!isNativeVideoRecordingEnabled()) return false
     if (nativePreviewActiveRef.current) {
       setNativeLivePreviewActive(true)
@@ -1032,6 +1035,7 @@ export function useCameraSession({
   ])
 
   const ensureAudioRecordingStream = useCallback(async (): Promise<MediaStream | null> => {
+    console.log('[AudioRecordLifecycle] prepareStream')
     const mode = recordingModeRef.current
     if (mode !== 'audio') {
       return ensureRecordableStream()
@@ -1229,6 +1233,19 @@ export function useCameraSession({
   const bindRecordingHandlers = useCallback(
     (recorder: MediaRecorder, takeId: string) => {
       recorder.ondataavailable = (event) => {
+        const now = performance.now()
+        console.log(`[AudioRecordLifecycle] dataavailable size=${event.data.size} recordingId=${takeId}`)
+
+        if (takeId !== activeRecordingIdRef.current) {
+          console.warn(`[AudioRecordLifecycle] discarding chunk for stale recordingId: ${takeId}`)
+          return
+        }
+
+        if (now < recordingStartMsRef.current) {
+          console.warn(`[AudioRecordLifecycle] discarding chunk before recordingStartMs`)
+          return
+        }
+
         if (event.data.size === 0) return
 
         if (writerRef.current) {
@@ -1245,6 +1262,7 @@ export function useCameraSession({
       }
 
       recorder.onstop = () => {
+        console.log('[AudioRecordLifecycle] recorderStop')
         void (async () => {
           const shouldSaveTake =
             !autoPreRollActiveRef.current || autoPerformanceActiveRef.current
@@ -1341,6 +1359,7 @@ export function useCameraSession({
               if (verified) {
                 const probedDuration = await probeMediaDuration(persisted.videoUrl, completedMode)
                 const finalDuration = probedDuration > 0 ? probedDuration : durationSeconds
+                console.log('[AudioRecordLifecycle] finalDuration', finalDuration)
 
                 onCompleteRef.current({
                   takeId: stoppedTakeId,
@@ -1458,41 +1477,7 @@ export function useCameraSession({
     }
   }, [cancelAutoPreRollCapture])
 
-  const beginAutoPreRollCapture = useCallback(
-    (armed: NonNullable<typeof armedAutoAudioRef.current>) => {
-      armedAutoAudioRef.current = null
-      recorderRef.current = armed.recorder
-      writerRef.current = armed.writer
-      activeTakeIdRef.current = armed.takeId
-      recorderMimeTypeRef.current = armed.mimeType
-      chunksRef.current = []
 
-      try {
-        if (shouldUseRecordingTimeslice(armed.mimeType)) {
-          armed.recorder.start(RECORDING_TIMESLICE_MS)
-        } else {
-          armed.recorder.start()
-        }
-        autoPreRollActiveRef.current = true
-        autoPerformanceActiveRef.current = false
-        autoPreRollStartedAtRef.current = performance.now()
-        autoPerformanceStartedAtRef.current = 0
-        recordStreamRef.current = buildRecorderStream(
-          streamRef.current!,
-          recordingModeRef.current,
-        )
-      } catch {
-        autoPreRollActiveRef.current = false
-        autoPreRollStartedAtRef.current = 0
-        autoPerformanceStartedAtRef.current = 0
-        recorderRef.current = null
-        writerRef.current = null
-        activeTakeIdRef.current = null
-        void armed.writer.abort().catch(() => {})
-      }
-    },
-    [],
-  )
 
   const tryMarkAutoPerformanceStart = useCallback((): 'started' | 'pending' | 'unavailable' => {
     if (autoPerformanceActiveRef.current || isRecordingRef.current) {
@@ -1517,52 +1502,8 @@ export function useCameraSession({
   }, [])
 
   const warmAutoAudioRecorder = useCallback(async () => {
-    if (
-      recordingModeRef.current !== 'audio' ||
-      isRecordingRef.current ||
-      autoPreRollActiveRef.current ||
-      warmAutoAudioInFlightRef.current ||
-      isAutoPlaybackHoldingMicWarmup()
-    ) {
-      return
-    }
-
-    warmAutoAudioInFlightRef.current = true
-    try {
-      const stream = await ensureAudioRecordingStream()
-      if (
-        !stream ||
-        recordingModeRef.current !== 'audio' ||
-        isRecordingRef.current ||
-        autoPreRollActiveRef.current
-      ) {
-        return
-      }
-
-      const takeId = crypto.randomUUID()
-      const mimeType = getRecorderMimeTypeForMode('audio')
-      const writer = await StreamingTakeWriter.open(takeId, mimeType)
-      if (!writer) return
-
-      if (
-        isRecordingRef.current ||
-        recordingModeRef.current !== 'audio' ||
-        autoPreRollActiveRef.current
-      ) {
-        await writer.abort().catch(() => {})
-        return
-      }
-
-      const recorder = createMediaRecorder(stream, mimeType)
-      bindRecordingHandlers(recorder, takeId)
-
-      beginAutoPreRollCapture({ recorder, writer, takeId, mimeType })
-    } catch {
-      /* cold start on trigger if warm fails */
-    } finally {
-      warmAutoAudioInFlightRef.current = false
-    }
-  }, [beginAutoPreRollCapture, bindRecordingHandlers, ensureAudioRecordingStream])
+    return
+  }, [])
 
   const restartAutoPreRollCapture = useCallback(() => {
     if (!autoPreRollActiveRef.current || autoPerformanceActiveRef.current) return
@@ -1790,10 +1731,23 @@ export function useCameraSession({
     // has none) — without this the ref would stay truthy forever after the
     // first successful audio recording and block every start after it.
     const settledSafe = (async () => {
+      console.log('[AudioRecordLifecycle] userPressedRecord')
       const currentStream = await ensureAudioRecordingStream()
       if (!currentStream || isRecordingRef.current) return isRecordingRef.current
 
+      // Stop and discard any existing MediaRecorder
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try {
+          console.log('[AudioRecordLifecycle] discarding active previous recorder')
+          recorderRef.current.stop()
+        } catch (e) {}
+      }
+      recorderRef.current = null
+
       const takeId = crypto.randomUUID()
+      activeRecordingIdRef.current = takeId
+      recordingStartMsRef.current = performance.now()
+
       const mode = recordingModeRef.current
       recordingOrientationRef.current = readRecordingOrientation()
       const mimeType = getRecorderMimeTypeForMode(mode)
@@ -1815,6 +1769,7 @@ export function useCameraSession({
         bindRecordingHandlers(recorder, takeId)
         recordStreamRef.current = recordStream
 
+        console.log('[AudioRecordLifecycle] recorderStart')
         if (shouldUseRecordingTimeslice(mimeType)) {
           recorder.start(RECORDING_TIMESLICE_MS)
         } else {
@@ -1939,6 +1894,7 @@ export function useCameraSession({
   }, [disarmAutoAudioRecorder])
 
   const stopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
+    console.log('[AudioRecordLifecycle] userPressedStop')
     // Route to the serialized native stop when a native recording is active OR
     // a native start is still settling (bridge warm / didStartRecording window)
     // — that stop path awaits the settle, so Stop is safe at any instant.

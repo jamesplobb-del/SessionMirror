@@ -4,6 +4,7 @@ import Foundation
 enum CameraSessionGuard {
     private(set) static var previewActive = false
     private(set) static var recordingActive = false
+    private(set) static var youtubePlayAlongActive = false
     private(set) static var playbackRouteActive = false
     private(set) static var playbackSessionPrepared = false
     private(set) static var recordingMode = "video"
@@ -42,7 +43,19 @@ enum CameraSessionGuard {
 
     static func setRecordingActive(_ active: Bool) {
         recordingActive = active
+        if !active {
+            youtubePlayAlongActive = false
+        }
         logOwnershipTransition(caller: "setRecordingActive(\(active))")
+    }
+
+    static func setYoutubePlayAlongActive(_ active: Bool) {
+        youtubePlayAlongActive = active
+        if !active {
+            logOwnershipTransition(caller: "setYoutubePlayAlongActive(false)")
+        } else {
+            print("[CameraSessionGuard] youtubePlayAlongActive=true")
+        }
     }
 
     static func setPlaybackRouteActive(_ active: Bool) {
@@ -106,6 +119,7 @@ enum CameraSessionGuard {
         [
             "previewActive": previewActive,
             "recordingActive": recordingActive,
+            "youtubePlayAlongActive": youtubePlayAlongActive,
             "playbackRouteActive": playbackRouteActive,
             "playbackSessionPrepared": playbackSessionPrepared,
         ]

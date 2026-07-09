@@ -39,7 +39,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var lastBridgeFrameTime: CFTimeInterval = 0
     private var pendingBridgeSample: CMSampleBuffer?
     private var isBridgeEncoding = false
-    private let bridgeFramesPerSecond: Double = 60
+    private let bridgeFramesPerSecondFull: Double = 60
+    /// Throttle preview JPEG pump during recording + YouTube play-along so WKWebView/Capacitor is not saturated.
+    private let bridgeFramesPerSecondRecordingPlayAlong: Double = 6
     // Preview-only pump sizing. The recorded movie file uses a separate
     // full-resolution AVCaptureMovieFileOutput and is UNAFFECTED by these.
     // 1080px/0.75 JPEG base64 at 60fps saturates the Capacitor/WKWebView bridge
@@ -1353,11 +1355,20 @@ extension NativeCameraRecordingEngine {
         return copied
     }
 
+    private func effectiveBridgeFrameInterval() -> CFTimeInterval {
+        if CameraSessionGuard.youtubePlayAlongActive,
+           CameraSessionGuard.recordingActive,
+           !isFrameBridgeExternallyRequested {
+            return 1.0 / bridgeFramesPerSecondRecordingPlayAlong
+        }
+        return 1.0 / bridgeFramesPerSecondFull
+    }
+
     private func drainBridgeFrames() {
         guard isFrameBridgeActive, !isBridgeEncoding, let sample = pendingBridgeSample else { return }
 
         let now = CACurrentMediaTime()
-        guard now - lastBridgeFrameTime >= (1.0 / bridgeFramesPerSecond) else { return }
+        guard now - lastBridgeFrameTime >= effectiveBridgeFrameInterval() else { return }
 
         lastBridgeFrameTime = now
         pendingBridgeSample = nil

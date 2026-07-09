@@ -15,6 +15,7 @@ export async function syncNativeCameraSessionState(options: {
   previewActive: boolean
   recordingActive: boolean
   recordingMode?: 'video' | 'audio'
+  youtubePlayAlongActive?: boolean
 }): Promise<void> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return
   nativeCameraPreviewActive = options.previewActive || options.recordingActive

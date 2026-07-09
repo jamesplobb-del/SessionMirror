@@ -123,7 +123,7 @@ function LiveCameraBackground({
   }, [nativeLivePreviewActive, nativeLivePreviewSeedUrl, previewRef])
 
   useEffect(() => {
-    if (!nativeCameraBridgeEnabled) return
+    if (!nativeLivePreviewActive) return
 
     let cancelled = false
     let removeListener: (() => void) | null = null
@@ -164,7 +164,7 @@ function LiveCameraBackground({
         ctx.clearRect(0, 0, canvas.width, canvas.height)
       }
     }
-  }, [nativeCameraBridgeEnabled])
+  }, [nativeLivePreviewActive])
 
   useEffect(() => {
     nativeBridgePrimedRef.current = nativeLivePreviewActive
@@ -695,18 +695,20 @@ function LiveCameraBackground({
         <div className="metronome-stage-ambient metronome-stage-ambient--live" aria-hidden />
       )}
 
-      {showAudioIdle && (
-        <div
-          className={`${overlayClass} camera-background-overlay--audio-hero flex flex-col items-center justify-center ${
-            isEmbedded ? 'camera-background-overlay--audio-hero-embedded' : ''
-          }`}
-        >
-          <AudioModeHeroMic isRecording={isRecording} compact={isEmbedded} />
-          {!isEmbedded && (
-            <p className="audio-mode-hero-mic__caption mt-4 text-sm font-medium">Audio Mode</p>
-          )}
-        </div>
-      )}
+      <div
+        className={`${overlayClass} camera-background-overlay--audio-hero flex flex-col items-center justify-center ${
+          isEmbedded ? 'camera-background-overlay--audio-hero-embedded' : ''
+        } transition-all duration-500 ease-out ${
+          showAudioIdle
+            ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+            : 'opacity-0 translate-y-4 scale-95 pointer-events-none'
+        }`}
+      >
+        <AudioModeHeroMic isRecording={isRecording} compact={isEmbedded} />
+        {!isEmbedded && (
+          <p className="audio-mode-hero-mic__caption mt-4 text-sm font-medium">Audio Mode</p>
+        )}
+      </div>
 
       <div
         className={`${overlayClass} pointer-events-none bg-gradient-to-b from-black/10 via-transparent to-black/25 ${

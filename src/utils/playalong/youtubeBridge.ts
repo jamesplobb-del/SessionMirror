@@ -9,6 +9,20 @@ import {
   refreshStereoPlaybackRoute,
   releaseStereoPlayback,
 } from '../stereoPlaybackRoute'
+import {
+  canAttemptSafeYoutubeResume,
+  canFireYoutubeMaintain,
+  clearYoutubeTapToResume,
+  ingestYoutubeProxyMessage,
+  markYoutubePlayAlongUserStarted,
+  markYoutubeResumeNeeded,
+  markYoutubeSafeResumeAttempted,
+  noteYoutubeMaintainFired,
+  noteYoutubeMaintainSkipped,
+  requestYoutubePlayerStatus,
+  setYoutubeRecordingPlayAlongActive,
+  shouldRunYoutubeRecordingMaintain,
+} from './youtubePlayAlongSession'
 
 const YOUTUBE_BOOST_DELAYS_MS = [
   0, 15, 30, 50, 80, 120, 180, 260, 380, 540, 760, 1100, 1600, 2300, 3200, 4500, 6300, 9000,
@@ -16,7 +30,8 @@ const YOUTUBE_BOOST_DELAYS_MS = [
 
 const YOUTUBE_WAKE_RETRY_MS = [0, 200, 450, 900, 1600, 2800, 4500]
 
-const YOUTUBE_RECORD_MAINTAIN_RETRY_MS = [0, 200, 450, 900, 1600, 2800, 4500, 7000, 10000]
+/** Sparse retries — first seconds after record start only. */
+const YOUTUBE_RECORD_MAINTAIN_RETRY_MS = [0, 900, 2800, 7000]
 
 const STEREO_REFRESH_MIN_MS = 3000
 const PLAYING_MAINTAIN_COOLDOWN_MS = 5000
@@ -78,10 +93,11 @@ function ensureYoutubeHeadphoneProfileListener(): void {
   })
 }
 
-/** Re-apply iOS stereo playback — throttled to avoid AVAudioSession churn that stalls camera preview. */
+/** Re-apply iOS stereo playback — throttled; skipped during recording play-along (recording owns session). */
 function refreshYoutubeStereoRoute(force = false): void {
   if (!Capacitor.isNativePlatform()) return
   if (!mayUseYoutubeStereoRoute()) return
+  if (maintainDuringRecording) return
 
   const now = Date.now()
   if (isStereoPlaybackEngaged() && now - lastStereoRefreshAt < STEREO_REFRESH_MIN_MS) return
@@ -149,7 +165,28 @@ function scheduleYoutubeLoudnessBursts(
   }
 }
 
+function attemptSafeYoutubeResume(
+  iframe: HTMLIFrameElement,
+  reason: string,
+): boolean {
+  if (!maintainDuringRecording) return false
+  if (!canAttemptSafeYoutubeResume()) {
+    markYoutubeResumeNeeded()
+    console.info('[YoutubeRecordMaintain] resume skipped (cooldown)', { reason })
+    return false
+  }
+
+  markYoutubeSafeResumeAttempted()
+  console.info('[YoutubeRecordMaintain] safe resume attempt', { reason })
+  boostYoutubeProxyAudio(iframe, 1)
+  postToYoutubeIframe(iframe, 'playVideo')
+  requestYoutubePlayerStatus((func, args) => postToYoutubeIframe(iframe, func, args))
+  return true
+}
+
 function handleProxyPlaybackMessage(data: unknown): void {
+  ingestYoutubeProxyMessage(data)
+
   if (typeof data !== 'string') return
   let payload: { event?: string; state?: string }
   try {
@@ -165,6 +202,7 @@ function handleProxyPlaybackMessage(data: unknown): void {
   if (payload.state === 'ready') {
     refreshYoutubeStereoRoute(true)
     boostYoutubeProxyAudio(iframe, 1)
+    requestYoutubePlayerStatus((func, args) => postToYoutubeIframe(iframe, func, args))
     return
   }
 
@@ -177,51 +215,79 @@ function handleProxyPlaybackMessage(data: unknown): void {
     return
   }
 
-  if (payload.state === 'paused' && maintainDuringRecording && mayUseYoutubeStereoRoute()) {
-    const now = Date.now()
-    if (now - lastPlayingMaintainAt < PLAYING_MAINTAIN_COOLDOWN_MS) return
-    lastPlayingMaintainAt = now
-    console.info('[YoutubeRecordMaintain] auto-resume after paused')
-    boostYoutubeProxyAudio(iframe, 1)
-    postToYoutubeIframe(iframe, 'playVideo')
+  if (
+    maintainDuringRecording &&
+    (payload.state === 'paused' || payload.state === 'buffering') &&
+    mayUseYoutubeStereoRoute()
+  ) {
+    attemptSafeYoutubeResume(iframe, payload.state)
   }
 }
 
 export function setYoutubeRecordingMaintain(active: boolean): void {
   maintainDuringRecording = active
+  setYoutubeRecordingPlayAlongActive(active)
 }
 
 export function maintainYoutubeReferenceDuringRecording(
   iframe: HTMLIFrameElement | null | undefined,
-  uiVolume = 1
+  uiVolume = 1,
+  options: { recordingActive?: boolean; force?: boolean } = {},
 ): void {
-  if (!iframe) return
-  console.info('[YoutubeRecordMaintain] maintain fired')
+  const recordingActive = options.recordingActive ?? maintainDuringRecording
+  const guard = shouldRunYoutubeRecordingMaintain({ iframe, recordingActive })
+  if (!guard.ok) {
+    noteYoutubeMaintainSkipped(guard.reason ?? 'unknown')
+    return
+  }
+  if (!options.force && !canFireYoutubeMaintain()) {
+    noteYoutubeMaintainSkipped('cooldown')
+    return
+  }
+
+  noteYoutubeMaintainFired({
+    recordingActive,
+    force: options.force ?? false,
+  })
+
   ensureYoutubePlaybackListener()
   registerYoutubeIframe(iframe)
   postYoutubeVolumeProfile(iframe)
-  refreshYoutubeStereoRoute(false)
+  // Recording owns AVAudioSession — do not engage web playback route here.
   boostYoutubeProxyAudio(iframe, uiVolume)
   postToYoutubeIframe(iframe, 'playVideo')
+  requestYoutubePlayerStatus((func, args) => postToYoutubeIframe(iframe!, func, args))
 }
 
 /** Retry maintain while recording — native record start can interrupt WKWebView audio once. */
 export function scheduleYoutubeRecordingMaintain(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
+  options: { recordingActive?: boolean } = {},
 ): void {
+  const recordingActive = options.recordingActive ?? maintainDuringRecording
+  const guard = shouldRunYoutubeRecordingMaintain({ iframe, recordingActive })
+  if (!guard.ok) {
+    noteYoutubeMaintainSkipped(`schedule:${guard.reason ?? 'unknown'}`)
+    return
+  }
+
   const generation = recordMaintainGeneration
   for (const delay of YOUTUBE_RECORD_MAINTAIN_RETRY_MS) {
     window.setTimeout(() => {
       if (generation !== recordMaintainGeneration) return
       if (!maintainDuringRecording) return
-      maintainYoutubeReferenceDuringRecording(iframe, uiVolume)
+      maintainYoutubeReferenceDuringRecording(iframe, uiVolume, {
+        recordingActive,
+        force: delay === 0,
+      })
     }, delay)
   }
 }
 
 export function cancelYoutubeRecordingMaintain(): void {
   recordMaintainGeneration += 1
+  setYoutubeRecordingPlayAlongActive(false)
 }
 
 /** Listen for ready/playing from the Netlify proxy player. */
@@ -229,6 +295,7 @@ export function ensureYoutubePlaybackListener(): void {
   if (playbackListenerInstalled) return
   playbackListenerInstalled = true
   window.addEventListener('message', (event) => {
+    if (event.origin !== YOUTUBE_PROXY_ORIGIN) return
     handleProxyPlaybackMessage(event.data)
   })
 }
@@ -250,6 +317,7 @@ export function wakeYoutubeReference(
   boostYoutubeProxyAudio(iframe, uiVolume)
 
   if (attemptPlay) {
+    markYoutubePlayAlongUserStarted()
     postToYoutubeIframe(iframe, 'playVideo')
   }
 
@@ -270,6 +338,7 @@ export function scheduleYoutubeReferenceWake(
 }
 
 export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
+  markYoutubePlayAlongUserStarted()
   wakeYoutubeReference(iframe, { attemptPlay: true })
 }
 
@@ -286,6 +355,7 @@ export function startYoutubeProxyPlayback(
   iframe: HTMLIFrameElement | null | undefined,
   uiVolume = 1,
 ): void {
+  markYoutubePlayAlongUserStarted()
   wakeYoutubeReference(iframe, { attemptPlay: true, uiVolume })
   scheduleYoutubeReferenceWake(iframe)
 }
@@ -322,4 +392,13 @@ export function seekYoutubeProxy(
   seconds: number,
 ): void {
   postToYoutubeIframe(iframe, 'seekTo', [seconds, true])
+}
+
+export function resumeYoutubePlayAlong(iframe: HTMLIFrameElement | null | undefined): void {
+  if (!iframe) return
+  clearYoutubeTapToResume()
+  markYoutubePlayAlongUserStarted()
+  boostYoutubeProxyAudio(iframe, 1)
+  postToYoutubeIframe(iframe, 'playVideo')
+  requestYoutubePlayerStatus((func, args) => postToYoutubeIframe(iframe, func, args))
 }

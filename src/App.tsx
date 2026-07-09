@@ -62,11 +62,21 @@ import {
   registerYoutubeStereoGuard,
   setYoutubeReferenceActive,
   startYoutubeProxyPlayback,
-  maintainYoutubeReferenceDuringRecording,
   cancelYoutubeRecordingMaintain,
   scheduleYoutubeRecordingMaintain,
   setYoutubeRecordingMaintain,
+  resumeYoutubePlayAlong,
+  maintainDuringRecording,
 } from './utils/playalong/youtubeBridge'
+import {
+  getYoutubePlayAlongUiState,
+  resetYoutubePlayAlongRouteFailure,
+  setYoutubeReferenceEnabled,
+  startYoutubePlayAlongDiagnostics,
+  stopYoutubePlayAlongDiagnostics,
+  subscribeYoutubePlayAlongUi,
+} from './utils/playalong/youtubePlayAlongSession'
+import { YOUTUBE_PROXY_ORIGIN, parseYoutubeVideoId } from './utils/youtubeEmbed'
 import { isYoutubeDialogOpen } from './utils/youtubeDialogState'
 import {
   deleteTakeFile,
@@ -433,6 +443,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [youtubeHeadphonesTipNonce, setYoutubeHeadphonesTipNonce] = useState(0)
   const [showYoutubeExpandTip, setShowYoutubeExpandTip] = useState(false)
   const [youtubeExpandTipNonce, setYoutubeExpandTipNonce] = useState(0)
+  const [youtubePlayAlongUi, setYoutubePlayAlongUi] = useState(getYoutubePlayAlongUiState)
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
@@ -1307,8 +1318,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   youtubeUrlRef.current = youtubeUrl
 
+  useEffect(() => subscribeYoutubePlayAlongUi(setYoutubePlayAlongUi), [])
+
   useEffect(() => {
     setYoutubeReferenceActive(Boolean(youtubeUrl))
+    setYoutubeReferenceEnabled(Boolean(youtubeUrl))
+    if (!youtubeUrl) {
+      resetYoutubePlayAlongRouteFailure()
+    }
   }, [youtubeUrl])
 
   const handleYoutubeHostChange = useCallback((el: HTMLDivElement | null) => {
@@ -1385,7 +1402,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     registerYoutubeStereoGuard(
-      () => !autoPlaybackPlaying && !audioModeTakePlaying && !handsFreePlaybackPending
+      () =>
+        !maintainDuringRecording &&
+        !autoPlaybackPlaying &&
+        !audioModeTakePlaying &&
+        !handsFreePlaybackPending,
     )
   }, [audioModeTakePlaying, autoPlaybackPlaying, handsFreePlaybackPending])
 
@@ -1412,14 +1433,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     if (isPlaybackRouteHoldActive()) return
+    const youtubePlayAlongActive =
+      isRecording && !settings.excludeYoutubeFromRecording && Boolean(youtubeUrl)
     void syncNativeCameraSessionState({
       previewActive:
         (recordingMode === 'video' && (ready || nativeLivePreviewActive)) ||
         (recordingMode === 'audio' && nativeLivePreviewActive),
       recordingActive: isRecording && recordingMode === 'video',
       recordingMode,
+      youtubePlayAlongActive,
     })
-  }, [isRecording, nativeLivePreviewActive, ready, recordingMode])
+  }, [
+    isRecording,
+    nativeLivePreviewActive,
+    ready,
+    recordingMode,
+    settings.excludeYoutubeFromRecording,
+    youtubeUrl,
+  ])
 
   // Native live preview uses canvas frame bridge — WebView stays opaque (no passthrough).
 
@@ -1652,28 +1683,47 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [isRecording, pauseYoutubeReference, settings.excludeYoutubeFromRecording, streamGeneration])
 
   useEffect(() => {
-    if (isRecording && !settings.excludeYoutubeFromRecording && youtubeUrlRef.current) {
+    const playAlongRecording =
+      isRecording && !settings.excludeYoutubeFromRecording && Boolean(youtubeUrlRef.current)
+
+    if (playAlongRecording) {
       setYoutubeRecordingMaintain(true)
+      resetYoutubePlayAlongRouteFailure()
       startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
-      maintainYoutubeReferenceDuringRecording(youtubeIframeRef.current, 1)
-      scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1)
+      scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1, { recordingActive: true })
+      startYoutubePlayAlongDiagnostics({
+        recordingActive: true,
+        getIframe: () => youtubeIframeRef.current,
+        getRecordingElapsedMs: () => elapsed,
+        getVideoId: () => parseYoutubeVideoId(youtubeUrlRef.current ?? ''),
+        onStallResumeAttempt: () => {
+          resumeYoutubePlayAlong(youtubeIframeRef.current)
+        },
+        postCommand: (func, args) => {
+          const iframe = youtubeIframeRef.current
+          if (!iframe?.contentWindow) return
+          iframe.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func, args: args ?? [] }),
+            YOUTUBE_PROXY_ORIGIN,
+          )
+        },
+      })
     } else {
       setYoutubeRecordingMaintain(false)
       cancelYoutubeRecordingMaintain()
+      stopYoutubePlayAlongDiagnostics()
     }
+
     return () => {
       setYoutubeRecordingMaintain(false)
       cancelYoutubeRecordingMaintain()
+      stopYoutubePlayAlongDiagnostics()
     }
-  }, [isRecording, settings.excludeYoutubeFromRecording])
+  }, [elapsed, isRecording, settings.excludeYoutubeFromRecording, youtubeUrl])
 
   useEffect(() => {
-    if (!isRecording || settings.excludeYoutubeFromRecording || !youtubeUrl) return
-    if (!youtubeHostEl) return
-    window.requestAnimationFrame(() => {
-      maintainYoutubeReferenceDuringRecording(youtubeIframeRef.current, 1)
-      scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1)
-    })
+    if (!isRecording || settings.excludeYoutubeFromRecording || !youtubeUrl || !youtubeHostEl) return
+    scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1, { recordingActive: true })
   }, [isRecording, settings.excludeYoutubeFromRecording, youtubeHostEl, youtubeUrl])
 
   useEffect(() => {
@@ -3082,6 +3132,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     prepareNewYoutubeReference()
     setYoutubeUrl(embedUrl)
+    setYoutubeReferenceEnabled(true)
     setYoutubeHeadphonesTipNonce((current) => current + 1)
     setShowYoutubeHeadphonesTip(true)
     setYoutubeExpandTipNonce((current) => current + 1)
@@ -3095,6 +3146,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setYoutubeHostEl(null)
     setShowYoutubeHeadphonesTip(false)
     setShowYoutubeExpandTip(false)
+    setYoutubeReferenceEnabled(false)
+    resetYoutubePlayAlongRouteFailure()
+    stopYoutubePlayAlongDiagnostics()
     stabilizeViewportAfterMediaInteraction()
   }, [])
 
@@ -3274,6 +3328,40 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
                   </motion.div>
                 )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {isRecording &&
+                  (youtubePlayAlongUi.showTapToResume || youtubePlayAlongUi.routeFailureMessage) && (
+                    <motion.div
+                      key="youtube-play-along-recording-ui"
+                      className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[125] flex justify-center px-4"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={iosHudDim}
+                    >
+                      <div className="pointer-events-auto flex w-full max-w-sm flex-col gap-2">
+                        {youtubePlayAlongUi.routeFailureMessage && (
+                          <div className="rounded-2xl border border-amber-300/30 bg-[rgba(28,22,12,0.9)] px-4 py-3 text-sm leading-snug text-amber-50/95 shadow-[0_18px_36px_rgba(8,10,14,0.24)] backdrop-blur-xl">
+                            {youtubePlayAlongUi.routeFailureMessage}
+                          </div>
+                        )}
+                        {youtubePlayAlongUi.showTapToResume && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerLightHaptic()
+                              resumeYoutubePlayAlong(youtubeIframeRef.current)
+                            }}
+                            className="rounded-2xl border border-white/20 bg-[rgba(20,24,31,0.92)] px-4 py-3 text-sm font-medium text-white shadow-[0_18px_36px_rgba(8,10,14,0.24)] backdrop-blur-xl"
+                          >
+                            Tap to resume play-along
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
               </AnimatePresence>
 
               {isAudioPracticeMetronomeTab && (

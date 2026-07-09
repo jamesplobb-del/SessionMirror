@@ -349,6 +349,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         let previewActive = call.getBool("previewActive") ?? false
         let recordingActive = call.getBool("recordingActive") ?? false
         let recordingMode = call.getString("recordingMode") ?? "video"
+        let youtubePlayAlongActive = call.getBool("youtubePlayAlongActive")
 
         CameraSessionGuard.setRecordingMode(recordingMode)
 
@@ -365,6 +366,11 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
         CameraSessionGuard.setPreviewActive(previewActive)
         CameraSessionGuard.setRecordingActive(recordingActive)
+        if let youtubePlayAlongActive {
+            CameraSessionGuard.setYoutubePlayAlongActive(youtubePlayAlongActive)
+        } else if !recordingActive {
+            CameraSessionGuard.setYoutubePlayAlongActive(false)
+        }
 
         if !previewActive && !recordingActive && !CameraSessionGuard.playbackRouteActive {
             if nativeCameraEngine.requiresActiveAudioSession {
@@ -1211,6 +1217,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func startNativeCameraBridge(_ call: CAPPluginCall) {
+        if CameraSessionGuard.recordingMode == "audio" {
+            call.reject("startNativeCameraBridge blocked because active mode is Audio Mode")
+            return
+        }
         let useFrontCamera = call.getBool("useFrontCamera") ?? true
         let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
         let micPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
@@ -1236,6 +1246,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func startNativeCameraPreview(_ call: CAPPluginCall) {
+        if CameraSessionGuard.recordingMode == "audio" {
+            call.reject("startNativeCameraPreview blocked because active mode is Audio Mode")
+            return
+        }
         let useFrontCamera = call.getBool("useFrontCamera") ?? true
         let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
         let micPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
@@ -1524,6 +1538,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Native camera recording A/B test (AVCaptureSession — bypasses WKWebView)
 
     @objc func startNativeCameraRecording(_ call: CAPPluginCall) {
+        if CameraSessionGuard.recordingMode == "audio" {
+            call.reject("startNativeCameraRecording blocked because active mode is Audio Mode")
+            return
+        }
         let useFrontCamera = call.getBool("useFrontCamera") ?? true
         let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
         let micPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
