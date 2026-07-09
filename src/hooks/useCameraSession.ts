@@ -2009,6 +2009,10 @@ export function useCameraSession({
 
       recordingModeRef.current = mode
 
+      if (mode === 'audio') {
+        void stopNativeVideoBridge()
+      }
+
       if (!softAudioHandoff) {
         setReady(false)
       }

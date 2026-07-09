@@ -153,6 +153,9 @@ enum AudioRouteConfigurator {
         input: AVAudioSessionPortDescription?,
         caller: String
     ) throws {
+        if session.preferredInput?.portType == input?.portType {
+            return
+        }
         let requestedInput = input?.portType.rawValue ?? "auto"
         print("[AVAudioSessionTrace] setPreferredInput caller=\(caller) requestedInput=\(requestedInput) before=\(routeSummary(session)) stack=\(compactStack())")
         try session.setPreferredInput(input)
@@ -212,34 +215,7 @@ enum AudioRouteConfigurator {
             session.currentRoute.outputs.contains { $0.portType == .bluetoothHFP }
     }
 
-    private static func resetSessionAwayFromBluetoothHFPIfNeeded(
-        _ session: AVAudioSession,
-        mode: AVAudioSession.Mode = .videoRecording
-    ) throws {
-        // Only reset when the LIVE route is actually on HFP. The mere presence
-        // of the allowBluetoothHFP category option is harmless (iOS keeps A2DP
-        // output for playback), and bouncing the session for it interrupted
-        // WebView (YouTube) audio and Bluetooth headphone playback.
-        guard routeUsesBluetoothHFP(session) else {
-            return
-        }
-
-        print("[MicInputPreference] resetting session away from BluetoothHFP before iPhone mic")
-        try debugSetPreferredInput(session, input: nil, caller: "resetSessionAwayFromBluetoothHFPIfNeeded.clearPreferredInput")
-        // Re-issuing setCategory without allowBluetoothHFP reroutes an active
-        // session in place; a setActive(false)/setActive(true) bounce is not
-        // required and interrupts other audio (WebView, other apps).
-        try debugSetCategory(
-            session,
-            category: .playAndRecord,
-            mode: mode,
-            options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
-            caller: "resetSessionAwayFromBluetoothHFPIfNeeded"
-        )
-        try session.setPreferredSampleRate(48_000)
-        try session.setPreferredIOBufferDuration(0.0029)
-        try ensureSessionActive(session, caller: "resetSessionAwayFromBluetoothHFPIfNeeded")
-    }
+    // (Removed resetSessionAwayFromBluetoothHFPIfNeeded as it disrupts the capture session)
 
     @discardableResult
     static func applyMicInputPreference(
@@ -251,7 +227,6 @@ enum AudioRouteConfigurator {
         if preference == .auto {
             try debugSetPreferredInput(session, input: nil, caller: "applyMicInputPreference.auto")
         } else {
-            if preference == .iphone { try resetSessionAwayFromBluetoothHFPIfNeeded(session) }
             let availableInputs = session.availableInputs ?? []
             if let input = preferredInputPort(for: preference, availableInputs: availableInputs) {
                 try debugSetPreferredInput(session, input: input, caller: "applyMicInputPreference.\(preference.rawValue)")
@@ -362,11 +337,14 @@ enum AudioRouteConfigurator {
         // inaudible (there's no reference media to keep re-pulling the speaker
         // route, unlike overdubs). Move to `.playAndRecord` / `.default`, which
         // records the mic AND lets loud playback (the click) reach the speaker.
-        // This runs during the count-in, before any recorded performance
-        // content (the count-in region is trimmed off the saved take), so a
-        // mode switch here can't affect the kept audio. Idempotent via
-        // debugSetCategory's already-applied guard.
-        if session.mode == .videoRecording {
+        // EXCEPTION: if an external output (headphones, Bluetooth) is already
+        // routing audio, DO NOT switch modes. Switching from videoRecording to
+        // default when BT is connected invites the OS to re-activate the HFP
+        // profile, which kills the capture session's audio pipeline (-17281).
+        // In that case, audio already goes to the headphones and is audible
+        // without any category change needed.
+        let externalOutputActive = hasExternalOutput(session)
+        if !externalOutputActive && (session.category != .playAndRecord || session.mode == .videoRecording) {
             try debugSetCategory(
                 session,
                 category: .playAndRecord,
@@ -377,7 +355,9 @@ enum AudioRouteConfigurator {
         }
 
         try ensureSessionActive(session, caller: "applyCoexistentPlaybackSpeakerRoute")
-        try preferBuiltInSpeakerIfSafe(session)
+        if !externalOutputActive {
+            try preferBuiltInSpeakerIfSafe(session)
+        }
 
         var snapshot = routeSnapshot(for: session)
         snapshot["success"] = true
@@ -593,7 +573,7 @@ enum AudioRouteConfigurator {
 
         if enabled {
             let playbackFocused = playbackActive && !recordingActive
-            let mode: AVAudioSession.Mode = playbackFocused ? .default : .videoRecording
+            let mode: AVAudioSession.Mode = (CameraSessionGuard.recordingMode == "audio") ? .default : (playbackFocused ? .default : .videoRecording)
             let stateKey = "rec=\(recordingActive) playFocused=\(playbackFocused)"
 
             if CameraSessionGuard.shouldBlockRouteChanges() {
@@ -700,6 +680,9 @@ enum AudioRouteConfigurator {
     }
 
     static func deactivateCaptureSessionIfIdle() throws {
+        if CameraSessionGuard.recordingMode == "audio" {
+            return
+        }
         guard !CameraSessionGuard.isCameraOrRecordingActive else { return }
         guard !CameraSessionGuard.playbackRouteActive else { return }
         guard !CameraSessionGuard.isWithinForegroundGracePeriod else {

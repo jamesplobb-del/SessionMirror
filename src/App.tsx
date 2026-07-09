@@ -1417,6 +1417,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         (recordingMode === 'video' && (ready || nativeLivePreviewActive)) ||
         (recordingMode === 'audio' && nativeLivePreviewActive),
       recordingActive: isRecording && recordingMode === 'video',
+      recordingMode,
     })
   }, [isRecording, nativeLivePreviewActive, ready, recordingMode])
 
@@ -2409,7 +2410,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       enabled: true,
       selectedAudioEngine,
       micInputPreference: settings.micInputPreference,
-      recordingActive: isRecording,
+      recordingActive: isRecording && recordingMode === 'video',
       playbackActive: nativeSessionPlaybackActive,
     })
   }, [

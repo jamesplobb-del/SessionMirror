@@ -15,7 +15,7 @@ enum NativeCameraAudioSessionProfile: String {
         return profile
     }
 
-    func apply(to audioSession: AVAudioSession) throws {
+    func apply(to audioSession: AVAudioSession, micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto) throws {
         switch self {
         case .videoRecording:
             // mixWithOthers is load-bearing: WKWebView media (take playback,
@@ -27,19 +27,25 @@ enum NativeCameraAudioSessionProfile: String {
             // headphone playback (YouTube) to the receiver/speaker at capture
             // start. defaultToSpeaker only applies when NO external output is
             // attached, so headphones still win when connected.
+            let options: AVAudioSession.CategoryOptions = micInputPreference == .iphone
+                ? [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                : [.mixWithOthers, .allowBluetoothA2DP, .allowBluetoothHFP, .allowAirPlay, .defaultToSpeaker]
             try AudioRouteConfigurator.debugSetCategory(
                 audioSession,
                 category: .playAndRecord,
                 mode: .videoRecording,
-                options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+                options: options,
                 caller: "NativeCameraAudioSessionProfile.videoRecording"
             )
         case .playAndRecordDefault:
+            let options: AVAudioSession.CategoryOptions = micInputPreference == .iphone
+                ? [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker]
+                : [.mixWithOthers, .allowBluetoothA2DP, .allowBluetoothHFP, .allowAirPlay, .defaultToSpeaker]
             try AudioRouteConfigurator.debugSetCategory(
                 audioSession,
                 category: .playAndRecord,
                 mode: .default,
-                options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+                options: options,
                 caller: "NativeCameraAudioSessionProfile.playAndRecordDefault"
             )
         case .recordVideoRecording:
@@ -55,13 +61,6 @@ enum NativeCameraAudioSessionProfile: String {
             audioSession,
             caller: "NativeCameraAudioSessionProfile.\(rawValue)"
         )
-        if let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) {
-            try AudioRouteConfigurator.debugSetPreferredInput(
-                audioSession,
-                input: builtInMic,
-                caller: "NativeCameraAudioSessionProfile.\(rawValue)"
-            )
-        }
     }
 
     var logLabel: String {

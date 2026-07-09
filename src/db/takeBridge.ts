@@ -4,8 +4,9 @@ import {
   primeThumbnailCacheIndex,
   resolveCachedTakeThumbnail,
 } from '../utils/takeThumbnailCache'
-import { getTakesByProject } from './vaultRepository'
+import { getTakesByProject, deleteVaultTake } from './vaultRepository'
 import type { VaultTake } from './types'
+import { nativeDataFileExists } from '../utils/filesystemInit'
 
 function defaultTakeName(vaultTake: VaultTake, index: number): string {
   if (vaultTake.name.trim()) return vaultTake.name
@@ -103,7 +104,20 @@ export async function hydrateVaultTakeRowsProgressive(
   const { batchSize = 3, priorityIds = [], onBatch } = options
   await primeThumbnailCacheIndex()
 
-  const chronological = [...rows].reverse()
+  const validRows: VaultTake[] = []
+  for (const row of rows) {
+    if (row.filePath) {
+      const exists = await nativeDataFileExists(row.filePath)
+      if (!exists) {
+        console.warn(`[takeBridge] Cleaning up stale database take ${row.id} because file at ${row.filePath} does not exist`)
+        await deleteVaultTake(row.id).catch(() => {})
+        continue
+      }
+    }
+    validRows.push(row)
+  }
+
+  const chronological = [...validRows].reverse()
   const indexed = chronological.map((row, index) => ({ row, index: index + 1 }))
   const prioritySet = new Set(priorityIds.filter(Boolean))
 

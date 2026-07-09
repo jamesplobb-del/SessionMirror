@@ -348,6 +348,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func setCameraSessionState(_ call: CAPPluginCall) {
         let previewActive = call.getBool("previewActive") ?? false
         let recordingActive = call.getBool("recordingActive") ?? false
+        let recordingMode = call.getString("recordingMode") ?? "video"
+
+        CameraSessionGuard.setRecordingMode(recordingMode)
 
         if CameraSessionGuard.playbackRouteActive {
             if previewActive || recordingActive {

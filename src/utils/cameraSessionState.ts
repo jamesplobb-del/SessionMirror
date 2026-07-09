@@ -14,6 +14,7 @@ export function isNativeCameraPreviewActive(): boolean {
 export async function syncNativeCameraSessionState(options: {
   previewActive: boolean
   recordingActive: boolean
+  recordingMode?: 'video' | 'audio'
 }): Promise<void> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return
   nativeCameraPreviewActive = options.previewActive || options.recordingActive

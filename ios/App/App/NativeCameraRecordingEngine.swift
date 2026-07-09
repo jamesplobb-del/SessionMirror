@@ -227,6 +227,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
 
+            if CameraSessionGuard.recordingMode == "audio" {
+                return
+            }
+
             let shouldBeActive = self.isPreviewActive || self.isBridgePreviewActive || self.isRecording
             guard shouldBeActive else { return }
 
@@ -240,9 +244,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 return
             }
 
-            if self.isRecording {
-                // Never touch inputs/outputs mid-recording; AVFoundation will
-                // usually resume the movie file output on its own once the
+            if self.isRecording || self.isStarting {
+                // Never touch inputs/outputs mid-recording (or while starting); 
+                // AVFoundation will usually resume the movie file output on its own once the
                 // interruption clears. Just make sure the session is running.
                 if !self.session.isRunning {
                     print("[NativeCameraRecovery][\(reason)] restarting session during active recording")
@@ -338,7 +342,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         activeAudioProfile = profile
         activeMicInputPreference = micInputPreference
         let session = AVAudioSession.sharedInstance()
-        try profile.apply(to: session)
+        try profile.apply(to: session, micInputPreference: micInputPreference)
 
         // videoRecording profile already pins built-in mic for split-route capture.
         // Re-applying .headphone when HFP is unavailable falls back to Auto and
@@ -446,8 +450,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             case .success:
                 self.sessionQueue.async {
                     do {
+                        let resolvedProfile = CameraSessionGuard.recordingMode == "audio" ? .playAndRecordDefault : audioSessionProfile
                         try self.configureAudioSessionForRecording(
-                            profile: audioSessionProfile,
+                            profile: resolvedProfile,
                             micInputPreference: micInputPreference
                         )
                         // Rebuild the capture session if needed. The explicit
@@ -520,8 +525,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             case .success:
                 self.sessionQueue.async {
                     do {
+                        let resolvedProfile = CameraSessionGuard.recordingMode == "audio" ? .playAndRecordDefault : audioSessionProfile
                         try self.configureAudioSessionForRecording(
-                            profile: audioSessionProfile,
+                            profile: resolvedProfile,
                             micInputPreference: micInputPreference
                         )
                         // See startBridgePreview: use the explicit needsAudioPipelineRebuild
@@ -582,10 +588,30 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         sessionQueue.async {
-            guard !self.isRecording, self.session.isRunning else { return }
-            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.begin")
-            self.session.stopRunning()
-            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.end")
+            guard !self.isRecording else { return }
+            if self.session.isRunning {
+                AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.begin")
+                self.session.stopRunning()
+                AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.end")
+            }
+            
+            // Clear inputs and outputs when stopped to prevent zombie hardware devices
+            // (like Bluetooth HFP inputs) from triggering capture session crashes
+            // when the audio route changes while the preview is inactive.
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview clearConfiguration.begin")
+            self.session.beginConfiguration()
+            for input in self.session.inputs {
+                self.session.removeInput(input)
+            }
+            for output in self.session.outputs {
+                self.session.removeOutput(output)
+            }
+            self.movieOutput = nil
+            self.videoDataOutput = nil
+            self.audioDataOutput = nil
+            self.isSessionConfigured = false
+            self.session.commitConfiguration()
+            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview clearConfiguration.end")
         }
     }
 

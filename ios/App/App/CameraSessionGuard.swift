@@ -6,9 +6,14 @@ enum CameraSessionGuard {
     private(set) static var recordingActive = false
     private(set) static var playbackRouteActive = false
     private(set) static var playbackSessionPrepared = false
+    private(set) static var recordingMode = "video"
+
+    static func setRecordingMode(_ mode: String) {
+        recordingMode = mode
+    }
 
     static var isCameraOrRecordingActive: Bool {
-        previewActive || recordingActive
+        recordingMode == "video" && (previewActive || recordingActive)
     }
 
     /// Timestamp of the most recent `applicationDidBecomeActive` /
@@ -80,6 +85,9 @@ enum CameraSessionGuard {
     }
 
     static func canApplyPlaybackSession(allowWithActivePreview: Bool = false) -> Bool {
+        if recordingMode == "audio" {
+            return true
+        }
         if !previewActive && !recordingActive {
             return true
         }

@@ -11,6 +11,7 @@ import {
   type CSSProperties,
 } from 'react'
 import { Maximize2, Minimize2, Play, Pause, Upload, X, Youtube } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import Pressable from './ui/Pressable'
@@ -51,6 +52,7 @@ import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interac
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { isAudioMimeType } from '../utils/mobileVideo'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
+import { nativeDataFileExists } from '../utils/filesystemInit'
 
 const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 
@@ -358,24 +360,32 @@ function BestTakeBox({
       stopEventBubble(event)
       if (suspendPlayback || !hasTake) return
 
-      if (useNativeTakePlayback) {
-        if (isPlaying) {
-          void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
-          if (nativeRouteHeldRef.current) {
-            nativeRouteHeldRef.current = false
-            void releaseInlineTakeBoxPlaybackRoute()
+      void (async () => {
+        if (Capacitor.isNativePlatform() && playbackFilePath) {
+          const exists = await nativeDataFileExists(playbackFilePath)
+          if (!exists) {
+            console.warn('[Playback] aborted — target file does not exist:', playbackFilePath)
+            return
           }
-          setIsPlaying(false)
-          setIsPlayArmed(false)
-          return
         }
-        if (nativePlayInFlightRef.current) return
 
-        const layout = measureInlineTakeBoxWindowRect(playbackStageRef.current)
-        if (!layout) return
+        if (useNativeTakePlayback) {
+          if (isPlaying) {
+            void stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
+            if (nativeRouteHeldRef.current) {
+              nativeRouteHeldRef.current = false
+              void releaseInlineTakeBoxPlaybackRoute()
+            }
+            setIsPlaying(false)
+            setIsPlayArmed(false)
+            return
+          }
+          if (nativePlayInFlightRef.current) return
 
-        setIsPlayArmed(true)
-        void (async () => {
+          const layout = measureInlineTakeBoxWindowRect(playbackStageRef.current)
+          if (!layout) return
+
+          setIsPlayArmed(true)
           nativePlayInFlightRef.current = true
           try {
             await prepareInlineTakeBoxPlaybackRoute()
@@ -397,22 +407,20 @@ function BestTakeBox({
           } finally {
             nativePlayInFlightRef.current = false
           }
-        })()
-        return
-      }
+          return
+        }
 
-      if (isPlaying) {
-        const video = videoRef.current
-        video?.pause()
-        void finalizeInlineTakeBoxPlaybackCleanup()
-        setIsPlaying(false)
-        setIsPlayArmed(false)
-        return
-      }
+        if (isPlaying) {
+          const video = videoRef.current
+          video?.pause()
+          void finalizeInlineTakeBoxPlaybackCleanup()
+          setIsPlaying(false)
+          setIsPlayArmed(false)
+          return
+        }
 
-      setIsPlayArmed(true)
+        setIsPlayArmed(true)
 
-      void (async () => {
         const media = (await waitForMediaElement(videoRef)) ?? videoRef.current
         if (!media) {
           setIsPlaying(false)
