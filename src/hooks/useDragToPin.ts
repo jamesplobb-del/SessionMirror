@@ -6,7 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import { triggerDragStartHaptic, triggerLightHaptic, triggerSelectionHaptic } from '../utils/haptics'
+import { triggerDragStartHaptic, triggerLightHaptic, triggerLongPressHaptic } from '../utils/haptics'
 
 const LONG_PRESS_MS = 200
 const DRAG_THRESHOLD_PX = 8
@@ -221,7 +221,7 @@ export function useDragToPin({
         setIsArming(true)
         emitDragState(false, true, false)
         if (hapticFeedback) {
-          void triggerSelectionHaptic()
+          void triggerLongPressHaptic()
         }
       }, LONG_PRESS_MS)
     },

@@ -808,6 +808,11 @@ html.app-dark-mode
   padding-top: 0.12rem;
 }
 
+.app-ui-overlay--audio-practice-tuner .auto-sound-hint {
+  color: rgba(255, 255, 255, 0.94) !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
 .app-ui-overlay--audio-mode .pitch-audio-idle-pane--polished {
   margin: 0.35rem 0.5rem;
   border-radius: var(--audio-radius-card);

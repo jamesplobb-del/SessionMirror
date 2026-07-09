@@ -212,7 +212,7 @@ import {
 import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
 import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './context/AudioModePlaybackContext'
 
-const AUTO_PLAYBACK_POST_COOLDOWN_MS = 350
+const AUTO_PLAYBACK_POST_COOLDOWN_MS = 0
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
 const YOUTUBE_HEADPHONES_TIP_MS = 3200
 const YOUTUBE_EXPAND_TIP_MS = 4500

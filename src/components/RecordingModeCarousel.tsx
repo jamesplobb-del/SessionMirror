@@ -167,9 +167,13 @@ function RecordingModeCarousel({
   )
 
   const handleRecordLongPress = useCallback(() => {
-    if (isRecording || !onAutoSoundRecordingChange) return
+    if (!onAutoSoundRecordingChange) return
+
+    const nextEnabled = !autoSoundRecordingRef.current
+    if (isRecording && nextEnabled) return
+
     triggerLightHaptic(hapticFeedback)
-    onAutoSoundRecordingChange(!autoSoundRecordingRef.current)
+    onAutoSoundRecordingChange(nextEnabled)
     notifyTutorial?.('hands-free-toggled')
   }, [hapticFeedback, isRecording, notifyTutorial, onAutoSoundRecordingChange])
 
