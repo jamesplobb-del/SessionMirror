@@ -101,15 +101,18 @@ function LiveCameraBackground({
   const showAudioIdle =
     isAudioMode && !pitchStageActive && !metronomeStageActive && !audioPracticeOverlayActive
   const isEmbedded = variant === 'embedded'
+  const previewWorkSuppressed = visuallySuppressed && !isEmbedded
+  const activeNativeLivePreview = nativeLivePreviewActive && !previewWorkSuppressed
   const overlayClass = isEmbedded
     ? 'camera-background-overlay camera-background-overlay--embedded'
     : 'camera-background-overlay'
-  const webPreviewMode = nativeLivePreviewActive ? 'audio' : recordingMode
+  const webPreviewMode = activeNativeLivePreview ? 'audio' : recordingMode
 
-  const showNativeBridgeCanvas = nativeCameraBridgeEnabled || nativeLivePreviewActive
+  const showNativeBridgeCanvas =
+    !previewWorkSuppressed && (nativeCameraBridgeEnabled || activeNativeLivePreview)
 
   useLayoutEffect(() => {
-    if (!nativeLivePreviewActive) return
+    if (!activeNativeLivePreview) return
     const canvas = nativePreviewCanvasRef.current
     if (!canvas) return
 
@@ -120,10 +123,10 @@ function LiveCameraBackground({
     if (nativeLivePreviewSeedUrl) {
       drawPreviewFrameOnCanvas(canvas, nativeLivePreviewSeedUrl)
     }
-  }, [nativeLivePreviewActive, nativeLivePreviewSeedUrl, previewRef])
+  }, [activeNativeLivePreview, nativeLivePreviewSeedUrl, previewRef])
 
   useEffect(() => {
-    if (!nativeLivePreviewActive) return
+    if (!activeNativeLivePreview) return
 
     let cancelled = false
     let removeListener: (() => void) | null = null
@@ -164,11 +167,11 @@ function LiveCameraBackground({
         ctx.clearRect(0, 0, canvas.width, canvas.height)
       }
     }
-  }, [nativeLivePreviewActive])
+  }, [activeNativeLivePreview])
 
   useEffect(() => {
-    nativeBridgePrimedRef.current = nativeLivePreviewActive
-    if (!nativeLivePreviewActive) {
+    nativeBridgePrimedRef.current = activeNativeLivePreview
+    if (!activeNativeLivePreview) {
       // Bridge just went inactive (backgrounded, mode switch, session
       // recovery) — the canvas may still hold a stale frame. Require a fresh
       // one to be painted before the next activation reveals it, instead of
@@ -176,7 +179,7 @@ function LiveCameraBackground({
       frameFreshSignaledRef.current = false
       setNativeFrameFresh(false)
     }
-  }, [nativeLivePreviewActive])
+  }, [activeNativeLivePreview])
 
   useEffect(() => {
     if (!holdPreviewForTakePlayback) return
@@ -191,6 +194,19 @@ function LiveCameraBackground({
     }
   }, [holdPreviewForTakePlayback, previewRef])
 
+  useEffect(() => {
+    if (!previewWorkSuppressed) return
+    const video = previewRef.current
+    if (!video) return
+
+    try {
+      video.pause()
+      video.srcObject = null
+    } catch {
+      /* ignore hidden preview release failures */
+    }
+  }, [previewRef, previewWorkSuppressed])
+
   const { resumingPreview, placeholderUrl, placeholderFading, showSlowIndicator } =
     useCameraPreviewResume({
       previewRef,
@@ -201,7 +217,8 @@ function LiveCameraBackground({
     })
 
   useEffect(() => {
-    if (nativeLivePreviewActive) return
+    if (previewWorkSuppressed) return
+    if (activeNativeLivePreview) return
     if (holdPreviewForTakePlayback) return
     if (handsFreePlaybackTakeId) return
     if (modePreparing) return
@@ -222,10 +239,11 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, nativeLivePreviewActive, holdPreviewForTakePlayback, handsFreePlaybackTakeId, modePreparing])
+  }, [previewRef, streamRef, streamGeneration, recordingMode, isAudioMode, activeNativeLivePreview, holdPreviewForTakePlayback, handsFreePlaybackTakeId, modePreparing, previewWorkSuppressed])
 
   useEffect(() => {
-    if (nativeLivePreviewActive) return
+    if (previewWorkSuppressed) return
+    if (activeNativeLivePreview) return
     if (holdPreviewForTakePlayback) return
     if (handsFreePlaybackTakeId) return
     if (isAudioMode || modePreparing || resumingPreview) return
@@ -270,10 +288,11 @@ function LiveCameraBackground({
       video?.removeEventListener('stalled', scheduleRevive)
       video?.removeEventListener('suspend', scheduleRevive)
     }
-  }, [handsFreePlaybackTakeId, holdPreviewForTakePlayback, isAudioMode, modePreparing, nativeLivePreviewActive, previewRef, resumingPreview, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, holdPreviewForTakePlayback, isAudioMode, modePreparing, activeNativeLivePreview, previewRef, resumingPreview, streamRef, streamGeneration, previewWorkSuppressed])
 
   useEffect(() => {
-    if (nativeLivePreviewActive) return
+    if (previewWorkSuppressed) return
+    if (activeNativeLivePreview) return
     if (holdPreviewForTakePlayback) return
     if (handsFreePlaybackTakeId) return
     if (visuallySuppressed || isAudioMode || modePreparing) return
@@ -286,7 +305,7 @@ function LiveCameraBackground({
     if (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       void video.play().catch((err) => console.warn('Playback intercepted:', err))
     }
-  }, [handsFreePlaybackTakeId, holdPreviewForTakePlayback, isAudioMode, modePreparing, nativeLivePreviewActive, previewRef, streamRef, streamGeneration, visuallySuppressed])
+  }, [handsFreePlaybackTakeId, holdPreviewForTakePlayback, isAudioMode, modePreparing, activeNativeLivePreview, previewRef, streamRef, streamGeneration, visuallySuppressed, previewWorkSuppressed])
 
   useEffect(() => {
     const wantsPlayback =
@@ -511,7 +530,7 @@ function LiveCameraBackground({
     if (canvas) {
       canvas.style.setProperty('--camera-preview-zoom', zoom)
     }
-  }, [pinchZoomEnabled, previewRef, streamGeneration, nativeLivePreviewActive])
+  }, [pinchZoomEnabled, previewRef, streamGeneration, activeNativeLivePreview])
 
   useEffect(() => {
     if (!pinchZoomEnabled) return
@@ -604,13 +623,14 @@ function LiveCameraBackground({
     isEmbedded ? 'camera-preview--embedded' : 'camera-preview',
     'camera-preview--mirror',
     'camera-preview--live',
-    isAudioMode || nativeLivePreviewActive || showHandsFreeTakePlayback ? 'camera-preview--hidden' : '',
+    isAudioMode || activeNativeLivePreview || showHandsFreeTakePlayback || previewWorkSuppressed ? 'camera-preview--hidden' : '',
   ]
     .filter(Boolean)
     .join(' ')
 
   const showPreparingOverlay = modePreparing && !resumingPreview
-  const showPlaceholder = !nativeLivePreviewActive && resumingPreview && Boolean(placeholderUrl)
+  const showPlaceholder =
+    !activeNativeLivePreview && !previewWorkSuppressed && resumingPreview && Boolean(placeholderUrl)
 
   return (
     <div
@@ -628,13 +648,13 @@ function LiveCameraBackground({
           <canvas
             ref={nativePreviewCanvasRef}
             className={`${isEmbedded ? 'camera-preview-canvas--embedded' : 'camera-preview-canvas'} ${
-              nativeLivePreviewActive
+              activeNativeLivePreview
                 ? 'camera-preview-canvas--live'
                 : 'camera-preview-canvas--primed'
             }`}
             aria-hidden
           />
-          {nativeLivePreviewActive && (
+          {activeNativeLivePreview && (
             <div
               className={`camera-preview-priming-veil ${
                 isEmbedded ? 'camera-preview-priming-veil--embedded' : ''
@@ -721,7 +741,7 @@ function LiveCameraBackground({
         aria-hidden
       />
 
-      {showPreparingOverlay && (
+      {showPreparingOverlay && !previewWorkSuppressed && (
         <div
           className={`${overlayClass} camera-background-overlay--preparing pointer-events-none`}
           aria-hidden
@@ -749,6 +769,7 @@ export default memo(
     prev.nativeLivePreviewActive === next.nativeLivePreviewActive &&
     prev.nativeCameraBridgeEnabled === next.nativeCameraBridgeEnabled &&
     prev.nativeLivePreviewSeedUrl === next.nativeLivePreviewSeedUrl &&
+    prev.holdPreviewForTakePlayback === next.holdPreviewForTakePlayback &&
     prev.handsFreePlaybackTakeId === next.handsFreePlaybackTakeId &&
     prev.handsFreePlaybackSrc === next.handsFreePlaybackSrc,
 )

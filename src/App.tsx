@@ -3001,6 +3001,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
 
   const handleUnpinBenchmark = useCallback(() => {
+    audioModePlaybackControlsRef.pause?.()
     teardownPipMedia(benchmarkPipVideoRef.current)
     void releaseTakePlaybackAudio()
     stabilizeViewportAfterMediaInteraction()
@@ -3009,6 +3010,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [teardownPipMedia])
 
   const handleUnpinChallenger = useCallback(() => {
+    audioModePlaybackControlsRef.pause?.()
     if (challengerId && autoPlaybackTakeId === challengerId) {
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(0)
@@ -3029,6 +3031,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   ])
 
   const handleClearAudioBenchmark = useCallback(() => {
+    audioModePlaybackControlsRef.pause?.()
     if (libraryBenchmarkPlayback) {
       handleClearLibraryReference()
     }
@@ -3799,6 +3802,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     ) && (
                       <ControlDeck
                         isRecording={isRecording}
+                        isStopping={isStopping}
                         elapsed={elapsed}
                         ready={ready}
                         recordingMode={recordingMode}

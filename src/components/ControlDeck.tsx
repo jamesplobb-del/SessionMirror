@@ -10,6 +10,7 @@ import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 
 interface ControlDeckProps {
   isRecording: boolean
+  isStopping?: boolean
   elapsed: number
   ready: boolean
   recordingMode: RecordingMode
@@ -50,6 +51,7 @@ function formatElapsed(seconds: number): string {
 
 function ControlDeck({
   isRecording,
+  isStopping = false,
   elapsed,
   ready,
   recordingMode,
@@ -82,6 +84,7 @@ function ControlDeck({
   hapticFeedback = true,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
+  const showFinishingTake = isStopping && recordingMode === 'video' && !showDeleteDrop
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const [branchOpen, setBranchOpen] = useState(false)
   const [branchActive, setBranchActive] = useState(false)
@@ -238,6 +241,20 @@ function ControlDeck({
                   <Trash2 className="h-6 w-6 text-white" strokeWidth={2.25} />
                 </div>
               </div>
+            ) : showFinishingTake ? (
+              <div
+                className="record-carousel-viewport flex items-center justify-center pointer-events-none"
+                role="status"
+                aria-live="polite"
+                aria-label="Finishing take"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/16 bg-black/45 shadow-[0_0_24px_rgba(255,255,255,0.16)] backdrop-blur-xl">
+                  <span
+                    className="h-6 w-6 animate-spin rounded-full border-2 border-white/25 border-t-white"
+                    aria-hidden
+                  />
+                </div>
+              </div>
             ) : (
               <RecordingModeCarousel
                 value={recordingMode}
@@ -252,19 +269,25 @@ function ControlDeck({
             )}
           </div>
 
-          {autoSoundListening && !isRecording && !showDeleteDrop && (
+          {showFinishingTake && (
+            <p className="auto-sound-hint auto-sound-hint--finishing max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/90">
+              Finishing your take… longer videos can take a moment
+            </p>
+          )}
+
+          {autoSoundListening && !isRecording && !showDeleteDrop && !showFinishingTake && (
             <p className="auto-sound-hint auto-sound-hint--listening max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/90">
               Listening for your playing — a take starts automatically when you begin
             </p>
           )}
 
-          {handsFreeRecording && isRecording && !showDeleteDrop && (
+          {handsFreeRecording && isRecording && !showDeleteDrop && !showFinishingTake && (
             <p className="auto-sound-hint auto-sound-hint--recording max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/88">
               Recording hands-free — playback starts when you stop playing
             </p>
           )}
 
-          {handsFreePlaybackPending && !isRecording && !showDeleteDrop && (
+          {handsFreePlaybackPending && !isRecording && !showDeleteDrop && !showFinishingTake && (
             <p className="auto-sound-hint auto-sound-hint--playback max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-emerald-200/90">
               Playing your take back…
             </p>
