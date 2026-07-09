@@ -1655,6 +1655,13 @@ export function useCameraSession({
       let captureDiagnostics: RecordingCaptureDiagnostics | undefined
       const peakDb = result.recordedPeakDb
       const activeRmsDb = result.recordedActiveRmsDb ?? result.recordedRmsDb
+      if (peakDb == null || activeRmsDb == null) {
+        console.warn('[NativeExperimentalAudio] recording finished with no measured audio levels', {
+          duration: result.duration,
+          audioTrackCount: result.audioTrackCount,
+          hasAudioTrack: result.hasAudioTrack,
+        })
+      }
       if (peakDb != null && activeRmsDb != null) {
         const levels = {
           recordedPeakDb: peakDb,

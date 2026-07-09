@@ -87,7 +87,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     /// Passive launch session — do not force HQ/headphone routes; JS applies on user action.
+    /// Skips while native camera preview/recording is live so we don't stomp the
+    /// videoRecording profile and silently drop the movie audio connection.
     private func configurePersistentAudioSession() {
+        if CameraSessionGuard.isCameraOrRecordingActive || NativeCameraRecordingEngine.shared.isNativeRecordingActive {
+            print("[AVAudioSessionTrace] configurePersistentAudioSession skipped — camera/recording active")
+            return
+        }
         let session = AVAudioSession.sharedInstance()
         do {
             try AudioRouteConfigurator.debugSetCategory(

@@ -127,6 +127,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             name: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance()
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance()
+        )
         // Diagnostic only (reported "quality degrades after extended use" has
         // no confirmed root cause yet) — surfaces thermal throttling in the
         // Xcode console so a repro session tells us whether the OS is
@@ -219,6 +225,21 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         ensureSessionHealthy(reason: type == .began ? "audioInterruptionBegan" : "audioInterruptionEnded")
     }
 
+    @objc private func handleAudioRouteChange(_ notification: Notification) {
+        let reasonRaw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+        let reason = reasonRaw.flatMap { AVAudioSession.RouteChangeReason(rawValue: $0) }
+        print("[NativeCameraRecovery] AVAudioSession route change reason=\(String(describing: reason))")
+        sessionQueue.async { [weak self] in
+            guard let self = self, self.isRecording || self.isStarting else { return }
+            self.recoverMovieAudioDuringRecording(reason: "routeChange.\(String(describing: reason))")
+        }
+    }
+
+    /// Best-effort flag for lifecycle guards (AppDelegate, background suspend).
+    var isNativeRecordingActive: Bool {
+        isRecording || isStarting
+    }
+
     /// Defensive resync used after any interruption/error/lifecycle event: if the
     /// session SHOULD be running (preview, bridge preview, or recording was
     /// active) but AVFoundation left it stopped — or hardware objects were
@@ -247,13 +268,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
 
             if self.isRecording || self.isStarting {
-                // Never touch inputs/outputs mid-recording (or while starting); 
-                // AVFoundation will usually resume the movie file output on its own once the
-                // interruption clears. Just make sure the session is running.
-                if !self.session.isRunning {
-                    print("[NativeCameraRecovery][\(reason)] restarting session during active recording")
-                    self.session.startRunning()
-                }
+                // Never tear down capture inputs/outputs mid-recording, but DO
+                // recover the movie audio connection and reactivate AVAudioSession
+                // input-only — interruptions/route changes can leave video writing
+                // while the audio connection is silently disabled.
+                self.recoverMovieAudioDuringRecording(reason: reason)
                 return
             }
 
@@ -764,6 +783,50 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
+    private func logMovieAudioConnection(context: String, movieOutput: AVCaptureMovieFileOutput) {
+        if let audioConnection = movieOutput.connection(with: .audio) {
+            print(
+                "[NativeCameraTest][\(context)] movieAudioConnection " +
+                "enabled=\(audioConnection.isEnabled) active=\(audioConnection.isActive) " +
+                "inputPorts=\(audioConnection.inputPorts.map { $0.mediaType.rawValue })"
+            )
+        } else {
+            print("[NativeCameraTest][\(context)] movieAudioConnection MISSING — movie output has no audio connection")
+        }
+    }
+
+    /// Safe mid-recording recovery: never setCategory or reconfigure the capture
+    /// session (that silently drops the movie audio connection), but DO re-enable
+    /// a disabled connection and reactivate AVAudioSession input-only.
+    private func recoverMovieAudioDuringRecording(reason: String) {
+        if let movieOutput = movieOutput {
+            logMovieAudioConnection(context: "recover.\(reason)", movieOutput: movieOutput)
+            if let audioConnection = movieOutput.connection(with: .audio), !audioConnection.isEnabled {
+                print("[NativeCameraRecovery][\(reason)] re-enabling disabled movie audio connection")
+                audioConnection.isEnabled = true
+            }
+        }
+
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try AudioRouteConfigurator.ensureSessionActive(
+                audioSession,
+                caller: "recoverMovieAudioDuringRecording.\(reason)"
+            )
+            _ = try AudioRouteConfigurator.applyMicInputPreferenceInputOnly(
+                activeMicInputPreference,
+                caller: "recoverMovieAudioDuringRecording.\(reason)"
+            )
+        } catch {
+            print("[NativeCameraRecovery][\(reason)] input-only session recovery failed: \(error.localizedDescription)")
+        }
+
+        if !session.isRunning {
+            print("[NativeCameraRecovery][\(reason)] restarting session during active recording")
+            session.startRunning()
+        }
+    }
+
     private func configureCaptureSession(useFrontCamera: Bool) throws -> AVCaptureMovieFileOutput {
         AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession beginConfiguration.begin")
         session.beginConfiguration()
@@ -1046,12 +1109,21 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
         }
 
-        if !isSessionConfigured || movieOutput == nil || (isPreviewActive && previewUsesFrontCamera != useFrontCamera) || needsAudioPipelineRebuild {
-            let configuredOutput = try configureCaptureSession(useFrontCamera: useFrontCamera)
-            movieOutput = configuredOutput
-            isSessionConfigured = true
-            previewUsesFrontCamera = useFrontCamera
-            needsAudioPipelineRebuild = false
+        let needsCaptureReconfigure =
+            !isSessionConfigured ||
+            movieOutput == nil ||
+            needsAudioPipelineRebuild ||
+            (!previewAlreadyActive && previewUsesFrontCamera != useFrontCamera)
+        if needsCaptureReconfigure {
+            if previewAlreadyActive {
+                print("[NativeCameraTest] WARNING: capture reconfigure requested while preview is live — skipping to preserve movie audio connection")
+            } else {
+                let configuredOutput = try configureCaptureSession(useFrontCamera: useFrontCamera)
+                movieOutput = configuredOutput
+                isSessionConfigured = true
+                previewUsesFrontCamera = useFrontCamera
+                needsAudioPipelineRebuild = false
+            }
         }
 
         if !session.isRunning {
@@ -1084,6 +1156,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 userInfo: [NSLocalizedDescriptionKey: "Movie output unavailable"]
             )
         }
+
+        logMovieAudioConnection(context: "recordStart", movieOutput: activeMovieOutput)
 
         var result: [String: Any] = [
             "filePath": "takes/\(filename)",
@@ -1157,6 +1231,17 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             print("[NativeCameraTest] recording started")
             print("[NativeCameraTest] fileURL = \(fileURL.absoluteString)")
+            if let movieOutput = self.movieOutput {
+                self.logMovieAudioConnection(context: "didStartRecording", movieOutput: movieOutput)
+            }
+            for connection in connections where connection.isActive {
+                if connection.inputPorts.contains(where: { $0.mediaType == .audio }) {
+                    print(
+                        "[NativeCameraTest][didStartRecording] active audio connection " +
+                        "enabled=\(connection.isEnabled) active=\(connection.isActive)"
+                    )
+                }
+            }
             AudioRouteConfigurator.logMicRouteProof(
                 context: "recordingStarted",
                 preference: self.activeMicInputPreference
@@ -1319,6 +1404,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         let route = routeSnapshot["outputPort"] as? String ?? "unknown"
         let relativePath = "takes/\(fileURL.lastPathComponent)"
 
+        let audioTracks = asset.tracks(withMediaType: .audio)
+        let audioTrackCount = audioTracks.count
+        if audioTrackCount == 0 {
+            print("[NativeCameraTest] WARNING: finished recording has NO audio track in file — silence is in-file, not playback-only")
+        } else {
+            print("[NativeCameraTest] finished recording audioTrackCount=\(audioTrackCount)")
+        }
+
         var result: [String: Any] = [
             "filePath": relativePath,
             "fileURL": fileURL.absoluteString,
@@ -1329,13 +1422,23 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             "height": height,
             "route": route,
             "audioSessionProfile": activeAudioProfile.rawValue,
+            "audioTrackCount": audioTrackCount,
+            "hasAudioTrack": audioTrackCount > 0,
         ]
+
+        if let movieOutput = movieOutput {
+            logMovieAudioConnection(context: "recordStop", movieOutput: movieOutput)
+        }
 
         if let levels = NativeCameraTestAudio.measureLevels(fileURL: fileURL) {
             NativeCameraTestAudio.logFileLevels(levels)
             for (key, value) in NativeCameraTestAudio.levelsPayload(levels) {
                 result[key] = value
             }
+        } else if audioTrackCount == 0 {
+            print("[NativeCameraTest] measureLevels skipped — no audio track to analyze")
+        } else {
+            print("[NativeCameraTest] measureLevels failed — audio track present but unreadable")
         }
 
         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: activeAudioProfile)

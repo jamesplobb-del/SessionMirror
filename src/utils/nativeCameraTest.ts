@@ -45,6 +45,8 @@ export interface NativeCameraRecordingStopResult extends NativeCameraSessionDiag
   recordedPeakDb?: number
   recordedRmsDb?: number
   recordedActiveRmsDb?: number
+  audioTrackCount?: number
+  hasAudioTrack?: boolean
 }
 
 export interface NativeCameraPostProcessPlaybackResult {

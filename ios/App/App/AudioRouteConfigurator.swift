@@ -701,6 +701,10 @@ enum AudioRouteConfigurator {
     }
 
     static func suspendForAppBackground() {
+        if NativeCameraRecordingEngine.shared.isNativeRecordingActive {
+            print("[AudioRoute] skipping background suspend — native recording in progress")
+            return
+        }
         CameraSessionGuard.setPreviewActive(false)
         CameraSessionGuard.setRecordingActive(false)
         CameraSessionGuard.setPlaybackRouteActive(false)
