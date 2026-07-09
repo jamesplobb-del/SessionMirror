@@ -3,6 +3,8 @@ import BestTakeAudioPlugin from './audioSessionRoute'
 
 const isNative = Capacitor.isNativePlatform()
 const isIOS = isNative && Capacitor.getPlatform() === 'ios'
+const HAPTIC_REPRIME_DELAY_MS = 700
+let hapticReprimeTimer: number | null = null
 
 /**
  * Cache the Capacitor haptics module once (Android / non-iOS native). The old
@@ -30,9 +32,24 @@ export function warmHaptics(): void {
   }
 }
 
-function runImpact(style: 'light' | 'medium' | 'heavy'): void {
+function scheduleHapticReprime(): void {
+  if (!isIOS) return
+  if (hapticReprimeTimer !== null) {
+    window.clearTimeout(hapticReprimeTimer)
+  }
+  hapticReprimeTimer = window.setTimeout(() => {
+    hapticReprimeTimer = null
+    warmHaptics()
+  }, HAPTIC_REPRIME_DELAY_MS)
+}
+
+if (isIOS) {
+  warmHaptics()
+}
+
+function runImpact(style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid'): void {
   if (isIOS) {
-    void BestTakeAudioPlugin.hapticImpact({ style }).catch(() => {})
+    void BestTakeAudioPlugin.hapticImpact({ style }).catch(() => {}).finally(scheduleHapticReprime)
     return
   }
 
@@ -42,7 +59,7 @@ function runImpact(style: 'light' | 'medium' | 'heavy'): void {
         style:
           style === 'heavy'
             ? ImpactStyle.Heavy
-            : style === 'medium'
+            : style === 'medium' || style === 'rigid'
               ? ImpactStyle.Medium
               : ImpactStyle.Light,
       }),
@@ -55,7 +72,7 @@ function runImpact(style: 'light' | 'medium' | 'heavy'): void {
 
 function runNotification(type: 'success' | 'warning' | 'error'): void {
   if (isIOS) {
-    void BestTakeAudioPlugin.hapticNotification({ type }).catch(() => {})
+    void BestTakeAudioPlugin.hapticNotification({ type }).catch(() => {}).finally(scheduleHapticReprime)
     return
   }
 
@@ -124,6 +141,12 @@ export function triggerMetronomeToggleHaptic(playing: boolean, enabled = true): 
     return
   }
   triggerLightHaptic(enabled)
+}
+
+/** Crisp iOS mode-switch tick — used for camera/audio carousel changes. */
+export function triggerModeSwitchHaptic(enabled = true): void {
+  if (!enabled) return
+  runImpact('rigid')
 }
 
 /** Warning — destructive confirm. */

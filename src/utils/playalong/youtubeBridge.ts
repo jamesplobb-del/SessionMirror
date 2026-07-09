@@ -15,6 +15,7 @@ import {
   clearYoutubeTapToResume,
   ingestYoutubeProxyMessage,
   markYoutubePlayAlongUserStarted,
+  markYoutubePlayAlongUserPaused,
   markYoutubeResumeNeeded,
   markYoutubeSafeResumeAttempted,
   noteYoutubeMaintainFired,
@@ -170,6 +171,7 @@ function attemptSafeYoutubeResume(
   reason: string,
 ): boolean {
   if (!maintainDuringRecording) return false
+  if (!shouldRunYoutubeRecordingMaintain({ iframe, recordingActive: true }).ok) return false
   if (!canAttemptSafeYoutubeResume()) {
     markYoutubeResumeNeeded()
     console.info('[YoutubeRecordMaintain] resume skipped (cooldown)', { reason })
@@ -215,9 +217,15 @@ function handleProxyPlaybackMessage(data: unknown): void {
     return
   }
 
+  if (payload.state === 'paused' || payload.state === 'ended') {
+    markYoutubePlayAlongUserPaused()
+    return
+  }
+
   if (
     maintainDuringRecording &&
-    (payload.state === 'paused' || payload.state === 'buffering') &&
+    shouldRunYoutubeRecordingMaintain({ iframe, recordingActive: true }).ok &&
+    payload.state === 'buffering' &&
     mayUseYoutubeStereoRoute()
   ) {
     attemptSafeYoutubeResume(iframe, payload.state)
@@ -343,6 +351,8 @@ export function playYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): 
 }
 
 export function pauseYoutubeProxy(iframe: HTMLIFrameElement | null | undefined): void {
+  markYoutubePlayAlongUserPaused()
+  cancelScheduledLoudnessWork()
   postToYoutubeIframe(iframe, 'pauseVideo')
   releaseYoutubeReferenceRoute()
 }

@@ -62,6 +62,7 @@ import {
   registerYoutubeStereoGuard,
   setYoutubeReferenceActive,
   startYoutubeProxyPlayback,
+  wakeYoutubeReference,
   cancelYoutubeRecordingMaintain,
   scheduleYoutubeRecordingMaintain,
   setYoutubeRecordingMaintain,
@@ -138,7 +139,12 @@ import {
 } from './db'
 import { hasBenchmarkReference, resolveBenchmarkPlayback } from './utils/benchmarkReference'
 import { hydrateLibraryItems, type HydratedLibraryItem } from './utils/libraryBridge'
-import { triggerBestTakeHaptic, triggerLightHaptic, triggerWarningHaptic } from './utils/haptics'
+import {
+  triggerBestTakeHaptic,
+  triggerLightHaptic,
+  triggerWarningHaptic,
+  warmHaptics,
+} from './utils/haptics'
 import {
   deleteLibraryFile,
   normalizeLibraryAudioMime,
@@ -539,12 +545,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
+    warmHaptics()
     void syncAppOrientationLock()
 
     let removeListener: (() => void) | undefined
     void import('@capacitor/app').then(({ App }) => {
       void App.addListener('appStateChange', ({ isActive }) => {
         if (isActive) {
+          warmHaptics()
           void syncAppOrientationLock()
         }
       }).then((sub) => {
@@ -1689,7 +1697,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (playAlongRecording) {
       setYoutubeRecordingMaintain(true)
       resetYoutubePlayAlongRouteFailure()
-      startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
       scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1, { recordingActive: true })
       startYoutubePlayAlongDiagnostics({
         recordingActive: true,
@@ -3160,7 +3167,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const next = !current
       if (next && youtubeUrlRef.current) {
         window.requestAnimationFrame(() => {
-          startYoutubeProxyPlayback(youtubeIframeRef.current, 1)
+          wakeYoutubeReference(youtubeIframeRef.current, { attemptPlay: false, uiVolume: 1 })
         })
       }
       if (next && isNativeCameraPlatform && recordingModeRef.current === 'video') {

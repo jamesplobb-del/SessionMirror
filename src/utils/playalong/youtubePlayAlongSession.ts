@@ -256,7 +256,16 @@ export function setYoutubeReferenceEnabled(enabled: boolean): void {
 }
 
 export function markYoutubePlayAlongUserStarted(): void {
-  session = { ...session, userStartedPlayAlong: true }
+  session = { ...session, userStartedPlayAlong: true, expectedPlaying: true }
+  setUi({ showTapToResume: false })
+  resetStallEpisode()
+  notifySession()
+}
+
+export function markYoutubePlayAlongUserPaused(): void {
+  session = { ...session, expectedPlaying: false }
+  setUi({ showTapToResume: false })
+  resetProgressTracker()
   notifySession()
 }
 
@@ -264,7 +273,9 @@ export function setYoutubeRecordingPlayAlongActive(active: boolean): void {
   session = {
     ...session,
     recordingPlayAlongActive: active,
-    expectedPlaying: active,
+    expectedPlaying: active
+      ? session.expectedPlaying || telemetry.playerState === 'playing'
+      : false,
   }
   if (!active) {
     setUi({ showTapToResume: false })
@@ -347,6 +358,7 @@ export function shouldRunYoutubeRecordingMaintain(options: {
   const { iframe, recordingActive } = options
   if (!recordingActive) return { ok: false, reason: 'not_recording' }
   if (!session.youtubeEnabled) return { ok: false, reason: 'youtube_disabled' }
+  if (!session.expectedPlaying) return { ok: false, reason: 'user_paused' }
   if (!session.userStartedPlayAlong && !session.recordingPlayAlongActive) {
     return { ok: false, reason: 'play_along_not_started' }
   }

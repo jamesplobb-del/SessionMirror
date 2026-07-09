@@ -3,6 +3,7 @@ import { Camera, Mic } from 'lucide-react'
 import RecordOrbitIcon from './RecordOrbitIcon'
 import {
   triggerLightHaptic,
+  triggerModeSwitchHaptic,
   triggerRecordStartHaptic,
   triggerRecordStopHaptic,
 } from '../utils/haptics'
@@ -159,7 +160,7 @@ function RecordingModeCarousel({
         return
       }
       if (modeSwitchLocked) return
-      triggerLightHaptic(hapticFeedback)
+      triggerModeSwitchHaptic(hapticFeedback)
       onChange(mode)
     },
     [hapticFeedback, isRecording, modeSwitchLocked, onChange, onToggleRecord, value],
@@ -184,10 +185,10 @@ function RecordingModeCarousel({
       const deltaX = endX - touchStartXRef.current
 
       if (deltaX <= -SWIPE_THRESHOLD_PX && value === 'video') {
-        triggerLightHaptic(hapticFeedback)
+        triggerModeSwitchHaptic(hapticFeedback)
         onChange('audio')
       } else if (deltaX >= SWIPE_THRESHOLD_PX && value === 'audio') {
-        triggerLightHaptic(hapticFeedback)
+        triggerModeSwitchHaptic(hapticFeedback)
         onChange('video')
       }
     },

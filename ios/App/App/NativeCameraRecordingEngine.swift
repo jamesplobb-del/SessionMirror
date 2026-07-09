@@ -49,8 +49,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var pendingBridgeSample: CMSampleBuffer?
     private var isBridgeEncoding = false
     private let bridgeFramesPerSecondFull: Double = 60
-    /// Throttle preview JPEG pump during recording + YouTube play-along so WKWebView/Capacitor is not saturated.
-    private let bridgeFramesPerSecondRecordingPlayAlong: Double = 6
+    /// Keep expand-mode live preview usable during recording + YouTube play-along while still avoiding a full 60fps bridge flood.
+    private let bridgeFramesPerSecondRecordingPlayAlong: Double = 40
     // Preview-only pump sizing. The recorded movie file uses a separate
     // full-resolution AVCaptureMovieFileOutput and is UNAFFECTED by these.
     // 1080px/0.75 JPEG base64 at 60fps saturates the Capacitor/WKWebView bridge
@@ -58,6 +58,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     // per-frame payload ~2.5x, letting the bridge sustain a far smoother rate.
     private let bridgeMaxPixelDimension: CGFloat = 720
     private let bridgeJpegQuality: CGFloat = 0.6
+    private let bridgeMaxPixelDimensionRecordingPlayAlong: CGFloat = 540
+    private let bridgeJpegQualityRecordingPlayAlong: CGFloat = 0.45
     private lazy var ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private lazy var bridgeColorSpace = CGColorSpaceCreateDeviceRGB()
     private var outputURL: URL?
@@ -1095,8 +1097,18 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         let sourceHeight = extent.height
         guard sourceWidth > 0, sourceHeight > 0 else { return nil }
 
+        let playAlongBridgeActive = isRecordingPlayAlongBridgeActive()
+        let maxPixelDimension: CGFloat
+        let jpegQuality: CGFloat
+        if playAlongBridgeActive {
+            maxPixelDimension = bridgeMaxPixelDimensionRecordingPlayAlong
+            jpegQuality = bridgeJpegQualityRecordingPlayAlong
+        } else {
+            maxPixelDimension = bridgeMaxPixelDimension
+            jpegQuality = bridgeJpegQuality
+        }
         let maxDim = max(sourceWidth, sourceHeight)
-        let scale = min(1, bridgeMaxPixelDimension / maxDim)
+        let scale = min(1, maxPixelDimension / maxDim)
         let outputWidth = Int(sourceWidth * scale)
         let outputHeight = Int(sourceHeight * scale)
 
@@ -1108,7 +1120,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         let options: [CIImageRepresentationOption: Any] = [
-            .init(rawValue: kCGImageDestinationLossyCompressionQuality as String): bridgeJpegQuality,
+            .init(rawValue: kCGImageDestinationLossyCompressionQuality as String): jpegQuality,
         ]
         guard let jpeg = ciContext.jpegRepresentation(
             of: scaledImage,
@@ -1815,14 +1827,15 @@ extension NativeCameraRecordingEngine {
         return copied
     }
 
+    private func isRecordingPlayAlongBridgeActive() -> Bool {
+        CameraSessionGuard.youtubePlayAlongActive && CameraSessionGuard.recordingActive
+    }
+
     private func effectiveBridgeFrameInterval() -> CFTimeInterval {
-        // Reverted: throttling this during plain recording (not just
-        // play-along) made preview very laggy and did NOT fix the
-        // audioTrackCount=0 bug on long takes, so the preview pump was not
-        // the cause — back to only throttling during YouTube play-along.
-        if CameraSessionGuard.youtubePlayAlongActive,
-           CameraSessionGuard.recordingActive,
-           !isFrameBridgeExternallyRequested {
+        // Plain recording keeps the full-rate preview. YouTube play-along uses
+        // a moderate frame cap plus smaller JPEGs so expand-mode preview stays
+        // smooth without pushing full-size frames through WKWebView.
+        if isRecordingPlayAlongBridgeActive() {
             return 1.0 / bridgeFramesPerSecondRecordingPlayAlong
         }
         return 1.0 / bridgeFramesPerSecondFull

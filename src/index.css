@@ -2250,6 +2250,7 @@ html.physical-landscape-right .ui-orient-spin {
 
 .record-carousel-viewport {
   position: relative;
+  --record-carousel-ease: cubic-bezier(0.19, 1, 0.22, 1);
   --record-carousel-viewport-width: 9.5rem;
   --record-slot-active-size: 66px;
   --record-slot-inactive-size: 40px;
@@ -2312,8 +2313,9 @@ html.physical-landscape-right .ui-orient-spin {
   position: relative;
   width: 100%;
   height: 100%;
-  transition: transform 360ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 460ms var(--record-carousel-ease);
   will-change: transform;
+  transform: translateZ(0);
 }
 
 .record-carousel-slot {
@@ -2332,15 +2334,18 @@ html.physical-landscape-right .ui-orient-spin {
   touch-action: manipulation;
   user-select: none;
   transform: translate(-50%, -50%);
+  transform-origin: center;
+  backface-visibility: hidden;
   /* background/box-shadow/border-color share one duration+curve with opacity
      so state changes (e.g. hands-free activation) read as one cohesive
      animation instead of three independently-timed property transitions. */
   transition:
-    transform 380ms cubic-bezier(0.32, 0.72, 0, 1.12),
-    opacity 260ms cubic-bezier(0.32, 0.72, 0, 1),
-    background 260ms cubic-bezier(0.32, 0.72, 0, 1),
-    box-shadow 260ms cubic-bezier(0.32, 0.72, 0, 1),
-    border-color 260ms cubic-bezier(0.32, 0.72, 0, 1);
+    transform 520ms var(--record-carousel-ease),
+    opacity 320ms var(--record-carousel-ease),
+    background 320ms var(--record-carousel-ease),
+    box-shadow 320ms var(--record-carousel-ease),
+    border-color 320ms var(--record-carousel-ease),
+    color 320ms var(--record-carousel-ease);
   will-change: transform, opacity, box-shadow;
 }
 
@@ -2348,8 +2353,9 @@ html.physical-landscape-right .ui-orient-spin {
 .record-carousel-slot-dot,
 .record-orbit-icon {
   transition:
-    transform 260ms cubic-bezier(0.32, 0.72, 0, 1.08),
-    opacity 220ms ease;
+    transform 420ms var(--record-carousel-ease),
+    opacity 260ms ease;
+  will-change: transform, opacity;
 }
 
 .record-carousel-slot--center {
@@ -5235,11 +5241,11 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .pitch-tuner--widget .pitch-audio-stage__hero {
-  padding: 0.1rem 0.35rem 0;
+  padding: 0.15rem 0.35rem 0.05rem;
 }
 
 .pitch-tuner--widget .pitch-note-orbit {
-  --orbit-size: min(34cqw, 4.8rem);
+  --orbit-size: min(38cqw, 5.35rem);
   filter: drop-shadow(0 6px 16px rgba(23, 26, 34, 0.06));
 }
 
