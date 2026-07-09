@@ -30,9 +30,8 @@ async function isCameraSessionActive(): Promise<boolean> {
 }
 
 function markNativeStereoUnavailable(error: unknown): void {
-  nativeStereoPermanentlySkipped = true
   console.warn(
-    '[AudioRoute] Native stereo route disabled after failure; Web Audio playback unchanged.',
+    '[AudioRoute] Native stereo route apply failed; Web Audio playback unchanged.',
     error,
   )
 }

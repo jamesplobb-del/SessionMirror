@@ -181,7 +181,10 @@ export interface BestTakeAudioPluginType {
   /** Read-only — reports the current output route without changing it. */
   getPlaybackOutputProfile(): Promise<AudioRouteSnapshot>
   /** Debug A/B — AVPlayer file playback, bypasses WKWebView Web Audio. iOS only. */
-  startNativePlaybackTest(options: { url: string }): Promise<NativePlaybackTestStartResult>
+  startNativePlaybackTest(options: {
+    url: string
+    startTime?: number
+  }): Promise<NativePlaybackTestStartResult>
   stopNativePlaybackTest(): Promise<void>
   startInlineTakeBoxPlayback(options: {
     ownerId?: string

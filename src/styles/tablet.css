@@ -339,7 +339,8 @@
   }
 
   .audio-practice-top-tabs {
-    max-width: min(46rem, calc(100% - 3rem));
+    width: min(100% - 2rem, 46rem);
+    max-width: none;
     min-height: 3.5rem;
     margin-top: clamp(0.75rem, 1.8vh, 1.35rem);
     margin-bottom: clamp(0.9rem, 1.8vh, 1.35rem);
@@ -352,9 +353,19 @@
   }
 
   .audio-mode-home-layer {
-    max-width: var(--ipad-content-max-width);
-    margin-inline: auto;
-    padding-inline: 1.5rem;
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    padding-inline: clamp(1.25rem, 3vw, 2rem);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .audio-mode-home-layer > * {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .audio-mode-home {
@@ -403,16 +414,17 @@
 
   .audio-practice-metronome-shell,
   .audio-practice-tuner-shell {
-    max-width: var(--ipad-content-max-width);
-    margin-inline: auto;
     width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    padding-inline: clamp(1.25rem, 3vw, 2rem);
   }
 
   .app-ui-overlay--audio-mode .audio-practice-metronome__body,
   .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
-    max-width: var(--ipad-content-max-width);
-    margin-inline: auto;
     width: 100%;
+    max-width: none;
+    margin-inline: 0;
   }
 
   .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large,
@@ -783,6 +795,7 @@
   .audio-mode-home-layer,
   .audio-practice-metronome-shell,
   .audio-practice-tuner-shell {
-    max-width: min(820px, calc(100% - 4rem));
+    width: 100%;
+    max-width: none;
   }
 }

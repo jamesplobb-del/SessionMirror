@@ -318,6 +318,7 @@ export function useCameraSession({
     takeId: string
     mimeType: string
   } | null>(null)
+  const warmAutoAudioInFlightRef = useRef(false)
   const autoAudioDisarmInFlightRef = useRef<Promise<void> | null>(null)
   const autoPreRollActiveRef = useRef(false)
   const autoPerformanceActiveRef = useRef(false)
@@ -1236,12 +1237,18 @@ export function useCameraSession({
         const now = performance.now()
         console.log(`[AudioRecordLifecycle] dataavailable size=${event.data.size} recordingId=${takeId}`)
 
-        if (takeId !== activeRecordingIdRef.current) {
+        const recordingId =
+          activeRecordingIdRef.current ?? (autoPreRollActiveRef.current ? activeTakeIdRef.current : null)
+        if (recordingId && takeId !== recordingId) {
           console.warn(`[AudioRecordLifecycle] discarding chunk for stale recordingId: ${takeId}`)
           return
         }
 
-        if (now < recordingStartMsRef.current) {
+        if (
+          recordingStartMsRef.current > 0 &&
+          now < recordingStartMsRef.current &&
+          !autoPreRollActiveRef.current
+        ) {
           console.warn(`[AudioRecordLifecycle] discarding chunk before recordingStartMs`)
           return
         }
@@ -1287,6 +1294,7 @@ export function useCameraSession({
           writerRef.current = null
           const stoppedTakeId = activeTakeIdRef.current ?? takeId
           activeTakeIdRef.current = null
+          activeRecordingIdRef.current = null
           const completedMode = recordingModeRef.current
           const durationSeconds =
             preRollStartedAt > 0
@@ -1435,6 +1443,7 @@ export function useCameraSession({
     const writer = writerRef.current
     writerRef.current = null
     activeTakeIdRef.current = null
+    activeRecordingIdRef.current = null
     if (writer) {
       void writer.abort().catch(() => {})
     }
@@ -1481,7 +1490,43 @@ export function useCameraSession({
     }
   }, [cancelAutoPreRollCapture])
 
+  const beginAutoPreRollCapture = useCallback(
+    (armed: NonNullable<typeof armedAutoAudioRef.current>) => {
+      armedAutoAudioRef.current = null
+      recorderRef.current = armed.recorder
+      writerRef.current = armed.writer
+      activeTakeIdRef.current = armed.takeId
+      activeRecordingIdRef.current = armed.takeId
+      recorderMimeTypeRef.current = armed.mimeType
+      chunksRef.current = []
 
+      try {
+        if (shouldUseRecordingTimeslice(armed.mimeType)) {
+          armed.recorder.start(RECORDING_TIMESLICE_MS)
+        } else {
+          armed.recorder.start()
+        }
+        autoPreRollActiveRef.current = true
+        autoPerformanceActiveRef.current = false
+        autoPreRollStartedAtRef.current = performance.now()
+        autoPerformanceStartedAtRef.current = 0
+        recordStreamRef.current = buildRecorderStream(
+          streamRef.current!,
+          recordingModeRef.current,
+        )
+      } catch {
+        autoPreRollActiveRef.current = false
+        autoPreRollStartedAtRef.current = 0
+        autoPerformanceStartedAtRef.current = 0
+        recorderRef.current = null
+        writerRef.current = null
+        activeTakeIdRef.current = null
+        activeRecordingIdRef.current = null
+        void armed.writer.abort().catch(() => {})
+      }
+    },
+    [],
+  )
 
   const tryMarkAutoPerformanceStart = useCallback((): 'started' | 'pending' | 'unavailable' => {
     if (autoPerformanceActiveRef.current || isRecordingRef.current) {
@@ -1506,8 +1551,52 @@ export function useCameraSession({
   }, [])
 
   const warmAutoAudioRecorder = useCallback(async () => {
-    return
-  }, [])
+    if (
+      recordingModeRef.current !== 'audio' ||
+      isRecordingRef.current ||
+      autoPreRollActiveRef.current ||
+      warmAutoAudioInFlightRef.current ||
+      isAutoPlaybackHoldingMicWarmup()
+    ) {
+      return
+    }
+
+    warmAutoAudioInFlightRef.current = true
+    try {
+      const stream = await ensureAudioRecordingStream()
+      if (
+        !stream ||
+        recordingModeRef.current !== 'audio' ||
+        isRecordingRef.current ||
+        autoPreRollActiveRef.current
+      ) {
+        return
+      }
+
+      const takeId = crypto.randomUUID()
+      const mimeType = getRecorderMimeTypeForMode('audio')
+      const writer = await StreamingTakeWriter.open(takeId, mimeType)
+      if (!writer) return
+
+      if (
+        isRecordingRef.current ||
+        recordingModeRef.current !== 'audio' ||
+        autoPreRollActiveRef.current
+      ) {
+        await writer.abort().catch(() => {})
+        return
+      }
+
+      const recorder = createMediaRecorder(stream, mimeType)
+      bindRecordingHandlers(recorder, takeId)
+
+      beginAutoPreRollCapture({ recorder, writer, takeId, mimeType })
+    } catch {
+      /* cold start on trigger if warm fails */
+    } finally {
+      warmAutoAudioInFlightRef.current = false
+    }
+  }, [beginAutoPreRollCapture, bindRecordingHandlers, ensureAudioRecordingStream])
 
   const restartAutoPreRollCapture = useCallback(() => {
     if (!autoPreRollActiveRef.current || autoPerformanceActiveRef.current) return

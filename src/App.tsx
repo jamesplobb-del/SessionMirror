@@ -217,6 +217,7 @@ import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './conte
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 0
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
+const AUDIO_PLAYBACK_CAPTURE_SUSPEND_MS = 300
 const YOUTUBE_HEADPHONES_TIP_MS = 3200
 const YOUTUBE_EXPAND_TIP_MS = 4500
 
@@ -488,6 +489,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const playAutoTakeAudioRef = useRef<
     (playbackUrl: string, takeId: string, performanceStartSeconds?: number, filePath?: string) => void
   >(() => {})
+  const refreshCameraSessionRef = useRef<() => Promise<void>>(async () => {})
+  const suspendCameraForBackgroundRef = useRef<() => void>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
@@ -690,6 +693,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void finalizeTakePlaybackCleanup().finally(() => {
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
+      if (recordingModeRef.current === 'audio') {
+        stabilizeViewportAfterMediaInteraction()
+        window.requestAnimationFrame(() => {
+          void refreshCameraSessionRef.current()
+        })
+      }
     })
   }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
@@ -780,6 +789,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
         try {
           if (Capacitor.isNativePlatform()) {
+            // Mirror camera hands-free: release live capture before route prep
+            // so headphone playback is not fighting the mic capture session.
+            suspendCameraForBackgroundRef.current()
+            await waitMs(AUDIO_PLAYBACK_CAPTURE_SUSPEND_MS)
             await preparePlaybackRoute({ suspendCamera: false })
           }
         } catch (error) {
@@ -789,6 +802,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           finishAutoPlayback()
           return
         }
+
+        audio.pause()
+        audio.onended = null
+        audio.onerror = null
+        audio.removeAttribute('src')
+        audio.load()
 
         prepareInlineMediaElement(audio)
         audio.preload = 'auto'
@@ -1418,12 +1437,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     nativeCameraRecordingEnabled: isNativeCameraPlatform,
     micInputPreference: settings.micInputPreference,
   })
+  refreshCameraSessionRef.current = refreshCameraSession
+  suspendCameraForBackgroundRef.current = suspendCameraForBackground
+
 
   const handleAudioModeBeforePlaybackStart = useCallback(async () => {
-    if (!isRecording) return
-    stopRecording()
-    await waitMs(AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS)
+    if (isRecording) {
+      stopRecording()
+      await waitMs(AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS)
+    }
   }, [isRecording, stopRecording])
+
+  const handleAudioModePlaybackActiveChange = useCallback((active: boolean) => {
+    setAudioModeTakePlaying(active)
+    if (active) return
+    stabilizeViewportAfterMediaInteraction()
+  }, [])
 
   useEffect(() => {
     registerYoutubeStereoGuard(
@@ -1683,8 +1712,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       void refreshCameraSession()
     },
   })
-  const refreshCameraSessionRef = useRef(refreshCameraSession)
-  refreshCameraSessionRef.current = refreshCameraSession
   const restartHandsFreeMonitorRef = useRef(restartHandsFreeMonitor)
   restartHandsFreeMonitorRef.current = restartHandsFreeMonitor
   const autoSoundRecordingEnabledRef = useRef(settings.autoSoundRecording)
@@ -2482,8 +2509,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const nativeExperimentalRecordingActive = isRecording && recordingMode === 'video'
   const handsFreeBackgroundPlaybackActive =
     recordingMode === 'video' && autoPlaybackTakeId !== null && autoPlaybackPlaying
+  const handsFreeAudioBackgroundPlaybackActive =
+    recordingMode === 'audio' && autoPlaybackTakeId !== null && autoPlaybackPlaying
   const shouldDeferNativeExperimentalAudioMode =
-    (isRecording && recordingMode === 'audio') || handsFreeBackgroundPlaybackActive
+    handsFreeBackgroundPlaybackActive ||
+    handsFreeAudioBackgroundPlaybackActive ||
+    (recordingMode === 'audio' && audioModeTakePlaying) ||
+    (isRecording && recordingMode === 'audio')
 
   useEffect(() => {
     registerInlineTakePlaybackPreviewHold(() => shouldHoldCameraPreviewForTakePlayback)
@@ -3264,7 +3296,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         >
           <AudioModePlaybackProvider
             onBeforePlay={handleAudioModeBeforePlaybackStart}
-            onPlaybackActiveChange={setAudioModeTakePlaying}
+            onPlaybackActiveChange={handleAudioModePlaybackActiveChange}
           >
             <div
               ref={appShellRef}
@@ -3432,7 +3464,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 metronomeStageActive={metronomeStageActive}
                 audioPracticeOverlayActive={
                   isAudioPracticeToolTab ||
-                  (recordingMode === 'audio' && audioPracticeTab === 'audio')
+                  (recordingMode === 'audio' && audioPracticeTab === 'audio' && !isSplitView)
                 }
                 visuallySuppressed={isSplitView}
                 nativeLivePreviewActive={nativeLivePreviewActive}
@@ -3607,7 +3639,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   </AnimatePresence>
 
                   <AnimatePresence initial={false}>
-                    {recordingMode === 'audio' && !quickSettingsOpen && !practiceSessionActive && (
+                    {recordingMode === 'audio' &&
+                      !quickSettingsOpen &&
+                      !practiceSessionActive &&
+                      !isSplitView && (
                       <motion.div
                         key="audio-mode-top-tabs"
                         data-tutorial="audio-mode-tabs"
@@ -3625,7 +3660,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
                   </AnimatePresence>
 
-                  {recordingMode === 'audio' && !quickSettingsOpen && (
+                  {recordingMode === 'audio' && !quickSettingsOpen && !isSplitView && (
                     <div className="relative flex min-h-0 flex-1">
                       <AnimatedTabPanel
                         panelKey="audio-practice-metronome-layer"

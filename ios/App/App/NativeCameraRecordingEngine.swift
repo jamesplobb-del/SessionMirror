@@ -48,7 +48,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var lastBridgeFrameTime: CFTimeInterval = 0
     private var pendingBridgeSample: CMSampleBuffer?
     private var isBridgeEncoding = false
-    private let bridgeFramesPerSecondFull: Double = 60
+    private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    /// Preview JPEG pump — recording uses AVCaptureMovieFileOutput at full session resolution.
+    private var bridgeFramesPerSecondFull: Double { isPad ? 50 : 60 }
     /// Keep expand-mode live preview usable during recording + YouTube play-along while still avoiding a full 60fps bridge flood.
     private let bridgeFramesPerSecondRecordingPlayAlong: Double = 40
     // Preview-only pump sizing. The recorded movie file uses a separate
@@ -56,8 +58,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     // 1080px/0.75 JPEG base64 at 60fps saturates the Capacitor/WKWebView bridge
     // and stutters; 720px/0.6 is ample for an on-screen phone preview and cuts
     // per-frame payload ~2.5x, letting the bridge sustain a far smoother rate.
-    private let bridgeMaxPixelDimension: CGFloat = 720
-    private let bridgeJpegQuality: CGFloat = 0.6
+    // iPad gets a modest bump (960px) — larger display, more SoC headroom — but
+    // stays below full 1080 bridge flood levels.
+    private var bridgeMaxPixelDimension: CGFloat { isPad ? 960 : 720 }
+    private var bridgeJpegQuality: CGFloat { isPad ? 0.68 : 0.6 }
     private let bridgeMaxPixelDimensionRecordingPlayAlong: CGFloat = 540
     private let bridgeJpegQualityRecordingPlayAlong: CGFloat = 0.45
     private lazy var ciContext = CIContext(options: [.useSoftwareRenderer: false])
@@ -893,6 +897,49 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
+    private func applyCaptureSessionPresetForDevice() {
+        if isPad {
+            if session.canSetSessionPreset(.hd1920x1080) {
+                session.sessionPreset = .hd1920x1080
+            } else {
+                session.sessionPreset = .high
+            }
+            return
+        }
+        session.sessionPreset = .high
+    }
+
+    /// Pick the highest front-camera format up to 1080p with ~30fps support.
+    private func preferHighestFormatWithin1080p(on device: AVCaptureDevice) {
+        var bestFormat: AVCaptureDevice.Format?
+        var bestPixels: Int32 = 0
+
+        for format in device.formats {
+            let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            guard dims.width <= 1920, dims.height <= 1920 else { continue }
+            let pixels = dims.width * dims.height
+            guard pixels >= 1280 * 720 else { continue }
+
+            let supports30fps = format.videoSupportedFrameRateRanges.contains {
+                $0.maxFrameRate >= 28 && $0.minFrameRate <= 32
+            }
+            guard supports30fps else { continue }
+
+            if pixels > bestPixels {
+                bestPixels = pixels
+                bestFormat = format
+            }
+        }
+
+        guard let bestFormat = bestFormat else { return }
+        let dims = CMVideoFormatDescriptionGetDimensions(bestFormat.formatDescription)
+        guard dims.width > 0, dims.height > 0 else { return }
+        let current = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+        guard dims.width * dims.height > current.width * current.height else { return }
+        device.activeFormat = bestFormat
+        print("[CameraQuality][iPad] activeFormat=\(dims.width)x\(dims.height)")
+    }
+
     private func configureCaptureSession(useFrontCamera: Bool) throws -> AVCaptureMovieFileOutput {
         AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession beginConfiguration.begin")
         session.beginConfiguration()
@@ -918,7 +965,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         audioDataOutput = nil
         isSessionConfigured = false
 
-        session.sessionPreset = .high
+        applyCaptureSessionPresetForDevice()
 
         let cameraPosition: AVCaptureDevice.Position = useFrontCamera ? .front : .back
         guard let videoDevice = AVCaptureDevice.default(
@@ -935,6 +982,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
         try videoDevice.lockForConfiguration()
         videoDevice.videoZoomFactor = 1.0
+        if isPad {
+            preferHighestFormatWithin1080p(on: videoDevice)
+        }
         applyContinuousFocusAndExposure(to: videoDevice)
         videoDevice.unlockForConfiguration()
 

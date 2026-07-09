@@ -243,10 +243,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func enableStereoPlayback(_ call: CAPPluginCall) {
         do {
             let result: [String: Any]
-            // YouTube and other iframe playback use this path without
-            // playbackRouteActive — coexistent speaker override is safe
-            // whenever the camera capture session is live.
-            if CameraSessionGuard.isCameraOrRecordingActive {
+            let session = AVAudioSession.sharedInstance()
+            // Camera preview and external output (headphones/BT) both need the
+            // coexistent PlayAndRecord path. Forcing Playback on Bluetooth HFP
+            // fails (-50) and leaves audio-mode take playback silent.
+            if CameraSessionGuard.isCameraOrRecordingActive
+                || AudioRouteConfigurator.hasExternalOutput(session) {
                 result = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
             } else {
                 result = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
@@ -1413,6 +1415,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             self.finishPlaybackRouteIfNeeded()
         }
 
+        let startSeconds = call.getDouble("startTime") ?? 0
+        if startSeconds > 0 {
+            let seekTime = CMTime(seconds: startSeconds, preferredTimescale: 600)
+            player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        }
+
         player.play()
 
         var payload: [String: Any] = [
@@ -1476,11 +1484,13 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 // JS awaits enableStereoPlayback before calling here, but re-assert
                 // the live session right before AVPlayer starts so take audio is not
                 // silent when YouTube/WebKit already owns the mixable capture session.
-                if CameraSessionGuard.isCameraOrRecordingActive {
+                let session = AVAudioSession.sharedInstance()
+                if CameraSessionGuard.isCameraOrRecordingActive
+                    || AudioRouteConfigurator.hasExternalOutput(session) {
                     _ = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
                 } else {
                     try AudioRouteConfigurator.ensureSessionActive(
-                        AVAudioSession.sharedInstance(),
+                        session,
                         caller: "startInlineTakeBoxPlayback"
                     )
                 }

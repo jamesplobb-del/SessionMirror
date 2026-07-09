@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type P
 import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
-import { iosBulletproofVideoProps } from '../utils/mobileVideo'
+import { iosBulletproofVideoProps, withWebKitThumbnailHint } from '../utils/mobileVideo'
 import { getFrontCameraZoomRange, getCssPreviewZoom, setFrontCameraZoom } from '../utils/videoCapture'
 import {
   assignMediaPlaybackSrc,
@@ -10,6 +10,10 @@ import {
 } from '../utils/mediaPlayback'
 import { resetVideoPlayback } from '../utils/videoPlayback'
 import { playTakeMediaAudible } from '../utils/takePlaybackAudio'
+import {
+  completePlaybackRouteRestore,
+  preparePlaybackRoute,
+} from '../utils/playbackRouteCoordinator'
 import { attachVideoDecoderStallRecovery } from '../utils/videoDecoderStallRecovery'
 import { applyAutoPlaybackLeadIn, attachAutoPlaybackTailSkip } from '../utils/autoRecordPlayback'
 import {
@@ -123,7 +127,9 @@ function LiveCameraBackground({
   const webPreviewMode = activeNativeLivePreview ? 'audio' : recordingMode
 
   const showNativeBridgeCanvas =
-    !previewWorkSuppressed && (nativeCameraBridgeEnabled || activeNativeLivePreview)
+    !previewWorkSuppressed &&
+    !showHandsFreeTakePlayback &&
+    (nativeCameraBridgeEnabled || activeNativeLivePreview)
 
   useLayoutEffect(() => {
     if (!activeNativeLivePreview) return
@@ -196,7 +202,7 @@ function LiveCameraBackground({
   }, [activeNativeLivePreview])
 
   useEffect(() => {
-    if (!holdPreviewForTakePlayback) return
+    if (!holdPreviewForTakePlayback && !handsFreePlaybackTakeId) return
     const video = previewRef.current
     if (!video) return
 
@@ -206,7 +212,7 @@ function LiveCameraBackground({
     } catch {
       /* ignore preview release failures */
     }
-  }, [holdPreviewForTakePlayback, previewRef])
+  }, [holdPreviewForTakePlayback, handsFreePlaybackTakeId, previewRef])
 
   useEffect(() => {
     if (!previewWorkSuppressed) return
@@ -345,18 +351,40 @@ function LiveCameraBackground({
         return
       }
 
+      // Suspend the live camera/native bridge BEFORE loading the take into a
+      // second <video>. Tearing down capture after the file decoder has already
+      // buffered leaves WKWebView's media clock wedged (frozen first frame,
+      // hard-stall until a seek nudge).
+      try {
+        await preparePlaybackRoute({ suspendCamera: true })
+      } catch (error) {
+        console.warn('[HandsFree] playback route prep failed', error)
+        onHandsFreePlaybackComplete?.()
+        return
+      }
+      if (cancelled || !handsFreePlaybackSessionRef.current) {
+        await completePlaybackRouteRestore()
+        return
+      }
+
       resetVideoPlayback(media)
-      assignMediaPlaybackSrc(media, handsFreePlaybackSrc!)
+      media.removeAttribute('src')
+      media.load()
+      assignMediaPlaybackSrc(media, withWebKitThumbnailHint(handsFreePlaybackSrc!))
       media.load()
 
       const ready = await waitForMediaReadyWithRetry(media)
-      if (cancelled || !handsFreePlaybackSessionRef.current) return
+      if (cancelled || !handsFreePlaybackSessionRef.current) {
+        await completePlaybackRouteRestore()
+        return
+      }
 
       if (!ready) {
         console.warn('Hands-free background playback media not ready', {
           takeId: handsFreePlaybackTakeId,
           readyState: media.readyState,
         })
+        await completePlaybackRouteRestore()
         onHandsFreePlaybackComplete?.()
         return
       }
@@ -386,8 +414,15 @@ function LiveCameraBackground({
         onEnded,
       )
 
+      stopStallRecovery()
+      handsFreeStallRecoveryRef.current = attachVideoDecoderStallRecovery(media, {
+        hasSource: () => Boolean(handsFreePlaybackSrc),
+        debugLabel: 'HandsFree',
+      })
+
       const started = await playTakeMediaAudible(media, {
-        suspendCameraForRoute: true,
+        skipRoutePrep: true,
+        suspendCameraForRoute: false,
         onFailure: () => onHandsFreePlaybackPlayingChange?.(false),
       })
       if (cancelled || !handsFreePlaybackSessionRef.current) {
@@ -399,13 +434,6 @@ function LiveCameraBackground({
       }
 
       if (started) {
-        // Recover the picture if iOS's hardware decoder stalls while audio keeps
-        // running (frozen video). Mirrors TakeVideoPlayer's vault-path recovery.
-        stopStallRecovery()
-        handsFreeStallRecoveryRef.current = attachVideoDecoderStallRecovery(media, {
-          hasSource: () => Boolean(handsFreePlaybackSrc),
-          debugLabel: 'HandsFree',
-        })
         onHandsFreePlaybackPlayingChange?.(true)
       } else {
         media.removeEventListener('ended', onEnded)
@@ -426,7 +454,10 @@ function LiveCameraBackground({
       const media = handsFreePlaybackVideoRef.current
       if (media) {
         resetVideoPlayback(media)
+        media.removeAttribute('src')
+        media.load()
       }
+      void completePlaybackRouteRestore()
     }
   }, [
     handsFreePlaybackSrc,
@@ -657,7 +688,11 @@ function LiveCameraBackground({
 
   const showPreparingOverlay = modePreparing && !resumingPreview
   const showPlaceholder =
-    !activeNativeLivePreview && !previewWorkSuppressed && resumingPreview && Boolean(placeholderUrl)
+    !showHandsFreeTakePlayback &&
+    !activeNativeLivePreview &&
+    !previewWorkSuppressed &&
+    resumingPreview &&
+    Boolean(placeholderUrl)
 
   return (
     <div
@@ -726,6 +761,7 @@ function LiveCameraBackground({
 
       {showHandsFreeTakePlayback && (
         <video
+          key={handsFreePlaybackTakeId ?? handsFreePlaybackSrc ?? 'handsfree-take-playback'}
           ref={handsFreePlaybackVideoRef}
           autoPlay
           playsInline

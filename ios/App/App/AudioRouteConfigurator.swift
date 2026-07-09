@@ -166,7 +166,7 @@ enum AudioRouteConfigurator {
         print("[AVCaptureTrace] \(label) \(details) route=\(routeSummary()) stack=\(compactStack())")
     }
 
-    private static func hasExternalOutput(_ session: AVAudioSession) -> Bool {
+    static func hasExternalOutput(_ session: AVAudioSession = .sharedInstance()) -> Bool {
         let externalOutputPorts: Set<AVAudioSession.Port> = [
             .airPlay,
             .bluetoothA2DP,
@@ -403,6 +403,19 @@ enum AudioRouteConfigurator {
                 try session.setPreferredIOBufferDuration(0.005)
                 try ensureSessionActive(session, caller: "applyWebPlaybackRoute.builtInSpeaker")
                 try preferBuiltInSpeakerIfSafe(session)
+            } else if routeUsesBluetoothHFP(session) {
+                // Bluetooth HFP is duplex — Playback category fails (-50). Mirror the
+                // coexistent camera path: stay on PlayAndRecord and leave routing alone.
+                try debugSetCategory(
+                    session,
+                    category: .playAndRecord,
+                    mode: .default,
+                    options: [.mixWithOthers, .allowBluetoothHFP, .allowBluetoothA2DP, .allowAirPlay, .defaultToSpeaker],
+                    caller: "applyWebPlaybackRoute.bluetoothHFP"
+                )
+                try session.setPreferredSampleRate(48_000)
+                try session.setPreferredIOBufferDuration(0.005)
+                try ensureSessionActive(session, caller: "applyWebPlaybackRoute.bluetoothHFP")
             } else {
                 // Full-volume external playback. Do not use duckOthers; omit mixWithOthers so WebView audio is not softened.
                 try debugSetCategory(

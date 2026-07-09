@@ -18,8 +18,17 @@ export function getPortraitVideoCaptureConstraints(): MediaTrackConstraints {
   }
 }
 
-/** Landscape-only soft 720p — applied at record start, not on live preview acquire. */
+/** Landscape-only soft 720p on phone — iPad uses the same 1080p ideal as portrait. */
 export function getLandscapeVideoCaptureConstraints(): MediaTrackConstraints {
+  if (typeof window !== 'undefined' && isTabletViewport()) {
+    return {
+      facingMode: 'user',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      aspectRatio: { ideal: 16 / 9 },
+    }
+  }
+
   return {
     facingMode: 'user',
     width: { ideal: 1280 },
@@ -46,7 +55,7 @@ export async function maybeBoostTabletPreviewResolution(
   if (!track) return
 
   const { width = 0 } = track.getSettings()
-  if (width >= 1280) return
+  if (width >= 1600) return
 
   try {
     await track.applyConstraints({
