@@ -55,6 +55,7 @@ import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { resolveMicPreferenceForLiveCapture, resolveNativeBridgeMicPreference } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isAppInForeground } from '../utils/appForeground'
 import type { MicInputPreference } from '../utils/appSettings'
 
@@ -324,6 +325,7 @@ export function useCameraSession({
   const autoPreRollStartedAtRef = useRef(0)
   const autoPerformanceStartedAtRef = useRef(0)
   const recordingOrientationRef = useRef<'portrait' | 'landscape'>('portrait')
+  const recordingStartedAtRef = useRef<number>(0)
   const scheduleWarmAutoAudioRef = useRef<() => void>(() => {})
   onCompleteRef.current = onRecordingComplete
   onBeforeForegroundRestartRef.current = onBeforeForegroundRestart
@@ -1271,7 +1273,9 @@ export function useCameraSession({
           const durationSeconds =
             preRollStartedAt > 0
               ? Math.max(0.1, (performance.now() - preRollStartedAt) / 1000)
-              : elapsedRef.current
+              : recordingStartedAtRef.current > 0
+                ? Math.max(0.1, (performance.now() - recordingStartedAtRef.current) / 1000)
+                : elapsedRef.current
           const autoPerformanceStartSeconds =
             preRollStartedAt > 0 && performanceStartedAt > preRollStartedAt
               ? Math.max(0, (performanceStartedAt - preRollStartedAt) / 1000)
@@ -1315,19 +1319,45 @@ export function useCameraSession({
                 stoppedTakeId,
                 recorderMimeTypeRef.current,
               )
-              onCompleteRef.current({
-                takeId: stoppedTakeId,
-                mimeType: recorderMimeTypeRef.current,
-                mediaType: completedMode,
-                filePath: persisted.filePath,
-                videoUrl: persisted.videoUrl,
-                durationSeconds,
-                recordingOrientation: recordingOrientationRef.current,
-                blob,
-                captureProfile,
-                captureTrackSnapshot,
-                autoPerformanceStartSeconds,
-              })
+
+              // Verify file exists and has size > 0 on native
+              let verified = true
+              if (Capacitor.isNativePlatform() && persisted.filePath) {
+                try {
+                  const stat = await Filesystem.stat({
+                    path: persisted.filePath,
+                    directory: Directory.Data,
+                  })
+                  if (stat.size === 0) {
+                    verified = false
+                    console.warn('[useCameraSession] finalized file size is 0')
+                  }
+                } catch (err) {
+                  verified = false
+                  console.warn('[useCameraSession] stat verification failed', err)
+                }
+              }
+
+              if (verified) {
+                const probedDuration = await probeMediaDuration(persisted.videoUrl, completedMode)
+                const finalDuration = probedDuration > 0 ? probedDuration : durationSeconds
+
+                onCompleteRef.current({
+                  takeId: stoppedTakeId,
+                  mimeType: recorderMimeTypeRef.current,
+                  mediaType: completedMode,
+                  filePath: persisted.filePath,
+                  videoUrl: persisted.videoUrl,
+                  durationSeconds: finalDuration,
+                  recordingOrientation: recordingOrientationRef.current,
+                  blob,
+                  captureProfile,
+                  captureTrackSnapshot,
+                  autoPerformanceStartSeconds,
+                })
+              } else {
+                console.error('[useCameraSession] save aborted due to missing/empty file')
+              }
             }
           } catch {
             if (activeWriter) {
@@ -1337,6 +1367,7 @@ export function useCameraSession({
             releaseRecorderStream(recordStreamRef.current, streamRef.current)
             recordStreamRef.current = null
             setIsRecording(false)
+            setIsStopping(false)
             scheduleWarmAutoAudioRef.current()
             void restoreNativeAudioBridgeAfterWebKitCapture()
           }
@@ -1344,6 +1375,7 @@ export function useCameraSession({
           releaseRecorderStream(recordStreamRef.current, streamRef.current)
           recordStreamRef.current = null
           setIsRecording(false)
+          setIsStopping(false)
           void restoreNativeAudioBridgeAfterWebKitCapture()
         })
       }
@@ -1793,6 +1825,7 @@ export function useCameraSession({
         setIsRecording(true)
         setElapsed(0)
         elapsedRef.current = 0
+        recordingStartedAtRef.current = performance.now()
         return true
       } catch {
         chunksRef.current = []
@@ -1917,9 +1950,11 @@ export function useCameraSession({
     const recorder = recorderRef.current
     if (!recorder || recorder.state === 'inactive') {
       setIsRecording(false)
+      setIsStopping(false)
       return
     }
 
+    setIsStopping(true)
     const mimeType = recorderMimeTypeRef.current
     // iOS/mp4 records as a single blob — requestData() emits an extra fMP4 fragment
     // that breaks mux timing when concatenated (A/V drift on longer takes).
@@ -2624,4 +2659,62 @@ export function useCameraSession({
     setSuppressNativeBridgeRecovery,
     stopNativeVideoBridge,
   }
+}
+
+function probeMediaDuration(url: string, mediaType: 'video' | 'audio'): Promise<number> {
+  return new Promise((resolve) => {
+    const media = document.createElement(mediaType === 'audio' ? 'audio' : 'video')
+    media.muted = true
+    
+    // Inline styling to prevent UI injection/glitches if appended,
+    // though we keep it detached from DOM
+    media.style.position = 'fixed'
+    media.style.top = '-9999px'
+    media.style.left = '-9999px'
+    media.style.width = '1px'
+    media.style.height = '1px'
+    media.style.pointerEvents = 'none'
+
+    let resolved = false
+    const done = (dur: number) => {
+      if (resolved) return
+      resolved = true
+      cleanup()
+      resolve(dur)
+    }
+
+    const onLoadedMetadata = () => {
+      if (media.duration && Number.isFinite(media.duration) && media.duration > 0) {
+        done(media.duration)
+      } else {
+        window.setTimeout(() => {
+          if (media.duration && Number.isFinite(media.duration) && media.duration > 0) {
+            done(media.duration)
+          } else {
+            done(0)
+          }
+        }, 150)
+      }
+    }
+
+    const onError = (e: ErrorEvent) => {
+      console.warn('[probeMediaDuration] error probing metadata', e)
+      done(0)
+    }
+
+    const cleanup = () => {
+      media.removeEventListener('loadedmetadata', onLoadedMetadata)
+      media.removeEventListener('error', onError as any)
+      media.src = ''
+      media.load()
+    }
+
+    media.addEventListener('loadedmetadata', onLoadedMetadata)
+    media.addEventListener('error', onError as any)
+    media.src = url
+    media.load()
+
+    // 2-second timeout to prevent getting stuck
+    window.setTimeout(() => done(0), 2000)
+  })
 }
