@@ -82,8 +82,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   captureProfile: 'natural',
 }
 
-/** Floating widgets — forced off on each cold app start. */
-const SESSION_START_WIDGET_OFF: Pick<AppSettings, 'pitchTrackerEnabled' | 'showMetronome'> = {
+/** Transient recording controls and floating widgets — forced off on each cold app start. */
+const SESSION_START_TRANSIENT_OFF: Pick<AppSettings, 'autoSoundRecording' | 'pitchTrackerEnabled' | 'showMetronome'> = {
+  autoSoundRecording: false,
   pitchTrackerEnabled: false,
   showMetronome: false,
 }
@@ -210,7 +211,7 @@ export function loadAppSettings(): AppSettings {
 /** Load persisted prefs but start with floating widgets hidden. */
 export function loadAppSettingsForSessionStart(): AppSettings {
   const loaded = loadAppSettings()
-  const sessionStart = { ...loaded, ...SESSION_START_WIDGET_OFF }
+  const sessionStart = { ...loaded, ...SESSION_START_TRANSIENT_OFF }
   saveAppSettings(sessionStart)
   return sessionStart
 }

@@ -36,6 +36,8 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(enhanceTakeAudio, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startNativeCameraRecording, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopNativeCameraRecording, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(startNativeAudioRecording, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(stopNativeAudioRecording, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(playNativeCameraTestPostProcess, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopNativeCameraTestPostProcess, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(hapticImpact, CAPPluginReturnPromise);

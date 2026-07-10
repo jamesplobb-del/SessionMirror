@@ -19,9 +19,11 @@ const POLL_INTERVAL_MS = 32
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 120
 const MONITOR_WARMUP_MS = 280
-const NATIVE_MONITOR_WARMUP_MS = 900
+// The native tap starts from an already-running pre-roll recorder. Keep enough
+// settling time to establish a quiet baseline without making normal speech feel
+// ignored when hands-free mode is first enabled.
+const NATIVE_MONITOR_WARMUP_MS = 500
 const NATIVE_ARMING_QUIET_HOLD_MS = 220
-const NATIVE_ARMING_MAX_DELAY_MS = 1600
 const POST_PLAYBACK_WARMUP_MS = 0
 const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
@@ -37,6 +39,8 @@ interface UseAutoSoundRecordingOptions {
   suppressStart: boolean
   /** Tear down mic analyser while takes play so iOS does not duck speaker output. */
   monitoringPaused?: boolean
+  /** True while native audio-only capture is active (WebKit mic is suspended). */
+  isNativeAudioCaptureActive?: () => boolean
   ready: boolean
   isRecording: boolean
   streamRef: RefObject<MediaStream | null>
@@ -81,11 +85,48 @@ function isStreamAudioLive(stream: MediaStream | null): boolean {
   )
 }
 
+function measureNativeFrameMetrics(buffer: Float32Array): { rms: number; peak: number } {
+  let sum = 0
+  let peak = 0
+  for (let i = 0; i < buffer.length; i++) {
+    const val = buffer[i]
+    sum += val * val
+    const abs = Math.abs(val)
+    if (abs > peak) peak = abs
+  }
+  return { rms: Math.sqrt(sum / buffer.length), peak }
+}
+
+/** Same path selection camera mode uses: native tap whenever the native capture
+ *  session is live (preview or recording) and WebKit mic is suspended. */
+function resolveHandsFreeMonitorPath(options: {
+  webKitLive: boolean
+  nativeCaptureActive: boolean
+  recordingActive: boolean
+}): 'native-tap' | 'webkit' | 'none' {
+  const nativeSessionActive = isNativeCameraPreviewActive()
+  const preferNativeMonitor =
+    options.nativeCaptureActive ||
+    (!options.webKitLive && nativeSessionActive) ||
+    (options.recordingActive && nativeSessionActive)
+  if (preferNativeMonitor) return 'native-tap'
+  if (options.webKitLive) return 'webkit'
+  if (nativeSessionActive) return 'native-tap'
+  return 'none'
+}
+
+function shouldReadNativeTapDuringRecording(
+  nativeCaptureActive: boolean,
+): boolean {
+  return nativeCaptureActive || isNativeCameraPreviewActive()
+}
+
 export function useAutoSoundRecording({
   enabled,
   monitoringAllowed,
   suppressStart,
   monitoringPaused = false,
+  isNativeAudioCaptureActive,
   ready,
   isRecording,
   streamRef,
@@ -120,7 +161,7 @@ export function useAutoSoundRecording({
   const monitorWarmUntilRef = useRef(0)
   const nativeStartArmedRef = useRef(false)
   const nativeQuietSinceRef = useRef<number | null>(null)
-  const nativeArmBypassAtRef = useRef(0)
+  const nativeTapReadyRef = useRef(false)
   const startLatchTimerRef = useRef<number | null>(null)
   const cooldownUntilRef = useRef(0)
   const quietRmsEmaRef = useRef(0)
@@ -141,6 +182,7 @@ export function useAutoSoundRecording({
   const isAutoPreRollCaptureActiveRef = useRef(isAutoPreRollCaptureActive)
   const getAutoPreRollAgeMsRef = useRef(getAutoPreRollAgeMs)
   const restartAutoPreRollCaptureRef = useRef(restartAutoPreRollCapture)
+  const isNativeAudioCaptureActiveRef = useRef(isNativeAudioCaptureActive)
   const pendingPerformanceGateRef = useRef(false)
   const profileRef = useRef(getAutoRecordProfile(volumeThreshold))
   const silenceMsRef = useRef(silenceMs)
@@ -161,6 +203,7 @@ export function useAutoSoundRecording({
   isAutoPreRollCaptureActiveRef.current = isAutoPreRollCaptureActive
   getAutoPreRollAgeMsRef.current = getAutoPreRollAgeMs
   restartAutoPreRollCaptureRef.current = restartAutoPreRollCapture
+  isNativeAudioCaptureActiveRef.current = isNativeAudioCaptureActive
   profileRef.current = getAutoRecordProfile(volumeThreshold)
   silenceMsRef.current = silenceMs
   effectiveGateRef.current = computeEffectiveGate(
@@ -168,8 +211,17 @@ export function useAutoSoundRecording({
     quietRmsEmaRef.current,
   )
 
+  // Native audio hands-free deliberately stops WebKit's microphone once the
+  // hidden pre-roll owns the hardware. That can briefly make the WebKit
+  // session report not-ready; the native capture is still a fully valid
+  // listening source and must not be torn down because of that handoff.
+  const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
   const shouldMonitor =
-    enabled && monitoringAllowed && ready && !monitoringPaused && appForeground
+    enabled &&
+    monitoringAllowed &&
+    !monitoringPaused &&
+    appForeground &&
+    (ready || nativeCaptureActive)
 
   useEffect(() => subscribeAppForeground(setAppForeground), [])
 
@@ -224,11 +276,20 @@ export function useAutoSoundRecording({
     if (mark === 'started') {
       pendingPerformanceGateRef.current = false
       autoTriggeredRef.current = true
+      // Native audio has been writing the hidden pre-roll already. The visible
+      // take, its minimum length, and silence timeout all begin at the actual
+      // performance trigger instead of at pre-roll startup.
+      recordingStartedAtRef.current = performance.now()
+      silenceSinceRef.current = null
       setHandsFreeRecording(true)
       loudSinceRef.current = null
       attackSinceRef.current = null
       armStartLatch()
       scheduleStartFailureRecovery()
+      // tryMarkAutoPerformanceStart already promoted pre-roll when applicable.
+      if (!isRecordingRef.current) {
+        startRecordingRef.current()
+      }
       return
     }
 
@@ -240,6 +301,8 @@ export function useAutoSoundRecording({
     }
 
     autoTriggeredRef.current = true
+    recordingStartedAtRef.current = performance.now()
+    silenceSinceRef.current = null
     setHandsFreeRecording(true)
     loudSinceRef.current = null
     attackSinceRef.current = null
@@ -255,7 +318,12 @@ export function useAutoSoundRecording({
 
     pendingPerformanceGateRef.current = false
     autoTriggeredRef.current = true
+    recordingStartedAtRef.current = performance.now()
+    silenceSinceRef.current = null
     setHandsFreeRecording(true)
+    if (!isRecordingRef.current) {
+      startRecordingRef.current()
+    }
     return true
   }
 
@@ -263,7 +331,59 @@ export function useAutoSoundRecording({
     setMonitorEpoch((epoch) => epoch + 1)
   }
 
-  const teardownMonitor = () => {
+  const maybeAutoStopFromSilence = (
+    metrics: { rms: number; peak: number },
+    now: number,
+  ): boolean => {
+    if (!autoTriggeredRef.current || !isRecordingRef.current) return false
+
+    const profile = profileRef.current
+    const gateLevel = profile.usePeak
+      ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
+      : metrics.rms
+    const stopGate = Math.max(
+      profile.gate * profile.stopGateRatio,
+      effectiveGateRef.current * 0.55,
+    )
+
+    if (recordingStartedAtRef.current === null) {
+      recordingStartedAtRef.current = now
+    }
+
+    const recordingDuration = now - recordingStartedAtRef.current
+    const stillLoud = metrics.rms >= stopGate || gateLevel >= stopGate
+
+    if (stillLoud) {
+      silenceSinceRef.current = null
+      return false
+    }
+    if (recordingDuration < MIN_RECORDING_MS) return false
+
+    if (silenceSinceRef.current === null) {
+      silenceSinceRef.current = now
+      return false
+    }
+    if (now - silenceSinceRef.current < silenceMsRef.current) return false
+
+    console.info('[AutoSound] autoStop (silence detected)')
+    onFinishedRef.current()
+    autoTriggeredRef.current = false
+    recordingStartedAtRef.current = null
+    silenceSinceRef.current = null
+    cooldownUntilRef.current = now + COOLDOWN_MS
+    stopRecordingRef.current()
+    return true
+  }
+
+  const shouldPreserveActiveHandsFreeCapture = () =>
+    // Native audio starts recording during the visible listening state. A
+    // monitor-path restart must not mistake that hidden pre-roll for disposable
+    // setup and stop the capture underneath it.
+    isNativeAudioCaptureActiveRef.current?.() === true ||
+    ((autoTriggeredRef.current || startLatchRef.current) && isRecordingRef.current)
+
+  const teardownMonitor = (options?: { preserveActiveCapture?: boolean }) => {
+    const preserve = options?.preserveActiveCapture === true
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
@@ -299,18 +419,29 @@ export function useAutoSoundRecording({
     silenceSinceRef.current = null
     loudSinceRef.current = null
     attackSinceRef.current = null
-    recordingStartedAtRef.current = null
-    autoTriggeredRef.current = false
-    monitorWarmUntilRef.current = 0
-    nativeStartArmedRef.current = false
-    nativeQuietSinceRef.current = null
-    nativeArmBypassAtRef.current = 0
-    pendingPerformanceGateRef.current = false
-    quietRmsEmaRef.current = 0
-    effectiveGateRef.current = profileRef.current.gate
+    if (!preserve) {
+      recordingStartedAtRef.current = null
+      if (!startLatchRef.current) {
+        autoTriggeredRef.current = false
+      }
+      monitorWarmUntilRef.current = 0
+      nativeStartArmedRef.current = false
+      nativeQuietSinceRef.current = null
+      pendingPerformanceGateRef.current = false
+      quietRmsEmaRef.current = 0
+      effectiveGateRef.current = profileRef.current.gate
+      setHandsFreeRecording(false)
+      void disarmRecorderRef.current()
+    } else if (autoTriggeredRef.current || isRecordingRef.current) {
+      // A native capture can be active while hands-free is merely listening.
+      // Do not promote that hidden pre-roll into a visible recording when a
+      // React effect refreshes the monitor.
+      if (recordingStartedAtRef.current === null) {
+        recordingStartedAtRef.current = performance.now()
+      }
+      setHandsFreeRecording(true)
+    }
     lastTickAtRef.current = 0
-    setHandsFreeRecording(false)
-    void disarmRecorderRef.current()
   }
 
   useLayoutEffect(() => {
@@ -344,6 +475,7 @@ export function useAutoSoundRecording({
 
   useEffect(() => {
     if (!shouldMonitor) return
+    if (isNativeAudioCaptureActiveRef.current?.() === true) return
     if (isStreamAudioLive(streamRef.current)) return
     if (!isAppInForeground()) return
 
@@ -371,9 +503,14 @@ export function useAutoSoundRecording({
 
     const stream = streamRef.current
     const isWebKitLive = isStreamAudioLive(stream)
-    const isNativeLive = isNativeCameraPreviewActive()
-
-    if (!isWebKitLive && !isNativeLive) {
+    const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
+    if (
+      resolveHandsFreeMonitorPath({
+        webKitLive: isWebKitLive,
+        nativeCaptureActive,
+        recordingActive: isRecordingRef.current,
+      }) === 'none'
+    ) {
       return
     }
 
@@ -385,12 +522,19 @@ export function useAutoSoundRecording({
     let acquiredNativeTap = false
 
     const setup = async () => {
-      teardownMonitor()
+      const preserveActiveCapture = shouldPreserveActiveHandsFreeCapture()
+      teardownMonitor({ preserveActiveCapture })
 
       const streamAtSetup = streamRef.current
       const webKitLive = isStreamAudioLive(streamAtSetup)
-      const nativeLive = isNativeCameraPreviewActive()
-      const path = webKitLive ? 'webkit' : nativeLive ? 'native-tap' : 'none'
+      const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
+      const path = preserveActiveCapture
+        ? 'native-tap'
+        : resolveHandsFreeMonitorPath({
+            webKitLive,
+            nativeCaptureActive,
+            recordingActive: isRecordingRef.current,
+          })
 
       console.info('[AutoSound] monitor setup', { path })
 
@@ -400,29 +544,47 @@ export function useAutoSoundRecording({
       }
 
       const isNativePath = path === 'native-tap'
+      nativeTapReadyRef.current = false
       let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
       const setupStartedAt = performance.now()
-      nativeStartArmedRef.current = !isNativePath
-      nativeQuietSinceRef.current = null
-      nativeArmBypassAtRef.current = isNativePath
-        ? setupStartedAt + NATIVE_ARMING_MAX_DELAY_MS
-        : 0
+      // Keep an already-triggered take running across a monitor restart. A
+      // hidden native pre-roll is different: it must still settle on a quiet
+      // baseline, otherwise the capture-session startup samples can be read as
+      // an immediate performance attack.
+      const performanceAlreadyTriggered =
+        autoTriggeredRef.current || startLatchRef.current || isRecordingRef.current
+      if (performanceAlreadyTriggered && isNativePath) {
+        nativeStartArmedRef.current = true
+        nativeQuietSinceRef.current = null
+        monitorWarmUntilRef.current = setupStartedAt
+        calibrated = true
+      } else {
+        nativeStartArmedRef.current = !isNativePath
+        nativeQuietSinceRef.current = null
+      }
 
       if (isNativePath) {
         await acquireNativeAudioTap()
         acquiredNativeTap = true
         if (cancelled || setupEpoch !== monitorEpoch) {
-          void releaseNativeAudioTap()
+          if (!preserveActiveCapture) {
+            void releaseNativeAudioTap()
+          }
           return
         }
         nativeTapListener = await subscribeNativeAudioPitchFrames((chunk) => {
           if (cancelled) return
           nativeFrameRef = { buffer: chunk.samples, timestamp: performance.now() }
         }) ?? null
+        nativeTapReadyRef.current = nativeTapListener !== null
         
         lastTickAtRef.current = performance.now()
-        monitorWarmUntilRef.current = performance.now() + NATIVE_MONITOR_WARMUP_MS
-        void warmRecorderRef.current()
+        if (!performanceAlreadyTriggered) {
+          monitorWarmUntilRef.current = performance.now() + NATIVE_MONITOR_WARMUP_MS
+        }
+        if (!preserveActiveCapture) {
+          void warmRecorderRef.current()
+        }
       } else {
         const audioContext = await getPlaybackAudioContext()
         if (cancelled || setupEpoch !== monitorEpoch) {
@@ -458,6 +620,19 @@ export function useAutoSoundRecording({
 
       const tick = () => {
         if (cancelled) return
+
+        // Native audio hands-free starts the file while the UI is still in its
+        // listening state. Move off the WebKit analyser as soon as that capture
+        // owns the mic, rather than waiting for the visual record state to flip.
+        if (
+          !isNativePath &&
+          shouldReadNativeTapDuringRecording(
+            isNativeAudioCaptureActiveRef.current?.() === true,
+          )
+        ) {
+          bumpMonitorEpoch()
+          return
+        }
         
         if (!isNativePath) {
           if (!analyserRef.current || !sampleBufferRef.current) return
@@ -475,39 +650,51 @@ export function useAutoSoundRecording({
         }
 
         if (isNativePath) {
-          if (!isNativeCameraPreviewActive() && !isRecordingRef.current) {
+          if (
+            !isNativeCameraPreviewActive() &&
+            !isRecordingRef.current &&
+            !isNativeAudioCaptureActiveRef.current?.()
+          ) {
             if (isAppInForeground()) {
               onMonitorStalledRef.current?.()
             }
             return
           }
         } else {
+          const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
+          const nativeTapDuringRecording =
+            isRecordingRef.current &&
+            shouldReadNativeTapDuringRecording(nativeCaptureActive)
           if (!isStreamAudioLive(streamRef.current)) {
-            if (isAppInForeground()) {
-              onMonitorStalledRef.current?.()
+            if (nativeTapDuringRecording) {
+              // WebKit mic is suspended for native capture — read levels from the
+              // native tap frame ref below (same as camera mode).
+            } else if (!isRecordingRef.current) {
+              if (isAppInForeground()) {
+                onMonitorStalledRef.current?.()
+              }
+              return
+            } else {
+              return
             }
-            return
           }
         }
 
         const profile = profileRef.current
         let metrics = { rms: 0, peak: 0 }
+        const useNativeMetrics =
+          isNativePath ||
+          (isRecordingRef.current &&
+            shouldReadNativeTapDuringRecording(
+              isNativeAudioCaptureActiveRef.current?.() === true,
+            ))
 
-        if (isNativePath) {
+        if (useNativeMetrics) {
           const frame = nativeFrameRef
           if (frame && now - frame.timestamp < 1000) {
-            const buf = frame.buffer
-            let sum = 0
-            let p = 0
-            for (let i = 0; i < buf.length; i++) {
-              const val = buf[i]
-              sum += val * val
-              const abs = Math.abs(val)
-              if (abs > p) p = abs
-            }
-            metrics = { rms: Math.sqrt(sum / buf.length), peak: p }
+            metrics = measureNativeFrameMetrics(frame.buffer)
           }
-        } else {
+        } else if (!useNativeMetrics) {
           metrics = readAnalyserMetrics(analyserRef.current!, sampleBufferRef.current!)
         }
         
@@ -586,10 +773,6 @@ export function useAutoSoundRecording({
               nativeQuietSinceRef.current = null
             }
 
-            if (!nativeStartArmedRef.current && now >= nativeArmBypassAtRef.current) {
-              nativeStartArmedRef.current = true
-            }
-
             if (!nativeStartArmedRef.current) {
               loudSinceRef.current = null
               attackSinceRef.current = null
@@ -655,12 +838,7 @@ export function useAutoSoundRecording({
           if (silenceSinceRef.current === null) {
             silenceSinceRef.current = now
           } else if (now - silenceSinceRef.current >= silenceMsRef.current) {
-            onFinishedRef.current()
-            autoTriggeredRef.current = false
-            recordingStartedAtRef.current = null
-            silenceSinceRef.current = null
-            cooldownUntilRef.current = now + COOLDOWN_MS
-            stopRecordingRef.current()
+            maybeAutoStopFromSilence(metrics, now)
           }
         }
       }
@@ -679,8 +857,11 @@ export function useAutoSoundRecording({
         const tickStale = now - lastTickAtRef.current > STALL_RECOVERY_MS
         
         let streamDead = false
-        if (isNativePath) {
-          streamDead = !isNativeCameraPreviewActive() || (now - (nativeFrameRef?.timestamp ?? 0) > 2000)
+        if (isNativePath || isNativeAudioCaptureActiveRef.current?.()) {
+          streamDead =
+            (!isNativeCameraPreviewActive() &&
+              !isNativeAudioCaptureActiveRef.current?.()) ||
+            now - (nativeFrameRef?.timestamp ?? 0) > 2000
         } else {
           streamDead = !isStreamAudioLive(streamRef.current)
           const ctx = audioContextRef.current
@@ -706,11 +887,13 @@ export function useAutoSoundRecording({
 
     return () => {
       cancelled = true
-      teardownMonitor()
+      nativeTapReadyRef.current = false
+      const preserveActiveCapture = shouldPreserveActiveHandsFreeCapture()
+      teardownMonitor({ preserveActiveCapture })
       if (nativeTapListener) {
         nativeTapListener.remove().catch(() => {})
       }
-      if (acquiredNativeTap) {
+      if (acquiredNativeTap && !preserveActiveCapture) {
         void releaseNativeAudioTap()
       }
     }
@@ -794,6 +977,12 @@ export function useAutoSoundRecording({
 
   const restartHandsFreeMonitor = useCallback(() => {
     if (!isAppInForeground()) return
+    if (
+      nativeTapReadyRef.current &&
+      isNativeAudioCaptureActiveRef.current?.() === true
+    ) {
+      return
+    }
     setMonitorEpoch((epoch) => epoch + 1)
     void warmRecorderRef.current()
   }, [])

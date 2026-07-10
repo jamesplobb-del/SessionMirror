@@ -1,11 +1,27 @@
-import type { PluginListenerHandle } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
 import {
   prepareInlineTakeBoxPlaybackRoute,
   releaseInlineTakeBoxPlaybackRoute,
 } from './playbackRouteCoordinator'
 import { resolveNativeFileUri } from './takeStorage'
-import { isNativeInlineTakeBoxPlaybackAvailable } from './nativeInlineTakeBoxPlayback'
+import {
+  isNativeInlineTakeBoxPlaybackAvailable,
+  setNativeInlineTakeBoxEndedHandler,
+  stopNativeInlineTakeBoxPlayback,
+  type InlineTakeBoxWindowRect,
+} from './nativeInlineTakeBoxPlayback'
+
+/** Matches camera-mode BestTakeBox inline preview — same AVPlayer + route stack. */
+export const AUDIO_MODE_NATIVE_PLAYBACK_OWNER = 'audio-mode-native-playback'
+
+/** Headless 1×1 pt overlay — audio-only takes have no video surface to show. */
+const HEADLESS_INLINE_LAYOUT: InlineTakeBoxWindowRect = {
+  x: 0,
+  y: 0,
+  width: 1,
+  height: 1,
+  cornerRadius: 0,
+}
 
 export function shouldUseAudioModeNativePlayback(item: {
   filePath: string
@@ -19,25 +35,20 @@ export function shouldUseAudioModeNativePlayback(item: {
 
 let endedHandler: (() => void) | null = null
 let endedListenerInstalled = false
-let endedListenerHandle: PluginListenerHandle | null = null
-
 export function setAudioModeNativePlaybackEndedHandler(handler: (() => void) | null): void {
   endedHandler = handler
 }
 
-async function ensureEndedListener(): Promise<void> {
+function ensureEndedListener(): void {
   if (endedListenerInstalled) return
   endedListenerInstalled = true
-  endedListenerHandle = await BestTakeAudioPlugin.addListener('playbackRouteEnded', () => {
+  setNativeInlineTakeBoxEndedHandler(AUDIO_MODE_NATIVE_PLAYBACK_OWNER, () => {
     endedHandler?.()
   })
 }
 
-export async function teardownAudioModeNativePlaybackListener(): Promise<void> {
-  if (endedListenerHandle) {
-    await endedListenerHandle.remove()
-    endedListenerHandle = null
-  }
+export function teardownAudioModeNativePlaybackListener(): void {
+  setNativeInlineTakeBoxEndedHandler(AUDIO_MODE_NATIVE_PLAYBACK_OWNER, null)
   endedListenerInstalled = false
   endedHandler = null
 }
@@ -45,6 +56,7 @@ export async function teardownAudioModeNativePlaybackListener(): Promise<void> {
 export async function startAudioModeNativePlayback(options: {
   filePath: string
   startTime?: number
+  gainDb?: number
 }): Promise<{ duration: number } | null> {
   if (!shouldUseAudioModeNativePlayback({ filePath: options.filePath })) return null
 
@@ -54,15 +66,41 @@ export async function startAudioModeNativePlayback(options: {
     return null
   }
 
+  // Camera-mode BestTakeBox uses this lightweight loud-speaker route.
   await prepareInlineTakeBoxPlaybackRoute()
-  await ensureEndedListener()
+  ensureEndedListener()
+
+  const startTime =
+    typeof options.startTime === 'number' && Number.isFinite(options.startTime)
+      ? Math.max(0, options.startTime)
+      : 0
+  const gainDb =
+    typeof options.gainDb === 'number' && Number.isFinite(options.gainDb)
+      ? Math.max(0, Math.min(options.gainDb, 30))
+      : 0
 
   try {
-    const result = await BestTakeAudioPlugin.startNativePlaybackTest({
+    const result = await BestTakeAudioPlugin.startInlineTakeBoxPlayback({
       url: fileURL,
-      startTime: options.startTime,
+      x: HEADLESS_INLINE_LAYOUT.x,
+      y: HEADLESS_INLINE_LAYOUT.y,
+      width: HEADLESS_INLINE_LAYOUT.width,
+      height: HEADLESS_INLINE_LAYOUT.height,
+      cornerRadius: HEADLESS_INLINE_LAYOUT.cornerRadius,
+      volume: 1,
+      audioOnly: true,
+      loudnessGainDb: gainDb,
+      ownerId: AUDIO_MODE_NATIVE_PLAYBACK_OWNER,
+      startTime,
     })
     const duration = typeof result.duration === 'number' ? result.duration : 0
+    console.info('[AudioModeNativePlayback] started inline AVPlayer (camera parity)', {
+      duration,
+      route: result.route ?? 'inline-take-box',
+      systemVolume: result.systemVolume,
+      playerVolume: result.playerVolume,
+      loudnessGainDb: gainDb,
+    })
     return { duration }
   } catch (error) {
     console.warn('[AudioModeNativePlayback] failed to start', error)
@@ -71,10 +109,19 @@ export async function startAudioModeNativePlayback(options: {
   }
 }
 
+/** Route cleanup after natural end — player already stopped natively. */
+export async function releaseAudioModeNativePlaybackRoute(): Promise<void> {
+  if (!isNativeInlineTakeBoxPlaybackAvailable()) return
+  await releaseInlineTakeBoxPlaybackRoute()
+}
+
 export async function stopAudioModeNativePlayback(): Promise<void> {
   if (!isNativeInlineTakeBoxPlaybackAvailable()) return
   try {
-    await BestTakeAudioPlugin.stopNativePlaybackTest()
+    await stopNativeInlineTakeBoxPlayback({
+      notify: false,
+      ownerId: AUDIO_MODE_NATIVE_PLAYBACK_OWNER,
+    })
   } catch {
     /* ignore */
   }

@@ -6,8 +6,8 @@ const CLICK_ATTACK_SEC = 0.0015
 
 const TIER_CLASSIC: Record<MetronomeClickTier, { hz: number; peak: number; decaySec: number }> = {
   downbeat: { hz: 1000, peak: 1.0, decaySec: 0.045 },
-  macro: { hz: 800, peak: 0.6, decaySec: 0.045 },
-  subdivision: { hz: 600, peak: 0.2, decaySec: 0.028 },
+  macro: { hz: 800, peak: 0.75, decaySec: 0.045 },
+  subdivision: { hz: 600, peak: 0.35, decaySec: 0.028 },
 }
 
 const TIER_WOODBLOCK: Record<MetronomeClickTier, { hz: number; peak: number; decaySec: number }> = {

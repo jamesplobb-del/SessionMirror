@@ -99,7 +99,7 @@ enum NativeCameraTestAudio {
         print("[PlaybackRoute] applying playback session")
         print("[CameraLikePlayback] applying session")
         let playbackSnapshot: [String: Any]
-        if CameraSessionGuard.isCameraOrRecordingActive
+        if CameraSessionGuard.needsCoexistentPlaybackRoute
             || AudioRouteConfigurator.hasExternalOutput(audioSession) {
             playbackSnapshot = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
         } else {

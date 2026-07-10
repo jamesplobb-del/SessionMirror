@@ -23,6 +23,9 @@
 		DRONEENG2FED79650016851F /* DroneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEENG1FED79650016851F /* DroneEngine.swift */; };
 		DRONEPLG2FED79650016851F /* DronePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG1FED79650016851F /* DronePlugin.swift */; };
 		DRONEPLG4FED79650016851F /* DronePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG3FED79650016851F /* DronePlugin.m */; };
+		METRONENG2FED79650016851F /* MetronomeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = METRONENG1FED79650016851F /* MetronomeEngine.swift */; };
+		METRONPLG2FED79650016851F /* MetronomePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = METRONPLG1FED79650016851F /* MetronomePlugin.swift */; };
+		METRONPLG4FED79650016851F /* MetronomePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = METRONPLG3FED79650016851F /* MetronomePlugin.m */; };
 		INLINEBOX2FED79650016851F /* InlineTakeBoxPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */; };
 		NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */; };
 		NATIVECAM2FED79650016851F /* NativeCameraRecordingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */; };
@@ -52,6 +55,9 @@
 		DRONEENG1FED79650016851F /* DroneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneEngine.swift; sourceTree = "<group>"; };
 		DRONEPLG1FED79650016851F /* DronePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DronePlugin.swift; sourceTree = "<group>"; };
 		DRONEPLG3FED79650016851F /* DronePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DronePlugin.m; sourceTree = "<group>"; };
+		METRONENG1FED79650016851F /* MetronomeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetronomeEngine.swift; sourceTree = "<group>"; };
+		METRONPLG1FED79650016851F /* MetronomePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetronomePlugin.swift; sourceTree = "<group>"; };
+		METRONPLG3FED79650016851F /* MetronomePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MetronomePlugin.m; sourceTree = "<group>"; };
 		ENTITLE1FED79650016851F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTakeBoxPlaybackController.swift; sourceTree = "<group>"; };
 		NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraTestAudio.swift; sourceTree = "<group>"; };
@@ -128,6 +134,9 @@
 				DRONEENG1FED79650016851F /* DroneEngine.swift */,
 				DRONEPLG1FED79650016851F /* DronePlugin.swift */,
 				DRONEPLG3FED79650016851F /* DronePlugin.m */,
+				METRONENG1FED79650016851F /* MetronomeEngine.swift */,
+				METRONPLG1FED79650016851F /* MetronomePlugin.swift */,
+				METRONPLG3FED79650016851F /* MetronomePlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -290,6 +299,9 @@
 				DRONEENG2FED79650016851F /* DroneEngine.swift in Sources */,
 				DRONEPLG2FED79650016851F /* DronePlugin.swift in Sources */,
 				DRONEPLG4FED79650016851F /* DronePlugin.m in Sources */,
+				METRONENG2FED79650016851F /* MetronomeEngine.swift in Sources */,
+				METRONPLG2FED79650016851F /* MetronomePlugin.swift in Sources */,
+				METRONPLG4FED79650016851F /* MetronomePlugin.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

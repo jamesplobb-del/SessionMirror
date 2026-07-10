@@ -117,6 +117,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var audioFallbackCaptureActive = false
     private var audioFallbackStarted = false
     private var audioFallbackSampleCount = 0
+    /// Audio-mode takes: mic-only session writing AAC via AVAssetWriter (no movie output).
+    private var isAudioOnlyRecording = false
+    private var audioOnlyTakeId: String?
 
     private func startRecordingDiagnosticsTimer() {
         recordingDiagnosticsTimer?.cancel()
@@ -128,7 +131,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             guard let self = self else { return }
             let elapsed = CACurrentMediaTime() - self.recordingDiagnosticsStartTime
             let sinceLastTapSample = CACurrentMediaTime() - self.lastAudioTapSampleTime
-            if let movieOutput = self.movieOutput, let audioConnection = movieOutput.connection(with: .audio) {
+            if self.isAudioOnlyRecording {
+                let sinceLastTapSample = CACurrentMediaTime() - self.lastAudioTapSampleTime
+                print(
+                    "[RecordingHealthCheck] t=\(String(format: "%.1f", elapsed))s " +
+                    "audioOnlyCapture sessionRunning=\(self.session.isRunning) " +
+                    "sinceLastTapSample=\(String(format: "%.2f", sinceLastTapSample))s"
+                )
+            } else if let movieOutput = self.movieOutput, let audioConnection = movieOutput.connection(with: .audio) {
                 print(
                     "[RecordingHealthCheck] t=\(String(format: "%.1f", elapsed))s " +
                     "movieAudioConnection enabled=\(audioConnection.isEnabled) active=\(audioConnection.isActive) " +
@@ -301,13 +311,21 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         print("[NativeCameraRecovery] AVAudioSession route change reason=\(String(describing: reason))")
         sessionQueue.async { [weak self] in
             guard let self = self, self.isRecording || self.isStarting else { return }
+            // The audio-only writer has no movie connection to repair. Reapplying
+            // preferred input while it is writing needlessly churns the capture
+            // route and can interrupt a hands-free take.
+            guard !self.isAudioOnlyRecording else { return }
             self.recoverMovieAudioDuringRecording(reason: "routeChange.\(String(describing: reason))")
         }
     }
 
     /// Best-effort flag for lifecycle guards (AppDelegate, background suspend).
     var isNativeRecordingActive: Bool {
-        isRecording || isStarting
+        isRecording || isStarting || isAudioOnlyRecording
+    }
+
+    var isAudioOnlyRecordingActive: Bool {
+        isAudioOnlyRecording
     }
 
     /// Defensive resync used after any interruption/error/lifecycle event: if the
@@ -524,7 +542,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     }
 
     var requiresActiveAudioSession: Bool {
-        session.isRunning && (isBridgePreviewActive || isPreviewActive || isRecording || isStarting)
+        session.isRunning && (
+            isBridgePreviewActive ||
+            isPreviewActive ||
+            isRecording ||
+            isStarting ||
+            isAudioOnlyRecording
+        )
     }
 
     func startBridgePreview(
@@ -540,6 +564,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 completion(.failure(error))
             case .success:
                 self.sessionQueue.async {
+                    MetronomeEngine.shared.pauseOutputForCaptureHandoff()
                     do {
                         let resolvedProfile = CameraSessionGuard.recordingMode == "audio" ? .playAndRecordDefault : audioSessionProfile
                         try self.configureAudioSessionForRecording(
@@ -570,11 +595,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                         self.isBridgePreviewActive = true
                         self.isPreviewActive = false
                         CameraSessionGuard.setPreviewActive(true)
+                        MetronomeEngine.shared.resumeOutputAfterCaptureHandoff()
                         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
                         DispatchQueue.main.async {
                             completion(.success(sessionInfo))
                         }
                     } catch {
+                        MetronomeEngine.shared.resumeOutputAfterCaptureHandoff()
                         DispatchQueue.main.async {
                             completion(.failure(error))
                         }
@@ -1189,6 +1216,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto,
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) throws -> [String: Any] {
+        if isAudioOnlyRecording {
+            throw NSError(
+                domain: "NativeCameraTest",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Audio-only recording active"]
+            )
+        }
         if isRecording || isStarting {
             throw NSError(
                 domain: "NativeCameraTest",
@@ -1310,6 +1344,16 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     func stop(trimStartMs: Int = 0, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
+            if self.isAudioOnlyRecording {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(
+                        domain: "NativeCameraTest",
+                        code: 12,
+                        userInfo: [NSLocalizedDescriptionKey: "Audio-only recording active — use stopAudioRecording"]
+                    )))
+                }
+                return
+            }
             self.pendingTrimStartMs = trimStartMs
 
             guard (self.isRecording || self.isStarting), let movieOutput = self.movieOutput else {
@@ -1614,7 +1658,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             }
             writer.startSession(atSourceTime: startTime)
             audioFallbackStarted = true
-            print("[NativeCameraTest] fallback audio writer started")
+            if isAudioOnlyRecording {
+                print("[NativeAudioRecording] AVAssetWriter started")
+                notifyAudioOnlyRecordingStartedIfNeeded()
+            } else {
+                print("[NativeCameraTest] fallback audio writer started")
+            }
         }
 
         guard writer.status == .writing else { return }
@@ -1803,7 +1852,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
-    private func buildStopResult(for fileURL: URL) throws -> [String: Any] {
+    private func buildStopResult(for fileURL: URL, audioOnly: Bool = false) throws -> [String: Any] {
         let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
         let fileSize = (attributes[.size] as? NSNumber)?.intValue ?? 0
 
@@ -1811,9 +1860,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         let durationSeconds = CMTimeGetSeconds(asset.duration)
         let safeDuration = durationSeconds.isFinite && durationSeconds > 0 ? durationSeconds : 0
 
-        var width = recordedVideoWidth
-        var height = recordedVideoHeight
-        if let videoTrack = asset.tracks(withMediaType: .video).first {
+        var width = audioOnly ? 0 : recordedVideoWidth
+        var height = audioOnly ? 0 : recordedVideoHeight
+        if !audioOnly, let videoTrack = asset.tracks(withMediaType: .video).first {
             let size = videoTrack.naturalSize.applying(videoTrack.preferredTransform)
             width = Int(abs(size.width))
             height = Int(abs(size.height))
@@ -1825,10 +1874,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
         let audioTracks = asset.tracks(withMediaType: .audio)
         let audioTrackCount = audioTracks.count
+        let logPrefix = audioOnly ? "NativeAudioRecording" : "NativeCameraTest"
         if audioTrackCount == 0 {
-            print("[NativeCameraTest] WARNING: finished recording has NO audio track in file — silence is in-file, not playback-only")
+            print("[\(logPrefix)] WARNING: finished recording has NO audio track in file — silence is in-file, not playback-only")
         } else {
-            print("[NativeCameraTest] finished recording audioTrackCount=\(audioTrackCount)")
+            print("[\(logPrefix)] finished recording audioTrackCount=\(audioTrackCount)")
         }
 
         var result: [String: Any] = [
@@ -1836,7 +1886,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             "fileURL": fileURL.absoluteString,
             "duration": safeDuration,
             "fileSize": fileSize,
-            "mimeType": "video/mp4",
+            "mimeType": audioOnly ? "audio/mp4" : "video/mp4",
             "width": width,
             "height": height,
             "route": route,
@@ -1845,7 +1895,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             "hasAudioTrack": audioTrackCount > 0,
         ]
 
-        if let movieOutput = movieOutput {
+        if let takeId = audioOnlyTakeId {
+            result["takeId"] = takeId
+        }
+
+        if !audioOnly, let movieOutput = movieOutput {
             logMovieAudioConnection(context: "recordStop", movieOutput: movieOutput)
         }
 
@@ -1866,6 +1920,377 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         return result
+    }
+
+    // MARK: - Audio-only recording (Audio Mode — AVAssetWriter via audio data output)
+
+    func startAudioRecording(
+        takeId: String,
+        audioSessionProfile: NativeCameraAudioSessionProfile = .playAndRecordDefault,
+        micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        requestMediaAccess(mediaType: .audio) { [weak self] audioGranted in
+            guard let self = self else { return }
+            guard audioGranted else {
+                completion(.failure(NSError(
+                    domain: "NativeAudioRecording",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied"]
+                )))
+                return
+            }
+            self.sessionQueue.async {
+                do {
+                    let result = try self.startAudioOnSessionQueue(
+                        takeId: takeId,
+                        audioSessionProfile: audioSessionProfile,
+                        micInputPreference: micInputPreference,
+                        completion: completion
+                    )
+                    print("[NativeAudioRecording] start requested")
+                    print("[NativeAudioRecording] fileURL = \(result["fileURL"] ?? "unknown")")
+                } catch {
+                    DispatchQueue.main.async {
+                        completion(.failure(error))
+                    }
+                }
+            }
+        }
+    }
+
+    func stopAudioRecording(trimStartMs: Int = 0, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.pendingTrimStartMs = trimStartMs
+
+            guard self.isAudioOnlyRecording,
+                  self.isRecording || self.isStarting || self.audioFallbackCaptureActive else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(
+                        domain: "NativeAudioRecording",
+                        code: 10,
+                        userInfo: [NSLocalizedDescriptionKey: "Not recording"]
+                    )))
+                }
+                return
+            }
+
+            // If stop arrives before didStart-equivalent fires, fail the pending start
+            // so JS is not left awaiting a promise that will never resolve.
+            if !self.isRecording, let pendingStart = self.startCompletion {
+                self.startCompletion = nil
+                self.pendingStartResult = nil
+                DispatchQueue.main.async {
+                    pendingStart(.failure(NSError(
+                        domain: "NativeAudioRecording",
+                        code: 14,
+                        userInfo: [NSLocalizedDescriptionKey: "Recording stopped before start completed"]
+                    )))
+                }
+            }
+
+            self.stopCompletion = completion
+            self.isStarting = false
+
+            self.audioTapQueue.async {
+                self.audioFallbackCaptureActive = false
+                self.finishAudioFallbackCapture { audioURL, sampleCount in
+                    self.sessionQueue.async {
+                        self.isRecording = false
+                        self.stopRecordingDiagnosticsTimer()
+
+                        let completion = self.stopCompletion
+                        self.stopCompletion = nil
+                        let trimStartMs = self.pendingTrimStartMs
+                        self.pendingTrimStartMs = 0
+                        self.isAudioOnlyRecording = false
+
+                        guard let fileURL = audioURL, sampleCount > 0 else {
+                            self.audioOnlyTakeId = nil
+                            self.restoreAudioSessionAfterTest()
+                            if self.session.isRunning && !self.isPreviewActive && !self.isBridgePreviewActive {
+                                self.session.stopRunning()
+                            }
+                            self.isSessionConfigured = false
+                            self.audioDataOutput = nil
+                            DispatchQueue.main.async {
+                                completion?(.failure(NSError(
+                                    domain: "NativeAudioRecording",
+                                    code: 13,
+                                    userInfo: [NSLocalizedDescriptionKey: "No audio captured"]
+                                )))
+                            }
+                            return
+                        }
+
+                        if trimStartMs > 0 {
+                            self.trimAudioOnly(sourceURL: fileURL, trimStartMs: trimStartMs) { trimResult in
+                                self.sessionQueue.async {
+                                    switch trimResult {
+                                    case .success(let url):
+                                        self.finalizeAudioOnlyStopResult(for: url, completion: completion)
+                                    case .failure(let error):
+                                        self.restoreAudioSessionAfterTest()
+                                        DispatchQueue.main.async {
+                                            completion?(.failure(error))
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            self.finalizeAudioOnlyStopResult(for: fileURL, completion: completion)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func startAudioOnSessionQueue(
+        takeId: String,
+        audioSessionProfile: NativeCameraAudioSessionProfile,
+        micInputPreference: AudioRouteConfigurator.MicInputPreference,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) throws -> [String: Any] {
+        if isRecording || isStarting || isAudioOnlyRecording {
+            throw NSError(
+                domain: "NativeAudioRecording",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Already recording"]
+            )
+        }
+
+        isAudioOnlyRecording = true
+        audioOnlyTakeId = takeId
+        isStarting = true
+
+        do {
+            try configureAudioSessionForRecording(
+                profile: audioSessionProfile,
+                micInputPreference: micInputPreference
+            )
+
+            _ = try configureAudioOnlyCaptureSession()
+
+            let takesDir = try takesDirectoryURL()
+            let filename = "\(takeId).m4a"
+            let fileURL = takesDir.appendingPathComponent(filename)
+            outputURL = fileURL
+            beginAudioOnlyRecording(for: fileURL)
+
+            if !session.isRunning {
+                session.startRunning()
+            }
+
+            let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
+            let route = sessionInfo["outputRoute"] as? String ?? "unknown"
+            let inputRoute = sessionInfo["inputRoute"] as? String ?? "unknown"
+
+            var result: [String: Any] = [
+                "filePath": "takes/\(filename)",
+                "fileURL": fileURL.absoluteString,
+                "route": route,
+                "inputRoute": inputRoute,
+                "audioSessionProfile": audioSessionProfile.rawValue,
+                "takeId": takeId,
+            ]
+            for (key, value) in sessionInfo {
+                result[key] = value
+            }
+
+            startCompletion = completion
+            pendingStartResult = result
+            AudioRouteConfigurator.logMicRouteProof(
+                context: "audioOnlyRecordingStartRequested",
+                preference: activeMicInputPreference
+            )
+            print("[NativeAudioRecording] session started — awaiting first audio sample")
+            return result
+        } catch {
+            isAudioOnlyRecording = false
+            isStarting = false
+            audioOnlyTakeId = nil
+            startCompletion = nil
+            pendingStartResult = nil
+            throw error
+        }
+    }
+
+    private func configureAudioOnlyCaptureSession() throws {
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+
+        for input in session.inputs { session.removeInput(input) }
+        for output in session.outputs { session.removeOutput(output) }
+
+        movieOutput = nil
+        videoDataOutput = nil
+        audioDataOutput = nil
+        isSessionConfigured = false
+
+        if session.canSetSessionPreset(.high) {
+            session.sessionPreset = .high
+        }
+
+        guard let audioDevice = preferredAudioCaptureDevice() else {
+            throw NSError(
+                domain: "NativeAudioRecording",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "Built-in microphone unavailable"]
+            )
+        }
+
+        let audioInput = try AVCaptureDeviceInput(device: audioDevice)
+        guard session.canAddInput(audioInput) else {
+            throw NSError(
+                domain: "NativeAudioRecording",
+                code: 7,
+                userInfo: [NSLocalizedDescriptionKey: "Cannot add audio input"]
+            )
+        }
+        session.addInput(audioInput)
+
+        let audioTapOutput = AVCaptureAudioDataOutput()
+        audioTapOutput.setSampleBufferDelegate(self, queue: audioTapQueue)
+        guard session.canAddOutput(audioTapOutput) else {
+            throw NSError(
+                domain: "NativeAudioRecording",
+                code: 8,
+                userInfo: [NSLocalizedDescriptionKey: "Cannot add audio data output"]
+            )
+        }
+        session.addOutput(audioTapOutput)
+        audioDataOutput = audioTapOutput
+        isSessionConfigured = true
+        print("[NativeAudioRecording] audio-only capture session configured")
+    }
+
+    private func beginAudioOnlyRecording(for fileURL: URL) {
+        // Arm the writer synchronously before startRunning() can deliver samples.
+        audioTapQueue.sync {
+            self.audioFallbackWriter?.cancelWriting()
+            if let oldURL = self.audioFallbackURL, oldURL != fileURL {
+                try? FileManager.default.removeItem(at: oldURL)
+            }
+            try? FileManager.default.removeItem(at: fileURL)
+            self.audioFallbackWriter = nil
+            self.audioFallbackInput = nil
+            self.audioFallbackURL = fileURL
+            self.audioFallbackCaptureActive = true
+            self.audioFallbackStarted = false
+            self.audioFallbackSampleCount = 0
+            print("[NativeAudioRecording] AVAssetWriter armed for \(fileURL.lastPathComponent)")
+        }
+    }
+
+    private func notifyAudioOnlyRecordingStartedIfNeeded() {
+        guard isAudioOnlyRecording, !isRecording else { return }
+        sessionQueue.async { [weak self] in
+            guard let self = self, self.isAudioOnlyRecording, !self.isRecording else { return }
+            self.isRecording = true
+            self.isStarting = false
+            self.startRecordingDiagnosticsTimer()
+
+            let completion = self.startCompletion
+            let result = self.pendingStartResult
+            self.startCompletion = nil
+            self.pendingStartResult = nil
+
+            print("[NativeAudioRecording] recording started (first audio sample written)")
+            AudioRouteConfigurator.logMicRouteProof(
+                context: "audioOnlyRecordingStarted",
+                preference: self.activeMicInputPreference
+            )
+            DispatchQueue.main.async {
+                if let result = result {
+                    completion?(.success(result))
+                }
+            }
+        }
+    }
+
+    private func finalizeAudioOnlyStopResult(
+        for fileURL: URL,
+        completion: ((Result<[String: Any], Error>) -> Void)?
+    ) {
+        do {
+            let info = try buildStopResult(for: fileURL, audioOnly: true)
+            print("[NativeAudioRecording] recording stopped")
+            restoreAudioSessionAfterTest()
+            if session.isRunning && !isPreviewActive && !isBridgePreviewActive {
+                session.stopRunning()
+            }
+            isSessionConfigured = false
+            audioDataOutput = nil
+            audioOnlyTakeId = nil
+            DispatchQueue.main.async {
+                completion?(.success(info))
+            }
+        } catch {
+            restoreAudioSessionAfterTest()
+            audioOnlyTakeId = nil
+            DispatchQueue.main.async {
+                completion?(.failure(error))
+            }
+        }
+    }
+
+    private func trimAudioOnly(
+        sourceURL: URL,
+        trimStartMs: Int,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        let asset = AVURLAsset(url: sourceURL)
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            completion(.failure(NSError(
+                domain: "NativeAudioRecording",
+                code: 20,
+                userInfo: [NSLocalizedDescriptionKey: "Cannot create audio export session"]
+            )))
+            return
+        }
+
+        let startTime = CMTime(value: Int64(trimStartMs), timescale: 1000)
+        let duration = asset.duration
+        let trimmedDuration = CMTimeSubtract(duration, startTime)
+        guard CMTimeGetSeconds(trimmedDuration) > 0.05 else {
+            completion(.success(sourceURL))
+            return
+        }
+
+        let tempURL = sourceURL.deletingLastPathComponent()
+            .appendingPathComponent("trim-\(UUID().uuidString).m4a")
+        exportSession.outputURL = tempURL
+        exportSession.outputFileType = .m4a
+        exportSession.timeRange = CMTimeRange(start: startTime, duration: trimmedDuration)
+
+        exportSession.exportAsynchronously {
+            switch exportSession.status {
+            case .completed:
+                do {
+                    _ = try FileManager.default.replaceItemAt(sourceURL, withItemAt: tempURL)
+                    completion(.success(sourceURL))
+                } catch {
+                    try? FileManager.default.removeItem(at: tempURL)
+                    completion(.failure(error))
+                }
+            case .failed, .cancelled:
+                try? FileManager.default.removeItem(at: tempURL)
+                completion(.failure(exportSession.error ?? NSError(
+                    domain: "NativeAudioRecording",
+                    code: 21,
+                    userInfo: [NSLocalizedDescriptionKey: "Audio trim export failed"]
+                )))
+            default:
+                try? FileManager.default.removeItem(at: tempURL)
+                completion(.failure(NSError(
+                    domain: "NativeAudioRecording",
+                    code: 22,
+                    userInfo: [NSLocalizedDescriptionKey: "Audio trim export incomplete"]
+                )))
+            }
+        }
     }
 }
 
@@ -1954,7 +2379,7 @@ extension NativeCameraRecordingEngine {
     private func handleAudioTapSample(_ sampleBuffer: CMSampleBuffer) {
         appendAudioFallbackSample(sampleBuffer)
         lastAudioTapSampleTime = CACurrentMediaTime()
-        guard isAudioTapEnabled else { return }
+        guard isAudioTapEnabled || isAudioOnlyRecording else { return }
         if !didLogFirstTapSample {
             didLogFirstTapSample = true
             print("[PitchTap] FIRST audio sample received from capture session — tap is delivering")

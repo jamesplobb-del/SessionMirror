@@ -23,7 +23,12 @@ function shouldAttemptNativeStereoRoute(): boolean {
 async function isCameraSessionActive(): Promise<boolean> {
   try {
     const snapshot = await BestTakeAudioPlugin.getCameraSessionState()
-    return snapshot.previewActive === true || snapshot.recordingActive === true
+    if (snapshot.previewActive === true || snapshot.recordingActive === true) {
+      return true
+    }
+    // Bridge acquire can take hundreds of ms — never stomp with enableRecordingRoute
+    // while native is switching into camera/video mode.
+    return snapshot.recordingMode === 'video'
   } catch {
     return false
   }

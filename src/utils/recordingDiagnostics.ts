@@ -26,6 +26,8 @@ export interface PlaybackGainMetadata {
   measuredPeakDb: number
   /** Non-destructive playback boost suggestion (dB) — not applied unless enabled later. */
   suggestedGainDb: number
+  /** Native speaker playback can safely use more gain because its limiter owns the ceiling. */
+  nativePlaybackGainDb: number
 }
 
 export interface RecordingCaptureDiagnostics {
@@ -146,6 +148,12 @@ export function computePlaybackGainMetadata(
   const rmsGainDb = targetActiveRmsDb - analysis.recordedActiveRmsDb
   const peakGainDb = peakCeilingDb - analysis.recordedPeakDb
   const suggestedGainDb = Math.min(13, Math.max(0, Math.min(rmsGainDb, peakGainDb)))
+  // Match the phone speaker path: target a strong average level and let the
+  // native peak limiter handle transients instead of keeping quiet takes low.
+  const nativePlaybackGainDb = Math.min(
+    30,
+    Math.max(0, -8 - analysis.recordedActiveRmsDb),
+  )
 
   return {
     targetActiveRmsDb,
@@ -153,7 +161,25 @@ export function computePlaybackGainMetadata(
     measuredActiveRmsDb: analysis.recordedActiveRmsDb,
     measuredPeakDb: analysis.recordedPeakDb,
     suggestedGainDb,
+    nativePlaybackGainDb,
   }
+}
+
+/** Resolve the limiter-protected native speaker gain, including older take metadata. */
+export function resolveNativePlaybackGainDb(
+  metadata: PlaybackGainMetadata | null | undefined,
+): number | undefined {
+  if (!metadata) return undefined
+  if (typeof metadata.nativePlaybackGainDb === 'number' && Number.isFinite(metadata.nativePlaybackGainDb)) {
+    return Math.max(0, Math.min(metadata.nativePlaybackGainDb, 30))
+  }
+  if (typeof metadata.measuredActiveRmsDb === 'number' && Number.isFinite(metadata.measuredActiveRmsDb)) {
+    return Math.max(0, Math.min(-8 - metadata.measuredActiveRmsDb, 30))
+  }
+  if (typeof metadata.suggestedGainDb === 'number' && Number.isFinite(metadata.suggestedGainDb)) {
+    return Math.max(0, Math.min(metadata.suggestedGainDb, 30))
+  }
+  return undefined
 }
 
 export function logRecordingCaptureDiagnostics(

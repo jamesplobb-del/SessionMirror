@@ -44,6 +44,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "enhanceTakeAudio", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraRecording", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startNativeAudioRecording", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNativeAudioRecording", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraTestPostProcess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "hapticImpact", returnType: CAPPluginReturnPromise),
@@ -247,7 +249,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             // Camera preview and external output (headphones/BT) both need the
             // coexistent PlayAndRecord path. Forcing Playback on Bluetooth HFP
             // fails (-50) and leaves audio-mode take playback silent.
-            if CameraSessionGuard.isCameraOrRecordingActive
+            if CameraSessionGuard.needsCoexistentPlaybackRoute
                 || AudioRouteConfigurator.hasExternalOutput(session) {
                 result = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
             } else {
@@ -356,12 +358,20 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CameraSessionGuard.setRecordingMode(recordingMode)
 
         if CameraSessionGuard.playbackRouteActive {
-            if previewActive || recordingActive {
-                call.resolve(CameraSessionGuard.snapshot())
-                return
+            // Metronome/playback can coexist with live camera — always honor mode
+            // and promote preview/recording to true. Never demote to idle here;
+            // stale JS snapshots during handoff must not clear a live bridge.
+            if previewActive {
+                CameraSessionGuard.setPreviewActive(true)
             }
-            CameraSessionGuard.setPreviewActive(false)
-            CameraSessionGuard.setRecordingActive(false)
+            if recordingActive {
+                CameraSessionGuard.setRecordingActive(true)
+            }
+            if let youtubePlayAlongActive {
+                CameraSessionGuard.setYoutubePlayAlongActive(youtubePlayAlongActive)
+            } else if !recordingActive {
+                CameraSessionGuard.setYoutubePlayAlongActive(false)
+            }
             call.resolve(CameraSessionGuard.snapshot())
             return
         }
@@ -1195,6 +1205,24 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         let recordingActive = call.getBool("recordingActive") ?? CameraSessionGuard.recordingActive
         let playbackActive = call.getBool("playbackActive") ?? CameraSessionGuard.playbackRouteActive
 
+        // The audio-only recorder owns a stable PlayAndRecord session while it
+        // writes. React state promotion (Listening -> Recording) can arrive
+        // after the writer starts; never let that bookkeeping reconfigure the
+        // session beneath an active take.
+        if nativeCameraEngine.isAudioOnlyRecordingActive {
+            var snapshot = AudioRouteConfigurator.routeSnapshot()
+            snapshot["success"] = true
+            snapshot["enabled"] = enabled
+            snapshot["selectedAudioEngine"] = selectedAudioEngine
+            snapshot["selectedMicPreference"] = micInputPreference.rawValue
+            snapshot["recordingActive"] = true
+            snapshot["playbackActive"] = playbackActive
+            snapshot["nativeLoudnessProfile"] = "camera-input"
+            snapshot["fallbackReason"] = "deferred while native audio recording is active"
+            call.resolve(snapshot)
+            return
+        }
+
         do {
             let result = try AudioRouteConfigurator.applyNativeExperimentalAudioMode(
                 enabled: enabled,
@@ -1383,7 +1411,15 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             guard applyCameraLikePlaybackSessionOrReject(call) else { return }
         }
 
-        let session = AVAudioSession.sharedInstance()
+        var session = AVAudioSession.sharedInstance()
+        if CameraSessionGuard.needsCoexistentPlaybackRoute
+            || AudioRouteConfigurator.hasExternalOutput(session) {
+            _ = try? AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
+        } else {
+            _ = try? AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
+        }
+        session = AVAudioSession.sharedInstance()
+
         let item = AVPlayerItem(url: fileURL)
         let player = AVPlayer(playerItem: item)
         player.volume = 1.0
@@ -1415,14 +1451,6 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             self.finishPlaybackRouteIfNeeded()
         }
 
-        let startSeconds = call.getDouble("startTime") ?? 0
-        if startSeconds > 0 {
-            let seekTime = CMTime(seconds: startSeconds, preferredTimescale: 600)
-            player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        }
-
-        player.play()
-
         var payload: [String: Any] = [
             "fileURL": fileURL.absoluteString,
             "duration": safeDuration,
@@ -1433,7 +1461,21 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         if postProcess {
             payload["postProcess"] = true
         }
-        call.resolve(payload)
+
+        let startSeconds = call.getDouble("startTime") ?? 0
+        let beginPlayback = {
+            player.play()
+            call.resolve(payload)
+        }
+
+        if startSeconds > 0 {
+            let seekTime = CMTime(seconds: startSeconds, preferredTimescale: 600)
+            player.seek(to: seekTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                beginPlayback()
+            }
+        } else {
+            beginPlayback()
+        }
     }
 
     @objc func startNativePlaybackTest(_ call: CAPPluginCall) {
@@ -1475,8 +1517,11 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let mirror = call.getBool("mirror") ?? false
         let volume = Float(call.getFloat("volume") ?? 1)
+        let audioOnly = call.getBool("audioOnly") ?? false
+        let loudnessGainDb = Float(call.getDouble("loudnessGainDb") ?? 0)
         let ownerId = call.getString("ownerId") ?? ""
         let cornerRadius = CGFloat(call.getFloat("cornerRadius") ?? 0)
+        let startTime = max(0, call.getDouble("startTime") ?? 0)
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -1485,7 +1530,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 // the live session right before AVPlayer starts so take audio is not
                 // silent when YouTube/WebKit already owns the mixable capture session.
                 let session = AVAudioSession.sharedInstance()
-                if CameraSessionGuard.isCameraOrRecordingActive
+                if CameraSessionGuard.needsCoexistentPlaybackRoute
                     || AudioRouteConfigurator.hasExternalOutput(session) {
                     _ = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
                 } else {
@@ -1503,7 +1548,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     mirror: mirror,
                     volume: volume,
                     ownerId: ownerId,
-                    cornerRadius: cornerRadius
+                    cornerRadius: cornerRadius,
+                    startTime: startTime,
+                    audioOnly: audioOnly,
+                    loudnessGainDb: loudnessGainDb
                 )
                 call.resolve(payload)
             } catch {
@@ -1579,6 +1627,51 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(payload)
             case .failure(let error):
                 call.reject("Native camera stop failed", nil, error)
+            }
+        })
+    }
+
+    @objc func startNativeAudioRecording(_ call: CAPPluginCall) {
+        // Hands-free pre-roll starts before React has promoted its visual record
+        // state, so the asynchronous camera-session sync can still report the
+        // previous mode here. This audio-specific entry point is authoritative.
+        // Do not reject a valid pre-roll because that bookkeeping is late.
+        if CameraSessionGuard.recordingMode != "audio" {
+            print("[NativeAudioRecording] correcting stale guard mode to audio before start")
+        }
+        CameraSessionGuard.setRecordingMode("audio")
+        guard let takeId = call.getString("takeId"), !takeId.isEmpty else {
+            call.reject("Missing takeId")
+            return
+        }
+        let profile = NativeCameraAudioSessionProfile.parse(call.getString("audioSessionProfile"))
+        let resolvedProfile: NativeCameraAudioSessionProfile =
+            profile == .videoRecording ? .playAndRecordDefault : profile
+        let micPreference = AudioRouteConfigurator.parseMicInputPreference(call.getString("micInputPreference"))
+
+        nativeCameraEngine.startAudioRecording(
+            takeId: takeId,
+            audioSessionProfile: resolvedProfile,
+            micInputPreference: micPreference,
+            completion: { result in
+                switch result {
+                case .success(let payload):
+                    call.resolve(payload)
+                case .failure(let error):
+                    call.reject("Native audio recording failed", nil, error)
+                }
+            }
+        )
+    }
+
+    @objc func stopNativeAudioRecording(_ call: CAPPluginCall) {
+        let trimStartMs = call.getInt("trimStartMs") ?? 0
+        nativeCameraEngine.stopAudioRecording(trimStartMs: trimStartMs, completion: { result in
+            switch result {
+            case .success(let payload):
+                call.resolve(payload)
+            case .failure(let error):
+                call.reject("Native audio stop failed", nil, error)
             }
         })
     }

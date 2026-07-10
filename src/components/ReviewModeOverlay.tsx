@@ -359,6 +359,7 @@ export default function ReviewModeOverlay({
     activeName,
     activeSlot,
     activeTake?.id,
+    activeTake?.playbackGainMetadata,
     activeTimelineFilePath,
     activeTimelineUrl,
     benchmarkMimeType,

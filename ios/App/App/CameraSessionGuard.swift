@@ -18,6 +18,15 @@ enum CameraSessionGuard {
         recordingMode == "video" && (previewActive || recordingActive)
     }
 
+    static var isAudioModeActive: Bool {
+        recordingMode == "audio"
+    }
+
+    /// PlayAndRecord coexistent routing — live camera capture plus loud playback.
+    static var needsCoexistentPlaybackRoute: Bool {
+        isCameraOrRecordingActive
+    }
+
     /// Timestamp of the most recent `applicationDidBecomeActive` /
     /// `applicationWillEnterForeground`. The JS↔native ownership handshake
     /// (camera bridge reacquire, playback-route release, Web Audio context
@@ -128,6 +137,7 @@ enum CameraSessionGuard {
         [
             "previewActive": previewActive,
             "recordingActive": recordingActive,
+            "recordingMode": recordingMode,
             "youtubePlayAlongActive": youtubePlayAlongActive,
             "playbackRouteActive": playbackRouteActive,
             "playbackSessionPrepared": playbackSessionPrepared,

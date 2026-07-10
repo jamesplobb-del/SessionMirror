@@ -20,6 +20,7 @@ import {
   persistRecordingBlob,
   composeBufferedRecordingBlob,
   StreamingTakeWriter,
+  deleteTakeFile,
   type RecordingCompletePayload,
   type MultitrackRecordingStopOptions,
 } from '../utils/takeStorage'
@@ -30,7 +31,6 @@ import {
   type RecordingCaptureDiagnostics,
   type RecordingTrackSnapshot,
 } from '../utils/recordingDiagnostics'
-import { AUTO_RECORD_PREROLL_MS } from '../utils/autoRecordPlayback'
 import {
   isAutoPlaybackHoldingMicWarmup,
   isInlineTakePlaybackDeferringCameraPreview,
@@ -45,15 +45,18 @@ import {
   ensureNativeCameraSessionHealthy,
   startNativeCameraBridge,
   startNativeCameraRecording,
+  startNativeAudioRecording,
   stopNativeCameraBridge,
   stopNativeCameraPreview,
   stopNativeCameraRecording,
+  stopNativeAudioRecording,
   setNativeCameraPassthrough,
   getAudioHardwareRtl,
 } from '../utils/nativeCameraTest'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { resolveMicPreferenceForLiveCapture, resolveNativeBridgeMicPreference } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
+import { acquireNativeAudioTap } from '../utils/nativeAudioPitchTap'
 import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isAppInForeground } from '../utils/appForeground'
@@ -302,8 +305,11 @@ export function useCameraSession({
   const micInputPreferenceRef = useRef<MicInputPreference>(micInputPreference)
   const queuedMicPreferenceRef = useRef<MicInputPreference | null>(micInputPreference)
   const nativeExperimentalRecordingRef = useRef(false)
+  const nativePreRollDiscardRef = useRef(false)
   /** Settle promise of the in-flight native start — Stop awaits this so it never races didStartRecording. */
   const nativeStartSettleRef = useRef<Promise<boolean> | null>(null)
+  const notifyHandsFreeMonitorRestartRef = useRef<(() => void) | null>(null)
+  const discardNativeAutoPreRollCaptureRef = useRef<() => Promise<void>>(async () => {})
   /** While true (multitrack stage open), native failures must not tear down the bridge preview. */
   const suppressBridgeRecoveryRef = useRef(false)
   const nativeCameraRecordingEnabledRef = useRef(nativeCameraRecordingEnabled)
@@ -1431,6 +1437,14 @@ export function useCameraSession({
   const cancelAutoPreRollCapture = useCallback(() => {
     if (!autoPreRollActiveRef.current || autoPerformanceActiveRef.current) return
 
+    if (
+      isNativeVideoRecordingEnabled() &&
+      (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current)
+    ) {
+      void discardNativeAutoPreRollCaptureRef.current()
+      return
+    }
+
     const recorder = recorderRef.current
     if (recorder?.state === 'recording') {
       recorder.stop()
@@ -1453,7 +1467,7 @@ export function useCameraSession({
     recorderRef.current = null
     releaseRecorderStream(recordStreamRef.current, streamRef.current)
     recordStreamRef.current = null
-  }, [])
+  }, [isNativeVideoRecordingEnabled])
 
   const disarmAutoAudioRecorder = useCallback(async () => {
     if (autoAudioDisarmInFlightRef.current) {
@@ -1536,19 +1550,28 @@ export function useCameraSession({
       return 'unavailable'
     }
 
-    const elapsed = performance.now() - autoPreRollStartedAtRef.current
-    if (elapsed < AUTO_RECORD_PREROLL_MS) {
+    // The native writer is armed before AVCapture has delivered its first
+    // sample. Wait for real capture before marking the performance so the
+    // playback lead-in is measured from audio that is actually in the file.
+    if (autoPreRollStartedAtRef.current <= 0) {
       return 'pending'
     }
 
     autoPerformanceActiveRef.current = true
     autoPerformanceStartedAtRef.current = performance.now()
-    isRecordingRef.current = true
-    setIsRecording(true)
-    setElapsed(0)
-    elapsedRef.current = 0
+
+    const nativeHandsFreePreRoll =
+      isNativeVideoRecordingEnabled() &&
+      nativeExperimentalRecordingRef.current &&
+      autoPreRollActiveRef.current
+    if (!nativeHandsFreePreRoll) {
+      isRecordingRef.current = true
+      setIsRecording(true)
+      setElapsed(0)
+      elapsedRef.current = 0
+    }
     return 'started'
-  }, [])
+  }, [isNativeVideoRecordingEnabled])
 
   const warmAutoAudioRecorder = useCallback(async () => {
     if (
@@ -1558,6 +1581,34 @@ export function useCameraSession({
       warmAutoAudioInFlightRef.current ||
       isAutoPlaybackHoldingMicWarmup()
     ) {
+      return
+    }
+
+    if (isNativeVideoRecordingEnabled()) {
+      warmAutoAudioInFlightRef.current = true
+      try {
+        await acquireNativeAudioTap()
+        if (
+          recordingModeRef.current !== 'audio' ||
+          isRecordingRef.current ||
+          autoPreRollActiveRef.current
+        ) {
+          return
+        }
+        if (!activeTakeIdRef.current) {
+          activeTakeIdRef.current = crypto.randomUUID()
+        }
+        const started = await beginNativeAutoPreRollCaptureRef.current()
+        if (!started) {
+          autoPreRollActiveRef.current = false
+          autoPreRollStartedAtRef.current = 0
+          activeTakeIdRef.current = null
+        }
+      } catch {
+        /* cold start on trigger if warm fails */
+      } finally {
+        warmAutoAudioInFlightRef.current = false
+      }
       return
     }
 
@@ -1596,15 +1647,18 @@ export function useCameraSession({
     } finally {
       warmAutoAudioInFlightRef.current = false
     }
-  }, [beginAutoPreRollCapture, bindRecordingHandlers, ensureAudioRecordingStream])
+  }, [bindRecordingHandlers, ensureAudioRecordingStream, isNativeVideoRecordingEnabled])
+
+  const warmAutoRecordingRef = useRef<() => Promise<void>>(async () => {})
+  const beginNativeAutoPreRollCaptureRef = useRef<() => Promise<boolean>>(async () => false)
 
   const restartAutoPreRollCapture = useCallback(() => {
     if (!autoPreRollActiveRef.current || autoPerformanceActiveRef.current) return
     cancelAutoPreRollCapture()
     window.setTimeout(() => {
-      void warmAutoAudioRecorder()
+      void warmAutoRecordingRef.current()
     }, 120)
-  }, [cancelAutoPreRollCapture, warmAutoAudioRecorder])
+  }, [cancelAutoPreRollCapture])
 
   scheduleWarmAutoAudioRef.current = () => {
     if (recordingModeRef.current !== 'audio') return
@@ -1619,6 +1673,12 @@ export function useCameraSession({
   const shouldUseNativeExperimentalRecording = useCallback(
     () =>
       isNativeVideoRecordingEnabled() && recordingModeRef.current === 'video',
+    [isNativeVideoRecordingEnabled],
+  )
+
+  const shouldUseNativeAudioRecording = useCallback(
+    () =>
+      isNativeVideoRecordingEnabled() && recordingModeRef.current === 'audio',
     [isNativeVideoRecordingEnabled],
   )
 
@@ -1700,6 +1760,84 @@ export function useCameraSession({
     suspendSharedMicForNativeRecording,
   ])
 
+  /**
+   * Camera hands-free mirrors the native audio workflow: AVCapture starts
+   * writing during "Listening," then the detector promotes that file to a
+   * visible take. The stored performance offset lets playback begin one
+   * second before the actual first note while the live preview is replaced.
+   */
+  const beginNativeVideoAutoPreRollCapture = useCallback((): Promise<boolean> => {
+    if (
+      nativeExperimentalRecordingRef.current ||
+      nativeStartSettleRef.current ||
+      isRecordingRef.current
+    ) {
+      return Promise.resolve(Boolean(nativeExperimentalRecordingRef.current))
+    }
+
+    const settle = (async (): Promise<boolean> => {
+      const takeId = activeTakeIdRef.current ?? crypto.randomUUID()
+      activeTakeIdRef.current = takeId
+      recordingOrientationRef.current = readRecordingOrientation()
+      recorderMimeTypeRef.current = 'video/mp4'
+      autoPreRollActiveRef.current = true
+      autoPerformanceActiveRef.current = false
+      autoPreRollStartedAtRef.current = 0
+      autoPerformanceStartedAtRef.current = 0
+
+      if (!nativePreviewActiveRef.current) {
+        const warmed = await acquireNativeVideoBridge()
+        if (!warmed) {
+          throw new Error('native camera bridge unavailable for hands-free pre-roll')
+        }
+      }
+
+      nativeExperimentalRecordingRef.current = true
+      suspendSharedMicForNativeRecording()
+
+      const result = await startNativeCameraRecording({
+        useFrontCamera: true,
+        audioSessionProfile: 'videoRecording',
+        micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
+      })
+      if (!result) {
+        throw new Error('native video pre-roll did not start')
+      }
+
+      const captureStartedAt = performance.now()
+      recordingStartedAtRef.current = captureStartedAt
+      autoPreRollStartedAtRef.current = captureStartedAt
+      // Switching off the shared WebKit mic is deliberate. Rebuild the
+      // monitor on the native PCM tap before the performer can miss a note.
+      notifyHandsFreeMonitorRestartRef.current?.()
+      return true
+    })()
+
+    const settledSafe = settle.catch((error) => {
+      console.warn('[NativeVideoRecording] native hands-free pre-roll start failed', error)
+      activeTakeIdRef.current = null
+      nativeExperimentalRecordingRef.current = false
+      autoPreRollActiveRef.current = false
+      autoPreRollStartedAtRef.current = 0
+      autoPerformanceActiveRef.current = false
+      autoPerformanceStartedAtRef.current = 0
+      recordingStartedAtRef.current = 0
+      recoverAfterNativeExperimentalFailure()
+      return false
+    })
+
+    nativeStartSettleRef.current = settledSafe
+    return settledSafe.finally(() => {
+      if (nativeStartSettleRef.current === settledSafe) {
+        nativeStartSettleRef.current = null
+      }
+    })
+  }, [
+    acquireNativeVideoBridge,
+    recoverAfterNativeExperimentalFailure,
+    suspendSharedMicForNativeRecording,
+  ])
+
   const stopNativeExperimentalRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     setIsStopping(true)
 
@@ -1774,11 +1912,15 @@ export function useCameraSession({
           playbackGainMetadata: computePlaybackGainMetadata(levels),
         }
       }
+
       const autoPerformanceStartSeconds =
-        autoPerformanceStartedAtRef.current > 0 && recordingStartedAtRef.current > 0
+        autoPerformanceStartedAtRef.current > 0 &&
+        (autoPreRollStartedAtRef.current > 0 || recordingStartedAtRef.current > 0)
           ? Math.max(
               0,
-              (autoPerformanceStartedAtRef.current - recordingStartedAtRef.current) / 1000,
+              (autoPerformanceStartedAtRef.current -
+                (autoPreRollStartedAtRef.current || recordingStartedAtRef.current)) /
+                1000,
             )
           : undefined
 
@@ -1822,12 +1964,351 @@ export function useCameraSession({
     })
   }, [recoverAfterNativeExperimentalFailure])
 
+  const recoverAfterNativeAudioRecording = useCallback(() => {
+    void acquireStream('audio', undefined, { forceNew: true, liveCapture: true })
+  }, [acquireStream])
+
+  const discardNativeAutoPreRollCapture = useCallback(async () => {
+    if (!autoPreRollActiveRef.current && !nativeExperimentalRecordingRef.current) {
+      return
+    }
+    if (autoPerformanceActiveRef.current && isRecordingRef.current) {
+      return
+    }
+
+    const preRollMode = recordingModeRef.current
+    nativePreRollDiscardRef.current = true
+    autoPreRollActiveRef.current = false
+    autoPreRollStartedAtRef.current = 0
+    autoPerformanceActiveRef.current = false
+    autoPerformanceStartedAtRef.current = 0
+    activeTakeIdRef.current = null
+
+    const startSettle = nativeStartSettleRef.current
+    if (startSettle) {
+      await startSettle.catch(() => false)
+      nativeStartSettleRef.current = null
+    }
+
+    if (nativeExperimentalRecordingRef.current) {
+      nativeExperimentalRecordingRef.current = false
+      const stoppedVideoPreRoll = preRollMode === 'video'
+      const result = stoppedVideoPreRoll
+        ? await stopNativeCameraRecording()
+        : await stopNativeAudioRecording()
+      if (result?.filePath) {
+        await deleteTakeFile(result.filePath).catch(() => {})
+      }
+    }
+
+    isRecordingRef.current = false
+    recordingStartedAtRef.current = 0
+    nativePreRollDiscardRef.current = false
+    setIsRecording(false)
+    setIsStopping(false)
+    if (preRollMode === 'audio') {
+      recoverAfterNativeAudioRecording()
+    }
+  }, [recoverAfterNativeAudioRecording])
+
+  discardNativeAutoPreRollCaptureRef.current = discardNativeAutoPreRollCapture
+
+  const beginNativeAutoPreRollCapture = useCallback((): Promise<boolean> => {
+    if (
+      nativeExperimentalRecordingRef.current ||
+      nativeStartSettleRef.current ||
+      isRecordingRef.current
+    ) {
+      return Promise.resolve(Boolean(nativeExperimentalRecordingRef.current))
+    }
+
+    const takeId = activeTakeIdRef.current ?? crypto.randomUUID()
+    activeTakeIdRef.current = takeId
+    recordingOrientationRef.current = readRecordingOrientation()
+    recorderMimeTypeRef.current = 'audio/mp4'
+
+    autoPreRollActiveRef.current = true
+    autoPerformanceActiveRef.current = false
+    // Set this only after the native writer confirms its first sample below.
+    // Until then the monitor stays in listening mode and treats the pre-roll
+    // as still warming up.
+    autoPreRollStartedAtRef.current = 0
+    autoPerformanceStartedAtRef.current = 0
+    nativeExperimentalRecordingRef.current = true
+
+    suspendSharedMicForNativeRecording()
+
+    const settle = (async (): Promise<boolean> => {
+      const result = await startNativeAudioRecording({
+        takeId,
+        audioSessionProfile: 'playAndRecordDefault',
+        micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
+      })
+      if (!result) {
+        throw new Error('native audio pre-roll did not start')
+      }
+      const captureStartedAt = performance.now()
+      recordingStartedAtRef.current = captureStartedAt
+      autoPreRollStartedAtRef.current = captureStartedAt
+      // The WebKit mic was intentionally stopped for native capture. Restart
+      // the level monitor on the native PCM tap immediately, before the first
+      // performance attack can be missed.
+      notifyHandsFreeMonitorRestartRef.current?.()
+      return true
+    })()
+
+    const settledSafe = settle.catch((error) => {
+      console.warn('[NativeAudioRecording] native pre-roll start failed', error)
+      activeTakeIdRef.current = null
+      nativeExperimentalRecordingRef.current = false
+      autoPreRollActiveRef.current = false
+      autoPreRollStartedAtRef.current = 0
+      recordingStartedAtRef.current = 0
+      recoverAfterNativeAudioRecording()
+      return false
+    })
+
+    nativeStartSettleRef.current = settledSafe
+    return settledSafe.finally(() => {
+      if (nativeStartSettleRef.current === settledSafe) {
+        nativeStartSettleRef.current = null
+      }
+    })
+  }, [recoverAfterNativeAudioRecording, suspendSharedMicForNativeRecording])
+
+  beginNativeAutoPreRollCaptureRef.current = beginNativeAutoPreRollCapture
+
+  const startNativeAudioRecordingSession = useCallback((): Promise<boolean> => {
+    if (isRecordingRef.current && nativeExperimentalRecordingRef.current) {
+      return Promise.resolve(true)
+    }
+
+    const settle = (async (): Promise<boolean> => {
+      const takeId = activeTakeIdRef.current ?? crypto.randomUUID()
+      activeTakeIdRef.current = takeId
+      recordingOrientationRef.current = readRecordingOrientation()
+      recorderMimeTypeRef.current = 'audio/mp4'
+
+      nativeExperimentalRecordingRef.current = true
+      isRecordingRef.current = true
+      autoPreRollActiveRef.current = false
+      autoPreRollStartedAtRef.current = 0
+      flushSync(() => {
+        setIsRecording(true)
+        setElapsed(0)
+        elapsedRef.current = 0
+      })
+
+      suspendSharedMicForNativeRecording()
+
+      notifyHandsFreeMonitorRestartRef.current?.()
+
+      const result = await startNativeAudioRecording({
+        takeId,
+        audioSessionProfile: 'playAndRecordDefault',
+        micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
+      })
+
+      if (!result) {
+        throw new Error('native audio recording did not start')
+      }
+      recordingStartedAtRef.current = performance.now()
+      nativeStartSettleRef.current = null
+      return true
+    })()
+
+    const settledSafe = settle.catch((error) => {
+      console.warn('[NativeAudioRecording] native recording start failed', error)
+      activeTakeIdRef.current = null
+      nativeExperimentalRecordingRef.current = false
+      isRecordingRef.current = false
+      recordingStartedAtRef.current = 0
+      autoPerformanceActiveRef.current = false
+      autoPerformanceStartedAtRef.current = 0
+      setIsRecording(false)
+      nativeStartSettleRef.current = null
+      recoverAfterNativeAudioRecording()
+      return false
+    })
+    nativeStartSettleRef.current = settledSafe
+    return settledSafe
+  }, [
+    recoverAfterNativeAudioRecording,
+    suspendSharedMicForNativeRecording,
+  ])
+
+  const stopNativeAudioRecordingSession = useCallback((options?: MultitrackRecordingStopOptions) => {
+    setIsStopping(true)
+
+    void (async () => {
+      let timelineOffsetMs: number | undefined
+      if (options?.timelineOffsetMs !== undefined) {
+        timelineOffsetMs = Math.round(options.timelineOffsetMs)
+      } else if (options?.rawOffsetMs !== undefined) {
+        const rtlMs = await getAudioHardwareRtl()
+        timelineOffsetMs = Math.round(options.rawOffsetMs - rtlMs)
+      }
+
+      const startSettle = nativeStartSettleRef.current
+      if (startSettle) {
+        const started = await startSettle
+        nativeStartSettleRef.current = null
+        if (!started) {
+          setIsRecording(false)
+          setIsStopping(false)
+          return
+        }
+      }
+
+      if (!nativeExperimentalRecordingRef.current) {
+        setIsRecording(false)
+        setIsStopping(false)
+        return
+      }
+      nativeExperimentalRecordingRef.current = false
+
+      const stoppedTakeId = activeTakeIdRef.current ?? crypto.randomUUID()
+      activeTakeIdRef.current = null
+
+      const result = await stopNativeAudioRecording()
+      isRecordingRef.current = false
+      setIsRecording(false)
+
+      if (!result) {
+        recoverAfterNativeAudioRecording()
+        setIsStopping(false)
+        return
+      }
+
+      if (nativePreRollDiscardRef.current) {
+        nativePreRollDiscardRef.current = false
+        if (result.filePath) {
+          await deleteTakeFile(result.filePath).catch(() => {})
+        }
+        autoPreRollActiveRef.current = false
+        autoPreRollStartedAtRef.current = 0
+        recoverAfterNativeAudioRecording()
+        setIsStopping(false)
+        return
+      }
+
+      const videoUrl = Capacitor.convertFileSrc(result.fileURL)
+      let captureDiagnostics: RecordingCaptureDiagnostics | undefined
+      const peakDb = result.recordedPeakDb
+      const activeRmsDb = result.recordedActiveRmsDb ?? result.recordedRmsDb
+      if (peakDb != null && activeRmsDb != null) {
+        const levels = {
+          recordedPeakDb: peakDb,
+          recordedActiveRmsDb: activeRmsDb,
+          leftChannelRmsDb: null,
+          rightChannelRmsDb: null,
+          channelCount: 1,
+        }
+        captureDiagnostics = {
+          captureProfile: getActiveCaptureProfile(),
+          trackSnapshot: null,
+          levels,
+          playbackGainMetadata: computePlaybackGainMetadata(levels),
+        }
+      }
+
+      const preRollStartedAt = autoPreRollStartedAtRef.current
+      const autoPerformanceStartSeconds =
+        autoPerformanceStartedAtRef.current > 0 &&
+        (preRollStartedAt > 0 || recordingStartedAtRef.current > 0)
+          ? Math.max(
+              0,
+              (autoPerformanceStartedAtRef.current -
+                (preRollStartedAt || recordingStartedAtRef.current)) /
+                1000,
+            )
+          : undefined
+
+      onCompleteRef.current({
+        takeId: stoppedTakeId,
+        mimeType: result.mimeType,
+        mediaType: 'audio',
+        filePath: result.filePath,
+        videoUrl,
+        durationSeconds: Math.max(
+          0.1,
+          result.duration ||
+            (preRollStartedAt > 0
+              ? (performance.now() - preRollStartedAt) / 1000
+              : elapsedRef.current),
+        ),
+        timelineOffsetMs,
+        recordingBpm: options?.recordingBpm,
+        performanceStartBeats: options?.performanceStartBeats,
+        performanceStartOffsetBeats: options?.performanceStartOffsetBeats,
+        referenceTrackId: options?.referenceTrackId,
+        referenceStartBeat: options?.referenceStartBeat,
+        recordingOrientation: recordingOrientationRef.current,
+        captureProfile: getActiveCaptureProfile(),
+        captureTrackSnapshot: null,
+        captureDiagnostics,
+        autoPerformanceStartSeconds,
+      })
+      recordingStartedAtRef.current = 0
+      autoPerformanceActiveRef.current = false
+      autoPerformanceStartedAtRef.current = 0
+      autoPreRollActiveRef.current = false
+      autoPreRollStartedAtRef.current = 0
+      setIsStopping(false)
+      recoverAfterNativeAudioRecording()
+    })().catch((error) => {
+      console.warn('[NativeAudioRecording] native recording stop failed', error)
+      isRecordingRef.current = false
+      activeTakeIdRef.current = null
+      nativeExperimentalRecordingRef.current = false
+      autoPerformanceActiveRef.current = false
+      autoPerformanceStartedAtRef.current = 0
+      autoPreRollActiveRef.current = false
+      autoPreRollStartedAtRef.current = 0
+      setIsRecording(false)
+      setIsStopping(false)
+      recoverAfterNativeAudioRecording()
+    })
+  }, [recoverAfterNativeAudioRecording])
+
   /** Resolves true once recording has actually started (native: didStartRecording confirmed). */
   const startRecording = useCallback((): Promise<boolean> => {
     if (isRecordingRef.current) return Promise.resolve(true)
 
     if (shouldUseNativeExperimentalRecording()) {
+      if (
+        autoPreRollActiveRef.current &&
+        nativeExperimentalRecordingRef.current &&
+        autoPerformanceActiveRef.current
+      ) {
+        isRecordingRef.current = true
+        flushSync(() => {
+          setIsRecording(true)
+          setElapsed(0)
+          elapsedRef.current = 0
+        })
+        notifyHandsFreeMonitorRestartRef.current?.()
+        return Promise.resolve(true)
+      }
       return startNativeExperimentalRecording()
+    }
+
+    if (shouldUseNativeAudioRecording()) {
+      if (
+        autoPreRollActiveRef.current &&
+        nativeExperimentalRecordingRef.current &&
+        autoPerformanceActiveRef.current
+      ) {
+        isRecordingRef.current = true
+        flushSync(() => {
+          setIsRecording(true)
+          setElapsed(0)
+          elapsedRef.current = 0
+        })
+        notifyHandsFreeMonitorRestartRef.current?.()
+        return Promise.resolve(true)
+      }
+      return startNativeAudioRecordingSession()
     }
 
     if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
@@ -1934,17 +2415,34 @@ export function useCameraSession({
   }, [
     bindRecordingHandlers,
     ensureAudioRecordingStream,
+    shouldUseNativeAudioRecording,
     shouldUseNativeExperimentalRecording,
+    startNativeAudioRecordingSession,
     startNativeExperimentalRecording,
   ])
 
   const startAutoAudioRecording = useCallback(() => {
+    if (isRecordingRef.current) return
+
     const preRollMark = tryMarkAutoPerformanceStart()
-    if (preRollMark === 'started' || preRollMark === 'pending') {
+    if (preRollMark === 'pending') return
+    if (preRollMark === 'started') {
+      if (!isRecordingRef.current) {
+        startRecording()
+      }
       return
     }
 
-    if (isRecordingRef.current) return
+    if (shouldUseNativeAudioRecording()) {
+      if (!autoPerformanceActiveRef.current) {
+        autoPerformanceActiveRef.current = true
+        autoPerformanceStartedAtRef.current = performance.now()
+      }
+      autoPreRollActiveRef.current = false
+      autoPreRollStartedAtRef.current = 0
+      startRecording()
+      return
+    }
 
     const armed = armedAutoAudioRef.current
     if (armed?.recorder.state === 'inactive') {
@@ -1979,6 +2477,7 @@ export function useCameraSession({
     startRecording()
   }, [
     disarmAutoAudioRecorder,
+    shouldUseNativeAudioRecording,
     startRecording,
     tryMarkAutoPerformanceStart,
     warmAutoAudioRecorder,
@@ -2005,14 +2504,31 @@ export function useCameraSession({
       return
     }
 
+    if (shouldUseNativeExperimentalRecording()) {
+      await beginNativeVideoAutoPreRollCapture()
+      return
+    }
+
     await ensureRecordableStream()
-  }, [ensureRecordableStream, warmAutoAudioRecorder])
+  }, [
+    beginNativeVideoAutoPreRollCapture,
+    ensureRecordableStream,
+    shouldUseNativeExperimentalRecording,
+    warmAutoAudioRecorder,
+  ])
+
+  warmAutoRecordingRef.current = warmAutoRecording
 
   const disarmAutoRecording = useCallback(async () => {
     if (recordingModeRef.current === 'audio') {
       await disarmAutoAudioRecorder()
+      return
     }
-  }, [disarmAutoAudioRecorder])
+
+    if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
+      cancelAutoPreRollCapture()
+    }
+  }, [cancelAutoPreRollCapture, disarmAutoAudioRecorder])
 
   const stopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     console.log('[AudioRecordLifecycle] userPressedStop')
@@ -2020,7 +2536,15 @@ export function useCameraSession({
     // a native start is still settling (bridge warm / didStartRecording window)
     // — that stop path awaits the settle, so Stop is safe at any instant.
     if (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current) {
-      stopNativeExperimentalRecording(options)
+      if (recordingModeRef.current === 'audio') {
+        if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
+          void discardNativeAutoPreRollCapture()
+          return
+        }
+        stopNativeAudioRecordingSession(options)
+      } else {
+        stopNativeExperimentalRecording(options)
+      }
       return
     }
 
@@ -2047,7 +2571,7 @@ export function useCameraSession({
     }
 
     recorder.stop()
-  }, [stopNativeExperimentalRecording])
+  }, [discardNativeAutoPreRollCapture, stopNativeAudioRecordingSession, stopNativeExperimentalRecording])
 
   const interruptRecordingForBackground = useCallback(() => {
     if (!isRecordingRef.current && !autoPreRollActiveRef.current) return
@@ -2058,7 +2582,11 @@ export function useCameraSession({
     }
 
     if (nativeExperimentalRecordingRef.current) {
-      stopNativeExperimentalRecording()
+      if (recordingModeRef.current === 'audio') {
+        stopNativeAudioRecordingSession()
+      } else {
+        stopNativeExperimentalRecording()
+      }
       return
     }
 
@@ -2083,7 +2611,7 @@ export function useCameraSession({
     autoPerformanceStartedAtRef.current = 0
     isRecordingRef.current = false
     setIsRecording(false)
-  }, [cancelAutoPreRollCapture, stopNativeExperimentalRecording])
+  }, [cancelAutoPreRollCapture, stopNativeAudioRecordingSession, stopNativeExperimentalRecording])
 
   const toggleRecording = useCallback(() => {
     // Gate on the ref, not the async React state: audio recording starts inside
@@ -2584,6 +3112,15 @@ export function useCameraSession({
     }
   }, [])
 
+  /** Drop the WebRTC capture session so native AVPlayer can own the audio route. */
+  const suspendAudioCaptureForPlayback = useCallback(async () => {
+    await suspendMicForPlayback()
+    releaseLiveStream()
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+      await new Promise((resolve) => window.setTimeout(resolve, 80))
+    }
+  }, [releaseLiveStream, suspendMicForPlayback])
+
   const resumeMicAfterPlayback = useCallback(async () => {
     const stream = streamRef.current
     if (!stream) return
@@ -2689,6 +3226,17 @@ export function useCameraSession({
     }
   }, [recordingMode, streamGeneration, syncPreviewTargets])
 
+  const isNativeAudioCaptureActive = useCallback(
+    () =>
+      isNativeVideoRecordingEnabled() &&
+      (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current !== null),
+    [isNativeVideoRecordingEnabled],
+  )
+
+  const registerHandsFreeMonitorRestart = useCallback((handler: () => void) => {
+    notifyHandsFreeMonitorRestartRef.current = handler
+  }, [])
+
   return {
     previewRef,
     streamRef,
@@ -2717,7 +3265,7 @@ export function useCameraSession({
     isAutoPreRollCaptureActive: () =>
       autoPreRollActiveRef.current && !autoPerformanceActiveRef.current,
     getAutoPreRollAgeMs: () =>
-      autoPreRollActiveRef.current
+      autoPreRollActiveRef.current && autoPreRollStartedAtRef.current > 0
         ? performance.now() - autoPreRollStartedAtRef.current
         : 0,
     restartAutoPreRollCapture,
@@ -2728,6 +3276,7 @@ export function useCameraSession({
     reacquireCaptureStream,
     suspendCameraForBackground,
     suspendMicForPlayback,
+    suspendAudioCaptureForPlayback,
     resumeMicAfterPlayback,
     isPreviewRecovering,
     nativeLivePreviewActive,
@@ -2735,6 +3284,8 @@ export function useCameraSession({
     acquireNativeVideoBridge,
     setSuppressNativeBridgeRecovery,
     stopNativeVideoBridge,
+    isNativeAudioCaptureActive,
+    registerHandsFreeMonitorRestart,
   }
 }
 

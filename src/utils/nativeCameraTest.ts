@@ -268,6 +268,60 @@ export async function stopNativeCameraRecording(options?: { trimStartMs?: number
   }
 }
 
+/** Start AVCaptureSession audio-only recording — iOS audio mode native path. */
+export async function startNativeAudioRecording(
+  options: {
+    takeId: string
+    audioSessionProfile?: NativeCameraAudioSessionProfile
+    micInputPreference?: MicInputPreference
+  },
+): Promise<NativeCameraRecordingStartResult | null> {
+  if (!isNativeCameraTestAvailable()) {
+    console.warn('[NativeAudioRecording] iOS native only')
+    return null
+  }
+
+  const { takeId, audioSessionProfile = 'playAndRecordDefault', micInputPreference } = options
+
+  try {
+    const result = await BestTakeAudioPlugin.startNativeAudioRecording({
+      takeId,
+      audioSessionProfile,
+      micInputPreference,
+    })
+    console.log('[NativeAudioRecording] session started (JS)')
+    console.log('takeId =', takeId)
+    console.log('audioSessionProfile =', result.audioSessionProfile ?? audioSessionProfile)
+    console.log('inputRoute =', result.inputRoute)
+    console.log('outputRoute =', result.outputRoute ?? result.route)
+    console.log('fileURL =', result.fileURL)
+    return result
+  } catch (error) {
+    console.warn('[NativeAudioRecording] start failed', error)
+    return null
+  }
+}
+
+export async function stopNativeAudioRecording(
+  options?: { trimStartMs?: number },
+): Promise<NativeCameraRecordingStopResult | null> {
+  if (!isNativeCameraTestAvailable()) return null
+
+  try {
+    const result = await BestTakeAudioPlugin.stopNativeAudioRecording(options)
+    console.log('[NativeAudioRecording] recording stopped (JS)')
+    console.log('file saved =', result.fileURL)
+    console.log('duration =', result.duration)
+    console.log('mimeType =', result.mimeType)
+    console.log('recordedPeakDb =', result.recordedPeakDb)
+    console.log('recordedActiveRmsDb =', result.recordedActiveRmsDb)
+    return result
+  } catch (error) {
+    console.warn('[NativeAudioRecording] stop failed', error)
+    return null
+  }
+}
+
 export async function getAudioHardwareRtl(): Promise<number> {
   if (!isNativeCameraTestAvailable()) return 0
   try {

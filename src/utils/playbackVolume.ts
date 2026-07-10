@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { isHeadphoneOutputActive } from './headphoneOutput'
-import { getSpeakerDefaultBusGain } from './speakerLoudnessNormalization'
+import { SPEAKER_MAX_BUS_GAIN } from './speakerLoudnessNormalization'
 import type { SpeakerLoudnessPreset } from './speakerLoudnessMastering'
 
 /** Legacy brute-force bus multiplier when speaker mastering preset is Off. */
@@ -94,24 +94,21 @@ export function youtubeVolumeFromUiSlider(uiVolume: number): number {
   return Math.round(Math.min(100, Math.max(YOUTUBE_VOLUME_FLOOR, boosted)))
 }
 
-/** Extra bus gain so metronome clicks are clearly audible on the iPhone speaker. */
-export const METRONOME_MASTER_GAIN = 3.25
-
-/** Web Audio metronome bus — moderate default when mastering on; legacy when Off. */
+/**
+ * Web Audio metronome: drive the bus to the preset ceiling. Take playback can use
+ * native AVAudioEngine (+30 dB); metronome clicks stay in WKWebView so we push
+ * the Web Audio bus as hard as the speaker-loudness presets allow.
+ */
 export function metronomeSpeakerGain(muted: boolean): number {
   if (muted) return 0
-  let base: number
   if (isHeadphoneOutputActive()) {
-    base = effectiveHeadphoneGain(1, false)
-  } else {
-    const preset = activeSpeakerLoudnessPreset
-    if (preset === 'off') {
-      base = effectiveSpeakerGain(1, false)
-    } else if (preset === 'phone' || preset === 'extreme' || preset === 'insane') {
-      base = getSpeakerDefaultBusGain('loud')
-    } else {
-      base = getSpeakerDefaultBusGain(preset)
-    }
+    return effectiveHeadphoneGain(1, false)
   }
-  return Math.min(base * METRONOME_MASTER_GAIN, PLAYBACK_GAIN_MAX)
+  const preset = activeSpeakerLoudnessPreset
+  if (preset === 'off') {
+    const legacy = effectiveSpeakerGain(1, false)
+    return Capacitor.isNativePlatform() ? Math.max(legacy, PLAYBACK_GAIN_NATIVE) : legacy
+  }
+  const maxBus = SPEAKER_MAX_BUS_GAIN[preset]
+  return Capacitor.isNativePlatform() ? maxBus * 1.25 : maxBus
 }

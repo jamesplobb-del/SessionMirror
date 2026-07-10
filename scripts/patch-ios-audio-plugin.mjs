@@ -6,7 +6,7 @@ const configPath = path.resolve(projectRoot, 'ios/App/App/capacitor.config.json'
 const pbxprojPath = path.resolve(projectRoot, 'ios/App/App.xcodeproj/project.pbxproj')
 const appPluginDir = path.resolve(projectRoot, 'ios/App/App')
 
-const pluginBaseNames = ['BestTakeAudioPlugin', 'DronePlugin']
+const pluginBaseNames = ['BestTakeAudioPlugin', 'DronePlugin', 'MetronomePlugin']
 
 const pbxproj = fs.readFileSync(pbxprojPath, 'utf8')
 const moduleMatch = /PRODUCT_MODULE_NAME = ([^;]+);/.exec(pbxproj)
@@ -41,7 +41,8 @@ const stripped = existing.filter(
     !pluginBaseNames.includes(entry) &&
     !requiredPluginClasses.includes(entry) &&
     !entry.endsWith('.BestTakeAudioPlugin') &&
-    !entry.endsWith('.DronePlugin'),
+    !entry.endsWith('.DronePlugin') &&
+    !entry.endsWith('.MetronomePlugin'),
 )
 const merged = [...stripped]
 let changed = stripped.length !== existing.length

@@ -108,6 +108,7 @@ export interface CameraLikePlaybackSessionSnapshot {
 export interface CameraSessionStateSnapshot {
   previewActive: boolean
   recordingActive: boolean
+  recordingMode?: 'video' | 'audio'
   playbackRouteActive?: boolean
   playbackSessionPrepared?: boolean
 }
@@ -196,6 +197,10 @@ export interface BestTakeAudioPluginType {
     cornerRadius?: number
     mirror?: boolean
     volume?: number
+    startTime?: number
+    /** Use the native audio-engine path with limiter-protected loudness gain. */
+    audioOnly?: boolean
+    loudnessGainDb?: number
   }): Promise<NativePlaybackTestStartResult>
   stopInlineTakeBoxPlayback(options?: { notify?: boolean }): Promise<void>
   updateInlineTakeBoxPlaybackLayout(options: {
@@ -279,6 +284,12 @@ export interface BestTakeAudioPluginType {
     params: Record<string, number>
   }): Promise<{ enhanced: boolean; duration: number }>
   stopNativeCameraRecording(options?: { trimStartMs?: number }): Promise<NativeCameraRecordingStopResult>
+  startNativeAudioRecording(options: {
+    takeId: string
+    audioSessionProfile?: string
+    micInputPreference?: MicInputPreference
+  }): Promise<NativeCameraRecordingStartResult>
+  stopNativeAudioRecording(options?: { trimStartMs?: number }): Promise<NativeCameraRecordingStopResult>
   getAudioHardwareRtl(): Promise<{ rtlMs: number }>
   getAudioOutputLatencyMs(): Promise<{ latencyMs: number }>
   computeTakeAlignment(options: {

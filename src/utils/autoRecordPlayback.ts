@@ -139,11 +139,19 @@ export async function applyAutoPlaybackLeadIn(
   leadInSeconds = AUTO_PLAYBACK_LEAD_IN_S,
   performanceStartSeconds?: number,
 ): Promise<void> {
-  const start =
+  const metadataStart =
     typeof performanceStartSeconds === 'number' &&
     Number.isFinite(performanceStartSeconds)
       ? Math.max(0, performanceStartSeconds - leadInSeconds)
-      : await findAutoPlaybackLeadInStartSeconds(media, leadInSeconds)
+      : 0
+
+  let start = metadataStart
+  if (metadataStart <= 0.01) {
+    const waveformStart = await findAutoPlaybackLeadInStartSeconds(media, leadInSeconds)
+    // Waveform onset can be late on native takes that start loud; never skip the file head.
+    start = Math.min(metadataStart, waveformStart)
+  }
+
   if (start <= 0.01) return
 
   const apply = () => {
