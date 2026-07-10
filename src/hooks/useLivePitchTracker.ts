@@ -44,7 +44,10 @@ import {
   releaseNativeAudioTap,
   subscribeNativeAudioPitchFrames,
 } from '../utils/nativeAudioPitchTap'
-import { isNativeCameraPreviewActive } from '../utils/cameraSessionState'
+import {
+  isNativeCaptureSessionActive,
+  subscribeNativeCaptureSessionActive,
+} from '../utils/cameraSessionState'
 const HISTORY_LENGTH = 140
 
 /** Brief hold before glow begins (~220ms). */
@@ -1580,7 +1583,15 @@ export function useLivePitchTracker(
         // Native-tap graphs have no WebKit stream to go stale — keep them as
         // long as their context is open.
         if (micGraph.nativeTap) {
-          if (micGraph.context.state !== 'closed') return
+          if (micGraph.context.state !== 'closed' && !nativeTapIsStale(micGraph.nativeTap)) return
+          safeDisposeMicGraph(micGraph)
+          graphRef.current = null
+        } else if (
+          preferNativeAudioTapRef.current &&
+          isNativeCaptureSessionActive() &&
+          micGraph.context.state !== 'closed'
+        ) {
+          // WebKit mic was stopped for native capture — switch to the native tap.
           safeDisposeMicGraph(micGraph)
           graphRef.current = null
         } else {
@@ -1620,7 +1631,7 @@ export function useLivePitchTracker(
           if (
             !nativeTapUnavailableRef.current &&
             preferNativeAudioTapRef.current &&
-            isNativeCameraPreviewActive()
+            isNativeCaptureSessionActive()
           ) {
             const graph = await createNativeTapPitchGraph(profileRef.current)
             if (cancelled) {
@@ -1723,6 +1734,35 @@ export function useLivePitchTracker(
     }
 
     tryAttachRef.current = tryAttach
+
+    const reattachForNativeCapture = () => {
+      if (cancelled || sourceRef.current !== 'microphone' || !enabled) return
+      if (!preferNativeAudioTapRef.current) return
+      if (isNativeCaptureSessionActive()) {
+        nativeTapUnavailableRef.current = false
+      }
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph) && graph.nativeTap) return
+      if (
+        graph &&
+        !isMediaPitchGraph(graph) &&
+        !graph.nativeTap &&
+        micStreamIsLive(graph.stream) &&
+        !isNativeCaptureSessionActive()
+      ) {
+        return
+      }
+      if (graph && !isMediaPitchGraph(graph)) {
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+      }
+      if (!isAttaching.current) {
+        void tryAttach()
+      }
+    }
+
+    pitchGraphReattachListeners.add(reattachForNativeCapture)
+    const unsubscribeNativeCapture = subscribeNativeCaptureSessionActive(reattachForNativeCapture)
 
     const recoverMicGraph = () => {
       if (cancelled || sourceRef.current !== 'microphone' || !enabled) return
@@ -1830,6 +1870,8 @@ export function useLivePitchTracker(
     return () => {
       cancelled = true
       tryAttachRef.current = null
+      pitchGraphReattachListeners.delete(reattachForNativeCapture)
+      unsubscribeNativeCapture()
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('focus', recoverMicGraph)
       document.removeEventListener('pointerdown', recoverMicGraph)
@@ -2036,6 +2078,23 @@ export function useLivePitchTracker(
 
       if (graph.context.state === 'suspended') {
         void graph.context.resume()
+      }
+
+      if (
+        !isMediaPitchGraph(graph) &&
+        !graph.nativeTap &&
+        preferNativeAudioTapRef.current &&
+        isNativeCaptureSessionActive() &&
+        !micStreamIsLive(graph.stream)
+      ) {
+        console.info('[PitchTracker] WebKit mic ended during native capture; switching to native tap')
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+        if (!isAttaching.current) {
+          void tryAttachRef.current?.()
+        }
+        tickRef.current = requestAnimationFrame(tick)
+        return
       }
 
       let analysisSampleRate = graph.context.sampleRate
@@ -2322,6 +2381,15 @@ export function useLivePitchTracker(
   ])
 
   return { readout, inTuneGlow }
+}
+
+const pitchGraphReattachListeners = new Set<() => void>()
+
+/** Ask all live mic pitch trackers to rebuild (e.g. after native capture handoff). */
+export function requestPitchGraphReattach(): void {
+  for (const listener of pitchGraphReattachListeners) {
+    listener()
+  }
 }
 
 /** Tear down all live mic pitch graphs (e.g. when backgrounding the app). */

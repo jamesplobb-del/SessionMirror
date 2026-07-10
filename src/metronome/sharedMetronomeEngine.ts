@@ -13,6 +13,7 @@ import {
 } from '../utils/playbackVolume'
 import { primePlaybackAudioContextSync, resumePlaybackAudioContext } from '../utils/playbackAudioContext'
 import BestTakeAudioPlugin from '../utils/audioSessionRoute'
+import { isHeadphoneOutputActive } from '../utils/headphoneOutput'
 import { engageStereoPlaybackAsync, releaseStereoPlayback } from '../utils/stereoPlaybackRoute'
 import { scheduleMetronomeClick } from '../utils/metronomeClickSounds'
 import {
@@ -261,6 +262,19 @@ class SharedMetronomeEngine {
 
   private async ensureNativeSpeakerRoute(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return
+
+    if (this.useNativeAudio && isHeadphoneOutputActive()) {
+      if (!this.nativeSpeakerRouteHeld) {
+        this.nativeSpeakerRouteHeld = true
+      }
+      try {
+        await nativeMetronomePrepare()
+      } catch {
+        /* native prepare is a no-op on external output */
+      }
+      return
+    }
+
     if (!this.nativeSpeakerRouteHeld) {
       await engageStereoPlaybackAsync()
       this.nativeSpeakerRouteHeld = true
@@ -276,6 +290,9 @@ class SharedMetronomeEngine {
   private async releaseNativeSpeakerRoute(): Promise<void> {
     if (!this.nativeSpeakerRouteHeld) return
     this.nativeSpeakerRouteHeld = false
+    if (this.useNativeAudio && isHeadphoneOutputActive()) {
+      return
+    }
     await releaseStereoPlayback()
   }
 

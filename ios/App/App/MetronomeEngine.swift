@@ -81,15 +81,9 @@ final class MetronomeEngine {
     /// Matches native Web Audio speaker bus (`PLAYBACK_GAIN_NATIVE` / phone preset audit).
     private let speakerBusGain: Float = 48
 
-    private let configurationObserver: NSObjectProtocol?
+    private var configurationObserver: NSObjectProtocol?
 
     private init() {
-        engine.attach(outputMixer)
-        engine.attach(sourceNode)
-        engine.connect(sourceNode, to: outputMixer, format: renderFormat)
-        engine.connect(outputMixer, to: engine.outputNode, format: nil)
-        outputMixer.outputVolume = 1
-
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: engine,
@@ -97,6 +91,12 @@ final class MetronomeEngine {
         ) { [weak self] _ in
             self?.handleEngineConfigurationChange()
         }
+
+        engine.attach(outputMixer)
+        engine.attach(sourceNode)
+        engine.connect(sourceNode, to: outputMixer, format: renderFormat)
+        engine.connect(outputMixer, to: engine.outputNode, format: nil)
+        outputMixer.outputVolume = 1
     }
 
     deinit {
@@ -264,15 +264,7 @@ final class MetronomeEngine {
     }
 
     private func preparePlaybackSession() throws {
-        if CameraSessionGuard.isCameraOrRecordingActive {
-            _ = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
-            return
-        }
-        if CameraSessionGuard.recordingMode == "video" {
-            // Camera bridge is acquiring — do not apply web playback route on top.
-            return
-        }
-        _ = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
+        try AudioRouteConfigurator.prepareMetronomePlaybackSessionIfNeeded()
     }
 
     // MARK: - Scheduler

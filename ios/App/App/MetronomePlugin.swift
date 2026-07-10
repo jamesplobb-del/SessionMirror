@@ -100,11 +100,7 @@ public class MetronomePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func prepare(_ call: CAPPluginCall) {
         do {
-            if CameraSessionGuard.needsCoexistentPlaybackRoute {
-                _ = try AudioRouteConfigurator.applyCoexistentPlaybackSpeakerRoute()
-            } else {
-                _ = try AudioRouteConfigurator.applyWebPlaybackRoute(webPlaybackActive: true)
-            }
+            try AudioRouteConfigurator.prepareMetronomePlaybackSessionIfNeeded()
             call.resolve(["prepared": true])
         } catch {
             call.reject("Failed to prepare metronome session", nil, error)

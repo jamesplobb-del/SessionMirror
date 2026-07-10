@@ -6,10 +6,40 @@ import { isPlaybackRouteHoldActive } from './playbackRouteCoordinator'
  * know the native capture session (and its audio tap) is available without a
  * round-trip to the plugin. */
 let nativeCameraPreviewActive = false
+/** Native audio-only AVCaptureSession (pre-roll / recording) without camera preview. */
+let nativeAudioCaptureActive = false
 let lastSyncedCameraSessionStateKey: string | null = null
+
+const nativeCaptureSessionListeners = new Set<() => void>()
+
+function notifyNativeCaptureSessionListeners(): void {
+  for (const listener of nativeCaptureSessionListeners) {
+    listener()
+  }
+}
+
+function pitchCaptureSessionActive(): boolean {
+  return nativeCameraPreviewActive || nativeAudioCaptureActive
+}
 
 export function isNativeCameraPreviewActive(): boolean {
   return nativeCameraPreviewActive
+}
+
+/** True when the native AVCapture audio tap can feed the pitch widget. */
+export function isNativeCaptureSessionActive(): boolean {
+  return pitchCaptureSessionActive()
+}
+
+export function setNativeAudioCaptureActive(active: boolean): void {
+  if (nativeAudioCaptureActive === active) return
+  nativeAudioCaptureActive = active
+  notifyNativeCaptureSessionListeners()
+}
+
+export function subscribeNativeCaptureSessionActive(listener: () => void): () => void {
+  nativeCaptureSessionListeners.add(listener)
+  return () => nativeCaptureSessionListeners.delete(listener)
 }
 
 /** Recording mode must reach native even while metronome holds playbackRouteActive. */
@@ -33,7 +63,11 @@ export async function syncNativeCameraSessionState(options: {
   youtubePlayAlongActive?: boolean
 }): Promise<void> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return
-  nativeCameraPreviewActive = options.previewActive || options.recordingActive
+  const nextPreviewActive = options.previewActive || options.recordingActive
+  if (nativeCameraPreviewActive !== nextPreviewActive) {
+    nativeCameraPreviewActive = nextPreviewActive
+    notifyNativeCaptureSessionListeners()
+  }
 
   const stateKey = JSON.stringify({
     previewActive: options.previewActive,

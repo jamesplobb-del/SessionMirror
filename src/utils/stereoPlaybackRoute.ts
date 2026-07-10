@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
+import { isHeadphoneOutputActive } from './headphoneOutput'
 
 let holdCount = 0
 let nativeRouteEngaged = false
@@ -120,6 +121,11 @@ export async function releaseStereoPlayback(): Promise<void> {
   nativeRouteEngaged = false
 
   if (!wasNativeEngaged) return
+
+  if (isHeadphoneOutputActive()) {
+    recordingRouteRestoredHandler?.()
+    return
+  }
 
   const cameraActive = await isCameraSessionActive()
   if (cameraActive) {

@@ -55,9 +55,9 @@ import {
 } from '../utils/nativeCameraTest'
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { resolveMicPreferenceForLiveCapture, resolveNativeBridgeMicPreference } from '../utils/liveMicRoute'
-import { releaseAllLiveMicPitchGraphs } from './useLivePitchTracker'
+import { releaseAllLiveMicPitchGraphs, requestPitchGraphReattach } from './useLivePitchTracker'
 import { acquireNativeAudioTap } from '../utils/nativeAudioPitchTap'
-import { syncNativeCameraSessionState } from '../utils/cameraSessionState'
+import { setNativeAudioCaptureActive, syncNativeCameraSessionState } from '../utils/cameraSessionState'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isAppInForeground } from '../utils/appForeground'
 import type { MicInputPreference } from '../utils/appSettings'
@@ -1965,6 +1965,8 @@ export function useCameraSession({
   }, [recoverAfterNativeExperimentalFailure])
 
   const recoverAfterNativeAudioRecording = useCallback(() => {
+    setNativeAudioCaptureActive(false)
+    requestPitchGraphReattach()
     void acquireStream('audio', undefined, { forceNew: true, liveCapture: true })
   }, [acquireStream])
 
@@ -2036,7 +2038,9 @@ export function useCameraSession({
     autoPerformanceStartedAtRef.current = 0
     nativeExperimentalRecordingRef.current = true
 
+    setNativeAudioCaptureActive(true)
     suspendSharedMicForNativeRecording()
+    requestPitchGraphReattach()
 
     const settle = (async (): Promise<boolean> => {
       const result = await startNativeAudioRecording({
@@ -2099,7 +2103,9 @@ export function useCameraSession({
         elapsedRef.current = 0
       })
 
+      setNativeAudioCaptureActive(true)
       suspendSharedMicForNativeRecording()
+      requestPitchGraphReattach()
 
       notifyHandsFreeMonitorRestartRef.current?.()
 

@@ -173,6 +173,7 @@ import {
   forceNativeRecordingMode,
   syncNativeCameraSessionState,
   isNativeCameraPreviewActive,
+  isNativeCaptureSessionActive,
 } from './utils/cameraSessionState'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem, nativeDataFileExists } from './utils/filesystemInit'
@@ -2378,7 +2379,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [requestCameraAccess])
 
   const micStreamIsLiveForTuner = useCallback(() => {
-    if (isNativeCameraPreviewActive()) return true
+    if (isNativeCaptureSessionActive()) return true
     return Boolean(
       streamRef.current?.getAudioTracks().some(
         (track) => track.readyState === 'live' && track.enabled,
@@ -2390,7 +2391,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (isRecording) return
 
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-      await acquireNativeVideoBridge()
+      if (!micStreamIsLiveForTuner() && !isNativeCaptureSessionActive()) {
+        requestCameraAccess('audio')
+      }
       return
     }
 
@@ -2398,7 +2401,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       requestCameraAccess('audio')
     }
   }, [
-    acquireNativeVideoBridge,
     isRecording,
     micStreamIsLiveForTuner,
     requestCameraAccess,

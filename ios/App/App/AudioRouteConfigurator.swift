@@ -379,6 +379,25 @@ enum AudioRouteConfigurator {
         return snapshot
     }
 
+    /// Native metronome playback — avoid re-categorizing headphones/BT (invites HFP + latency).
+    static func prepareMetronomePlaybackSessionIfNeeded() throws {
+        let session = AVAudioSession.sharedInstance()
+        if hasExternalOutput(session) {
+            return
+        }
+        if CameraSessionGuard.playbackRouteActive || CameraSessionGuard.playbackSessionPrepared {
+            return
+        }
+        if CameraSessionGuard.isCameraOrRecordingActive {
+            _ = try applyCoexistentPlaybackSpeakerRoute()
+            return
+        }
+        if CameraSessionGuard.recordingMode == "video" {
+            return
+        }
+        _ = try applyWebPlaybackRoute(webPlaybackActive: true)
+    }
+
     static func applyWebPlaybackRoute(webPlaybackActive: Bool = true) throws -> [String: Any] {
         let session = AVAudioSession.sharedInstance()
         var fallbackReason: String?
@@ -403,6 +422,10 @@ enum AudioRouteConfigurator {
                 try session.setPreferredIOBufferDuration(0.005)
                 try ensureSessionActive(session, caller: "applyWebPlaybackRoute.builtInSpeaker")
                 try preferBuiltInSpeakerIfSafe(session)
+                routeApplied = true
+            } else if hasExternalOutput(session) && session.category == .playAndRecord {
+                // Headphones/BT already route duplex audio — setCategory flips HFP and adds latency.
+                try ensureSessionActive(session, caller: "applyWebPlaybackRoute.externalPassthrough")
             } else if routeUsesBluetoothHFP(session) {
                 // Bluetooth HFP is duplex — Playback category fails (-50). Mirror the
                 // coexistent camera path: stay on PlayAndRecord and leave routing alone.
@@ -416,6 +439,7 @@ enum AudioRouteConfigurator {
                 try session.setPreferredSampleRate(48_000)
                 try session.setPreferredIOBufferDuration(0.005)
                 try ensureSessionActive(session, caller: "applyWebPlaybackRoute.bluetoothHFP")
+                routeApplied = true
             } else {
                 // Full-volume external playback. Do not use duckOthers; omit mixWithOthers so WebView audio is not softened.
                 try debugSetCategory(
@@ -428,9 +452,8 @@ enum AudioRouteConfigurator {
                 try session.setPreferredSampleRate(48_000)
                 try session.setPreferredIOBufferDuration(0.005)
                 try debugSetActive(session, active: true, options: [], caller: "applyWebPlaybackRoute.externalOutput")
+                routeApplied = true
             }
-
-            routeApplied = true
         }
 
         var snapshot = routeSnapshot(for: session)

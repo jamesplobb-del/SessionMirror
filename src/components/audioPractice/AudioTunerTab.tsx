@@ -21,8 +21,9 @@ interface AudioTunerTabProps {
 function micStreamIsLive(
   stream: MediaStream | null | undefined,
   nativeLivePreviewActive: boolean,
+  recording: boolean,
 ): boolean {
-  if (nativeLivePreviewActive) return true
+  if (nativeLivePreviewActive || recording) return true
   return Boolean(
     stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled),
   )
@@ -70,7 +71,7 @@ export default function AudioTunerTab({
     ],
   )
 
-  const micStreamLive = micStreamIsLive(streamRef.current, nativeLivePreviewActive)
+  const micStreamLive = micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording)
   const liveMicReady = true
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function AudioTunerTab({
     let cancelled = false
     const poll = window.setInterval(() => {
       if (cancelled) return
-      if (micStreamIsLive(streamRef.current, nativeLivePreviewActive)) {
+      if (micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording)) {
         setMicLiveEpoch((epoch) => epoch + 1)
       }
     }, 160)
@@ -95,7 +96,7 @@ export default function AudioTunerTab({
       cancelled = true
       window.clearInterval(poll)
     }
-  }, [micStreamLive, nativeLivePreviewActive, streamGeneration, streamRef])
+  }, [isRecording, micStreamLive, nativeLivePreviewActive, streamGeneration, streamRef])
 
   return (
     <section className="audio-practice-tuner-shell flex min-h-0 flex-1 flex-col" aria-label="Tuner">
@@ -104,7 +105,7 @@ export default function AudioTunerTab({
         mediaRef={mediaRef}
         enabled
         isPlaying={isRecording}
-        mediaKey={`tuner-tab-${streamGeneration}-${micLiveEpoch}-${nativeLivePreviewActive ? 'native' : 'webkit'}`}
+        mediaKey={`tuner-tab-${streamGeneration}-${micLiveEpoch}-${isRecording ? 'recording' : 'idle'}-${nativeLivePreviewActive || isRecording ? 'native' : 'webkit'}`}
         label="Pitch Analysis"
         liveMicEnabled={liveMicReady}
         micStreamRef={streamRef}
