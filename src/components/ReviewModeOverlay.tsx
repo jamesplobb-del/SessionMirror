@@ -29,6 +29,7 @@ import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { loadTakeMarkers } from '../practiceTimeline/recording/timelineMarkers'
 import { describeSaveTakeResult, shareTakeToSystem, shareTakeVideo } from '../utils/shareTakeVideo'
 import { triggerBestTakeHaptic, triggerLightHaptic, triggerWarningHaptic } from '../utils/haptics'
+import { trimTakeMediaInPlace } from '../utils/trimTakeMedia'
 import { useActionSheet } from '../context/ActionSheetContext'
 import {
   useAudioModePlayback,
@@ -252,6 +253,7 @@ export default function ReviewModeOverlay({
   const hideOverlayTimerRef = useRef<number | null>(null)
   const isScrubbingRef = useRef(false)
   const wasPlayingBeforeScrubRef = useRef(false)
+  const trimRangeRef = useRef({ start: 0, end: 0 })
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -262,6 +264,10 @@ export default function ReviewModeOverlay({
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [showPitch, setShowPitch] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
+  const [trimMode, setTrimMode] = useState(false)
+  const [trimRange, setTrimRange] = useState({ start: 0, end: 0 })
+  const [trimApplying, setTrimApplying] = useState(false)
+  const [mediaRevision, setMediaRevision] = useState(0)
 
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
@@ -306,10 +312,10 @@ export default function ReviewModeOverlay({
       : challengerVideoRef
 
   const activePitchMediaKey = isVault
-    ? `vault-${vaultTake?.id ?? vaultIndex}`
+    ? `vault-${vaultTake?.id ?? vaultIndex}-r${mediaRevision}`
     : activeSlot === 'benchmark'
-      ? `benchmark-${benchmarkFilePath}-${benchmarkSrc}`
-      : `challenger-${challengerFilePath}-${challengerSrc}`
+      ? `benchmark-${benchmarkFilePath}-${benchmarkSrc}-r${mediaRevision}`
+      : `challenger-${challengerFilePath}-${challengerSrc}-r${mediaRevision}`
 
   const activeIsAudio = isVault
     ? Boolean(
@@ -381,6 +387,13 @@ export default function ReviewModeOverlay({
   const displayIsPlaying = activeAudioPlaybackItem && audioControllerActive
     ? audioPlayback.state.isPlaying
     : isPlaying
+  const trimAvailable = Boolean(activeTake?.filePath) && displayDuration >= 0.1
+  const safeTrimStart = Math.max(0, Math.min(trimRange.start, displayDuration || trimRange.start))
+  const safeTrimEnd = Math.max(safeTrimStart, Math.min(trimRange.end, displayDuration || trimRange.end))
+
+  useEffect(() => {
+    trimRangeRef.current = { start: safeTrimStart, end: safeTrimEnd }
+  }, [safeTrimEnd, safeTrimStart])
 
   useEffect(() => {
     if (!isOpen) {
@@ -476,6 +489,23 @@ export default function ReviewModeOverlay({
     }
   }, [])
 
+  const stopAtTrimEnd = useCallback(
+    (media: HTMLMediaElement): boolean => {
+      if (!trimMode) return false
+      const { end } = trimRangeRef.current
+      if (end <= 0 || media.currentTime < end - 0.015) return false
+
+      if (activeAudioPlaybackItem) {
+        audioPlayback.pause()
+      } else {
+        media.pause()
+      }
+      scheduleTimeUpdate(end)
+      return true
+    },
+    [activeAudioPlaybackItem, audioPlayback, scheduleTimeUpdate, trimMode],
+  )
+
   const stopProgressLoop = useCallback(() => {
     if (progressLoopRef.current !== null) {
       cancelAnimationFrame(progressLoopRef.current)
@@ -493,13 +523,18 @@ export default function ReviewModeOverlay({
         return
       }
 
+      if (stopAtTrimEnd(video)) {
+        progressLoopRef.current = null
+        return
+      }
+
       scheduleTimeUpdate(video.currentTime)
       syncDurationFromVideo(video)
       progressLoopRef.current = requestAnimationFrame(tick)
     }
 
     progressLoopRef.current = requestAnimationFrame(tick)
-  }, [getActiveVideo, scheduleTimeUpdate, stopProgressLoop, syncDurationFromVideo])
+  }, [getActiveVideo, scheduleTimeUpdate, stopAtTrimEnd, stopProgressLoop, syncDurationFromVideo])
 
   const scrubToClientX = useCallback(
     (clientX: number) => {
@@ -558,8 +593,20 @@ export default function ReviewModeOverlay({
   )
 
   const togglePlayPause = useCallback(() => {
+    const { start: trimStart, end: trimEnd } = trimRangeRef.current
+    const hasTrimWindow = trimMode && trimEnd > trimStart
+
     if (activeAudioPlaybackItem) {
-      audioPlayback.toggle(activeAudioPlaybackItem)
+      if (displayIsPlaying) {
+        audioPlayback.pause()
+      } else {
+        const nextStartTime =
+          hasTrimWindow &&
+          (displayCurrentTime < trimStart || displayCurrentTime >= trimEnd - 0.015)
+            ? trimStart
+            : displayCurrentTime
+        audioPlayback.play(activeAudioPlaybackItem, { startTime: nextStartTime })
+      }
       revealPlayOverlay(true)
       return
     }
@@ -568,6 +615,10 @@ export default function ReviewModeOverlay({
     if (!video) return
 
     if (video.paused || video.ended) {
+      if (hasTrimWindow && (video.currentTime < trimStart || video.currentTime >= trimEnd - 0.015)) {
+        video.currentTime = trimStart
+        scheduleTimeUpdate(trimStart)
+      }
       revealPlayOverlay(true)
       const started = toggleInlineTakePlayback(video, {
         onPlaying: () => {
@@ -591,7 +642,16 @@ export default function ReviewModeOverlay({
         },
       })
     }
-  }, [activeAudioPlaybackItem, audioPlayback, getActiveVideo, revealPlayOverlay])
+  }, [
+    activeAudioPlaybackItem,
+    audioPlayback,
+    displayCurrentTime,
+    displayIsPlaying,
+    getActiveVideo,
+    revealPlayOverlay,
+    scheduleTimeUpdate,
+    trimMode,
+  ])
 
   const handleToggleChrome = useCallback(() => {
     setActionMenuOpen(false)
@@ -715,6 +775,22 @@ export default function ReviewModeOverlay({
   useEffect(() => {
     setActionMenuOpen(false)
   }, [activeSlot, vaultTake?.id, vaultIndex])
+
+  useEffect(() => {
+    setTrimMode(false)
+    setTrimApplying(false)
+    setTrimRange({ start: 0, end: 0 })
+  }, [activeTake?.id, isOpen])
+
+  useEffect(() => {
+    if (!Number.isFinite(displayDuration) || displayDuration <= 0) return
+    setTrimRange((current) => {
+      if (!trimMode) return { start: 0, end: displayDuration }
+      const start = Math.max(0, Math.min(current.start, displayDuration))
+      const end = Math.max(start, Math.min(current.end || displayDuration, displayDuration))
+      return { start, end }
+    })
+  }, [displayDuration, trimMode])
 
   useEffect(() => {
     reviewAutoplayEnabledRef.current = isOpen
@@ -905,6 +981,143 @@ export default function ReviewModeOverlay({
     syncDurationFromVideo,
     activeAudioPlaybackItem,
     audioPlayback,
+  ])
+
+  const handleRequestTrim = useCallback(() => {
+    if (!trimAvailable || trimApplying) return
+    const trimDuration = displayDuration
+    if (!Number.isFinite(trimDuration) || trimDuration < 0.1) return
+
+    if (activeAudioPlaybackItem) {
+      audioPlayback.pause()
+    } else {
+      const video = getActiveVideo()
+      video?.pause()
+      stopProgressLoop()
+    }
+    wasPlayingBeforeScrubRef.current = false
+    setTrimRange({ start: 0, end: trimDuration })
+    setTrimMode(true)
+    revealPlayOverlay(false)
+    triggerLightHaptic()
+  }, [
+    activeAudioPlaybackItem,
+    audioPlayback,
+    displayDuration,
+    getActiveVideo,
+    revealPlayOverlay,
+    stopProgressLoop,
+    trimApplying,
+    trimAvailable,
+  ])
+
+  const handleTrimStart = useCallback(() => {
+    if (activeAudioPlaybackItem) {
+      audioPlayback.pause()
+    } else {
+      const video = getActiveVideo()
+      video?.pause()
+      stopProgressLoop()
+    }
+    isScrubbingRef.current = true
+    setIsScrubbing(true)
+    revealPlayOverlay(false)
+  }, [activeAudioPlaybackItem, audioPlayback, getActiveVideo, revealPlayOverlay, stopProgressLoop])
+
+  const handleTrimRangeChange = useCallback(
+    (start: number, end: number, handle: 'start' | 'end') => {
+      const durationForTrim = displayDuration
+      if (!Number.isFinite(durationForTrim) || durationForTrim <= 0) return
+      const nextStart = Math.max(0, Math.min(start, durationForTrim))
+      const nextEnd = Math.max(nextStart, Math.min(end, durationForTrim))
+      setTrimRange({ start: nextStart, end: nextEnd })
+
+      const previewTime = handle === 'start' ? nextStart : nextEnd
+      if (activeAudioPlaybackItem) {
+        audioPlayback.seek(previewTime)
+        return
+      }
+      const video = getActiveVideo()
+      if (!video) return
+      video.currentTime = previewTime
+      scheduleTimeUpdate(previewTime)
+    },
+    [activeAudioPlaybackItem, audioPlayback, displayDuration, getActiveVideo, scheduleTimeUpdate],
+  )
+
+  const handleTrimEnd = useCallback(() => {
+    isScrubbingRef.current = false
+    setIsScrubbing(false)
+    wasPlayingBeforeScrubRef.current = false
+    revealPlayOverlay(false)
+  }, [revealPlayOverlay])
+
+  const handleCancelTrim = useCallback(() => {
+    setTrimMode(false)
+    setTrimRange({ start: 0, end: displayDuration })
+    revealPlayOverlay(false)
+    triggerLightHaptic()
+  }, [displayDuration, revealPlayOverlay])
+
+  const handleApplyTrim = useCallback(() => {
+    if (!activeTake || trimApplying) return
+    const { start, end } = trimRangeRef.current
+    const originalDuration = displayDuration
+    if (!Number.isFinite(originalDuration) || originalDuration <= 0) return
+
+    if (start <= 0.01 && end >= originalDuration - 0.01) {
+      handleCancelTrim()
+      return
+    }
+
+    void (async () => {
+      setTrimApplying(true)
+      if (activeAudioPlaybackItem) {
+        audioPlayback.pause()
+      } else {
+        pauseAllReviewVideosSafe()
+        stopProgressLoop()
+      }
+
+      try {
+        const result = await trimTakeMediaInPlace(activeTake, start, end)
+        setMediaRevision((revision) => revision + 1)
+        setCurrentTime(0)
+        setDuration(result.duration)
+        setTrimRange({ start: 0, end: result.duration })
+        setTrimMode(false)
+
+        if (activeAudioPlaybackItem) {
+          const player = audioPlayback.playerRef.current
+          player?.pause()
+          player?.removeAttribute('src')
+          player?.load()
+          audioPlayback.select(activeAudioPlaybackItem)
+        }
+
+        triggerLightHaptic()
+      } catch (error) {
+        void showAlert({
+          title: 'Unable to Trim',
+          message: error instanceof Error ? error.message : 'The take could not be trimmed.',
+          tone: 'error',
+        })
+      } finally {
+        setTrimApplying(false)
+        revealPlayOverlay(false)
+      }
+    })()
+  }, [
+    activeAudioPlaybackItem,
+    activeTake,
+    audioPlayback,
+    displayDuration,
+    handleCancelTrim,
+    pauseAllReviewVideosSafe,
+    revealPlayOverlay,
+    showAlert,
+    stopProgressLoop,
+    trimApplying,
   ])
 
   const completeSwipe = useCallback(
@@ -1141,7 +1354,7 @@ export default function ReviewModeOverlay({
       <div className="review-video-stage relative min-h-0 flex-1 overflow-hidden">
         {isOpen && isVault && vaultTake ? (
           <ReviewTakeLayer
-            takeKey={`vault-${vaultTake.id}`}
+            takeKey={`vault-${vaultTake.id}-r${mediaRevision}`}
             filePath={vaultTake.filePath}
             videoUrl={vaultTake.videoUrl}
             mimeType={
@@ -1171,7 +1384,7 @@ export default function ReviewModeOverlay({
                 }`}
               >
                 <ReviewTakeLayer
-                  takeKey={`benchmark-${benchmarkFilePath}-${benchmarkSrc}`}
+                  takeKey={`benchmark-${benchmarkFilePath}-${benchmarkSrc}-r${mediaRevision}`}
                   filePath={benchmarkFilePath}
                   videoUrl={benchmarkSrc ?? ''}
                   mimeType={benchmarkMimeType}
@@ -1209,7 +1422,7 @@ export default function ReviewModeOverlay({
                 }`}
               >
                 <ReviewTakeLayer
-                  takeKey={`challenger-${challengerFilePath}-${challengerSrc}`}
+                  takeKey={`challenger-${challengerFilePath}-${challengerSrc}-r${mediaRevision}`}
                   filePath={challengerFilePath}
                   videoUrl={challengerSrc ?? ''}
                   mimeType={challengerMimeType}
@@ -1287,6 +1500,17 @@ export default function ReviewModeOverlay({
                     onPlayPause={togglePlayPause}
                     mediaFilePath={activeTimelineFilePath}
                     mediaUrl={activeTimelineUrl}
+                    trimAvailable={trimAvailable}
+                    trimActive={trimMode}
+                    trimStart={safeTrimStart}
+                    trimEnd={safeTrimEnd}
+                    trimApplying={trimApplying}
+                    onRequestTrim={handleRequestTrim}
+                    onTrimStart={handleTrimStart}
+                    onTrimChange={handleTrimRangeChange}
+                    onTrimEnd={handleTrimEnd}
+                    onCancelTrim={handleCancelTrim}
+                    onApplyTrim={handleApplyTrim}
                   />
 
                   <ReviewSectionMarkers

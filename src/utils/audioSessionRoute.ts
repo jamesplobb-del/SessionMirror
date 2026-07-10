@@ -225,6 +225,12 @@ export interface BestTakeAudioPluginType {
   restoreRecordingRouteAfterPlayback(): Promise<AudioRouteSnapshot>
   shareMediaFile(options: { path: string; title?: string; audioGain?: number }): Promise<NativeShareResult>
   saveVideoToPhotos(options: { path: string; audioGain?: number }): Promise<{ success: boolean }>
+  trimTakeMedia(options: {
+    url: string
+    startTime: number
+    endTime: number
+    mediaType: 'video' | 'audio'
+  }): Promise<{ duration: number }>
   renderCreatorStudioVideo(options: {
     sourcePath: string
     aspectRatio: string

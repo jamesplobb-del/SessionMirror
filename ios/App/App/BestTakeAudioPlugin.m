@@ -21,6 +21,7 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(restoreRecordingRouteAfterPlayback, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(shareMediaFile, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(saveVideoToPhotos, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(trimTakeMedia, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(renderCreatorStudioVideo, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(renderMultitrackVideo, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setNativeExperimentalAudioMode, CAPPluginReturnPromise);

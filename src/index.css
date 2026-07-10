@@ -742,7 +742,7 @@ body.settings-branch-open * {
   box-shadow: 0 0 10px rgba(21, 152, 255, 0.18);
 }
 
-.review-timeline-track--waveform > .pointer-events-none {
+.review-timeline-waveform > .review-timeline-waveform__playhead {
   transition: left 90ms linear, transform 120ms ease-out;
   will-change: left, transform;
 }
@@ -844,7 +844,8 @@ body.settings-branch-open * {
   bottom: 6%;
   width: 2px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
+  background: #171a22;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 1px 4px rgba(23, 26, 34, 0.28);
   transform: translateX(-50%);
   transition: left 90ms linear;
   will-change: left;
@@ -861,7 +862,7 @@ body.settings-branch-open * {
   width: 0.44rem;
   height: 0.44rem;
   border-radius: 999px;
-  background: currentColor;
+  background: #171a22;
   content: '';
   transform: translateX(-50%);
 }
@@ -3640,6 +3641,33 @@ video.camera-preview--embedded.camera-preview--mirror {
 .review-playback-controls {
   min-height: 62px;
   padding: 9px 12px 5px;
+}
+
+.review-trim-actions {
+  border-top: 1px solid rgba(23, 26, 34, 0.08);
+}
+
+.review-trim-action {
+  border-radius: 8px;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.review-trim-action--cancel {
+  color: #4e535c;
+}
+
+.review-trim-action--cancel:active:not(:disabled) {
+  background: rgba(23, 26, 34, 0.06);
+}
+
+.review-trim-action--done {
+  color: #ffffff;
+  background: #171a22;
+  box-shadow: 0 2px 6px rgba(23, 26, 34, 0.16);
+}
+
+.review-trim-action--done:disabled {
+  opacity: 0.54;
 }
 
 .review-playback-button {

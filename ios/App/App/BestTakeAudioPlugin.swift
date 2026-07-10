@@ -29,6 +29,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restoreRecordingRouteAfterPlayback", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareMediaFile", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveVideoToPhotos", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "trimTakeMedia", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderCreatorStudioVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderMultitrackVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
@@ -1368,6 +1369,75 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(payload)
             case .failure(let error):
                 call.reject("Audio enhancement failed", nil, error)
+            }
+        }
+    }
+
+    /** Replaces a recorded take only after AVFoundation has exported the selected range. */
+    @objc func trimTakeMedia(_ call: CAPPluginCall) {
+        guard let sourceURL = resolvePluginFileURL(from: call) else { return }
+
+        let asset = AVURLAsset(url: sourceURL)
+        let duration = CMTimeGetSeconds(asset.duration)
+        guard duration.isFinite, duration > 0 else {
+            call.reject("The take has no playable duration")
+            return
+        }
+
+        let startTime = max(0, min(call.getDouble("startTime") ?? 0, duration))
+        let requestedEndTime = call.getDouble("endTime") ?? duration
+        let endTime = max(startTime, min(requestedEndTime, duration))
+        let trimmedDuration = endTime - startTime
+        guard trimmedDuration >= 0.1 else {
+            call.reject("Keep at least a tenth of a second in the trimmed take")
+            return
+        }
+
+        let hasVideo = !asset.tracks(withMediaType: .video).isEmpty
+        let preset = hasVideo ? AVAssetExportPresetHighestQuality : AVAssetExportPresetAppleM4A
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: preset) else {
+            call.reject("Could not create a trim export session")
+            return
+        }
+
+        let outputType: AVFileType = hasVideo ? .mp4 : .m4a
+        guard exportSession.supportedFileTypes.contains(outputType) else {
+            call.reject("This take format cannot be trimmed on this device")
+            return
+        }
+
+        let extensionName = hasVideo ? "mp4" : "m4a"
+        let outputURL = sourceURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".besttake-trim-\(UUID().uuidString).\(extensionName)")
+        try? FileManager.default.removeItem(at: outputURL)
+
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = outputType
+        exportSession.shouldOptimizeForNetworkUse = true
+        exportSession.timeRange = CMTimeRange(
+            start: CMTime(seconds: startTime, preferredTimescale: 600),
+            duration: CMTime(seconds: trimmedDuration, preferredTimescale: 600)
+        )
+
+        print("[TakeTrim] export start source=\(sourceURL.lastPathComponent) start=\(startTime) end=\(endTime)")
+        exportSession.exportAsynchronously {
+            DispatchQueue.main.async {
+                guard exportSession.status == .completed else {
+                    try? FileManager.default.removeItem(at: outputURL)
+                    call.reject("Take trim export failed", exportSession.error?.localizedDescription)
+                    return
+                }
+
+                do {
+                    // replaceItemAt preserves the original unless the finished export is ready.
+                    _ = try FileManager.default.replaceItemAt(sourceURL, withItemAt: outputURL)
+                    print("[TakeTrim] export complete source=\(sourceURL.lastPathComponent) duration=\(trimmedDuration)")
+                    call.resolve(["duration": trimmedDuration])
+                } catch {
+                    try? FileManager.default.removeItem(at: outputURL)
+                    call.reject("Could not replace the original take after trimming", nil, error)
+                }
             }
         }
     }
