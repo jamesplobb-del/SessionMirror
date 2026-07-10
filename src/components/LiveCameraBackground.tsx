@@ -91,6 +91,7 @@ function LiveCameraBackground({
   const nativeBridgePrimedRef = useRef(false)
   /** True once a frame has actually been painted since the bridge was last (re)primed — gates revealing the canvas so a stale/frozen frame from before backgrounding is never shown as if live. */
   const [nativeFrameFresh, setNativeFrameFresh] = useState(false)
+  const [handsFreePlaybackReady, setHandsFreePlaybackReady] = useState(false)
   /**
    * Mirrors whether `nativeFrameFresh` has already been signaled true for the
    * current priming cycle. The frame pump paints on every native frame
@@ -111,14 +112,20 @@ function LiveCameraBackground({
     isAudioMode && !pitchStageActive && !metronomeStageActive && !audioPracticeOverlayActive
   const isEmbedded = variant === 'embedded'
   const previewWorkSuppressed = visuallySuppressed && !isEmbedded
-  const showHandsFreeTakePlayback =
+  const handsFreeTakePlaybackRequested =
     recordingMode === 'video' &&
     Boolean(handsFreePlaybackTakeId) &&
     Boolean(handsFreePlaybackSrc) &&
     !isAudioMode &&
     !visuallySuppressed
+  // Keep the live preview visible until the saved take has loaded. Hiding it
+  // before the decoder is ready leaves a black camera surface if a just-saved
+  // file needs another moment to become readable on iOS.
+  const showHandsFreeTakePlayback =
+    handsFreeTakePlaybackRequested && handsFreePlaybackReady
   const nativePreviewSuppressedForPlayback =
-    holdPreviewForTakePlayback || showHandsFreeTakePlayback
+    showHandsFreeTakePlayback ||
+    (holdPreviewForTakePlayback && !handsFreeTakePlaybackRequested)
   const activeNativeLivePreview =
     nativeLivePreviewActive && !previewWorkSuppressed && !nativePreviewSuppressedForPlayback
   const overlayClass = isEmbedded
@@ -330,13 +337,11 @@ function LiveCameraBackground({
   useEffect(() => {
     const wantsPlayback =
       recordingMode === 'video' &&
-      Boolean(handsFreePlaybackTakeId) &&
-      Boolean(handsFreePlaybackSrc) &&
-      !isAudioMode &&
-      !visuallySuppressed
+      handsFreeTakePlaybackRequested
 
     if (!wantsPlayback) {
       handsFreePlaybackSessionRef.current = false
+      setHandsFreePlaybackReady(false)
       return
     }
 
@@ -351,10 +356,29 @@ function LiveCameraBackground({
         return
       }
 
-      // Suspend the live camera/native bridge BEFORE loading the take into a
-      // second <video>. Tearing down capture after the file decoder has already
-      // buffered leaves WKWebView's media clock wedged (frozen first frame,
-      // hard-stall until a seek nudge).
+      resetVideoPlayback(media)
+      media.removeAttribute('src')
+      media.load()
+      assignMediaPlaybackSrc(media, withWebKitThumbnailHint(handsFreePlaybackSrc!))
+      media.load()
+
+      // Preflight while the preview is still visible. This is the critical
+      // difference from the old path: a file that is not ready cannot replace
+      // the camera with an empty black video element.
+      const ready = await waitForMediaReadyWithRetry(media)
+      if (cancelled || !handsFreePlaybackSessionRef.current) {
+        return
+      }
+
+      if (!ready) {
+        console.warn('Hands-free background playback media not ready', {
+          takeId: handsFreePlaybackTakeId,
+          readyState: media.readyState,
+        })
+        onHandsFreePlaybackComplete?.()
+        return
+      }
+
       try {
         await preparePlaybackRoute({ suspendCamera: true })
       } catch (error) {
@@ -367,27 +391,7 @@ function LiveCameraBackground({
         return
       }
 
-      resetVideoPlayback(media)
-      media.removeAttribute('src')
-      media.load()
-      assignMediaPlaybackSrc(media, withWebKitThumbnailHint(handsFreePlaybackSrc!))
-      media.load()
-
-      const ready = await waitForMediaReadyWithRetry(media)
-      if (cancelled || !handsFreePlaybackSessionRef.current) {
-        await completePlaybackRouteRestore()
-        return
-      }
-
-      if (!ready) {
-        console.warn('Hands-free background playback media not ready', {
-          takeId: handsFreePlaybackTakeId,
-          readyState: media.readyState,
-        })
-        await completePlaybackRouteRestore()
-        onHandsFreePlaybackComplete?.()
-        return
-      }
+      setHandsFreePlaybackReady(true)
 
       await applyAutoPlaybackLeadIn(media, undefined, handsFreePlaybackPerformanceStartSeconds)
 
@@ -440,6 +444,7 @@ function LiveCameraBackground({
         stopTailSkip?.()
         stopTailSkip = null
         handsFreePlaybackSessionRef.current = false
+        setHandsFreePlaybackReady(false)
         onHandsFreePlaybackComplete?.()
       }
     })()
@@ -447,6 +452,7 @@ function LiveCameraBackground({
     return () => {
       cancelled = true
       handsFreePlaybackSessionRef.current = false
+      setHandsFreePlaybackReady(false)
       stopTailSkip?.()
       stopTailSkip = null
       handsFreeStallRecoveryRef.current?.()
@@ -464,7 +470,7 @@ function LiveCameraBackground({
     handsFreePlaybackPerformanceStartSeconds,
     handsFreePlaybackTailSkipSeconds,
     handsFreePlaybackTakeId,
-    isAudioMode,
+    handsFreeTakePlaybackRequested,
     onHandsFreePlaybackComplete,
     onHandsFreePlaybackPlayingChange,
     recordingMode,
@@ -759,14 +765,15 @@ function LiveCameraBackground({
         className={previewClassName}
       />
 
-      {showHandsFreeTakePlayback && (
+      {handsFreeTakePlaybackRequested && (
         <video
           key={handsFreePlaybackTakeId ?? handsFreePlaybackSrc ?? 'handsfree-take-playback'}
           ref={handsFreePlaybackVideoRef}
-          autoPlay
           playsInline
           {...iosBulletproofVideoProps}
-          className={`${isEmbedded ? 'camera-preview--embedded' : 'camera-preview'} camera-preview--take-playback camera-preview--live`}
+          className={`${isEmbedded ? 'camera-preview--embedded' : 'camera-preview'} camera-preview--take-playback camera-preview--live ${
+            handsFreePlaybackReady ? '' : 'camera-preview--hidden'
+          }`}
         />
       )}
 

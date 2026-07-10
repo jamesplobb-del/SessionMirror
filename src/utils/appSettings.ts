@@ -260,12 +260,15 @@ export interface AutoRecordProfile {
 
 /** Per-slider detection profile — loud mode rejects peak-only spikes; sensitive mode triggers fast. */
 export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
-  const gate = volumeThresholdToLevel(sliderValue)
+  const baseGate = volumeThresholdToLevel(sliderValue)
   const t = clamp(sliderValue, 1, 100)
 
-  if (t >= 75) {
+  // Keep this boundary aligned with the Settings label ("Loud only" at 70+).
+  // A small lift prevents the loud preset from starting on borderline room noise
+  // or an isolated transient while retaining the same silence-stop behavior.
+  if (t >= 70) {
     return {
-      gate,
+      gate: baseGate * 1.12,
       usePeak: true,
       holdMs: 36,
       attackHoldMs: 14,
@@ -280,7 +283,7 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
 
   if (t <= 25) {
     return {
-      gate,
+      gate: baseGate,
       usePeak: true,
       holdMs: 24,
       attackHoldMs: 12,
@@ -293,7 +296,7 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
   }
 
   return {
-    gate,
+    gate: baseGate,
     usePeak: true,
     holdMs: 36,
     attackHoldMs: 16,

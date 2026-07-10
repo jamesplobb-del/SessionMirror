@@ -10,7 +10,11 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { prepareInlineMediaElement, resolveMediaPlaybackSrc } from '../utils/mediaPlayback'
+import {
+  prepareInlineMediaElement,
+  resolveMediaPlaybackSrc,
+  waitForMediaReadyWithRetry,
+} from '../utils/mediaPlayback'
 import {
   completePlaybackRouteRestore,
   isPlaybackRouteHoldActive,
@@ -82,9 +86,6 @@ interface AudioModePlaybackContextValue {
 }
 
 const AudioModePlaybackContext = createContext<AudioModePlaybackContextValue | null>(null)
-const AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS = 220
-const AUDIO_MODE_PRIME_READY_TIMEOUT_MS = 700
-
 /** App-level hook for pausing inline audio-mode take playback (vault, settings, review). */
 export const audioModePlaybackControlsRef: {
   pause: (() => void) | null
@@ -121,36 +122,35 @@ async function resolveItemSrcForPlayback(item: AudioModePlaybackItem): Promise<s
   return resolveMediaPlaybackSrc(resolved || item.mediaUrl)
 }
 
-function waitForAudioModePlaybackReady(
-  player: HTMLAudioElement,
-  timeoutMs = AUDIO_MODE_PLAYBACK_READY_TIMEOUT_MS,
-): Promise<void> {
-  if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-    return Promise.resolve()
+function playableDuration(player: HTMLMediaElement): number | null {
+  return Number.isFinite(player.duration) && player.duration > 0 ? player.duration : null
+}
+
+/**
+ * Never treat a short timeout as readiness. Large local takes can need more
+ * decoder time on iOS; playback only proceeds after the element reports both
+ * current media data and a real duration.
+ */
+async function waitForAudioModePlaybackReady(player: HTMLAudioElement): Promise<number> {
+  const existingDuration = playableDuration(player)
+  if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && existingDuration !== null) {
+    return existingDuration
   }
 
-  return new Promise((resolve) => {
-    let settled = false
-    let timeoutId: number | null = null
-
-    const settle = () => {
-      if (settled) return
-      settled = true
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-        timeoutId = null
-      }
-      player.removeEventListener('loadeddata', settle)
-      player.removeEventListener('canplay', settle)
-      player.removeEventListener('error', settle)
-      resolve()
-    }
-
-    timeoutId = window.setTimeout(settle, timeoutMs)
-    player.addEventListener('loadeddata', settle, { once: true })
-    player.addEventListener('canplay', settle, { once: true })
-    player.addEventListener('error', settle, { once: true })
+  const ready = await waitForMediaReadyWithRetry(player, {
+    attempts: 15,
+    intervalMs: 250,
+    timeoutMs: 1200,
   })
+  const duration = playableDuration(player)
+  if (!ready || duration === null) {
+    const code = player.error?.code
+    throw new Error(
+      `Audio take did not become playable${code ? ` (media error ${code})` : ''}.`,
+    )
+  }
+
+  return duration
 }
 
 export function AudioModePlaybackProvider({
@@ -172,6 +172,7 @@ export function AudioModePlaybackProvider({
   const resumeInFlightRef = useRef(false)
   const primingSourceKeyRef = useRef('')
   const primeInFlightRef = useRef<Promise<void> | null>(null)
+  const playbackRequestIdRef = useRef(0)
   const nativePlaybackActiveRef = useRef(false)
   const nativePlaybackStartingRef = useRef(false)
   const nativePlaybackStartMsRef = useRef(0)
@@ -246,8 +247,8 @@ export function AudioModePlaybackProvider({
 
       setState((prev) => ({
         ...prev,
-        currentTime: player.currentTime,
-        duration: Number.isFinite(player.duration) ? player.duration : prev.duration,
+        currentTime: Number.isFinite(player.currentTime) ? player.currentTime : 0,
+        duration: playableDuration(player) ?? prev.duration,
       }))
       progressRafRef.current = requestAnimationFrame(tick)
     }
@@ -404,8 +405,17 @@ export function AudioModePlaybackProvider({
         player.load()
       }
       primeTakePlaybackForPreparedSession(player)
-      await waitForAudioModePlaybackReady(player, AUDIO_MODE_PRIME_READY_TIMEOUT_MS)
-    })().finally(() => {
+      const duration = playableDuration(player)
+      if (duration !== null && currentSourceKeyRef.current === sourceKey) {
+        setState((prev) => ({ ...prev, duration }))
+      }
+    })().catch((error) => {
+      if (currentSourceKeyRef.current !== sourceKey) return
+      logPlayback('Playback prime not ready', {
+        takeId: item.takeId ?? item.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }).finally(() => {
       if (primingSourceKeyRef.current === sourceKey) {
         primeInFlightRef.current = null
       }
@@ -430,6 +440,7 @@ export function AudioModePlaybackProvider({
         sessionPrepared: sessionPreparedRef.current,
         path: usesNativeHandsFreePlayback(item) ? 'native-avplayer' : 'webkit',
       })
+      const requestId = ++playbackRequestIdRef.current
 
       if (usesNativeHandsFreePlayback(item)) {
         const startTime =
@@ -513,6 +524,12 @@ export function AudioModePlaybackProvider({
         return
       }
 
+      const sourceKey = sourceKeyFor(item)
+      const isCurrentRequest = () =>
+        playbackRequestIdRef.current === requestId &&
+        desiredPlayingRef.current &&
+        currentSourceKeyRef.current === sourceKey
+
       const player = ensurePlayerSource(item)
       if (!player) return
 
@@ -544,17 +561,13 @@ export function AudioModePlaybackProvider({
         try {
           await logAudioSessionSnapshot('audio-mode-before-session-prep', sessionId)
           await prepareSessionOnce(item)
+          if (!isCurrentRequest()) return
           await logAudioSessionSnapshot('audio-mode-before-prime', sessionId)
           const resolvedSrc = await resolveItemSrcForPlayback(item)
           if (!resolvedSrc) {
             throw new Error('Audio mode playback source is empty')
           }
-          if (currentSourceKeyRef.current !== sourceKeyFor(item)) {
-            pipelineDetachRef.current?.()
-            pipelineDetachRef.current = null
-            setActivePlaybackDiagSession(null)
-            return
-          }
+          if (!isCurrentRequest()) return
           if (resolvedSrc && player.src !== resolvedSrc) {
             player.pause()
             player.src = resolvedSrc
@@ -580,7 +593,7 @@ export function AudioModePlaybackProvider({
               playerSrc: player.src,
             })
           }
-          await waitForAudioModePlaybackReady(player)
+          const duration = await waitForAudioModePlaybackReady(player)
           logPlayback('[Diag] waitForReady resolved', {
             takeId: item.takeId ?? item.id,
             readyState: player.readyState,
@@ -591,15 +604,11 @@ export function AudioModePlaybackProvider({
             mediaErrorCode: player.error?.code ?? null,
             mediaErrorMessage: player.error?.message ?? null,
           })
-          if (currentSourceKeyRef.current !== sourceKeyFor(item)) {
-            pipelineDetachRef.current?.()
-            pipelineDetachRef.current = null
-            setActivePlaybackDiagSession(null)
-            return
-          }
+          if (!isCurrentRequest()) return
+          setState((prev) => ({ ...prev, duration }))
           if (pendingStartTimeRef.current !== null) {
             try {
-              player.currentTime = Math.max(0, pendingStartTimeRef.current)
+              player.currentTime = Math.max(0, Math.min(pendingStartTimeRef.current, duration))
             } catch {
               /* ignore */
             }
@@ -619,7 +628,7 @@ export function AudioModePlaybackProvider({
             mediaErrorMessage: player.error?.message ?? null,
           })
           const started = await playTakeMediaAudible(player, { skipRoutePrep: true })
-          if (!started) {
+          if (!started || !isCurrentRequest()) {
             throw new Error('Audio mode playback did not start')
           }
           await logAudioSessionSnapshot('audio-mode-after-play', sessionId, {
@@ -640,6 +649,7 @@ export function AudioModePlaybackProvider({
             playerExists: true,
           }))
         } catch (error) {
+          if (!isCurrentRequest()) return
           pipelineDetachRef.current?.()
           pipelineDetachRef.current = null
           setActivePlaybackDiagSession(null)
@@ -652,6 +662,7 @@ export function AudioModePlaybackProvider({
             sessionPrepared: sessionPreparedRef.current,
           })
           setState((prev) => ({ ...prev, isPlaying: false }))
+          options.onFailed?.()
         }
       })()
     },
@@ -724,6 +735,7 @@ export function AudioModePlaybackProvider({
   )
 
   const pause = useCallback(() => {
+    playbackRequestIdRef.current += 1
     if (nativePlaybackActiveRef.current) {
       const elapsedSeconds = (performance.now() - nativePlaybackStartMsRef.current) / 1000
       const duration = nativeDurationRef.current
@@ -789,6 +801,10 @@ export function AudioModePlaybackProvider({
       }
       const player = playerRef.current
       if (sameSource && player && !player.paused && !player.ended) {
+        pause()
+        return
+      }
+      if (sameSource && desiredPlayingRef.current) {
         pause()
         return
       }

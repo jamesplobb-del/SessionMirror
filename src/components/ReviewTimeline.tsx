@@ -31,7 +31,12 @@ export default function ReviewTimeline({
   mediaFilePath = '',
   mediaUrl = '',
 }: ReviewTimelineProps) {
-  const percent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0
+  const safeCurrentTime =
+    Number.isFinite(currentTime) && safeDuration > 0
+      ? Math.max(0, Math.min(currentTime, safeDuration))
+      : 0
+  const percent = safeDuration > 0 ? (safeCurrentTime / safeDuration) * 100 : 0
   const peaks = useMediaWaveform({
     filePath: mediaFilePath,
     mediaUrl,
@@ -88,15 +93,15 @@ export default function ReviewTimeline({
         </Pressable>
 
         <span className="w-11 text-right text-[11px] font-medium tabular-nums tracking-tight text-[#6c7077]">
-          {formatTime(currentTime)}
+          {formatTime(safeCurrentTime)}
         </span>
 
         <div
           ref={trackRef}
           role="slider"
           aria-valuemin={0}
-          aria-valuemax={duration}
-          aria-valuenow={currentTime}
+          aria-valuemax={safeDuration}
+          aria-valuenow={safeCurrentTime}
           aria-label="Video timeline"
           className="review-timeline-track review-timeline-track--waveform relative h-12 min-w-0 flex-1 cursor-pointer touch-none"
           style={{ touchAction: 'none' }}
@@ -129,7 +134,7 @@ export default function ReviewTimeline({
         </div>
 
         <span className="w-11 text-left text-[11px] font-medium tabular-nums tracking-tight text-[#6c7077]/80">
-          {formatTime(duration)}
+          {formatTime(safeDuration)}
         </span>
       </div>
     </div>

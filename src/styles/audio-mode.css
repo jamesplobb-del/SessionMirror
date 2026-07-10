@@ -592,6 +592,27 @@ html.app-audio-mode #root {
   opacity: 1;
 }
 
+.audio-mode-take-card--preparing .audio-mode-take-card__play:disabled {
+  color: var(--audio-blue);
+  background: var(--audio-blue-soft);
+  box-shadow: none;
+}
+
+.audio-mode-take-card--error .audio-mode-take-card__play {
+  color: var(--audio-gold);
+  border-color: var(--audio-gold);
+}
+
+.audio-mode-take-card--error .audio-mode-take-card__title-row p {
+  color: #b45309;
+}
+
+.audio-mode-waveform--disabled {
+  cursor: default;
+  opacity: 0.58;
+  touch-action: auto;
+}
+
 /* —— Bottom control deck —— */
 .app-ui-overlay--audio-mode .control-deck__vault-btn,
 .app-ui-overlay--audio-mode .control-deck__settings-btn {

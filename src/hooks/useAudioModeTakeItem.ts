@@ -25,9 +25,15 @@ export function useAudioModeTakeItem({
   const hasMedia = Boolean(playbackItem)
   const isCurrentItem = playbackItem ? audioPlayback.matchesCurrentSource(playbackItem) : false
   const isPlaying = isCurrentItem && audioPlayback.state.isPlaying
-  const durationSeconds = isCurrentItem ? audioPlayback.state.duration : 0
-  const currentTime = isCurrentItem ? audioPlayback.state.currentTime : 0
-  const playbackProgress = durationSeconds > 0 ? currentTime / durationSeconds : 0
+  const durationSeconds =
+    isCurrentItem && Number.isFinite(audioPlayback.state.duration) && audioPlayback.state.duration > 0
+      ? audioPlayback.state.duration
+      : 0
+  const currentTime =
+    isCurrentItem && Number.isFinite(audioPlayback.state.currentTime)
+      ? Math.max(0, Math.min(audioPlayback.state.currentTime, durationSeconds || audioPlayback.state.currentTime))
+      : 0
+  const playbackProgress = durationSeconds > 0 ? Math.max(0, Math.min(1, currentTime / durationSeconds)) : 0
   const displayName =
     libraryPlayback?.name ?? take?.name ?? (tone === 'best' ? 'No Best Take' : 'No Current Take')
 

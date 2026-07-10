@@ -23,14 +23,14 @@
 		DRONEENG2FED79650016851F /* DroneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEENG1FED79650016851F /* DroneEngine.swift */; };
 		DRONEPLG2FED79650016851F /* DronePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG1FED79650016851F /* DronePlugin.swift */; };
 		DRONEPLG4FED79650016851F /* DronePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = DRONEPLG3FED79650016851F /* DronePlugin.m */; };
+		INLINEBOX2FED79650016851F /* InlineTakeBoxPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */; };
 		METRONENG2FED79650016851F /* MetronomeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = METRONENG1FED79650016851F /* MetronomeEngine.swift */; };
 		METRONPLG2FED79650016851F /* MetronomePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = METRONPLG1FED79650016851F /* MetronomePlugin.swift */; };
 		METRONPLG4FED79650016851F /* MetronomePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = METRONPLG3FED79650016851F /* MetronomePlugin.m */; };
-		INLINEBOX2FED79650016851F /* InlineTakeBoxPlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */; };
 		NATIVEAUD2FED79650016851F /* NativeCameraTestAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */; };
 		NATIVECAM2FED79650016851F /* NativeCameraRecordingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */; };
-		PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */; };
 		NATIVEDEC2FED79650016851F /* NativeAudioDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEDEC1FED79650016851F /* NativeAudioDecoder.swift */; };
+		PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */; };
 		TAKEALGN2FED79650016851F /* TakeAlignmentEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */; };
 /* End PBXBuildFile section */
 
@@ -55,15 +55,15 @@
 		DRONEENG1FED79650016851F /* DroneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneEngine.swift; sourceTree = "<group>"; };
 		DRONEPLG1FED79650016851F /* DronePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DronePlugin.swift; sourceTree = "<group>"; };
 		DRONEPLG3FED79650016851F /* DronePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DronePlugin.m; sourceTree = "<group>"; };
+		ENTITLE1FED79650016851F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTakeBoxPlaybackController.swift; sourceTree = "<group>"; };
 		METRONENG1FED79650016851F /* MetronomeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetronomeEngine.swift; sourceTree = "<group>"; };
 		METRONPLG1FED79650016851F /* MetronomePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetronomePlugin.swift; sourceTree = "<group>"; };
 		METRONPLG3FED79650016851F /* MetronomePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MetronomePlugin.m; sourceTree = "<group>"; };
-		ENTITLE1FED79650016851F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
-		INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineTakeBoxPlaybackController.swift; sourceTree = "<group>"; };
 		NATIVEAUD1FED79650016851F /* NativeCameraTestAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraTestAudio.swift; sourceTree = "<group>"; };
 		NATIVECAM1FED79650016851F /* NativeCameraRecordingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCameraRecordingEngine.swift; sourceTree = "<group>"; };
-		PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitBridgeViewController.swift; sourceTree = "<group>"; };
 		NATIVEDEC1FED79650016851F /* NativeAudioDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioDecoder.swift; sourceTree = "<group>"; };
+		PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitBridgeViewController.swift; sourceTree = "<group>"; };
 		TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeAlignmentEngine.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -85,7 +85,6 @@
 				30F5B1B6FB32A592FF61E3B1 /* Pods-App.debug.xcconfig */,
 				54B30F73516ACD7E3398CC08 /* Pods-App.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -446,7 +445,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 2.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.besttake.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -468,7 +467,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.besttake.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";

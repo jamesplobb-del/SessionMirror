@@ -260,12 +260,27 @@ class SharedMetronomeEngine {
     void nativeMetronomeUpdate(this.buildNativeTimingPayload())
   }
 
+  private async ensurePlaybackRouteForMetronome(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return
+    try {
+      const { isPlaybackRouteHoldActive, preparePlaybackRoute } = await import(
+        '../utils/playbackRouteCoordinator'
+      )
+      if (!isPlaybackRouteHoldActive()) {
+        await preparePlaybackRoute({ suspendCamera: false })
+      }
+    } catch {
+      /* mic capture may block briefly — stereo route still helps */
+    }
+  }
+
   private async ensureNativeSpeakerRoute(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return
 
     if (this.useNativeAudio && isHeadphoneOutputActive()) {
       if (!this.nativeSpeakerRouteHeld) {
         this.nativeSpeakerRouteHeld = true
+        await this.ensurePlaybackRouteForMetronome()
       }
       try {
         await nativeMetronomePrepare()
@@ -276,6 +291,7 @@ class SharedMetronomeEngine {
     }
 
     if (!this.nativeSpeakerRouteHeld) {
+      await this.ensurePlaybackRouteForMetronome()
       await engageStereoPlaybackAsync()
       this.nativeSpeakerRouteHeld = true
     }

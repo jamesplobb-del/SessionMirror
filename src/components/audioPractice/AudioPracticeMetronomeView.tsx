@@ -380,11 +380,10 @@ export default function AudioPracticeMetronomeView() {
           <div
             className={[
               'audio-practice-metronome__select-row',
-              pulseModeOptions.length > 0 && feelOptions.length > 0
-                ? 'audio-practice-metronome__select-row--five'
-                : pulseModeOptions.length > 0 || feelOptions.length > 0
-                  ? 'audio-practice-metronome__select-row--quad'
-                  : 'audio-practice-metronome__select-row--triple',
+              'audio-practice-metronome__select-row--primary',
+              pulseModeOptions.length > 0
+                ? 'audio-practice-metronome__select-row--three'
+                : 'audio-practice-metronome__select-row--two',
             ].join(' ')}
           >
             <MetronomeAudioSelect
@@ -396,20 +395,11 @@ export default function AudioPracticeMetronomeView() {
             />
             {pulseModeOptions.length > 0 ? (
               <MetronomeAudioSelect
-                label="Pulse"
+                label="Tempo unit"
                 ariaLabel="Conducting pulse (what BPM means)"
                 value={pulseModeId}
                 options={pulseModeOptions}
                 onChange={handlePulseModeChange}
-              />
-            ) : null}
-            {feelOptions.length > 0 ? (
-              <MetronomeAudioSelect
-                label="Feel"
-                ariaLabel="Beat grouping feel"
-                value={feelId ?? feelOptions[0].value}
-                options={feelOptions}
-                onChange={handleFeelChange}
               />
             ) : null}
             <MetronomeAudioSelect
@@ -422,6 +412,25 @@ export default function AudioPracticeMetronomeView() {
               }))}
               onChange={handleSubdivisionChange}
             />
+          </div>
+          <div
+            className={[
+              'audio-practice-metronome__select-row',
+              'audio-practice-metronome__select-row--secondary',
+              feelOptions.length > 0
+                ? 'audio-practice-metronome__select-row--two'
+                : 'audio-practice-metronome__select-row--one',
+            ].join(' ')}
+          >
+            {feelOptions.length > 0 ? (
+              <MetronomeAudioSelect
+                label="Beat grouping"
+                ariaLabel="Beat grouping feel"
+                value={feelId ?? feelOptions[0].value}
+                options={feelOptions}
+                onChange={handleFeelChange}
+              />
+            ) : null}
             <MetronomeAudioSelect<AudioPracticeClickSoundId>
               label="Accent"
               ariaLabel="Metronome click sound"
