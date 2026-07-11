@@ -126,6 +126,8 @@ export default function AudioPracticeMetronomeView() {
   const pulseModeOptions = practiceMeterHasPulseChoice(meter)
     ? getPracticePulseModeOptions(meter)
     : []
+  const showBeatGrouping =
+    feelOptions.length > 1 && (meter.endsWith('/8') || meter.endsWith('/16'))
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -417,12 +419,12 @@ export default function AudioPracticeMetronomeView() {
             className={[
               'audio-practice-metronome__select-row',
               'audio-practice-metronome__select-row--secondary',
-              feelOptions.length > 0
+              showBeatGrouping
                 ? 'audio-practice-metronome__select-row--two'
                 : 'audio-practice-metronome__select-row--one',
             ].join(' ')}
           >
-            {feelOptions.length > 0 ? (
+            {showBeatGrouping ? (
               <MetronomeAudioSelect
                 label="Beat grouping"
                 ariaLabel="Beat grouping feel"
