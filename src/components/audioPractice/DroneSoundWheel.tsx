@@ -182,6 +182,8 @@ export default function DroneSoundWheel({
           viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`}
           aria-hidden
         >
+          <circle className="drone-sound-wheel__track drone-sound-wheel__track--outer" cx="100" cy="100" r="89" />
+          <circle className="drone-sound-wheel__track drone-sound-wheel__track--inner" cx="100" cy="100" r="67" />
 
           {DRONE_NOTE_STRIP.map(({ pitchClass }, index) => {
             const active = activeNotes.includes(pitchClass)
@@ -239,7 +241,7 @@ export default function DroneSoundWheel({
       </div>
 
       <div className="drone-sound-wheel__octave" aria-label="Drone octave">
-        <span className="drone-sound-wheel__octave-label">Oct</span>
+        <span className="drone-sound-wheel__octave-label">Octave</span>
         <button
           type="button"
           className="drone-sound-wheel__octave-btn"

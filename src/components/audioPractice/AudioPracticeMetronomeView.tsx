@@ -384,8 +384,8 @@ export default function AudioPracticeMetronomeView() {
               'audio-practice-metronome__select-row',
               'audio-practice-metronome__select-row--primary',
               pulseModeOptions.length > 0
-                ? 'audio-practice-metronome__select-row--three'
-                : 'audio-practice-metronome__select-row--two',
+                ? 'audio-practice-metronome__select-row--four'
+                : 'audio-practice-metronome__select-row--three',
             ].join(' ')}
           >
             <MetronomeAudioSelect
@@ -414,25 +414,6 @@ export default function AudioPracticeMetronomeView() {
               }))}
               onChange={handleSubdivisionChange}
             />
-          </div>
-          <div
-            className={[
-              'audio-practice-metronome__select-row',
-              'audio-practice-metronome__select-row--secondary',
-              showBeatGrouping
-                ? 'audio-practice-metronome__select-row--two'
-                : 'audio-practice-metronome__select-row--one',
-            ].join(' ')}
-          >
-            {showBeatGrouping ? (
-              <MetronomeAudioSelect
-                label="Beat grouping"
-                ariaLabel="Beat grouping feel"
-                value={feelId ?? feelOptions[0].value}
-                options={feelOptions}
-                onChange={handleFeelChange}
-              />
-            ) : null}
             <MetronomeAudioSelect<AudioPracticeClickSoundId>
               label="Accent"
               ariaLabel="Metronome click sound"
@@ -444,6 +425,17 @@ export default function AudioPracticeMetronomeView() {
               onChange={handleSoundChange}
             />
           </div>
+          {showBeatGrouping ? (
+            <div className="audio-practice-metronome__select-row audio-practice-metronome__select-row--secondary audio-practice-metronome__select-row--one">
+              <MetronomeAudioSelect
+                label="Beat grouping"
+                ariaLabel="Beat grouping feel"
+                value={feelId ?? feelOptions[0].value}
+                options={feelOptions}
+                onChange={handleFeelChange}
+              />
+            </div>
+          ) : null}
         </section>
 
         <MetronomeBeatDisplay interactive />

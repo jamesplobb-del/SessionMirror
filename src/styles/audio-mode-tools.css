@@ -56,6 +56,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.app-ui-overlay--audio-mode .audio-practice-metronome__select-row--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .app-ui-overlay--audio-mode .audio-practice-metronome__select-row--one {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -148,7 +152,8 @@
   min-width: 100%;
   max-width: min(19rem, calc(100vw - 2rem));
   transform: translateX(-50%);
-  top: calc(100% + 0.32rem);
+  top: auto;
+  bottom: calc(100% + 0.32rem);
   z-index: 80;
   max-height: min(12rem, 32vh);
   overflow-y: auto;
@@ -201,7 +206,8 @@
 }
 
 @media (max-width: 359px) {
-  .app-ui-overlay--audio-mode .audio-practice-metronome__select-row--three {
+  .app-ui-overlay--audio-mode .audio-practice-metronome__select-row--three,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__select-row--four {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -512,6 +518,9 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__controls {
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
   padding: 0.1rem 0.5rem 0.25rem;
   max-width: 100%;
 }
