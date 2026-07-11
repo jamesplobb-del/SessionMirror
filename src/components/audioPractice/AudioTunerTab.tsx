@@ -3,6 +3,7 @@ import LivePitchTuner from '../LivePitchTuner'
 import { useDrone } from '../../hooks/useDrone'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { DroneWaveform } from '../../utils/droneEngine'
+import { APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../../utils/appForeground'
 
 interface AudioTunerTabProps {
   streamRef: RefObject<MediaStream | null>
@@ -77,6 +78,17 @@ export default function AudioTunerTab({
   useEffect(() => {
     void onRequestMicStream()
   }, [onRequestMicStream, streamGeneration, nativeLivePreviewActive])
+
+  useEffect(() => {
+    const recoverTunerMic = () => {
+      void onRequestMicStream()
+      setMicLiveEpoch((epoch) => epoch + 1)
+    }
+    window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
+    return () => {
+      window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
+    }
+  }, [onRequestMicStream])
 
   useEffect(() => {
     if (micStreamLive) {

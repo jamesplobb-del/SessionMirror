@@ -33,6 +33,7 @@ import {
   isSharedPlaybackContext,
   resumePlaybackAudioContext,
 } from '../utils/playbackAudioContext'
+import { APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../utils/appForeground'
 import {
   getTakePlaybackSpeakerNodes,
   registerTakePlaybackSpeakerRoute,
@@ -1848,6 +1849,7 @@ export function useLivePitchTracker(
 
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('focus', recoverMicGraph)
+    window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverMicGraph)
     document.addEventListener('pointerdown', recoverMicGraph)
     document.addEventListener('touchstart', recoverMicGraph)
 
@@ -1874,6 +1876,7 @@ export function useLivePitchTracker(
       unsubscribeNativeCapture()
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('focus', recoverMicGraph)
+      window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverMicGraph)
       document.removeEventListener('pointerdown', recoverMicGraph)
       document.removeEventListener('touchstart', recoverMicGraph)
       removeAppListener?.()

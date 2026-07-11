@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core'
 
 export const APP_BACKGROUND_SUSPEND_EVENT = 'sessionmirror:app-background-suspend'
 export const APP_FOREGROUND_RECOVERY_EVENT = 'sessionmirror:app-foreground-recovery'
+export const APP_INTERACTIVE_MEDIA_RECOVERY_EVENT = 'sessionmirror:interactive-media-recovery'
 
 let appInForeground =
   typeof document === 'undefined' ? true : document.visibilityState === 'visible'
@@ -56,6 +57,7 @@ function dispatchForeground(reason: string): void {
   if (now - lastForegroundDispatchAt >= FOREGROUND_DISPATCH_DEDUPE_MS) {
     lastForegroundDispatchAt = now
     dispatchLifecycleEvent(APP_FOREGROUND_RECOVERY_EVENT, reason)
+    dispatchLifecycleEvent(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, reason)
   }
 
   if (recoveryTimer !== null) {
@@ -67,7 +69,15 @@ function dispatchForeground(reason: string): void {
     if (sequence !== recoverySequence) return
     recoveryTimer = null
     dispatchLifecycleEvent(APP_FOREGROUND_RECOVERY_EVENT, `${reason}:settled`)
+    dispatchLifecycleEvent(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, `${reason}:settled`)
   }, 450)
+}
+
+/** Revalidate idle media engines from a real user gesture without changing their on/off state. */
+export function requestInteractiveMediaRecovery(reason: string): void {
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+  recoverySequence += 1
+  dispatchLifecycleEvent(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, reason)
 }
 
 function markForeground(reason: string): void {

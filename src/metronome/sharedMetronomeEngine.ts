@@ -3,6 +3,7 @@ import { App } from '@capacitor/app'
 import {
   APP_BACKGROUND_SUSPEND_EVENT,
   APP_FOREGROUND_RECOVERY_EVENT,
+  APP_INTERACTIVE_MEDIA_RECOVERY_EVENT,
 } from '../utils/appForeground'
 import {
   cycleAccentLevel,
@@ -395,6 +396,7 @@ class SharedMetronomeEngine {
     window.addEventListener('pagehide', onPageHide)
     window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, onBackground)
     window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, onForeground)
+    window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, onForeground)
 
     const retryOnUserGesture = () => {
       if (!this.resumeOnForeground || this.snapshot.playing) return

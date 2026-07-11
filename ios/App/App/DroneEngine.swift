@@ -34,12 +34,12 @@ final class DroneEngine {
     private var masterVolume: Float = DroneEngine.outputVolume(for: 0.75)
     private var waveform: DroneWaveform = .sine
     private var isRunning = false
-    private var audioSessionPrepared = false
     private var configurationObserver: NSObjectProtocol?
     private let stateLock = NSLock()
 
     private let fadeDuration: TimeInterval = 0.035
     private let oscillatorHeadroom: Float = 0.62
+    private let speakerBusGain: Float = 1.9
 
     private init() {
         engine.attach(mainMixer)
@@ -275,7 +275,7 @@ final class DroneEngine {
                 renderVoices[pitchClass] = voice
             }
 
-            let sample = Self.cleanLimit(mixed * chordNormalization * oscillatorHeadroom)
+            let sample = Self.cleanLimit(mixed * chordNormalization * oscillatorHeadroom * speakerBusGain)
             for channel in 0..<channelCount {
                 guard let buffer = ablPointer[channel].mData?.assumingMemoryBound(to: Float.self) else { continue }
                 buffer[frame] = sample
@@ -364,7 +364,7 @@ final class DroneEngine {
         stateLock.unlock()
 
         do {
-            prepareAudioSessionIfNeeded()
+            try AudioRouteConfigurator.prepareMetronomePlaybackSessionIfNeeded()
             if !engine.isRunning {
                 engine.prepare()
                 try engine.start()
@@ -373,7 +373,10 @@ final class DroneEngine {
             isRunning = true
             let activeNotes = voices.keys.sorted()
             stateLock.unlock()
-            print("[DroneEngine] started activeNotes=\(activeNotes) requestedVolume=\(requestedVolume) outputVolume=\(masterVolume)")
+            print(
+                "[DroneEngine] started activeNotes=\(activeNotes) requestedVolume=\(requestedVolume) " +
+                "outputVolume=\(masterVolume) speakerBusGain=\(speakerBusGain) path=direct"
+            )
         } catch {
             stateLock.lock()
             isRunning = false
@@ -383,42 +386,17 @@ final class DroneEngine {
         }
     }
 
-    private func prepareAudioSessionIfNeeded() {
-        guard !audioSessionPrepared else { return }
-        let session = AVAudioSession.sharedInstance()
-        do {
-            let options: AVAudioSession.CategoryOptions = [
-                .mixWithOthers,
-                .allowBluetoothA2DP,
-                .allowAirPlay,
-                .defaultToSpeaker,
-            ]
-            try AudioRouteConfigurator.debugSetCategory(
-                session,
-                category: .playAndRecord,
-                mode: .default,
-                options: options,
-                caller: "DroneEngine.prepareAudioSession"
-            )
-            try session.setPreferredSampleRate(48_000)
-            try session.setPreferredIOBufferDuration(0.005)
-            try AudioRouteConfigurator.ensureSessionActive(
-                session,
-                caller: "DroneEngine.prepareAudioSession"
-            )
-            audioSessionPrepared = true
-            print("[DroneEngine] prepared audio session route=\(AudioRouteConfigurator.routeSnapshot())")
-        } catch {
-            print("[DroneEngine] audio session prepare failed: \(error.localizedDescription)")
-        }
-    }
-
     private func handleEngineConfigurationChange() {
         stateLock.lock()
         isRunning = false
-        audioSessionPrepared = false
+        let hasAudibleVoice = voices.contains { $0.value.currentGain > 0.001 || $0.value.targetGain > 0.001 }
         stateLock.unlock()
-        print("[DroneEngine] configuration changed; will restart on next note")
+        guard hasAudibleVoice else {
+            print("[DroneEngine] configuration changed; idle")
+            return
+        }
+        print("[DroneEngine] configuration changed; restarting active drone")
+        ensureEngineRunning()
     }
 
     private func stopEngineIfIdle() {

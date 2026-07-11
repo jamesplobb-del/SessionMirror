@@ -6,11 +6,13 @@ import {
   droneSetVolume,
   droneSetWaveform,
   droneSoloNote,
+  droneStart,
   droneStop,
   droneToggleNote,
   isDroneNativeAvailable,
   type DroneWaveform,
 } from '../utils/droneEngine'
+import { APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../utils/appForeground'
 import { loadDronePrefs, saveDronePrefs, type DronePrefs } from '../utils/dronePrefs'
 import { triggerLightHaptic } from '../utils/haptics'
 
@@ -38,6 +40,8 @@ export function useDrone({
 }: UseDroneOptions): UseDroneResult {
   const [prefs, setPrefs] = useState<DronePrefs>(() => loadDronePrefs())
   const restoredRef = useRef(false)
+  const prefsRef = useRef(prefs)
+  prefsRef.current = prefs
 
   useEffect(() => {
     if (!isDroneNativeAvailable() || restoredRef.current) return
@@ -97,6 +101,17 @@ export function useDrone({
       return next
     })
   }, [])
+
+  useEffect(() => {
+    const recoverActiveDrone = () => {
+      if (!isDroneNativeAvailable() || prefsRef.current.activeNotes.length === 0) return
+      void droneStart().then(() => syncFromNative()).catch(() => {})
+    }
+    window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverActiveDrone)
+    return () => {
+      window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverActiveDrone)
+    }
+  }, [syncFromNative])
 
   const toggleNote = useCallback(
     (pitchClass: number) => {
