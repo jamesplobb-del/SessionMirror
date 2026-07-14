@@ -64,7 +64,7 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
   {
     intensity = 'normal',
     squish = true,
-    haptic = false,
+    haptic = 'light',
     hapticFeedback = true,
     transition,
     whileTap,

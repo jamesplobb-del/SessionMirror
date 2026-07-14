@@ -72,13 +72,13 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showTakeCards: true,
   showMetronome: false,
   muteMetronomeDuringPlayback: true,
-  takeCardScale: 100,
+  takeCardScale: 105,
   audioEnhancerEnabled: false,
   nativeExperimentalAudioEnabled: true,
   audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
   speakerLoudnessPreset: 'phone',
   excludeYoutubeFromRecording: false,
-  micInputPreference: 'headphone',
+  micInputPreference: 'iphone',
   captureProfile: 'natural',
 }
 

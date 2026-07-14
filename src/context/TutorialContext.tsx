@@ -8,7 +8,11 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { COACH_MARKS, type CoachMarkContent, type CoachMarkId } from '../utils/tutorialContent'
+import {
+  COACH_MARKS,
+  type CoachMarkContent,
+  type TutorialActionId,
+} from '../utils/tutorialContent'
 import {
   hasSeenCoachMark,
   markAllCoachMarksSeen,
@@ -18,9 +22,11 @@ import {
 interface TutorialContextValue {
   activeCoachMark: CoachMarkContent | null
   activeTargetRect: DOMRect | null
+  activeStepNumber: number
+  totalSteps: number
   dismissCoachMark: () => void
   skipCoachMarks: () => void
-  markCoachMark: (id: CoachMarkId) => void
+  markCoachMark: (id: TutorialActionId) => void
 }
 
 const TutorialContext = createContext<TutorialContextValue | null>(null)
@@ -32,10 +38,12 @@ export interface TutorialSignals {
   isSplitView: boolean
   autoSoundRecording: boolean
   recordingMode: 'video' | 'audio'
+  audioPracticeTab: 'audio' | 'metronome' | 'tuner' | 'practice'
 }
 
 interface TutorialProviderProps {
   active: boolean
+  enabled: boolean
   onComplete?: () => void
   signals?: TutorialSignals
   children: ReactNode
@@ -57,10 +65,18 @@ function coachMarkIsVisible(coachMark: CoachMarkContent, signals?: TutorialSigna
   if (coachMark.requiresRecordingMode && signals?.recordingMode !== coachMark.requiresRecordingMode) {
     return false
   }
+  if (coachMark.requiresVault === 'open' && !signals?.isVaultOpen) return false
+  if (coachMark.requiresVault === 'closed' && signals?.isVaultOpen) return false
   return Boolean(findVisibleTarget(coachMark.selector))
 }
 
-export function TutorialProvider({ active, onComplete, signals, children }: TutorialProviderProps) {
+export function TutorialProvider({
+  active,
+  enabled,
+  onComplete,
+  signals,
+  children,
+}: TutorialProviderProps) {
   const [activeCoachMark, setActiveCoachMark] = useState<CoachMarkContent | null>(null)
   const [activeTargetRect, setActiveTargetRect] = useState<DOMRect | null>(null)
   const onCompleteRef = useRef(onComplete)
@@ -81,7 +97,7 @@ export function TutorialProvider({ active, onComplete, signals, children }: Tuto
 
   const dismissCoachMark = useCallback(() => {
     setActiveCoachMark((current) => {
-      if (!current || current.advance !== 'dismiss') return current
+      if (!current || current.advance !== 'tap-screen') return current
       markCoachMarkSeen(current.id)
       return null
     })
@@ -94,55 +110,30 @@ export function TutorialProvider({ active, onComplete, signals, children }: Tuto
     onCompleteRef.current?.()
   }, [clearCoachMark])
 
-  const markCoachMark = useCallback(
-    (id: CoachMarkId) => {
-      if (id === 'youtube-opened' || id === 'media-touched') {
-        setActiveCoachMark((current) => {
-          if (current?.id !== 'practice-media') return current
-          markCoachMarkSeen('practice-media')
-          return null
-        })
-        setActiveTargetRect(null)
-        return
-      }
-
-      if (id !== 'branch-widget-selected' && id !== 'hands-free-toggled') return
-
-      setActiveCoachMark((current) => {
-        if (!current || current.advance !== 'branch-widget-or-hands-free') return current
-        markCoachMarkSeen(current.id)
-        return null
-      })
-      setActiveTargetRect(null)
-    },
-    [],
-  )
+  const markCoachMark = useCallback((_id: TutorialActionId) => {}, [])
 
   const skipCoachMarks = useCallback(() => {
     completeInteractiveTutorial()
   }, [completeInteractiveTutorial])
 
   const showNextCoachMark = useCallback(() => {
-    for (const coachMark of COACH_MARKS) {
-      if (hasSeenCoachMark(coachMark.id)) continue
-      if (!coachMarkIsVisible(coachMark, signals)) continue
-      const target = findVisibleTarget(coachMark.selector)
-      if (!target) continue
-      setActiveCoachMark(coachMark)
-      setActiveTargetRect(target.getBoundingClientRect())
-      return true
-    }
-    return false
+    const coachMark = COACH_MARKS.find((candidate) => !hasSeenCoachMark(candidate.id))
+    if (!coachMark || !coachMarkIsVisible(coachMark, signals)) return false
+    const target = findVisibleTarget(coachMark.selector)
+    if (!target) return false
+    setActiveCoachMark(coachMark)
+    setActiveTargetRect(target.getBoundingClientRect())
+    return true
   }, [signals])
 
   useEffect(() => {
-    if (active || activeCoachMark || typeof document === 'undefined') return
+    if (!enabled || active || activeCoachMark || typeof document === 'undefined') return
 
     let cancelled = false
     const timer = window.setTimeout(() => {
       if (cancelled) return
       const shown = showNextCoachMark()
-      if (!shown) {
+      if (!shown && COACH_MARKS.every((coachMark) => hasSeenCoachMark(coachMark.id))) {
         onCompleteRef.current?.()
       }
     }, 900)
@@ -151,51 +142,84 @@ export function TutorialProvider({ active, onComplete, signals, children }: Tuto
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [active, activeCoachMark, showNextCoachMark])
+  }, [active, activeCoachMark, enabled, showNextCoachMark])
 
   useEffect(() => {
-    if (active || activeCoachMark || typeof document === 'undefined') return
+    if (!enabled || active || activeCoachMark || typeof document === 'undefined') return
 
     const shown = showNextCoachMark()
     if (!shown && COACH_MARKS.every((coachMark) => hasSeenCoachMark(coachMark.id))) {
       onCompleteRef.current?.()
     }
-  }, [active, activeCoachMark, showNextCoachMark, signals?.isSplitView, signals?.recordingMode])
+  }, [
+    active,
+    activeCoachMark,
+    enabled,
+    showNextCoachMark,
+    signals?.audioPracticeTab,
+    signals?.isSplitView,
+    signals?.isVaultOpen,
+    signals?.recordingMode,
+  ])
 
   useEffect(() => {
     if (!activeCoachMark) return
 
-    if (activeCoachMark.advance === 'split-open' && signals?.isSplitView) {
+    if (activeCoachMark.advance === 'audio-mode' && signals?.recordingMode === 'audio') {
       advanceCoachMark(activeCoachMark)
       return
     }
 
-    if (activeCoachMark.advance === 'split-close' && !signals?.isSplitView) {
+    if (
+      activeCoachMark.advance === 'audio-tab-metronome' &&
+      signals?.audioPracticeTab === 'metronome'
+    ) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (
+      activeCoachMark.advance === 'audio-tab-tuner' &&
+      signals?.audioPracticeTab === 'tuner'
+    ) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'vault-open' && signals?.isVaultOpen) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'vault-close' && !signals?.isVaultOpen) {
       advanceCoachMark(activeCoachMark)
     }
-  }, [activeCoachMark, advanceCoachMark, signals?.isSplitView])
+  }, [
+    activeCoachMark,
+    advanceCoachMark,
+    signals?.audioPracticeTab,
+    signals?.isVaultOpen,
+    signals?.recordingMode,
+  ])
 
   useEffect(() => {
-    if (!activeCoachMark || activeCoachMark.advance !== 'branch-widget-or-hands-free') return
-    if (hasSeenCoachMark(activeCoachMark.id)) {
-      clearCoachMark()
-    }
-  }, [activeCoachMark, clearCoachMark])
+    if (enabled && !active) return
+    clearCoachMark()
+  }, [active, clearCoachMark, enabled])
 
   useEffect(() => {
-    if (activeCoachMark || typeof document === 'undefined') return
+    if (!enabled || active || activeCoachMark || typeof document === 'undefined') return
     if (!COACH_MARKS.every((coachMark) => hasSeenCoachMark(coachMark.id))) return
     onCompleteRef.current?.()
-  }, [activeCoachMark])
+  }, [active, activeCoachMark, enabled])
 
   useEffect(() => {
     if (!activeCoachMark || typeof window === 'undefined') return
 
     const updateRect = () => {
       const target = findVisibleTarget(activeCoachMark.selector)
-      if (!target) {
-        if (coachMarkIsVisible(activeCoachMark, signals)) return
-        clearCoachMark()
+      if (!target || !coachMarkIsVisible(activeCoachMark, signals)) {
+        setActiveTargetRect(null)
         return
       }
       setActiveTargetRect(target.getBoundingClientRect())
@@ -211,17 +235,30 @@ export function TutorialProvider({ active, onComplete, signals, children }: Tuto
       window.removeEventListener('scroll', updateRect, true)
       window.clearInterval(interval)
     }
-  }, [activeCoachMark, clearCoachMark, signals])
+  }, [activeCoachMark, signals])
+
+  const activeStepNumber = activeCoachMark
+    ? Math.max(1, COACH_MARKS.findIndex((coachMark) => coachMark.id === activeCoachMark.id) + 1)
+    : 0
 
   const value = useMemo(
     () => ({
       activeCoachMark,
       activeTargetRect,
+      activeStepNumber,
+      totalSteps: COACH_MARKS.length,
       dismissCoachMark,
       skipCoachMarks,
       markCoachMark,
     }),
-    [activeCoachMark, activeTargetRect, dismissCoachMark, markCoachMark, skipCoachMarks],
+    [
+      activeCoachMark,
+      activeStepNumber,
+      activeTargetRect,
+      dismissCoachMark,
+      markCoachMark,
+      skipCoachMarks,
+    ],
   )
 
   return <TutorialContext.Provider value={value}>{children}</TutorialContext.Provider>
@@ -231,6 +268,6 @@ export function useTutorial(): TutorialContextValue | null {
   return useContext(TutorialContext)
 }
 
-export function useTutorialAction(): ((id: CoachMarkId) => void) | undefined {
+export function useTutorialAction(): ((id: TutorialActionId) => void) | undefined {
   return useContext(TutorialContext)?.markCoachMark
 }

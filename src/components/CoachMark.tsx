@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Pressable from './ui/Pressable'
 import { useTutorial } from '../context/TutorialContext'
@@ -67,12 +66,18 @@ export default function CoachMark() {
     : shouldShowBelow
       ? 'coach-mark-card--below'
       : 'coach-mark-card--above'
-  const canDismiss = coachMark.advance === 'dismiss'
+  const advancesOnScreenTap = coachMark.advance === 'tap-screen'
   const initialOffset = sidePlacement === 'left' ? 8 : sidePlacement === 'right' ? -8 : 0
   const initialYOffset = sidePlacement ? 0 : shouldShowBelow ? -8 : 8
 
   return createPortal(
-    <div className="coach-mark-layer fixed inset-0 z-[140] pointer-events-none" aria-live="polite">
+    <div
+      className={`coach-mark-layer fixed inset-0 z-[140] ${
+        advancesOnScreenTap ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}
+      aria-live="polite"
+      onClick={advancesOnScreenTap ? tutorial.dismissCoachMark : undefined}
+    >
       <motion.div
         className="coach-mark-target pointer-events-none"
         initial={{ opacity: 0, scale: 0.96 }}
@@ -107,28 +112,22 @@ export default function CoachMark() {
         } as CSSProperties}
       >
         <div className="coach-mark-card__arrow" aria-hidden />
+        <span className="coach-mark-card__progress" aria-hidden>
+          {tutorial.activeStepNumber} of {tutorial.totalSteps}
+        </span>
         <div className="coach-mark-card__copy">
           <h2>{coachMark.title}</h2>
           <p>{coachMark.body}</p>
           <p className="coach-mark-card__continue">{coachMark.continueHint}</p>
         </div>
-        {canDismiss && (
-          <Pressable
-            type="button"
-            intensity="icon"
-            haptic="light"
-            onClick={tutorial.dismissCoachMark}
-            className="coach-mark-card__close"
-            aria-label="Dismiss tip"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Pressable>
-        )}
         <Pressable
           type="button"
           intensity="soft"
           haptic="light"
-          onClick={tutorial.skipCoachMarks}
+          onClick={(event) => {
+            event.stopPropagation()
+            tutorial.skipCoachMarks()
+          }}
           className="coach-mark-card__skip"
         >
           Skip

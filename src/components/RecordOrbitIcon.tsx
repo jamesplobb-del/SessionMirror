@@ -6,7 +6,6 @@ interface RecordOrbitIconProps {
 
 export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconProps) {
   const id = useId().replace(/:/g, '')
-  const ringGradientId = `record-orbit-ring-${id}`
   const dotGradientId = `record-orbit-dot-${id}`
 
   return (
@@ -16,19 +15,6 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
     >
       <svg viewBox="0 0 64 64" className="record-orbit-icon__svg" fill="none">
         <defs>
-          <linearGradient
-            id={ringGradientId}
-            x1="0"
-            y1="32"
-            x2="64"
-            y2="32"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop offset="0%" stopColor="var(--sm-gold, #f7a600)" />
-            <stop offset="50%" stopColor="var(--sm-gold, #f7a600)" />
-            <stop offset="50%" stopColor="var(--sm-blue, #1598ff)" />
-            <stop offset="100%" stopColor="var(--sm-blue, #1598ff)" />
-          </linearGradient>
           <radialGradient id={dotGradientId} cx="38%" cy="32%" r="72%">
             <stop offset="0%" stopColor="#ff9a5c" />
             <stop offset="55%" stopColor="#ff4d4d" />
@@ -41,9 +27,7 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
             className="record-orbit-icon__ring"
             cx="32"
             cy="32"
-            r="28"
-            stroke={`url(#${ringGradientId})`}
-            strokeWidth="1.55"
+            r="28.5"
           />
         </g>
 

@@ -309,7 +309,10 @@ export interface BestTakeAudioPluginType {
   playNativeCameraTestPostProcess(options: { url: string }): Promise<NativeCameraPostProcessPlaybackResult>
   stopNativeCameraTestPostProcess(): Promise<void>
   /** Native pre-warmed Taptic Engine impact. iOS only. */
-  hapticImpact(options: { style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid' }): Promise<void>
+  hapticImpact(options: {
+    style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid'
+    intensity?: number
+  }): Promise<void>
   /** Native pre-warmed Taptic Engine notification. iOS only. */
   hapticNotification(options: { type: 'success' | 'warning' | 'error' }): Promise<void>
   /** Re-prime the Taptic Engine so the next haptic fires instantly. iOS only. */

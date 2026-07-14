@@ -4,7 +4,11 @@ import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'r
 import { createPortal } from 'react-dom'
 import { useTutorialAction } from '../context/TutorialContext'
 import MetronomeIcon from './icons/MetronomeIcon'
-import { BRANCH_ITEM_WIDTH, layoutBranchItems } from '../utils/settingsBranchLayout'
+import {
+  BRANCH_ITEM_WIDTH,
+  layoutBranchItems,
+  type SettingsBranchLayoutMode,
+} from '../utils/settingsBranchLayout'
 import { motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
 import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
 import { triggerLightHaptic } from '../utils/haptics'
@@ -18,18 +22,22 @@ interface SettingsBranchWheelProps {
   showTakeCards: boolean
   showMetronome: boolean
   audioEnhancerEnabled: boolean
+  layoutMode?: SettingsBranchLayoutMode
+  tunerTakePillsVisible?: boolean
+  tunerTakePillsToggleVisible?: boolean
   pitchToggleVisible: boolean
   takeCardsToggleVisible?: boolean
   onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
   onShowMetronomeChange: (show: boolean) => void
   onAudioEnhancerChange: (enabled: boolean) => void
+  onTunerTakePillsChange?: (show: boolean) => void
 }
 
 interface BranchItem {
   id: string
   label: string
-  icon: 'pitch' | 'take-cards' | 'metronome' | 'enhancer'
+  icon: 'pitch' | 'take-cards' | 'tuner-takes' | 'metronome' | 'enhancer'
   active: boolean
   onSelect: () => void
 }
@@ -45,12 +53,16 @@ export default function SettingsBranchWheel({
   showTakeCards,
   showMetronome,
   audioEnhancerEnabled,
+  layoutMode = 'camera',
+  tunerTakePillsVisible = false,
+  tunerTakePillsToggleVisible = false,
   pitchToggleVisible,
   takeCardsToggleVisible = true,
   onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
   onAudioEnhancerChange,
+  onTunerTakePillsChange,
 }: SettingsBranchWheelProps) {
   const notifyTutorial = useTutorialAction()
   const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
@@ -74,10 +86,14 @@ export default function SettingsBranchWheel({
     measure()
     window.addEventListener('resize', measure)
     window.addEventListener('scroll', measure, true)
+    window.visualViewport?.addEventListener('resize', measure)
+    window.visualViewport?.addEventListener('scroll', measure)
 
     return () => {
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
+      window.visualViewport?.removeEventListener('resize', measure)
+      window.visualViewport?.removeEventListener('scroll', measure)
     }
   }, [anchorRef, open])
 
@@ -135,6 +151,16 @@ export default function SettingsBranchWheel({
       })
     }
 
+    if (tunerTakePillsToggleVisible) {
+      items.push({
+        id: 'tuner-takes',
+        label: 'Tuner Takes',
+        icon: 'tuner-takes',
+        active: tunerTakePillsVisible,
+        onSelect: () => onTunerTakePillsChange?.(!tunerTakePillsVisible),
+      })
+    }
+
     items.push(
       {
         id: 'metronome',
@@ -159,14 +185,19 @@ export default function SettingsBranchWheel({
     onPitchTrackerChange,
     onShowMetronomeChange,
     onShowTakeCardsChange,
+    onTunerTakePillsChange,
     pitchToggleVisible,
     pitchTrackerEnabled,
     showMetronome,
     showTakeCards,
     takeCardsToggleVisible,
+    tunerTakePillsToggleVisible,
+    tunerTakePillsVisible,
   ])
 
-  const positions = anchor ? layoutBranchItems(branchItems.length, anchor.rect) : []
+  const positions = anchor
+    ? layoutBranchItems(branchItems.length, anchor.rect, layoutMode)
+    : []
 
   if (typeof document === 'undefined') return null
 
@@ -197,7 +228,7 @@ export default function SettingsBranchWheel({
             }}
           >
             <motion.div
-              className="settings-branch-wheel relative"
+              className={`settings-branch-wheel settings-branch-wheel--${layoutMode} relative`}
               role="menu"
               aria-label="Quick settings"
               initial={{ opacity: 0 }}
@@ -231,7 +262,7 @@ export default function SettingsBranchWheel({
                       type="button"
                       role="menuitem"
                       {...(tutorialTarget ? { 'data-tutorial': tutorialTarget } : {})}
-                      className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center gap-1.5 ${NATIVE_SQUISH} ${
+                      className={`settings-branch-wheel__item pointer-events-auto flex w-full flex-col items-center ${NATIVE_SQUISH} ${
                         item.active ? 'settings-branch-wheel__item--active' : ''
                       }`}
                       initial={nativeGlideIn}
@@ -247,11 +278,11 @@ export default function SettingsBranchWheel({
                         notifyTutorial?.('branch-widget-selected')
                       }}
                     >
-                      <span className="ui-orient-spin flex w-full flex-col items-center gap-1.5">
+                      <span className="ui-orient-spin flex w-full flex-col items-center">
                         <span className="settings-branch-wheel__icon flex h-11 w-11 items-center justify-center rounded-full bg-black/55">
                           {item.icon === 'pitch' ? (
                             <AudioLines className="h-5 w-5" strokeWidth={2.1} />
-                          ) : item.icon === 'take-cards' ? (
+                          ) : item.icon === 'take-cards' || item.icon === 'tuner-takes' ? (
                             <LayoutGrid className="h-5 w-5" strokeWidth={2.1} />
                           ) : item.icon === 'enhancer' ? (
                             <Sparkles className="h-5 w-5" strokeWidth={2.1} />
@@ -259,7 +290,7 @@ export default function SettingsBranchWheel({
                             <MetronomeIcon className="h-5 w-5" />
                           )}
                         </span>
-                        <span className="settings-branch-wheel__label block max-w-[5.5rem] text-center text-[10px] font-semibold leading-snug tracking-wide">
+                        <span className="settings-branch-wheel__label block w-full text-center text-[10px] font-semibold">
                           {item.label}
                         </span>
                       </span>

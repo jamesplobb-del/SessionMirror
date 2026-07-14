@@ -124,13 +124,20 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func hapticImpact(_ call: CAPPluginCall) {
         let style = call.getString("style") ?? "medium"
+        let requestedIntensity = call.getDouble("intensity")
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
                 call.resolve()
                 return
             }
             let generator = self.impactGenerators[style] ?? self.impactGenerators["medium"]
-            generator?.impactOccurred()
+            generator?.prepare()
+            if #available(iOS 13.0, *), let requestedIntensity = requestedIntensity {
+                let intensity = CGFloat(max(0, min(1, requestedIntensity)))
+                generator?.impactOccurred(intensity: intensity)
+            } else {
+                generator?.impactOccurred()
+            }
             // Re-prime immediately so the next tap is just as crisp.
             generator?.prepare()
             call.resolve()

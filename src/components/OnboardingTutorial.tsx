@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, ChevronLeft, X } from 'lucide-react'
+import { ChevronLeft, MousePointer2 } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
@@ -9,12 +9,14 @@ import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { triggerLightHaptic } from '../utils/haptics'
 
 interface OnboardingTutorialProps {
-  onClose: () => void
+  onComplete: () => void
+  onSkip: () => void
   hapticFeedback?: boolean
 }
 
 export default function OnboardingTutorial({
-  onClose,
+  onComplete,
+  onSkip,
   hapticFeedback = true,
 }: OnboardingTutorialProps) {
   const [index, setIndex] = useState(0)
@@ -30,8 +32,13 @@ export default function OnboardingTutorial({
 
   const finish = useCallback(() => {
     markOnboardingComplete()
-    onClose()
-  }, [onClose])
+    onComplete()
+  }, [onComplete])
+
+  const skip = useCallback(() => {
+    markOnboardingComplete()
+    onSkip()
+  }, [onSkip])
 
   const handleNext = useCallback(() => {
     void triggerLightHaptic(hapticFeedback)
@@ -47,10 +54,27 @@ export default function OnboardingTutorial({
     setIndex((value) => Math.max(0, value - 1))
   }, [hapticFeedback])
 
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      handleNext()
+    },
+    [handleNext],
+  )
+
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <div className="onboarding-lite fixed inset-0 z-[145]" role="dialog" aria-modal="true" aria-label="BestTake onboarding">
+    <div
+      className="onboarding-lite fixed inset-0 z-[145]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="BestTake onboarding"
+      tabIndex={0}
+      onClick={handleNext}
+      onKeyDown={handleKeyDown}
+    >
       <motion.div
         className="onboarding-lite__backdrop absolute inset-0"
         initial={{ opacity: 0 }}
@@ -69,7 +93,10 @@ export default function OnboardingTutorial({
           <Pressable
             type="button"
             intensity="icon"
-            onClick={handleBack}
+            onClick={(event) => {
+              event.stopPropagation()
+              handleBack()
+            }}
             disabled={index === 0}
             className="onboarding-lite__icon-btn"
             aria-label="Previous card"
@@ -79,15 +106,9 @@ export default function OnboardingTutorial({
           <div className="onboarding-lite__glyph" aria-hidden>
             <img src="/icons/icon.png" alt="" draggable={false} />
           </div>
-          <Pressable
-            type="button"
-            intensity="icon"
-            onClick={finish}
-            className="onboarding-lite__icon-btn"
-            aria-label="Close onboarding"
-          >
-            <X className="h-4 w-4" />
-          </Pressable>
+          <span className="onboarding-lite__step" aria-label={`Step ${index + 1} of ${ONBOARDING_CARDS.length}`}>
+            {index + 1}/{ONBOARDING_CARDS.length}
+          </span>
         </header>
 
         <AnimatePresence mode="wait">
@@ -116,28 +137,18 @@ export default function OnboardingTutorial({
             intensity="soft"
             haptic="light"
             hapticFeedback={hapticFeedback}
-            onClick={finish}
+            onClick={(event) => {
+              event.stopPropagation()
+              skip()
+            }}
             className="onboarding-lite__skip"
           >
             Skip
           </Pressable>
-          <Pressable
-            type="button"
-            intensity="soft"
-            haptic="light"
-            hapticFeedback={hapticFeedback}
-            onClick={handleNext}
-            className="onboarding-lite__primary"
-          >
-            {isLast ? (
-              <>
-                <CheckCircle2 className="h-4 w-4" />
-                Start Practicing
-              </>
-            ) : (
-              'Next'
-            )}
-          </Pressable>
+          <div className="onboarding-lite__tap-hint" aria-hidden>
+            <MousePointer2 className="h-4 w-4" />
+            {isLast ? 'Tap to start the guided tour' : 'Tap anywhere to continue'}
+          </div>
         </footer>
       </motion.div>
     </div>,

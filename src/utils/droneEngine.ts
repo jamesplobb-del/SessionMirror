@@ -19,7 +19,7 @@ interface DronePluginType {
   start(): Promise<DroneState>
   stop(): Promise<DroneState>
   toggleNote(options: { pitchClass: number }): Promise<DroneToggleResult>
-  soloNote(options: { pitchClass: number }): Promise<DroneToggleResult>
+  soloNote(options: { pitchClass: number; octave?: number }): Promise<DroneToggleResult>
   setOctave(options: { octave: number }): Promise<DroneState>
   setVolume(options: { volume: number }): Promise<DroneState>
   setWaveform(options: { waveform: DroneWaveform }): Promise<DroneState>
@@ -115,8 +115,13 @@ export async function droneToggleNote(pitchClass: number): Promise<DroneToggleRe
   return plugin().toggleNote({ pitchClass })
 }
 
-export async function droneSoloNote(pitchClass: number): Promise<DroneToggleResult> {
-  return plugin().soloNote({ pitchClass })
+export async function droneSoloNote(
+  pitchClass: number,
+  octave?: number,
+): Promise<DroneToggleResult> {
+  return plugin().soloNote(
+    octave === undefined ? { pitchClass } : { pitchClass, octave },
+  )
 }
 
 export async function droneSetOctave(octave: number): Promise<DroneState> {

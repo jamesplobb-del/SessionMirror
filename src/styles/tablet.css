@@ -471,6 +471,12 @@
     min-height: clamp(16rem, 34vh, 24rem);
   }
 
+  .app-ui-overlay--audio-practice-tuner.app-ui-overlay--tuner-takes-hidden
+    .pitch-audio-stage--polished
+    .pitch-audio-stage__chart {
+    min-height: clamp(20rem, 44vh, 30rem);
+  }
+
   .app-ui-overlay--audio-mode .pitch-chart-card {
     border-radius: 1.35rem;
   }
@@ -741,6 +747,12 @@
 
   .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__chart {
     min-height: clamp(18rem, 52vh, 28rem);
+  }
+
+  .app-ui-overlay--audio-practice-tuner.app-ui-overlay--tuner-takes-hidden
+    .pitch-audio-stage--polished
+    .pitch-audio-stage__chart {
+    min-height: clamp(22rem, 58vh, 34rem);
   }
 
   .animated-bottom-sheet,

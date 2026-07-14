@@ -38,6 +38,7 @@ export default function AudioPracticeTopTabs({
                 requestInteractiveMediaRecovery(`audio-top-tab:${tab.id}`)
                 onTabChange(tab.id)
               }}
+              data-tutorial={`audio-tab-${tab.id}`}
               className={`audio-practice-top-tabs__btn ${isActive ? 'audio-practice-top-tabs__btn--active' : ''}`}
               aria-current={isActive ? 'page' : undefined}
             >

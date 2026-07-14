@@ -103,7 +103,7 @@ import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosFade, iosHudDim, motionGpuLayer } from './utils/motionPresets'
-import { isOnboardingComplete } from './utils/onboardingTutorial'
+import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
@@ -220,6 +220,7 @@ import {
 } from './practiceTimeline/recording/timelineMarkers'
 import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
 import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './context/AudioModePlaybackContext'
+import type { AudioPracticeTab } from './types/audioPractice'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 0
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
@@ -470,7 +471,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
+  const [tutorialTourEnabled, setTutorialTourEnabled] = useState(false)
   const [practiceSessionActive, setPracticeSessionActive] = useState(false)
+  const [showTunerTakePills, setShowTunerTakePills] = useState(false)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
   const {
@@ -478,6 +481,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setActiveTab: setAudioPracticeTab,
     resetToAudioTab,
   } = useAudioPracticeTab()
+  const handleAudioPracticeTabChange = useCallback(
+    (tab: AudioPracticeTab) => {
+      if (tab === 'tuner' && audioPracticeTab !== 'tuner') {
+        setShowTunerTakePills(false)
+      }
+      setAudioPracticeTab(tab)
+    },
+    [audioPracticeTab, setAudioPracticeTab],
+  )
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
   const audioEnhancerEnabledRef = useRef(settings.audioEnhancerEnabled)
@@ -556,12 +568,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return () => window.clearTimeout(timer)
   }, [])
 
-  const handleCloseOnboardingTutorial = useCallback(() => {
+  const handleCompleteOnboardingTutorial = useCallback(() => {
     setShowOnboardingTutorial(false)
+    setTutorialTourEnabled(true)
+  }, [])
+
+  const handleSkipOnboardingTutorial = useCallback(() => {
+    markAllCoachMarksSeen()
+    setShowOnboardingTutorial(false)
+    setTutorialTourEnabled(false)
   }, [])
 
   const handleReplayOnboardingTutorial = useCallback(() => {
     setIsSettingsOpen(false)
+    setTutorialTourEnabled(false)
     scheduleAfterPaint(() => {
       setShowOnboardingTutorial(true)
     })
@@ -2358,8 +2378,46 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       return
     }
 
+    if (
+      recordingModeRef.current === 'video' &&
+      isRecording &&
+      settings.autoSoundRecording
+    ) {
+      updateSettings({ autoSoundRecording: false })
+    }
+
     toggleRecording()
-  }, [isRecording, ready, requestCameraAccess, toggleRecording])
+  }, [
+    isRecording,
+    ready,
+    requestCameraAccess,
+    settings.autoSoundRecording,
+    toggleRecording,
+    updateSettings,
+  ])
+
+  const handleAutoSoundRecordingChange = useCallback(
+    (enabled: boolean) => {
+      updateSettings({ autoSoundRecording: enabled })
+
+      if (recordingModeRef.current !== 'video') return
+
+      if (!enabled) {
+        void disarmAutoRecording()
+        return
+      }
+
+      // Camera startup and hands-free activation can overlap on a fresh launch.
+      // Warm the existing pre-roll path now; its native bridge acquisition is
+      // serialized so this safely joins an in-flight camera startup.
+      void warmAutoRecording().finally(() => {
+        if (recordingModeRef.current === 'video') {
+          restartHandsFreeMonitorRef.current()
+        }
+      })
+    },
+    [disarmAutoRecording, updateSettings, warmAutoRecording],
+  )
 
   const handleCloseSettings = useCallback(() => {
     if (import.meta.env.DEV) {
@@ -3586,12 +3644,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       isSplitView,
       autoSoundRecording: settings.autoSoundRecording,
       recordingMode,
+      audioPracticeTab,
     }),
-    [isRecording, isReviewOpen, isSplitView, isVaultOpen, recordingMode, settings.autoSoundRecording]
+    [
+      audioPracticeTab,
+      isRecording,
+      isReviewOpen,
+      isSplitView,
+      isVaultOpen,
+      recordingMode,
+      settings.autoSoundRecording,
+    ]
   )
 
   return (
-    <TutorialProvider active={showOnboardingTutorial} signals={tutorialSignals}>
+    <TutorialProvider
+      active={showOnboardingTutorial}
+      enabled={tutorialTourEnabled}
+      signals={tutorialSignals}
+      onComplete={() => setTutorialTourEnabled(false)}
+    >
       <ActionSheetProvider>
         <MetronomeProvider
           isTakePlaying={takePlaybackActive}
@@ -3903,7 +3975,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     isSplitView ? 'app-ui-overlay--split-open' : ''
                   } ${
                     isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
-                  } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''                  } ${
+                  } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${
+                    isAudioPracticeTunerTab && !showTunerTakePills
+                      ? 'app-ui-overlay--tuner-takes-hidden'
+                      : ''
+                  } ${
                     isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline app-ui-overlay--audio-practice-metronome' : ''
                   } ${practiceSessionActive ? 'app-ui-overlay--practice-session-active' : ''}`}
                   aria-hidden={hudModalState === 'review'}
@@ -3963,7 +4039,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       >
                         <AudioPracticeTopTabs
                           activeTab={audioPracticeTab}
-                          onTabChange={setAudioPracticeTab}
+                          onTabChange={handleAudioPracticeTabChange}
                         />
                       </motion.div>
                     )}
@@ -4105,10 +4181,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
-                    {(isAudioPracticeTunerTab ||
-                      (isAudioPracticeTimelineTab && practiceSessionActive)) &&
+                    {((isAudioPracticeTunerTab && showTunerTakePills) ||
+                      (isAudioPracticeTimelineTab && practiceSessionActive && settings.showTakeCards)) &&
                       !quickSettingsOpen &&
-                      settings.showTakeCards && (
+                      (
                         <motion.div
                           key={
                             isAudioPracticeTimelineTab && practiceSessionActive
@@ -4116,7 +4192,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                               : 'tuner-take-pills'
                           }
                           className={`audio-tuner-take-pills-wrap pointer-events-auto w-full ${
-                            isAudioPracticeTimelineTab && practiceSessionActive
+                            isAudioPracticeTunerTab ||
+                            (isAudioPracticeTimelineTab && practiceSessionActive)
                               ? 'audio-tuner-take-pills-wrap--compact'
                               : ''
                           }`}
@@ -4127,7 +4204,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         >
                           <TunerTakePillRow
                             compact={
-                              isAudioPracticeTimelineTab && practiceSessionActive
+                              isAudioPracticeTunerTab ||
+                              (isAudioPracticeTimelineTab && practiceSessionActive)
                             }
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
@@ -4210,9 +4288,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         handsFreeRecording={handsFreeRecording}
                         handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
                         autoSoundRecording={settings.autoSoundRecording}
-                        onAutoSoundRecordingChange={(enabled) =>
-                          updateSettings({ autoSoundRecording: enabled })
-                        }
+                        onAutoSoundRecordingChange={handleAutoSoundRecordingChange}
                         recordDropRef={recordDeleteDropRef}
                         dragDeleteActive={pipDragState.isDragging}
                         dragOverDelete={pipDragState.overDelete}
@@ -4225,6 +4301,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onShowMetronomeChange={handleShowMetronomeSettingChange}
                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
+                        settingsLayoutMode={
+                          isAudioPracticeTunerTab
+                            ? 'tuner'
+                            : recordingMode === 'audio'
+                              ? 'audio'
+                              : 'camera'
+                        }
+                        tunerTakePillsVisible={showTunerTakePills}
+                        tunerTakePillsToggleVisible={isAudioPracticeTunerTab}
+                        onTunerTakePillsChange={setShowTunerTakePills}
                         settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen}
                         onBranchOpenChange={handleQuickSettingsOpenChange}
                         hapticFeedback={settings.hapticFeedback}
@@ -4406,7 +4492,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     {showOnboardingTutorial && (
                       <OnboardingTutorial
                         key="onboarding-tutorial"
-                        onClose={handleCloseOnboardingTutorial}
+                        onComplete={handleCompleteOnboardingTutorial}
+                        onSkip={handleSkipOnboardingTutorial}
                         hapticFeedback={settings.hapticFeedback}
                       />
                     )}

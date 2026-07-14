@@ -1,26 +1,34 @@
 export type OnboardingCardId =
-  | 'record-two-videos'
-  | 'pin-first-best'
-  | 'record-practice'
-  | 'analyze-playing'
-  | 'save-best-takes'
-  | 'import-practice-media'
+  | 'welcome'
+  | 'capture'
+  | 'practice-tools'
+  | 'take-vault'
 
 export type CoachMarkId =
-  | 'expand-mode'
-  | 'practice-media'
-  | 'close-expand'
+  | 'camera-recording'
+  | 'hands-free-recording'
+  | 'switch-to-audio'
+  | 'audio-workspace'
+  | 'visit-metronome'
+  | 'visit-tuner'
+  | 'open-take-vault'
+  | 'take-vault-overview'
+  | 'close-take-vault'
   | 'quick-settings'
+
+export type TutorialActionId =
   | 'youtube-opened'
   | 'media-touched'
   | 'branch-widget-selected'
   | 'hands-free-toggled'
 
 export type CoachMarkAdvance =
-  | 'dismiss'
-  | 'split-open'
-  | 'split-close'
-  | 'branch-widget-or-hands-free'
+  | 'tap-screen'
+  | 'audio-mode'
+  | 'audio-tab-metronome'
+  | 'audio-tab-tuner'
+  | 'vault-open'
+  | 'vault-close'
 
 export type HelpTopicId =
   | 'recording-modes'
@@ -54,6 +62,7 @@ export interface CoachMarkContent {
   continueHint: string
   requiresSplitView?: 'open' | 'closed'
   requiresRecordingMode?: 'video' | 'audio'
+  requiresVault?: 'open' | 'closed'
 }
 
 export interface HelpTopic {
@@ -65,78 +74,133 @@ export interface HelpTopic {
 
 export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
-    id: 'record-two-videos',
-    title: 'Record Two Quick Takes',
-    body: 'Tap Record, say something quick, then tap Record again to stop. Do that twice. It can be literally anything, just enough to fill Current Take and Best Take.',
+    id: 'welcome',
+    title: 'Welcome to BestTake',
+    body: 'A focused practice space for capturing performances, hearing the details, and keeping the takes that move you forward.',
   },
   {
-    id: 'pin-first-best',
-    title: 'Move One Into Best Take',
-    body: 'After the second take, long-press Current Take and drag it into Best Take. You can also use Make Best from the Vault later.',
+    id: 'capture',
+    title: 'Easy Recording and Playback',
+    body: 'Record with video when technique matters, or switch to Audio for fast listening. Long-press Record when you want hands-free practice.',
   },
   {
-    id: 'record-practice',
-    title: 'Record Your Practice',
-    body: 'Use Camera Mode for video practice or Audio Mode for focused listening. Long-press Record for hands-free sessions.',
+    id: 'practice-tools',
+    title: 'Tools That Stay Close',
+    body: 'Move between the metronome, tuner, drones, and practice timeline without leaving your session.',
   },
   {
-    id: 'analyze-playing',
-    title: 'Analyze Your Playing',
-    body: 'Practice with the metronome, tuner, drones, and pitch analysis tools built into the app.',
-  },
-  {
-    id: 'save-best-takes',
-    title: 'Save Your Best Takes',
-    body: 'Every recording is stored automatically. Pin and organize your favorite performances in the Take Vault.',
-  },
-  {
-    id: 'import-practice-media',
-    title: 'Import Practice Media',
-    body: 'Use YouTube and other media sources alongside your practice sessions and expand your workspace when needed.',
+    id: 'take-vault',
+    title: 'Build Your Take Vault',
+    body: 'Every take is saved automatically. Compare performances, pin your best, trim recordings, and return to any session later.',
   },
 ]
 
 export const COACH_MARKS: CoachMarkContent[] = [
   {
-    id: 'expand-mode',
-    title: 'Expand Mode',
-    body: 'Tap expand to open a larger workspace for media, playback, and comparison.',
-    selector: '[data-tutorial="best-take-expand"]',
-    placement: 'left',
-    advance: 'split-open',
-    continueHint: 'Tap expand to continue.',
+    id: 'camera-recording',
+    title: 'Record a Take',
+    body: 'Tap once to record, then tap again to stop. Camera captures technique and movement; Audio keeps repetitions fast and focused.',
+    selector: '[data-tutorial="record-controls"]',
+    placement: 'top',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to continue.',
     requiresSplitView: 'closed',
   },
   {
-    id: 'practice-media',
-    title: 'Practice Media',
-    body: 'Upload files or load YouTube play-alongs here while expand view is open.',
-    selector: '[data-tutorial="best-take-youtube"], [data-tutorial="best-take-box"]',
+    id: 'hands-free-recording',
+    title: 'Hands-Free Practice',
+    body: 'Long-press Record to listen for your playing, capture the full first note with pre-roll, and play each take back automatically.',
+    selector: '[data-tutorial="record-controls"]',
     placement: 'top',
-    advance: 'dismiss',
-    continueHint: 'Tap X when you are ready to continue.',
-    requiresSplitView: 'open',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to continue.',
+    requiresSplitView: 'closed',
   },
   {
-    id: 'close-expand',
-    title: 'Close Expand View',
-    body: 'Tap the expand button again to return to the normal practice layout.',
-    selector: '[data-tutorial="best-take-collapse"]',
+    id: 'switch-to-audio',
+    title: 'Switch to Audio',
+    body: 'Audio Mode is built for quick listening and focused repetitions. Open it now to see the practice tools.',
+    selector: '[data-tutorial-mode="audio"]',
     placement: 'top',
-    advance: 'split-close',
-    continueHint: 'Tap expand to close and continue.',
-    requiresSplitView: 'open',
+    advance: 'audio-mode',
+    continueHint: 'Tap the Audio button to continue.',
+    requiresSplitView: 'closed',
+  },
+  {
+    id: 'audio-workspace',
+    title: 'Your Audio Workspace',
+    body: 'These tabs keep recording, timing, tuning, and structured practice together in one place.',
+    selector: '[data-tutorial="audio-mode-tabs"]',
+    placement: 'bottom',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to continue.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'audio',
+  },
+  {
+    id: 'visit-metronome',
+    title: 'Meet the Metronome',
+    body: 'Set tempo, meter, subdivision, beat grouping, accents, and click sound from the full metronome workspace.',
+    selector: '[data-tutorial="audio-tab-metronome"]',
+    placement: 'bottom',
+    advance: 'audio-tab-metronome',
+    continueHint: 'Tap Metronome to continue.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'audio',
+  },
+  {
+    id: 'visit-tuner',
+    title: 'Tune and Build Intonation',
+    body: 'The Tuner gives you live pitch feedback, instrument-aware note guidance, and a radial drone wheel.',
+    selector: '[data-tutorial="audio-tab-tuner"]',
+    placement: 'bottom',
+    advance: 'audio-tab-tuner',
+    continueHint: 'Tap Tuner to continue.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'audio',
+  },
+  {
+    id: 'open-take-vault',
+    title: 'Open the Take Vault',
+    body: 'All of your recordings are stored here, ready to search, compare, favorite, trim, or share.',
+    selector: '[data-tutorial="vault-button"]',
+    placement: 'top',
+    advance: 'vault-open',
+    continueHint: 'Tap the Take Vault button to continue.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'audio',
+    requiresVault: 'closed',
+  },
+  {
+    id: 'take-vault-overview',
+    title: 'Everything You Record, Organized',
+    body: 'Takes stay grouped with your session. Search, select, pin a reference performance, or open any take full screen.',
+    selector: '[data-tutorial="vault-sheet"]',
+    placement: 'bottom',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to continue.',
+    requiresVault: 'open',
+  },
+  {
+    id: 'close-take-vault',
+    title: 'Back to Practice',
+    body: 'Close the Vault whenever you are ready. Your takes remain saved and waiting for you.',
+    selector: '[data-tutorial="vault-close"]',
+    placement: 'left',
+    advance: 'vault-close',
+    continueHint: 'Tap Close to continue.',
+    requiresVault: 'open',
   },
   {
     id: 'quick-settings',
-    title: 'Long-Press Shortcuts',
-    body: 'In Camera Mode, long-press Settings to toggle widgets like Pitch Analysis, Take Cards, Metronome, and Audio Enhancer. Or long-press Record for hands-free practice.',
+    title: 'One Last Shortcut',
+    body: 'Tap Settings for the full menu, or long-press it for quick access to the tools you use most.',
     selector: '[data-tutorial="settings-button"]',
     placement: 'left',
-    advance: 'branch-widget-or-hands-free',
-    continueHint: 'Long-press Settings and pick a widget, or long-press Record.',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to finish.',
     requiresSplitView: 'closed',
-    requiresRecordingMode: 'video',
+    requiresVault: 'closed',
   },
 ]
 

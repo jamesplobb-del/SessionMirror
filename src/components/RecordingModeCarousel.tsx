@@ -100,6 +100,7 @@ function ModeSlot({
       disabled={!isCenter && modeSwitchLocked}
       aria-label={ariaLabel}
       aria-pressed={isCenter}
+      data-tutorial-mode={mode}
       {...(isCenter ? { 'data-tutorial': 'record-controls' } : {})}
       onContextMenu={(event) => event.preventDefault()}
       {...buttonHandlers}

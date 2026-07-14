@@ -6,7 +6,12 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
-import { triggerDragStartHaptic, triggerLightHaptic, triggerLongPressHaptic } from '../utils/haptics'
+import {
+  triggerConfirmedLongPressHaptic,
+  triggerDragStartHaptic,
+  triggerLightHaptic,
+  warmHaptics,
+} from '../utils/haptics'
 
 const LONG_PRESS_MS = 200
 const DRAG_THRESHOLD_PX = 8
@@ -204,6 +209,9 @@ export function useDragToPin({
       if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return
 
       clearLongPressTimer()
+      if (hapticFeedback) {
+        warmHaptics()
+      }
       startRef.current = { x: event.clientX, y: event.clientY }
       pointerIdRef.current = event.pointerId
       draggingRef.current = false
@@ -221,7 +229,7 @@ export function useDragToPin({
         setIsArming(true)
         emitDragState(false, true, false)
         if (hapticFeedback) {
-          void triggerLongPressHaptic()
+          void triggerConfirmedLongPressHaptic()
         }
       }, LONG_PRESS_MS)
     },

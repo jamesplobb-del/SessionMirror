@@ -1,6 +1,5 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import Pressable from './ui/Pressable'
-import { triggerLightHaptic } from '../utils/haptics'
 import type { SortMode } from '../types'
 
 interface GallerySortStripProps {
@@ -15,7 +14,6 @@ export default function GallerySortStrip({
   takeCount: _takeCount,
 }: GallerySortStripProps) {
   const toggleSort = () => {
-    triggerLightHaptic()
     onSortChange(sortMode === 'newest' ? 'highest-rated' : 'newest')
   }
 

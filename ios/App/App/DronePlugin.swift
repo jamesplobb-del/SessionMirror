@@ -55,6 +55,9 @@ public class DronePlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("pitchClass is required")
             return
         }
+        if let octave = call.getInt("octave") {
+            engine.setOctave(octave)
+        }
         let active = engine.soloNote(pitchClass: pitchClass)
         var result = statePayload()
         result["pitchClass"] = pitchClass

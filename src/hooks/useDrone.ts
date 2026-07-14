@@ -29,6 +29,8 @@ export interface UseDroneResult {
   nativeAvailable: boolean
   toggleNote: (pitchClass: number) => void
   soloNote: (pitchClass: number) => void
+  glissNote: (pitchClass: number, octave: number) => void
+  setNotes: (pitchClasses: number[]) => void
   incrementOctave: () => void
   decrementOctave: () => void
 }
@@ -40,6 +42,7 @@ export function useDrone({
 }: UseDroneOptions): UseDroneResult {
   const [prefs, setPrefs] = useState<DronePrefs>(() => loadDronePrefs())
   const restoredRef = useRef(false)
+  const commandSequenceRef = useRef(0)
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
 
@@ -115,6 +118,7 @@ export function useDrone({
 
   const toggleNote = useCallback(
     (pitchClass: number) => {
+      const commandSequence = ++commandSequenceRef.current
       void triggerLightHaptic(hapticFeedback)
       if (!isDroneNativeAvailable()) {
         setPrefs((current) => {
@@ -139,6 +143,7 @@ export function useDrone({
 
       void droneToggleNote(pitchClass)
         .then((result) => {
+          if (commandSequence !== commandSequenceRef.current) return
           setPrefs((current) => {
             const next: DronePrefs = {
               ...current,
@@ -153,7 +158,9 @@ export function useDrone({
           })
         })
         .catch(() => {
-          void syncFromNative()
+          if (commandSequence === commandSequenceRef.current) {
+            void syncFromNative()
+          }
         })
     },
     [hapticFeedback, syncFromNative],
@@ -161,6 +168,7 @@ export function useDrone({
 
   const soloNote = useCallback(
     (pitchClass: number) => {
+      const commandSequence = ++commandSequenceRef.current
       if (!isDroneNativeAvailable()) {
         setPrefs((current) => {
           const next = {
@@ -182,6 +190,7 @@ export function useDrone({
 
       void droneSoloNote(pitchClass)
         .then((result) => {
+          if (commandSequence !== commandSequenceRef.current) return
           setPrefs((current) => {
             const next: DronePrefs = {
               ...current,
@@ -196,14 +205,105 @@ export function useDrone({
           })
         })
         .catch(() => {
-          void syncFromNative()
+          if (commandSequence === commandSequenceRef.current) {
+            void syncFromNative()
+          }
         })
     },
     [syncFromNative],
   )
 
+  const glissNote = useCallback(
+    (pitchClass: number, octave: number) => {
+      const clampedOctave = Math.min(8, Math.max(0, Math.round(octave)))
+      const commandSequence = ++commandSequenceRef.current
+
+      setPrefs((current) => ({
+        ...current,
+        activeNotes: [pitchClass],
+        octave: clampedOctave,
+        enabled: true,
+      }))
+
+      if (!isDroneNativeAvailable()) return
+
+      void droneSoloNote(pitchClass, clampedOctave)
+        .then((result) => {
+          if (commandSequence !== commandSequenceRef.current) return
+          setPrefs((current) => {
+            const next: DronePrefs = {
+              ...current,
+              activeNotes: result.activeNotes,
+              octave: result.octave,
+              enabled: result.enabled,
+              volume: result.volume,
+              waveform: result.waveform,
+            }
+            saveDronePrefs(next)
+            return next
+          })
+        })
+        .catch(() => {
+          if (commandSequence === commandSequenceRef.current) {
+            void syncFromNative()
+          }
+        })
+    },
+    [syncFromNative],
+  )
+
+  const setNotes = useCallback(
+    (pitchClasses: number[]) => {
+      const activeNotes = Array.from(
+        new Set(pitchClasses.filter((note) => Number.isInteger(note) && note >= 0 && note <= 11)),
+      ).sort((a, b) => a - b)
+      const commandSequence = ++commandSequenceRef.current
+      void triggerLightHaptic(hapticFeedback)
+
+      const current = prefsRef.current
+      const optimistic: DronePrefs = {
+        ...current,
+        activeNotes,
+        enabled: activeNotes.length > 0,
+      }
+      setPrefs(optimistic)
+      saveDronePrefs(optimistic)
+
+      if (!isDroneNativeAvailable()) return
+
+      void droneRestoreState({
+        activeNotes,
+        octave: current.octave,
+        volume: current.volume,
+        waveform: current.waveform,
+      })
+        .then((state) => {
+          if (commandSequence !== commandSequenceRef.current) return
+          setPrefs((latest) => {
+            const next: DronePrefs = {
+              ...latest,
+              activeNotes: state.activeNotes,
+              octave: state.octave,
+              enabled: state.enabled,
+              volume: state.volume,
+              waveform: state.waveform,
+            }
+            saveDronePrefs(next)
+            return next
+          })
+        })
+        .catch(() => {
+          if (commandSequence === commandSequenceRef.current) {
+            void syncFromNative()
+          }
+        })
+    },
+    [hapticFeedback, syncFromNative],
+  )
+
   const setOctave = useCallback(
     (octave: number) => {
+      const commandSequence = ++commandSequenceRef.current
       const clamped = Math.min(8, Math.max(0, octave))
       if (!isDroneNativeAvailable()) {
         setPrefs((current) => {
@@ -215,6 +315,7 @@ export function useDrone({
       }
 
       void droneSetOctave(clamped).then((state) => {
+        if (commandSequence !== commandSequenceRef.current) return
         setPrefs((current) => {
           const next: DronePrefs = {
             ...current,
@@ -233,18 +334,20 @@ export function useDrone({
   const incrementOctave = useCallback(() => {
     setPrefs((current) => {
       if (current.octave >= 8) return current
+      void triggerLightHaptic(hapticFeedback)
       void setOctave(current.octave + 1)
       return { ...current, octave: current.octave + 1 }
     })
-  }, [setOctave])
+  }, [hapticFeedback, setOctave])
 
   const decrementOctave = useCallback(() => {
     setPrefs((current) => {
       if (current.octave <= 0) return current
+      void triggerLightHaptic(hapticFeedback)
       void setOctave(current.octave - 1)
       return { ...current, octave: current.octave - 1 }
     })
-  }, [setOctave])
+  }, [hapticFeedback, setOctave])
 
   useEffect(() => {
     return () => {
@@ -269,6 +372,8 @@ export function useDrone({
     nativeAvailable: isDroneNativeAvailable(),
     toggleNote,
     soloNote,
+    glissNote,
+    setNotes,
     incrementOctave,
     decrementOctave,
   }

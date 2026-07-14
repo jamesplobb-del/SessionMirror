@@ -272,7 +272,7 @@ export default function SettingsDrawer({
 
             <SettingToggle
               label="Hands-Free Record & Play"
-              description="In Audio mode, starts recording when your playing crosses the trigger level, stops after silence, then immediately plays the take back through the speaker."
+              description="In Camera and Audio modes, starts the visible take when your playing crosses the trigger level, stops after silence, then plays it back automatically."
               checked={settings.autoSoundRecording}
               onChange={(checked) => onUpdate({ autoSoundRecording: checked })}
             />
@@ -286,45 +286,33 @@ export default function SettingsDrawer({
               }
             />
 
-            <AnimatedExpand open={settings.autoSoundRecording}>
-              <div className="space-y-3 pl-1 pt-3">
-                {recordingMode !== 'audio' && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"
-                  >
-                    Switch to Audio on the record carousel for hands-free recording to run.
-                  </motion.p>
-                )}
+            <div className="space-y-3 pl-1 pt-1">
+              <SettingSlider
+                label="Stop After Silence"
+                description="How long the app waits in silence before ending the take."
+                value={settings.soundSilenceSeconds}
+                min={0.5}
+                max={6}
+                step={0.5}
+                unit="s"
+                formatValue={(value) => `${value}s`}
+                onChange={(value) => onUpdate({ soundSilenceSeconds: value })}
+              />
 
-                <SettingSlider
-                  label="Stop After Silence"
-                  description="How long the app waits in silence before ending the take."
-                  value={settings.soundSilenceSeconds}
-                  min={0.5}
-                  max={6}
-                  step={0.5}
-                  unit="s"
-                  formatValue={(value) => `${value}s`}
-                  onChange={(value) => onUpdate({ soundSilenceSeconds: value })}
-                />
-
-                <SettingSlider
-                  label="Trigger Sensitivity"
-                  description="How loud your playing must be to start recording. Left catches quieter playing; right needs a stronger signal."
-                  value={settings.soundVolumeThreshold}
-                  min={1}
-                  max={100}
-                  step={1}
-                  unit=""
-                  formatValue={(value) =>
-                    value <= 30 ? 'Sensitive' : value >= 70 ? 'Loud only' : 'Balanced'
-                  }
-                  onChange={(value) => onUpdate({ soundVolumeThreshold: value })}
-                />
-              </div>
-            </AnimatedExpand>
+              <SettingSlider
+                label="Trigger Sensitivity"
+                description="How loud your playing must be to start recording. Left catches quieter playing; right needs a stronger signal."
+                value={settings.soundVolumeThreshold}
+                min={1}
+                max={100}
+                step={1}
+                unit=""
+                formatValue={(value) =>
+                  value <= 30 ? 'Sensitive' : value >= 70 ? 'Loud only' : 'Balanced'
+                }
+                onChange={(value) => onUpdate({ soundVolumeThreshold: value })}
+              />
+            </div>
           </section>
 
           <section className="settings-group space-y-3">
@@ -467,7 +455,7 @@ export default function SettingsDrawer({
 
             <SettingToggle
               label="Haptic Feedback"
-              description="Light vibration when you arm a drag to pin a take as Best Take."
+              description="Tactile confirmation for important buttons, toggles, recording actions, and long presses."
               checked={settings.hapticFeedback}
               onChange={(checked) => onUpdate({ hapticFeedback: checked })}
             />

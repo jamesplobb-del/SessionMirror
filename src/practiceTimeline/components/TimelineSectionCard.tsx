@@ -220,11 +220,9 @@ export default function TimelineSectionCard({
             <Pressable
               type="button"
               intensity="soft"
+              haptic="warning"
               className="practice-timeline__section-action practice-timeline__section-action--danger"
-              onClick={() => {
-                triggerWarningHaptic()
-                onDelete()
-              }}
+              onClick={onDelete}
             >
               <Trash2 size={14} className="mr-1 inline" />
               Delete

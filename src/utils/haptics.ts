@@ -20,8 +20,8 @@ function loadCapacitorHaptics(): Promise<CapacitorHapticsModule> {
   return capacitorHapticsPromise
 }
 
-if (isNative && !isIOS) {
-  // Warm the module immediately so the first Android tap isn't a cold import.
+if (isNative) {
+  // Keep the Capacitor fallback warm in case a custom native haptic call fails.
   void loadCapacitorHaptics()
 }
 
@@ -47,23 +47,33 @@ if (isIOS) {
   warmHaptics()
 }
 
-function runImpact(style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid'): void {
+function runCapacitorImpact(style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid'): void {
+  void loadCapacitorHaptics().then(({ Haptics, ImpactStyle }) =>
+    Haptics.impact({
+      style:
+        style === 'heavy'
+          ? ImpactStyle.Heavy
+          : style === 'medium' || style === 'rigid'
+            ? ImpactStyle.Medium
+            : ImpactStyle.Light,
+    }),
+  )
+}
+
+function runImpact(
+  style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid',
+  intensity?: number,
+): void {
   if (isIOS) {
-    void BestTakeAudioPlugin.hapticImpact({ style }).catch(() => {}).finally(scheduleHapticReprime)
+    const options = intensity === undefined ? { style } : { style, intensity }
+    void BestTakeAudioPlugin.hapticImpact(options)
+      .catch(() => runCapacitorImpact(style))
+      .finally(scheduleHapticReprime)
     return
   }
 
   if (isNative) {
-    void loadCapacitorHaptics().then(({ Haptics, ImpactStyle }) =>
-      Haptics.impact({
-        style:
-          style === 'heavy'
-            ? ImpactStyle.Heavy
-            : style === 'medium' || style === 'rigid'
-              ? ImpactStyle.Medium
-              : ImpactStyle.Light,
-      }),
-    )
+    runCapacitorImpact(style)
     return
   }
 
@@ -169,6 +179,11 @@ export async function triggerSelectionHaptic(): Promise<void> {
 /** Deliberate pulse when a long-press action fires (e.g. quick settings reveal). */
 export async function triggerLongPressHaptic(): Promise<void> {
   triggerHeavyHaptic()
+}
+
+/** Full-strength confirmation for long presses that reveal a secondary action. */
+export async function triggerConfirmedLongPressHaptic(): Promise<void> {
+  runImpact('heavy', 1)
 }
 
 /** Slightly stronger pulse when drag begins. */

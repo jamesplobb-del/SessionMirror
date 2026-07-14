@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
-import { triggerLongPressHaptic } from '../utils/haptics'
+import {
+  triggerConfirmedLongPressHaptic,
+  triggerLongPressHaptic,
+  warmHaptics,
+} from '../utils/haptics'
 
 interface UseLongPressOptions {
   onClick: () => void
@@ -7,6 +11,8 @@ interface UseLongPressOptions {
   delay?: number
   disabled?: boolean
   hapticFeedback?: boolean
+  primeHapticsOnPointerDown?: boolean
+  strongHapticFeedback?: boolean
   targetRef?: RefObject<HTMLElement | null>
 }
 
@@ -20,6 +26,8 @@ export function useLongPress({
   delay = 450,
   disabled = false,
   hapticFeedback = true,
+  primeHapticsOnPointerDown = false,
+  strongHapticFeedback = false,
   targetRef,
 }: UseLongPressOptions) {
   const timerRef = useRef<number | null>(null)
@@ -62,6 +70,9 @@ export function useLongPress({
       longPressTriggeredRef.current = false
       pressingRef.current = true
       clearTimer()
+      if (hapticFeedback && primeHapticsOnPointerDown) {
+        warmHaptics()
+      }
 
       event.preventDefault()
       event.stopPropagation()
@@ -90,12 +101,22 @@ export function useLongPress({
         longPressTriggeredRef.current = true
         clearTextSelection()
         if (hapticFeedback) {
-          void triggerLongPressHaptic()
+          void (strongHapticFeedback
+            ? triggerConfirmedLongPressHaptic()
+            : triggerLongPressHaptic())
         }
         onLongPress()
       }, delay)
     },
-    [clearTimer, delay, disabled, hapticFeedback, onLongPress],
+    [
+      clearTimer,
+      delay,
+      disabled,
+      hapticFeedback,
+      onLongPress,
+      primeHapticsOnPointerDown,
+      strongHapticFeedback,
+    ],
   )
 
   const onPointerUp = useCallback(

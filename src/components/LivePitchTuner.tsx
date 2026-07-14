@@ -35,7 +35,8 @@ interface LivePitchTunerProps {
     activeNotes: number[]
     octave: number
     onToggleNote: (pitchClass: number) => void
-    onSoloNote: (pitchClass: number) => void
+    onGlissNote: (pitchClass: number, octave: number) => void
+    onSetNotes: (pitchClasses: number[]) => void
     onIncrementOctave: () => void
     onDecrementOctave: () => void
   }
@@ -326,7 +327,8 @@ function LiveAudioTunerPane({
             activeNotes={drone.activeNotes}
             octave={drone.octave}
             onToggleNote={drone.onToggleNote}
-            onSoloNote={drone.onSoloNote}
+            onGlissNote={drone.onGlissNote}
+            onSetNotes={drone.onSetNotes}
             onIncrementOctave={drone.onIncrementOctave}
             onDecrementOctave={drone.onDecrementOctave}
             onDroneInteraction={onDroneInteraction}

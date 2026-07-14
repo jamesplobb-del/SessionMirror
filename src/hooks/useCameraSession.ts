@@ -315,7 +315,7 @@ export function useCameraSession({
   const nativeCameraRecordingEnabledRef = useRef(nativeCameraRecordingEnabled)
   const nativePreviewActiveRef = useRef(false)
   const nativePreviewStartTokenRef = useRef(0)
-  const nativeBridgeAcquireInFlightRef = useRef(false)
+  const nativeBridgeAcquireInFlightRef = useRef<Promise<boolean> | null>(null)
   const ensureRecordableStreamRef = useRef<(() => Promise<MediaStream | null>) | null>(null)
   const requestCameraAccessRef = useRef<((requestedMode?: RecordingMode) => void) | null>(null)
   const armedAutoAudioRef = useRef<{
@@ -615,10 +615,10 @@ export function useCameraSession({
       setReady(true)
       return true
     }
-    if (nativeBridgeAcquireInFlightRef.current) return false
+    const existingAcquire = nativeBridgeAcquireInFlightRef.current
+    if (existingAcquire) return existingAcquire
 
-    nativeBridgeAcquireInFlightRef.current = true
-    try {
+    const acquire = (async (): Promise<boolean> => {
       releaseWebKitVideoTracksForNativeBridge()
       if (Capacitor.isNativePlatform()) {
         await new Promise((resolve) => window.setTimeout(resolve, IOS_NATIVE_BRIDGE_HANDOFF_MS))
@@ -642,8 +642,15 @@ export function useCameraSession({
       setReady(true)
       void syncNativeCameraSessionState({ previewActive: true, recordingActive: false })
       return true
+    })()
+
+    nativeBridgeAcquireInFlightRef.current = acquire
+    try {
+      return await acquire
     } finally {
-      nativeBridgeAcquireInFlightRef.current = false
+      if (nativeBridgeAcquireInFlightRef.current === acquire) {
+        nativeBridgeAcquireInFlightRef.current = null
+      }
     }
   }, [isNativeVideoRecordingEnabled, releaseWebKitVideoTracksForNativeBridge])
 

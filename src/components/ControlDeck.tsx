@@ -7,6 +7,7 @@ import RecordingModeCarousel from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
 import type { RecordingMode } from '../types'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
+import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
 
 interface ControlDeckProps {
   isRecording: boolean
@@ -38,6 +39,10 @@ interface ControlDeckProps {
   onShowTakeCardsChange?: (show: boolean) => void
   onShowMetronomeChange?: (show: boolean) => void
   onAudioEnhancerChange?: (enabled: boolean) => void
+  settingsLayoutMode?: SettingsBranchLayoutMode
+  tunerTakePillsVisible?: boolean
+  tunerTakePillsToggleVisible?: boolean
+  onTunerTakePillsChange?: (show: boolean) => void
   settingsBranchDisabled?: boolean
   onBranchOpenChange?: (open: boolean) => void
   hapticFeedback?: boolean
@@ -79,6 +84,10 @@ function ControlDeck({
   onShowTakeCardsChange,
   onShowMetronomeChange,
   onAudioEnhancerChange,
+  settingsLayoutMode = 'camera',
+  tunerTakePillsVisible = false,
+  tunerTakePillsToggleVisible = false,
+  onTunerTakePillsChange,
   settingsBranchDisabled = false,
   onBranchOpenChange,
   hapticFeedback = true,
@@ -121,6 +130,8 @@ function ControlDeck({
     onLongPress: () => openBranch(),
     disabled: settingsBranchDisabled,
     hapticFeedback,
+    primeHapticsOnPointerDown: true,
+    strongHapticFeedback: true,
     targetRef: settingsButtonRef,
   })
 
@@ -137,12 +148,16 @@ function ControlDeck({
         showTakeCards={showTakeCards}
         showMetronome={showMetronome}
         audioEnhancerEnabled={audioEnhancerEnabled}
+        layoutMode={settingsLayoutMode}
+        tunerTakePillsVisible={tunerTakePillsVisible}
+        tunerTakePillsToggleVisible={tunerTakePillsToggleVisible}
         pitchToggleVisible={pitchToggleVisible}
         takeCardsToggleVisible={recordingMode !== 'audio'}
         onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
         onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}
         onAudioEnhancerChange={(enabled) => onAudioEnhancerChange?.(enabled)}
+        onTunerTakePillsChange={(show) => onTunerTakePillsChange?.(show)}
       />
 
       <div className="control-deck__main-row relative flex w-full max-w-xs items-center justify-center">
