@@ -5995,3 +5995,71 @@ html.dark .help-sheet__bullet {
 .camera-recording-border--active {
   opacity: 1;
 }
+
+/* Shared optical grid for take-box close, expand, and pin controls. */
+.pip-video-container {
+  --take-chrome-inset: 0.25rem;
+  --take-chrome-control-size: 1.875rem;
+}
+
+.split-compare-layout {
+  --take-chrome-inset: 0.5rem;
+  --take-chrome-control-size: 2rem;
+}
+
+.pip-chrome-btn--corner {
+  width: var(--take-chrome-control-size) !important;
+  height: var(--take-chrome-control-size) !important;
+  padding: 0 !important;
+}
+
+.pip-chrome-btn--corner > svg {
+  width: 0.8125rem !important;
+  height: 0.8125rem !important;
+  stroke-width: 2.25;
+}
+
+.split-compare-layout .pip-chrome-btn--corner > svg {
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+}
+
+.pip-chrome-btn--pin-best > svg {
+  transform: translateY(-0.25px);
+}
+
+.pip-chrome-btn--top-left {
+  top: var(--take-chrome-inset) !important;
+  left: var(--take-chrome-inset) !important;
+}
+
+.pip-chrome-btn--top-right {
+  top: var(--take-chrome-inset) !important;
+  right: var(--take-chrome-inset) !important;
+}
+
+.pip-chrome-btn--bottom-left {
+  bottom: var(--take-chrome-inset) !important;
+  left: var(--take-chrome-inset) !important;
+  top: auto !important;
+}
+
+.pip-chrome-btn--bottom-right {
+  right: var(--take-chrome-inset) !important;
+  bottom: var(--take-chrome-inset) !important;
+  top: auto !important;
+}
+
+@media (min-width: 768px) {
+  .pip-video-container,
+  .split-compare-layout {
+    --take-chrome-inset: 0.625rem;
+    --take-chrome-control-size: 2.55rem;
+  }
+
+  .pip-chrome-btn--corner > svg,
+  .split-compare-layout .pip-chrome-btn--corner > svg {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+  }
+}

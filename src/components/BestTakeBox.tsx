@@ -564,9 +564,6 @@ function BestTakeBox({
 
   const pillLeft = showUploadBadge ? 36 : 8
 
-  const cornerInset = isFill ? (splitViewActive ? 3 : 6) : 2
-  const pipControlsClearance = 0
-
   const renderClearButton = () => {
     if (!hasReference) return null
 
@@ -583,8 +580,7 @@ function BestTakeBox({
           e.stopPropagation()
           handleClearReference()
         }}
-        className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--clear`}
-        style={{ top: cornerInset, right: cornerInset }}
+        className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--top-right pip-chrome-btn--clear`}
         aria-label={hasYoutube ? 'Clear YouTube reference' : hasLibraryPlayback ? 'Clear library reference' : 'Unload Best Take'}
       >
         <X className="h-3 w-3" />
@@ -595,9 +591,9 @@ function BestTakeBox({
   const renderSplitViewToggle = () => {
     if (!onToggleSplitView) return null
 
-    const splitStyle = hasReference
-      ? { bottom: cornerInset + pipControlsClearance, right: cornerInset }
-      : { top: cornerInset, right: cornerInset }
+    const splitPositionClass = hasReference
+      ? 'pip-chrome-btn--bottom-right'
+      : 'pip-chrome-btn--top-right'
 
     return (
       <Pressable
@@ -615,8 +611,7 @@ function BestTakeBox({
           e.stopPropagation()
           onToggleSplitView()
         }}
-        className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--expand`}
-        style={splitStyle}
+        className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--expand ${splitPositionClass}`}
         aria-label={splitViewActive ? 'Return to normal view' : 'Open split view layout'}
       >
         {splitViewActive ? (
@@ -839,8 +834,7 @@ function BestTakeBox({
               onTouchStart={stopEventBubble}
               onTouchEnd={stopEventBubble}
               onClick={stopEventBubble}
-              className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--upload`}
-              style={{ top: cornerInset, left: cornerInset }}
+              className={`${CHROME_BADGE_BTN} pip-chrome-btn pip-chrome-btn--corner ${isFill ? 'pip-chrome-btn--bottom-left' : 'pip-chrome-btn--top-left'} pip-chrome-btn--upload`}
               aria-label="Upload best take media"
             >
               <Upload className="h-3 w-3" />

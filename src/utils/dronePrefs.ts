@@ -13,7 +13,7 @@ export const DEFAULT_DRONE_PREFS: DronePrefs = {
   octave: 4,
   enabled: false,
   volume: 0.75,
-  waveform: 'sine',
+  waveform: 'warmSynth',
 }
 
 const STORAGE_KEY = 'sessionmirror:drone-prefs'
@@ -24,7 +24,7 @@ function clampOctave(value: number): number {
 
 function parseWaveform(value: unknown): DroneWaveform {
   if (value === 'triangle' || value === 'organ' || value === 'warmSynth') return value
-  return 'sine'
+  return DEFAULT_DRONE_PREFS.waveform
 }
 
 export function loadDronePrefs(): DronePrefs {

@@ -143,7 +143,7 @@ function PipWindow({
   const mediaSurfaceClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
   const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && hasMedia
   const isFill = layout === 'fill'
-  const pillLeft = showUploadBadge || showPinAsBest ? 32 : 8
+  const pillLeft = !isFill && (showUploadBadge || showPinAsBest) ? 38 : 8
   const isAutoPlayArmed = Boolean(
     autoPlayRequestId && takeId && autoPlayRequestId === takeId,
   )
@@ -507,9 +507,8 @@ function PipWindow({
       ? 'bg-amber-400/90 text-white'
       : 'bg-sky-500/90 text-white'
 
-  const chromeInset = isFill ? (splitViewActive ? 3 : 6) : 4
-  const exteriorBadgeInset = isFill && splitViewActive ? chromeInset : isFill ? -10 : chromeInset
-  const exteriorUploadInset = isFill && splitViewActive ? chromeInset : isFill ? -12 : chromeInset
+  const chromeInset = isFill ? 8 : 4
+  const exteriorUploadInset = isFill ? 8 : chromeInset
 
   const shellClass = isFill
     ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-visible ${className}`.trim()
@@ -555,7 +554,7 @@ function PipWindow({
           className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass} ${
             isFill ? 'px-2 py-0.5 text-[10px]' : ''
           }`}
-          style={{ top: chromeInset, left: isFill ? pillLeft + (showPinAsBest ? 4 : 0) : pillLeft }}
+          style={{ top: chromeInset, left: pillLeft }}
         >
           {label}
         </span>
@@ -676,8 +675,7 @@ function PipWindow({
               e.stopPropagation()
               onPinAsBest()
             }}
-            className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn--pin-best`}
-            style={{ top: chromeInset, left: chromeInset }}
+            className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--top-left pip-chrome-btn--pin-best`}
             aria-label="Pin current take as Best Take"
             title="Pin as Best Take"
           >
@@ -698,8 +696,7 @@ function PipWindow({
               e.stopPropagation()
               onUnpin()
             }}
-            className={HUD_GLASS_FLOAT_BADGE}
-            style={{ top: chromeInset, right: chromeInset }}
+            className={`${HUD_GLASS_FLOAT_BADGE} pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--top-right pip-chrome-btn--clear`}
             aria-label={`Unload ${label}`}
           >
             <X className="h-3 w-3" />
@@ -719,8 +716,7 @@ function PipWindow({
             e.stopPropagation()
             onPinAsBest()
           }}
-          className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn--pin-best`}
-          style={{ top: exteriorBadgeInset, left: exteriorBadgeInset }}
+          className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--bottom-left pip-chrome-btn--pin-best`}
           aria-label="Pin current take as Best Take"
           title="Pin as Best Take"
         >
@@ -740,8 +736,7 @@ function PipWindow({
             e.stopPropagation()
             onUnpin()
           }}
-          className={`${HUD_GLASS_FLOAT_BADGE} pip-chrome-btn pip-chrome-btn--clear`}
-          style={{ top: exteriorBadgeInset, right: exteriorBadgeInset }}
+          className={`${HUD_GLASS_FLOAT_BADGE} pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--top-right pip-chrome-btn--clear`}
           aria-label={`Unload ${label}`}
         >
           <X className="h-3 w-3" />

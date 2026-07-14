@@ -68,7 +68,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
   droneVolume: 75,
-  droneWaveform: 'sine',
+  droneWaveform: 'warmSynth',
   showTakeCards: true,
   showMetronome: false,
   muteMetronomeDuringPlayback: true,
