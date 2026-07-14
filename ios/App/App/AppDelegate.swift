@@ -85,7 +85,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationWillEnterForeground(_ application: UIApplication) {
         CameraSessionGuard.markForegroundActivation()
         lockInterfaceToPortrait()
-        configurePersistentAudioSession()
     }
 
     /// Passive launch session — do not force HQ/headphone routes; JS applies on user action.
@@ -130,10 +129,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
-        AudioRouteConfigurator.suspendForAppBackground()
-    }
-
-    func applicationDidEnterBackground(_ application: UIApplication) {
         AudioRouteConfigurator.suspendForAppBackground()
     }
 

@@ -345,6 +345,7 @@ export function useCameraSession({
 
   const [error, setError] = useState<string | null>(null)
   const [needsPermission, setNeedsPermission] = useState(false)
+  const [permissionBlocked, setPermissionBlocked] = useState(false)
   const [permissionRequestInFlight, setPermissionRequestInFlight] = useState(false)
   const permissionRequestInFlightRef = useRef(false)
   const [ready, setReady] = useState(false)
@@ -930,6 +931,7 @@ export function useCameraSession({
     const constraints = getMediaConstraints(mode)
     permissionRequestInFlightRef.current = true
     setPermissionRequestInFlight(true)
+    setPermissionBlocked(false)
     setError(null)
 
     // iOS requires getUserMedia to start synchronously inside the tap handler.
@@ -962,6 +964,7 @@ export function useCameraSession({
         syncPreviewTargets(mediaStream, mode)
         setStreamGeneration((generation) => generation + 1)
         setNeedsPermission(false)
+        setPermissionBlocked(false)
         setReady(true)
       })
       .catch((err) => {
@@ -969,6 +972,8 @@ export function useCameraSession({
           return
         }
         console.warn('Failed to acquire camera/microphone stream', err)
+        const errorName = err instanceof DOMException ? err.name : ''
+        setPermissionBlocked(errorName === 'NotAllowedError' || errorName === 'SecurityError')
         setNeedsPermission(true)
         setReady(false)
       })
@@ -3256,6 +3261,7 @@ export function useCameraSession({
     streamGeneration,
     error,
     needsPermission,
+    permissionBlocked,
     permissionRequestInFlight,
     requestCameraAccess,
     ready,

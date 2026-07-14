@@ -317,6 +317,8 @@ export interface BestTakeAudioPluginType {
   hapticNotification(options: { type: 'success' | 'warning' | 'error' }): Promise<void>
   /** Re-prime the Taptic Engine so the next haptic fires instantly. iOS only. */
   prepareHaptics(): Promise<void>
+  /** Open this app's page in iOS Settings so denied permissions can be recovered. */
+  openAppSettings(): Promise<void>
   addListener(
     eventName: 'audioRouteChanged',
     listenerFunc: (data: AudioRouteSnapshot) => void,

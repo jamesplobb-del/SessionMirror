@@ -3076,6 +3076,26 @@ video.camera-preview.camera-preview--hidden {
   opacity: 0.65;
 }
 
+.camera-permission-gate__retry {
+  min-height: 2.75rem;
+  border: none;
+  background: transparent;
+  padding: 0.625rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.76);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.camera-permission-gate__retry:active:not(:disabled) {
+  color: #fff;
+}
+
+.camera-permission-gate__retry:disabled {
+  opacity: 0.5;
+}
+
 video.camera-preview--embedded {
   position: absolute !important;
   inset: 0 !important;

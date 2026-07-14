@@ -4,6 +4,7 @@ import './index.css'
 import './styles/drone-keyboard.css'
 import './styles/drone-sound-wheel.css'
 import App from './App.tsx'
+import AppErrorBoundary from './components/ui/AppErrorBoundary.tsx'
 import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
 import { primeWebStatusBarChrome } from './utils/nativeStatusBar'
 import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
@@ -20,7 +21,9 @@ function bootstrap() {
 
   createRoot(rootEl).render(
     <StrictMode>
-      <App />
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
     </StrictMode>,
   )
 }

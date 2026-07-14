@@ -119,7 +119,6 @@ import {
   deleteProject,
   deleteLibraryItem,
   deleteVaultTake,
-  deleteTakesByProject,
   findBestTakeId,
   getLibraryItemsByProject,
   getProjectBenchmarkBinding,
@@ -297,7 +296,7 @@ const BOOT_REVEAL_DELAY_MS = 500
 
 function formatBootFailureMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : typeof error === 'string' ? error : null
-  const base = 'BestTake could not start. Restart the app or reinstall if this continues.'
+  const base = 'BestTake could not finish starting. Your saved takes are still on this device.'
   return detail ? `${base}\n\n${detail}` : base
 }
 
@@ -356,6 +355,7 @@ export default function App() {
   const [isBooting, setIsBooting] = useState(true)
   const [bootSnapshot, setBootSnapshot] = useState<AppBootSnapshot | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
+  const [bootAttempt, setBootAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -403,6 +403,13 @@ export default function App() {
     return () => {
       cancelled = true
     }
+  }, [bootAttempt])
+
+  const retryBoot = useCallback(() => {
+    setBootError(null)
+    setBootSnapshot(null)
+    setIsBooting(true)
+    setBootAttempt((attempt) => attempt + 1)
   }, [])
 
   if (isBooting) {
@@ -411,9 +418,21 @@ export default function App() {
 
   if (bootError || !bootSnapshot) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black p-6 text-center font-sans text-white">
-        <p>{bootError ?? 'BestTake could not start.'}</p>
-      </div>
+      <main className="fixed inset-0 flex items-center justify-center bg-black p-6 text-center font-sans text-white">
+        <div className="flex max-w-sm flex-col items-center gap-4">
+          <h1 className="text-xl font-semibold">BestTake could not start</h1>
+          <p className="whitespace-pre-line text-sm leading-6 text-white/70">
+            {bootError ?? 'BestTake could not start.'}
+          </p>
+          <button
+            type="button"
+            onClick={retryBoot}
+            className="min-h-11 rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-black"
+          >
+            Try Again
+          </button>
+        </div>
+      </main>
     )
   }
 
@@ -457,6 +476,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [reviewPlaybackPlaying, setReviewPlaybackPlaying] = useState(false)
+  const [takeDeleteError, setTakeDeleteError] = useState<string | null>(null)
   const [audioTakeReadiness, setAudioTakeReadiness] = useState<Record<string, AudioTakeReadiness>>({})
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
@@ -1659,6 +1679,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     streamRef,
     streamGeneration,
     needsPermission: cameraNeedsPermission,
+    permissionBlocked: cameraPermissionBlocked,
     permissionRequestInFlight: cameraPermissionRequestInFlight,
     requestCameraAccess,
     ready,
@@ -3341,17 +3362,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void updateVaultTake(id, updates)
   }, [])
 
-  const removeTakeResources = useCallback((take: Take) => {
-    void deleteCachedTakeThumbnail(take.id)
-    if (take.filePath) {
-      void deleteTakeFile(take.filePath)
-    } else if (take.videoUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(take.videoUrl)
-    }
-  }, [])
-
   const handleDeleteTakes = useCallback(
-    (ids: string[]) => {
+    async (ids: string[]) => {
       if (ids.length === 0) return
 
       const idSet = new Set(ids)
@@ -3365,15 +3377,51 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         pausePipVideos()
       }
 
-      const removed = takes.filter((take) => idSet.has(take.id))
+      const requestedTakes = takesRef.current.filter((take) => idSet.has(take.id))
+      setTakeDeleteError(null)
 
-      setTakes((prev) => prev.filter((take) => !idSet.has(take.id)))
-      void Promise.all(ids.map((id) => deleteVaultTake(id)))
-      setBenchmarkId((current) => (current && idSet.has(current) ? null : current))
-      setChallengerId((current) => (current && idSet.has(current) ? null : current))
+      const outcomes = await Promise.all(
+        requestedTakes.map(async (take) => {
+          if (take.filePath) {
+            const fileDeleted = await deleteTakeFile(take.filePath)
+            if (!fileDeleted) {
+              return { id: take.id, removed: false, cleanupWarning: false }
+            }
+          } else if (take.videoUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(take.videoUrl)
+          }
 
-      for (const take of removed) {
-        removeTakeResources(take)
+          let cleanupWarning = false
+          try {
+            await deleteVaultTake(take.id)
+          } catch (error) {
+            cleanupWarning = true
+            console.error('[TakeDelete] Media removed but database cleanup failed', {
+              takeId: take.id,
+              error,
+            })
+          }
+
+          await deleteCachedTakeThumbnail(take.id).catch((error) => {
+            console.warn('[TakeDelete] Thumbnail cleanup failed', { takeId: take.id, error })
+          })
+          return { id: take.id, removed: true, cleanupWarning }
+        }),
+      )
+
+      const removedIds = new Set(
+        outcomes.filter((outcome) => outcome.removed).map((outcome) => outcome.id),
+      )
+      if (removedIds.size > 0) {
+        setTakes((prev) => prev.filter((take) => !removedIds.has(take.id)))
+        setBenchmarkId((current) => (current && removedIds.has(current) ? null : current))
+        setChallengerId((current) => (current && removedIds.has(current) ? null : current))
+      }
+
+      if (outcomes.some((outcome) => !outcome.removed)) {
+        setTakeDeleteError('A take could not be deleted and remains in your library. Please try again.')
+      } else if (outcomes.some((outcome) => outcome.cleanupWarning)) {
+        setTakeDeleteError('The take was removed, but library cleanup did not finish. BestTake will reconcile it when the app restarts.')
       }
     },
     [
@@ -3382,9 +3430,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       challengerId,
       pausePipVideos,
       releaseAutoRecordSuppress,
-      removeTakeResources,
       stopAutoPlaybackAudio,
-      takes,
     ]
   )
 
@@ -3392,44 +3438,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     (id: string) => {
       triggerWarningHaptic(settings.hapticFeedback)
       pausePipVideos()
-      handleDeleteTakes([id])
+      void handleDeleteTakes([id])
     },
     [handleDeleteTakes, pausePipVideos, settings.hapticFeedback]
   )
 
   const handleDeleteTake = useCallback(
     (id: string) => {
-      handleDeleteTakes([id])
+      void handleDeleteTakes([id])
     },
     [handleDeleteTakes]
   )
 
   const handleClearAllTakes = useCallback(() => {
-    const projectId = activeProjectIdRef.current
-    if (!projectId || takes.length === 0) return
-
-    stopAutoPlaybackAudio()
-    releaseAutoRecordSuppress(0)
-
-    const takesToRemove = takes
-    setTakes([])
-    setBenchmarkId(null)
-    setChallengerId(null)
-
-    void (async () => {
-      await Promise.all([
-        deleteTakesByProject(projectId),
-        ...takesToRemove.map(async (take) => {
-          await deleteCachedTakeThumbnail(take.id)
-          if (take.filePath) {
-            await deleteTakeFile(take.filePath)
-          } else if (take.videoUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(take.videoUrl)
-          }
-        }),
-      ])
-    })()
-  }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio, takes])
+    const ids = takesRef.current.map((take) => take.id)
+    if (ids.length === 0) return
+    void handleDeleteTakes(ids)
+  }, [handleDeleteTakes])
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
@@ -3689,6 +3714,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 } as React.AudioHTMLAttributes<HTMLAudioElement>)}
               />
 
+              {takeDeleteError && (
+                <div
+                  role="alert"
+                  className="fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[220] flex w-[min(92vw,24rem)] -translate-x-1/2 items-start gap-3 rounded-md border border-white/15 bg-black/95 px-4 py-3 text-left text-sm text-white shadow-2xl"
+                >
+                  <span className="min-w-0 flex-1 leading-5">{takeDeleteError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setTakeDeleteError(null)}
+                    className="min-h-11 shrink-0 px-2 font-semibold text-white/80"
+                    aria-label="Dismiss deletion message"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               {youtubeUrl && (
                 <YoutubeBenchmarkPlayer
                   embedUrl={youtubeUrl}
@@ -3859,7 +3901,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 <CameraPermissionPrompt
                   recordingMode={recordingMode}
                   requesting={cameraPermissionRequestInFlight}
+                  blocked={cameraPermissionBlocked}
                   onRequestPermission={requestCameraAccess}
+                  onOpenSettings={() => {
+                    void BestTakeAudioPlugin.openAppSettings().catch((error) => {
+                      console.warn('Could not open iOS Settings', error)
+                    })
+                  }}
                 />
               )}
 

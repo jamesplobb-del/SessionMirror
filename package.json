@@ -1,7 +1,7 @@
 {
   "name": "session-mirror",
   "private": true,
-  "version": "0.1.0",
+  "version": "2.2.0",
   "type": "module",
   "scripts": {
     "copy:sql:wasm": "copyfiles -u 3 node_modules/sql.js/dist/sql-wasm.wasm public/assets",

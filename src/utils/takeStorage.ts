@@ -568,15 +568,14 @@ export async function resolveTakePlaybackUrl(
   return applyStrictPlaybackSrc(fallbackUrl)
 }
 
-const deleteTakeFileInFlight = new Map<string, Promise<void>>()
+const deleteTakeFileInFlight = new Map<string, Promise<boolean>>()
 
-export async function deleteTakeFile(filePath: string): Promise<void> {
-  if (!filePath || !Capacitor.isNativePlatform()) return
+export async function deleteTakeFile(filePath: string): Promise<boolean> {
+  if (!filePath || !Capacitor.isNativePlatform()) return true
 
   const inFlight = deleteTakeFileInFlight.get(filePath)
   if (inFlight) {
-    await inFlight
-    return
+    return inFlight
   }
 
   const task = (async () => {
@@ -588,11 +587,13 @@ export async function deleteTakeFile(filePath: string): Promise<void> {
           directory: Directory.Data,
         })
       }
+      return true
     } catch (err) {
       if (isFilesystemMissingError(err)) {
-        return
+        return true
       }
-      /* file may already be gone or delete is best-effort */
+      console.error('[TakeStorage] Failed to delete take file', { filePath, error: err })
+      return false
     } finally {
       invalidatePlaybackSrcCache(filePath)
       deleteTakeFileInFlight.delete(filePath)
@@ -600,5 +601,5 @@ export async function deleteTakeFile(filePath: string): Promise<void> {
   })()
 
   deleteTakeFileInFlight.set(filePath, task)
-  await task
+  return task
 }

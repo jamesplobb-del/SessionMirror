@@ -52,6 +52,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "hapticImpact", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "hapticNotification", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareHaptics", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openAppSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioHardwareRtl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioOutputLatencyMs", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "computeTakeAlignment", returnType: CAPPluginReturnPromise),
@@ -167,6 +168,23 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async { [weak self] in
             self?.warmHaptics()
             call.resolve()
+        }
+    }
+
+    @objc func openAppSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: UIApplication.openSettingsURLString),
+                  UIApplication.shared.canOpenURL(url) else {
+                call.reject("App Settings are unavailable")
+                return
+            }
+            UIApplication.shared.open(url, options: [:]) { opened in
+                if opened {
+                    call.resolve()
+                } else {
+                    call.reject("Could not open App Settings")
+                }
+            }
         }
     }
 
