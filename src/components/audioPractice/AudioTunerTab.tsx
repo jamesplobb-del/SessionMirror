@@ -10,6 +10,7 @@ interface AudioTunerTabProps {
   streamGeneration: number
   nativeLivePreviewActive: boolean
   ready: boolean
+  permissionRequestInFlight: boolean
   isRecording: boolean
   tunerInstrument: TunerInstrument
   liveMicTunerEnabled: boolean
@@ -26,7 +27,10 @@ function micStreamIsLive(
 ): boolean {
   if (nativeLivePreviewActive || recording) return true
   return Boolean(
-    stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled),
+    stream?.active &&
+      stream
+        .getAudioTracks()
+        .some((track) => track.readyState === 'live' && track.enabled && !track.muted),
   )
 }
 
@@ -35,6 +39,7 @@ export default function AudioTunerTab({
   streamGeneration,
   nativeLivePreviewActive,
   ready: _ready,
+  permissionRequestInFlight,
   isRecording,
   tunerInstrument,
   liveMicTunerEnabled: _liveMicTunerEnabled,
@@ -74,43 +79,66 @@ export default function AudioTunerTab({
     ],
   )
 
-  const micStreamLive = micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording)
   const liveMicReady = true
 
   useEffect(() => {
-    void onRequestMicStream()
-  }, [onRequestMicStream, streamGeneration, nativeLivePreviewActive])
-
-  useEffect(() => {
     const recoverTunerMic = () => {
-      void onRequestMicStream()
+      if (!permissionRequestInFlight) {
+        void onRequestMicStream()
+      }
       setMicLiveEpoch((epoch) => epoch + 1)
     }
     window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     return () => {
       window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     }
-  }, [onRequestMicStream])
+  }, [onRequestMicStream, permissionRequestInFlight])
 
   useEffect(() => {
-    if (micStreamLive) {
-      setMicLiveEpoch((epoch) => epoch + 1)
-      return
-    }
-
     let cancelled = false
-    const poll = window.setInterval(() => {
+    let sourceWasLive = micStreamIsLive(
+      streamRef.current,
+      nativeLivePreviewActive,
+      isRecording,
+    )
+    let retryTimer: number | null = null
+
+    const verifyMicSource = () => {
       if (cancelled) return
-      if (micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording)) {
+
+      const sourceIsLive = micStreamIsLive(
+        streamRef.current,
+        nativeLivePreviewActive,
+        isRecording,
+      )
+
+      if (sourceIsLive && !sourceWasLive) {
         setMicLiveEpoch((epoch) => epoch + 1)
       }
-    }, 160)
+      if (!sourceIsLive && !isRecording && !permissionRequestInFlight) {
+        void onRequestMicStream()
+      }
+
+      sourceWasLive = sourceIsLive
+      retryTimer = window.setTimeout(verifyMicSource, sourceIsLive ? 1500 : 500)
+    }
+
+    retryTimer = window.setTimeout(verifyMicSource, sourceWasLive ? 1500 : 650)
 
     return () => {
       cancelled = true
-      window.clearInterval(poll)
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
+      }
     }
-  }, [isRecording, micStreamLive, nativeLivePreviewActive, streamGeneration, streamRef])
+  }, [
+    isRecording,
+    nativeLivePreviewActive,
+    onRequestMicStream,
+    permissionRequestInFlight,
+    streamGeneration,
+    streamRef,
+  ])
 
   return (
     <section className="audio-practice-tuner-shell flex min-h-0 flex-1 flex-col" aria-label="Tuner">

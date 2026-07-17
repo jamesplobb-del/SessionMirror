@@ -1181,15 +1181,16 @@ body.settings-branch-open * {
 }
 
 .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--polished .pitch-audio-stage__chart--flat {
-  min-height: min(52vh, 23rem);
-  flex: 1 1 auto;
+  min-height: 0;
+  flex: 1 1 0;
+  overflow: hidden;
   padding: 0.08rem 0.15rem 0.04rem;
 }
 
 .app-ui-overlay--audio-practice-tuner.app-ui-overlay--tuner-takes-hidden
   .pitch-audio-stage--polished
   .pitch-audio-stage__chart--flat {
-  min-height: min(60vh, 28rem);
+  min-height: 0;
 }
 
 .app-ui-overlay--audio-practice-tuner
@@ -6062,4 +6063,198 @@ html.dark .help-sheet__bullet {
     width: 1.1rem !important;
     height: 1.1rem !important;
   }
+}
+
+
+/* Camera control islands: quiet utility icons with a translucent record control. */
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck__vault-btn,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck__settings-btn {
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: rgba(248, 251, 255, 0.94) !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 2px 3px rgba(4, 10, 20, 0.72));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .control-deck__settings-btn[aria-expanded='true'] {
+  border-color: rgba(91, 174, 245, 0.62) !important;
+  background: rgba(231, 244, 255, 0.92) !important;
+  color: #287cbf !important;
+  box-shadow:
+    0 0.25rem 0.75rem rgba(4, 12, 25, 0.16),
+    0 0 0 2px rgba(91, 174, 245, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--center,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--orbit,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--video-active {
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: rgba(247, 250, 253, 0.58) !important;
+  box-shadow:
+    0 0.375rem 1rem rgba(4, 12, 25, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-orbit-icon__ring {
+  stroke: rgba(66, 82, 106, 0.8);
+  filter: drop-shadow(0 1px 2px rgba(4, 12, 25, 0.16));
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--inactive {
+  border: 1px solid transparent;
+  background: transparent !important;
+  color: rgba(248, 251, 255, 0.9);
+  box-shadow: none;
+  opacity: 0.72;
+  filter: drop-shadow(0 2px 3px rgba(4, 10, 20, 0.72));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .record-carousel-slot--inactive svg {
+  color: rgba(248, 251, 255, 0.94) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--hands-free:not(.record-carousel-slot--recording) {
+  border-color: rgba(91, 174, 245, 0.72) !important;
+  background: rgba(231, 244, 255, 0.72) !important;
+  color: #287cbf !important;
+  box-shadow:
+    0 0.375rem 1rem rgba(4, 12, 25, 0.2),
+    0 0 0 3px rgba(91, 174, 245, 0.12),
+    0 0 1.125rem rgba(91, 174, 245, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--hands-free
+  .record-orbit-icon__ring {
+  stroke: #287cbf;
+  filter: drop-shadow(0 0 5px rgba(91, 174, 245, 0.52));
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--recording.record-carousel-slot--orbit {
+  border-color: rgba(254, 202, 202, 0.74) !important;
+  background: rgba(255, 247, 247, 0.68) !important;
+  box-shadow:
+    0 0.375rem 1rem rgba(4, 12, 25, 0.22),
+    0 0 1.125rem rgba(239, 68, 68, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--recording
+  .record-orbit-icon__ring {
+  stroke: rgba(220, 38, 38, 0.78);
+  filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.42));
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .control-deck__vault-btn,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .control-deck__settings-btn,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--center,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--orbit,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--video-active,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--inactive {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(15, 20, 29, 0.88) !important;
+  color: rgba(245, 248, 252, 0.84) !important;
+  box-shadow:
+    0 0.25rem 0.875rem rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .control-deck__vault-btn,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .control-deck__settings-btn:not([aria-expanded='true']),
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--inactive {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: rgba(248, 251, 255, 0.9) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--center,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--orbit,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--video-active {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(15, 20, 29, 0.58) !important;
+  box-shadow:
+    0 0.375rem 1rem rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--inactive
+  svg {
+  color: rgba(245, 248, 252, 0.82) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-orbit-icon__ring {
+  stroke: rgba(245, 248, 252, 0.78);
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .control-deck__settings-btn[aria-expanded='true'],
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--hands-free:not(.record-carousel-slot--recording) {
+  border-color: rgba(91, 174, 245, 0.56) !important;
+  background: rgba(15, 48, 72, 0.7) !important;
+  color: rgba(191, 226, 255, 0.96) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--hands-free
+  .record-orbit-icon__ring {
+  stroke: rgba(125, 202, 255, 0.96);
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--recording.record-carousel-slot--orbit {
+  border-color: rgba(248, 113, 113, 0.48) !important;
+  background: rgba(55, 20, 25, 0.7) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .record-carousel-slot--recording
+  .record-orbit-icon__ring {
+  stroke: rgba(252, 165, 165, 0.94);
 }

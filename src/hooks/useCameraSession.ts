@@ -100,7 +100,7 @@ function isStreamRecordable(stream: MediaStream | null, mode: RecordingMode): bo
 
   const audioLive = stream
     .getAudioTracks()
-    .some((track) => track.readyState === 'live' && track.enabled)
+    .some((track) => track.readyState === 'live' && track.enabled && !track.muted)
   if (!audioLive) return false
 
   if (mode === 'audio') return true
@@ -145,7 +145,7 @@ function canSoftHandoffToAudio(stream: MediaStream | null): boolean {
   if (!stream) return false
   const audioLive = stream
     .getAudioTracks()
-    .some((track) => track.readyState === 'live' && track.enabled)
+    .some((track) => track.readyState === 'live' && track.enabled && !track.muted)
   if (!audioLive) return false
   return stream
     .getVideoTracks()
@@ -736,10 +736,9 @@ export function useCameraSession({
       setError(null)
 
       if (
-        (mode === 'video' || mode === 'audio') &&
+        mode === 'video' &&
         isNativeVideoRecordingEnabled() &&
-        !options?.forceNew &&
-        !(mode === 'audio' && options?.liveCapture)
+        !options?.forceNew
       ) {
         const warmed = await acquireNativeVideoBridge()
         return warmed ? streamRef.current : null
@@ -1098,21 +1097,6 @@ export function useCameraSession({
         if (cancelled) return
         if (ok) {
           previewHealthyRef.current = true
-        }
-        return
-      }
-
-      if (
-        mode === 'audio' &&
-        nativeCameraRecordingEnabledRef.current &&
-        Capacitor.isNativePlatform() &&
-        Capacitor.getPlatform() === 'ios'
-      ) {
-        previousRecordingModeRef.current = mode
-        const ok = await acquireNativeVideoBridge()
-        if (cancelled) return
-        if (ok) {
-          setReady(true)
         }
         return
       }

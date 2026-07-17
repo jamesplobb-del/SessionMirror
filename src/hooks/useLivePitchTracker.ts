@@ -298,7 +298,9 @@ function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
   return Boolean(
     stream &&
       stream.active &&
-      stream.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled),
+      stream
+        .getAudioTracks()
+        .some((track) => track.readyState === 'live' && track.enabled && !track.muted),
   )
 }
 
@@ -908,9 +910,9 @@ function drawTraceEndpointDot(
   ctx.shadowBlur = 0
 }
 
-function getGlassLayoutMetrics(height: number) {
+function getGlassLayoutMetrics(height: number, centerVertically = false) {
   const pitchTop = height * 0.06
-  const pitchBottom = height * 0.96
+  const pitchBottom = height * (centerVertically ? 0.94 : 0.96)
   const pitchHeight = pitchBottom - pitchTop
   const midPitchY = pitchTop + pitchHeight * 0.5
   const centsToY = (cents: number) =>
@@ -1099,7 +1101,7 @@ function drawGlassAudioGrid(
 }
 
 /** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 9
+const GLASS_STATIC_GRID_VERSION = 10
 
 type GlassStaticVariant = 'widget' | 'legacy' | 'audio'
 
@@ -1158,7 +1160,7 @@ function blitGlassStaticLayer(
     if (variant === 'widget') {
       drawGlassWidgetStaticContent(offCtx, width, height, dark)
     } else if (variant === 'audio') {
-      const { pitchTop, pitchBottom, centsToY } = getGlassLayoutMetrics(height)
+      const { pitchTop, pitchBottom, centsToY } = getGlassLayoutMetrics(height, true)
       offCtx.clearRect(0, 0, width, height)
       drawGlassAudioGrid(offCtx, width, height, pitchTop, pitchBottom, centsToY, dark)
     } else {
@@ -1171,7 +1173,7 @@ function blitGlassStaticLayer(
   }
 
   targetCtx.drawImage(cache.canvas, 0, 0, width, height)
-  return getGlassLayoutMetrics(height)
+  return getGlassLayoutMetrics(height, variant === 'audio')
 }
 
 function drawPitchCanvas(
@@ -2081,6 +2083,21 @@ export function useLivePitchTracker(
 
       if (graph.context.state === 'suspended') {
         void graph.context.resume()
+      }
+
+      if (
+        !isMediaPitchGraph(graph) &&
+        !graph.nativeTap &&
+        !micStreamIsLive(graph.stream)
+      ) {
+        console.info('[PitchTracker] WebKit mic source unavailable; reacquiring')
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+        if (!isAttaching.current) {
+          void tryAttachRef.current?.()
+        }
+        tickRef.current = requestAnimationFrame(tick)
+        return
       }
 
       if (

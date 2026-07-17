@@ -2569,9 +2569,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const micStreamIsLiveForTuner = useCallback(() => {
     if (isNativeCaptureSessionActive()) return true
     return Boolean(
-      streamRef.current?.getAudioTracks().some(
-        (track) => track.readyState === 'live' && track.enabled,
-      ),
+      streamRef.current?.active &&
+        streamRef.current.getAudioTracks().some(
+          (track) => track.readyState === 'live' && track.enabled && !track.muted,
+        ),
     )
   }, [])
 
@@ -4129,6 +4130,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           streamGeneration={streamGeneration}
                           nativeLivePreviewActive={nativeLivePreviewActive}
                           ready={ready}
+                          permissionRequestInFlight={cameraPermissionRequestInFlight}
                           isRecording={isRecording}
                           tunerInstrument={settings.tunerInstrument}
                           liveMicTunerEnabled={settings.liveMicTunerEnabled}
