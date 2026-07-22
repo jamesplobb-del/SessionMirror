@@ -1,4 +1,4 @@
-import { Minus, Pause, Play, Plus } from 'lucide-react'
+import { ChevronsUpDown, Minus, Pause, Play, Plus } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useMetronome } from '../../hooks/useMetronome'
 import { useTapTempo } from '../../hooks/useTapTempo'
@@ -73,6 +73,7 @@ export default function AudioPracticeMetronomeView() {
   const currentBpmRef = useRef(0)
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState('')
+  const [tempoScrubbing, setTempoScrubbing] = useState(false)
 
   const {
     bpm,
@@ -214,6 +215,7 @@ export default function AudioPracticeMetronomeView() {
         lastBpm: currentBpmRef.current,
         moved: false,
       }
+      setTempoScrubbing(true)
       event.currentTarget.setPointerCapture(event.pointerId)
     },
     [],
@@ -248,6 +250,7 @@ export default function AudioPracticeMetronomeView() {
     const drag = tempoDragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
     tempoDragRef.current = null
+    setTempoScrubbing(false)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
@@ -289,12 +292,17 @@ export default function AudioPracticeMetronomeView() {
             </PracticeControlButton>
 
             <div
-              className="audio-practice-metronome__tempo-scrubber pointer-events-auto"
+              className={`audio-practice-metronome__tempo-scrubber pointer-events-auto ${
+                tempoScrubbing
+                  ? 'audio-practice-metronome__tempo-scrubber--dragging'
+                  : ''
+              }`}
               onWheel={handleTempoWheel}
               onPointerDown={handleTempoPointerDown}
               onPointerMove={handleTempoPointerMove}
               onPointerUp={handleTempoPointerEnd}
               onPointerCancel={handleTempoPointerEnd}
+              onLostPointerCapture={handleTempoPointerEnd}
               role="group"
               aria-label={`${bpm} beats per minute. Swipe up or down to change tempo.`}
             >
@@ -334,6 +342,20 @@ export default function AudioPracticeMetronomeView() {
                   </button>
                 )}
               </div>
+              {!editingBpm && (
+                <>
+                  <ChevronsUpDown
+                    className="audio-practice-metronome__tempo-drag-cue"
+                    strokeWidth={2.2}
+                    aria-hidden
+                  />
+                  <div className="audio-practice-metronome__tempo-drag-scale" aria-hidden>
+                    <span>{clampAudioPracticeBpm(bpm + 1)}</span>
+                    <strong>{bpm}</strong>
+                    <span>{clampAudioPracticeBpm(bpm - 1)}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             <PracticeControlButton

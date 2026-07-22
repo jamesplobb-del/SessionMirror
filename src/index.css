@@ -6285,6 +6285,7 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-scrubber {
+  position: relative;
   display: grid;
   flex: 0 1 10.5rem;
   place-items: center;
@@ -6296,6 +6297,7 @@ html.app-dark-mode
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  overflow: hidden;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-scrubber:active {
@@ -6304,6 +6306,71 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__bpm-center {
   width: 100%;
+  transition: opacity 150ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-drag-cue {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  color: color-mix(in srgb, var(--audio-blue) 68%, var(--audio-gold));
+  opacity: 0.72;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-drag-scale {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  place-items: center;
+  padding-block: 0.2rem;
+  color: var(--audio-text-secondary);
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.25rem);
+  transition: opacity 140ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-drag-scale span {
+  font-size: 0.72rem;
+  font-weight: 650;
+  opacity: 0.52;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-drag-scale strong {
+  color: var(--audio-text-primary);
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber--dragging
+  .audio-practice-metronome__bpm-center,
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber--dragging
+  .audio-practice-metronome__tempo-drag-cue {
+  opacity: 0;
+  transform: translateY(-0.25rem);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber--dragging
+  .audio-practice-metronome__tempo-drag-scale {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-ui-overlay--audio-mode .audio-practice-metronome__bpm-center,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-drag-scale {
+    transition: none;
+  }
 }
 
 .app-ui-overlay--audio-mode
@@ -6381,7 +6448,7 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
-  --runway-node-width: clamp(2.15rem, 8.5vw, 2.85rem);
+  --runway-node-width: clamp(2.25rem, 9vw, 3rem);
   --runway-node-height: clamp(5.25rem, 16dvh, 7.75rem);
   position: relative;
   isolation: isolate;
@@ -6466,6 +6533,12 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode
   .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--single-line {
+  width: min(100%, calc(var(--beat-columns) * clamp(4.15rem, 17vw, 5.8rem)));
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
   .audio-practice-metronome__beat-cell {
   position: relative;
   display: flex;
@@ -6508,7 +6581,7 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode
   .audio-practice-metronome__visual--large
   .audio-practice-metronome__beat-row--compact {
-  --runway-node-width: clamp(1.95rem, 7.5vw, 2.35rem);
+  --runway-node-width: clamp(2.05rem, 7.8vw, 2.5rem);
   --runway-node-height: clamp(4rem, 12dvh, 5.5rem);
   row-gap: clamp(1rem, 2.7dvh, 1.5rem);
 }
@@ -6516,7 +6589,7 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode
   .audio-practice-metronome__visual--large
   .audio-practice-metronome__beat-row--spacious {
-  --runway-node-width: clamp(2.8rem, 11vw, 3.4rem);
+  --runway-node-width: clamp(2.95rem, 11.5vw, 3.6rem);
   --runway-node-height: clamp(6.5rem, 20dvh, 9rem);
   max-width: 32rem;
 }

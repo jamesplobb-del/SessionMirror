@@ -2349,6 +2349,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (modeChanged) {
         setShowPitch(false)
         resetToAudioTab()
+        // Refresh the cached visual viewport before the audio layout mounts.
+        // Otherwise iOS can paint one frame with the camera surface's stale
+        // height and clip the bottom deck before its later recovery pass.
+        stabilizeViewportAfterMediaInteraction()
+        if (mode === 'audio' && !showTakeCardsRef.current) {
+          showTakeCardsRef.current = true
+          updateSettings({ showTakeCards: true })
+        }
         if (import.meta.env.DEV) {
           console.log(
             mode === 'video' ? '[ModeSwitch] entering camera' : '[ModeSwitch] entering audio'
@@ -2366,9 +2374,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         window.setTimeout(reconcileMetronomeAfterModeSwitch, 420)
         window.setTimeout(reconcileMetronomeAfterModeSwitch, 900)
         window.setTimeout(reconcileMetronomeAfterModeSwitch, 1500)
-      }
-      if (mode === 'audio' && !showTakeCardsRef.current) {
-        updateSettings({ showTakeCards: true })
       }
       if (mode === 'audio') {
         requestCameraAccess('audio')
