@@ -26,20 +26,7 @@ import {
 import MetronomeAudioSelect from './MetronomeAudioSelect'
 import MetronomeBeatDisplay from './MetronomeBeatDisplay'
 
-const TEMPO_DEGREES_PER_BPM = 7
-
-function pointerAngleFromCenter(event: React.PointerEvent<HTMLElement>): number {
-  const rect = event.currentTarget.getBoundingClientRect()
-  const centerX = rect.left + rect.width / 2
-  const centerY = rect.top + rect.height / 2
-  return Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI)
-}
-
-function normalizeAngleDelta(delta: number): number {
-  if (delta > 180) return delta - 360
-  if (delta < -180) return delta + 360
-  return delta
-}
+const TEMPO_PIXELS_PER_BPM = 5
 
 function PracticeControlButton({
   label,
@@ -78,15 +65,14 @@ export default function AudioPracticeMetronomeView() {
   const didNormalizeBpmRef = useRef(false)
   const tempoDragRef = useRef<{
     pointerId: number
-    lastAngle: number
-    accumulatedDegrees: number
+    lastY: number
+    accumulatedPixels: number
     lastBpm: number
     moved: boolean
   } | null>(null)
   const currentBpmRef = useRef(0)
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState('')
-  const [tempoWheelRotation, setTempoWheelRotation] = useState(0)
 
   const {
     bpm,
@@ -212,7 +198,6 @@ export default function AudioPracticeMetronomeView() {
       if (nextBpm === currentBpmRef.current) return
       triggerLightHaptic()
       currentBpmRef.current = nextBpm
-      setTempoWheelRotation((rotation) => rotation + direction * TEMPO_DEGREES_PER_BPM)
       setPracticeBpm(nextBpm)
     },
     [setPracticeBpm],
@@ -224,8 +209,8 @@ export default function AudioPracticeMetronomeView() {
       event.preventDefault()
       tempoDragRef.current = {
         pointerId: event.pointerId,
-        lastAngle: pointerAngleFromCenter(event),
-        accumulatedDegrees: 0,
+        lastY: event.clientY,
+        accumulatedPixels: 0,
         lastBpm: currentBpmRef.current,
         moved: false,
       }
@@ -239,23 +224,21 @@ export default function AudioPracticeMetronomeView() {
       const drag = tempoDragRef.current
       if (!drag || drag.pointerId !== event.pointerId) return
       event.preventDefault()
-      const nextAngle = pointerAngleFromCenter(event)
-      const deltaDegrees = normalizeAngleDelta(nextAngle - drag.lastAngle)
-      drag.lastAngle = nextAngle
-      drag.accumulatedDegrees += deltaDegrees
-      if (Math.abs(drag.accumulatedDegrees) > 3) drag.moved = true
+      const deltaPixels = drag.lastY - event.clientY
+      drag.lastY = event.clientY
+      drag.accumulatedPixels += deltaPixels
+      if (Math.abs(drag.accumulatedPixels) > 3) drag.moved = true
 
-      const steps = Math.trunc(drag.accumulatedDegrees / TEMPO_DEGREES_PER_BPM)
+      const steps = Math.trunc(drag.accumulatedPixels / TEMPO_PIXELS_PER_BPM)
       if (steps === 0) return
 
-      drag.accumulatedDegrees -= steps * TEMPO_DEGREES_PER_BPM
+      drag.accumulatedPixels -= steps * TEMPO_PIXELS_PER_BPM
       const nextBpm = clampAudioPracticeBpm(drag.lastBpm + steps)
       if (nextBpm === drag.lastBpm) return
 
       drag.lastBpm = nextBpm
       currentBpmRef.current = nextBpm
       triggerLightHaptic()
-      setTempoWheelRotation((rotation) => rotation + steps * TEMPO_DEGREES_PER_BPM)
       setPracticeBpm(nextBpm)
     },
     [setPracticeBpm],
@@ -292,7 +275,11 @@ export default function AudioPracticeMetronomeView() {
     >
       <div className="audio-practice-metronome__body min-h-0 flex-1">
         <header className="metronome-audio-stage__hero shrink-0">
-          <div className="audio-practice-metronome__bpm-row">
+          <div
+            className="audio-practice-metronome__bpm-row audio-practice-metronome__tempo-strip"
+            role="group"
+            aria-label="Tempo controls"
+          >
             <PracticeControlButton
               label="Decrease tempo"
               onPress={() => adjustBpm(-1)}
@@ -302,30 +289,15 @@ export default function AudioPracticeMetronomeView() {
             </PracticeControlButton>
 
             <div
-              className="audio-practice-metronome__tempo-dial pointer-events-auto"
+              className="audio-practice-metronome__tempo-scrubber pointer-events-auto"
               onWheel={handleTempoWheel}
               onPointerDown={handleTempoPointerDown}
               onPointerMove={handleTempoPointerMove}
               onPointerUp={handleTempoPointerEnd}
               onPointerCancel={handleTempoPointerEnd}
               role="group"
-              aria-label={`${bpm} beats per minute. Drag up or down to change tempo.`}
+              aria-label={`${bpm} beats per minute. Swipe up or down to change tempo.`}
             >
-              <div className="audio-practice-metronome__tempo-glow" aria-hidden />
-              <div
-                className="audio-practice-metronome__tempo-rim"
-                style={{ '--tempo-wheel-rotation': `${tempoWheelRotation}deg` } as React.CSSProperties}
-                aria-hidden
-              >
-                {Array.from({ length: 72 }, (_, index) => (
-                  <span
-                    key={index}
-                    className="audio-practice-metronome__tempo-tick"
-                    style={{ '--tick-rotation': `${index * 5}deg` } as React.CSSProperties}
-                  />
-                ))}
-              </div>
-              <span className="audio-practice-metronome__tempo-marker" aria-hidden />
               <div className="audio-practice-metronome__bpm-center">
                 {editingBpm ? (
                   <input
@@ -376,7 +348,7 @@ export default function AudioPracticeMetronomeView() {
         </header>
 
         <section
-          className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel pointer-events-auto shrink-0"
+          className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel audio-practice-metronome__selectors--under-orbit pointer-events-auto shrink-0"
           aria-label="Metronome time, rhythm, and accent"
         >
           <div

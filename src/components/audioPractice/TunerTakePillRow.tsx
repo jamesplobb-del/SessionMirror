@@ -47,8 +47,8 @@ function TunerTakePill({
       className={`audio-tuner-take-pill audio-tuner-take-pill--${tone} ${
         compact ? 'audio-tuner-take-pill--compact' : ''
       } ${hasMedia ? '' : 'audio-tuner-take-pill--empty'} ${isPlaying ? 'audio-tuner-take-pill--playing' : ''}`}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={iosHudDim}
       style={motionGpuLayer}
       role="button"

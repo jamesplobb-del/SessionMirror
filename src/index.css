@@ -6258,3 +6258,419 @@ html.app-dark-mode
   .record-orbit-icon__ring {
   stroke: rgba(252, 165, 165, 0.94);
 }
+
+/* Audio metronome: compact tempo controls with the beat display as the main stage. */
+.app-ui-overlay--audio-mode .audio-practice-metronome__body {
+  gap: clamp(0.12rem, 0.45vh, 0.28rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome .metronome-audio-stage__hero {
+  padding: 0.05rem 0.35rem 0;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip {
+  width: min(100%, 22.5rem);
+  margin-inline: auto;
+  padding: 0.36rem 0.5rem;
+  gap: clamp(0.52rem, 2.2vw, 0.82rem);
+  border: 1px solid rgba(21, 152, 255, 0.13);
+  border-radius: 0.72rem;
+  background:
+    linear-gradient(90deg, rgba(247, 166, 0, 0.055), transparent 24%, rgba(21, 152, 255, 0.055) 76%, transparent),
+    var(--audio-surface);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 13px 32px rgba(23, 26, 34, 0.075),
+    0 2px 7px rgba(21, 152, 255, 0.055);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-scrubber {
+  display: grid;
+  flex: 0 1 10.5rem;
+  place-items: center;
+  min-width: 8.5rem;
+  min-height: 5.3rem;
+  padding-inline: 0.5rem;
+  border-inline: 1px solid rgba(21, 152, 255, 0.13);
+  cursor: ns-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-scrubber:active {
+  cursor: ns-resize;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__bpm-center {
+  width: 100%;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm {
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber
+  .audio-practice-metronome__tempo-label {
+  margin-bottom: 0.08rem;
+  font-size: 0.68rem;
+  color: var(--audio-gold);
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm-value {
+  font-size: clamp(3.2rem, 13vw, 4.25rem);
+  line-height: 0.82;
+  color: var(--audio-text-primary);
+  text-shadow: 0 8px 22px rgba(21, 152, 255, 0.11);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm-label {
+  margin-top: 0.28rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--audio-blue);
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm-input {
+  width: 7rem;
+  padding: 0.28rem 0.45rem;
+  border-radius: 0.5rem;
+  font-size: 2.25rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip .audio-practice-metronome__step-btn {
+  flex: 0 0 auto;
+  width: 2.85rem;
+  height: 2.85rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__selectors--under-orbit,
+.app-ui-overlay--audio-mode .audio-practice-metronome__selectors--under-wheel {
+  margin: 0.12rem auto 0.08rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  justify-content: center;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__center-stack
+  .metronome-audio-stage__beats {
+  min-height: 0;
+  padding: 0.2rem 0;
+  overflow: visible;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
+  --runway-node-width: clamp(2.15rem, 8.5vw, 2.85rem);
+  --runway-node-height: clamp(5.25rem, 16dvh, 7.75rem);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 42rem);
+  min-height: clamp(12.5rem, 34dvh, 19rem);
+  margin: 0 auto;
+  padding: clamp(1.15rem, 3dvh, 1.85rem) clamp(0.45rem, 2.5vw, 1.15rem);
+  overflow: visible;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__visual--large::before,
+.app-ui-overlay--audio-mode .audio-practice-metronome__visual--large::after {
+  content: '';
+  position: absolute;
+  left: clamp(0.6rem, 4vw, 2rem);
+  right: clamp(0.6rem, 4vw, 2rem);
+  top: 50%;
+  pointer-events: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__visual--large::before {
+  z-index: 0;
+  height: clamp(8rem, 23dvh, 12rem);
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(21, 152, 255, 0.035) 48%,
+    transparent 76%
+  );
+  box-shadow: none;
+  transform: translateY(-50%);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__visual--large::after {
+  z-index: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(247, 166, 0, 0.42) 9%,
+    rgba(21, 152, 255, 0.28) 36%,
+    rgba(21, 152, 255, 0.1) 78%,
+    transparent
+  );
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__pulse {
+  left: 7%;
+  right: 7%;
+  top: calc(50% - 4.5rem);
+  z-index: 1;
+  width: auto;
+  height: 9rem;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(56, 189, 248, 0.16), transparent 68%);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(var(--beat-columns), minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+  max-width: 39rem;
+  margin: 0;
+  gap: clamp(0.25rem, 1.5vw, 0.72rem);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-cell {
+  position: relative;
+  display: flex;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat {
+  width: var(--runway-node-width);
+  height: var(--runway-node-height);
+  border-radius: clamp(0.85rem, 3vw, 1.2rem);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 8px 18px rgba(23, 26, 34, 0.085);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat:not(.audio-practice-metronome__beat--active):not(
+    .audio-practice-metronome__beat--sub-active
+  ):not(.audio-practice-metronome__beat--accented) {
+  background-color: var(--audio-surface);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat--downbeat {
+  width: calc(var(--runway-node-width) + 0.2rem);
+  height: calc(var(--runway-node-height) + 0.2rem);
+  border-color: rgba(247, 166, 0, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(247, 166, 0, 0.16),
+    var(--audio-shadow-fab);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--compact {
+  --runway-node-width: clamp(1.95rem, 7.5vw, 2.35rem);
+  --runway-node-height: clamp(4rem, 12dvh, 5.5rem);
+  row-gap: clamp(1rem, 2.7dvh, 1.5rem);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--spacious {
+  --runway-node-width: clamp(2.8rem, 11vw, 3.4rem);
+  --runway-node-height: clamp(6.5rem, 20dvh, 9rem);
+  max-width: 32rem;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--compact
+  .audio-practice-metronome__beat,
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--compact
+  .audio-practice-metronome__beat--downbeat {
+  width: var(--runway-node-width);
+  height: var(--runway-node-height);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--two-line::after {
+  content: '';
+  position: absolute;
+  right: -0.15rem;
+  top: calc(50% - 0.42rem);
+  width: 0.62rem;
+  height: 0.84rem;
+  border-right: 2px solid rgba(21, 152, 255, 0.36);
+  border-bottom: 2px solid rgba(21, 152, 255, 0.36);
+  border-radius: 0 0 0.42rem;
+  transform: translateY(-50%);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat--sub-active {
+  transform: scale(0.94);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-tap:active {
+  transform: scale(0.94);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__sub-notches {
+  position: static;
+  min-height: 0;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--compact
+  .audio-practice-metronome__sub-notch {
+  width: 0.27rem;
+  height: 0.27rem;
+}
+
+@keyframes audio-practice-metronome-runway-pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes audio-practice-metronome-runway-pulse-soft {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .metronome-audio-stage__beat-row--playing
+  .audio-practice-metronome__beat--pulse {
+  animation: audio-practice-metronome-runway-pulse 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .metronome-audio-stage__beat-row--playing
+  .audio-practice-metronome__beat--pulse-soft {
+  animation: audio-practice-metronome-runway-pulse-soft 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .metronome-audio-stage__beat-row--reduced-motion
+  .audio-practice-metronome__beat--pulse,
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .metronome-audio-stage__beat-row--reduced-motion
+  .audio-practice-metronome__beat--pulse-soft {
+  animation: none;
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip {
+  border-color: rgba(226, 232, 240, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large::before {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(30, 41, 59, 0.42) 0%,
+    rgba(56, 189, 248, 0.045) 48%,
+    transparent 76%
+  );
+  box-shadow: none;
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large::after {
+  background: linear-gradient(90deg, rgba(247, 166, 0, 0.62), rgba(56, 189, 248, 0.46) 28%, rgba(125, 211, 252, 0.18));
+}
+
+@media (max-height: 760px) {
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
+    min-height: clamp(12rem, 34dvh, 15.5rem);
+    padding-block: 0.65rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip {
+    padding-block: 0.18rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-scrubber {
+    min-height: 4.8rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip {
+    width: min(100%, 22rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
+    width: min(100%, 48rem);
+    min-height: clamp(14rem, 30dvh, 21rem);
+  }
+}

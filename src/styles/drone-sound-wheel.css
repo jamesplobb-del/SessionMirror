@@ -389,13 +389,13 @@ html.app-dark-mode .drone-sound-wheel__octave-btn {
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__quality,
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__octave {
   display: flex;
-  min-width: 2.75rem;
+  min-width: 2.45rem;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   gap: 0.1rem;
   margin: 0;
-  padding: 0.28rem 0.16rem;
+  padding: 0.2rem 0.12rem;
   border-radius: 0.72rem;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 6px 18px rgba(21, 152, 255, 0.08);
@@ -417,31 +417,34 @@ html.app-dark-mode .drone-sound-wheel__octave-btn {
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__root {
-  min-width: 2.4rem;
-  min-height: 1.45rem;
-  padding: 0.18rem 0.1rem;
+  min-width: 2.15rem;
+  min-height: 1.25rem;
+  padding: 0.12rem 0.08rem;
+  font-size: 0.66rem;
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__quality-btn {
-  width: 2.55rem;
-  min-width: 2.55rem;
-  min-height: 2.75rem;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.35rem;
   border-radius: 0.58rem;
+  font-size: 0.62rem;
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__octave-btn {
-  width: 2.55rem;
-  height: 2.75rem;
+  width: 2.25rem;
+  height: 2.35rem;
   border-radius: 0.58rem;
 }
 
 .app-ui-overlay--audio-practice-tuner .drone-sound-wheel__octave-value {
   display: flex;
-  min-width: 2.55rem;
-  min-height: 1.8rem;
+  min-width: 2.25rem;
+  min-height: 1.55rem;
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  font-size: 0.7rem;
 }
 
 html.app-dark-mode

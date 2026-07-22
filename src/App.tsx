@@ -2870,11 +2870,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
 
   useEffect(() => {
-    if (!metronomePlaying || settings.showMetronome) return
-    updateSettings({ showMetronome: true })
-  }, [metronomePlaying, settings.showMetronome, updateSettings])
-
-  useEffect(() => {
     if (!metronomePlaying) return
     if (recordingMode === 'video' && !nativeLivePreviewActive) return
     sharedMetronomeEngine.reconcileAfterModeSwitch(recordingMode)
@@ -4247,8 +4242,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                               ? 'audio-tuner-take-pills-wrap--compact'
                               : ''
                           }`}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
                           transition={iosHudDim}
                           style={motionGpuLayer}
                         >

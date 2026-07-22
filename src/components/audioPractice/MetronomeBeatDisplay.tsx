@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { useMetronome } from '../../hooks/useMetronome'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { subTicksPerPulse } from '../../utils/metronomeConfig'
@@ -26,6 +27,7 @@ export default function MetronomeBeatDisplay({ interactive = true }: MetronomeBe
   const beatsPerBar = pulseCount
   const compoundMeter = compound
   const subNotchCount = subTicksPerPulse(meter, subdivision, pulseCount)
+  const beatColumns = beatsPerBar > 8 ? Math.ceil(beatsPerBar / 2) : beatsPerBar
 
   const isMainBeatPulse = playing && subTickIndex === 0
   const activeLevel = accentLevels[beatIndex] ?? 'weak'
@@ -59,11 +61,16 @@ export default function MetronomeBeatDisplay({ interactive = true }: MetronomeBe
               'audio-practice-metronome__beat-row',
               compoundMeter ? 'audio-practice-metronome__beat-row--compound' : '',
               beatsPerBar > 8 ? 'audio-practice-metronome__beat-row--compact' : '',
+              beatsPerBar > 8
+                ? 'audio-practice-metronome__beat-row--two-line'
+                : 'audio-practice-metronome__beat-row--single-line',
+              beatsPerBar <= 6 ? 'audio-practice-metronome__beat-row--spacious' : '',
               playing ? 'metronome-audio-stage__beat-row--playing' : '',
               prefersReducedMotion ? 'metronome-audio-stage__beat-row--reduced-motion' : '',
             ]
               .filter(Boolean)
               .join(' ')}
+            style={{ '--beat-columns': beatColumns } as CSSProperties}
             role="group"
             aria-label="Beat indicators"
           >

@@ -233,8 +233,8 @@ function AudioModeTakeCard({
       } ${isPreparing ? 'audio-mode-take-card--preparing' : ''} ${
         preparationFailed ? 'audio-mode-take-card--error' : ''
       }`}
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={iosHudDim}
       style={motionGpuLayer}
       onClick={() => {
@@ -382,8 +382,8 @@ function AudioModeHome({
     <section className="audio-mode-home pointer-events-auto">
       <motion.div
         className={`audio-mode-hero ${isRecording ? 'audio-mode-hero--recording' : ''}`}
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={iosHudDim}
       >
         <AudioModeHeroMic isRecording={isRecording} />
