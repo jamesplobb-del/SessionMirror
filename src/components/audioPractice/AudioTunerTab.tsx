@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Mic } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import LivePitchTuner from '../LivePitchTuner'
 import { useDrone } from '../../hooks/useDrone'
+import type { PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { DroneWaveform } from '../../utils/droneEngine'
-import { APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../../utils/appForeground'
+import {
+  APP_INTERACTIVE_MEDIA_RECOVERY_EVENT,
+  requestInteractiveMediaRecovery,
+} from '../../utils/appForeground'
+import { triggerLightHaptic } from '../../utils/haptics'
 
 interface AudioTunerTabProps {
   streamRef: RefObject<MediaStream | null>
@@ -51,6 +57,9 @@ export default function AudioTunerTab({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const normalizedVolume = droneVolume / 100
   const [micLiveEpoch, setMicLiveEpoch] = useState(0)
+  const [sourceHealth, setSourceHealth] = useState<PitchSourceHealth>('connecting')
+  const [showRecoveryPrompt, setShowRecoveryPrompt] = useState(false)
+  const automaticRecoveryAttemptsRef = useRef(0)
 
   const drone = useDrone({
     volume: normalizedVolume,
@@ -67,6 +76,7 @@ export default function AudioTunerTab({
       onSetNotes: drone.setNotes,
       onIncrementOctave: drone.incrementOctave,
       onDecrementOctave: drone.decrementOctave,
+      hapticsEnabled: hapticFeedback,
     }),
     [
       drone.activeNotes,
@@ -76,13 +86,28 @@ export default function AudioTunerTab({
       drone.octave,
       drone.setNotes,
       drone.toggleNote,
+      hapticFeedback,
     ],
   )
 
   const liveMicReady = true
 
+  const handleSourceHealthChange = useCallback((health: PitchSourceHealth) => {
+    setSourceHealth(health)
+    if (health === 'healthy') {
+      automaticRecoveryAttemptsRef.current = 0
+      setShowRecoveryPrompt(false)
+    }
+  }, [])
+
   useEffect(() => {
-    const recoverTunerMic = () => {
+    const recoverTunerMic = (event: Event) => {
+      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
+      if (reason !== 'tuner-auto-source-stalled') {
+        automaticRecoveryAttemptsRef.current = 0
+      }
+      setShowRecoveryPrompt(false)
+      setSourceHealth('connecting')
       if (!permissionRequestInFlight) {
         void onRequestMicStream()
       }
@@ -93,6 +118,24 @@ export default function AudioTunerTab({
       window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     }
   }, [onRequestMicStream, permissionRequestInFlight])
+
+  useEffect(() => {
+    if (
+      sourceHealth !== 'stalled' ||
+      isRecording ||
+      permissionRequestInFlight
+    ) {
+      return
+    }
+
+    if (automaticRecoveryAttemptsRef.current >= 2) {
+      setShowRecoveryPrompt(true)
+      return
+    }
+
+    automaticRecoveryAttemptsRef.current += 1
+    requestInteractiveMediaRecovery('tuner-auto-source-stalled')
+  }, [isRecording, permissionRequestInFlight, sourceHealth])
 
   useEffect(() => {
     let cancelled = false
@@ -140,8 +183,19 @@ export default function AudioTunerTab({
     streamRef,
   ])
 
+  const reactivateTuner = useCallback(() => {
+    triggerLightHaptic(hapticFeedback)
+    automaticRecoveryAttemptsRef.current = 0
+    setShowRecoveryPrompt(false)
+    setSourceHealth('connecting')
+    requestInteractiveMediaRecovery('tuner-manual-reactivate')
+  }, [hapticFeedback])
+
   return (
-    <section className="audio-practice-tuner-shell flex min-h-0 flex-1 flex-col" aria-label="Tuner">
+    <section
+      className="audio-practice-tuner-shell relative flex min-h-0 flex-1 flex-col"
+      aria-label="Tuner"
+    >
       <LivePitchTuner
         variant="audio"
         mediaRef={mediaRef}
@@ -154,7 +208,22 @@ export default function AudioTunerTab({
         liveMicOnly
         tunerInstrument={tunerInstrument}
         drone={droneKeyboard}
+        onLiveSourceHealthChange={handleSourceHealthChange}
       />
+      {showRecoveryPrompt && !isRecording ? (
+        <button
+          type="button"
+          className="pitch-tuner-recovery"
+          onClick={reactivateTuner}
+          aria-label="Reactivate tuner microphone"
+        >
+          <span className="pitch-tuner-recovery__prompt">
+            <Mic aria-hidden />
+            <strong>Tap to reactivate tuner</strong>
+            <small>Microphone connection paused</small>
+          </span>
+        </button>
+      ) : null}
     </section>
   )
 }

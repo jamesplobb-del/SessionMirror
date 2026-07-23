@@ -6443,13 +6443,13 @@ html.app-dark-mode
   .audio-practice-metronome__center-stack
   .metronome-audio-stage__beats {
   min-height: 0;
-  padding: 0.2rem 0;
+  padding: 0;
   overflow: visible;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
-  --runway-node-width: clamp(2.25rem, 9vw, 3rem);
-  --runway-node-height: clamp(5.25rem, 16dvh, 7.75rem);
+  --runway-node-width: clamp(2.55rem, 10vw, 3.35rem);
+  --runway-node-height: clamp(6.2rem, 19.5dvh, 9.25rem);
   position: relative;
   isolation: isolate;
   display: flex;
@@ -6457,8 +6457,8 @@ html.app-dark-mode
   align-items: center;
   justify-content: center;
   width: min(100%, 42rem);
-  min-height: clamp(12.5rem, 34dvh, 19rem);
-  margin: 0 auto;
+  min-height: clamp(14.25rem, 41dvh, 22.5rem);
+  margin: -0.4rem auto 0;
   padding: clamp(1.15rem, 3dvh, 1.85rem) clamp(0.45rem, 2.5vw, 1.15rem);
   overflow: visible;
 }
@@ -6581,16 +6581,16 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode
   .audio-practice-metronome__visual--large
   .audio-practice-metronome__beat-row--compact {
-  --runway-node-width: clamp(2.05rem, 7.8vw, 2.5rem);
-  --runway-node-height: clamp(4rem, 12dvh, 5.5rem);
+  --runway-node-width: clamp(2.25rem, 8.6vw, 2.8rem);
+  --runway-node-height: clamp(4.75rem, 14.5dvh, 6.5rem);
   row-gap: clamp(1rem, 2.7dvh, 1.5rem);
 }
 
 .app-ui-overlay--audio-mode
   .audio-practice-metronome__visual--large
   .audio-practice-metronome__beat-row--spacious {
-  --runway-node-width: clamp(2.95rem, 11.5vw, 3.6rem);
-  --runway-node-height: clamp(6.5rem, 20dvh, 9rem);
+  --runway-node-width: clamp(3.35rem, 13vw, 4.1rem);
+  --runway-node-height: clamp(7.75rem, 24dvh, 11rem);
   max-width: 32rem;
 }
 
@@ -6724,7 +6724,7 @@ html.app-dark-mode
 
 @media (max-height: 760px) {
   .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
-    min-height: clamp(12rem, 34dvh, 15.5rem);
+    min-height: clamp(13.25rem, 38dvh, 17.5rem);
     padding-block: 0.65rem;
   }
 
@@ -6744,6 +6744,6 @@ html.app-dark-mode
 
   .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
     width: min(100%, 48rem);
-    min-height: clamp(14rem, 30dvh, 21rem);
+    min-height: clamp(16rem, 36dvh, 25rem);
   }
 }

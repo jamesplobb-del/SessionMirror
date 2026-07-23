@@ -1,16 +1,19 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useMemo, useRef, type RefObject } from 'react'
-import { useLivePitchTracker } from '../hooks/useLivePitchTracker'
+import { Music2 } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  useLivePitchTracker,
+  type PitchSourceHealth,
+} from '../hooks/useLivePitchTracker'
 import DroneSoundWheel from './audioPractice/DroneSoundWheel'
+import TuningGauge from './audioPractice/TuningGauge'
+import { triggerLightHaptic } from '../utils/haptics'
 import {
   formatDisplayCents,
   formatFrequencyHz,
-  formatAccentOrbitArcStyle,
-  formatInTuneGlowStyles,
   getIntonationColor,
   getIntonationZone,
   isInTune,
-  TUNING_GREEN_CENTS,
   type PitchReadout,
 } from '../utils/pitchUtils'
 import type { TunerInstrument } from '../utils/pitchConfig'
@@ -30,6 +33,8 @@ interface LivePitchTunerProps {
   pitchSource?: 'media' | 'microphone'
   /** Audio mode: analyze live mic stream (recording or idle tuner). */
   liveMicOnly?: boolean
+  /** Audio tuner only: reports whether live PCM is actually arriving. */
+  onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
   /** Multi-select drone keyboard (audio tuner tab). */
   drone?: {
     activeNotes: number[]
@@ -39,6 +44,7 @@ interface LivePitchTunerProps {
     onSetNotes: (pitchClasses: number[]) => void
     onIncrementOctave: () => void
     onDecrementOctave: () => void
+    hapticsEnabled?: boolean
   }
 }
 
@@ -48,21 +54,25 @@ function PitchChartCanvas({
   canvasRef,
   glass = false,
   fill = false,
+  living = false,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
   glass?: boolean
   fill?: boolean
+  living?: boolean
 }) {
   return (
     <div
-      className="pitch-chart-shell relative w-full flex-1"
+      className={`pitch-chart-shell relative w-full flex-1 ${
+        living ? 'pitch-chart-shell--living' : ''
+      }`}
       style={fill ? { minHeight: '100%', height: '100%' } : { minHeight: 140, height: '100%' }}
     >
       <canvas
         ref={canvasRef}
         className={`pitch-spectrogram absolute inset-0 h-full w-full ${
           glass ? 'pitch-spectrogram--glass' : ''
-        }`}
+        } ${living ? 'pitch-spectrogram--living' : ''}`}
         style={fill ? { minHeight: '100%' } : { minHeight: 140 }}
       />
     </div>
@@ -136,226 +146,123 @@ function StatusLabel({
   )
 }
 
-const ORBIT_RADIUS = 93
-const ORBIT_CENTER = 100
-
-function orbitPoint(cx: number, cy: number, r: number, degreesFromTop: number) {
-  const rad = (degreesFromTop * Math.PI) / 180 - Math.PI / 2
-  return {
-    x: cx + r * Math.cos(rad),
-    y: cy + r * Math.sin(rad),
-  }
-}
-
-function describeOrbitArc(
-  cx: number,
-  cy: number,
-  r: number,
-  startFromTop: number,
-  endFromTop: number,
-) {
-  const start = orbitPoint(cx, cy, r, startFromTop)
-  const end = orbitPoint(cx, cy, r, endFromTop)
-  const span = endFromTop - startFromTop
-  const largeArc = Math.abs(span) > 180 ? 1 : 0
-  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`
-}
-
-function NoteOrbitReadout({
-  noteName,
-  frequencyHz,
-  cents,
-  active,
-  inTuneGlow = 0,
-  lightSurface = false,
-}: {
-  noteName: string
-  frequencyHz: number
-  cents: number
-  active: boolean
-  inTuneGlow?: number
-  lightSurface?: boolean
-}) {
-  const inTune = active && isInTune(cents, TUNING_GREEN_CENTS)
-  const zone = active ? getIntonationZone(cents) : null
-  const idleAccent = lightSurface ? 'rgba(108, 112, 119, 0.72)' : 'rgba(255,255,255,0.55)'
-  const accent = active ? getIntonationColor(cents) : idleAccent
-  const isSharp = active && cents > TUNING_GREEN_CENTS
-  const isFlat = active && cents < -TUNING_GREEN_CENTS
-  const pulseDuration = zone === 'red' ? 0.38 : zone === 'yellow' ? 0.58 : 0.85
-  const sustainedGlow = inTune && inTuneGlow > 0 ? formatInTuneGlowStyles(inTuneGlow) : null
-  const accentGlow = active && !sustainedGlow ? `0 0 20px ${accent}33` : 'none'
-  const textShadow = sustainedGlow?.textShadow ?? accentGlow
-  const fillRatio = active ? Math.min(1, Math.abs(cents) / 50) : 0
-  const arcSpan = 34 + fillRatio * 56
-  const accentArc =
-    active && zone && (isSharp || isFlat)
-      ? formatAccentOrbitArcStyle(accent, zone, fillRatio)
-      : null
-
-  return (
-    <div
-      className={`pitch-note-orbit ${lightSurface ? 'pitch-note-orbit--light-native' : ''} ${inTune ? 'pitch-note-orbit--in-tune' : ''} ${isSharp ? 'pitch-note-orbit--sharp' : ''} ${isFlat ? 'pitch-note-orbit--flat' : ''}`}
-      style={{
-        ['--orbit-accent' as string]: accent,
-        ['--in-tune-glow' as string]: String(inTuneGlow),
-        filter: sustainedGlow?.filter,
-      }}
-    >
-      <div className="pitch-note-orbit__ring">
-        <svg className="pitch-note-orbit__svg" viewBox="0 0 200 200" aria-hidden>
-          <circle className="pitch-note-orbit__ring-track" cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS} />
-
-          {inTune && sustainedGlow && inTuneGlow > 0.04 && (
-            <circle
-              className="pitch-note-orbit__ring-halo"
-              cx={ORBIT_CENTER}
-              cy={ORBIT_CENTER}
-              r={ORBIT_RADIUS}
-              fill="none"
-              stroke="#22c55e"
-              strokeWidth={sustainedGlow.haloStrokeWidth}
-              strokeOpacity={sustainedGlow.haloOpacity}
-            />
-          )}
-
-          {inTune && (
-            <circle
-              className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--in-tune"
-              cx={ORBIT_CENTER}
-              cy={ORBIT_CENTER}
-              r={ORBIT_RADIUS}
-              fill="none"
-              stroke="#22c55e"
-              strokeWidth={sustainedGlow?.ringStrokeWidth ?? 2.5}
-              strokeOpacity={sustainedGlow?.ringOpacity ?? 0.82}
-            />
-          )}
-
-          <AnimatePresence mode="wait">
-            {isSharp && accentArc && (
-              <motion.path
-                key="sharp-arc"
-                className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--accent"
-                d={describeOrbitArc(ORBIT_CENTER, ORBIT_CENTER, ORBIT_RADIUS, -arcSpan, arcSpan)}
-                fill="none"
-                stroke={accent}
-                strokeLinecap="round"
-                style={{ filter: accentArc.filter }}
-                initial={{ opacity: 0, pathLength: 0.6 }}
-                animate={{
-                  opacity: [accentArc.minOpacity, 1, accentArc.minOpacity],
-                  pathLength: [0.82, 1, 0.82],
-                  strokeWidth: [accentArc.minStroke, accentArc.maxStroke, accentArc.minStroke],
-                }}
-                exit={{ opacity: 0, transition: { duration: 0.28, ease: 'easeOut' } }}
-                transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
-              />
-            )}
-
-            {isFlat && accentArc && (
-              <motion.path
-                key="flat-arc"
-                className="pitch-note-orbit__ring-arc pitch-note-orbit__ring-arc--accent"
-                d={describeOrbitArc(
-                  ORBIT_CENTER,
-                  ORBIT_CENTER,
-                  ORBIT_RADIUS,
-                  180 - arcSpan,
-                  180 + arcSpan,
-                )}
-                fill="none"
-                stroke={accent}
-                strokeLinecap="round"
-                style={{ filter: accentArc.filter }}
-                initial={{ opacity: 0, pathLength: 0.6 }}
-                animate={{
-                  opacity: [accentArc.minOpacity, 1, accentArc.minOpacity],
-                  pathLength: [0.82, 1, 0.82],
-                  strokeWidth: [accentArc.minStroke, accentArc.maxStroke, accentArc.minStroke],
-                }}
-                exit={{ opacity: 0, transition: { duration: 0.28, ease: 'easeOut' } }}
-                transition={{ duration: pulseDuration, repeat: Infinity, ease: 'easeInOut' }}
-              />
-            )}
-          </AnimatePresence>
-        </svg>
-
-        <div className="pitch-note-orbit__core">
-          <p
-            className="pitch-note-orbit__note pitch-readout-display"
-            style={{ color: accent, textShadow }}
-          >
-            {noteName}
-          </p>
-          <div className="pitch-note-orbit__meta pitch-readout-display">
-            <span style={{ color: accent, textShadow }}>{formatFrequencyHz(frequencyHz)}</span>
-            <span className="pitch-note-orbit__sep" aria-hidden>
-              ·
-            </span>
-            <span style={{ color: accent, textShadow }}>
-              {active ? formatDisplayCents(cents) : '—'}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function LiveAudioTunerPane({
   readout,
-  inTuneGlow,
   canvasRef,
   drone,
   onDroneInteraction,
 }: {
   readout: PitchReadout
-  inTuneGlow: number
   canvasRef: RefObject<HTMLCanvasElement | null>
   drone?: LivePitchTunerProps['drone']
   onDroneInteraction?: () => void
 }) {
-  const active = readout.noteName !== '—'
-  const displayCents = active ? readout.cents : 0
+  const [droneOpen, setDroneOpen] = useState(false)
+  const pitchActive = readout.noteName !== '—'
+  const pitchZone = pitchActive ? getIntonationZone(readout.cents) : 'idle'
+  const droneActive = Boolean(drone?.activeNotes.length)
+  const droneStatus = droneActive
+    ? `${drone?.activeNotes.length ?? 0} ${drone?.activeNotes.length === 1 ? 'note' : 'notes'}`
+    : 'Off'
+
+  const toggleDrone = () => {
+    triggerLightHaptic(drone?.hapticsEnabled)
+    setDroneOpen((open) => !open)
+  }
 
   return (
-    <div className="pitch-audio-stage pitch-audio-stage--polished pitch-audio-stage--tuner-wheel flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="pitch-audio-stage__hero shrink-0">
-        {drone ? (
-          <DroneSoundWheel
-            activeNotes={drone.activeNotes}
-            octave={drone.octave}
-            onToggleNote={drone.onToggleNote}
-            onGlissNote={drone.onGlissNote}
-            onSetNotes={drone.onSetNotes}
-            onIncrementOctave={drone.onIncrementOctave}
-            onDecrementOctave={drone.onDecrementOctave}
-            onDroneInteraction={onDroneInteraction}
-          >
-            <NoteOrbitReadout
-              noteName={readout.noteName}
-              frequencyHz={readout.frequencyHz}
-              cents={displayCents}
-              active={active}
-              inTuneGlow={inTuneGlow}
-              lightSurface
-            />
-          </DroneSoundWheel>
-        ) : (
-          <NoteOrbitReadout
-            noteName={readout.noteName}
-            frequencyHz={readout.frequencyHz}
-            cents={displayCents}
-            active={active}
-            inTuneGlow={inTuneGlow}
-            lightSurface
-          />
-        )}
-      </div>
+    <div
+      className={`pitch-audio-stage pitch-audio-stage--besttake pitch-audio-stage--${pitchZone} flex min-h-0 flex-1 flex-col overflow-hidden`}
+    >
+      <div className="pitch-living-canvas">
+        <PitchChartCanvas canvasRef={canvasRef} fill living />
+        <TuningGauge readout={readout} />
 
-      <div className="pitch-audio-stage__chart pitch-audio-stage__chart--flat min-h-0 flex-1">
-        <PitchChartCanvas canvasRef={canvasRef} fill />
+        <div className="pitch-living-canvas__direction" aria-hidden>
+          <span>Sharp</span>
+          <span>Flat</span>
+        </div>
+
+        {drone ? (
+          <>
+            <button
+              type="button"
+              className={`pitch-living-drone-trigger ${
+                droneActive ? 'pitch-living-drone-trigger--active' : ''
+              }`}
+              onClick={toggleDrone}
+              aria-expanded={droneOpen}
+              aria-controls="pitch-living-drone-panel"
+              title={droneOpen ? 'Hide drone' : 'Open drone'}
+            >
+              <Music2 aria-hidden />
+              <span>Drone</span>
+              <small>{droneStatus}</small>
+            </button>
+
+            <AnimatePresence>
+              {droneOpen ? (
+                <motion.section
+                  id="pitch-living-drone-panel"
+                  className="pitch-living-drone-panel"
+                  initial={{ y: '105%', opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: '105%', opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 390, damping: 36 }}
+                  aria-label="Drone widget"
+                >
+                  <DroneSoundWheel
+                    activeNotes={drone.activeNotes}
+                    octave={drone.octave}
+                    onToggleNote={drone.onToggleNote}
+                    onGlissNote={drone.onGlissNote}
+                    onSetNotes={drone.onSetNotes}
+                    onIncrementOctave={drone.onIncrementOctave}
+                    onDecrementOctave={drone.onDecrementOctave}
+                    onDroneInteraction={onDroneInteraction}
+                    onClose={toggleDrone}
+                    hapticsEnabled={drone.hapticsEnabled}
+                  />
+                </motion.section>
+              ) : null}
+            </AnimatePresence>
+          </>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function CompactPitchWidgetPane({
+  readout,
+  canvasRef,
+  isPlaying,
+}: {
+  readout: PitchReadout
+  canvasRef: RefObject<HTMLCanvasElement | null>
+  isPlaying: boolean
+}) {
+  const active = readout.noteName !== '—'
+  const cents = active ? readout.cents : 0
+  const accent = active ? getIntonationColor(cents) : 'rgba(255,255,255,0.55)'
+  const inTune = active && isInTune(cents)
+  const zone = active ? getIntonationZone(cents) : null
+
+  return (
+    <div className="pitch-widget-besttake">
+      <header>
+        <div>
+          <strong style={{ color: accent }}>{readout.noteName}</strong>
+          <span>{formatFrequencyHz(readout.frequencyHz)}</span>
+        </div>
+        <div className="pitch-widget-besttake__deviation">
+          <strong style={{ color: accent }}>{active ? formatDisplayCents(cents) : '—'}</strong>
+          <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
+        </div>
+      </header>
+      <CentsNeedle cents={cents} active={active} compact />
+      <div className="pitch-widget-besttake__chart">
+        <PitchChartCanvas canvasRef={canvasRef} glass fill />
       </div>
     </div>
   )
@@ -372,6 +279,7 @@ function LivePitchTunerAudio({
   tunerInstrument = 'voice',
   liveMicOnly = false,
   drone,
+  onLiveSourceHealthChange,
 }: {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -383,6 +291,7 @@ function LivePitchTunerAudio({
   tunerInstrument?: TunerInstrument
   liveMicOnly?: boolean
   drone?: LivePitchTunerProps['drone']
+  onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
 }) {
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -409,8 +318,10 @@ function LivePitchTunerAudio({
       suppressUntilRef: droneAnalysisSuppressUntilRef,
       allowStandaloneMicFallback: liveMicOnly,
       preferNativeAudioTap: true,
+      retryNativeTapOnInteractiveRecovery: liveMicOnly,
+      onSourceHealthChange: onLiveSourceHealthChange,
     }),
-    [liveMicOnly, micStreamRef, tunerInstrument],
+    [liveMicOnly, micStreamRef, onLiveSourceHealthChange, tunerInstrument],
   )
 
   const playbackTrackerOptions = useMemo(
@@ -429,7 +340,7 @@ function LivePitchTunerAudio({
     liveTrackerEnabled,
     `live-mic-${mediaKey}`,
     liveCanvasRef,
-    'glass-audio',
+    'living-audio',
     liveTrackerOptions,
   )
 
@@ -439,7 +350,7 @@ function LivePitchTunerAudio({
     playbackTrackerEnabled,
     `${mediaKey}-playback`,
     playbackCanvasRef,
-    'glass-audio',
+    'living-audio',
     playbackTrackerOptions,
   )
 
@@ -459,7 +370,6 @@ function LivePitchTunerAudio({
           {showPlayback ? (
             <LiveAudioTunerPane
               readout={playbackTracker.readout}
-              inTuneGlow={playbackTracker.inTuneGlow}
               canvasRef={playbackCanvasRef}
               drone={drone}
               onDroneInteraction={suppressDroneAnalysis}
@@ -467,7 +377,6 @@ function LivePitchTunerAudio({
           ) : showLive ? (
             <LiveAudioTunerPane
               readout={liveTracker.readout}
-              inTuneGlow={liveTracker.inTuneGlow}
               canvasRef={liveCanvasRef}
               drone={drone}
               onDroneInteraction={suppressDroneAnalysis}
@@ -502,6 +411,7 @@ export default function LivePitchTuner({
   pitchSource = 'media',
   liveMicOnly = false,
   drone,
+  onLiveSourceHealthChange,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -543,6 +453,7 @@ export default function LivePitchTuner({
         tunerInstrument={tunerInstrument}
         liveMicOnly={liveMicOnly}
         drone={drone}
+        onLiveSourceHealthChange={onLiveSourceHealthChange}
       />
     )
   }
@@ -560,10 +471,10 @@ export default function LivePitchTuner({
     return (
       <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col">
         <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget pitch-glass-panel--elevated relative flex h-full min-h-0 w-full flex-col overflow-hidden">
-          <LiveAudioTunerPane
+          <CompactPitchWidgetPane
             readout={tracker.readout}
-            inTuneGlow={tracker.inTuneGlow}
             canvasRef={canvasRef}
+            isPlaying={trackerPlaying}
           />
           {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
             <p className="pitch-widget-hint pointer-events-none shrink-0 px-3 pb-2 text-center">
