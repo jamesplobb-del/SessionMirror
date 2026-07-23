@@ -3058,12 +3058,12 @@ export function useCameraSession({
 
   /** Re-open capture after AVAudioSession route changes (e.g. device mic vs BT HFP). */
   const reacquireStreamForAudioRoute = useCallback(
-    async (options?: { liveCapture?: boolean }) => {
-      if (isRecordingRef.current || resumeInFlightRef.current) return
+    async (options?: { liveCapture?: boolean }): Promise<boolean> => {
+      if (isRecordingRef.current || resumeInFlightRef.current) return false
 
       if (isNativeVideoRecordingEnabled() && recordingModeRef.current === 'video') {
         await applyMicInputPreference(micInputPreferenceRef.current)
-        return
+        return true
       }
 
       if (
@@ -3075,10 +3075,10 @@ export function useCameraSession({
           await applyMicInputPreference(
             resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
           )
-          return
+          return true
         }
         await acquireNativeVideoBridge()
-        return
+        return true
       }
 
       cancelScheduledRelease()
@@ -3088,9 +3088,10 @@ export function useCameraSession({
         await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
       }
 
-      await acquireStream(recordingModeRef.current, undefined, {
+      const stream = await acquireStream(recordingModeRef.current, undefined, {
         liveCapture: options?.liveCapture,
       })
+      return Boolean(stream)
     },
     [
       acquireNativeVideoBridge,

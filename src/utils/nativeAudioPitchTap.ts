@@ -1,6 +1,8 @@
 import type { PluginListenerHandle } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
 import { isNativeCameraTestAvailable } from './nativeCameraTest'
+import { setNativeAudioCaptureActive } from './cameraSessionState'
+import type { MicInputPreference } from './appSettings'
 
 /**
  * Native audio tap for the camera-mode pitch widget.
@@ -22,6 +24,66 @@ export interface NativeAudioPitchChunk {
  * practice overlay) can share the single native tap without fighting over it.
  */
 let tapRefCount = 0
+let tunerMonitorRefCount = 0
+let tunerMonitorStart: Promise<boolean> | null = null
+
+async function startTunerMonitor(
+  micInputPreference?: MicInputPreference,
+): Promise<boolean> {
+  if (!isNativeCameraTestAvailable()) return false
+  try {
+    const result = await BestTakeAudioPlugin.startNativeTunerMonitor({
+      micInputPreference,
+    })
+    const active = result.active === true
+    setNativeAudioCaptureActive(active)
+    return active
+  } catch (error) {
+    setNativeAudioCaptureActive(false)
+    console.warn('[PitchTap] native tuner monitor start failed', error)
+    return false
+  }
+}
+
+export async function acquireNativeTunerMonitor(
+  micInputPreference?: MicInputPreference,
+): Promise<boolean> {
+  if (!isNativeCameraTestAvailable()) return false
+  tunerMonitorRefCount += 1
+  if (!tunerMonitorStart) {
+    tunerMonitorStart = startTunerMonitor(micInputPreference).finally(() => {
+      tunerMonitorStart = null
+    })
+  }
+  return tunerMonitorStart
+}
+
+export async function recoverNativeTunerMonitor(
+  micInputPreference?: MicInputPreference,
+): Promise<boolean> {
+  if (!isNativeCameraTestAvailable() || tunerMonitorRefCount === 0) return false
+  if (!tunerMonitorStart) {
+    tunerMonitorStart = startTunerMonitor(micInputPreference).finally(() => {
+      tunerMonitorStart = null
+    })
+  }
+  return tunerMonitorStart
+}
+
+export async function releaseNativeTunerMonitor(): Promise<void> {
+  if (!isNativeCameraTestAvailable()) return
+  tunerMonitorRefCount = Math.max(0, tunerMonitorRefCount - 1)
+  if (tunerMonitorRefCount > 0) return
+
+  await tunerMonitorStart?.catch(() => false)
+  try {
+    await BestTakeAudioPlugin.stopNativeTunerMonitor()
+  } catch (error) {
+    console.warn('[PitchTap] native tuner monitor stop failed', error)
+  } finally {
+    setNativeAudioCaptureActive(false)
+  }
+}
 
 export async function acquireNativeAudioTap(): Promise<void> {
   if (!isNativeCameraTestAvailable()) return

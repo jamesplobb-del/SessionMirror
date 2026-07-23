@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ListMusic, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronDown, ListMusic, Mic, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
@@ -46,6 +46,8 @@ interface ControlDeckProps {
   settingsBranchDisabled?: boolean
   onBranchOpenChange?: (open: boolean) => void
   hapticFeedback?: boolean
+  collapsible?: boolean
+  collapseKey?: string
 }
 
 function formatElapsed(seconds: number): string {
@@ -91,12 +93,19 @@ function ControlDeck({
   settingsBranchDisabled = false,
   onBranchOpenChange,
   hapticFeedback = true,
+  collapsible = false,
+  collapseKey,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
   const showFinishingTake = isStopping && recordingMode === 'video' && !showDeleteDrop
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const [branchOpen, setBranchOpen] = useState(false)
   const [branchActive, setBranchActive] = useState(false)
+  const [deckExpanded, setDeckExpanded] = useState(!collapsible)
+
+  useEffect(() => {
+    setDeckExpanded(!collapsible)
+  }, [collapsible, collapseKey])
 
   const openBranch = () => {
     setBranchOpen(true)
@@ -138,7 +147,11 @@ function ControlDeck({
   const { onClickCapture, ...settingsPressHandlers } = settingsPress
 
   return (
-    <div className="control-deck pointer-events-auto flex w-full flex-col items-center px-4">
+    <div
+      className={`control-deck pointer-events-auto flex w-full flex-col items-center px-4 ${
+        collapsible ? 'control-deck--collapsible' : ''
+      }`}
+    >
       <SettingsBranchWheel
         open={branchOpen}
         onClose={closeBranch}
@@ -160,7 +173,37 @@ function ControlDeck({
         onTunerTakePillsChange={(show) => onTunerTakePillsChange?.(show)}
       />
 
+      {collapsible && !deckExpanded ? (
+        <Pressable
+          type="button"
+          intensity="icon"
+          squish={false}
+          haptic="light"
+          hapticFeedback={hapticFeedback}
+          className="control-deck__expand-trigger"
+          onClick={() => setDeckExpanded(true)}
+          aria-label="Show recording controls"
+          aria-expanded={false}
+        >
+          <Mic aria-hidden strokeWidth={2.15} />
+        </Pressable>
+      ) : (
       <div className="control-deck__main-row relative flex w-full max-w-xs items-center justify-center">
+        {collapsible ? (
+          <Pressable
+            type="button"
+            intensity="icon"
+            squish={false}
+            haptic="light"
+            hapticFeedback={hapticFeedback}
+            className="control-deck__collapse-trigger"
+            onClick={() => setDeckExpanded(false)}
+            aria-label="Hide recording controls"
+            aria-expanded
+          >
+            <ChevronDown aria-hidden />
+          </Pressable>
+        ) : null}
         <Pressable
           type="button"
           intensity="icon"
@@ -318,6 +361,7 @@ function ControlDeck({
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

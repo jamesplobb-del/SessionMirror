@@ -41,6 +41,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setNativeCameraFrameBridgeEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPreviewZoom", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeAudioTapEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startNativeTunerMonitor", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNativeTunerMonitor", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "ensureNativeCameraSessionHealthy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "enhanceTakeAudio", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraRecording", returnType: CAPPluginReturnPromise),
@@ -1395,6 +1397,29 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             case .failure(let error):
                 call.reject("Audio enhancement failed", nil, error)
             }
+        }
+    }
+
+    @objc func startNativeTunerMonitor(_ call: CAPPluginCall) {
+        let micPreference = AudioRouteConfigurator.parseMicInputPreference(
+            call.getString("micInputPreference")
+        )
+        nativeCameraEngine.startTunerMonitor(
+            micInputPreference: micPreference,
+            completion: { result in
+                switch result {
+                case .success(let payload):
+                    call.resolve(payload)
+                case .failure(let error):
+                    call.reject("Native tuner monitor failed", nil, error)
+                }
+            }
+        )
+    }
+
+    @objc func stopNativeTunerMonitor(_ call: CAPPluginCall) {
+        nativeCameraEngine.stopTunerMonitor {
+            call.resolve(["active": false])
         }
     }
 

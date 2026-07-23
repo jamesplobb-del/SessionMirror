@@ -1724,6 +1724,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   refreshCameraSessionRef.current = refreshCameraSession
   suspendCameraForBackgroundRef.current = suspendCameraForBackground
 
+  const liveStreamGenerationRef = useRef(streamGeneration)
+  const tunerMicBackgroundGenerationRef = useRef<number | null>(null)
+  liveStreamGenerationRef.current = streamGeneration
+
+  useEffect(() => {
+    const markTunerMicForForegroundRecovery = () => {
+      tunerMicBackgroundGenerationRef.current = liveStreamGenerationRef.current
+    }
+
+    window.addEventListener(
+      APP_BACKGROUND_SUSPEND_EVENT,
+      markTunerMicForForegroundRecovery,
+    )
+    return () => {
+      window.removeEventListener(
+        APP_BACKGROUND_SUSPEND_EVENT,
+        markTunerMicForForegroundRecovery,
+      )
+    }
+  }, [])
 
   const audioModePlaybackSuspendedCaptureRef = useRef(false)
 
@@ -2581,22 +2601,67 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     )
   }, [])
 
-  const handleRequestTunerMicStream = useCallback(async () => {
-    if (isRecording) return
+  const handleRequestTunerMicStream = useCallback(async (
+    options?: { forceRecovery?: boolean },
+  ): Promise<boolean> => {
+    if (isRecording) return false
+
+    const backgroundGeneration = tunerMicBackgroundGenerationRef.current
+    const hasFreshForegroundStream =
+      backgroundGeneration !== null &&
+      liveStreamGenerationRef.current > backgroundGeneration &&
+      micStreamIsLiveForTuner()
+
+    if (hasFreshForegroundStream) {
+      tunerMicBackgroundGenerationRef.current = null
+      return true
+    }
+
+    if (backgroundGeneration !== null && !options?.forceRecovery) {
+      // The shared camera lifecycle gets first ownership of foreground recovery.
+      // A delayed tuner fallback forces a fresh stream only if that rebuild
+      // never produces a newer generation.
+      return false
+    }
 
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+      if (options?.forceRecovery) {
+        if (backgroundGeneration !== null) {
+          for (let attempt = 0; attempt < 4; attempt += 1) {
+            await waitMs(180)
+            if (
+              liveStreamGenerationRef.current > backgroundGeneration &&
+              micStreamIsLiveForTuner()
+            ) {
+              tunerMicBackgroundGenerationRef.current = null
+              return true
+            }
+          }
+        }
+
+        const recovered = await reacquireStreamForAudioRoute({ liveCapture: true })
+        if (recovered) {
+          tunerMicBackgroundGenerationRef.current = null
+        }
+        return recovered
+      }
+
       if (!micStreamIsLiveForTuner() && !isNativeCaptureSessionActive()) {
         requestCameraAccess('audio')
+        return false
       }
-      return
+      return true
     }
 
     if (!micStreamIsLiveForTuner()) {
       requestCameraAccess('audio')
+      return false
     }
+    return true
   }, [
     isRecording,
     micStreamIsLiveForTuner,
+    reacquireStreamForAudioRoute,
     requestCameraAccess,
   ])
 
@@ -4137,6 +4202,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           droneVolume={settings.droneVolume}
                           droneWaveform={settings.droneWaveform}
                           hapticFeedback={settings.hapticFeedback}
+                          micInputPreference={settings.micInputPreference}
                           onRequestMicStream={handleRequestTunerMicStream}
                         />
                       </AnimatedTabPanel>
@@ -4364,6 +4430,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen}
                         onBranchOpenChange={handleQuickSettingsOpenChange}
                         hapticFeedback={settings.hapticFeedback}
+                        collapsible={
+                          isAudioPracticeTunerTab || isAudioPracticeMetronomeTab
+                        }
+                        collapseKey={
+                          isAudioPracticeTunerTab
+                            ? 'tuner'
+                            : isAudioPracticeMetronomeTab
+                              ? 'metronome'
+                              : undefined
+                        }
                       />
                     )}
                   </div>

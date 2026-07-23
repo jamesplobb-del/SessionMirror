@@ -50,6 +50,9 @@ import {
   subscribeNativeCaptureSessionActive,
 } from '../utils/cameraSessionState'
 const HISTORY_LENGTH = 140
+const LIVING_TRACE_HISTORY_LENGTH = 110
+const LIVING_TRACE_MAX_STEP_CENTS = 8
+const LIVING_TRACE_END_BLEND_MAX = 0.42
 
 /** Brief hold before glow begins (~220ms). */
 const IN_TUNE_GLOW_HOLD_MS = 220
@@ -750,6 +753,27 @@ function drawColoredTraceSegments(
   ctx.globalAlpha = alpha
 
   let runStart = 0
+  const strokeRun = (start: number, end: number) => {
+    ctx.beginPath()
+    ctx.moveTo(points[start].x, points[start].y)
+    if (end === start) return
+    if (end === start + 1) {
+      ctx.lineTo(points[end].x, points[end].y)
+      return
+    }
+    for (let step = start + 1; step < end; step += 1) {
+      const midpointX = (points[step].x + points[step + 1].x) * 0.5
+      const midpointY = (points[step].y + points[step + 1].y) * 0.5
+      ctx.quadraticCurveTo(points[step].x, points[step].y, midpointX, midpointY)
+    }
+    ctx.quadraticCurveTo(
+      points[end - 1].x,
+      points[end - 1].y,
+      points[end].x,
+      points[end].y,
+    )
+  }
+
   for (let index = 1; index < points.length; index += 1) {
     const zoneChanged =
       getTraceZone(points[index].cents) !== getTraceZone(points[index - 1].cents)
@@ -765,21 +789,13 @@ function drawColoredTraceSegments(
       ctx.shadowColor = glowColorForCents(points[runEnd].cents)
       ctx.shadowBlur = lineWidth >= 6 ? 10 : 8
       ctx.strokeStyle = strokeColor
-      ctx.beginPath()
-      ctx.moveTo(points[runStart].x, points[runStart].y)
-      for (let step = runStart + 1; step <= runEnd; step += 1) {
-        ctx.lineTo(points[step].x, points[step].y)
-      }
+      strokeRun(runStart, runEnd)
       ctx.stroke()
       ctx.restore()
     }
 
     ctx.strokeStyle = strokeColor
-    ctx.beginPath()
-    ctx.moveTo(points[runStart].x, points[runStart].y)
-    for (let step = runStart + 1; step <= runEnd; step += 1) {
-      ctx.lineTo(points[step].x, points[step].y)
-    }
+    strokeRun(runStart, runEnd)
     ctx.stroke()
 
     runStart = zoneChanged ? index - 1 : index
@@ -794,6 +810,89 @@ interface TraceDisplayPoint {
   cents: number
 }
 
+function shapeLivingTraceSilence(values: number[]): number[] {
+  const output = [...values]
+  const pitchedIndices: number[] = []
+
+  for (let index = 0; index < values.length; index += 1) {
+    if (!isSilenceFloorSample(values[index])) pitchedIndices.push(index)
+  }
+
+  if (pitchedIndices.length === 0) return output
+
+  const first = pitchedIndices[0]
+  const riseLength = Math.min(first, 6)
+  for (let index = Math.max(0, first - riseLength); index < first; index += 1) {
+    const t = (index - (first - riseLength) + 1) / (riseLength + 1)
+    const eased = t * t * (3 - 2 * t)
+    output[index] =
+      PITCH_SILENCE_FLOOR_CENTS +
+      (values[first] - PITCH_SILENCE_FLOOR_CENTS) * eased
+  }
+
+  for (let pitched = 1; pitched < pitchedIndices.length; pitched += 1) {
+    const startIndex = pitchedIndices[pitched - 1]
+    const endIndex = pitchedIndices[pitched]
+    const gapLength = endIndex - startIndex - 1
+    if (gapLength <= 0) continue
+
+    if (gapLength <= 5) {
+      for (let gap = 1; gap <= gapLength; gap += 1) {
+        const t = gap / (gapLength + 1)
+        output[startIndex + gap] =
+          values[startIndex] + (values[endIndex] - values[startIndex]) * t
+      }
+      continue
+    }
+
+    const edgeLength = Math.min(5, Math.floor(gapLength / 2))
+    for (let gap = 1; gap <= edgeLength; gap += 1) {
+      const t = gap / (edgeLength + 1)
+      const eased = t * t * (3 - 2 * t)
+      output[startIndex + gap] =
+        values[startIndex] +
+        (PITCH_SILENCE_FLOOR_CENTS - values[startIndex]) * eased
+      output[endIndex - gap] =
+        values[endIndex] +
+        (PITCH_SILENCE_FLOOR_CENTS - values[endIndex]) * eased
+    }
+  }
+
+  const last = pitchedIndices[pitchedIndices.length - 1]
+  const fallLength = Math.min(output.length - last - 1, 7)
+  for (let gap = 1; gap <= fallLength; gap += 1) {
+    const t = gap / (fallLength + 1)
+    const eased = t * t * (3 - 2 * t)
+    output[last + gap] =
+      values[last] + (PITCH_SILENCE_FLOOR_CENTS - values[last]) * eased
+  }
+
+  return output
+}
+
+function limitTraceStepCents(values: number[], maxStepCents: number): number[] {
+  const output = [...values]
+  let previous: number | null = null
+
+  for (let index = 0; index < output.length; index += 1) {
+    const current = output[index]
+    if (isSilenceFloorSample(current)) {
+      previous = null
+      continue
+    }
+
+    if (previous != null) {
+      const delta = current - previous
+      if (Math.abs(delta) > maxStepCents) {
+        output[index] = previous + Math.sign(delta) * maxStepCents
+      }
+    }
+    previous = output[index]
+  }
+
+  return output
+}
+
 function buildTraceDisplayPoints(
   centsHistory: number[],
   historyLength: number,
@@ -802,19 +901,29 @@ function buildTraceDisplayPoints(
   graphSmoothWindow: number,
   traceEndBlend: number,
   singlePassSmooth = false,
+  bridgeSilenceGaps = false,
+  maxDisplayStepCents: number | null = null,
 ): TraceDisplayPoint[] {
   if (centsHistory.length < 2) return []
 
-  const pass1 = movingAverage(centsHistory, graphSmoothWindow)
-  const smoothed =
+  const traceValues = bridgeSilenceGaps
+    ? shapeLivingTraceSilence(centsHistory)
+    : centsHistory
+
+  const pass1 = movingAverage(traceValues, graphSmoothWindow)
+  let smoothed =
     singlePassSmooth || graphSmoothWindow < 4
       ? pass1
       : movingAverage(pass1, Math.max(2, Math.floor(graphSmoothWindow / 2)))
 
-  const rawLast = centsHistory[centsHistory.length - 1]
+  const rawLast = traceValues[traceValues.length - 1]
   if (!isSilenceFloorSample(rawLast)) {
     const lastIdx = smoothed.length - 1
     smoothed[lastIdx] = smoothed[lastIdx] * (1 - traceEndBlend) + rawLast * traceEndBlend
+  }
+
+  if (maxDisplayStepCents != null) {
+    smoothed = limitTraceStepCents(smoothed, maxDisplayStepCents)
   }
 
   const historyStep = width / Math.max(historyLength - 1, 1)
@@ -836,8 +945,8 @@ function drawSmoothPitchTrace(
   if (points.length < 2) return
 
   if (theme === 'living-audio') {
-    drawColoredTraceSegments(ctx, points, 6.5, 0.24, true)
-    drawColoredTraceSegments(ctx, points, 2.65, 1)
+    drawColoredTraceSegments(ctx, points, 5.5, 0.14, true)
+    drawColoredTraceSegments(ctx, points, 2.65, 0.98)
     return
   }
 
@@ -928,7 +1037,7 @@ function drawTraceEndpointDot(
   ctx.fillStyle = dotColor
   ctx.fill()
   ctx.strokeStyle = isLivingAudio
-    ? 'rgba(255,255,255,0.78)'
+    ? 'rgba(23, 26, 34, 0.14)'
     : isAudioGlass
       ? 'rgba(23, 26, 34, 0.14)'
       : 'rgba(255,255,255,0.9)'
@@ -1137,11 +1246,11 @@ function drawLivingPitchSurface(
   const bandBottom = Math.max(centsToY(TUNING_GREEN_CENTS), centsToY(-TUNING_GREEN_CENTS))
   const glow = Math.min(1, Math.max(0, inTuneHighlight))
 
-  ctx.fillStyle = `rgba(93, 255, 151, ${0.18 + glow * 0.22})`
+  ctx.fillStyle = `rgba(34, 197, 94, ${0.15 + glow * 0.24})`
   ctx.fillRect(0, bandTop, width, bandBottom - bandTop)
 
   const centerY = centsToY(0)
-  ctx.strokeStyle = `rgba(211, 255, 225, ${0.7 + glow * 0.26})`
+  ctx.strokeStyle = `rgba(21, 128, 61, ${0.62 + glow * 0.3})`
   ctx.lineWidth = 1.4 + glow * 0.85
   ctx.setLineDash([])
   ctx.beginPath()
@@ -1151,9 +1260,9 @@ function drawLivingPitchSurface(
 
   if (glow > 0.05) {
     ctx.save()
-    ctx.shadowColor = `rgba(81, 255, 143, ${0.42 + glow * 0.4})`
+    ctx.shadowColor = `rgba(34, 197, 94, ${0.38 + glow * 0.42})`
     ctx.shadowBlur = 10 + glow * 24
-    ctx.strokeStyle = `rgba(187, 247, 208, ${0.38 + glow * 0.42})`
+    ctx.strokeStyle = `rgba(21, 128, 61, ${0.34 + glow * 0.46})`
     ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(0, centerY)
@@ -1352,14 +1461,20 @@ function drawPitchCanvas(
     ctx.setLineDash([])
   }
 
+  const traceHistoryLength = isLivingAudio ? LIVING_TRACE_HISTORY_LENGTH : HISTORY_LENGTH
+  const traceHistory = isLivingAudio
+    ? centsHistory.slice(-traceHistoryLength)
+    : centsHistory
   const tracePoints = buildTraceDisplayPoints(
-    centsHistory,
-    HISTORY_LENGTH,
+    traceHistory,
+    traceHistoryLength,
     width,
     centsToY,
     graphSmoothWindow,
-    traceEndBlend,
+    isLivingAudio ? Math.min(traceEndBlend, LIVING_TRACE_END_BLEND_MAX) : traceEndBlend,
     responsiveTrace,
+    isLivingAudio,
+    isLivingAudio ? LIVING_TRACE_MAX_STEP_CENTS : null,
   )
 
   if (tracePoints.length > 1) {

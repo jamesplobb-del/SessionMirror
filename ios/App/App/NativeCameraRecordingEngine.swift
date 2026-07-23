@@ -119,6 +119,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var audioFallbackSampleCount = 0
     /// Audio-mode takes: mic-only session writing AAC via AVAssetWriter (no movie output).
     private var isAudioOnlyRecording = false
+    private var isTunerMonitorActive = false
     private var audioOnlyTakeId: String?
 
     private func startRecordingDiagnosticsTimer() {
@@ -338,11 +339,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
 
-            if CameraSessionGuard.recordingMode == "audio" {
+            if CameraSessionGuard.recordingMode == "audio" && !self.isTunerMonitorActive {
                 return
             }
 
-            let shouldBeActive = self.isPreviewActive || self.isBridgePreviewActive || self.isRecording
+            let shouldBeActive =
+                self.isPreviewActive ||
+                self.isBridgePreviewActive ||
+                self.isRecording ||
+                self.isTunerMonitorActive
             guard shouldBeActive else { return }
 
             // Playback owns the AVAudioSession speaker route. Defer all health
@@ -388,14 +393,30 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             let isHealthy =
                 self.session.isRunning &&
                 self.isSessionConfigured &&
-                !self.needsFullReconfigureAfterMediaReset
+                !self.needsFullReconfigureAfterMediaReset &&
+                (
+                    !self.isTunerMonitorActive ||
+                    (
+                        self.lastAudioTapSampleTime > 0 &&
+                        CACurrentMediaTime() - self.lastAudioTapSampleTime < 2.5
+                    )
+                )
             if isHealthy {
                 return
             }
 
             print("[NativeCameraRecovery][\(reason)] session unhealthy — running recovery (isRunning=\(self.session.isRunning) configured=\(self.isSessionConfigured) needsRebuild=\(self.needsFullReconfigureAfterMediaReset))")
 
-            if self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured {
+            if self.isTunerMonitorActive &&
+                (self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured) {
+                do {
+                    try self.configureAudioOnlyCaptureSession()
+                    self.needsFullReconfigureAfterMediaReset = false
+                } catch {
+                    print("[NativeTunerMonitor][\(reason)] rebuild failed: \(error.localizedDescription)")
+                    return
+                }
+            } else if self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured {
                 print("[NativeCameraRecovery][\(reason)] rebuilding capture session from scratch")
                 do {
                     let configuredOutput = try self.configureCaptureSession(useFrontCamera: self.previewUsesFrontCamera)
@@ -1924,6 +1945,87 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     // MARK: - Audio-only recording (Audio Mode — AVAssetWriter via audio data output)
 
+    func startTunerMonitor(
+        micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        requestMediaAccess(mediaType: .audio) { [weak self] audioGranted in
+            guard let self = self else { return }
+            guard audioGranted else {
+                completion(.failure(NSError(
+                    domain: "NativeTunerMonitor",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Microphone permission denied"]
+                )))
+                return
+            }
+
+            self.sessionQueue.async {
+                do {
+                    guard !self.isRecording && !self.isStarting && !self.isAudioOnlyRecording else {
+                        throw NSError(
+                            domain: "NativeTunerMonitor",
+                            code: 3,
+                            userInfo: [NSLocalizedDescriptionKey: "Recording owns microphone"]
+                        )
+                    }
+                    try self.configureAudioSessionForRecording(
+                        profile: .playAndRecordDefault,
+                        micInputPreference: micInputPreference
+                    )
+                    let tapIsFresh =
+                        self.lastAudioTapSampleTime > 0 &&
+                        CACurrentMediaTime() - self.lastAudioTapSampleTime < 2.5
+                    if self.isTunerMonitorActive &&
+                        self.session.isRunning &&
+                        self.isSessionConfigured &&
+                        tapIsFresh {
+                        DispatchQueue.main.async {
+                            completion(.success(["active": true]))
+                        }
+                        return
+                    }
+                    _ = try self.configureAudioOnlyCaptureSession()
+                    self.lastAudioTapSampleTime = 0
+                    self.isTunerMonitorActive = true
+                    self.needsFullReconfigureAfterMediaReset = false
+                    if !self.session.isRunning {
+                        self.session.startRunning()
+                    }
+                    DispatchQueue.main.async {
+                        completion(.success(["active": true]))
+                    }
+                } catch {
+                    self.isTunerMonitorActive = false
+                    DispatchQueue.main.async {
+                        completion(.failure(error))
+                    }
+                }
+            }
+        }
+    }
+
+    func stopTunerMonitor(completion: @escaping () -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.isTunerMonitorActive = false
+            if !self.isRecording &&
+                !self.isStarting &&
+                !self.isPreviewActive &&
+                !self.isBridgePreviewActive {
+                if self.session.isRunning {
+                    self.session.stopRunning()
+                }
+                self.isSessionConfigured = false
+                self.audioDataOutput = nil
+                self.restoreAudioSessionAfterTest()
+            }
+            DispatchQueue.main.async {
+                completion()
+            }
+        }
+    }
+
     func startAudioRecording(
         takeId: String,
         audioSessionProfile: NativeCameraAudioSessionProfile = .playAndRecordDefault,
@@ -2061,6 +2163,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             )
         }
 
+        isTunerMonitorActive = false
         isAudioOnlyRecording = true
         audioOnlyTakeId = takeId
         isStarting = true
