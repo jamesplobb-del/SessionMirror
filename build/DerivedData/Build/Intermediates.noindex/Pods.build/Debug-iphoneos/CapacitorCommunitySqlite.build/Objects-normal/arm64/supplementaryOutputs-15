@@ -1,0 +1,30 @@
+{
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor-community/sqlite/ios/Plugin/Database.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Database.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Database.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Database.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Database.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Database.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor-community/sqlite/ios/Plugin/Extensions/Data.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Data.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Data.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Data.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Data.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/Data.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor-community/sqlite/ios/Plugin/GlobalSQLite.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/GlobalSQLite.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/GlobalSQLite.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/GlobalSQLite.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/GlobalSQLite.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/GlobalSQLite.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor-community/sqlite/ios/Plugin/ImportExportJson/ExportToJson.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/ExportToJson.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/ExportToJson.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/ExportToJson.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/ExportToJson.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunitySqlite.build/Objects-normal/arm64/ExportToJson.swiftdeps"
+  }
+}

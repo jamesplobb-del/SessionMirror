@@ -1,0 +1,44 @@
+{
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPLog.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPNotifications.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPlugin+LoadInstance.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPluginCall.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-8773586a0efdb3e2143cfb694b45d7c6.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-8773586a0efdb3e2143cfb694b45d7c6.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-8773586a0efdb3e2143cfb694b45d7c6.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-8773586a0efdb3e2143cfb694b45d7c6.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-8773586a0efdb3e2143cfb694b45d7c6.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPluginMethod.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-368a6c0e84330e6ea460148372664c31.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-368a6c0e84330e6ea460148372664c31.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-368a6c0e84330e6ea460148372664c31.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-368a6c0e84330e6ea460148372664c31.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-368a6c0e84330e6ea460148372664c31.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/Console.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/Console.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/Console.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/Console.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/Console.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/Objects-normal/arm64/Console.swiftdeps"
+  }
+}

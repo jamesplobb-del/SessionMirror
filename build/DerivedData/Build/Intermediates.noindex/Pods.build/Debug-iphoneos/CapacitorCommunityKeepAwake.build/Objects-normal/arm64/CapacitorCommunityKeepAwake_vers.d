@@ -1,0 +1,3 @@
+dependencies: \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/module.modulemap \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/DerivedSources/CapacitorCommunityKeepAwake_vers.c

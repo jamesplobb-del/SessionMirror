@@ -1,0 +1,79 @@
+{
+  "" : {
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CapacitorStatusBar-primary.dia",
+    "emit-module-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CapacitorStatusBar-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CapacitorStatusBar-primary-emit-module.dia",
+    "pch" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CapacitorStatusBar-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CapacitorStatusBar-primary.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/status-bar/ios/Sources/StatusBarPlugin/CAPBridgeViewController.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPBridgeViewController~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/status-bar/ios/Sources/StatusBarPlugin/CAPNotifications.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/CAPNotifications~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/status-bar/ios/Sources/StatusBarPlugin/StatusBar.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBar~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/status-bar/ios/Sources/StatusBarPlugin/StatusBarConfig.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarConfig~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/status-bar/ios/Sources/StatusBarPlugin/StatusBarInfo.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarInfo~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/status-bar/ios/Sources/StatusBarPlugin/StatusBarPlugin.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/StatusBarPlugin~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/status-bar/ios/Sources/StatusBarPlugin/UIColor.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorStatusBar.build/Objects-normal/arm64/UIColor~partial.swiftmodule"
+  }
+}

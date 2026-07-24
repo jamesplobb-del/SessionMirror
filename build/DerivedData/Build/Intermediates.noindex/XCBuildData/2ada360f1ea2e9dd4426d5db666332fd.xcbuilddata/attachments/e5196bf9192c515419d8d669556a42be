@@ -1,0 +1,4 @@
+
+module CapacitorCommunityMedia.__Swift {
+  exclude header "CapacitorCommunityMedia-Swift.h"
+}

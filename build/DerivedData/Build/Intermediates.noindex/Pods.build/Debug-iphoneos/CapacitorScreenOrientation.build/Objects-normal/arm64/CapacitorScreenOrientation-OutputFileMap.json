@@ -1,0 +1,29 @@
+{
+  "" : {
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-primary.dia",
+    "emit-module-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-primary-emit-module.dia",
+    "pch" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-primary.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/screen-orientation/ios/Sources/ScreenOrientationPlugin/ScreenOrientation.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/screen-orientation/ios/Sources/ScreenOrientationPlugin/ScreenOrientationPlugin.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin~partial.swiftmodule"
+  }
+}

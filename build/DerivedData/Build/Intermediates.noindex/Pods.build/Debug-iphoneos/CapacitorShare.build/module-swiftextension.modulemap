@@ -1,0 +1,4 @@
+
+module CapacitorShare.Swift {
+  header "CapacitorShare-Swift.h"
+}

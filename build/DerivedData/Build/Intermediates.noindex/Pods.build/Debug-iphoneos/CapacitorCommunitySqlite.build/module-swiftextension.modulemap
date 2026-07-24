@@ -1,0 +1,4 @@
+
+module CapacitorCommunitySqlite.Swift {
+  header "CapacitorCommunitySqlite-Swift.h"
+}

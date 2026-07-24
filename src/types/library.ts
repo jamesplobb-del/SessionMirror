@@ -25,4 +25,5 @@ export interface LibraryPlaybackReference {
   playbackUrl: string
   filePath: string
   mimeType: string
+  duration: number
 }

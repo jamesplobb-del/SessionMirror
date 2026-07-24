@@ -14,6 +14,7 @@ export function libraryItemToPlaybackRef(
     playbackUrl: item.playbackUrl,
     filePath: item.filePath,
     mimeType: item.mimeType,
+    duration: item.duration,
   }
 }
 

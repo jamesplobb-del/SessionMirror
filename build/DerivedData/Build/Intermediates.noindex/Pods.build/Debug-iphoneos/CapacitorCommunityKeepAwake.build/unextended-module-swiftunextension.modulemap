@@ -1,0 +1,4 @@
+
+module CapacitorCommunityKeepAwake.__Swift {
+  exclude header "CapacitorCommunityKeepAwake-Swift.h"
+}

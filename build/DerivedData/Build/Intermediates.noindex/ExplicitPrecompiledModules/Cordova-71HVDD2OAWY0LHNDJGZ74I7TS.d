@@ -1,0 +1,22 @@
+moduledependenciestarget: \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Modules/module.modulemap \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CapacitorCordova.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/AppDelegate.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVViewController.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDV.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVAvailability.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPlugin.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPluginResult.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVCommandDelegate.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVInvokedUrlCommand.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk/System/Library/Frameworks/WebKit.framework/Modules/module.modulemap \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVURLProtocol.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVScreenOrientationDelegate.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVWebViewProcessPoolFactory.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVCommandDelegateImpl.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPluginManager.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVConfigParser.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPlugin+Resources.h \
+  /Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/Headers/NSDictionary+CordovaPreferences.h

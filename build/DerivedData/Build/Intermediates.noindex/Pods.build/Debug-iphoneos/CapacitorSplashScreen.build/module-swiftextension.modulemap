@@ -1,0 +1,4 @@
+
+module CapacitorSplashScreen.Swift {
+  header "CapacitorSplashScreen-Swift.h"
+}

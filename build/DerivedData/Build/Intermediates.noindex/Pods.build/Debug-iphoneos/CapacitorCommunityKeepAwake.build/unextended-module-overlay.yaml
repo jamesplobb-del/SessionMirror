@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCommunityKeepAwake/CapacitorCommunityKeepAwake.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Products/Debug-iphoneos/CapacitorCommunityKeepAwake/CapacitorCommunityKeepAwake.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "CapacitorCommunityKeepAwake-Swift.h",
+      "external-contents": "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/unextended-interface-header.h",
+    }]
+  }]
+}

@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary.dia",
+    "emit-module-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary-emit-module.dia",
+    "pch" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor/share/ios/Sources/SharePlugin/SharePlugin.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorShare.build/Objects-normal/arm64/SharePlugin~partial.swiftmodule"
+  }
+}

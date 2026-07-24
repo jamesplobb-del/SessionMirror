@@ -21,6 +21,8 @@ export interface Take {
   videoMimeType: string
   thumbnailUrl: string
   timestamp: number
+  /** Saved media duration in seconds when known. */
+  duration?: number
   rating: number
   notes: string
   /** Defaults to video for legacy takes. */

@@ -1,0 +1,4 @@
+
+module CapacitorFilesystem.Swift {
+  header "CapacitorFilesystem-Swift.h"
+}

@@ -1,0 +1,23 @@
+{
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/Pods/ZIPFoundation/Sources/ZIPFoundation/Archive+Helpers.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Helpers.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Helpers.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Helpers.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Helpers.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Helpers.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/Pods/ZIPFoundation/Sources/ZIPFoundation/Archive+MemoryFile.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+MemoryFile.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+MemoryFile.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+MemoryFile.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+MemoryFile.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+MemoryFile.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/Pods/ZIPFoundation/Sources/ZIPFoundation/Archive+Progress.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Progress.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Progress.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Progress.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Progress.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+Progress.swiftdeps"
+  }
+}

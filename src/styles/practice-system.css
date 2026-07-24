@@ -2,40 +2,40 @@
 
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) {
   --tuner-ui-hue: #1598ff;
-  --tuner-ui-strength: 4%;
-  --tuner-ui-feather-strength: 2%;
+  --tuner-ui-strength: 0%;
+  --tuner-ui-feather-strength: 0%;
   --tuner-ui-dark-strength: 22%;
-  --tuner-center-strength: 8%;
+  --tuner-center-strength: 0%;
 }
 
 html.app-audio-mode:has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--green
 ) {
-  --tuner-ui-hue: #1aad64;
-  --tuner-ui-strength: 8%;
-  --tuner-ui-feather-strength: 5%;
+  --tuner-ui-hue: #08a957;
+  --tuner-ui-strength: 18%;
+  --tuner-ui-feather-strength: 11%;
   --tuner-ui-dark-strength: 38%;
-  --tuner-center-strength: 34%;
+  --tuner-center-strength: 46%;
 }
 
 html.app-audio-mode:has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--yellow
 ) {
-  --tuner-ui-hue: #e7a216;
-  --tuner-ui-strength: 7%;
-  --tuner-ui-feather-strength: 4%;
+  --tuner-ui-hue: #e79b00;
+  --tuner-ui-strength: 16%;
+  --tuner-ui-feather-strength: 10%;
   --tuner-ui-dark-strength: 36%;
-  --tuner-center-strength: 29%;
+  --tuner-center-strength: 42%;
 }
 
 html.app-audio-mode:has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--red
 ) {
-  --tuner-ui-hue: #e54f5b;
-  --tuner-ui-strength: 7%;
-  --tuner-ui-feather-strength: 4%;
+  --tuner-ui-hue: #e33a4e;
+  --tuner-ui-strength: 17%;
+  --tuner-ui-feather-strength: 10%;
   --tuner-ui-dark-strength: 36%;
-  --tuner-center-strength: 28%;
+  --tuner-center-strength: 42%;
 }
 
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner),
@@ -284,7 +284,7 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 
 .pitch-audio-stage--besttake {
   --pitch-stage-hue: #1598ff;
-  --pitch-ambient-strength: 4%;
+  --pitch-ambient-strength: 0%;
   position: relative;
   isolation: isolate;
   padding: 0;
@@ -298,19 +298,19 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 }
 
 .pitch-audio-stage--green {
-  --pitch-stage-hue: #1aad64;
-  --pitch-ambient-strength: 10%;
+  --pitch-stage-hue: #08a957;
+  --pitch-ambient-strength: 18%;
   background: transparent;
 }
 
 .pitch-audio-stage--yellow {
-  --pitch-stage-hue: #e7a216;
-  --pitch-ambient-strength: 8%;
+  --pitch-stage-hue: #e79b00;
+  --pitch-ambient-strength: 16%;
 }
 
 .pitch-audio-stage--red {
-  --pitch-stage-hue: #e54f5b;
-  --pitch-ambient-strength: 8%;
+  --pitch-stage-hue: #e33a4e;
+  --pitch-ambient-strength: 17%;
 }
 
 .pitch-living-canvas {

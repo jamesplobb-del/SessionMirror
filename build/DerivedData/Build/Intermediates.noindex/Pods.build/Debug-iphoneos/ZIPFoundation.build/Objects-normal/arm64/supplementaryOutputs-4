@@ -1,0 +1,23 @@
+{
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/Pods/ZIPFoundation/Sources/ZIPFoundation/Archive+WritingDeprecated.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+WritingDeprecated.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+WritingDeprecated.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+WritingDeprecated.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+WritingDeprecated.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+WritingDeprecated.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/Pods/ZIPFoundation/Sources/ZIPFoundation/Archive+ZIP64.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+ZIP64.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+ZIP64.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+ZIP64.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+ZIP64.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Archive+ZIP64.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/Pods/ZIPFoundation/Sources/ZIPFoundation/Data+Compression.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Data+Compression.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Data+Compression.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Data+Compression.dia",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Data+Compression.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/ZIPFoundation.build/Objects-normal/arm64/Data+Compression.swiftdeps"
+  }
+}

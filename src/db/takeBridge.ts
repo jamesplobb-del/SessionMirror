@@ -32,6 +32,7 @@ export function vaultTakeToUiTake(
     videoMimeType: vaultTake.mimeType,
     thumbnailUrl,
     timestamp: vaultTake.createdAt,
+    duration: vaultTake.duration,
     rating: vaultTake.rating,
     notes: vaultTake.notes,
     mediaType: vaultTake.mediaType,

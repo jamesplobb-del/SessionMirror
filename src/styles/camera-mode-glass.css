@@ -991,3 +991,266 @@ html.app-dark-mode .review-overlay--camera .review-nav-button {
   visibility: hidden;
   pointer-events: none;
 }
+
+/* Compact camera take dock — thumbnail-first quick playback with full tools one chevron away. */
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row-wrap--compact {
+  padding-bottom: 0;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 0;
+  padding-inline:
+    max(1.5rem, calc(env(safe-area-inset-left, 0px) + 1rem))
+    max(1.5rem, calc(env(safe-area-inset-right, 0px) + 1rem));
+  overflow: visible;
+  transform: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .app-pip-row--compact
+  > .app-pip-slot {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
+
+.compact-take-slot {
+  --compact-take-width: clamp(5.15rem, 18vw, 7rem);
+  display: flex;
+  width: calc(var(--compact-take-width) * var(--pip-scale, 1)) !important;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container--compact {
+  width: calc(var(--compact-take-width) * var(--pip-scale, 1)) !important;
+  min-width: calc(var(--compact-take-width) * var(--pip-scale, 1)) !important;
+  min-height: 0 !important;
+  aspect-ratio: 1.52 !important;
+  transition:
+    width 260ms cubic-bezier(0.32, 0.72, 0, 1),
+    min-width 260ms cubic-bezier(0.32, 0.72, 0, 1),
+    aspect-ratio 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .compact-take-slot
+  .pip-video-container--compact
+  > .ui-orient-spin
+  > .relative {
+  overflow: hidden;
+  border-width: 1.5px !important;
+  border-radius: 0.78rem !important;
+  background: rgba(7, 12, 20, 0.28) !important;
+  box-shadow:
+    0 9px 22px rgba(2, 7, 15, 0.24),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.12) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .compact-take-slot--best
+  .pip-video-container--compact
+  > .ui-orient-spin
+  > .relative {
+  border-color: rgba(247, 174, 28, 0.82) !important;
+  --tw-ring-color: rgba(247, 174, 28, 0.18) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .compact-take-slot--current
+  .pip-video-container--compact
+  > .ui-orient-spin
+  > .relative {
+  border-color: rgba(58, 164, 255, 0.86) !important;
+  --tw-ring-color: rgba(58, 164, 255, 0.18) !important;
+}
+
+.compact-take-marker {
+  display: flex;
+  height: 0.9rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.28rem;
+  filter: drop-shadow(0 2px 4px rgba(2, 7, 15, 0.46));
+}
+
+.compact-take-marker--best {
+  color: #ffb11f;
+}
+
+.compact-take-marker--best svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+  stroke-width: 1.8;
+}
+
+.compact-take-marker--current {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.compact-take-marker--current::after {
+  width: 0.58rem;
+  height: 0.58rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: #299cff;
+  box-shadow: 0 0 0 3px rgba(41, 156, 255, 0.1);
+  content: '';
+}
+
+.compact-take-caption {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.08rem;
+  margin-top: 0.38rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 2px 5px rgba(1, 6, 14, 0.74);
+}
+
+.compact-take-caption__label {
+  overflow: hidden;
+  width: 100%;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: clamp(0.55rem, 2.45vw, 0.68rem);
+  font-weight: 680;
+  letter-spacing: 0.045em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.compact-take-caption__detail {
+  font-size: clamp(0.58rem, 2.55vw, 0.7rem);
+  font-weight: 650;
+  letter-spacing: 0.015em;
+}
+
+.compact-take-caption--best .compact-take-caption__detail {
+  color: #ffb11f;
+}
+
+.compact-take-caption--current .compact-take-caption__detail {
+  color: #42aaff;
+}
+
+.compact-take-card__play-surface {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: #ffffff;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.compact-take-card__play-surface:active {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.compact-take-card__play-icon {
+  display: flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(4, 9, 17, 0.45);
+  box-shadow: 0 3px 9px rgba(1, 5, 12, 0.28);
+  color: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  backdrop-filter: blur(8px) saturate(1.08);
+}
+
+.compact-take-card__play-icon svg {
+  width: 0.55rem;
+  height: 0.55rem;
+  stroke-width: 2.35;
+}
+
+.compact-take-card__play-icon svg.fill-white {
+  fill: currentColor;
+}
+
+.pip-video-container--compact .youtube-pip-interaction-layer {
+  background: transparent !important;
+}
+
+.compact-take-card__empty {
+  border-radius: inherit;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012)),
+    rgba(4, 9, 17, 0.32);
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.camera-take-cards-toggle-wrap {
+  display: flex;
+  height: 1.9rem;
+  align-items: center;
+  justify-content: center;
+  margin-block: -0.2rem -0.4rem;
+}
+
+.camera-take-cards-toggle {
+  position: relative;
+  z-index: 35;
+  display: flex;
+  width: 2.6rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(5, 10, 18, 0.5);
+  box-shadow:
+    0 7px 18px rgba(1, 5, 12, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.96);
+  -webkit-backdrop-filter: blur(16px) saturate(1.16);
+  backdrop-filter: blur(16px) saturate(1.16);
+}
+
+.camera-take-cards-toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke-width: 2.35;
+}
+
+.camera-take-cards-toggle__handle {
+  position: absolute;
+  bottom: 0.28rem;
+  left: 50%;
+  width: 1.15rem;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  transform: translateX(-50%);
+}
+
+.camera-take-cards-toggle:focus-visible {
+  outline: 2px solid rgba(79, 172, 255, 0.9);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container--compact {
+    transition: none;
+  }
+}

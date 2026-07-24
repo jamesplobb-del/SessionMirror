@@ -1,0 +1,10 @@
+framework module CapacitorCommunityMedia {
+  umbrella header "CapacitorCommunityMedia-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module CapacitorCommunityMedia.Swift {
+  header "CapacitorCommunityMedia-Swift.h"
+}

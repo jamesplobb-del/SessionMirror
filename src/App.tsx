@@ -14,13 +14,14 @@ import {
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Headphones, Maximize2, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Headphones, Maximize2, X } from 'lucide-react'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import CameraPermissionPrompt from './components/CameraPermissionPrompt'
 import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
+import Pressable from './components/ui/Pressable'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
 import type { LabsRoute } from './components/labs/LabsOverlay'
@@ -490,6 +491,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
+  const [cameraTakeCardsExpanded, setCameraTakeCardsExpanded] = useState(false)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
   const [tutorialTourEnabled, setTutorialTourEnabled] = useState(false)
   const [practiceSessionActive, setPracticeSessionActive] = useState(false)
@@ -1384,6 +1386,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const index = prev.length + 1
       const savedTake: Take = {
         ...createTake(takeId, index, optimisticUrl, filePath, mimeType, mediaType),
+        duration: durationSeconds,
         recordingOrientation: recordingOrientation ?? 'portrait',
         ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
         timelineOffsetMs,
@@ -2605,6 +2608,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     options?: { forceRecovery?: boolean },
   ): Promise<boolean> => {
     if (isRecording) return false
+
+    if (
+      Capacitor.isNativePlatform() &&
+      Capacitor.getPlatform() === 'ios' &&
+      isNativeCaptureSessionActive()
+    ) {
+      tunerMicBackgroundGenerationRef.current = null
+      return true
+    }
 
     const backgroundGeneration = tunerMicBackgroundGenerationRef.current
     const hasFreshForegroundStream =
@@ -4341,7 +4353,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       recordingMode !== 'audio' && (
                         <motion.div
                           key="pip-row"
-                          className="app-pip-row-wrap pointer-events-auto w-full"
+                          className={`app-pip-row-wrap pointer-events-auto w-full ${
+                            cameraTakeCardsExpanded ? '' : 'app-pip-row-wrap--compact'
+                          }`}
                           data-tutorial="review-mode-button"
                           initial={{ opacity: 0, y: 14 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -4349,6 +4363,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           style={{ ...motionGpuLayer, ...pipScaleStyle }}
                         >
                           <PipCompareRow
+                            compact={!cameraTakeCardsExpanded}
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                             challengerTake={challengerTake}
@@ -4380,6 +4395,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             hapticFeedback={settings.hapticFeedback}
                           />
                         </motion.div>
+                      )}
+
+                    {!quickSettingsOpen &&
+                      settings.showTakeCards &&
+                      !isSplitView &&
+                      recordingMode !== 'audio' && (
+                        <div className="camera-take-cards-toggle-wrap pointer-events-auto">
+                          <Pressable
+                            type="button"
+                            intensity="icon"
+                            squish={false}
+                            haptic="light"
+                            hapticFeedback={settings.hapticFeedback}
+                            className="camera-take-cards-toggle"
+                            onClick={() => setCameraTakeCardsExpanded((expanded) => !expanded)}
+                            aria-label={
+                              cameraTakeCardsExpanded
+                                ? 'Collapse take cards to quick playback'
+                                : 'Expand take cards and controls'
+                            }
+                            aria-expanded={cameraTakeCardsExpanded}
+                          >
+                            {cameraTakeCardsExpanded ? (
+                              <ChevronDown aria-hidden />
+                            ) : (
+                              <ChevronUp aria-hidden />
+                            )}
+                            <span className="camera-take-cards-toggle__handle" aria-hidden />
+                          </Pressable>
+                        </div>
                       )}
 
                     {!(

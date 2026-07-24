@@ -115,6 +115,7 @@ export default function AudioPracticeMetronomeView() {
     : []
   const showBeatGrouping =
     feelOptions.length > 1 && (meter.endsWith('/8') || meter.endsWith('/16'))
+  const selectorCount = 3 + (pulseModeOptions.length > 0 ? 1 : 0) + (showBeatGrouping ? 1 : 0)
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -277,7 +278,7 @@ export default function AudioPracticeMetronomeView() {
       data-practice-mode="metronome-tab"
     >
       <div className="audio-practice-metronome__body min-h-0 flex-1">
-        <header className="metronome-audio-stage__hero shrink-0">
+        <header className="metronome-audio-stage__hero audio-practice-metronome__tempo-card shrink-0">
           <div
             className="audio-practice-metronome__bpm-row audio-practice-metronome__tempo-strip"
             role="group"
@@ -367,21 +368,14 @@ export default function AudioPracticeMetronomeView() {
             </PracticeControlButton>
           </div>
 
-        </header>
-
-        <section
-          className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel audio-practice-metronome__selectors--under-orbit pointer-events-auto shrink-0"
-          aria-label="Metronome time, rhythm, and accent"
-        >
-          <div
-            className={[
-              'audio-practice-metronome__select-row',
-              'audio-practice-metronome__select-row--primary',
-              pulseModeOptions.length > 0
-                ? 'audio-practice-metronome__select-row--four'
-                : 'audio-practice-metronome__select-row--three',
-            ].join(' ')}
+          <section
+            className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel audio-practice-metronome__selectors--under-orbit pointer-events-auto shrink-0"
+            aria-label="Metronome time, rhythm, and accent"
           >
+            <div
+              className="audio-practice-metronome__select-row audio-practice-metronome__select-row--primary"
+              data-control-count={selectorCount}
+            >
             <MetronomeAudioSelect
               label="Time"
               ariaLabel="Time signature"
@@ -408,8 +402,17 @@ export default function AudioPracticeMetronomeView() {
               }))}
               onChange={handleSubdivisionChange}
             />
+            {showBeatGrouping ? (
+              <MetronomeAudioSelect
+                label="Feel"
+                ariaLabel="Beat grouping feel"
+                value={feelId ?? feelOptions[0].value}
+                options={feelOptions}
+                onChange={handleFeelChange}
+              />
+            ) : null}
             <MetronomeAudioSelect<AudioPracticeClickSoundId>
-              label="Accent"
+              label="Sound"
               ariaLabel="Metronome click sound"
               value={soundId as AudioPracticeClickSoundId}
               options={AUDIO_PRACTICE_CLICK_SOUNDS.map(({ id, label }) => ({
@@ -418,19 +421,9 @@ export default function AudioPracticeMetronomeView() {
               }))}
               onChange={handleSoundChange}
             />
-          </div>
-          {showBeatGrouping ? (
-            <div className="audio-practice-metronome__select-row audio-practice-metronome__select-row--secondary audio-practice-metronome__select-row--one">
-              <MetronomeAudioSelect
-                label="Beat grouping"
-                ariaLabel="Beat grouping feel"
-                value={feelId ?? feelOptions[0].value}
-                options={feelOptions}
-                onChange={handleFeelChange}
-              />
             </div>
-          ) : null}
-        </section>
+          </section>
+        </header>
 
         <MetronomeBeatDisplay interactive />
       </div>

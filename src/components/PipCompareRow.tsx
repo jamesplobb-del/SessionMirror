@@ -1,5 +1,6 @@
 import { useRef, memo, type RefObject } from 'react'
 import { motion } from 'framer-motion'
+import { Star } from 'lucide-react'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
@@ -11,6 +12,7 @@ import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 export interface PipCompareRowProps {
+  compact?: boolean
   benchmarkTake: Take | null
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
   challengerTake: Take | null
@@ -41,6 +43,38 @@ export interface PipCompareRowProps {
   onPinCurrentAsBest?: () => void
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
   youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
+}
+
+function formatCompactDuration(duration?: number): string | null {
+  if (!duration || !Number.isFinite(duration) || duration <= 0) return null
+  const rounded = Math.max(0, Math.round(duration))
+  const minutes = Math.floor(rounded / 60)
+  const seconds = rounded % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+function CompactTakeCaption({
+  label,
+  tone,
+  duration,
+  hasMedia,
+  youtube = false,
+}: {
+  label: string
+  tone: 'best' | 'current'
+  duration?: number
+  hasMedia: boolean
+  youtube?: boolean
+}) {
+  const formattedDuration = formatCompactDuration(duration)
+  const detail = formattedDuration ?? (youtube ? 'YouTube' : hasMedia ? 'Tap to play' : 'No take')
+
+  return (
+    <div className={`compact-take-caption compact-take-caption--${tone}`} aria-hidden>
+      <span className="compact-take-caption__label">{label}</span>
+      <span className="compact-take-caption__detail">{detail}</span>
+    </div>
+  )
 }
 
 export function PipDragGhost({
@@ -104,6 +138,7 @@ export function PipDragGhost({
 }
 
 export default memo(function PipCompareRow({
+  compact = false,
   benchmarkTake,
   libraryBenchmarkPlayback,
   challengerTake,
@@ -151,7 +186,7 @@ export default memo(function PipCompareRow({
     onDelete: onDeleteTake,
     onTap: onExpandChallenger,
     onDragStateChange,
-    enabled: takeHasPlaybackMedia(challengerTake),
+    enabled: !compact && takeHasPlaybackMedia(challengerTake),
     hapticFeedback,
   })
 
@@ -166,16 +201,34 @@ export default memo(function PipCompareRow({
     onPin: onPinChallenger,
     onTap: onExpandBenchmark,
     onDragStateChange,
-    enabled: takeHasPlaybackMedia(benchmarkTake) && !libraryBenchmarkPlayback && !youtubeEmbedUrl,
+    enabled:
+      !compact &&
+      takeHasPlaybackMedia(benchmarkTake) &&
+      !libraryBenchmarkPlayback &&
+      !youtubeEmbedUrl,
     hapticFeedback,
   })
 
   return (
     <>
-      <div className="app-pip-row" data-tutorial="pip-row">
-        <div ref={benchmarkDropRef} className="app-pip-slot pointer-events-auto">
+      <div
+        className={`app-pip-row ${compact ? 'app-pip-row--compact' : ''}`}
+        data-tutorial="pip-row"
+      >
+        <div
+          ref={benchmarkDropRef}
+          className={`app-pip-slot pointer-events-auto ${
+            compact ? 'compact-take-slot compact-take-slot--best' : ''
+          }`}
+        >
+          {compact && (
+            <span className="compact-take-marker compact-take-marker--best" aria-hidden>
+              <Star />
+            </span>
+          )}
           <BestTakeBox
             layout="pip"
+            compact={compact}
             take={benchmarkTake}
             libraryPlayback={libraryBenchmarkPlayback}
             youtubeEmbedUrl={youtubeEmbedUrl}
@@ -204,10 +257,33 @@ export default memo(function PipCompareRow({
                 : undefined
             }
           />
+          {compact && (
+            <CompactTakeCaption
+              label="Best Take"
+              tone="best"
+              duration={libraryBenchmarkPlayback?.duration ?? benchmarkTake?.duration}
+              hasMedia={Boolean(
+                youtubeEmbedUrl ||
+                  libraryBenchmarkPlayback ||
+                  takeHasPlaybackMedia(benchmarkTake),
+              )}
+              youtube={Boolean(youtubeEmbedUrl)}
+            />
+          )}
         </div>
 
-        <div ref={challengerDropRef} className="app-pip-slot pointer-events-auto" data-tutorial="challenger-card">
+        <div
+          ref={challengerDropRef}
+          className={`app-pip-slot pointer-events-auto ${
+            compact ? 'compact-take-slot compact-take-slot--current' : ''
+          }`}
+          data-tutorial="challenger-card"
+        >
+          {compact && (
+            <span className="compact-take-marker compact-take-marker--current" aria-hidden />
+          )}
           <PipWindow
+            compact={compact}
             src={challengerTake?.videoUrl ?? null}
           filePath={challengerTake?.filePath}
           mimeType={
@@ -241,6 +317,14 @@ export default memo(function PipCompareRow({
             (challengerTake?.mediaType === 'audio' ? AUDIO_TAKE_THUMBNAIL : null)
           }
           />
+          {compact && (
+            <CompactTakeCaption
+              label="Current Take"
+              tone="current"
+              duration={challengerTake?.duration}
+              hasMedia={takeHasPlaybackMedia(challengerTake)}
+            />
+          )}
         </div>
       </div>
 

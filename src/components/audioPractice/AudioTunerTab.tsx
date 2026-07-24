@@ -132,7 +132,9 @@ export default function AudioTunerTab({
   }, [])
 
   useEffect(() => {
-    const recoverTunerMic = (event: Event) => {
+    let cancelled = false
+
+    const recoverTunerMic = async (event: Event) => {
       const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
       if (!reason?.startsWith('tuner-')) return
       if (reason !== 'tuner-auto-source-stalled') {
@@ -140,16 +142,20 @@ export default function AudioTunerTab({
       }
       setShowRecoveryPrompt(false)
       setSourceHealth('connecting')
-      if (!permissionRequestInFlight) {
-        void onRequestMicStream({ forceRecovery: true })
+      const nativeActive = await recoverNativeTunerMonitor(micInputPreference)
+      if (cancelled) return
+      if (!nativeActive && !permissionRequestInFlight) {
+        await onRequestMicStream({ forceRecovery: true })
+        if (cancelled) return
       }
       setMicLiveEpoch((epoch) => epoch + 1)
     }
     window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     return () => {
+      cancelled = true
       window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     }
-  }, [onRequestMicStream, permissionRequestInFlight])
+  }, [micInputPreference, onRequestMicStream, permissionRequestInFlight])
 
   useEffect(() => {
     let fallbackTimer: number | null = null
@@ -181,7 +187,7 @@ export default function AudioTunerTab({
       }
     }
 
-    const recoverAfterForeground = (event: Event) => {
+    const recoverAfterForeground = async (event: Event) => {
       const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
       if (reason?.endsWith(':settled')) return
 
@@ -190,16 +196,23 @@ export default function AudioTunerTab({
       automaticRecoveryAttemptsRef.current = 0
       setShowRecoveryPrompt(false)
       setSourceHealth('connecting')
-      void recoverNativeTunerMonitor(micInputPreference).then((active) => {
-        if (!cancelled && active) {
-          setMicLiveEpoch((epoch) => epoch + 1)
-        }
-      })
+      const nativeActive = await recoverNativeTunerMonitor(micInputPreference)
+      if (cancelled) return
+
+      if (nativeActive) {
+        setMicLiveEpoch((epoch) => epoch + 1)
+        return
+      }
+
+      let webKitRecovered = false
       if (!permissionRequestInFlight) {
-        void onRequestMicStream()
+        webKitRecovered = await onRequestMicStream()
+        if (cancelled) return
       }
       setMicLiveEpoch((epoch) => epoch + 1)
-      fallbackTimer = window.setTimeout(runForegroundFallback, 1200)
+      if (!webKitRecovered) {
+        fallbackTimer = window.setTimeout(runForegroundFallback, 1200)
+      }
     }
 
     window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverAfterForeground)

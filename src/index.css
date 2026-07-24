@@ -6747,3 +6747,302 @@ html.app-dark-mode
     min-height: clamp(16rem, 36dvh, 25rem);
   }
 }
+
+/* Audio metronome hero — large tempo card, one-line setup, and a clear beat runway. */
+.app-ui-overlay--audio-mode .audio-practice-metronome {
+  padding-inline: clamp(0.65rem, 3vw, 1rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__body {
+  gap: clamp(0.35rem, 0.9dvh, 0.65rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
+  width: min(100%, 30rem);
+  margin-inline: auto;
+  padding: clamp(0.7rem, 1.8dvh, 1rem) clamp(0.7rem, 3vw, 1rem) 0.8rem;
+  border: 1px solid rgba(23, 26, 34, 0.055);
+  border-radius: clamp(1.35rem, 5vw, 1.8rem);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(247, 166, 0, 0.055), transparent 42%),
+    var(--audio-surface);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 1.15rem 2.8rem rgba(23, 26, 34, 0.075);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-strip {
+  width: 100%;
+  margin: 0;
+  padding: 0 0.15rem 0.65rem;
+  gap: clamp(0.65rem, 4vw, 1.35rem);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-scrubber {
+  flex-basis: 13.5rem;
+  min-width: 9rem;
+  min-height: clamp(7.4rem, 17dvh, 9.4rem);
+  padding-inline: 0.75rem;
+  border: 0;
+  overflow: visible;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-scrubber
+  .audio-practice-metronome__tempo-label {
+  margin-bottom: 0.45rem;
+  font-size: clamp(0.72rem, 2.7vw, 0.88rem);
+  letter-spacing: 0.07em;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm-value {
+  font-size: clamp(5.25rem, 25vw, 7.4rem);
+  font-weight: 820;
+  line-height: 0.78;
+  letter-spacing: -0.055em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm-label {
+  display: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-drag-cue {
+  right: 0.2rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  opacity: 0.42;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-strip
+  .audio-practice-metronome__step-btn {
+  width: clamp(3.2rem, 14vw, 3.8rem);
+  height: clamp(3.2rem, 14vw, 3.8rem);
+  border-color: rgba(23, 26, 34, 0.065);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 0.55rem 1.25rem rgba(23, 26, 34, 0.08);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__selectors {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0.35rem 0 0;
+  border-top: 1px solid rgba(23, 26, 34, 0.055);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__select-row--primary {
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+  overflow: visible;
+  border: 1px solid rgba(23, 26, 34, 0.055);
+  border-radius: 0.95rem;
+  background: color-mix(in srgb, var(--audio-bg-base) 76%, var(--audio-surface));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 0.5rem 1.3rem rgba(23, 26, 34, 0.045);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__select-row--primary[data-control-count='4'] {
+  grid-template-columns:
+    minmax(0, 0.72fr)
+    minmax(0, 1.45fr)
+    minmax(0, 1fr)
+    minmax(0, 1fr);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__select-row--primary[data-control-count='5'] {
+  grid-template-columns:
+    minmax(0, 0.65fr)
+    minmax(0, 1.2fr)
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    minmax(0, 0.95fr);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .metronome-audio-select + .metronome-audio-select {
+  border-left: 1px solid rgba(23, 26, 34, 0.06);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .metronome-audio-select__label {
+  left: 50%;
+  top: 0.36rem;
+  width: calc(100% - 0.75rem);
+  overflow: hidden;
+  color: var(--audio-text-secondary);
+  font-size: clamp(0.47rem, 1.75vw, 0.58rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .metronome-audio-select__control {
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 1.15rem 1.05rem 0.42rem 0.35rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: clamp(0.62rem, 2.2vw, 0.78rem);
+  font-weight: 720;
+  text-align: center;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .metronome-audio-select__value {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .metronome-audio-select__chevron {
+  right: 0.28rem;
+  bottom: 0.6rem;
+  width: 0.68rem;
+  height: 0.68rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .metronome-audio-select:first-child
+  .metronome-audio-select__menu {
+  left: 0;
+  transform: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+  .metronome-audio-select:last-child
+  .metronome-audio-select__menu {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
+  width: min(100%, 42rem);
+  margin-inline: auto;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
+  min-height: clamp(15.5rem, 43dvh, 24rem);
+  margin-top: 0;
+  padding-block: clamp(1.2rem, 3dvh, 2.2rem);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--spacious {
+  --runway-node-width: clamp(3.75rem, 15vw, 4.65rem);
+  --runway-node-height: clamp(8.75rem, 25dvh, 12rem);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__controls {
+  padding-top: 0.2rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__transport-row {
+  gap: 0.75rem;
+  max-width: 24rem;
+  padding-inline: 0;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__transport-row
+  .audio-practice-metronome__play-btn {
+  width: clamp(3.8rem, 16vw, 4.3rem);
+  height: clamp(3.8rem, 16vw, 4.3rem);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__transport-row
+  .audio-practice-metronome__tap-btn {
+  max-width: 13.5rem;
+  min-height: 3.45rem;
+  font-size: 0.98rem;
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
+  border-color: rgba(226, 232, 240, 0.09);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(247, 166, 0, 0.075), transparent 42%),
+    var(--audio-surface);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 1.15rem 2.8rem rgba(0, 0, 0, 0.22);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__select-row--primary,
+html.app-dark-mode .app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__selectors {
+  border-color: rgba(226, 232, 240, 0.085);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .metronome-audio-select + .metronome-audio-select {
+  border-left-color: rgba(226, 232, 240, 0.085);
+}
+
+@media (max-height: 740px) {
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
+    padding-top: 0.45rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card
+    .audio-practice-metronome__tempo-scrubber {
+    min-height: 6.15rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__tempo-card
+    .audio-practice-metronome__tempo-scrubber
+    .metronome-audio-stage__bpm-value {
+    font-size: clamp(4.6rem, 21vw, 6rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large {
+    min-height: clamp(12.5rem, 35dvh, 17rem);
+    padding-block: 0.65rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
+    width: min(100%, 34rem);
+  }
+}

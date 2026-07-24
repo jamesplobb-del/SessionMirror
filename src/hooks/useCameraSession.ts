@@ -625,6 +625,13 @@ export function useCameraSession({
         await new Promise((resolve) => window.setTimeout(resolve, IOS_NATIVE_BRIDGE_HANDOFF_MS))
       }
 
+      // The user may have already switched away from video mode (e.g. into the tuner)
+      // while this handoff delay was running — don't start the native bridge for a
+      // mode nobody wants anymore.
+      if (recordingModeRef.current !== 'video') {
+        return false
+      }
+
       const result = await startNativeCameraBridge({
         useFrontCamera: true,
         audioSessionProfile: 'videoRecording',
@@ -633,6 +640,15 @@ export function useCameraSession({
 
       if (!result) {
         setReady(false)
+        return false
+      }
+
+      if (recordingModeRef.current !== 'video') {
+        // Mode moved on while the native round-trip was in flight. Tear the bridge
+        // back down instead of publishing a stale "preview active" state that would
+        // make isNativeCaptureSessionActive() report true for a session the tuner
+        // (or whatever mode is now active) never actually attached to.
+        void stopNativeCameraBridge()
         return false
       }
 

@@ -1,0 +1,4 @@
+
+module CapacitorCommunityKeepAwake.Swift {
+  header "CapacitorCommunityKeepAwake-Swift.h"
+}

@@ -88,6 +88,7 @@ function PipMediaPoster({
 
 export interface BestTakeBoxProps {
   layout: 'pip' | 'fill'
+  compact?: boolean
   take: Take | null
   libraryPlayback?: LibraryPlaybackReference | null
   youtubeEmbedUrl: string | null
@@ -118,6 +119,7 @@ export interface BestTakeBoxProps {
 
 function BestTakeBox({
   layout,
+  compact = false,
   take,
   libraryPlayback = null,
   youtubeEmbedUrl,
@@ -176,7 +178,8 @@ function BestTakeBox({
     : null
   const showYoutubePipOverlay = hasYoutube && !isFill && !suspendPlayback
 
-  const showUploadBadge = Boolean(onUpload) && hasTake && !hasLibraryPlayback
+  const showUploadBadge =
+    !compact && Boolean(onUpload) && hasTake && !hasLibraryPlayback
 
   const handleYoutubeHostRef = useCallback(
     (el: HTMLDivElement | null) => {
@@ -529,9 +532,12 @@ function BestTakeBox({
     else onUnpinTake()
   }, [hasLibraryPlayback, hasYoutube, onClearLibraryReference, onClearYoutube, onUnpinTake])
 
-  const pipTouchTargetClass =
-    'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
-  const pipTouchIconClass = HUD_GLASS_PIP_PLAY_ICON
+  const pipPlayButtonClass = compact
+    ? 'compact-take-card__play-surface pointer-events-auto absolute inset-0 z-[5] flex items-center justify-center'
+    : 'pointer-events-auto absolute left-1/2 top-1/2 z-[5] flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center p-3'
+  const pipTouchIconClass = compact
+    ? 'compact-take-card__play-icon'
+    : HUD_GLASS_PIP_PLAY_ICON
 
   const isAudioMedia = isAudioMimeType(playbackMimeType)
   const mediaStageClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
@@ -543,7 +549,9 @@ function BestTakeBox({
 
   const shellClass = isFill
     ? 'relative h-full w-full min-h-0 overflow-hidden'
-    : 'pip-video-container group relative aspect-video'
+    : `pip-video-container group relative aspect-video ${
+        compact ? 'pip-video-container--compact' : ''
+      }`
 
   const innerClass = isFill
     ? `group relative z-0 h-full w-full overflow-hidden ${mediaStageClass} ring-1 ring-amber-400/50 ${
@@ -565,7 +573,7 @@ function BestTakeBox({
   const pillLeft = showUploadBadge ? 36 : 8
 
   const renderClearButton = () => {
-    if (!hasReference) return null
+    if (compact || !hasReference) return null
 
     return (
       <Pressable
@@ -589,7 +597,7 @@ function BestTakeBox({
   }
 
   const renderSplitViewToggle = () => {
-    if (!onToggleSplitView) return null
+    if (compact || !onToggleSplitView) return null
 
     const splitPositionClass = hasReference
       ? 'pip-chrome-btn--bottom-right'
@@ -639,14 +647,16 @@ function BestTakeBox({
 
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
-          <span
-            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
-              isFill ? 'px-2 py-0.5 text-[10px]' : ''
-            }`}
-            style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
-          >
-            Best Take
-          </span>
+          {!compact && (
+            <span
+              className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
+                isFill ? 'px-2 py-0.5 text-[10px]' : ''
+              }`}
+              style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
+            >
+              Best Take
+            </span>
+          )}
 
           {hasYoutube ? (
             <>
@@ -714,7 +724,7 @@ function BestTakeBox({
                 <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
               )}
 
-              {onExpand && (
+              {!compact && onExpand && (
                 dragSourceProps ? (
                   <div
                     role="button"
@@ -747,7 +757,7 @@ function BestTakeBox({
                     onTouchStart={stopEventBubble}
                     onTouchEnd={stopEventBubble}
                     onClick={handlePlayPauseClick}
-                    className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+                    className={pipPlayButtonClass}
                     aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
                   >
                     <span className={pipTouchIconClass}>
@@ -761,7 +771,7 @@ function BestTakeBox({
                 )}
               </div>
 
-              {!suspendPlayback && (
+              {!compact && !suspendPlayback && (
                 <div
                   className={`absolute inset-x-0 bottom-0 z-20 translate-y-full px-2 py-1 transition-transform duration-200 group-hover:translate-y-0 ${
                     isAudioMedia ? 'take-audio-controls-bar' : 'bg-black/70'
@@ -777,6 +787,10 @@ function BestTakeBox({
                   />
                 </div>
               )}
+            </div>
+          ) : compact ? (
+            <div className="compact-take-card__empty absolute inset-0 flex items-center justify-center">
+              <span aria-hidden>—</span>
             </div>
           ) : (
             <div className={`pip-empty-state absolute inset-0 flex flex-col ${isFill ? 'pip-empty-state--split' : ''}`}>

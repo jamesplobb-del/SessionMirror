@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/CapacitorCommunityKeepAwake-primary.dia",
+    "emit-module-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/CapacitorCommunityKeepAwake-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/CapacitorCommunityKeepAwake-primary-emit-module.dia",
+    "pch" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/CapacitorCommunityKeepAwake-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/CapacitorCommunityKeepAwake-primary.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/node_modules/@capacitor-community/keep-awake/ios/Sources/KeepAwakePlugin/KeepAwakePlugin.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityKeepAwake.build/Objects-normal/arm64/KeepAwakePlugin~partial.swiftmodule"
+  }
+}

@@ -1,0 +1,47 @@
+{
+	"appId": "com.besttake.app",
+	"appName": "BestTake",
+	"webDir": "dist",
+	"server": {
+		"hostname": "localhost",
+		"androidScheme": "https",
+		"iosScheme": "capacitor",
+		"allowNavigation": [
+			"*.youtube.com",
+			"*.youtu.be",
+			"stalwart-salamander-9451ab.netlify.app",
+			"singular-manatee-b52df8.netlify.app"
+		]
+	},
+	"ios": {
+		"contentInset": "never",
+		"backgroundColor": "#000000",
+		"scrollEnabled": false
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchAutoHide": false,
+			"launchShowDuration": 0
+		},
+		"StatusBar": {
+			"style": "DARK",
+			"backgroundColor": "#000000",
+			"overlaysWebView": true
+		}
+	},
+	"packageClassList": [
+		"KeepAwakePlugin",
+		"MediaPlugin",
+		"CapacitorSQLitePlugin",
+		"AppPlugin",
+		"FilesystemPlugin",
+		"HapticsPlugin",
+		"ScreenOrientationPlugin",
+		"SharePlugin",
+		"SplashScreenPlugin",
+		"StatusBarPlugin",
+		"App.BestTakeAudioPlugin",
+		"App.DronePlugin",
+		"App.MetronomePlugin"
+	]
+}

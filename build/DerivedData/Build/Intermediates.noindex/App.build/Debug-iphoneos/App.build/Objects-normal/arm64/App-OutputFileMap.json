@@ -1,0 +1,169 @@
+{
+  "" : {
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/App-primary.dia",
+    "emit-module-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/App-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/App-primary-emit-module.dia",
+    "pch" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/App-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/App-primary.swiftdeps"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/AppDelegate.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AppDelegate~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/AudioEnhancerRenderer.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioEnhancerRenderer~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/AudioRouteConfigurator.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/AudioRouteConfigurator~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/BestTakeAudioPlugin.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/BestTakeAudioPlugin-4d8e85dc1c778677a09e108da86937e2~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/CameraSessionGuard.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/CameraSessionGuard~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/DroneEngine.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DroneEngine~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/DronePlugin.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/DronePlugin-7e43b4beb410fe2fd902900df5213a44~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/InlineTakeBoxPlaybackController.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/InlineTakeBoxPlaybackController~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/MetronomeEngine.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomeEngine~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/MetronomePlugin.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/MetronomePlugin-5c108d8a41a352082d7cac38343a2618~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/NativeAudioDecoder.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeAudioDecoder~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/NativeCameraRecordingEngine.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraRecordingEngine~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/NativeCameraTestAudio.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/NativeCameraTestAudio~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/PortraitBridgeViewController.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/PortraitBridgeViewController~partial.swiftmodule"
+  },
+  "/Users/jameslobb/Documents/SessionMirror/ios/App/App/TakeAlignmentEngine.swift" : {
+    "const-values" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine.swiftconstvalues",
+    "dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine.d",
+    "diagnostics" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine.o",
+    "llvm-bc" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine.bc",
+    "object" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine.o",
+    "swift-dependencies" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine.swiftdeps",
+    "swiftmodule" : "/Users/jameslobb/Documents/SessionMirror/build/DerivedData/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Objects-normal/arm64/TakeAlignmentEngine~partial.swiftmodule"
+  }
+}

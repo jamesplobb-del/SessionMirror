@@ -915,9 +915,6 @@ class SharedMetronomeEngine {
       const muted = this.shouldMuteOutput()
       const sound = this.snapshot.soundId
 
-      let uiBeat = -1
-      let uiSubTick = 0
-
       while (this.nextBeatTime < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
         const tickInBar = this.tickCounter % barTicks
         const beatTime = this.nextBeatTime
@@ -934,8 +931,25 @@ class SharedMetronomeEngine {
 
         if (beatTime - activeCtx.currentTime <= SCHEDULE_AHEAD_SEC) {
           const uiTick = resolveUiTick(meter, tickInBar, subdivision, pulseCount)
-          uiBeat = uiTick.beatIndex
-          uiSubTick = uiTick.subTickIndex
+          const uiBeat = uiTick.beatIndex
+          const uiSubTick = uiTick.subTickIndex
+          // React 18 batches synchronous state updates, so if several ticks fall in the
+          // same lookahead pass (startup backlog, or a delayed poll catching up), patching
+          // state for each one inline would collapse into a single render of the last tick
+          // only — silently dropping earlier ticks, most visibly the main beat (subTick 0).
+          // Scheduling each tick's UI update on its own timer, matched to its audio time,
+          // keeps every tick in its own render pass and lines the flash up with the click.
+          const uiDelayMs = Math.max(0, (beatTime - activeCtx.currentTime) * 1000)
+          window.setTimeout(() => {
+            if (!this.snapshot.playing || sessionId !== this.schedulerSession) return
+            if (uiSubTick === 0) this.emitPulse(uiBeat)
+            this.patchState({
+              beatIndex: uiBeat,
+              subTickIndex: uiSubTick,
+              beatPulseId: this.snapshot.beatPulseId + 1,
+            })
+            this.debugLog(`beat=${uiBeat + 1} subTick=${uiSubTick}`)
+          }, uiDelayMs)
         }
 
         this.nextBeatTime += secondsPerTick
@@ -943,18 +957,6 @@ class SharedMetronomeEngine {
         if (this.tickCounter > 0 && this.tickCounter % barTicks === 0) {
           this.emitBar()
         }
-      }
-
-      if (uiBeat >= 0) {
-        if (uiSubTick === 0) {
-          this.emitPulse(uiBeat)
-        }
-        this.patchState({
-          beatIndex: uiBeat,
-          subTickIndex: uiSubTick,
-          beatPulseId: this.snapshot.beatPulseId + 1,
-        })
-        this.debugLog(`beat=${uiBeat + 1} subTick=${uiSubTick}`)
       }
 
       this.schedulerTimer = window.setTimeout(tick, LOOKAHEAD_MS)

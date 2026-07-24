@@ -31,6 +31,7 @@ import { isAudioMimeType } from '../utils/mobileVideo'
 
 interface PipWindowProps {
   layout?: 'pip' | 'fill'
+  compact?: boolean
   src: string | null
   filePath?: string
   mimeType?: string
@@ -94,6 +95,7 @@ function PipMediaPoster({
 
 function PipWindow({
   layout = 'pip',
+  compact = false,
   src,
   filePath = '',
   mimeType = 'video/mp4',
@@ -141,7 +143,8 @@ function PipWindow({
     !isAudioMimeType(mimeType)
   const isAudioMedia = isAudioMimeType(mimeType)
   const mediaSurfaceClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
-  const showUploadBadge = variant === 'benchmark' && Boolean(onUpload) && hasMedia
+  const showUploadBadge =
+    !compact && variant === 'benchmark' && Boolean(onUpload) && hasMedia
   const isFill = layout === 'fill'
   const pillLeft = !isFill && (showUploadBadge || showPinAsBest) ? 38 : 8
   const isAutoPlayArmed = Boolean(
@@ -496,9 +499,12 @@ function PipWindow({
   const playbackFit =
     layout === 'fill' && recordingOrientation === 'landscape' ? 'contain' : 'cover'
 
-  const pipTouchTargetClass =
-    'pointer-events-auto z-[5] flex min-h-11 min-w-11 items-center justify-center p-3'
-  const pipTouchIconClass = HUD_GLASS_PIP_PLAY_ICON
+  const pipPlayButtonClass = compact
+    ? 'compact-take-card__play-surface pointer-events-auto absolute inset-0 z-[5] flex items-center justify-center'
+    : 'pointer-events-auto absolute left-1/2 top-1/2 z-[5] flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center p-3'
+  const pipTouchIconClass = compact
+    ? 'compact-take-card__play-icon'
+    : HUD_GLASS_PIP_PLAY_ICON
 
   const accentRing =
     variant === 'benchmark' ? 'ring-amber-400/50' : 'ring-sky-400/50'
@@ -512,7 +518,9 @@ function PipWindow({
 
   const shellClass = isFill
     ? `pip-window--fill relative flex h-full w-full min-h-0 flex-col overflow-visible ${className}`.trim()
-    : `pip-video-container group relative aspect-video ${className}`.trim()
+    : `pip-video-container group relative aspect-video ${
+        compact ? 'pip-video-container--compact' : ''
+      } ${className}`.trim()
 
   const innerShellClass = isFill
     ? `relative flex min-h-0 flex-1 w-full flex-col overflow-hidden ${mediaSurfaceClass} ring-1 ${accentRing} transition-opacity duration-200 ease-in ${
@@ -550,14 +558,16 @@ function PipWindow({
 
       <div className={orientWrapperClass}>
       <div className={innerShellClass}>
-        <span
-          className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass} ${
-            isFill ? 'px-2 py-0.5 text-[10px]' : ''
-          }`}
-          style={{ top: chromeInset, left: pillLeft }}
-        >
-          {label}
-        </span>
+        {!compact && (
+          <span
+            className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider ${badgeClass} ${
+              isFill ? 'px-2 py-0.5 text-[10px]' : ''
+            }`}
+            style={{ top: chromeInset, left: pillLeft }}
+          >
+            {label}
+          </span>
+        )}
 
         <div ref={playbackStageRef} className={mediaStageClass}>
         {hasMedia ? (
@@ -582,7 +592,7 @@ function PipWindow({
                 <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
               )}
 
-            {onExpand && (
+            {!compact && onExpand && (
               dragSourceProps ? (
                 <div
                   role="button"
@@ -615,7 +625,7 @@ function PipWindow({
                 onTouchStart={stopEventBubble}
                 onTouchEnd={stopEventBubble}
                 onClick={handlePlayPauseClick}
-                className={`${pipTouchTargetClass} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`}
+                className={pipPlayButtonClass}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >
                 <span className={pipTouchIconClass}>
@@ -629,7 +639,7 @@ function PipWindow({
               )}
             </div>
 
-            {!suspendPlayback && (
+            {!compact && !suspendPlayback && (
             <div
               className={`absolute inset-x-0 bottom-0 z-20 translate-y-full px-2 py-1 transition-transform duration-200 group-hover:translate-y-0 ${
                 isAudioMedia ? 'take-audio-controls-bar' : 'bg-black/70'
@@ -646,6 +656,10 @@ function PipWindow({
             </div>
             )}
           </>
+        ) : compact ? (
+          <div className="compact-take-card__empty absolute inset-0 flex items-center justify-center">
+            <span aria-hidden>—</span>
+          </div>
         ) : (
           <div className="pip-empty-state absolute inset-0 flex flex-col px-2 pb-2 pt-6">
             <div className="pip-empty-state__body flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
@@ -663,7 +677,7 @@ function PipWindow({
         )}
         </div>
 
-        {showPinAsBest && onPinAsBest && !isFill && (
+        {!compact && showPinAsBest && onPinAsBest && !isFill && (
           <Pressable
             type="button"
             intensity="icon"
@@ -683,7 +697,7 @@ function PipWindow({
           </Pressable>
         )}
 
-        {hasMedia && !isFill && (
+        {!compact && hasMedia && !isFill && (
           <Pressable
             type="button"
             intensity="icon"

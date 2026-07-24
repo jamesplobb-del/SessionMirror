@@ -1,0 +1,4 @@
+
+module ZIPFoundation.Swift {
+  header "ZIPFoundation-Swift.h"
+}

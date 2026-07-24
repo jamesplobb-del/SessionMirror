@@ -1,0 +1,4 @@
+
+module CapacitorCommunityMedia.Swift {
+  header "CapacitorCommunityMedia-Swift.h"
+}
