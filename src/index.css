@@ -709,23 +709,6 @@ body.settings-branch-open * {
   background: transparent !important;
 }
 
-.app-ui-overlay--audio-mode .app-hud-bottom {
-  position: relative;
-  background: var(--audio-bg-base) !important;
-  box-shadow: 0 -1px 0 var(--audio-bg-base);
-}
-
-.app-ui-overlay--audio-mode .app-hud-bottom::before {
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  left: 0;
-  height: 1rem;
-  background: linear-gradient(to bottom, transparent, var(--audio-bg-base));
-  content: '';
-  pointer-events: none;
-}
-
 /* Audio mode visuals live in src/styles/audio-mode.css */
 
 .review-timeline-track--waveform {
@@ -2975,6 +2958,13 @@ video.camera-preview.camera-preview--hidden {
 
 .hands-free-status:not([aria-hidden='true']) {
   opacity: 1;
+}
+
+.hands-free-status[aria-hidden='true'] {
+  width: 0;
+  min-height: 0;
+  height: 0;
+  gap: 0;
 }
 
 .hands-free-status--recording {

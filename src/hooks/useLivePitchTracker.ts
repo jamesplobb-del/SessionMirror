@@ -2403,11 +2403,11 @@ export function useLivePitchTracker(
         // first chunk arrives the buffer stays zeroed — the RMS gate below
         // treats that as silence, which renders as an idle (not broken) tuner.
         const latest = nativeTap.latest
-        if (!latest || nativeTap.sequence === nativeTap.processedSequence) {
-          tickRef.current = requestAnimationFrame(tick)
-          return
-        }
-        nativeTap.processedSequence = nativeTap.sequence
+        // Keep analysis and canvas motion on the display's animation cadence.
+        // Native PCM arrives in larger chunks, but reusing the latest complete
+        // chunk between deliveries prevents the trace from dropping to the
+        // audio chunk rate (roughly 23fps at 48kHz).
+        if (latest) nativeTap.processedSequence = nativeTap.sequence
         if (latest) {
           publishSourceHealth('healthy')
           if (latest.length === graph.buffer.length) {
