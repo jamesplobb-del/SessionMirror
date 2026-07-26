@@ -172,7 +172,6 @@ import {
 import {
   forceNativeRecordingMode,
   syncNativeCameraSessionState,
-  isNativeCameraPreviewActive,
   isNativeCaptureSessionActive,
 } from './utils/cameraSessionState'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
@@ -219,7 +218,10 @@ import {
   saveTakeMarkers,
 } from './practiceTimeline/recording/timelineMarkers'
 import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
-import { AudioModePlaybackProvider, audioModePlaybackControlsRef } from './context/AudioModePlaybackContext'
+import {
+  AudioModePlaybackProvider,
+  audioModePlaybackControlsRef,
+} from './context/AudioModePlaybackContext'
 import type { AudioPracticeTab } from './types/audioPractice'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 0
@@ -463,7 +465,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [labsRoute, setLabsRoute] = useState<LabsRoute | null>(null)
   const [multitrackOpen, setMultitrackOpen] = useState(false)
-  const [multitrackPendingRecordingTakeId, setMultitrackPendingRecordingTakeId] = useState<string | null>(null)
+  const [multitrackPendingRecordingTakeId, setMultitrackPendingRecordingTakeId] = useState<
+    string | null
+  >(null)
   const multitrackRecordingActiveRef = useRef(false)
   const [isCreatorStudioPickerOpen, setIsCreatorStudioPickerOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
@@ -478,7 +482,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [reviewPlaybackPlaying, setReviewPlaybackPlaying] = useState(false)
   const [takeDeleteError, setTakeDeleteError] = useState<string | null>(null)
-  const [audioTakeReadiness, setAudioTakeReadiness] = useState<Record<string, AudioTakeReadiness>>({})
+  const [audioTakeReadiness, setAudioTakeReadiness] = useState<Record<string, AudioTakeReadiness>>(
+    {}
+  )
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
@@ -495,6 +501,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
   const [tutorialTourEnabled, setTutorialTourEnabled] = useState(false)
   const [practiceSessionActive, setPracticeSessionActive] = useState(false)
+  const [practiceRecordingControlsExpanded, setPracticeRecordingControlsExpanded] = useState(false)
   const [showTunerTakePills, setShowTunerTakePills] = useState(false)
 
   const { settings, updateSettings, resetSettings } = useAppSettings()
@@ -510,7 +517,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       setAudioPracticeTab(tab)
     },
-    [audioPracticeTab, setAudioPracticeTab],
+    [audioPracticeTab, setAudioPracticeTab]
   )
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
@@ -524,7 +531,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const reloadTakesGenerationRef = useRef(0)
   const takesRef = useRef<Take[]>([])
   const pendingAutoPlaybackRef = useRef(false)
-  const audioTakeReadinessInputRef = useRef(new Map<string, { filePath: string; fallbackUrl: string }>())
+  const audioTakeReadinessInputRef = useRef(
+    new Map<string, { filePath: string; fallbackUrl: string }>()
+  )
   const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
   const autoPlaybackUsesNativeRef = useRef(false)
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
@@ -540,7 +549,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       takeId: string,
       performanceStartSeconds?: number,
       filePath?: string,
-      playbackGainDb?: number,
+      playbackGainDb?: number
     ) => void
   >(() => {})
   const refreshCameraSessionRef = useRef<() => Promise<void>>(async () => {})
@@ -560,7 +569,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
-
 
   const isReviewOpen = reviewSlot !== null
   const isLabsOpen = labsRoute !== null
@@ -755,8 +763,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const finishAutoPlayback = useCallback(() => {
+    // Clear the replay UI and invalidate any in-flight native start
+    // immediately. Route/mic cleanup can take a bridge round trip and must not
+    // leave the interface stuck in "Playing your take back…" while it settles.
+    stopAutoPlaybackAudio()
     void finalizeTakePlaybackCleanup().finally(() => {
-      stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
       if (recordingModeRef.current === 'audio') {
         stabilizeViewportAfterMediaInteraction()
@@ -773,7 +784,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       takeId: string,
       performanceStartSeconds?: number,
       filePath = '',
-      playbackGainDb?: number,
+      playbackGainDb?: number
     ) => {
       if (recordingModeRef.current !== 'audio') {
         pendingAutoPlaybackRef.current = false
@@ -805,9 +816,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setAutoPlaybackTakeId(takeId)
 
       const useNativeAudioPlayback =
-        Capacitor.isNativePlatform() &&
-        Capacitor.getPlatform() === 'ios' &&
-        Boolean(filePath)
+        Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios' && Boolean(filePath)
 
       if (useNativeAudioPlayback) {
         autoPlaybackUsesNativeRef.current = true
@@ -824,9 +833,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             playNativeAudio = audioModePlaybackControlsRef.play
           }
           if (!playNativeAudio) {
-            console.error('[Playback] native audio controller unavailable; WebKit fallback disabled', {
-              takeId,
-            })
+            console.error(
+              '[Playback] native audio controller unavailable; WebKit fallback disabled',
+              {
+                takeId,
+              }
+            )
             autoPlaybackUsesNativeRef.current = false
             setActivePlaybackDiagSession(null)
             finishAutoPlayback()
@@ -846,7 +858,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           const startTime = Math.max(
             0,
             (typeof performanceStartSeconds === 'number' ? performanceStartSeconds : 0) -
-              AUTO_PLAYBACK_LEAD_IN_S,
+              AUTO_PLAYBACK_LEAD_IN_S
           )
           let tailTimer: number | null = null
           const clearTailTimer = () => {
@@ -895,7 +907,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               },
               onFailed: completeNativeAutoPlayback,
               onEnded: completeNativeAutoPlayback,
-            },
+            }
           )
         })()
         return
@@ -1043,7 +1055,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         detachTailSkip = attachAutoPlaybackTailSkip(
           audio,
           settings.soundSilenceSeconds,
-          completeAutoPlayback,
+          completeAutoPlayback
         )
         audio.onended = completeAutoPlayback
         audio.onerror = completeAutoPlayback
@@ -1063,7 +1075,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         await logAudioSessionSnapshot(
           started ? 'after-playTakeMediaAudible-started' : 'after-playTakeMediaAudible-failed',
           sessionId,
-          { started },
+          { started }
         )
 
         if (started) {
@@ -1269,7 +1281,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const input = audioTakeReadinessInputRef.current.get(takeId)
     if (!input) return null
 
-    setAudioTakeReadiness((current) => ({ ...current, [takeId]: { status: 'preparing' } }))
+    setAudioTakeReadiness((current) => ({
+      ...current,
+      [takeId]: { status: 'preparing' },
+    }))
     console.info('[TakeReadiness] playback-source-creation-started', {
       takeId,
       filePath: input.filePath,
@@ -1280,8 +1295,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const readiness = await prepareTakePlaybackReadiness(input)
       setTakes((current) =>
         current.map((take) =>
-          take.id === takeId ? { ...take, videoUrl: readiness.playbackUrl } : take,
-        ),
+          take.id === takeId ? { ...take, videoUrl: readiness.playbackUrl } : take
+        )
       )
       console.info('[TakeReadiness] playback-source-created', {
         takeId,
@@ -1294,13 +1309,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       })
       setAudioTakeReadiness((current) => ({
         ...current,
-        [takeId]: { status: 'ready', durationSeconds: readiness.durationSeconds },
+        [takeId]: {
+          status: 'ready',
+          durationSeconds: readiness.durationSeconds,
+        },
       }))
-      console.info('[TakeReadiness] play-enabled', { takeId, atMs: performance.now() })
+      console.info('[TakeReadiness] play-enabled', {
+        takeId,
+        atMs: performance.now(),
+      })
       return readiness
     } catch (error) {
       const message = error instanceof Error ? error.message : 'This take could not be prepared.'
-      console.error('[TakeReadiness] preparation-failed', { takeId, message, error })
+      console.error('[TakeReadiness] preparation-failed', {
+        takeId,
+        message,
+        error,
+      })
       setAudioTakeReadiness((current) => ({
         ...current,
         [takeId]: { status: 'error', message },
@@ -1309,339 +1334,360 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [])
 
-  const handleRetryAudioTakePreparation = useCallback((takeId: string) => {
-    void prepareAudioTakePlayback(takeId)
-  }, [prepareAudioTakePlayback])
+  const handleRetryAudioTakePreparation = useCallback(
+    (takeId: string) => {
+      void prepareAudioTakePlayback(takeId)
+    },
+    [prepareAudioTakePlayback]
+  )
 
-  const handleSaveTake = useCallback((payload: RecordingCompletePayload) => {
-    const {
-      takeId,
-      mimeType,
-      filePath,
-      videoUrl,
-      blob,
-      mediaType,
-      durationSeconds,
-      recordingOrientation,
-      captureProfile,
-      captureTrackSnapshot,
-      autoPerformanceStartSeconds,
-      mirrorPlayback,
-      timelineOffsetMs,
-      recordingBpm,
-      performanceStartBeats,
-      performanceStartOffsetBeats,
-      referenceTrackId,
-      referenceStartBeat,
-    } = payload
-
-    void logRecordingOutputVerification({
-      takeId,
-      filePath,
-      mimeType,
-      durationSeconds,
-      videoUrl,
-      mediaType,
-    })
-
-    const timelineMarkers = consumePendingMarkers()
-    if (timelineMarkers.length > 0) {
-      saveTakeMarkers(takeId, timelineMarkers)
-    }
-
-    const shouldAutoPlay =
-      pendingAutoPlaybackRef.current &&
-      ((mediaType === 'audio' && recordingModeRef.current === 'audio') ||
-        (mediaType === 'video' && recordingModeRef.current === 'video'))
-    const playbackGainDb = resolveNativePlaybackGainDb(
-      payload.captureDiagnostics?.playbackGainMetadata,
-    )
-
-    const optimisticUrl =
-      resolveTakePlaybackUrlFast(filePath, videoUrl) ??
-      (videoUrl ? resolveMediaPlaybackSrc(videoUrl) : '')
-    const projectId = activeProjectIdRef.current
-
-    if (mediaType === 'audio') {
-      audioTakeReadinessInputRef.current.set(takeId, {
+  const handleSaveTake = useCallback(
+    (payload: RecordingCompletePayload) => {
+      const {
+        takeId,
+        mimeType,
         filePath,
-        fallbackUrl: optimisticUrl,
-      })
-      setAudioTakeReadiness((current) => ({ ...current, [takeId]: { status: 'preparing' } }))
-      console.info('[TakeReadiness] recording-stop-received', {
+        videoUrl,
+        blob,
+        mediaType,
+        durationSeconds,
+        recordingOrientation,
+        captureProfile,
+        captureTrackSnapshot,
+        autoPerformanceStartSeconds,
+        mirrorPlayback,
+        timelineOffsetMs,
+        recordingBpm,
+        performanceStartBeats,
+        performanceStartOffsetBeats,
+        referenceTrackId,
+        referenceStartBeat,
+      } = payload
+
+      void logRecordingOutputVerification({
         takeId,
         filePath,
+        mimeType,
         durationSeconds,
-        atMs: performance.now(),
+        videoUrl,
+        mediaType,
       })
-    }
 
-    if (showTakeCardsRef.current || shouldAutoPlay) {
-      challengerUserDismissedRef.current = false
-      pendingChallengerIdRef.current = takeId
-      setChallengerId(takeId)
-    }
-
-    setTakes((prev) => {
-      const index = prev.length + 1
-      const savedTake: Take = {
-        ...createTake(takeId, index, optimisticUrl, filePath, mimeType, mediaType),
-        duration: durationSeconds,
-        recordingOrientation: recordingOrientation ?? 'portrait',
-        ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
-        timelineOffsetMs,
-        ...(recordingBpm !== undefined ? { recordingBpm } : null),
-        ...(performanceStartBeats !== undefined ? { performanceStartBeats } : null),
-        ...(performanceStartOffsetBeats !== undefined ? { performanceStartOffsetBeats } : null),
-        ...(autoPerformanceStartSeconds !== undefined
-          ? { performanceStartSeconds: autoPerformanceStartSeconds }
-          : null),
-        ...(referenceTrackId !== undefined ? { referenceTrackId } : null),
-        ...(referenceStartBeat !== undefined ? { referenceStartBeat } : null),
-        ...(payload.captureDiagnostics?.playbackGainMetadata
-          ? { playbackGainMetadata: payload.captureDiagnostics.playbackGainMetadata }
-          : null),
+      const timelineMarkers = consumePendingMarkers()
+      if (timelineMarkers.length > 0) {
+        saveTakeMarkers(takeId, timelineMarkers)
       }
-      return [...prev, savedTake]
-    })
 
-    if (multitrackRecordingActiveRef.current) {
-      multitrackRecordingActiveRef.current = false
-      setMultitrackPendingRecordingTakeId(takeId)
-    }
-
-    if (shouldAutoPlay && mediaType === 'audio') {
-      // Keep the hands-free turn-around intact, but do not hand a just-written
-      // file to the native player before the same readiness validation as the card.
-      setHandsFreePlaybackPending(true)
-    } else if (shouldAutoPlay && mediaType === 'video') {
-      pendingAutoPlaybackRef.current = false
-      autoRecordStartSuppressedRef.current = true
-      setAutoRecordStartSuppressed(true)
-      setHandsFreePlaybackPending(true)
-      setAutoPlaybackPlaying(false)
-      setAutoPlaybackTakeId(takeId)
-    } else if (shouldAutoPlay) {
-      pendingAutoPlaybackRef.current = false
-      setHandsFreePlaybackPending(false)
-      releaseAutoRecordSuppress(0)
-    }
-
-    if (mediaType === 'audio') {
-      setTakes((current) =>
-        current.map((take) =>
-          take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take
-        )
-      )
-    }
-
-    void (async () => {
-      const safeVideoUrl = resolveMediaPlaybackSrc(
-        optimisticUrl || (await resolveTakePlaybackUrl(filePath, videoUrl))
+      const shouldAutoPlay =
+        pendingAutoPlaybackRef.current &&
+        ((mediaType === 'audio' && recordingModeRef.current === 'audio') ||
+          (mediaType === 'video' && recordingModeRef.current === 'video'))
+      const playbackGainDb = resolveNativePlaybackGainDb(
+        payload.captureDiagnostics?.playbackGainMetadata
       )
 
-      if (safeVideoUrl && safeVideoUrl !== optimisticUrl) {
-        setTakes((current) =>
-          current.map((take) => (take.id === takeId ? { ...take, videoUrl: safeVideoUrl } : take))
-        )
-      }
-
-      let resolvedFilePath = filePath
-      let playbackUrl = safeVideoUrl || optimisticUrl
-      let normalizedBlob = blob
-
-      if (mediaType === 'video' && recordingOrientation === 'landscape') {
-        if (blob) {
-          normalizedBlob = await normalizeLandscapeRecordingBlob(
-            blob,
-            mimeType,
-            recordingOrientation
-          )
-          if (normalizedBlob !== blob) {
-            if (playbackUrl.startsWith('blob:')) {
-              URL.revokeObjectURL(playbackUrl)
-            }
-            playbackUrl = URL.createObjectURL(normalizedBlob)
-          }
-        } else if (filePath) {
-          const normalized = await normalizeLandscapeTakeInPlace({
-            id: takeId,
-            filePath,
-            videoUrl: playbackUrl,
-            videoMimeType: mimeType,
-            recordingOrientation,
-          })
-          if (normalized) {
-            resolvedFilePath = normalized.filePath
-            playbackUrl = await resolveTakePlaybackUrl(normalized.filePath, normalized.videoUrl)
-          }
-        }
-
-        if (playbackUrl !== optimisticUrl || resolvedFilePath !== filePath) {
-          setTakes((current) =>
-            current.map((take) =>
-              take.id === takeId
-                ? { ...take, videoUrl: playbackUrl, filePath: resolvedFilePath }
-                : take
-            )
-          )
-        }
-      }
-
-      if (projectId && resolvedFilePath) {
-        const existing = await getTakesByProject(projectId)
-        const takeIndex = existing.length + 1
-        await saveTake({
-          projectId,
-          filePath: resolvedFilePath,
-          duration: durationSeconds,
-          takeId,
-          mimeType,
-          mediaType,
-          recordingOrientation,
-          timelineOffsetMs,
-          name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
-        })
-      }
+      const optimisticUrl =
+        resolveTakePlaybackUrlFast(filePath, videoUrl) ??
+        (videoUrl ? resolveMediaPlaybackSrc(videoUrl) : '')
+      const projectId = activeProjectIdRef.current
 
       if (mediaType === 'audio') {
-        const fileExists = !resolvedFilePath || (await nativeDataFileExists(resolvedFilePath))
-        console.info('[TakeReadiness] file-finalization-complete', {
+        audioTakeReadinessInputRef.current.set(takeId, {
+          filePath,
+          fallbackUrl: optimisticUrl,
+        })
+        setAudioTakeReadiness((current) => ({
+          ...current,
+          [takeId]: { status: 'preparing' },
+        }))
+        console.info('[TakeReadiness] recording-stop-received', {
           takeId,
-          filePath: resolvedFilePath,
-          fileExists,
+          filePath,
+          durationSeconds,
           atMs: performance.now(),
         })
-        audioTakeReadinessInputRef.current.set(takeId, {
-          filePath: resolvedFilePath,
-          fallbackUrl: playbackUrl,
-        })
+      }
 
-        const readiness = await prepareAudioTakePlayback(takeId)
-        if (shouldAutoPlay) {
-          if (readiness) {
-            pendingAutoPlaybackRef.current = false
-            playAutoTakeAudioRef.current(
-              readiness.playbackUrl,
-              takeId,
-              autoPerformanceStartSeconds,
-              resolvedFilePath,
-              playbackGainDb,
-            )
-          } else {
-            pendingAutoPlaybackRef.current = false
-            setHandsFreePlaybackPending(false)
-            releaseAutoRecordSuppress(0)
-          }
+      if (showTakeCardsRef.current || shouldAutoPlay) {
+        challengerUserDismissedRef.current = false
+        pendingChallengerIdRef.current = takeId
+        setChallengerId(takeId)
+      }
+
+      setTakes((prev) => {
+        const index = prev.length + 1
+        const savedTake: Take = {
+          ...createTake(takeId, index, optimisticUrl, filePath, mimeType, mediaType),
+          duration: durationSeconds,
+          recordingOrientation: recordingOrientation ?? 'portrait',
+          ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
+          timelineOffsetMs,
+          ...(recordingBpm !== undefined ? { recordingBpm } : null),
+          ...(performanceStartBeats !== undefined ? { performanceStartBeats } : null),
+          ...(performanceStartOffsetBeats !== undefined ? { performanceStartOffsetBeats } : null),
+          ...(autoPerformanceStartSeconds !== undefined
+            ? { performanceStartSeconds: autoPerformanceStartSeconds }
+            : null),
+          ...(referenceTrackId !== undefined ? { referenceTrackId } : null),
+          ...(referenceStartBeat !== undefined ? { referenceStartBeat } : null),
+          ...(payload.captureDiagnostics?.playbackGainMetadata
+            ? {
+                playbackGainMetadata: payload.captureDiagnostics.playbackGainMetadata,
+              }
+            : null),
         }
+        return [...prev, savedTake]
+      })
+
+      if (multitrackRecordingActiveRef.current) {
+        multitrackRecordingActiveRef.current = false
+        setMultitrackPendingRecordingTakeId(takeId)
       }
 
-      // Bake the Audio Enhancer into the saved file (native offline render).
-      // Non-blocking: playback of the take uses the live WebAudio enhancer
-      // until enhancerBaked flips, so audio is never double-enhanced and
-      // never un-enhanced. On any native failure the original file survives.
-      if (
-        audioEnhancerEnabledRef.current &&
-        isNativeCameraPlatform &&
-        resolvedFilePath
-      ) {
-        void (async () => {
-          try {
-            const fileUri = await resolveNativeFileUri(resolvedFilePath)
-            if (!fileUri) return
-            await BestTakeAudioPlugin.enhanceTakeAudio({
-              url: fileUri,
-              mediaType: mediaType === 'audio' ? 'audio' : 'video',
-              params: buildNativeEnhancerParams(audioEnhancerSettingsRef.current),
-            })
-            await setTakeEnhancerBaked(takeId, true)
-            setTakes((current) =>
-              current.map((take) =>
-                take.id === takeId ? { ...take, enhancerBaked: true } : take
-              )
-            )
-            console.info('[AudioEnhancer] baked into take', takeId)
-          } catch (error) {
-            console.warn('[AudioEnhancer] bake failed; take keeps live playback enhancement', error)
-          }
-        })()
-      }
-
-      let audioAnalysisSource: Blob | string | null = normalizedBlob ?? blob ?? null
-      if (!audioAnalysisSource && resolvedFilePath) {
-        const nativeUri = await resolveNativeFileUri(resolvedFilePath)
-        if (nativeUri) audioAnalysisSource = nativeUri
-      } else if (!audioAnalysisSource && playbackUrl) {
-        audioAnalysisSource = playbackUrl
-      }
-
-      const captureDiagnostics =
-        payload.captureDiagnostics ??
-        (await buildRecordingCaptureDiagnostics(
-          captureProfile ?? 'natural',
-          captureTrackSnapshot ?? null,
-          audioAnalysisSource
-        ))
-      logRecordingCaptureDiagnostics(takeId, captureDiagnostics)
-
-      if (captureDiagnostics.playbackGainMetadata) {
-        setTakes((current) =>
-          current.map((take) =>
-            take.id === takeId
-              ? {
-                  ...take,
-                  playbackGainMetadata: captureDiagnostics.playbackGainMetadata ?? undefined,
-                }
-              : take
-          )
-        )
-      }
-
-      pendingChallengerIdRef.current = null
-
-      if (mediaType !== 'video') return
-
-      const thumbnailTake: Take = {
-        ...createTake(takeId, 1, playbackUrl, resolvedFilePath, mimeType, mediaType),
-        recordingOrientation: recordingOrientation ?? 'portrait',
-        ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
-      }
-
-      const thumbnailPromise = normalizedBlob
-        ? generateThumbnailFromBlob(
-            normalizedBlob,
-            thumbnailTake.mirrorPlayback === true,
-            thumbnailTake.recordingOrientation
-          ).then((dataUrl) =>
-            persistTakeThumbnail(takeId, dataUrl, thumbnailTake.recordingOrientation ?? 'portrait')
-          )
-        : captureAndPersistTakeThumbnail(thumbnailTake)
-
-      void thumbnailPromise
-        .then((thumbnailUrl) => {
-          if (!thumbnailUrl) return
-          setTakes((current) =>
-            current.map((take) => (take.id === takeId ? { ...take, thumbnailUrl } : take))
-          )
-        })
-        .catch(() => {
-          /* vault falls back to placeholder until thumbnail is ready */
-        })
-    })().catch((error) => {
-      console.error('[Recording] take finalization failed', { takeId, error })
-      if (mediaType !== 'audio') return
-      const message = error instanceof Error ? error.message : 'This take could not be prepared.'
-      setAudioTakeReadiness((current) => ({
-        ...current,
-        [takeId]: { status: 'error', message },
-      }))
-      if (shouldAutoPlay) {
+      if (shouldAutoPlay && mediaType === 'audio') {
+        // Keep the hands-free turn-around intact, but do not hand a just-written
+        // file to the native player before the same readiness validation as the card.
+        setHandsFreePlaybackPending(true)
+      } else if (shouldAutoPlay && mediaType === 'video') {
+        pendingAutoPlaybackRef.current = false
+        autoRecordStartSuppressedRef.current = true
+        setAutoRecordStartSuppressed(true)
+        setHandsFreePlaybackPending(true)
+        setAutoPlaybackPlaying(false)
+        setAutoPlaybackTakeId(takeId)
+      } else if (shouldAutoPlay) {
         pendingAutoPlaybackRef.current = false
         setHandsFreePlaybackPending(false)
         releaseAutoRecordSuppress(0)
       }
-    })
-  }, [prepareAudioTakePlayback, releaseAutoRecordSuppress])
+
+      if (mediaType === 'audio') {
+        setTakes((current) =>
+          current.map((take) =>
+            take.id === takeId ? { ...take, thumbnailUrl: AUDIO_TAKE_THUMBNAIL } : take
+          )
+        )
+      }
+
+      void (async () => {
+        const safeVideoUrl = resolveMediaPlaybackSrc(
+          optimisticUrl || (await resolveTakePlaybackUrl(filePath, videoUrl))
+        )
+
+        if (safeVideoUrl && safeVideoUrl !== optimisticUrl) {
+          setTakes((current) =>
+            current.map((take) => (take.id === takeId ? { ...take, videoUrl: safeVideoUrl } : take))
+          )
+        }
+
+        let resolvedFilePath = filePath
+        let playbackUrl = safeVideoUrl || optimisticUrl
+        let normalizedBlob = blob
+
+        if (mediaType === 'video' && recordingOrientation === 'landscape') {
+          if (blob) {
+            normalizedBlob = await normalizeLandscapeRecordingBlob(
+              blob,
+              mimeType,
+              recordingOrientation
+            )
+            if (normalizedBlob !== blob) {
+              if (playbackUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(playbackUrl)
+              }
+              playbackUrl = URL.createObjectURL(normalizedBlob)
+            }
+          } else if (filePath) {
+            const normalized = await normalizeLandscapeTakeInPlace({
+              id: takeId,
+              filePath,
+              videoUrl: playbackUrl,
+              videoMimeType: mimeType,
+              recordingOrientation,
+            })
+            if (normalized) {
+              resolvedFilePath = normalized.filePath
+              playbackUrl = await resolveTakePlaybackUrl(normalized.filePath, normalized.videoUrl)
+            }
+          }
+
+          if (playbackUrl !== optimisticUrl || resolvedFilePath !== filePath) {
+            setTakes((current) =>
+              current.map((take) =>
+                take.id === takeId
+                  ? {
+                      ...take,
+                      videoUrl: playbackUrl,
+                      filePath: resolvedFilePath,
+                    }
+                  : take
+              )
+            )
+          }
+        }
+
+        if (projectId && resolvedFilePath) {
+          const existing = await getTakesByProject(projectId)
+          const takeIndex = existing.length + 1
+          await saveTake({
+            projectId,
+            filePath: resolvedFilePath,
+            duration: durationSeconds,
+            takeId,
+            mimeType,
+            mediaType,
+            recordingOrientation,
+            timelineOffsetMs,
+            name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
+          })
+        }
+
+        if (mediaType === 'audio') {
+          const fileExists = !resolvedFilePath || (await nativeDataFileExists(resolvedFilePath))
+          console.info('[TakeReadiness] file-finalization-complete', {
+            takeId,
+            filePath: resolvedFilePath,
+            fileExists,
+            atMs: performance.now(),
+          })
+          audioTakeReadinessInputRef.current.set(takeId, {
+            filePath: resolvedFilePath,
+            fallbackUrl: playbackUrl,
+          })
+
+          const readiness = await prepareAudioTakePlayback(takeId)
+          if (shouldAutoPlay) {
+            if (readiness) {
+              pendingAutoPlaybackRef.current = false
+              playAutoTakeAudioRef.current(
+                readiness.playbackUrl,
+                takeId,
+                autoPerformanceStartSeconds,
+                resolvedFilePath,
+                playbackGainDb
+              )
+            } else {
+              pendingAutoPlaybackRef.current = false
+              setHandsFreePlaybackPending(false)
+              releaseAutoRecordSuppress(0)
+            }
+          }
+        }
+
+        // Bake the Audio Enhancer into the saved file (native offline render).
+        // Non-blocking: playback of the take uses the live WebAudio enhancer
+        // until enhancerBaked flips, so audio is never double-enhanced and
+        // never un-enhanced. On any native failure the original file survives.
+        if (audioEnhancerEnabledRef.current && isNativeCameraPlatform && resolvedFilePath) {
+          void (async () => {
+            try {
+              const fileUri = await resolveNativeFileUri(resolvedFilePath)
+              if (!fileUri) return
+              await BestTakeAudioPlugin.enhanceTakeAudio({
+                url: fileUri,
+                mediaType: mediaType === 'audio' ? 'audio' : 'video',
+                params: buildNativeEnhancerParams(audioEnhancerSettingsRef.current),
+              })
+              await setTakeEnhancerBaked(takeId, true)
+              setTakes((current) =>
+                current.map((take) =>
+                  take.id === takeId ? { ...take, enhancerBaked: true } : take
+                )
+              )
+              console.info('[AudioEnhancer] baked into take', takeId)
+            } catch (error) {
+              console.warn(
+                '[AudioEnhancer] bake failed; take keeps live playback enhancement',
+                error
+              )
+            }
+          })()
+        }
+
+        let audioAnalysisSource: Blob | string | null = normalizedBlob ?? blob ?? null
+        if (!audioAnalysisSource && resolvedFilePath) {
+          const nativeUri = await resolveNativeFileUri(resolvedFilePath)
+          if (nativeUri) audioAnalysisSource = nativeUri
+        } else if (!audioAnalysisSource && playbackUrl) {
+          audioAnalysisSource = playbackUrl
+        }
+
+        const captureDiagnostics =
+          payload.captureDiagnostics ??
+          (await buildRecordingCaptureDiagnostics(
+            captureProfile ?? 'natural',
+            captureTrackSnapshot ?? null,
+            audioAnalysisSource
+          ))
+        logRecordingCaptureDiagnostics(takeId, captureDiagnostics)
+
+        if (captureDiagnostics.playbackGainMetadata) {
+          setTakes((current) =>
+            current.map((take) =>
+              take.id === takeId
+                ? {
+                    ...take,
+                    playbackGainMetadata: captureDiagnostics.playbackGainMetadata ?? undefined,
+                  }
+                : take
+            )
+          )
+        }
+
+        pendingChallengerIdRef.current = null
+
+        if (mediaType !== 'video') return
+
+        const thumbnailTake: Take = {
+          ...createTake(takeId, 1, playbackUrl, resolvedFilePath, mimeType, mediaType),
+          recordingOrientation: recordingOrientation ?? 'portrait',
+          ...(mirrorPlayback !== undefined ? { mirrorPlayback } : null),
+        }
+
+        const thumbnailPromise = normalizedBlob
+          ? generateThumbnailFromBlob(
+              normalizedBlob,
+              thumbnailTake.mirrorPlayback === true,
+              thumbnailTake.recordingOrientation
+            ).then((dataUrl) =>
+              persistTakeThumbnail(
+                takeId,
+                dataUrl,
+                thumbnailTake.recordingOrientation ?? 'portrait'
+              )
+            )
+          : captureAndPersistTakeThumbnail(thumbnailTake)
+
+        void thumbnailPromise
+          .then((thumbnailUrl) => {
+            if (!thumbnailUrl) return
+            setTakes((current) =>
+              current.map((take) => (take.id === takeId ? { ...take, thumbnailUrl } : take))
+            )
+          })
+          .catch(() => {
+            /* vault falls back to placeholder until thumbnail is ready */
+          })
+      })().catch((error) => {
+        console.error('[Recording] take finalization failed', {
+          takeId,
+          error,
+        })
+        if (mediaType !== 'audio') return
+        const message = error instanceof Error ? error.message : 'This take could not be prepared.'
+        setAudioTakeReadiness((current) => ({
+          ...current,
+          [takeId]: { status: 'error', message },
+        }))
+        if (shouldAutoPlay) {
+          pendingAutoPlaybackRef.current = false
+          setHandsFreePlaybackPending(false)
+          releaseAutoRecordSuppress(0)
+        }
+      })
+    },
+    [prepareAudioTakePlayback, releaseAutoRecordSuppress]
+  )
 
   youtubeUrlRef.current = youtubeUrl
 
@@ -1736,15 +1782,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       tunerMicBackgroundGenerationRef.current = liveStreamGenerationRef.current
     }
 
-    window.addEventListener(
-      APP_BACKGROUND_SUSPEND_EVENT,
-      markTunerMicForForegroundRecovery,
-    )
+    window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, markTunerMicForForegroundRecovery)
     return () => {
-      window.removeEventListener(
-        APP_BACKGROUND_SUSPEND_EVENT,
-        markTunerMicForForegroundRecovery,
-      )
+      window.removeEventListener(APP_BACKGROUND_SUSPEND_EVENT, markTunerMicForForegroundRecovery)
     }
   }, [])
 
@@ -1758,9 +1798,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (!Capacitor.isNativePlatform()) return
     // Native AVPlayer cannot share output with a live WebRTC mic session — release
     // capture before playback, then refresh after (speaker and headphones).
-    console.info(
-      '[AudioModePlayback] releasing WebRTC capture before native AVPlayer playback',
-    )
+    console.info('[AudioModePlayback] releasing WebRTC capture before native AVPlayer playback')
     await suspendAudioCaptureForPlayback()
     audioModePlaybackSuspendedCaptureRef.current = true
   }, [isRecording, stopRecording, suspendAudioCaptureForPlayback])
@@ -1775,7 +1813,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         void refreshCameraSession()
       })
     },
-    [refreshCameraSession],
+    [refreshCameraSession]
   )
 
   useEffect(() => {
@@ -1784,7 +1822,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         !maintainDuringRecording &&
         !autoPlaybackPlaying &&
         !audioModeTakePlaying &&
-        !handsFreePlaybackPending,
+        !handsFreePlaybackPending
     )
   }, [audioModeTakePlaying, autoPlaybackPlaying, handsFreePlaybackPending])
 
@@ -1807,7 +1845,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
     lastMicPreferenceRouteRef.current = settings.micInputPreference
     void reacquireStreamForAudioRoute()
-  }, [isRecording, nativeLivePreviewActive, recordingMode, reacquireStreamForAudioRoute, ready, settings.micInputPreference])
+  }, [
+    isRecording,
+    nativeLivePreviewActive,
+    recordingMode,
+    reacquireStreamForAudioRoute,
+    ready,
+    settings.micInputPreference,
+  ])
 
   useEffect(() => {
     if (isPlaybackRouteHoldActive()) return
@@ -1908,6 +1953,25 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const autoPlaybackPlayingRef = useRef(autoPlaybackPlaying)
   autoPlaybackPlayingRef.current = autoPlaybackPlaying
+  const previousAudioPracticeTabRef = useRef(audioPracticeTab)
+
+  useEffect(() => {
+    const previousTab = previousAudioPracticeTabRef.current
+    previousAudioPracticeTabRef.current = audioPracticeTab
+    if (previousTab === audioPracticeTab) return
+    if (
+      !pendingAutoPlaybackRef.current &&
+      !autoPlaybackPlayingRef.current &&
+      autoPlaybackTakeId === null
+    ) {
+      return
+    }
+
+    // A tab change can transfer the native mic/session while AVPlayer is
+    // still starting. Cancel the replay as one transaction so the listening
+    // state cannot remain stuck behind a lost start callback.
+    finishAutoPlayback()
+  }, [audioPracticeTab, autoPlaybackTakeId, finishAutoPlayback])
 
   useEffect(() => {
     registerTakePlaybackMicHandlers({
@@ -2005,47 +2069,48 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     !isExperimentalOpen &&
     (ready || nativeHandsFreeCaptureActive)
 
-  const { handsFreeRecording, restartHandsFreeMonitor } = useAutoSoundRecording({
-    enabled: settings.autoSoundRecording,
-    monitoringAllowed: autoMonitoringAllowed,
-    suppressStart: autoRecordStartSuppressed,
-    isNativeAudioCaptureActive,
-    monitoringPaused:
-      handsFreePlaybackPending ||
-      autoPlaybackPlaying ||
-      audioModeTakePlaying ||
-      benchmarkPipPlaying ||
-      challengerPipPlaying ||
-      isPreviewRecovering,
-    ready,
-    isRecording,
-    streamRef,
-    streamGeneration,
-    silenceMs: settings.soundSilenceSeconds * 1000,
-    volumeThreshold: settings.soundVolumeThreshold,
-    startRecording: startAutoRecording,
-    stopRecording,
-    warmRecorder: () => {
-      void warmAutoRecording()
-    },
-    disarmRecorder: () => {
-      void disarmAutoRecording()
-    },
-    tryMarkAutoPerformance: tryMarkAutoPerformanceStart,
-    isAutoPreRollCaptureActive,
-    getAutoPreRollAgeMs,
-    restartAutoPreRollCapture,
-    onAutoRecordingFinished: () => {
-      pendingAutoPlaybackRef.current = true
-      autoRecordStartSuppressedRef.current = true
-      setHandsFreePlaybackPending(true)
-      setAutoRecordStartSuppressed(true)
-    },
-    onMonitorStalled: () => {
-      if (!isAppInForeground()) return
-      void refreshCameraSession()
-    },
-  })
+  const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor } =
+    useAutoSoundRecording({
+      enabled: settings.autoSoundRecording,
+      monitoringAllowed: autoMonitoringAllowed,
+      suppressStart: autoRecordStartSuppressed,
+      isNativeAudioCaptureActive,
+      monitoringPaused:
+        handsFreePlaybackPending ||
+        autoPlaybackPlaying ||
+        audioModeTakePlaying ||
+        benchmarkPipPlaying ||
+        challengerPipPlaying ||
+        isPreviewRecovering,
+      ready,
+      isRecording,
+      streamRef,
+      streamGeneration,
+      silenceMs: settings.soundSilenceSeconds * 1000,
+      volumeThreshold: settings.soundVolumeThreshold,
+      startRecording: startAutoRecording,
+      stopRecording,
+      warmRecorder: () => {
+        void warmAutoRecording()
+      },
+      disarmRecorder: () => {
+        void disarmAutoRecording()
+      },
+      tryMarkAutoPerformance: tryMarkAutoPerformanceStart,
+      isAutoPreRollCaptureActive,
+      getAutoPreRollAgeMs,
+      restartAutoPreRollCapture,
+      onAutoRecordingFinished: () => {
+        pendingAutoPlaybackRef.current = true
+        autoRecordStartSuppressedRef.current = true
+        setHandsFreePlaybackPending(true)
+        setAutoRecordStartSuppressed(true)
+      },
+      onMonitorStalled: () => {
+        if (!isAppInForeground()) return
+        void refreshCameraSession()
+      },
+    })
   const restartHandsFreeMonitorRef = useRef(restartHandsFreeMonitor)
   restartHandsFreeMonitorRef.current = restartHandsFreeMonitor
 
@@ -2088,7 +2153,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (playAlongRecording) {
       setYoutubeRecordingMaintain(true)
       resetYoutubePlayAlongRouteFailure()
-      scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1, { recordingActive: true })
+      scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1, {
+        recordingActive: true,
+      })
       startYoutubePlayAlongDiagnostics({
         recordingActive: true,
         getIframe: () => youtubeIframeRef.current,
@@ -2102,7 +2169,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           if (!iframe?.contentWindow) return
           iframe.contentWindow.postMessage(
             JSON.stringify({ event: 'command', func, args: args ?? [] }),
-            YOUTUBE_PROXY_ORIGIN,
+            YOUTUBE_PROXY_ORIGIN
           )
         },
       })
@@ -2120,8 +2187,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [elapsed, isRecording, settings.excludeYoutubeFromRecording, youtubeUrl])
 
   useEffect(() => {
-    if (!isRecording || settings.excludeYoutubeFromRecording || !youtubeUrl || !youtubeHostEl) return
-    scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1, { recordingActive: true })
+    if (!isRecording || settings.excludeYoutubeFromRecording || !youtubeUrl || !youtubeHostEl)
+      return
+    scheduleYoutubeRecordingMaintain(youtubeIframeRef.current, 1, {
+      recordingActive: true,
+    })
   }, [isRecording, settings.excludeYoutubeFromRecording, youtubeHostEl, youtubeUrl])
 
   useEffect(() => {
@@ -2214,18 +2284,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         void refreshCameraSession()
       })
     },
-    [refreshCameraSession, requestCameraPreviewResume],
+    [refreshCameraSession, requestCameraPreviewResume]
   )
-
-  const autoSoundListening =
-    settings.autoSoundRecording &&
-    autoMonitoringAllowed &&
-    !isRecording &&
-    !autoRecordStartSuppressed &&
-    !handsFreePlaybackPending &&
-    (Boolean(streamRef.current?.getAudioTracks().some(t => t.readyState === 'live' && t.enabled)) ||
-      isNativeCameraPreviewActive() ||
-      isNativeAudioCaptureActive())
 
   const wasVaultOpenRef = useRef(false)
   const vaultEnterLoadDoneRef = useRef(false)
@@ -2288,14 +2348,32 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const wasSettingsOpenRef = useRef(false)
   useEffect(() => {
-    if (wasSettingsOpenRef.current && !isSettingsOpen) {
-      const timer = window.setTimeout(() => {
-        recoverCameraAfterSurfaceDismiss('settings-close')
-      }, 350)
-      wasSettingsOpenRef.current = isSettingsOpen
-      return () => window.clearTimeout(timer)
-    }
+    const wasOpen = wasSettingsOpenRef.current
     wasSettingsOpenRef.current = isSettingsOpen
+    const timers: number[] = []
+
+    if (!wasOpen && isSettingsOpen) {
+      timers.push(
+        window.setTimeout(() => {
+          sharedMetronomeEngine.reconcileAfterSurfaceTransition(recordingModeRef.current)
+        }, 180)
+      )
+    } else if (wasOpen && !isSettingsOpen) {
+      timers.push(
+        window.setTimeout(() => {
+          recoverCameraAfterSurfaceDismiss('settings-close')
+        }, 350)
+      )
+      timers.push(
+        window.setTimeout(() => {
+          sharedMetronomeEngine.reconcileAfterSurfaceTransition(recordingModeRef.current)
+        }, 560)
+      )
+    }
+
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer)
+    }
   }, [isSettingsOpen, recoverCameraAfterSurfaceDismiss])
 
   const wasReviewOpenRef = useRef(false)
@@ -2427,11 +2505,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       return
     }
 
-    if (
-      recordingModeRef.current === 'video' &&
-      isRecording &&
-      settings.autoSoundRecording
-    ) {
+    if (recordingModeRef.current === 'video' && isRecording && settings.autoSoundRecording) {
       updateSettings({ autoSoundRecording: false })
     }
 
@@ -2447,11 +2521,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleAutoSoundRecordingChange = useCallback(
     (enabled: boolean) => {
+      autoSoundRecordingEnabledRef.current = enabled
       updateSettings({ autoSoundRecording: enabled })
 
-      if (recordingModeRef.current !== 'video') return
-
       if (!enabled) {
+        stopAutoPlaybackAudio()
+        releaseAutoRecordSuppress(0)
         void disarmAutoRecording()
         return
       }
@@ -2460,12 +2535,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       // Warm the existing pre-roll path now; its native bridge acquisition is
       // serialized so this safely joins an in-flight camera startup.
       void warmAutoRecording().finally(() => {
-        if (recordingModeRef.current === 'video') {
+        if (autoSoundRecordingEnabledRef.current) {
           restartHandsFreeMonitorRef.current()
         }
       })
     },
-    [disarmAutoRecording, updateSettings, warmAutoRecording],
+    [
+      disarmAutoRecording,
+      releaseAutoRecordSuppress,
+      stopAutoPlaybackAudio,
+      updateSettings,
+      warmAutoRecording,
+    ]
   )
 
   const handleCloseSettings = useCallback(() => {
@@ -2527,7 +2608,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // the live bridge preview (black stage) — recovery is suppressed until close.
     setSuppressNativeBridgeRecovery(true)
     deferHudMediaPause()
-  }, [deferHudMediaPause, markOverlayClosed, setSuppressNativeBridgeRecovery, settings.hapticFeedback])
+  }, [
+    deferHudMediaPause,
+    markOverlayClosed,
+    setSuppressNativeBridgeRecovery,
+    settings.hapticFeedback,
+  ])
 
   const handleMultitrackOpenRecordingStage = useCallback(() => {
     handleRecordingModeChange('video')
@@ -2538,7 +2624,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       return
     }
     void requestCameraAccess('video')
-  }, [acquireNativeVideoBridge, handleRecordingModeChange, isNativeCameraPlatform, requestCameraAccess])
+  }, [
+    acquireNativeVideoBridge,
+    handleRecordingModeChange,
+    isNativeCameraPlatform,
+    requestCameraAccess,
+  ])
 
   const handleMultitrackStartRecording = useCallback((): Promise<boolean> => {
     multitrackRecordingActiveRef.current = true
@@ -2549,12 +2640,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return startRecording()
   }, [pausePipVideos, pauseYoutubeReference, startRecording, settings.excludeYoutubeFromRecording])
 
-  const handleMultitrackStopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
-    // No isRecording gate: the serialized native stop is safe at any instant
-    // (it awaits an in-flight start), and the old stale-state gate could
-    // silently no-op a legitimate Stop.
-    stopRecording(options)
-  }, [stopRecording])
+  const handleMultitrackStopRecording = useCallback(
+    (options?: MultitrackRecordingStopOptions) => {
+      // No isRecording gate: the serialized native stop is safe at any instant
+      // (it awaits an in-flight start), and the old stale-state gate could
+      // silently no-op a legitimate Stop.
+      stopRecording(options)
+    },
+    [stopRecording]
+  )
 
   const handleClearMultitrackPendingRecording = useCallback(() => {
     setMultitrackPendingRecordingTakeId(null)
@@ -2572,7 +2666,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setMultitrackOpen(false)
     setSuppressNativeBridgeRecovery(false)
     recoverCameraAfterSurfaceDismiss('multitrack-close')
-  }, [isRecording, recoverCameraAfterSurfaceDismiss, setSuppressNativeBridgeRecovery, settings.hapticFeedback, stopRecording])
+  }, [
+    isRecording,
+    recoverCameraAfterSurfaceDismiss,
+    setSuppressNativeBridgeRecovery,
+    settings.hapticFeedback,
+    stopRecording,
+  ])
 
   const handleCloseCreatorStudioPicker = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
@@ -2598,84 +2698,82 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (isNativeCaptureSessionActive()) return true
     return Boolean(
       streamRef.current?.active &&
-        streamRef.current.getAudioTracks().some(
-          (track) => track.readyState === 'live' && track.enabled && !track.muted,
-        ),
+        streamRef.current
+          .getAudioTracks()
+          .some((track) => track.readyState === 'live' && track.enabled && !track.muted)
     )
   }, [])
 
-  const handleRequestTunerMicStream = useCallback(async (
-    options?: { forceRecovery?: boolean },
-  ): Promise<boolean> => {
-    if (isRecording) return false
+  const handleRequestTunerMicStream = useCallback(
+    async (options?: { forceRecovery?: boolean }): Promise<boolean> => {
+      if (isRecording) return false
 
-    if (
-      Capacitor.isNativePlatform() &&
-      Capacitor.getPlatform() === 'ios' &&
-      isNativeCaptureSessionActive()
-    ) {
-      tunerMicBackgroundGenerationRef.current = null
-      return true
-    }
-
-    const backgroundGeneration = tunerMicBackgroundGenerationRef.current
-    const hasFreshForegroundStream =
-      backgroundGeneration !== null &&
-      liveStreamGenerationRef.current > backgroundGeneration &&
-      micStreamIsLiveForTuner()
-
-    if (hasFreshForegroundStream) {
-      tunerMicBackgroundGenerationRef.current = null
-      return true
-    }
-
-    if (backgroundGeneration !== null && !options?.forceRecovery) {
-      // The shared camera lifecycle gets first ownership of foreground recovery.
-      // A delayed tuner fallback forces a fresh stream only if that rebuild
-      // never produces a newer generation.
-      return false
-    }
-
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-      if (options?.forceRecovery) {
-        if (backgroundGeneration !== null) {
-          for (let attempt = 0; attempt < 4; attempt += 1) {
-            await waitMs(180)
-            if (
-              liveStreamGenerationRef.current > backgroundGeneration &&
-              micStreamIsLiveForTuner()
-            ) {
-              tunerMicBackgroundGenerationRef.current = null
-              return true
-            }
-          }
-        }
-
-        const recovered = await reacquireStreamForAudioRoute({ liveCapture: true })
-        if (recovered) {
-          tunerMicBackgroundGenerationRef.current = null
-        }
-        return recovered
+      if (
+        Capacitor.isNativePlatform() &&
+        Capacitor.getPlatform() === 'ios' &&
+        isNativeCaptureSessionActive()
+      ) {
+        tunerMicBackgroundGenerationRef.current = null
+        return true
       }
 
-      if (!micStreamIsLiveForTuner() && !isNativeCaptureSessionActive()) {
+      const backgroundGeneration = tunerMicBackgroundGenerationRef.current
+      const hasFreshForegroundStream =
+        backgroundGeneration !== null &&
+        liveStreamGenerationRef.current > backgroundGeneration &&
+        micStreamIsLiveForTuner()
+
+      if (hasFreshForegroundStream) {
+        tunerMicBackgroundGenerationRef.current = null
+        return true
+      }
+
+      if (backgroundGeneration !== null && !options?.forceRecovery) {
+        // The shared camera lifecycle gets first ownership of foreground recovery.
+        // A delayed tuner fallback forces a fresh stream only if that rebuild
+        // never produces a newer generation.
+        return false
+      }
+
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        if (options?.forceRecovery) {
+          if (backgroundGeneration !== null) {
+            for (let attempt = 0; attempt < 4; attempt += 1) {
+              await waitMs(180)
+              if (
+                liveStreamGenerationRef.current > backgroundGeneration &&
+                micStreamIsLiveForTuner()
+              ) {
+                tunerMicBackgroundGenerationRef.current = null
+                return true
+              }
+            }
+          }
+
+          const recovered = await reacquireStreamForAudioRoute({
+            liveCapture: true,
+          })
+          if (recovered) {
+            tunerMicBackgroundGenerationRef.current = null
+          }
+          return recovered
+        }
+
+        if (!micStreamIsLiveForTuner() && !isNativeCaptureSessionActive()) {
+          requestCameraAccess('audio')
+          return false
+        }
+        return true
+      }
+
+      if (!micStreamIsLiveForTuner()) {
         requestCameraAccess('audio')
         return false
       }
       return true
-    }
-
-    if (!micStreamIsLiveForTuner()) {
-      requestCameraAccess('audio')
-      return false
-    }
-    return true
-  }, [
-    isRecording,
-    micStreamIsLiveForTuner,
-    reacquireStreamForAudioRoute,
-    requestCameraAccess,
-  ])
+    },
+    [isRecording, micStreamIsLiveForTuner, reacquireStreamForAudioRoute, requestCameraAccess]
+  )
 
   const schedulePitchTrackerCommit = useCallback(
     (enabled: boolean) => {
@@ -2821,12 +2919,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         videoTakes.map(async (take) => {
           const refreshed = await reResolveCachedTakeThumbnail(
             take.id,
-            take.recordingOrientation ?? 'portrait',
+            take.recordingOrientation ?? 'portrait'
           )
           if (refreshed && refreshed !== take.thumbnailUrl) {
             updates.set(take.id, refreshed)
           }
-        }),
+        })
       )
 
       if (updates.size > 0) {
@@ -2948,7 +3046,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const metronomePlaying = useSyncExternalStore(
     sharedMetronomeEngine.subscribe,
     () => sharedMetronomeEngine.getSnapshot().playing,
-    () => false,
+    () => false
   )
 
   useEffect(() => {
@@ -2961,8 +3059,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const showFloatingMetronomeWidget =
     showMetronomeWidget &&
-    (recordingMode === 'video' ||
-      (recordingMode === 'audio' && audioPracticeTab !== 'metronome'))
+    (recordingMode === 'video' || (recordingMode === 'audio' && audioPracticeTab !== 'metronome'))
 
   const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended
 
@@ -2984,7 +3081,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     (recordingMode === 'video' && takePlaybackActive) ||
     (recordingMode === 'audio' && audioModeTakePlaying)
   const nativeExperimentalRecordingActive =
-    isRecording && (recordingMode === 'video' || (recordingMode === 'audio' && isNativeCameraPlatform))
+    isRecording &&
+    (recordingMode === 'video' || (recordingMode === 'audio' && isNativeCameraPlatform))
   const handsFreeBackgroundPlaybackActive =
     recordingMode === 'video' && autoPlaybackTakeId !== null && autoPlaybackPlaying
   const handsFreeAudioBackgroundPlaybackActive =
@@ -3080,6 +3178,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setPracticeSessionActive(false)
     }
   }, [isAudioPracticeTimelineTab])
+
+  useEffect(() => {
+    if (!practiceSessionActive) {
+      setPracticeRecordingControlsExpanded(false)
+    }
+  }, [practiceSessionActive])
 
   const isAudioPracticeToolTab =
     isAudioPracticeMetronomeTab || isAudioPracticeTunerTab || isAudioPracticeTimelineTab
@@ -3481,14 +3585,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           }
 
           await deleteCachedTakeThumbnail(take.id).catch((error) => {
-            console.warn('[TakeDelete] Thumbnail cleanup failed', { takeId: take.id, error })
+            console.warn('[TakeDelete] Thumbnail cleanup failed', {
+              takeId: take.id,
+              error,
+            })
           })
           return { id: take.id, removed: true, cleanupWarning }
-        }),
+        })
       )
 
       const removedIds = new Set(
-        outcomes.filter((outcome) => outcome.removed).map((outcome) => outcome.id),
+        outcomes.filter((outcome) => outcome.removed).map((outcome) => outcome.id)
       )
       if (removedIds.size > 0) {
         setTakes((prev) => prev.filter((take) => !removedIds.has(take.id)))
@@ -3497,9 +3604,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
 
       if (outcomes.some((outcome) => !outcome.removed)) {
-        setTakeDeleteError('A take could not be deleted and remains in your library. Please try again.')
+        setTakeDeleteError(
+          'A take could not be deleted and remains in your library. Please try again.'
+        )
       } else if (outcomes.some((outcome) => outcome.cleanupWarning)) {
-        setTakeDeleteError('The take was removed, but library cleanup did not finish. BestTake will reconcile it when the app restarts.')
+        setTakeDeleteError(
+          'The take was removed, but library cleanup did not finish. BestTake will reconcile it when the app restarts.'
+        )
       }
     },
     [
@@ -3660,7 +3771,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         setAutoPlaybackPlaying(false)
       }
     },
-    [autoPlaybackTakeId],
+    [autoPlaybackTakeId]
   )
 
   const handleChallengerAutoPlayComplete = useCallback(() => {
@@ -3699,7 +3810,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const next = !current
       if (next && youtubeUrlRef.current) {
         window.requestAnimationFrame(() => {
-          wakeYoutubeReference(youtubeIframeRef.current, { attemptPlay: false, uiVolume: 1 })
+          wakeYoutubeReference(youtubeIframeRef.current, {
+            attemptPlay: false,
+            uiVolume: 1,
+          })
         })
       }
       if (next && isNativeCameraPlatform && recordingModeRef.current === 'video') {
@@ -3905,7 +4019,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               <AnimatePresence>
                 {isRecording &&
-                  (youtubePlayAlongUi.showTapToResume || youtubePlayAlongUi.routeFailureMessage) && (
+                  (youtubePlayAlongUi.showTapToResume ||
+                    youtubePlayAlongUi.routeFailureMessage) && (
                     <motion.div
                       key="youtube-play-along-recording-ui"
                       className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[125] flex justify-center px-4"
@@ -3950,8 +4065,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 holdPreviewForTakePlayback={shouldHoldCameraPreviewForTakePlayback}
                 resumeNonce={cameraResumeNonce}
                 modePreparing={
-                  isPreviewRecovering ||
-                  (!ready && !isRecording && !cameraNeedsPermission)
+                  isPreviewRecovering || (!ready && !isRecording && !cameraNeedsPermission)
                 }
                 pitchStageActive={
                   isAudioPracticeTunerTab || (showPitch && mainVideoPitchSource !== null)
@@ -4037,15 +4151,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     <AnimatePresence>
                       <DraggableMetronomeWidget
                         key={
-                          recordingMode === 'audio'
-                            ? 'audio-metronome-widget'
-                            : 'main-metronome'
+                          recordingMode === 'audio' ? 'audio-metronome-widget' : 'main-metronome'
                         }
                         boundaryRef={appShellRef}
                         positionId={
-                          recordingMode === 'audio'
-                            ? 'audio-metronome-widget'
-                            : 'main-metronome'
+                          recordingMode === 'audio' ? 'audio-metronome-widget' : 'main-metronome'
                         }
                         isTakePlaying={takePlaybackActive}
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
@@ -4106,8 +4216,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       ? 'app-ui-overlay--tuner-takes-hidden'
                       : ''
                   } ${
-                    isAudioPracticeTimelineTab ? 'app-ui-overlay--audio-practice-timeline app-ui-overlay--audio-practice-metronome' : ''
-                  } ${practiceSessionActive ? 'app-ui-overlay--practice-session-active' : ''}`}
+                    isAudioPracticeTimelineTab
+                      ? 'app-ui-overlay--audio-practice-timeline app-ui-overlay--audio-practice-metronome'
+                      : ''
+                  } ${practiceSessionActive ? 'app-ui-overlay--practice-session-active' : ''} ${
+                    practiceSessionActive && practiceRecordingControlsExpanded
+                      ? 'app-ui-overlay--practice-recorder-expanded'
+                      : ''
+                  }`}
                   aria-hidden={hudModalState === 'review'}
                   animate={{
                     opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
@@ -4154,21 +4270,21 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       !quickSettingsOpen &&
                       !practiceSessionActive &&
                       !isSplitView && (
-                      <motion.div
-                        key="audio-mode-top-tabs"
-                        data-tutorial="audio-mode-tabs"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={iosFade}
-                        style={motionGpuLayer}
-                      >
-                        <AudioPracticeTopTabs
-                          activeTab={audioPracticeTab}
-                          onTabChange={handleAudioPracticeTabChange}
-                        />
-                      </motion.div>
-                    )}
+                        <motion.div
+                          key="audio-mode-top-tabs"
+                          data-tutorial="audio-mode-tabs"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={iosFade}
+                          style={motionGpuLayer}
+                        >
+                          <AudioPracticeTopTabs
+                            activeTab={audioPracticeTab}
+                            onTabChange={handleAudioPracticeTabChange}
+                          />
+                        </motion.div>
+                      )}
                   </AnimatePresence>
 
                   {recordingMode === 'audio' && !quickSettingsOpen && !isSplitView && (
@@ -4215,6 +4331,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           droneWaveform={settings.droneWaveform}
                           hapticFeedback={settings.hapticFeedback}
                           micInputPreference={settings.micInputPreference}
+                          handsFreeEnabled={settings.autoSoundRecording}
                           onRequestMicStream={handleRequestTunerMicStream}
                         />
                       </AnimatedTabPanel>
@@ -4310,9 +4427,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
                     {((isAudioPracticeTunerTab && showTunerTakePills) ||
-                      (isAudioPracticeTimelineTab && practiceSessionActive && settings.showTakeCards)) &&
-                      !quickSettingsOpen &&
-                      (
+                      (isAudioPracticeTimelineTab &&
+                        practiceSessionActive &&
+                        practiceRecordingControlsExpanded &&
+                        settings.showTakeCards)) &&
+                      !quickSettingsOpen && (
                         <motion.div
                           key={
                             isAudioPracticeTimelineTab && practiceSessionActive
@@ -4440,13 +4559,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         recordingMode={recordingMode}
                         onRecordingModeChange={handleRecordingModeChange}
                         onToggleRecord={handleToggleRecord}
-                        onOpenVault={recordingMode === 'audio' ? handleToggleVault : handleOpenVault}
+                        onOpenVault={
+                          recordingMode === 'audio' ? handleToggleVault : handleOpenVault
+                        }
                         isVaultOpen={isVaultOpen}
                         vaultToggleEnabled={recordingMode === 'audio'}
                         onOpenSettings={handleOpenSettings}
                         takeCount={takes.length}
-                        autoSoundListening={autoSoundListening}
                         handsFreeRecording={handsFreeRecording}
+                        handsFreeListeningReady={handsFreeListeningReady}
                         handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
                         autoSoundRecording={settings.autoSoundRecording}
                         onAutoSoundRecordingChange={handleAutoSoundRecordingChange}
@@ -4466,24 +4587,35 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           isAudioPracticeTunerTab
                             ? 'tuner'
                             : recordingMode === 'audio'
-                              ? 'audio'
-                              : 'camera'
+                            ? 'audio'
+                            : 'camera'
                         }
                         tunerTakePillsVisible={showTunerTakePills}
                         tunerTakePillsToggleVisible={isAudioPracticeTunerTab}
                         onTunerTakePillsChange={setShowTunerTakePills}
-                        settingsBranchDisabled={isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen}
+                        settingsBranchDisabled={
+                          isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen
+                        }
                         onBranchOpenChange={handleQuickSettingsOpenChange}
                         hapticFeedback={settings.hapticFeedback}
                         collapsible={
-                          isAudioPracticeTunerTab || isAudioPracticeMetronomeTab
+                          isAudioPracticeTunerTab ||
+                          isAudioPracticeMetronomeTab ||
+                          (isAudioPracticeTimelineTab && practiceSessionActive)
                         }
                         collapseKey={
                           isAudioPracticeTunerTab
                             ? 'tuner'
                             : isAudioPracticeMetronomeTab
-                              ? 'metronome'
-                              : undefined
+                            ? 'metronome'
+                            : isAudioPracticeTimelineTab && practiceSessionActive
+                            ? 'practice'
+                            : undefined
+                        }
+                        onExpandedChange={
+                          isAudioPracticeTimelineTab && practiceSessionActive
+                            ? setPracticeRecordingControlsExpanded
+                            : undefined
                         }
                       />
                     )}

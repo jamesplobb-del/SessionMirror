@@ -37,9 +37,26 @@ export function validateGroupingForMeter(grouping: number[], section: TimelineSe
   return groupingSum(grouping) === resolved.pulseCount
 }
 
+export function groupingExample(section: TimelineSection): string {
+  const { pulseCount } = resolveSectionPulse(section)
+  if (pulseCount <= 3) return String(pulseCount)
+
+  const groups: number[] = []
+  let remaining = pulseCount
+  while (remaining > 0) {
+    if (remaining === 3) {
+      groups.push(3)
+      break
+    }
+    groups.push(2)
+    remaining -= 2
+  }
+  return formatGrouping(groups)
+}
+
 export function groupingValidationMessage(section: TimelineSection): string {
   const resolved = resolveSectionPulse(section)
-  return `Groups must add up to ${resolved.pulseCount} (e.g. 2+2+3)`
+  return `Groups must total ${resolved.pulseCount} pulses, for example ${groupingExample(section)}.`
 }
 
 /** @deprecated Use validateGroupingForMeter with section */

@@ -18,7 +18,7 @@ export interface AppSettings {
   darkMode: boolean
   /** Audio mode: auto-start/stop recording from mic levels. */
   autoSoundRecording: boolean
-  /** Seconds of silence before auto-stop (0.5–6). */
+  /** Seconds of silence before auto-stop (0 = immediate, up to 6). */
   soundSilenceSeconds: number
   /** Loudness required to start (1 = sensitive, 100 = loud only). */
   soundVolumeThreshold: number
@@ -135,8 +135,10 @@ export function loadAppSettings(): AppSettings {
           : DEFAULT_APP_SETTINGS.darkMode,
       autoSoundRecording: Boolean(parsed.autoSoundRecording),
       soundSilenceSeconds: clamp(
-        Number(parsed.soundSilenceSeconds) || DEFAULT_APP_SETTINGS.soundSilenceSeconds,
-        0.5,
+        Number.isFinite(Number(parsed.soundSilenceSeconds))
+          ? Number(parsed.soundSilenceSeconds)
+          : DEFAULT_APP_SETTINGS.soundSilenceSeconds,
+        0,
         6,
       ),
       soundVolumeThreshold: clamp(

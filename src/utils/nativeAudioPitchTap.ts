@@ -1,7 +1,10 @@
 import type { PluginListenerHandle } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
 import { isNativeCameraTestAvailable } from './nativeCameraTest'
-import { setNativeAudioCaptureActive } from './cameraSessionState'
+import {
+  isNativeCaptureSessionActive,
+  setNativeAudioCaptureActive,
+} from './cameraSessionState'
 import type { MicInputPreference } from './appSettings'
 
 /**
@@ -24,8 +27,29 @@ export interface NativeAudioPitchChunk {
  * practice overlay) can share the single native tap without fighting over it.
  */
 let tapRefCount = 0
+let tapActive = false
+let tapOperation: Promise<void> = Promise.resolve()
 let tunerMonitorRefCount = 0
-let tunerMonitorStart: Promise<boolean> | null = null
+let tunerMonitorActive = false
+let tunerMonitorOperation: Promise<void> = Promise.resolve()
+
+function enqueueTunerMonitorOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = tunerMonitorOperation.then(operation, operation)
+  tunerMonitorOperation = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
+
+function enqueueTapOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = tapOperation.then(operation, operation)
+  tapOperation = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
 
 async function startTunerMonitor(
   micInputPreference?: MicInputPreference,
@@ -36,12 +60,27 @@ async function startTunerMonitor(
       micInputPreference,
     })
     const active = result.active === true
+    tunerMonitorActive = active
     setNativeAudioCaptureActive(active)
     return active
   } catch (error) {
-    setNativeAudioCaptureActive(false)
+    tunerMonitorActive = false
+    if (!isNativeCaptureSessionActive()) {
+      setNativeAudioCaptureActive(false)
+    }
     console.warn('[PitchTap] native tuner monitor start failed', error)
     return false
+  }
+}
+
+async function stopTunerMonitor(): Promise<void> {
+  try {
+    const result = await BestTakeAudioPlugin.stopNativeTunerMonitor()
+    setNativeAudioCaptureActive(result.active === true)
+  } catch (error) {
+    console.warn('[PitchTap] native tuner monitor stop failed', error)
+  } finally {
+    tunerMonitorActive = false
   }
 }
 
@@ -50,24 +89,31 @@ export async function acquireNativeTunerMonitor(
 ): Promise<boolean> {
   if (!isNativeCameraTestAvailable()) return false
   tunerMonitorRefCount += 1
-  if (!tunerMonitorStart) {
-    tunerMonitorStart = startTunerMonitor(micInputPreference).finally(() => {
-      tunerMonitorStart = null
-    })
-  }
-  return tunerMonitorStart
+  return enqueueTunerMonitorOperation(async () => {
+    if (tunerMonitorRefCount === 0) return false
+    if (tunerMonitorActive) return true
+    const active = await startTunerMonitor(micInputPreference)
+    if (active && tunerMonitorRefCount === 0) {
+      await stopTunerMonitor()
+      return false
+    }
+    return active
+  })
 }
 
 export async function recoverNativeTunerMonitor(
   micInputPreference?: MicInputPreference,
 ): Promise<boolean> {
   if (!isNativeCameraTestAvailable() || tunerMonitorRefCount === 0) return false
-  if (!tunerMonitorStart) {
-    tunerMonitorStart = startTunerMonitor(micInputPreference).finally(() => {
-      tunerMonitorStart = null
-    })
-  }
-  return tunerMonitorStart
+  return enqueueTunerMonitorOperation(async () => {
+    if (tunerMonitorRefCount === 0) return false
+    const active = await startTunerMonitor(micInputPreference)
+    if (active && tunerMonitorRefCount === 0) {
+      await stopTunerMonitor()
+      return false
+    }
+    return active
+  })
 }
 
 export async function releaseNativeTunerMonitor(): Promise<void> {
@@ -75,39 +121,41 @@ export async function releaseNativeTunerMonitor(): Promise<void> {
   tunerMonitorRefCount = Math.max(0, tunerMonitorRefCount - 1)
   if (tunerMonitorRefCount > 0) return
 
-  await tunerMonitorStart?.catch(() => false)
-  try {
-    await BestTakeAudioPlugin.stopNativeTunerMonitor()
-  } catch (error) {
-    console.warn('[PitchTap] native tuner monitor stop failed', error)
-  } finally {
-    setNativeAudioCaptureActive(false)
-  }
+  await enqueueTunerMonitorOperation(async () => {
+    if (tunerMonitorRefCount > 0) return
+    await stopTunerMonitor()
+  })
 }
 
 export async function acquireNativeAudioTap(): Promise<void> {
   if (!isNativeCameraTestAvailable()) return
   tapRefCount += 1
-  if (tapRefCount === 1) {
+  await enqueueTapOperation(async () => {
+    if (tapRefCount === 0 || tapActive) return
     try {
       await BestTakeAudioPlugin.setNativeAudioTapEnabled({ enabled: true })
+      tapActive = true
       console.info('[PitchTap] JS enabled native audio tap')
     } catch (error) {
+      tapActive = false
       console.warn('[PitchTap] JS enable failed', error)
     }
-  }
+  })
 }
 
 export async function releaseNativeAudioTap(): Promise<void> {
   if (!isNativeCameraTestAvailable()) return
   tapRefCount = Math.max(0, tapRefCount - 1)
-  if (tapRefCount === 0) {
+  await enqueueTapOperation(async () => {
+    if (tapRefCount > 0 || !tapActive) return
     try {
       await BestTakeAudioPlugin.setNativeAudioTapEnabled({ enabled: false })
     } catch (error) {
       console.warn('[NativeAudioTap] disable failed', error)
+    } finally {
+      tapActive = false
     }
-  }
+  })
 }
 
 function decodePcmBase64(pcmBase64: string): Float32Array | null {
@@ -124,19 +172,79 @@ function decodePcmBase64(pcmBase64: string): Float32Array | null {
   }
 }
 
+type PitchFrameSubscriber = (chunk: NativeAudioPitchChunk) => void
+
+const pitchFrameSubscribers = new Set<PitchFrameSubscriber>()
+let sharedPitchFrameListener: PluginListenerHandle | null = null
+let sharedPitchFrameListenerPromise: Promise<PluginListenerHandle> | null = null
+let loggedFirstPitchFrame = false
+let loggedPitchSubscriberFailure = false
+
+function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
+  if (sharedPitchFrameListener) return Promise.resolve(sharedPitchFrameListener)
+  if (sharedPitchFrameListenerPromise) return sharedPitchFrameListenerPromise
+
+  const pending = BestTakeAudioPlugin.addListener('nativeAudioPitchFrame', (event) => {
+    if (!event.pcmBase64 || !event.sampleRate) return
+    const samples = decodePcmBase64(event.pcmBase64)
+    if (!samples || samples.length === 0) return
+    if (!loggedFirstPitchFrame) {
+      loggedFirstPitchFrame = true
+      console.info(
+        `[PitchTap] JS received first PCM frame (${samples.length} samples @ ${event.sampleRate}Hz)`,
+      )
+    }
+    const chunk = { samples, sampleRate: event.sampleRate }
+    for (const subscriber of [...pitchFrameSubscribers]) {
+      try {
+        subscriber(chunk)
+      } catch (error) {
+        if (!loggedPitchSubscriberFailure) {
+          loggedPitchSubscriberFailure = true
+          console.warn('[PitchTap] subscriber failed', error)
+        }
+      }
+    }
+  }).then(async (handle) => {
+    if (pitchFrameSubscribers.size === 0) {
+      await handle.remove()
+      return { remove: async () => {} }
+    }
+    sharedPitchFrameListener = handle
+    return handle
+  }).finally(() => {
+    if (sharedPitchFrameListenerPromise === pending) {
+      sharedPitchFrameListenerPromise = null
+    }
+  })
+
+  sharedPitchFrameListenerPromise = pending
+  return pending
+}
+
+async function releaseSharedPitchFrameListenerIfIdle(): Promise<void> {
+  if (pitchFrameSubscribers.size > 0) return
+  const handle = sharedPitchFrameListener
+  sharedPitchFrameListener = null
+  await handle?.remove()
+}
+
 export function subscribeNativeAudioPitchFrames(
   onChunk: (chunk: NativeAudioPitchChunk) => void,
 ): Promise<PluginListenerHandle> | null {
   if (!isNativeCameraTestAvailable()) return null
-  let loggedFirst = false
-  return BestTakeAudioPlugin.addListener('nativeAudioPitchFrame', (event) => {
-    if (!event.pcmBase64 || !event.sampleRate) return
-    const samples = decodePcmBase64(event.pcmBase64)
-    if (!samples || samples.length === 0) return
-    if (!loggedFirst) {
-      loggedFirst = true
-      console.info(`[PitchTap] JS received first PCM frame (${samples.length} samples @ ${event.sampleRate}Hz)`)
-    }
-    onChunk({ samples, sampleRate: event.sampleRate })
+  pitchFrameSubscribers.add(onChunk)
+  let removed = false
+
+  return ensureSharedPitchFrameListener().then(() => ({
+    remove: async () => {
+      if (removed) return
+      removed = true
+      pitchFrameSubscribers.delete(onChunk)
+      await releaseSharedPitchFrameListenerIfIdle()
+    },
+  })).catch((error) => {
+    pitchFrameSubscribers.delete(onChunk)
+    throw error
   })
 }

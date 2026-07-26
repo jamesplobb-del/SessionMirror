@@ -24,10 +24,7 @@ function markerPositionLabel(marker: SectionTempoMarker): string {
   return `Bar ${marker.measure}`
 }
 
-export default function SectionTempoDepthPanel({
-  section,
-  onChange,
-}: SectionTempoDepthPanelProps) {
+export default function SectionTempoDepthPanel({ section, onChange }: SectionTempoDepthPanelProps) {
   const timing = resolveSectionTiming(section)
   const totalMeasures = effectiveBars(section)
   const markers = section.advanced?.tempoMarkers ?? []
@@ -51,9 +48,7 @@ export default function SectionTempoDepthPanel({
     }
 
     const endBpm =
-      mode === 'faster'
-        ? Math.min(300, section.bpm + 20)
-        : Math.max(40, section.bpm - 20)
+      mode === 'faster' ? Math.min(300, section.bpm + 20) : Math.max(40, section.bpm - 20)
 
     updateAdvanced({
       tempoRamp: { enabled: true, endBpm, shape: rampShape },
@@ -61,9 +56,7 @@ export default function SectionTempoDepthPanel({
   }
 
   const updateMarker = (id: string, patch: Partial<SectionTempoMarker>) => {
-    updateMarkers(
-      markers.map((marker) => (marker.id === id ? { ...marker, ...patch } : marker)),
-    )
+    updateMarkers(markers.map((marker) => (marker.id === id ? { ...marker, ...patch } : marker)))
   }
 
   const removeMarker = (id: string) => {
@@ -81,12 +74,22 @@ export default function SectionTempoDepthPanel({
       measure: Math.min(totalMeasures, measure),
       bpm: section.bpm,
     }
-    updateMarkers([...markers, next].sort((a, b) => a.measure - b.measure || (a.beat ?? 1) - (b.beat ?? 1)))
+    updateMarkers(
+      [...markers, next].sort((a, b) => a.measure - b.measure || (a.beat ?? 1) - (b.beat ?? 1))
+    )
   }
 
   return (
-    <div className="practice-timeline-editor__tempo-depth">
-      <p className="practice-timeline-editor__label">Tempo changes</p>
+    <section
+      className="practice-timeline-editor__tempo-depth"
+      aria-labelledby="section-tempo-heading"
+    >
+      <div className="practice-timeline-editor__group-heading">
+        <div>
+          <h2 id="section-tempo-heading">Tempo changes</h2>
+          <p>Keep a steady tempo, ramp gradually, or add exact tempo pins.</p>
+        </div>
+      </div>
 
       <div className="practice-timeline-editor__select-grid">
         <TimelineEditorSelect
@@ -117,13 +120,14 @@ export default function SectionTempoDepthPanel({
       </div>
 
       {ramp?.enabled ? (
-        <div className="practice-timeline-editor__stepper">
+        <div className="practice-timeline-editor__field practice-timeline-editor__field--control">
           <span className="practice-timeline-editor__label">End tempo ({timing.bpmSymbol})</span>
           <div className="practice-timeline-editor__stepper">
             <Pressable
               type="button"
               intensity="icon"
               className="practice-timeline-editor__stepper-btn"
+              aria-label="Decrease ending tempo"
               onClick={() =>
                 updateAdvanced({
                   tempoRamp: {
@@ -155,6 +159,7 @@ export default function SectionTempoDepthPanel({
               type="button"
               intensity="icon"
               className="practice-timeline-editor__stepper-btn"
+              aria-label="Increase ending tempo"
               onClick={() =>
                 updateAdvanced({
                   tempoRamp: {
@@ -173,15 +178,17 @@ export default function SectionTempoDepthPanel({
 
       <div className="practice-timeline-editor__tempo-markers">
         <div className="practice-timeline-editor__tempo-markers-header">
-          <span className="practice-timeline-editor__label">Pins</span>
+          <span className="practice-timeline-editor__label">Tempo pins</span>
           <Pressable type="button" intensity="soft" onClick={addMarker}>
             <Plus size={14} className="mr-1 inline" />
-            Add
+            Add pin
           </Pressable>
         </div>
 
         {markers.length === 0 ? (
-          <p className="practice-timeline-editor__hint">No pins</p>
+          <p className="practice-timeline-editor__hint">
+            No pins yet. Add one to change tempo at an exact bar.
+          </p>
         ) : (
           <ul className="practice-timeline-editor__tempo-marker-list">
             {markers.map((marker) => (
@@ -235,7 +242,10 @@ export default function SectionTempoDepthPanel({
                   >
                     −
                   </Pressable>
-                  <span className="practice-timeline-editor__stepper-value" title="Beat within bar (1 = bar line)">
+                  <span
+                    className="practice-timeline-editor__stepper-value"
+                    title="Beat within bar (1 = bar line)"
+                  >
                     {marker.beat && marker.beat > 1 ? marker.beat : '—'}
                   </span>
                   <Pressable
@@ -257,8 +267,11 @@ export default function SectionTempoDepthPanel({
                     type="button"
                     intensity="icon"
                     className="practice-timeline-editor__stepper-btn"
+                    aria-label="Decrease pinned tempo"
                     onClick={() =>
-                      updateMarker(marker.id, { bpm: Math.max(40, marker.bpm - 1) })
+                      updateMarker(marker.id, {
+                        bpm: Math.max(40, marker.bpm - 1),
+                      })
                     }
                   >
                     −
@@ -274,8 +287,11 @@ export default function SectionTempoDepthPanel({
                     type="button"
                     intensity="icon"
                     className="practice-timeline-editor__stepper-btn"
+                    aria-label="Increase pinned tempo"
                     onClick={() =>
-                      updateMarker(marker.id, { bpm: Math.min(300, marker.bpm + 1) })
+                      updateMarker(marker.id, {
+                        bpm: Math.min(300, marker.bpm + 1),
+                      })
                     }
                   >
                     +
@@ -294,6 +310,6 @@ export default function SectionTempoDepthPanel({
           </ul>
         )}
       </div>
-    </div>
+    </section>
   )
 }

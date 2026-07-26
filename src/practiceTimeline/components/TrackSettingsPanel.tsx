@@ -34,7 +34,7 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
         aria-expanded={open}
       >
         <span className="practice-timeline__playback-options-copy">
-          <span className="practice-timeline__playback-options-title">Playback options</span>
+          <span className="practice-timeline__playback-options-title">Count-in &amp; looping</span>
           {!open ? (
             <span className="practice-timeline__playback-options-summary">{summary}</span>
           ) : null}
@@ -44,6 +44,9 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
 
       {open ? (
         <div className="practice-timeline__track-settings">
+          <p className="practice-timeline__track-settings-intro">
+            Choose how the full routine starts and repeats.
+          </p>
           <div className="practice-timeline__track-settings-row">
             <span className="practice-timeline__track-settings-label">Count-in</span>
             <div className="practice-timeline-editor__stepper practice-timeline__track-settings-stepper">
@@ -51,7 +54,12 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
                 type="button"
                 intensity="icon"
                 className="practice-timeline-editor__stepper-btn"
-                onClick={() => onChange({ countInBars: Math.max(0, settings.countInBars - 1) })}
+                aria-label="Decrease routine count-in"
+                onClick={() =>
+                  onChange({
+                    countInBars: Math.max(0, settings.countInBars - 1),
+                  })
+                }
               >
                 −
               </Pressable>
@@ -64,7 +72,12 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
                 type="button"
                 intensity="icon"
                 className="practice-timeline-editor__stepper-btn"
-                onClick={() => onChange({ countInBars: Math.min(8, settings.countInBars + 1) })}
+                aria-label="Increase routine count-in"
+                onClick={() =>
+                  onChange({
+                    countInBars: Math.min(8, settings.countInBars + 1),
+                  })
+                }
               >
                 +
               </Pressable>
@@ -83,10 +96,17 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
             </div>
           ) : null}
 
-          <label className="practice-timeline__track-settings-loop">
-            <span>Loop routine</span>
-            <IOSSwitch checked={settings.loopTrack} onChange={(loopTrack) => onChange({ loopTrack })} />
-          </label>
+          <div className="practice-timeline__track-settings-loop">
+            <span className="practice-timeline__track-settings-loop-copy">
+              <strong>Loop routine</strong>
+              <small>Start again after the last section</small>
+            </span>
+            <IOSSwitch
+              checked={settings.loopTrack}
+              ariaLabel="Loop routine"
+              onChange={(loopTrack) => onChange({ loopTrack })}
+            />
+          </div>
         </div>
       ) : null}
     </div>

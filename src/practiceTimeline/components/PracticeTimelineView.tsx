@@ -1,9 +1,9 @@
-import { Plus } from 'lucide-react'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { BookOpen, Pencil, Play, Plus } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
-import { describeSection, timelineSummaryLines } from '../naturalLanguage'
+import { describeSection } from '../naturalLanguage'
 import { stashPendingMarkers } from '../recording/timelineMarkers'
 import { effectiveBars } from '../timeSignatureLogic'
 import TimelineLibrarySheet from './TimelineLibrarySheet'
@@ -68,6 +68,7 @@ export default function PracticeTimelineView({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(timeline.name)
+  const practiceRecordingStartedRef = useRef(false)
 
   const trackSettings = {
     countInBars: timeline.settings?.countInBars ?? 0,
@@ -77,21 +78,24 @@ export default function PracticeTimelineView({
 
   const maxBars = useMemo(
     () => Math.max(1, ...timeline.sections.map((s) => effectiveBars(s))),
-    [timeline.sections],
+    [timeline.sections]
   )
-  const summaryLines = useMemo(() => timelineSummaryLines(timeline), [timeline])
   const editingSection = timeline.sections.find((s) => s.id === editingSectionId)
 
   const beginSession = (startSectionIndex = 0) => {
     if (timeline.sections.length === 0) return
-    if (recordEnabled && !isRecording) onStartRecording?.()
+    practiceRecordingStartedRef.current = recordEnabled && !isRecording && Boolean(onStartRecording)
+    if (practiceRecordingStartedRef.current) onStartRecording?.()
 
     prepareSession(timeline, {
       startSectionIndex,
       onFinished: (markers) => {
         if (recordEnabled) {
           stashPendingMarkers(markers)
-          if (isRecording) onStopRecording?.()
+        }
+        if (practiceRecordingStartedRef.current) {
+          practiceRecordingStartedRef.current = false
+          onStopRecording?.()
         }
         if (!trackSettings.loopTrack) exitSession()
       },
@@ -100,7 +104,10 @@ export default function PracticeTimelineView({
 
   const handleExitSession = () => {
     exitSession()
-    if (recordEnabled && isRecording) onStopRecording?.()
+    if (practiceRecordingStartedRef.current) {
+      practiceRecordingStartedRef.current = false
+      onStopRecording?.()
+    }
   }
 
   if (playbackState.sessionActive && sessionTimeline) {
@@ -130,6 +137,7 @@ export default function PracticeTimelineView({
         className="practice-timeline__footer-btn practice-timeline__footer-btn--secondary"
         onClick={() => setLibraryOpen(true)}
       >
+        <BookOpen size={18} aria-hidden />
         Routines
       </Pressable>
       <Pressable
@@ -140,6 +148,7 @@ export default function PracticeTimelineView({
         disabled={timeline.sections.length === 0}
         onClick={() => beginSession(0)}
       >
+        <Play size={18} fill="currentColor" aria-hidden />
         Start Practice
       </Pressable>
     </footer>
@@ -155,106 +164,176 @@ export default function PracticeTimelineView({
         />
       ) : null}
 
-      <div className="practice-timeline__scroll">
-        <header className="practice-timeline__hero">
-          {renaming ? (
-            <input
-              className="practice-timeline__hero-rename"
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={() => {
-                renameTimeline(nameDraft)
-                setRenaming(false)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  renameTimeline(nameDraft)
-                  setRenaming(false)
-                }
-              }}
-              autoFocus
-            />
-          ) : (
-            <Pressable
-              type="button"
-              intensity="soft"
-              onClick={() => {
-                setNameDraft(timeline.name)
-                setRenaming(true)
-              }}
-            >
-              <h1 className="practice-timeline__hero-title">
-                {timeline.sections.length === 0 ? 'Create Your Practice' : timeline.name}
-              </h1>
-            </Pressable>
-          )}
-          <p className="practice-timeline__hero-sub">
-            {timeline.sections.length === 0
-              ? 'Add sections like a playlist'
-              : `${timeline.sections.length} sections`}
-          </p>
-        </header>
-
-        {timeline.sections.map((section, index) => (
-          <Fragment key={section.id}>
-            {index > 0 ? <div className="practice-timeline__connector">↓</div> : null}
-            <TimelineSectionCard
-              section={section}
-              maxBars={maxBars}
-              index={index}
-              isDragging={dragIndex === index}
-              onPress={() => setEditingSectionId(section.id)}
-              onPlayFrom={() => beginSession(index)}
-              onDuplicate={() => duplicateSection(section.id)}
-              onDelete={() => deleteSection(section.id)}
-              onDragStart={setDragIndex}
-              onDragOver={(overIndex) => {
-                if (dragIndex !== null && dragIndex !== overIndex) {
-                  reorderSections(dragIndex, overIndex)
-                  setDragIndex(overIndex)
-                }
-              }}
-              onDragEnd={() => setDragIndex(null)}
-            />
-          </Fragment>
-        ))}
-
-        {timeline.sections.length > 0 ? <div className="practice-timeline__connector">↓</div> : null}
-
-        <Pressable
-          type="button"
-          intensity="soft"
-          haptic="light"
-          className="practice-timeline__add-btn"
-          onClick={addSection}
-        >
-          <Plus size={20} />
-          Add Section
-        </Pressable>
-
-        {timeline.sections.length > 0 ? (
-          <TrackSettingsPanel settings={trackSettings} onChange={updateTrackSettings} />
-        ) : null}
-
-        <label className="practice-timeline__record-toggle pointer-events-auto">
-          <span>Record with practice</span>
-          <IOSSwitch checked={recordEnabled} onChange={setRecordEnabled} />
-        </label>
-
-        <div className="practice-timeline__summary">
-          <p className="practice-timeline__summary-label">Your practice session</p>
-          {summaryLines.map((line, index) => (
-            <Fragment key={`${line}-${index}`}>
-              {index > 0 ? <div className="practice-timeline__summary-arrow">↓</div> : null}
-              <p className="practice-timeline__summary-line">
-                {index < timeline.sections.length ? describeSection(timeline.sections[index]) : line}
+      {!editingSection ? (
+        <>
+          <div className="practice-timeline__scroll">
+            <header className="practice-timeline__hero">
+              {renaming ? (
+                <input
+                  className="practice-timeline__hero-rename"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onBlur={() => {
+                    renameTimeline(nameDraft)
+                    setRenaming(false)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      renameTimeline(nameDraft)
+                      setRenaming(false)
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <div className="practice-timeline__hero-title-row">
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    className="practice-timeline__hero-name"
+                    aria-label={`Rename ${timeline.name}`}
+                    onClick={() => {
+                      setNameDraft(timeline.name)
+                      setRenaming(true)
+                    }}
+                  >
+                    <h1 className="practice-timeline__hero-title">
+                      {timeline.sections.length === 0 ? 'Create Your Practice' : timeline.name}
+                    </h1>
+                    <Pencil size={15} aria-hidden />
+                  </Pressable>
+                  {timeline.sections.length > 0 ? (
+                    <span className="practice-timeline__section-count">
+                      {timeline.sections.length}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+              <p className="practice-timeline__hero-sub">
+                {timeline.sections.length === 0
+                  ? 'Build a routine one section at a time.'
+                  : 'Drag to reorder. Tap Edit to change timing.'}
               </p>
-            </Fragment>
-          ))}
-        </div>
-      </div>
+            </header>
 
-      {footer}
+            <section className="practice-timeline__builder" aria-label="Routine sections">
+              {timeline.sections.length > 0 ? (
+                <div className="practice-timeline__builder-heading">
+                  <div>
+                    <h2>Routine sections</h2>
+                    <p>They play from top to bottom.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="practice-timeline__empty">
+                  <span className="practice-timeline__empty-icon" aria-hidden>
+                    <Plus size={22} />
+                  </span>
+                  <h2>Start with a section</h2>
+                  <p>Set its bars, tempo, time signature, and repeats.</p>
+                </div>
+              )}
+
+              {timeline.sections.map((section, index) => (
+                <Fragment key={section.id}>
+                  {index > 0 ? <div className="practice-timeline__connector">↓</div> : null}
+                  <TimelineSectionCard
+                    section={section}
+                    maxBars={maxBars}
+                    index={index}
+                    isDragging={dragIndex === index}
+                    onPress={() => setEditingSectionId(section.id)}
+                    onPlayFrom={() => beginSession(index)}
+                    onDuplicate={() => duplicateSection(section.id)}
+                    onDelete={() => deleteSection(section.id)}
+                    onDragStart={setDragIndex}
+                    onDragOver={(overIndex) => {
+                      if (dragIndex !== null && dragIndex !== overIndex) {
+                        reorderSections(dragIndex, overIndex)
+                        setDragIndex(overIndex)
+                      }
+                    }}
+                    onDragEnd={() => setDragIndex(null)}
+                  />
+                </Fragment>
+              ))}
+
+              {timeline.sections.length > 0 ? (
+                <div className="practice-timeline__connector">↓</div>
+              ) : null}
+
+              <Pressable
+                type="button"
+                intensity="soft"
+                haptic="light"
+                className="practice-timeline__add-btn"
+                onClick={addSection}
+              >
+                <Plus size={20} />
+                Add Section
+              </Pressable>
+            </section>
+
+            {timeline.sections.length > 0 ? (
+              <>
+                <section
+                  className="practice-timeline__setup"
+                  aria-labelledby="practice-session-setup"
+                >
+                  <div className="practice-timeline__setup-heading">
+                    <div>
+                      <h2 id="practice-session-setup">Session setup</h2>
+                      <p>Optional settings for this run.</p>
+                    </div>
+                  </div>
+
+                  <TrackSettingsPanel settings={trackSettings} onChange={updateTrackSettings} />
+
+                  <div className="practice-timeline__record-toggle pointer-events-auto">
+                    <span className="practice-timeline__record-copy">
+                      <strong>Record this practice</strong>
+                      <small>Save one take with markers for each section.</small>
+                    </span>
+                    <IOSSwitch
+                      checked={recordEnabled}
+                      ariaLabel="Record this practice"
+                      onChange={setRecordEnabled}
+                    />
+                  </div>
+                </section>
+
+                <section
+                  className="practice-timeline__summary"
+                  aria-labelledby="practice-ready-heading"
+                >
+                  <div className="practice-timeline__summary-heading">
+                    <div>
+                      <h2 id="practice-ready-heading">Ready to practice</h2>
+                      <p>
+                        {timeline.sections.length} section
+                        {timeline.sections.length === 1 ? '' : 's'} in order
+                      </p>
+                    </div>
+                  </div>
+                  <ol className="practice-timeline__summary-list">
+                    {timeline.sections.map((section, index) => (
+                      <li key={section.id}>
+                        <span>{index + 1}</span>
+                        <div>
+                          <strong>{section.title}</strong>
+                          <p>{describeSection(section)}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              </>
+            ) : null}
+          </div>
+
+          {footer}
+        </>
+      ) : null}
 
       <TimelineLibrarySheet
         open={libraryOpen}

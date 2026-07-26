@@ -2005,12 +2005,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
-    func stopTunerMonitor(completion: @escaping () -> Void) {
+    func stopTunerMonitor(completion: @escaping (_ captureStillActive: Bool) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             self.isTunerMonitorActive = false
             if !self.isRecording &&
                 !self.isStarting &&
+                !self.isAudioOnlyRecording &&
                 !self.isPreviewActive &&
                 !self.isBridgePreviewActive {
                 if self.session.isRunning {
@@ -2020,8 +2021,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 self.audioDataOutput = nil
                 self.restoreAudioSessionAfterTest()
             }
+            let captureStillActive =
+                self.isRecording ||
+                self.isStarting ||
+                self.isAudioOnlyRecording ||
+                self.isPreviewActive ||
+                self.isBridgePreviewActive
             DispatchQueue.main.async {
-                completion()
+                completion(captureStillActive)
             }
         }
     }

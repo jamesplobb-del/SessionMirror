@@ -289,13 +289,13 @@ export default function SettingsDrawer({
             <div className="space-y-3 pl-1 pt-1">
               <SettingSlider
                 label="Stop After Silence"
-                description="How long the app waits in silence before ending the take."
+                description="How long the app waits before ending the take and starting playback."
                 value={settings.soundSilenceSeconds}
-                min={0.5}
+                min={0}
                 max={6}
                 step={0.5}
                 unit="s"
-                formatValue={(value) => `${value}s`}
+                formatValue={(value) => (value === 0 ? 'Immediate' : `${value}s`)}
                 onChange={(value) => onUpdate({ soundSilenceSeconds: value })}
               />
 

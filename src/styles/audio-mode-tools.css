@@ -115,9 +115,7 @@
   font-size: 0.78rem;
   font-weight: 650;
   line-height: 1.08;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.88),
-    0 4px 12px rgba(23, 26, 34, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 4px 12px rgba(23, 26, 34, 0.055);
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
@@ -138,9 +136,7 @@
 .app-ui-overlay--audio-mode .metronome-audio-select--open .metronome-audio-select__control {
   border-color: var(--audio-blue-border);
   background: var(--audio-surface);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 0 0 3px var(--audio-blue-soft),
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 0 0 3px var(--audio-blue-soft),
     0 7px 18px rgba(23, 26, 34, 0.07);
 }
 
@@ -183,9 +179,7 @@
   border-radius: 0.78rem;
   background: rgba(255, 255, 255, 0.985);
   padding: 0.28rem;
-  box-shadow:
-    0 22px 48px rgba(23, 26, 34, 0.14),
-    0 5px 14px rgba(23, 26, 34, 0.075),
+  box-shadow: 0 22px 48px rgba(23, 26, 34, 0.14), 0 5px 14px rgba(23, 26, 34, 0.075),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   -webkit-backdrop-filter: blur(22px) saturate(1.1);
   backdrop-filter: blur(22px) saturate(1.1);
@@ -235,7 +229,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .app-ui-overlay--audio-mode .audio-practice-metronome__select-row--three .metronome-audio-select:last-child {
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__select-row--three
+    .metronome-audio-select:last-child {
     grid-column: 1 / -1;
   }
 
@@ -799,7 +795,7 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--practice-session-active .audio-tuner-take-pills-wrap {
-  padding-top: 0.18rem;
+  padding-top: 0;
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pills-wrap--compact {
@@ -844,7 +840,7 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--practice-session-active .control-deck {
-  padding-top: 0.12rem;
+  padding-top: 0.04rem;
 }
 
 .app-ui-overlay--audio-practice-tuner .auto-sound-hint {
@@ -907,10 +903,7 @@ html.app-dark-mode
   color: var(--audio-text-primary);
   text-align: left;
   cursor: pointer;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill:active {
@@ -927,9 +920,7 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill--playing {
-  box-shadow:
-    0 12px 30px rgba(23, 26, 34, 0.1),
-    0 0 0 1.5px rgba(59, 130, 246, 0.22);
+  box-shadow: 0 12px 30px rgba(23, 26, 34, 0.1), 0 0 0 1.5px rgba(59, 130, 246, 0.22);
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill--best {
@@ -937,15 +928,11 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill--best.audio-tuner-take-pill--playing {
-  box-shadow:
-    0 12px 30px rgba(23, 26, 34, 0.1),
-    0 0 0 1.5px rgba(245, 158, 11, 0.28);
+  box-shadow: 0 12px 30px rgba(23, 26, 34, 0.1), 0 0 0 1.5px rgba(245, 158, 11, 0.28);
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill--current.audio-tuner-take-pill--playing {
-  box-shadow:
-    0 12px 30px rgba(23, 26, 34, 0.1),
-    0 0 0 1.5px rgba(59, 130, 246, 0.28);
+  box-shadow: 0 12px 30px rgba(23, 26, 34, 0.1), 0 0 0 1.5px rgba(59, 130, 246, 0.28);
 }
 
 .app-ui-overlay--audio-mode .audio-tuner-take-pill--current {

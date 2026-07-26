@@ -19,11 +19,12 @@ public class MetronomePlugin: CAPPlugin, CAPBridgedPlugin {
     override public func load() {
         super.load()
         engine.setEventHandlers(
-            pulse: { [weak self] beatIndex, subTickIndex, beatPulseId in
+            pulse: { [weak self] beatIndex, subTickIndex, beatPulseId, audible in
                 self?.notifyListeners("metronomePulse", data: [
                     "beatIndex": beatIndex,
                     "subTickIndex": subTickIndex,
                     "beatPulseId": beatPulseId,
+                    "audible": audible,
                 ])
             },
             bar: { [weak self] in

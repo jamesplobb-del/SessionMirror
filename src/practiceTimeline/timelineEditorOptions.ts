@@ -11,21 +11,29 @@ function meterLabel(meter: MetronomeMeter): string {
 type HeaderValue = '__header_common__' | '__header_more__'
 
 export function meterSelectOptions(
-  meters: MetronomeMeter[] = COMMON_METERS,
+  meters: MetronomeMeter[] = COMMON_METERS
 ): MetronomeAudioSelectOption<MetronomeMeter | HeaderValue>[] {
   const core = meters.filter((meter) => PRACTICE_CORE_METERS.includes(meter))
   const more = meters.filter((meter) => !PRACTICE_CORE_METERS.includes(meter))
   const options: MetronomeAudioSelectOption<MetronomeMeter | HeaderValue>[] = []
 
   if (core.length > 0) {
-    options.push({ value: '__header_common__', label: 'Common', disabled: true })
+    options.push({
+      value: '__header_common__',
+      label: 'Common',
+      disabled: true,
+    })
     for (const meter of core) {
       options.push({ value: meter, label: meterLabel(meter) })
     }
   }
 
   if (more.length > 0) {
-    options.push({ value: '__header_more__', label: 'More time signatures', disabled: true })
+    options.push({
+      value: '__header_more__',
+      label: 'More time signatures',
+      disabled: true,
+    })
     for (const meter of more) {
       options.push({ value: meter, label: meterLabel(meter) })
     }
@@ -35,13 +43,13 @@ export function meterSelectOptions(
 }
 
 export function pulseSelectOptions(
-  modes: { id: string; label: string }[],
+  modes: { id: string; label: string }[]
 ): MetronomeAudioSelectOption<string>[] {
   return modes.map((mode) => ({ value: mode.id, label: mode.label }))
 }
 
 export function feelSelectOptions(
-  options: { id: string; label: string }[],
+  options: { id: string; label: string }[]
 ): MetronomeAudioSelectOption<string>[] {
   return options.map((option) => ({ value: option.id, label: option.label }))
 }
@@ -57,7 +65,7 @@ const SUBDIVISION_LABELS: Record<MetronomeSubdivision, string> = {
 }
 
 export function subdivisionSelectOptions(
-  choices: { id: SectionSubdivision; label: string }[],
+  choices: { id: SectionSubdivision; label: string }[]
 ): MetronomeAudioSelectOption<SectionSubdivision>[] {
   return choices.map((choice) => ({
     value: choice.id,
@@ -71,8 +79,8 @@ export function subdivisionSelectOptions(
 export type SectionTypeValue = 'single' | 'pattern'
 
 export const SECTION_TYPE_OPTIONS: MetronomeAudioSelectOption<SectionTypeValue>[] = [
-  { value: 'single', label: 'One signature' },
-  { value: 'pattern', label: 'Alternating' },
+  { value: 'single', label: 'Single time signature' },
+  { value: 'pattern', label: 'Changing time signatures' },
 ]
 
 export type CountInWhenValue = 'start' | 'every-loop'

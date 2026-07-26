@@ -237,6 +237,8 @@ interface NativeTapBinding {
   /** Most recent 2048-sample mono chunk (latest-wins; the loop copies it each tick). */
   latest: Float32Array | null
   sampleRate: number
+  sequence: number
+  processedSequence: number
   receivedAny: boolean
   startedAt: number
   lastFrameAt: number
@@ -423,6 +425,8 @@ async function createNativeTapPitchGraph(
   const binding: NativeTapBinding = {
     latest: null,
     sampleRate: 48_000,
+    sequence: 0,
+    processedSequence: -1,
     receivedAny: false,
     startedAt: performance.now(),
     lastFrameAt: 0,
@@ -433,6 +437,7 @@ async function createNativeTapPitchGraph(
   const subscription = subscribeNativeAudioPitchFrames((chunk) => {
     binding.latest = chunk.samples
     binding.sampleRate = chunk.sampleRate
+    binding.sequence += 1
     binding.receivedAny = true
     binding.lastFrameAt = performance.now()
     onFrame?.()
@@ -2398,6 +2403,11 @@ export function useLivePitchTracker(
         // first chunk arrives the buffer stays zeroed — the RMS gate below
         // treats that as silence, which renders as an idle (not broken) tuner.
         const latest = nativeTap.latest
+        if (!latest || nativeTap.sequence === nativeTap.processedSequence) {
+          tickRef.current = requestAnimationFrame(tick)
+          return
+        }
+        nativeTap.processedSequence = nativeTap.sequence
         if (latest) {
           publishSourceHealth('healthy')
           if (latest.length === graph.buffer.length) {

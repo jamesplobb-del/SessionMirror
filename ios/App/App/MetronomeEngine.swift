@@ -39,7 +39,12 @@ enum MetronomeWaveform {
 final class MetronomeEngine {
     static let shared = MetronomeEngine()
 
-    typealias PulseHandler = (_ beatIndex: Int, _ subTickIndex: Int, _ beatPulseId: Int) -> Void
+    typealias PulseHandler = (
+        _ beatIndex: Int,
+        _ subTickIndex: Int,
+        _ beatPulseId: Int,
+        _ audible: Bool
+    ) -> Void
     typealias BarHandler = () -> Void
 
     private let engine = AVAudioEngine()
@@ -51,9 +56,14 @@ final class MetronomeEngine {
     }
 
     private let stateLock = NSLock()
+    /// Every AVAudioEngine start/stop/reconfigure must share one ownership
+    /// lane. App lifecycle callbacks, capture handoffs, and engine
+    /// configuration notifications can otherwise arrive on different queues.
+    private let controlLock = NSRecursiveLock()
     private let schedulerQueue = DispatchQueue(label: "MetronomeEngine.scheduler", qos: .userInteractive)
 
     private var isRunning = false
+    private var outputPausedForCaptureHandoff = false
     private var muted = false
     private var soundId: MetronomeSoundId = .classic
 
@@ -63,6 +73,7 @@ final class MetronomeEngine {
     private var framesPerTick: Int64 = 48_000
     private var tickCounter = 0
     private var beatPulseId = 0
+    private var eventGeneration = 0
 
     private var globalSampleIndex: Int64 = 0
     private var nextTickSample: Int64 = 0
@@ -82,6 +93,7 @@ final class MetronomeEngine {
     private let speakerBusGain: Float = 48
 
     private var configurationObserver: NSObjectProtocol?
+    private var lastConfigurationRecoveryAt: TimeInterval = 0
 
     private init() {
         configurationObserver = NotificationCenter.default.addObserver(
@@ -124,6 +136,9 @@ final class MetronomeEngine {
         muted: Bool,
         leadSec: Double
     ) throws -> [String: Any] {
+        controlLock.lock()
+        defer { controlLock.unlock() }
+        outputPausedForCaptureHandoff = false
         stopSchedulerOnly()
 
         let sampleRate = renderFormat.sampleRate
@@ -171,6 +186,9 @@ final class MetronomeEngine {
     }
 
     func stop() {
+        controlLock.lock()
+        defer { controlLock.unlock() }
+        outputPausedForCaptureHandoff = false
         stopSchedulerOnly()
         stopEngine()
         print("[MetronomeEngine] stopped")
@@ -206,6 +224,8 @@ final class MetronomeEngine {
     }
 
     func isPlaying() -> Bool {
+        controlLock.lock()
+        defer { controlLock.unlock() }
         stateLock.lock()
         defer { stateLock.unlock() }
         return schedulerTimer != nil
@@ -213,6 +233,9 @@ final class MetronomeEngine {
 
     /// Pause AVAudioEngine output while AVCaptureSession configures — avoids black preview.
     func pauseOutputForCaptureHandoff() {
+        controlLock.lock()
+        defer { controlLock.unlock() }
+        outputPausedForCaptureHandoff = true
         if engine.isRunning {
             engine.stop()
         }
@@ -221,7 +244,10 @@ final class MetronomeEngine {
 
     /// Resume after camera bridge owns the session (scheduler keeps running).
     func resumeOutputAfterCaptureHandoff() {
+        controlLock.lock()
+        defer { controlLock.unlock() }
         guard schedulerTimer != nil else { return }
+        outputPausedForCaptureHandoff = false
         do {
             try preparePlaybackSession()
             try ensureEngineRunning()
@@ -233,7 +259,12 @@ final class MetronomeEngine {
     // MARK: - Audio graph
 
     private func handleEngineConfigurationChange() {
-        isRunning = false
+        controlLock.lock()
+        defer { controlLock.unlock() }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastConfigurationRecoveryAt >= 0.08 else { return }
+        lastConfigurationRecoveryAt = now
+        guard !outputPausedForCaptureHandoff else { return }
         guard schedulerTimer != nil else { return }
         do {
             try preparePlaybackSession()
@@ -245,7 +276,11 @@ final class MetronomeEngine {
     }
 
     private func ensureEngineRunning() throws {
-        if isRunning, engine.isRunning { return }
+        if engine.isRunning {
+            isRunning = true
+            return
+        }
+        isRunning = false
         outputMixer.outputVolume = 1
         engine.prepare()
         try engine.start()
@@ -282,6 +317,9 @@ final class MetronomeEngine {
     private func stopSchedulerOnly() {
         schedulerTimer?.cancel()
         schedulerTimer = nil
+        stateLock.lock()
+        eventGeneration += 1
+        stateLock.unlock()
     }
 
     private func scheduleAhead() {
@@ -293,9 +331,12 @@ final class MetronomeEngine {
         let perTick = framesPerTick
         let sound = soundId
         let isMuted = muted
+        let eventHandler = pulseHandler
+        let capturedEventGeneration = eventGeneration
         var nextSample = nextTickSample
         var counter = tickCounter
         var pulseId = beatPulseId
+        var scheduledClicks: [PendingClick] = []
         let pulseCount = max(1, barTicks / max(1, pulseTickCount))
         stateLock.unlock()
 
@@ -305,7 +346,9 @@ final class MetronomeEngine {
             let tickInBar = counter % barTicks
             let tier = pattern[tickInBar]
             if let tier = tier, !isMuted {
-                enqueueClick(at: nextSample, tier: tier, sound: sound)
+                scheduledClicks.append(
+                    PendingClick(startSample: nextSample, tier: tier, sound: sound)
+                )
             }
 
             if nextSample - currentSample <= scheduleAheadFrames {
@@ -313,20 +356,39 @@ final class MetronomeEngine {
                 let subTickIndex = tickInBar % pulseTickCount
                 if subTickIndex == 0 {
                     pulseId += 1
-                    let handler = pulseHandler
-                    let capturedBeat = beatIndex
-                    let capturedSub = subTickIndex
-                    let capturedPulseId = pulseId
-                    DispatchQueue.main.async {
-                        handler?(capturedBeat, capturedSub, capturedPulseId)
-                    }
+                }
+                let capturedBeat = beatIndex
+                let capturedSub = subTickIndex
+                let capturedPulseId = pulseId
+                let capturedAudible = tier != nil && !isMuted
+                let delaySeconds = max(
+                    0,
+                    Double(nextSample - currentSample) / renderFormat.sampleRate
+                )
+                DispatchQueue.main.asyncAfter(deadline: .now() + delaySeconds) { [weak self] in
+                    guard let self = self else { return }
+                    self.stateLock.lock()
+                    let eventIsCurrent = self.eventGeneration == capturedEventGeneration
+                    self.stateLock.unlock()
+                    guard eventIsCurrent else { return }
+                    eventHandler?(
+                        capturedBeat,
+                        capturedSub,
+                        capturedPulseId,
+                        capturedAudible
+                    )
                 }
             }
 
             counter += 1
             if counter > 0 && counter % barTicks == 0 {
                 let handler = barHandler
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.stateLock.lock()
+                    let eventIsCurrent = self.eventGeneration == capturedEventGeneration
+                    self.stateLock.unlock()
+                    guard eventIsCurrent else { return }
                     handler?()
                 }
             }
@@ -335,6 +397,11 @@ final class MetronomeEngine {
         }
 
         stateLock.lock()
+        guard eventGeneration == capturedEventGeneration else {
+            stateLock.unlock()
+            return
+        }
+        pendingClicks.append(contentsOf: scheduledClicks)
         nextTickSample = nextSample
         tickCounter = counter
         beatPulseId = pulseId
@@ -357,12 +424,6 @@ final class MetronomeEngine {
         var hz: Float
         var peak: Float
         var wave: MetronomeWaveform
-    }
-
-    private func enqueueClick(at sample: Int64, tier: MetronomeClickTier, sound: MetronomeSoundId) {
-        stateLock.lock()
-        pendingClicks.append(PendingClick(startSample: sample, tier: tier, sound: sound))
-        stateLock.unlock()
     }
 
     private func profile(for tier: MetronomeClickTier, sound: MetronomeSoundId) -> MetronomeClickProfile {

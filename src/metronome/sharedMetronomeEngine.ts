@@ -76,6 +76,11 @@ export interface SharedMetronomeSnapshot {
 type Listener = () => void
 type BarListener = () => void
 type PulseListener = (beatIndex: number) => void
+type TickListener = (event: {
+  beatIndex: number
+  subTickIndex: number
+  audible: boolean
+}) => void
 
 function createInitialSnapshot(): SharedMetronomeSnapshot {
   const prefs = loadMetronomePrefs()
@@ -114,6 +119,7 @@ class SharedMetronomeEngine {
   private listeners = new Set<Listener>()
   private barListeners = new Set<BarListener>()
   private pulseListeners = new Set<PulseListener>()
+  private tickListeners = new Set<TickListener>()
   private snapshot: SharedMetronomeSnapshot = createInitialSnapshot()
 
   private audioCtx: AudioContext | null = null
@@ -132,6 +138,9 @@ class SharedMetronomeEngine {
   private foregroundTimer: number | null = null
   private recoveringForeground = false
   private startInFlight = false
+  private controlGeneration = 0
+  private nativeControlQueue: Promise<void> = Promise.resolve()
+  private nativeRouteQueue: Promise<void> = Promise.resolve()
   private nativeSpeakerRouteHeld = false
   private nativeListenersAttached = false
   private readonly useNativeAudio = isNativeIosMetronome()
@@ -169,6 +178,14 @@ class SharedMetronomeEngine {
     }
   }
 
+  /** Fires on each scheduled tick, including subdivisions. */
+  subscribeTick = (listener: TickListener): (() => void) => {
+    this.tickListeners.add(listener)
+    return () => {
+      this.tickListeners.delete(listener)
+    }
+  }
+
   private emitBar(): void {
     for (const listener of this.barListeners) {
       listener()
@@ -179,6 +196,30 @@ class SharedMetronomeEngine {
     for (const listener of this.pulseListeners) {
       listener(beatIndex)
     }
+  }
+
+  private emitTick(event: Parameters<TickListener>[0]): void {
+    for (const listener of this.tickListeners) {
+      listener(event)
+    }
+  }
+
+  private enqueueNativeControl<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.nativeControlQueue.then(operation, operation)
+    this.nativeControlQueue = result.then(
+      () => undefined,
+      () => undefined,
+    )
+    return result
+  }
+
+  private enqueueNativeRoute<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.nativeRouteQueue.then(operation, operation)
+    this.nativeRouteQueue = result.then(
+      () => undefined,
+      () => undefined,
+    )
+    return result
   }
 
   getSnapshot = (): SharedMetronomeSnapshot => this.snapshot
@@ -209,6 +250,11 @@ class SharedMetronomeEngine {
 
     void nativeMetronomeAddPulseListener((event) => {
       if (!this.snapshot.playing) return
+      this.emitTick({
+        beatIndex: event.beatIndex,
+        subTickIndex: event.subTickIndex,
+        audible: event.audible !== false,
+      })
       if (event.subTickIndex === 0) {
         this.emitPulse(event.beatIndex)
       }
@@ -275,7 +321,11 @@ class SharedMetronomeEngine {
     }
   }
 
-  private async ensureNativeSpeakerRoute(): Promise<void> {
+  private ensureNativeSpeakerRoute(): Promise<void> {
+    return this.enqueueNativeRoute(() => this.ensureNativeSpeakerRouteUnlocked())
+  }
+
+  private async ensureNativeSpeakerRouteUnlocked(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return
 
     if (this.useNativeAudio && isHeadphoneOutputActive()) {
@@ -304,7 +354,11 @@ class SharedMetronomeEngine {
     }
   }
 
-  private async releaseNativeSpeakerRoute(): Promise<void> {
+  private releaseNativeSpeakerRoute(): Promise<void> {
+    return this.enqueueNativeRoute(() => this.releaseNativeSpeakerRouteUnlocked())
+  }
+
+  private async releaseNativeSpeakerRouteUnlocked(): Promise<void> {
     if (!this.nativeSpeakerRouteHeld) return
     this.nativeSpeakerRouteHeld = false
     if (this.useNativeAudio && isHeadphoneOutputActive()) {
@@ -313,12 +367,14 @@ class SharedMetronomeEngine {
     await releaseStereoPlayback()
   }
 
-  private async reassertNativeSpeakerRoute(): Promise<void> {
-    if (!this.snapshot.playing || !this.nativeSpeakerRouteHeld) return
-    await this.releaseNativeSpeakerRoute()
-    if (this.snapshot.playing) {
-      await this.ensureNativeSpeakerRoute()
-    }
+  private reassertNativeSpeakerRoute(): Promise<void> {
+    return this.enqueueNativeRoute(async () => {
+      if (!this.snapshot.playing || !this.nativeSpeakerRouteHeld) return
+      await this.releaseNativeSpeakerRouteUnlocked()
+      if (this.snapshot.playing) {
+        await this.ensureNativeSpeakerRouteUnlocked()
+      }
+    })
   }
 
   private applyMasterGain(): void {
@@ -352,7 +408,9 @@ class SharedMetronomeEngine {
     this.lifecycleAttached = true
     this.attachNativeListeners()
 
-    this.attachPlaybackInterruptWatch()
+    if (!this.useNativeAudio) {
+      this.attachPlaybackInterruptWatch()
+    }
 
     const onBackground = () => {
       if (this.isBackgrounded) return
@@ -371,6 +429,10 @@ class SharedMetronomeEngine {
 
     const onForeground = () => {
       this.isBackgrounded = false
+      if (this.useNativeAudio) {
+        this.reconcileAfterInterrupt()
+        return
+      }
       void resumePlaybackAudioContext().finally(() => {
         this.reconcileAfterInterrupt()
       })
@@ -447,6 +509,7 @@ class SharedMetronomeEngine {
     }
 
     if (!this.snapshot.playing) return
+    if (this.useNativeAudio) return
 
     const ctx = this.audioCtx ?? primePlaybackAudioContextSync()
     const audioNeedsRecovery = ctx.state !== 'running'
@@ -484,15 +547,19 @@ class SharedMetronomeEngine {
     this.releaseAudioGraph()
 
     try {
-      await resumePlaybackAudioContext()
-      this.attachPlaybackInterruptWatch()
+      if (!this.useNativeAudio) {
+        await resumePlaybackAudioContext()
+        this.attachPlaybackInterruptWatch()
+      }
 
       for (let attempt = 0; attempt < 6; attempt++) {
         if (!this.resumeOnForeground) return
 
         if (attempt > 0) {
           await new Promise((resolve) => window.setTimeout(resolve, 100 * attempt))
-          await resumePlaybackAudioContext()
+          if (!this.useNativeAudio) {
+            await resumePlaybackAudioContext()
+          }
         }
 
         const started = await this.start({ recovered: true })
@@ -933,6 +1000,7 @@ class SharedMetronomeEngine {
           const uiTick = resolveUiTick(meter, tickInBar, subdivision, pulseCount)
           const uiBeat = uiTick.beatIndex
           const uiSubTick = uiTick.subTickIndex
+          const uiTickAudible = Boolean(tier) && !muted
           // React 18 batches synchronous state updates, so if several ticks fall in the
           // same lookahead pass (startup backlog, or a delayed poll catching up), patching
           // state for each one inline would collapse into a single render of the last tick
@@ -942,6 +1010,11 @@ class SharedMetronomeEngine {
           const uiDelayMs = Math.max(0, (beatTime - activeCtx.currentTime) * 1000)
           window.setTimeout(() => {
             if (!this.snapshot.playing || sessionId !== this.schedulerSession) return
+            this.emitTick({
+              beatIndex: uiBeat,
+              subTickIndex: uiSubTick,
+              audible: uiTickAudible,
+            })
             if (uiSubTick === 0) this.emitPulse(uiBeat)
             this.patchState({
               beatIndex: uiBeat,
@@ -985,10 +1058,11 @@ class SharedMetronomeEngine {
 
   private sanityReset(): void {
     this.debugLog('sanity reset')
+    this.controlGeneration += 1
     this.schedulerSession += 1
     this.clearSchedulerTimer()
     if (this.useNativeAudio) {
-      void nativeMetronomeStop()
+      void this.enqueueNativeControl(nativeMetronomeStop)
     }
     this.patchState({ playing: false })
   }
@@ -996,6 +1070,28 @@ class SharedMetronomeEngine {
   reconcileAfterModeSwitch(targetMode: 'video' | 'audio' = 'video'): void {
     if (!this.snapshot.playing) return
     void this.recoverAfterModeSwitch(targetMode)
+  }
+
+  /**
+   * A sheet can release or reconfigure the shared AVAudioSession without
+   * changing the metronome's React state. Reassert the route and restart the
+   * native engine once that surface transition settles.
+   */
+  reconcileAfterSurfaceTransition(_targetMode: 'video' | 'audio' = 'video'): void {
+    if (!this.snapshot.playing) return
+    if (!this.useNativeAudio) {
+      this.reconcileAfterInterrupt()
+      return
+    }
+    void (async () => {
+      try {
+        await this.reassertNativeSpeakerRoute()
+      } catch {
+        /* The native start below prepares the route again. */
+      }
+      if (!this.snapshot.playing) return
+      await this.start({ recovered: true, fromStale: true })
+    })()
   }
 
   private async recoverAfterModeSwitch(targetMode: 'video' | 'audio'): Promise<void> {
@@ -1094,7 +1190,12 @@ class SharedMetronomeEngine {
     this.sanityReset()
     if (this.useNativeAudio) {
       await this.ensureNativeSpeakerRoute()
-      return nativeMetronomePrepare()
+      await this.enqueueNativeControl(async () => {})
+      const [ctx, prepared] = await Promise.all([
+        this.prepareAudioContextForStart(),
+        nativeMetronomePrepare(),
+      ])
+      return Boolean(ctx && prepared)
     }
     const ctx = await this.prepareAudioContextForStart()
     return !!(ctx && ctx.state === 'running')
@@ -1104,13 +1205,14 @@ class SharedMetronomeEngine {
     if (this.snapshot.playing && !options?.background) {
       this.debugLog('stop')
     }
+    this.controlGeneration += 1
     if (this.useNativeAudio) {
-      void nativeMetronomeStop()
+      void this.enqueueNativeControl(nativeMetronomeStop)
     }
     this.schedulerSession += 1
     this.clearSchedulerTimer()
     this.patchState({ playing: false })
-    void this.releaseNativeSpeakerRoute()
+    void this.releaseNativeSpeakerRoute().catch(() => {})
     if (options?.background) {
       this.releaseAudioGraph()
     }
@@ -1131,6 +1233,7 @@ class SharedMetronomeEngine {
     if (this.startInFlight) return false
 
     this.startInFlight = true
+    let startGeneration = 0
     let started = false
 
     try {
@@ -1138,27 +1241,36 @@ class SharedMetronomeEngine {
         this.debugLog('start recovered from stale state')
         this.sanityReset()
       }
+      startGeneration = ++this.controlGeneration
 
       this.clearSchedulerTimer()
 
-      await this.ensureNativeSpeakerRoute()
+      try {
+        await this.ensureNativeSpeakerRoute()
+      } catch {
+        this.debugLog('speaker route preparation deferred to native start')
+      }
+      if (startGeneration !== this.controlGeneration || this.isBackgrounded) return false
 
       if (this.useNativeAudio) {
         this.attachNativeListeners()
         const leadSec = Math.max(START_LEAD_SEC, options?.firstBeatDelaySec ?? START_LEAD_SEC)
-        const ctx = await this.prepareAudioContextForStart()
-        if (!ctx || ctx.state === 'closed') {
-          this.patchState({ playing: false })
+        const anchorCtx =
+          this.audioCtx && this.audioCtx.state === 'running' ? this.audioCtx : null
+        const result = await this.enqueueNativeControl(() =>
+          nativeMetronomeStart({
+            ...this.buildNativeTimingPayload(),
+            muted: this.shouldMuteOutput(),
+            leadSec,
+          }),
+        )
+        if (startGeneration !== this.controlGeneration || this.isBackgrounded) {
+          await this.enqueueNativeControl(nativeMetronomeStop)
           return false
         }
-        const result = await nativeMetronomeStart({
-          ...this.buildNativeTimingPayload(),
-          muted: this.shouldMuteOutput(),
-          leadSec,
-        })
         if (result?.playing) {
           this.lastStartInfo = {
-            firstClickCtxTime: ctx.currentTime + leadSec,
+            firstClickCtxTime: anchorCtx ? anchorCtx.currentTime + leadSec : 0,
             firstClickPerfMs: result.firstClickPerfMs,
           }
           this.patchState({ playing: true, beatIndex: 0, subTickIndex: 0, beatPulseId: 0 })
@@ -1170,6 +1282,7 @@ class SharedMetronomeEngine {
       }
 
       const ctx = await this.prepareAudioContextForStart()
+      if (startGeneration !== this.controlGeneration || this.isBackgrounded) return false
       if (!ctx || ctx.state === 'closed') {
         this.schedulerSession += 1
         this.clearSchedulerTimer()
@@ -1194,7 +1307,7 @@ class SharedMetronomeEngine {
       return true
     } finally {
       if (!started) {
-        void this.releaseNativeSpeakerRoute()
+        void this.releaseNativeSpeakerRoute().catch(() => {})
       }
       this.startInFlight = false
     }

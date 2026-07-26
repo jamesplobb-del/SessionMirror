@@ -13,6 +13,7 @@ export interface NativeMetronomePulseEvent {
   beatIndex: number
   subTickIndex: number
   beatPulseId: number
+  audible?: boolean
 }
 
 interface MetronomePluginType {

@@ -1418,8 +1418,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stopNativeTunerMonitor(_ call: CAPPluginCall) {
-        nativeCameraEngine.stopTunerMonitor {
-            call.resolve(["active": false])
+        nativeCameraEngine.stopTunerMonitor { captureStillActive in
+            call.resolve(["active": captureStillActive])
         }
     }
 

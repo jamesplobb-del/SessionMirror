@@ -3,27 +3,24 @@ import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
 import { AUTO_RECORD_MAX_IDLE_PREROLL_MS } from '../utils/autoRecordPlayback'
 import { isAppInForeground, subscribeAppForeground } from '../utils/appForeground'
-import {
-  getPlaybackAudioContext,
-  isSharedPlaybackContext,
-} from '../utils/playbackAudioContext'
+import { getPlaybackAudioContext, isSharedPlaybackContext } from '../utils/playbackAudioContext'
 import {
   acquireNativeAudioTap,
   releaseNativeAudioTap,
   subscribeNativeAudioPitchFrames,
 } from '../utils/nativeAudioPitchTap'
 import { isNativeCameraPreviewActive } from '../utils/cameraSessionState'
+import { sharedMetronomeEngine } from '../metronome/sharedMetronomeEngine'
 import type { PluginListenerHandle } from '@capacitor/core'
 
-const POLL_INTERVAL_MS = 32
+const POLL_INTERVAL_MS = 48
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 120
 const MONITOR_WARMUP_MS = 280
 // The native tap starts from an already-running pre-roll recorder. Keep enough
 // settling time to establish a quiet baseline without making normal speech feel
 // ignored when hands-free mode is first enabled.
-const NATIVE_MONITOR_WARMUP_MS = 500
-const NATIVE_ARMING_QUIET_HOLD_MS = 220
+const NATIVE_MONITOR_WARMUP_MS = 180
 const POST_PLAYBACK_WARMUP_MS = 0
 const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
@@ -31,6 +28,13 @@ const HEALTH_CHECK_MS = 2500
 const STALL_RECOVERY_MS = 2200
 const START_FAILURE_CLEAR_MS = 450
 const QUIET_EMA_ALPHA = 0.03
+const METRONOME_START_HOLD_MS = 180
+
+function metronomeClickGuardMs(soundId: string): number {
+  if (soundId === 'soft') return 145
+  if (soundId === 'classic') return 110
+  return 90
+}
 
 interface UseAutoSoundRecordingOptions {
   enabled: boolean
@@ -61,10 +65,7 @@ interface UseAutoSoundRecordingOptions {
 
 function percentile(sorted: number[], ratio: number): number {
   if (sorted.length === 0) return 0
-  const index = Math.min(
-    sorted.length - 1,
-    Math.floor(sorted.length * ratio),
-  )
+  const index = Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))
   return sorted[index] ?? 0
 }
 
@@ -79,13 +80,14 @@ function computeEffectiveGate(profile: AutoRecordProfile, quietRms: number): num
 
 function isStreamAudioLive(stream: MediaStream | null): boolean {
   return Boolean(
-    stream?.getAudioTracks().some(
-      (track) => track.readyState === 'live' && track.enabled,
-    ),
+    stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled)
   )
 }
 
-function measureNativeFrameMetrics(buffer: Float32Array): { rms: number; peak: number } {
+function measureNativeFrameMetrics(buffer: Float32Array): {
+  rms: number
+  peak: number
+} {
   let sum = 0
   let peak = 0
   for (let i = 0; i < buffer.length; i++) {
@@ -115,9 +117,7 @@ function resolveHandsFreeMonitorPath(options: {
   return 'none'
 }
 
-function shouldReadNativeTapDuringRecording(
-  nativeCaptureActive: boolean,
-): boolean {
+function shouldReadNativeTapDuringRecording(nativeCaptureActive: boolean): boolean {
   return nativeCaptureActive || isNativeCameraPreviewActive()
 }
 
@@ -159,9 +159,8 @@ export function useAutoSoundRecording({
   const autoTriggeredRef = useRef(false)
   const startLatchRef = useRef(false)
   const monitorWarmUntilRef = useRef(0)
-  const nativeStartArmedRef = useRef(false)
-  const nativeQuietSinceRef = useRef<number | null>(null)
   const nativeTapReadyRef = useRef(false)
+  const monitorReadyRef = useRef(false)
   const startLatchTimerRef = useRef<number | null>(null)
   const cooldownUntilRef = useRef(0)
   const quietRmsEmaRef = useRef(0)
@@ -169,6 +168,7 @@ export function useAutoSoundRecording({
   const lastTickAtRef = useRef(0)
   const [monitorEpoch, setMonitorEpoch] = useState(0)
   const [handsFreeRecording, setHandsFreeRecording] = useState(false)
+  const [handsFreeListeningReady, setHandsFreeListeningReady] = useState(false)
   const [appForeground, setAppForeground] = useState(isAppInForeground)
   const suppressStartRef = useRef(suppressStart)
   const isRecordingRef = useRef(isRecording)
@@ -190,6 +190,7 @@ export function useAutoSoundRecording({
   const appliedVolumeThresholdRef = useRef(volumeThreshold)
   const prevSuppressStartRef = useRef(suppressStart)
   const prevMonitoringPausedRef = useRef(monitoringPaused)
+  const metronomeClickGuardUntilRef = useRef(0)
 
   isRecordingRef.current = isRecording
   suppressStartRef.current = suppressStart
@@ -206,10 +207,7 @@ export function useAutoSoundRecording({
   isNativeAudioCaptureActiveRef.current = isNativeAudioCaptureActive
   profileRef.current = getAutoRecordProfile(volumeThreshold)
   silenceMsRef.current = silenceMs
-  effectiveGateRef.current = computeEffectiveGate(
-    profileRef.current,
-    quietRmsEmaRef.current,
-  )
+  effectiveGateRef.current = computeEffectiveGate(profileRef.current, quietRmsEmaRef.current)
 
   // Native audio hands-free deliberately stops WebKit's microphone once the
   // hidden pre-roll owns the hardware. That can briefly make the WebKit
@@ -224,6 +222,19 @@ export function useAutoSoundRecording({
     (ready || nativeCaptureActive)
 
   useEffect(() => subscribeAppForeground(setAppForeground), [])
+
+  useEffect(() => {
+    if (!shouldMonitor) {
+      metronomeClickGuardUntilRef.current = 0
+      return
+    }
+    return sharedMetronomeEngine.subscribeTick((event) => {
+      if (!event.audible) return
+      const metronome = sharedMetronomeEngine.getSnapshot()
+      metronomeClickGuardUntilRef.current =
+        performance.now() + metronomeClickGuardMs(metronome.soundId)
+    })
+  }, [shouldMonitor])
 
   const clearStartFailureTimer = () => {
     if (startFailureTimerRef.current !== null) {
@@ -264,11 +275,7 @@ export function useAutoSoundRecording({
   }
 
   const triggerAutoStart = () => {
-    if (
-      startLatchRef.current ||
-      isRecordingRef.current ||
-      suppressStartRef.current
-    ) {
+    if (startLatchRef.current || isRecordingRef.current || suppressStartRef.current) {
       return
     }
 
@@ -331,9 +338,15 @@ export function useAutoSoundRecording({
     setMonitorEpoch((epoch) => epoch + 1)
   }
 
+  const setMonitorReady = (ready: boolean) => {
+    if (monitorReadyRef.current === ready) return
+    monitorReadyRef.current = ready
+    setHandsFreeListeningReady(ready)
+  }
+
   const maybeAutoStopFromSilence = (
     metrics: { rms: number; peak: number },
-    now: number,
+    now: number
   ): boolean => {
     if (!autoTriggeredRef.current || !isRecordingRef.current) return false
 
@@ -341,17 +354,18 @@ export function useAutoSoundRecording({
     const gateLevel = profile.usePeak
       ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
       : metrics.rms
-    const stopGate = Math.max(
-      profile.gate * profile.stopGateRatio,
-      effectiveGateRef.current * 0.55,
-    )
+    const stopGate = Math.max(profile.gate * profile.stopGateRatio, effectiveGateRef.current * 0.55)
 
     if (recordingStartedAtRef.current === null) {
       recordingStartedAtRef.current = now
     }
 
     const recordingDuration = now - recordingStartedAtRef.current
-    const stillLoud = metrics.rms >= stopGate || gateLevel >= stopGate
+    const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
+    const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
+    const stillLoud =
+      !metronomeTransient &&
+      (metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate)
 
     if (stillLoud) {
       silenceSinceRef.current = null
@@ -361,7 +375,7 @@ export function useAutoSoundRecording({
 
     if (silenceSinceRef.current === null) {
       silenceSinceRef.current = now
-      return false
+      if (silenceMsRef.current > 0) return false
     }
     if (now - silenceSinceRef.current < silenceMsRef.current) return false
 
@@ -425,12 +439,11 @@ export function useAutoSoundRecording({
         autoTriggeredRef.current = false
       }
       monitorWarmUntilRef.current = 0
-      nativeStartArmedRef.current = false
-      nativeQuietSinceRef.current = null
       pendingPerformanceGateRef.current = false
       quietRmsEmaRef.current = 0
       effectiveGateRef.current = profileRef.current.gate
       setHandsFreeRecording(false)
+      setMonitorReady(false)
       void disarmRecorderRef.current()
     } else if (autoTriggeredRef.current || isRecordingRef.current) {
       // A native capture can be active while hands-free is merely listening.
@@ -545,6 +558,7 @@ export function useAutoSoundRecording({
 
       const isNativePath = path === 'native-tap'
       nativeTapReadyRef.current = false
+      setMonitorReady(false)
       let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
       const setupStartedAt = performance.now()
       // Keep an already-triggered take running across a monitor restart. A
@@ -554,30 +568,28 @@ export function useAutoSoundRecording({
       const performanceAlreadyTriggered =
         autoTriggeredRef.current || startLatchRef.current || isRecordingRef.current
       if (performanceAlreadyTriggered && isNativePath) {
-        nativeStartArmedRef.current = true
-        nativeQuietSinceRef.current = null
         monitorWarmUntilRef.current = setupStartedAt
         calibrated = true
-      } else {
-        nativeStartArmedRef.current = !isNativePath
-        nativeQuietSinceRef.current = null
       }
 
       if (isNativePath) {
         await acquireNativeAudioTap()
         acquiredNativeTap = true
         if (cancelled || setupEpoch !== monitorEpoch) {
-          if (!preserveActiveCapture) {
-            void releaseNativeAudioTap()
-          }
+          void releaseNativeAudioTap()
+          acquiredNativeTap = false
           return
         }
-        nativeTapListener = await subscribeNativeAudioPitchFrames((chunk) => {
-          if (cancelled) return
-          nativeFrameRef = { buffer: chunk.samples, timestamp: performance.now() }
-        }) ?? null
+        nativeTapListener =
+          (await subscribeNativeAudioPitchFrames((chunk) => {
+            if (cancelled) return
+            nativeFrameRef = {
+              buffer: chunk.samples,
+              timestamp: performance.now(),
+            }
+          })) ?? null
         nativeTapReadyRef.current = nativeTapListener !== null
-        
+
         lastTickAtRef.current = performance.now()
         if (!performanceAlreadyTriggered) {
           monitorWarmUntilRef.current = performance.now() + NATIVE_MONITOR_WARMUP_MS
@@ -626,14 +638,12 @@ export function useAutoSoundRecording({
         // owns the mic, rather than waiting for the visual record state to flip.
         if (
           !isNativePath &&
-          shouldReadNativeTapDuringRecording(
-            isNativeAudioCaptureActiveRef.current?.() === true,
-          )
+          shouldReadNativeTapDuringRecording(isNativeAudioCaptureActiveRef.current?.() === true)
         ) {
           bumpMonitorEpoch()
           return
         }
-        
+
         if (!isNativePath) {
           if (!analyserRef.current || !sampleBufferRef.current) return
         }
@@ -663,8 +673,7 @@ export function useAutoSoundRecording({
         } else {
           const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
           const nativeTapDuringRecording =
-            isRecordingRef.current &&
-            shouldReadNativeTapDuringRecording(nativeCaptureActive)
+            isRecordingRef.current && shouldReadNativeTapDuringRecording(nativeCaptureActive)
           if (!isStreamAudioLive(streamRef.current)) {
             if (nativeTapDuringRecording) {
               // WebKit mic is suspended for native capture — read levels from the
@@ -685,19 +694,19 @@ export function useAutoSoundRecording({
         const useNativeMetrics =
           isNativePath ||
           (isRecordingRef.current &&
-            shouldReadNativeTapDuringRecording(
-              isNativeAudioCaptureActiveRef.current?.() === true,
-            ))
+            shouldReadNativeTapDuringRecording(isNativeAudioCaptureActiveRef.current?.() === true))
 
+        let nativeFrameFresh = false
         if (useNativeMetrics) {
           const frame = nativeFrameRef
           if (frame && now - frame.timestamp < 1000) {
             metrics = measureNativeFrameMetrics(frame.buffer)
+            nativeFrameFresh = true
           }
         } else if (!useNativeMetrics) {
           metrics = readAnalyserMetrics(analyserRef.current!, sampleBufferRef.current!)
         }
-        
+
         if (now - lastLevelsLog > 1000) {
           lastLevelsLog = now
           // console.debug('[AutoSound] levels', { rms: metrics.rms.toFixed(4), peak: metrics.peak.toFixed(4) })
@@ -706,13 +715,18 @@ export function useAutoSoundRecording({
         const gateLevel = profile.usePeak
           ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
           : metrics.rms
-        const stopGate = Math.max(
-          profile.gate * profile.stopGateRatio,
-          effectiveGateRef.current * 0.55,
-        )
+
+        if (isNativePath && !nativeFrameFresh) {
+          return
+        }
 
         if (now < monitorWarmUntilRef.current) {
-          calibrationSamples.push(metrics.rms)
+          // Capture only genuinely quiet startup samples. If the user begins
+          // playing immediately, those notes must not become the noise floor
+          // and raise the gate above the performance.
+          if (metrics.rms < profile.gate * 0.9) {
+            calibrationSamples.push(metrics.rms)
+          }
           loudSinceRef.current = null
           attackSinceRef.current = null
           return
@@ -726,6 +740,11 @@ export function useAutoSoundRecording({
           calibrated = true
           void warmRecorderRef.current()
         }
+
+        // The short warmup above is enough to reject route-start transients.
+        // Requiring a separate quiet pause here made performances that began
+        // during activation or immediately after playback impossible to start.
+        setMonitorReady(true)
 
         if (!isRecordingRef.current) {
           silenceSinceRef.current = null
@@ -747,12 +766,8 @@ export function useAutoSoundRecording({
             quietRmsEmaRef.current =
               quietRmsEmaRef.current === 0
                 ? metrics.rms
-                : quietRmsEmaRef.current * (1 - QUIET_EMA_ALPHA) +
-                  metrics.rms * QUIET_EMA_ALPHA
-            effectiveGateRef.current = computeEffectiveGate(
-              profile,
-              quietRmsEmaRef.current,
-            )
+                : quietRmsEmaRef.current * (1 - QUIET_EMA_ALPHA) + metrics.rms * QUIET_EMA_ALPHA
+            effectiveGateRef.current = computeEffectiveGate(profile, quietRmsEmaRef.current)
           }
 
           if (suppressStartRef.current) {
@@ -761,29 +776,19 @@ export function useAutoSoundRecording({
             return
           }
 
-          if (isNativePath && !nativeStartArmedRef.current) {
-            const quietEnough = gateLevel < effectiveGateRef.current * 0.85
-            if (quietEnough) {
-              if (nativeQuietSinceRef.current === null) {
-                nativeQuietSinceRef.current = now
-              } else if (now - nativeQuietSinceRef.current >= NATIVE_ARMING_QUIET_HOLD_MS) {
-                nativeStartArmedRef.current = true
-              }
-            } else {
-              nativeQuietSinceRef.current = null
-            }
+          const currentGate = effectiveGateRef.current
+          const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
+          const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
+          const aboveGate = metronomeActive ? metrics.rms >= currentGate : gateLevel >= currentGate
 
-            if (!nativeStartArmedRef.current) {
-              loudSinceRef.current = null
-              attackSinceRef.current = null
-              return
-            }
+          if (metronomeTransient) {
+            loudSinceRef.current = null
+            attackSinceRef.current = null
+            return
           }
 
-          const currentGate = effectiveGateRef.current
-          const aboveGate = gateLevel >= currentGate
-
           const attackEligible =
+            !metronomeActive &&
             profile.attackHoldMs > 0 &&
             profile.attackPeakRatio > 0 &&
             metrics.peak >= currentGate * profile.attackPeakRatio
@@ -806,7 +811,10 @@ export function useAutoSoundRecording({
               if (loudSinceRef.current === null) {
                 loudSinceRef.current = now
               } else if (
-                now - loudSinceRef.current >= profile.holdMs &&
+                now - loudSinceRef.current >=
+                  (metronomeActive
+                    ? Math.max(profile.holdMs, METRONOME_START_HOLD_MS)
+                    : profile.holdMs) &&
                 !startLatchRef.current
               ) {
                 console.info('[AutoSound] triggerAutoStart')
@@ -824,23 +832,7 @@ export function useAutoSoundRecording({
         attackSinceRef.current = null
 
         if (!autoTriggeredRef.current) return
-
-        if (recordingStartedAtRef.current === null) {
-          recordingStartedAtRef.current = now
-        }
-
-        const recordingDuration = now - recordingStartedAtRef.current
-        const stillLoud = metrics.rms >= stopGate || gateLevel >= stopGate
-
-        if (stillLoud) {
-          silenceSinceRef.current = null
-        } else if (recordingDuration >= MIN_RECORDING_MS) {
-          if (silenceSinceRef.current === null) {
-            silenceSinceRef.current = now
-          } else if (now - silenceSinceRef.current >= silenceMsRef.current) {
-            maybeAutoStopFromSilence(metrics, now)
-          }
-        }
+        maybeAutoStopFromSilence(metrics, now)
       }
 
       pollTimerRef.current = window.setInterval(tick, POLL_INTERVAL_MS)
@@ -855,12 +847,11 @@ export function useAutoSoundRecording({
 
         const now = performance.now()
         const tickStale = now - lastTickAtRef.current > STALL_RECOVERY_MS
-        
+
         let streamDead = false
         if (isNativePath || isNativeAudioCaptureActiveRef.current?.()) {
           streamDead =
-            (!isNativeCameraPreviewActive() &&
-              !isNativeAudioCaptureActiveRef.current?.()) ||
+            (!isNativeCameraPreviewActive() && !isNativeAudioCaptureActiveRef.current?.()) ||
             now - (nativeFrameRef?.timestamp ?? 0) > 2000
         } else {
           streamDead = !isStreamAudioLive(streamRef.current)
@@ -893,7 +884,7 @@ export function useAutoSoundRecording({
       if (nativeTapListener) {
         nativeTapListener.remove().catch(() => {})
       }
-      if (acquiredNativeTap && !preserveActiveCapture) {
+      if (acquiredNativeTap) {
         void releaseNativeAudioTap()
       }
     }
@@ -977,10 +968,7 @@ export function useAutoSoundRecording({
 
   const restartHandsFreeMonitor = useCallback(() => {
     if (!isAppInForeground()) return
-    if (
-      nativeTapReadyRef.current &&
-      isNativeAudioCaptureActiveRef.current?.() === true
-    ) {
+    if (nativeTapReadyRef.current && isNativeAudioCaptureActiveRef.current?.() === true) {
       return
     }
     setMonitorEpoch((epoch) => epoch + 1)
@@ -990,6 +978,7 @@ export function useAutoSoundRecording({
   return {
     teardownMonitor,
     handsFreeRecording: handsFreeRecording && isRecording,
+    handsFreeListeningReady: handsFreeListeningReady && shouldMonitor && !suppressStart,
     restartHandsFreeMonitor,
   }
 }

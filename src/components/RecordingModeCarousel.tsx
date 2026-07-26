@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, memo } from 'react'
-import { Camera, Mic } from 'lucide-react'
+import { Camera, Mic, Play } from 'lucide-react'
 import RecordOrbitIcon from './RecordOrbitIcon'
 import {
   triggerLightHaptic,
@@ -23,9 +23,11 @@ interface RecordingModeCarouselProps {
   autoSoundRecording?: boolean
   onAutoSoundRecordingChange?: (enabled: boolean) => void
   hapticFeedback?: boolean
+  handsFreePhase?: HandsFreePhase
 }
 
 type SlotPosition = 'center' | 'left' | 'right'
+export type HandsFreePhase = 'preparing' | 'listening' | 'recording' | 'playback'
 
 function slotPosition(mode: RecordingMode, active: RecordingMode): SlotPosition {
   if (mode === active) return 'center'
@@ -41,6 +43,7 @@ interface ModeSlotProps {
   onActivate: () => void
   onLongPress?: () => void
   longPressActive?: boolean
+  handsFreePhase?: HandsFreePhase
   hapticFeedback?: boolean
 }
 
@@ -53,6 +56,7 @@ function ModeSlot({
   onActivate,
   onLongPress,
   longPressActive = false,
+  handsFreePhase,
   hapticFeedback = true,
 }: ModeSlotProps) {
   const isCenter = position === 'center'
@@ -60,18 +64,20 @@ function ModeSlot({
   const recordStartBlocked = isCenter && isVideo && !ready && !isRecording
 
   const ariaLabel = isCenter
-    ? isRecording
+    ? handsFreePhase === 'playback'
+      ? 'Playing back latest take. Long press to turn off hands-free practice.'
+      : isRecording
       ? 'Stop recording'
       : isVideo
-        ? onLongPress
-          ? 'Start video recording. Long press to toggle hands-free practice.'
-          : 'Start video recording'
-        : onLongPress
-          ? 'Start audio recording. Long press to toggle hands-free practice.'
-          : 'Start audio recording'
+      ? onLongPress
+        ? 'Start video recording. Long press to toggle hands-free practice.'
+        : 'Start video recording'
+      : onLongPress
+      ? 'Start audio recording. Long press to toggle hands-free practice.'
+      : 'Start audio recording'
     : isVideo
-      ? 'Switch to video mode'
-      : 'Switch to audio mode'
+    ? 'Switch to video mode'
+    : 'Switch to audio mode'
 
   const longPressHandlers = useLongPress({
     onClick: onActivate,
@@ -107,16 +113,22 @@ function ModeSlot({
       className={`record-carousel-slot pointer-events-auto record-carousel-slot--${position} ${
         isCenter ? 'record-carousel-slot--active' : 'record-carousel-slot--inactive'
       } ${isCenter && isVideo ? 'record-carousel-slot--orbit' : ''} ${
-        isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''} ${
-        isCenter && isRecording ? 'record-carousel-slot--recording' : ''
-      } ${longPressActive ? 'record-carousel-slot--hands-free' : ''} ${
+        isCenter && isVideo && !isRecording ? 'record-carousel-slot--video-active' : ''
+      } ${isCenter && isRecording ? 'record-carousel-slot--recording' : ''} ${
+        longPressActive ? 'record-carousel-slot--hands-free' : ''
+      } ${handsFreePhase ? `record-carousel-slot--hands-free-${handsFreePhase}` : ''} ${
         recordStartBlocked ? 'record-carousel-slot--not-ready' : ''
       }`}
     >
-      {isCenter && isVideo ? (
+      {isCenter && handsFreePhase === 'playback' ? (
+        <Play className="record-carousel-slot-playback h-5 w-5" fill="currentColor" aria-hidden />
+      ) : isCenter && isVideo ? (
         <RecordOrbitIcon recording={isRecording} />
       ) : isCenter && isRecording ? (
-        <span className="record-carousel-slot-stop block h-3 w-3 rounded-[3px] bg-red-500" aria-hidden />
+        <span
+          className="record-carousel-slot-stop block h-3 w-3 rounded-[3px] bg-red-500"
+          aria-hidden
+        />
       ) : isCenter ? (
         <Mic className="h-5 w-5 text-white" strokeWidth={2.25} />
       ) : isVideo ? (
@@ -138,10 +150,12 @@ function RecordingModeCarousel({
   autoSoundRecording = false,
   onAutoSoundRecordingChange,
   hapticFeedback = true,
+  handsFreePhase,
 }: RecordingModeCarouselProps) {
   const notifyTutorial = useTutorialAction()
   const touchStartXRef = useRef(0)
   const autoSoundRecordingRef = useRef(autoSoundRecording)
+  const lastHandsFreeToggleAtRef = useRef(0)
   const modeSwitchLocked = disabled || isRecording
 
   useEffect(() => {
@@ -151,6 +165,7 @@ function RecordingModeCarousel({
   const handleSlotActivate = useCallback(
     (mode: RecordingMode) => {
       if (mode === value) {
+        if (handsFreePhase === 'playback') return
         if (!isRecording && mode === 'video' && !ready) return
         if (isRecording) {
           triggerRecordStopHaptic(hapticFeedback)
@@ -164,15 +179,21 @@ function RecordingModeCarousel({
       triggerModeSwitchHaptic(hapticFeedback)
       onChange(mode)
     },
-    [hapticFeedback, isRecording, modeSwitchLocked, onChange, onToggleRecord, value],
+    [handsFreePhase, hapticFeedback, isRecording, modeSwitchLocked, onChange, onToggleRecord, value]
   )
 
   const handleRecordLongPress = useCallback(() => {
     if (!onAutoSoundRecordingChange) return
+    const now = performance.now()
+    if (now - lastHandsFreeToggleAtRef.current < 650) return
 
     const nextEnabled = !autoSoundRecordingRef.current
     if (isRecording && nextEnabled) return
 
+    lastHandsFreeToggleAtRef.current = now
+    // Keep the gesture's source of truth synchronous. A second pointer event
+    // can arrive before React commits the new prop on iOS.
+    autoSoundRecordingRef.current = nextEnabled
     triggerLightHaptic(hapticFeedback)
     onAutoSoundRecordingChange(nextEnabled)
     notifyTutorial?.('hands-free-toggled')
@@ -197,12 +218,14 @@ function RecordingModeCarousel({
         onChange('video')
       }
     },
-    [hapticFeedback, modeSwitchLocked, onChange, value],
+    [hapticFeedback, modeSwitchLocked, onChange, value]
   )
 
   return (
     <div
-      className={`record-carousel-viewport ${isRecording ? 'record-carousel-viewport--recording' : ''} ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+      className={`record-carousel-viewport ${
+        isRecording ? 'record-carousel-viewport--recording' : ''
+      } ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
       role="group"
       aria-label="Recording mode"
       onTouchStart={handleTouchStart}
@@ -218,6 +241,7 @@ function RecordingModeCarousel({
           onActivate={() => handleSlotActivate('video')}
           onLongPress={value === 'video' ? handleRecordLongPress : undefined}
           longPressActive={value === 'video' && autoSoundRecording}
+          handsFreePhase={value === 'video' ? handsFreePhase : undefined}
           hapticFeedback={hapticFeedback}
         />
         <ModeSlot
@@ -229,6 +253,7 @@ function RecordingModeCarousel({
           onActivate={() => handleSlotActivate('audio')}
           onLongPress={value === 'audio' ? handleRecordLongPress : undefined}
           longPressActive={value === 'audio' && autoSoundRecording}
+          handsFreePhase={value === 'audio' ? handsFreePhase : undefined}
           hapticFeedback={hapticFeedback}
         />
       </div>
