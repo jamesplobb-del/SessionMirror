@@ -677,7 +677,7 @@ function PipWindow({
         )}
         </div>
 
-        {!compact && showPinAsBest && onPinAsBest && !isFill && (
+        {showPinAsBest && onPinAsBest && !isFill && (
           <Pressable
             type="button"
             intensity="icon"
@@ -689,7 +689,11 @@ function PipWindow({
               e.stopPropagation()
               onPinAsBest()
             }}
-            className={`${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--top-left pip-chrome-btn--pin-best`}
+            className={
+              compact
+                ? 'compact-take-card__pin'
+                : `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--gold pip-chrome-btn pip-chrome-btn--corner pip-chrome-btn--top-left pip-chrome-btn--pin-best`
+            }
             aria-label="Pin current take as Best Take"
             title="Pin as Best Take"
           >

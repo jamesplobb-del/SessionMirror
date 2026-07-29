@@ -1,5 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Camera, ChevronDown, ListMusic, Mic, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import {
+  Camera,
+  ChevronDown,
+  ListMusic,
+  Mic,
+  Settings,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
@@ -218,14 +227,18 @@ function ControlDeck({
             </motion.span>
           ) : (
             <motion.span
-              key="settings"
+              key={isCameraPresentation ? 'camera-settings' : 'audio-settings'}
               initial={{ opacity: 0, rotate: 45, scale: 0.8 }}
               animate={{ opacity: 1, rotate: 0, scale: 1 }}
               exit={{ opacity: 0, rotate: -45, scale: 0.8 }}
               transition={{ duration: 0.16, ease: 'easeOut' }}
               className="flex items-center justify-center"
             >
-              <SlidersHorizontal className="h-5 w-5" strokeWidth={2.15} />
+              {isCameraPresentation ? (
+                <SlidersHorizontal className="h-5 w-5" strokeWidth={2.15} />
+              ) : (
+                <Settings className="h-5 w-5" strokeWidth={1.9} />
+              )}
             </motion.span>
           )}
         </AnimatePresence>

@@ -655,6 +655,7 @@
 
   .app-ui-overlay--audio-mode .audio-mode-home {
     display: grid;
+    width: 100%;
     grid-template-columns: minmax(19rem, 0.82fr) minmax(24rem, 1fr);
     gap: clamp(1.4rem, 3vw, 3rem);
     align-items: center;

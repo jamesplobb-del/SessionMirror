@@ -136,7 +136,7 @@ import {
   updateVaultTake,
   type Project,
 } from './db'
-import { hasBenchmarkReference, resolveBenchmarkPlayback } from './utils/benchmarkReference'
+import { resolveBenchmarkPlayback } from './utils/benchmarkReference'
 import { hydrateLibraryItems, type HydratedLibraryItem } from './utils/libraryBridge'
 import {
   triggerBestTakeHaptic,
@@ -3835,11 +3835,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
   }, [recoverCameraAfterSurfaceDismiss])
 
-  const hasBestTakeReference = hasBenchmarkReference(youtubeUrl, resolvedBenchmark)
-
   const showPinCurrentAsBest = Boolean(
-    hasBestTakeReference &&
-      takeHasPlaybackMedia(challengerTake) &&
+    takeHasPlaybackMedia(challengerTake) &&
       challengerId &&
       challengerId !== benchmarkId
   )
@@ -4323,6 +4320,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         <div data-tutorial="audio-take-cards">
                           <AudioModeHome
                             isRecording={isRecording}
+                            elapsed={elapsed}
                             ready={ready}
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}

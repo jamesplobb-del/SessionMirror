@@ -43,6 +43,7 @@ interface UseDragToPinOptions {
   onTap?: () => void
   onDragStateChange?: (state: PipDragUiState) => void
   enabled: boolean
+  activationMode?: 'hold' | 'move'
   hapticFeedback?: boolean
 }
 
@@ -55,6 +56,7 @@ export function useDragToPin({
   onTap,
   onDragStateChange,
   enabled,
+  activationMode = 'hold',
   hapticFeedback = true,
 }: UseDragToPinOptions) {
   const draggingRef = useRef(false)
@@ -224,16 +226,25 @@ export function useDragToPin({
         /* pointer capture can fail if the press target leaves the tree */
       }
 
-      longPressTimerRef.current = window.setTimeout(() => {
-        armedRef.current = true
-        setIsArming(true)
-        emitDragState(false, true, false)
-        if (hapticFeedback) {
-          void triggerConfirmedLongPressHaptic()
-        }
-      }, LONG_PRESS_MS)
+      if (activationMode === 'hold') {
+        longPressTimerRef.current = window.setTimeout(() => {
+          armedRef.current = true
+          setIsArming(true)
+          emitDragState(false, true, false)
+          if (hapticFeedback) {
+            void triggerConfirmedLongPressHaptic()
+          }
+        }, LONG_PRESS_MS)
+      }
     },
-    [clearLongPressTimer, emitDragState, enabled, hapticFeedback, sourceTakeId],
+    [
+      activationMode,
+      clearLongPressTimer,
+      emitDragState,
+      enabled,
+      hapticFeedback,
+      sourceTakeId,
+    ],
   )
 
   const handlePointerMove = useCallback(
@@ -245,10 +256,15 @@ export function useDragToPin({
       const distance = Math.hypot(deltaX, deltaY)
 
       if (!armedRef.current && !draggingRef.current) {
-        if (distance > MOVEMENT_CANCEL_PX) {
-          clearLongPressTimer()
+        if (activationMode === 'move') {
+          if (distance < DRAG_THRESHOLD_PX) return
+          armedRef.current = true
+        } else {
+          if (distance > MOVEMENT_CANCEL_PX) {
+            clearLongPressTimer()
+          }
+          return
         }
-        return
       }
 
       if (armedRef.current && !draggingRef.current) {
@@ -281,6 +297,7 @@ export function useDragToPin({
     },
     [
       clearLongPressTimer,
+      activationMode,
       emitDragState,
       hapticFeedback,
       resolveDropTargets,

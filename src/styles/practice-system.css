@@ -1714,25 +1714,26 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode
   .control-deck__settings-btn.audio-control-deck__settings-btn {
   position: absolute !important;
-  top: 50%;
+  top: auto !important;
+  bottom: 0.08rem;
   right: max(0.8rem, calc(env(safe-area-inset-right, 0px) + 0.55rem)) !important;
   z-index: 12;
-  width: 2.75rem !important;
-  height: 2.75rem !important;
-  min-width: 2.75rem !important;
-  min-height: 2.75rem !important;
+  width: 2.45rem !important;
+  height: 2.45rem !important;
+  min-width: 2.45rem !important;
+  min-height: 2.45rem !important;
   margin: 0 !important;
   border-color: transparent !important;
   background: transparent !important;
   color: rgba(35, 58, 74, 0.88) !important;
   box-shadow: none !important;
   filter: drop-shadow(0 2px 3px rgba(29, 61, 84, 0.16));
-  transform: translateY(-50%);
+  transform: none;
 }
 
 .app-ui-overlay--audio-mode
   .control-deck__settings-btn.audio-control-deck__settings-btn:active {
-  transform: translateY(-50%) scale(0.92);
+  transform: scale(0.92);
 }
 
 .app-ui-overlay--audio-mode
@@ -1746,8 +1747,8 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-mode .audio-control-deck__settings-btn svg {
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 1.18rem;
+  height: 1.18rem;
   stroke-width: 1.9;
 }
 
@@ -1933,5 +1934,16 @@ html.app-dark-mode
 @media (prefers-reduced-motion: reduce) {
   .app-ui-overlay--audio-mode .audio-control-pill {
     animation: none;
+  }
+}
+
+/* Keep the reference-style Audio take cards compact after late tablet/global rules. */
+.app-ui-overlay--audio-mode .audio-mode-take-card {
+  min-height: clamp(6.9rem, 14.5vh, 7.75rem) !important;
+}
+
+@media (min-width: 744px) {
+  .app-ui-overlay--audio-mode .audio-mode-take-card {
+    min-height: clamp(8rem, 13vh, 9.5rem) !important;
   }
 }

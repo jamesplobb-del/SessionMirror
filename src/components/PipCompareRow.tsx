@@ -1,6 +1,13 @@
-import { useRef, memo, type RefObject } from 'react'
+import {
+  useRef,
+  memo,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type RefObject,
+} from 'react'
 import { motion } from 'framer-motion'
-import { X } from 'lucide-react'
+import { Columns2, X } from 'lucide-react'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import Pressable from './ui/Pressable'
@@ -75,6 +82,9 @@ function CompactTakeCaption({
   library = false,
   onOpen,
   hapticFeedback,
+  dragSourceProps,
+  dragSourceActive = false,
+  dragSourceArming = false,
 }: {
   label: string
   tone: 'best' | 'current'
@@ -86,6 +96,15 @@ function CompactTakeCaption({
   library?: boolean
   onOpen?: () => void
   hapticFeedback: boolean
+  dragSourceProps?: {
+    onPointerDown: (event: PointerEvent<HTMLElement>) => void
+    onPointerMove: (event: PointerEvent<HTMLElement>) => void
+    onPointerUp: (event: PointerEvent<HTMLElement>) => void
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => void
+    style?: CSSProperties
+  }
+  dragSourceActive?: boolean
+  dragSourceArming?: boolean
 }) {
   const formattedDuration = formatCompactDuration(duration)
   const formattedTimestamp = formatCompactTimestamp(timestamp)
@@ -102,6 +121,31 @@ function CompactTakeCaption({
     </>
   )
 
+  const captionClassName = `compact-take-caption compact-take-caption--${tone} ${
+    dragSourceActive ? 'compact-take-caption--dragging' : ''
+  } ${dragSourceArming ? 'compact-take-caption--arming' : ''}`
+
+  if (hasMedia && onOpen && dragSourceProps) {
+    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      onOpen()
+    }
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        className={captionClassName}
+        aria-label={`Drag ${label} to the other box, or tap to open full screen`}
+        onKeyDown={handleKeyDown}
+        {...dragSourceProps}
+      >
+        {content}
+      </div>
+    )
+  }
+
   return hasMedia && onOpen ? (
     <Pressable
       type="button"
@@ -109,14 +153,14 @@ function CompactTakeCaption({
       squish={false}
       haptic="light"
       hapticFeedback={hapticFeedback}
-      className={`compact-take-caption compact-take-caption--${tone}`}
+      className={captionClassName}
       onClick={onOpen}
       aria-label={`Open ${label} full screen`}
     >
       {content}
     </Pressable>
   ) : (
-    <div className={`compact-take-caption compact-take-caption--${tone}`}>{content}</div>
+    <div className={captionClassName}>{content}</div>
   )
 }
 
@@ -141,6 +185,30 @@ function CompactTakeClearButton({
       aria-label={`Unload ${label}`}
     >
       <X aria-hidden />
+    </Pressable>
+  )
+}
+
+function CompactCompareButton({
+  onToggle,
+  hapticFeedback,
+}: {
+  onToggle: () => void
+  hapticFeedback: boolean
+}) {
+  return (
+    <Pressable
+      type="button"
+      intensity="soft"
+      squish={false}
+      haptic="light"
+      hapticFeedback={hapticFeedback}
+      className="camera-compare-toggle pointer-events-auto"
+      onClick={onToggle}
+      aria-label="Open split comparison"
+    >
+      <Columns2 aria-hidden />
+      <span>Compare</span>
     </Pressable>
   )
 }
@@ -254,7 +322,8 @@ export default memo(function PipCompareRow({
     onDelete: onDeleteTake,
     onTap: onExpandChallenger,
     onDragStateChange,
-    enabled: !compact && takeHasPlaybackMedia(challengerTake),
+    enabled: takeHasPlaybackMedia(challengerTake),
+    activationMode: compact ? 'move' : 'hold',
     hapticFeedback,
   })
 
@@ -270,10 +339,10 @@ export default memo(function PipCompareRow({
     onTap: onExpandBenchmark,
     onDragStateChange,
     enabled:
-      !compact &&
       takeHasPlaybackMedia(benchmarkTake) &&
       !libraryBenchmarkPlayback &&
       !youtubeEmbedUrl,
+    activationMode: compact ? 'move' : 'hold',
     hapticFeedback,
   })
 
@@ -296,6 +365,8 @@ export default memo(function PipCompareRow({
           ref={benchmarkDropRef}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--best' : ''
+          } ${
+            compact && challengerGhost?.overPin ? 'compact-take-slot--drop-active' : ''
           }`}
         >
           <BestTakeBox
@@ -348,6 +419,15 @@ export default memo(function PipCompareRow({
               library={Boolean(libraryBenchmarkPlayback)}
               onOpen={onExpandBenchmark}
               hapticFeedback={hapticFeedback}
+              dragSourceProps={
+                takeHasPlaybackMedia(benchmarkTake) &&
+                !libraryBenchmarkPlayback &&
+                !youtubeEmbedUrl
+                  ? benchmarkDragSourceProps
+                  : undefined
+              }
+              dragSourceActive={benchmarkDragging}
+              dragSourceArming={benchmarkArming}
             />
           )}
           {compact && compactBenchmarkHasMedia && (
@@ -363,6 +443,8 @@ export default memo(function PipCompareRow({
           ref={challengerDropRef}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--current' : ''
+          } ${
+            compact && benchmarkGhost?.overPin ? 'compact-take-slot--drop-active' : ''
           }`}
           data-tutorial="challenger-card"
         >
@@ -411,6 +493,13 @@ export default memo(function PipCompareRow({
               hasMedia={takeHasPlaybackMedia(challengerTake)}
               onOpen={onExpandChallenger}
               hapticFeedback={hapticFeedback}
+              dragSourceProps={
+                takeHasPlaybackMedia(challengerTake)
+                  ? challengerDragSourceProps
+                  : undefined
+              }
+              dragSourceActive={challengerDragging}
+              dragSourceArming={challengerArming}
             />
           )}
           {compact && takeHasPlaybackMedia(challengerTake) && (
@@ -422,6 +511,13 @@ export default memo(function PipCompareRow({
           )}
         </div>
       </div>
+
+      {compact && (
+        <CompactCompareButton
+          onToggle={onToggleSplitView}
+          hapticFeedback={hapticFeedback}
+        />
+      )}
 
       {challengerGhost && challengerTake && (
         <PipDragGhost

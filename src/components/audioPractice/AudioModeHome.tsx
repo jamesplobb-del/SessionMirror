@@ -1,8 +1,15 @@
-import { memo, useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react'
 import { motion } from 'framer-motion'
 import { LoaderCircle, Pause, Play, RotateCw, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
-import AudioModeHeroMic from './AudioModeHeroMic'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
 import { stopEventBubble } from '../../utils/eventBubbling'
@@ -26,14 +33,6 @@ function formatDuration(seconds?: number): string {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
-function formatTakeTime(timestamp?: number): string {
-  if (!timestamp) return 'Today'
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(timestamp))
-}
-
 interface AudioModeTakeCardProps {
   label: string
   tone: 'current' | 'best'
@@ -48,6 +47,29 @@ interface AudioModeTakeCardProps {
 }
 
 type ScrubPhase = 'start' | 'move' | 'end'
+
+function AudioRecordingWaveform({ isRecording }: { isRecording: boolean }) {
+  return (
+    <div
+      className={`audio-recording-waveform ${
+        isRecording ? 'audio-recording-waveform--recording' : ''
+      }`}
+      aria-hidden
+    >
+      {EMPTY_WAVEFORM_PEAKS.map((peak, index) => (
+        <span
+          key={index}
+          className="audio-recording-waveform__bar"
+          style={{
+            height: `${Math.round(8 + peak * 88)}%`,
+            animationDelay: `${-(index % 13) * 47}ms`,
+            animationDuration: `${620 + (index % 9) * 53}ms`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
 
 function AudioWaveform({
   tone,
@@ -122,6 +144,29 @@ function AudioWaveform({
     event.stopPropagation()
   }
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return
+    const step = event.shiftKey ? 0.1 : 0.025
+    let nextProgress: number | null = null
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      nextProgress = Math.max(0, displayedProgress - step)
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      nextProgress = Math.min(1, displayedProgress + step)
+    } else if (event.key === 'Home') {
+      nextProgress = 0
+    } else if (event.key === 'End') {
+      nextProgress = 1
+    }
+
+    if (nextProgress === null) return
+    event.preventDefault()
+    event.stopPropagation()
+    onScrub(nextProgress, 'start')
+    onScrub(nextProgress, 'end')
+    triggerLightHaptic(hapticFeedback)
+  }
+
   return (
     <div
       className={`audio-mode-waveform audio-mode-waveform--${tone} ${
@@ -140,6 +185,7 @@ function AudioWaveform({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onKeyDown={handleKeyDown}
       onClick={stopEventBubble}
     >
       {peaks.map((peak, index) => (
@@ -151,7 +197,7 @@ function AudioWaveform({
               : 'audio-mode-waveform__bar'
           }
           style={{
-            height: `${Math.round(14 + peak * 78)}%`,
+            height: `${Math.round(5 + peak * 25)}px`,
             animationDelay: active ? `${index * 18}ms` : undefined,
           }}
         />
@@ -186,7 +232,6 @@ function AudioModeTakeCard({
     audioPlayback,
     isCurrentItem,
   } = useAudioModeTakeItem({ tone, take, libraryPlayback })
-  const timestamp = take?.timestamp
   const isPreparing = readiness?.status === 'preparing'
   const preparationFailed = readiness?.status === 'error'
   const playable = hasMedia && !isPreparing && !preparationFailed
@@ -277,32 +322,7 @@ function AudioModeTakeCard({
         </div>
       </div>
 
-      <div className="audio-mode-take-card__title-row">
-        <div className="min-w-0">
-          <h3>{displayName}</h3>
-          <p>
-            {isPreparing
-              ? 'Preparing playback...'
-              : preparationFailed
-                ? readiness?.message ?? 'Playback preparation failed.'
-                : timestamp
-                  ? `Today, ${formatTakeTime(timestamp)}`
-                  : 'Ready for a new take'}
-            {playable ? `  •  ${formatDuration(knownDurationSeconds)}` : ''}
-          </p>
-        </div>
-      </div>
-
       <div className="audio-mode-take-card__media">
-        <AudioWaveform
-          tone={tone}
-          active={isPlaying}
-          peaks={displayPeaks}
-          progress={playable ? waveformProgress : 0}
-          onScrub={handleWaveformScrub}
-          disabled={!playable}
-          hapticFeedback={hapticFeedback}
-        />
         <Pressable
           type="button"
           intensity="icon"
@@ -339,6 +359,39 @@ function AudioModeTakeCard({
             <Play className="ml-0.5 h-5 w-5 fill-[#171A22]" />
           )}
         </Pressable>
+        <div className="audio-mode-take-card__playback-column">
+          <div className="audio-mode-take-card__title-row">
+            <div className="audio-mode-take-card__title-copy">
+              <div className="audio-mode-take-card__name-line">
+                <h3>{displayName}</h3>
+                {playable && (
+                  <span className="audio-mode-take-card__duration">
+                    <span aria-hidden />
+                    {formatDuration(knownDurationSeconds)}
+                  </span>
+                )}
+              </div>
+              {!playable && (
+                <p>
+                  {isPreparing
+                    ? 'Preparing playback...'
+                    : preparationFailed
+                      ? readiness?.message ?? 'Playback preparation failed.'
+                      : 'Ready for a new take'}
+                </p>
+              )}
+            </div>
+          </div>
+          <AudioWaveform
+            tone={tone}
+            active={isPlaying}
+            peaks={displayPeaks}
+            progress={playable ? waveformProgress : 0}
+            onScrub={handleWaveformScrub}
+            disabled={!playable}
+            hapticFeedback={hapticFeedback}
+          />
+        </div>
       </div>
     </motion.article>
   )
@@ -346,6 +399,7 @@ function AudioModeTakeCard({
 
 interface AudioModeHomeProps {
   isRecording: boolean
+  elapsed: number
   ready: boolean
   challengerTake: Take | null
   benchmarkTake: Take | null
@@ -362,6 +416,7 @@ interface AudioModeHomeProps {
 
 function AudioModeHome({
   isRecording,
+  elapsed,
   ready,
   challengerTake,
   benchmarkTake,
@@ -375,8 +430,8 @@ function AudioModeHome({
   onRetryTakePreparation,
   hapticFeedback = true,
 }: AudioModeHomeProps) {
-  const status = isRecording ? 'Recording...' : ready ? 'Ready to record' : 'Preparing audio'
-  const hint = isRecording ? 'Listening now' : 'Tap the mic to start'
+  const status = isRecording ? 'Recording' : ready ? 'Ready' : 'Preparing'
+  const hint = isRecording ? 'Recording audio… tap stop when finished' : 'Tap the mic to start recording'
 
   return (
     <section className="audio-mode-home pointer-events-auto">
@@ -386,12 +441,36 @@ function AudioModeHome({
         animate={{ opacity: 1 }}
         transition={iosHudDim}
       >
-        <AudioModeHeroMic isRecording={isRecording} />
-        <h2>{status}</h2>
+        <div
+          className={`audio-mode-status-pill ${
+            isRecording ? 'audio-mode-status-pill--recording' : ''
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="audio-mode-status-pill__dot" aria-hidden />
+          <strong>{status}</strong>
+          <span className="audio-mode-status-pill__divider" aria-hidden />
+          <time>{formatDuration(isRecording ? elapsed : 0)}</time>
+        </div>
+        <AudioRecordingWaveform isRecording={isRecording} />
         <p>{hint}</p>
       </motion.div>
 
       <div className="audio-mode-take-stack">
+        <AudioModeTakeCard
+          label="Current Take"
+          tone="current"
+          take={challengerTake}
+          onOpen={onExpandChallenger}
+          onFavorite={onPinCurrentAsBest}
+          onClear={onClearChallenger}
+          readiness={challengerTake ? takeReadiness[challengerTake.id] : undefined}
+          onRetryPreparation={
+            challengerTake ? () => onRetryTakePreparation?.(challengerTake.id) : undefined
+          }
+          hapticFeedback={hapticFeedback}
+        />
         <AudioModeTakeCard
           label="Best Take"
           tone="best"
@@ -404,19 +483,6 @@ function AudioModeHome({
           readiness={benchmarkTake ? takeReadiness[benchmarkTake.id] : undefined}
           onRetryPreparation={
             benchmarkTake ? () => onRetryTakePreparation?.(benchmarkTake.id) : undefined
-          }
-          hapticFeedback={hapticFeedback}
-        />
-        <AudioModeTakeCard
-          label="Current Take"
-          tone="current"
-          take={challengerTake}
-          onOpen={onExpandChallenger}
-          onFavorite={onPinCurrentAsBest}
-          onClear={onClearChallenger}
-          readiness={challengerTake ? takeReadiness[challengerTake.id] : undefined}
-          onRetryPreparation={
-            challengerTake ? () => onRetryTakePreparation?.(challengerTake.id) : undefined
           }
           hapticFeedback={hapticFeedback}
         />

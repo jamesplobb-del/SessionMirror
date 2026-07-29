@@ -1205,6 +1205,119 @@ button.compact-take-caption:active {
   stroke-width: 1.85;
 }
 
+.compact-take-card__pin {
+  position: absolute;
+  bottom: 0.24rem;
+  left: 0.24rem;
+  z-index: 34;
+  display: grid;
+  width: 1.42rem;
+  height: 1.42rem;
+  padding: 0;
+  border: 0.5px solid rgba(255, 207, 92, 0.5);
+  border-radius: 999px;
+  background: rgba(18, 16, 10, 0.44);
+  color: #f7ae1c;
+  box-shadow:
+    0 0.2rem 0.5rem rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 225, 154, 0.16);
+  place-items: center;
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  backdrop-filter: blur(8px) saturate(1.08);
+}
+
+.compact-take-card__pin:active {
+  opacity: 0.7;
+  transform: scale(0.91);
+}
+
+.compact-take-card__pin svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  stroke-width: 2;
+}
+
+.compact-take-caption[role='button'] {
+  cursor: grab;
+  touch-action: none;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
+}
+
+.compact-take-caption[role='button']:focus-visible {
+  border-radius: 0.45rem;
+  outline: 1.5px solid rgba(255, 255, 255, 0.72);
+  outline-offset: -0.12rem;
+}
+
+.compact-take-caption--arming {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.compact-take-caption--dragging {
+  cursor: grabbing;
+  opacity: 0.52;
+}
+
+.compact-take-slot--drop-active {
+  transform: scale(1.018);
+}
+
+.compact-take-slot--best.compact-take-slot--drop-active {
+  box-shadow:
+    0 0.55rem 1.35rem rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(247, 174, 28, 0.42),
+    0 0 1.15rem rgba(247, 166, 0, 0.18),
+    inset 0 1px 0 rgba(255, 211, 116, 0.12);
+}
+
+.compact-take-slot--current.compact-take-slot--drop-active {
+  box-shadow:
+    0 0.55rem 1.35rem rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(37, 164, 241, 0.42),
+    0 0 1.15rem rgba(21, 152, 255, 0.18),
+    inset 0 1px 0 rgba(95, 190, 255, 0.12);
+}
+
+.camera-compare-toggle {
+  display: flex;
+  width: max-content;
+  min-height: 1.9rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+  margin: 0.48rem auto 0;
+  padding: 0.35rem 0.68rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
+    rgba(8, 12, 18, 0.16);
+  color: rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 0.3rem 0.85rem rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11);
+  font-size: 0.58rem;
+  font-weight: 620;
+  letter-spacing: 0.025em;
+  line-height: 1;
+  -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+
+.camera-compare-toggle:active {
+  opacity: 0.7;
+  transform: scale(0.95);
+}
+
+.camera-compare-toggle svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  color: #61bdff;
+  stroke-width: 1.75;
+}
+
 .compact-take-card__play-surface {
   width: 100%;
   height: 100%;
