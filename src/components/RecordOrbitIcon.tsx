@@ -31,25 +31,22 @@ export default function RecordOrbitIcon({ recording = false }: RecordOrbitIconPr
           />
         </g>
 
-        {recording ? (
-          <rect
-            className="record-orbit-icon__stop"
-            x="24"
-            y="24"
-            width="16"
-            height="16"
-            rx="2.75"
-            fill={`url(#${dotGradientId})`}
-          />
-        ) : (
-          <circle
-            className="record-orbit-icon__dot"
-            cx="32"
-            cy="32"
-            r="7.25"
-            fill={`url(#${dotGradientId})`}
-          />
-        )}
+        <circle
+          className="record-orbit-icon__dot"
+          cx="32"
+          cy="32"
+          r="7.25"
+          fill={`url(#${dotGradientId})`}
+        />
+        <rect
+          className="record-orbit-icon__stop"
+          x="24"
+          y="24"
+          width="16"
+          height="16"
+          rx="2.75"
+          fill={`url(#${dotGradientId})`}
+        />
       </svg>
     </span>
   )

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
-import { Pause, Play, Pin, Upload, X } from 'lucide-react'
+import { Pause, Play, Pin, Upload, Video, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import MiniPipControls from './MiniPipControls'
 import Pressable from './ui/Pressable'
@@ -658,7 +658,7 @@ function PipWindow({
           </>
         ) : compact ? (
           <div className="compact-take-card__empty absolute inset-0 flex items-center justify-center">
-            <span aria-hidden>—</span>
+            <Video className="compact-take-card__empty-placeholder" aria-hidden />
           </div>
         ) : (
           <div className="pip-empty-state absolute inset-0 flex flex-col px-2 pb-2 pt-6">

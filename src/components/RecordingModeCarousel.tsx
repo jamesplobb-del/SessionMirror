@@ -24,6 +24,7 @@ interface RecordingModeCarouselProps {
   onAutoSoundRecordingChange?: (enabled: boolean) => void
   hapticFeedback?: boolean
   handsFreePhase?: HandsFreePhase
+  presentation?: 'carousel' | 'camera' | 'audio'
 }
 
 type SlotPosition = 'center' | 'left' | 'right'
@@ -45,6 +46,7 @@ interface ModeSlotProps {
   longPressActive?: boolean
   handsFreePhase?: HandsFreePhase
   hapticFeedback?: boolean
+  cameraPresentation?: boolean
 }
 
 function ModeSlot({
@@ -58,6 +60,7 @@ function ModeSlot({
   longPressActive = false,
   handsFreePhase,
   hapticFeedback = true,
+  cameraPresentation = false,
 }: ModeSlotProps) {
   const isCenter = position === 'center'
   const isVideo = mode === 'video'
@@ -118,7 +121,7 @@ function ModeSlot({
         longPressActive ? 'record-carousel-slot--hands-free' : ''
       } ${handsFreePhase ? `record-carousel-slot--hands-free-${handsFreePhase}` : ''} ${
         recordStartBlocked ? 'record-carousel-slot--not-ready' : ''
-      }`}
+      } ${cameraPresentation ? 'record-carousel-slot--camera' : ''}`}
     >
       {isCenter && handsFreePhase === 'playback' ? (
         <Play className="record-carousel-slot-playback h-5 w-5" fill="currentColor" aria-hidden />
@@ -151,6 +154,7 @@ function RecordingModeCarousel({
   onAutoSoundRecordingChange,
   hapticFeedback = true,
   handsFreePhase,
+  presentation = 'carousel',
 }: RecordingModeCarouselProps) {
   const notifyTutorial = useTutorialAction()
   const touchStartXRef = useRef(0)
@@ -220,6 +224,63 @@ function RecordingModeCarousel({
     },
     [hapticFeedback, modeSwitchLocked, onChange, value]
   )
+
+  if (presentation === 'camera') {
+    return (
+      <div
+        className={`record-carousel-viewport record-carousel-viewport--camera ${
+          isRecording ? 'record-carousel-viewport--recording' : ''
+        } ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+        role="group"
+        aria-label="Camera recording"
+      >
+        <div className="record-carousel-track">
+          <ModeSlot
+            mode="video"
+            position="center"
+            isRecording={isRecording}
+            ready={ready}
+            modeSwitchLocked={modeSwitchLocked}
+            onActivate={() => handleSlotActivate('video')}
+            onLongPress={handleRecordLongPress}
+            longPressActive={autoSoundRecording}
+            handsFreePhase={handsFreePhase}
+            hapticFeedback={hapticFeedback}
+            cameraPresentation
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (presentation === 'audio') {
+    return (
+      <div
+        className={`record-carousel-viewport record-carousel-viewport--audio-compact ${
+          isRecording ? 'record-carousel-viewport--recording' : ''
+        } ${modeSwitchLocked ? 'record-carousel-viewport--locked' : ''}`}
+        role="group"
+        aria-label="Audio recording"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="record-carousel-track">
+          <ModeSlot
+            mode="audio"
+            position="center"
+            isRecording={isRecording}
+            ready={ready}
+            modeSwitchLocked={modeSwitchLocked}
+            onActivate={() => handleSlotActivate('audio')}
+            onLongPress={handleRecordLongPress}
+            longPressActive={autoSoundRecording}
+            handsFreePhase={handsFreePhase}
+            hapticFeedback={hapticFeedback}
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

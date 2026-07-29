@@ -1426,3 +1426,512 @@ html.app-dark-mode
     animation: none;
   }
 }
+
+/* Audio Mode recording deck — Camera Mode's compact glass language. */
+.app-ui-overlay--audio-mode .control-deck:not(.control-deck--camera) {
+  display: flex !important;
+  width: 100% !important;
+  grid-template-columns: none !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 0 clamp(0.72rem, 2vh, 1rem) !important;
+}
+
+.app-ui-overlay--audio-mode .audio-control-deck__main-row {
+  position: relative;
+  display: flex !important;
+  width: 100%;
+  min-height: 4rem;
+  max-width: none !important;
+  align-items: center;
+  justify-content: center;
+  margin: 0 !important;
+}
+
+.app-ui-overlay--audio-mode .audio-control-pill {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  width: clamp(13.35rem, 57vw, 14.5rem);
+  height: 4rem;
+  grid-template-columns: minmax(0, 1fr) 3.45rem minmax(0, 1fr);
+  align-items: center;
+  justify-items: stretch;
+  overflow: visible;
+  border: 0.75px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.14)),
+    rgba(222, 234, 244, 0.16);
+  box-shadow:
+    0 0.65rem 1.7rem rgba(29, 61, 84, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  animation: audio-control-pill-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  backdrop-filter: blur(22px) saturate(1.18);
+}
+
+.app-ui-overlay--audio-mode .audio-control-pill::before,
+.app-ui-overlay--audio-mode .audio-control-pill::after {
+  position: absolute;
+  inset-block: 0;
+  z-index: -1;
+  width: 46%;
+  content: "";
+  pointer-events: none;
+}
+
+.app-ui-overlay--audio-mode .audio-control-pill::before {
+  left: 0;
+  border-radius: 999px 0 0 999px;
+  background: radial-gradient(circle at 0% 100%, rgba(247, 166, 0, 0.08), transparent 66%);
+}
+
+.app-ui-overlay--audio-mode .audio-control-pill::after {
+  right: 0;
+  border-radius: 0 999px 999px 0;
+  background: radial-gradient(circle at 100% 100%, rgba(21, 152, 255, 0.11), transparent 66%);
+}
+
+.app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,
+.app-ui-overlay--audio-mode .audio-control-pill .audio-camera-button {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 100% !important;
+  min-width: 2.75rem !important;
+  height: 100% !important;
+  min-height: 2.75rem !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.app-ui-overlay--audio-mode .audio-vault-button__icon-wrap {
+  position: relative;
+  display: flex;
+  width: 2.35rem;
+  height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  color: rgba(35, 58, 74, 0.9);
+}
+
+.app-ui-overlay--audio-mode .audio-vault-button__icon-wrap > svg {
+  width: 1.62rem;
+  height: 1.62rem;
+}
+
+.app-ui-overlay--audio-mode
+  .control-deck__vault-btn
+  .audio-vault-button__badge {
+  position: absolute;
+  top: 0.02rem;
+  right: -0.2rem;
+  display: flex;
+  height: 1.16rem;
+  min-width: 1.16rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.24rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.96);
+  border-radius: 999px;
+  background: #f47b20 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0.12rem 0.35rem rgba(0, 0, 0, 0.2);
+  font-size: 0.58rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.app-ui-overlay--audio-mode .audio-camera-button__content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.08rem;
+  color: rgba(36, 67, 88, 0.92);
+  font-size: 0.66rem;
+  font-weight: 520;
+  line-height: 1;
+}
+
+.app-ui-overlay--audio-mode .audio-camera-button__content > svg {
+  width: 1.68rem;
+  height: 1.42rem;
+  color: #1598ff;
+  filter: drop-shadow(0 0 0.2rem rgba(21, 152, 255, 0.13));
+}
+
+.app-ui-overlay--audio-mode .audio-vault-button,
+.app-ui-overlay--audio-mode .audio-camera-button {
+  transition: opacity 140ms ease;
+}
+
+.app-ui-overlay--audio-mode .audio-vault-button:active,
+.app-ui-overlay--audio-mode .audio-camera-button:active:not(:disabled) {
+  opacity: 0.68;
+}
+
+.app-ui-overlay--audio-mode .audio-camera-button:disabled {
+  opacity: 0.42;
+}
+
+.app-ui-overlay--audio-mode .audio-control-deck__record-stack {
+  position: relative;
+  z-index: 4;
+  width: 3.45rem;
+  height: 4rem;
+  align-self: center;
+  justify-content: center;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  .record-delete-drop,
+.app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  .record-carousel-viewport,
+.app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  .record-carousel-viewport--audio-compact {
+  --record-carousel-viewport-width: 3.45rem;
+  --record-slot-active-size: 2.9rem;
+  width: 3.45rem !important;
+  height: 3.45rem !important;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot--center {
+  width: 2.9rem !important;
+  height: 2.9rem !important;
+  border: 0.75px solid rgba(66, 91, 109, 0.26) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.13)),
+    rgba(223, 234, 242, 0.14) !important;
+  color: #c78100 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 0.18rem 0.6rem rgba(29, 61, 84, 0.13) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.12);
+  backdrop-filter: blur(12px) saturate(1.12);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot--center:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot--center
+  > svg {
+  width: 1.08rem;
+  height: 1.08rem;
+  color: #c78100 !important;
+  stroke-width: 2.15;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot--recording {
+  border-color: rgba(225, 75, 91, 0.3) !important;
+  background: rgba(255, 242, 244, 0.38) !important;
+  color: #e43b50 !important;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot-stop {
+  display: block;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 0.2rem;
+  background: #eb2f4b !important;
+  box-shadow: 0 0.1rem 0.22rem rgba(168, 20, 45, 0.22);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot--hands-free:not(.record-carousel-slot--recording) {
+  border-color: rgba(21, 152, 255, 0.48) !important;
+  background: rgba(228, 244, 255, 0.46) !important;
+  color: #197cbf !important;
+  box-shadow:
+    0 0 0 3px rgba(21, 152, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot--hands-free:not(.record-carousel-slot--recording)
+  > svg {
+  color: #197cbf !important;
+}
+
+.app-ui-overlay--audio-mode .audio-control-deck__record-stack > .auto-sound-hint,
+.app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  > .hands-free-status:not([aria-hidden="true"]),
+.app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  > .recording-elapsed {
+  position: absolute;
+  bottom: calc(100% + 0.48rem);
+  left: 50%;
+  width: max-content;
+  max-width: min(15rem, calc(100vw - 2rem));
+  min-height: 1.55rem;
+  padding: 0.34rem 0.64rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 0.35rem 0.9rem rgba(29, 61, 84, 0.12);
+  color: rgba(35, 58, 74, 0.92) !important;
+  text-shadow: none;
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(16px) saturate(1.14);
+  backdrop-filter: blur(16px) saturate(1.14);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  > .recording-elapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-ui-overlay--audio-mode
+  .control-deck__settings-btn.audio-control-deck__settings-btn {
+  position: absolute !important;
+  top: 50%;
+  right: max(0.8rem, calc(env(safe-area-inset-right, 0px) + 0.55rem)) !important;
+  z-index: 12;
+  width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-width: 2.75rem !important;
+  min-height: 2.75rem !important;
+  margin: 0 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: rgba(35, 58, 74, 0.88) !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 2px 3px rgba(29, 61, 84, 0.16));
+  transform: translateY(-50%);
+}
+
+.app-ui-overlay--audio-mode
+  .control-deck__settings-btn.audio-control-deck__settings-btn:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
+.app-ui-overlay--audio-mode
+  .control-deck__settings-btn.audio-control-deck__settings-btn[aria-expanded="true"] {
+  border-color: rgba(21, 152, 255, 0.2) !important;
+  background: rgba(235, 247, 255, 0.72) !important;
+  color: #197cbf !important;
+  box-shadow: 0 0.25rem 0.75rem rgba(29, 61, 84, 0.12) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.app-ui-overlay--audio-mode .audio-control-deck__settings-btn svg {
+  width: 1.55rem;
+  height: 1.55rem;
+  stroke-width: 1.9;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-deck__main-row
+  .control-deck__collapse-trigger {
+  position: absolute;
+  top: -0.92rem;
+  left: 50%;
+  z-index: 10;
+  display: grid;
+  width: 2rem;
+  height: 1.3rem;
+  padding: 0;
+  border: 0.5px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.56);
+  color: rgba(51, 76, 94, 0.62);
+  box-shadow: 0 0.22rem 0.65rem rgba(29, 61, 84, 0.1);
+  transform: translateX(-50%);
+  place-items: center;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-deck__main-row
+  .control-deck__collapse-trigger:active {
+  transform: translateX(-50%) scale(0.92);
+}
+
+.app-ui-overlay--audio-mode
+  .audio-control-deck__main-row
+  .control-deck__collapse-trigger
+  svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.app-ui-overlay--audio-mode
+  .control-deck--collapsible
+  > .control-deck__expand-trigger {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  padding: 0;
+  border: 0.75px solid rgba(255, 255, 255, 0.84);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.16)),
+    rgba(222, 234, 244, 0.16);
+  color: #c78100;
+  box-shadow:
+    0 0.55rem 1.35rem rgba(29, 61, 84, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  place-items: center;
+  -webkit-backdrop-filter: blur(20px) saturate(1.16);
+  backdrop-filter: blur(20px) saturate(1.16);
+}
+
+.app-ui-overlay--audio-mode
+  .control-deck--collapsible
+  > .control-deck__expand-trigger
+  svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-control-pill {
+  border-color: rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.028)),
+    rgba(8, 12, 18, 0.16);
+  box-shadow:
+    0 0.65rem 1.7rem rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-vault-button__icon-wrap,
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-camera-button__content,
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .control-deck__settings-btn.audio-control-deck__settings-btn {
+  color: rgba(245, 249, 252, 0.9) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-control-pill
+  .record-carousel-slot--center {
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  background: rgba(8, 12, 18, 0.18) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    0 0.18rem 0.6rem rgba(0, 0, 0, 0.18) !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  > .auto-sound-hint,
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  > .hands-free-status:not([aria-hidden="true"]),
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-control-deck__record-stack
+  > .recording-elapsed {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(8, 12, 18, 0.54);
+  color: rgba(245, 249, 252, 0.9) !important;
+  box-shadow: 0 0.35rem 0.9rem rgba(0, 0, 0, 0.2);
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-control-deck__main-row
+  .control-deck__collapse-trigger,
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .control-deck--collapsible
+  > .control-deck__expand-trigger {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(8, 12, 18, 0.38);
+  color: rgba(245, 249, 252, 0.84);
+  box-shadow:
+    0 0.45rem 1rem rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11);
+}
+
+@keyframes audio-control-pill-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.3rem) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 350px) {
+  .app-ui-overlay--audio-mode .audio-control-pill {
+    width: 12.8rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .control-deck__settings-btn.audio-control-deck__settings-btn {
+    right: max(0.25rem, env(safe-area-inset-right, 0px)) !important;
+  }
+}
+
+@media (max-height: 700px) {
+  .app-ui-overlay--audio-mode .control-deck:not(.control-deck--camera) {
+    padding-bottom: 0.44rem !important;
+  }
+}
+
+@media (min-width: 744px) {
+  .app-ui-overlay--audio-mode .audio-control-pill {
+    width: 15.5rem;
+    height: 4.25rem;
+    grid-template-columns: minmax(0, 1fr) 3.75rem minmax(0, 1fr);
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-deck__record-stack {
+    width: 3.75rem;
+    height: 4.25rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .control-deck__settings-btn.audio-control-deck__settings-btn {
+    right: max(2rem, calc(env(safe-area-inset-right, 0px) + 1.25rem)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-ui-overlay--audio-mode .audio-control-pill {
+    animation: none;
+  }
+}

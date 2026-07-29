@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, ListMusic, Mic, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { Camera, ChevronDown, ListMusic, Mic, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel, { type HandsFreePhase } from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
 import type { RecordingMode } from '../types'
+import { triggerModeSwitchHaptic } from '../utils/haptics'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
 
@@ -55,6 +56,19 @@ function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function ToolsWaveformIcon() {
+  return (
+    <svg
+      viewBox="0 0 32 24"
+      className="camera-tools-button__waveform"
+      fill="none"
+      aria-hidden
+    >
+      <path d="M4 10v4M9 6v12M14 2v20M19 5v14M24 8v8M29 10v4" />
+    </svg>
+  )
 }
 
 function ControlDeck({
@@ -164,12 +178,176 @@ function ControlDeck({
   })
 
   const { onClickCapture, ...settingsPressHandlers } = settingsPress
+  const isCameraPresentation = recordingMode === 'video'
+
+  const settingsButton = (
+    <button
+      type="button"
+      ref={settingsButtonRef}
+      data-tutorial="settings-button"
+      className={`control-deck__settings-btn ${
+        isCameraPresentation
+          ? 'camera-control-deck__settings-btn'
+          : 'audio-control-deck__settings-btn'
+      } flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN} ${
+        branchActive
+          ? 'bg-sky-500/10 text-sky-400 ring-1 ring-sky-400/30 shadow-[0_0_15px_rgba(56,189,248,0.3)]'
+          : 'bg-black/40 text-white hover:bg-black/55'
+      }`}
+      aria-label={
+        branchActive ? 'Close quick settings' : 'Open settings. Long press for quick settings.'
+      }
+      aria-expanded={branchActive}
+      aria-haspopup="menu"
+      onContextMenu={(event) => event.preventDefault()}
+      onClickCapture={onClickCapture}
+      {...settingsPressHandlers}
+    >
+      <span className="ui-orient-spin flex items-center justify-center">
+        <AnimatePresence mode="wait" initial={false}>
+          {branchActive ? (
+            <motion.span
+              key="close"
+              initial={{ opacity: 0, rotate: -45, scale: 0.8 }}
+              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+              exit={{ opacity: 0, rotate: 45, scale: 0.8 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              className="flex items-center justify-center"
+            >
+              <X className="h-5 w-5" />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="settings"
+              initial={{ opacity: 0, rotate: 45, scale: 0.8 }}
+              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+              exit={{ opacity: 0, rotate: -45, scale: 0.8 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              className="flex items-center justify-center"
+            >
+              <SlidersHorizontal className="h-5 w-5" strokeWidth={2.15} />
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </span>
+    </button>
+  )
+
+  const recordStage = (
+    <div
+      className={`ui-orient-spin control-deck__record-stack flex flex-col items-center gap-1 ${
+        isCameraPresentation
+          ? 'camera-control-deck__record-stack'
+          : 'audio-control-deck__record-stack'
+      }`}
+    >
+      <div
+        ref={recordDropRef}
+        className={`record-delete-drop ${
+          isCameraPresentation ? 'record-delete-drop--camera' : ''
+        } ${showDeleteDrop ? 'record-delete-drop--active' : ''} ${
+          dragOverDelete ? 'record-delete-drop--hover' : ''
+        }`}
+      >
+        {showDeleteDrop ? (
+          <div
+            className="record-carousel-viewport flex items-center justify-center pointer-events-none"
+            aria-label="Drop to delete take"
+          >
+            <div
+              className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition-transform duration-150 ${
+                dragOverDelete
+                  ? 'scale-110 border-white/80 bg-red-600 shadow-[0_0_24px_rgba(239,68,68,0.55)]'
+                  : 'border-red-300/50 bg-red-500/85 shadow-lg'
+              }`}
+            >
+              <Trash2 className="h-6 w-6 text-white" strokeWidth={2.25} />
+            </div>
+          </div>
+        ) : showFinishingTake ? (
+          <div
+            className="record-carousel-viewport flex items-center justify-center pointer-events-none"
+            role="status"
+            aria-live="polite"
+            aria-label="Finishing take"
+          >
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/16 bg-black/45 shadow-[0_0_24px_rgba(255,255,255,0.16)] backdrop-blur-xl">
+              <span
+                className="h-6 w-6 animate-spin rounded-full border-2 border-white/25 border-t-white"
+                aria-hidden
+              />
+            </div>
+          </div>
+        ) : (
+          <RecordingModeCarousel
+            value={recordingMode}
+            onChange={onRecordingModeChange}
+            onToggleRecord={onToggleRecord}
+            isRecording={isRecording}
+            ready={ready}
+            autoSoundRecording={autoSoundRecording}
+            handsFreePhase={handsFreePhase ?? undefined}
+            hapticFeedback={hapticFeedback}
+            onAutoSoundRecordingChange={onAutoSoundRecordingChange}
+            presentation={isCameraPresentation ? 'camera' : 'audio'}
+          />
+        )}
+      </div>
+
+      {showFinishingTake && (
+        <p className="auto-sound-hint auto-sound-hint--finishing max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/90">
+          Finishing your take… longer videos can take a moment
+        </p>
+      )}
+
+      <div
+        className={`hands-free-status ${
+          handsFreePhase ? `hands-free-status--${handsFreePhase}` : ''
+        }`}
+        role="status"
+        aria-live="polite"
+        aria-atomic
+        aria-hidden={!handsFreePhase}
+      >
+        <span className="hands-free-status__dot" aria-hidden />
+        <span className="hands-free-status__copy">
+          <strong>
+            {handsFreePhase === 'recording'
+              ? 'Recording'
+              : handsFreePhase === 'playback'
+              ? 'Playing back'
+              : handsFreePhase === 'preparing'
+              ? 'Getting ready'
+              : 'Listening'}
+          </strong>
+          <small>
+            {handsFreePhase === 'recording'
+              ? 'Take in progress'
+              : handsFreePhase === 'playback'
+              ? 'Listen, then play again'
+              : handsFreePhase === 'preparing'
+              ? 'Connecting microphone'
+              : 'Play when you’re ready'}
+          </small>
+        </span>
+      </div>
+
+      {isRecording && !handsFreeRecording && (
+        <span
+          className="recording-elapsed text-xs font-medium tabular-nums tracking-wide text-white/90"
+          aria-live="polite"
+        >
+          {formatElapsed(elapsed)}
+        </span>
+      )}
+    </div>
+  )
 
   return (
     <div
       className={`control-deck pointer-events-auto flex w-full flex-col items-center px-4 ${
         collapsible ? 'control-deck--collapsible' : ''
-      }`}
+      } ${isCameraPresentation ? 'control-deck--camera' : ''}`}
     >
       <SettingsBranchWheel
         open={branchOpen}
@@ -192,7 +370,56 @@ function ControlDeck({
         onTunerTakePillsChange={(show) => onTunerTakePillsChange?.(show)}
       />
 
-      {collapsible && !deckExpanded ? (
+      {isCameraPresentation ? (
+        <div className="camera-control-deck__main-row">
+          <div className="camera-control-pill">
+            <Pressable
+              type="button"
+              intensity="icon"
+              squish={false}
+              onClick={onOpenVault}
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              data-tutorial="vault-button"
+              className="control-deck__vault-btn camera-vault-button pointer-events-auto"
+              aria-label={`Open Take Vault${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
+            >
+              <span className="ui-orient-spin camera-vault-button__icon-wrap">
+                <ListMusic aria-hidden strokeWidth={1.85} />
+                {takeCount > 0 && (
+                  <span className="camera-vault-button__badge">
+                    {takeCount > 99 ? '99+' : takeCount}
+                  </span>
+                )}
+              </span>
+            </Pressable>
+
+            {recordStage}
+
+            <Pressable
+              type="button"
+              intensity="soft"
+              squish={false}
+              haptic={false}
+              hapticFeedback={hapticFeedback}
+              className="camera-tools-button pointer-events-auto"
+              disabled={isRecording || isStopping}
+              onClick={() => {
+                triggerModeSwitchHaptic(hapticFeedback)
+                onRecordingModeChange('audio')
+              }}
+              aria-label="Open Tools"
+            >
+              <span className="ui-orient-spin camera-tools-button__content">
+                <ToolsWaveformIcon />
+                <span>Tools</span>
+              </span>
+            </Pressable>
+          </div>
+
+          {settingsButton}
+        </div>
+      ) : collapsible && !deckExpanded ? (
         <Pressable
           type="button"
           intensity="icon"
@@ -207,7 +434,11 @@ function ControlDeck({
           <Mic aria-hidden strokeWidth={2.15} />
         </Pressable>
       ) : (
-        <div className="control-deck__main-row relative flex w-full max-w-xs items-center justify-center">
+        <div
+          className={`audio-control-deck__main-row ${
+            collapsible ? 'audio-control-deck__main-row--collapsible' : ''
+          }`}
+        >
           {collapsible ? (
             <Pressable
               type="button"
@@ -223,179 +454,56 @@ function ControlDeck({
               <ChevronDown aria-hidden />
             </Pressable>
           ) : null}
-          <Pressable
-            type="button"
-            intensity="icon"
-            squish={false}
-            onClick={onOpenVault}
-            haptic="light"
-            hapticFeedback={hapticFeedback}
-            data-tutorial="vault-button"
-            className={`control-deck__vault-btn pointer-events-auto absolute left-0 flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN}`}
-            aria-label={
-              vaultToggleEnabled && isVaultOpen
-                ? 'Close take vault'
-                : `View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`
-            }
-          >
-            <span className="relative flex h-full w-full items-center justify-center">
-              <ListMusic className="h-[1.18rem] w-[1.18rem]" strokeWidth={2.25} />
-              {takeCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[9px] font-semibold text-stone-900">
-                  {takeCount > 99 ? '99+' : takeCount}
-                </span>
-              )}
-            </span>
-          </Pressable>
-
-          <button
-            type="button"
-            ref={settingsButtonRef}
-            data-tutorial="settings-button"
-            className={`control-deck__settings-btn absolute right-0 flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN} ${
-              branchActive
-                ? 'bg-sky-500/10 text-sky-400 ring-1 ring-sky-400/30 shadow-[0_0_15px_rgba(56,189,248,0.3)]'
-                : 'bg-black/40 text-white hover:bg-black/55'
-            }`}
-            aria-label={
-              branchActive
-                ? 'Close quick settings'
-                : 'Open settings. Long press for quick settings.'
-            }
-            aria-expanded={branchActive}
-            aria-haspopup="menu"
-            onContextMenu={(event) => event.preventDefault()}
-            onClickCapture={onClickCapture}
-            {...settingsPressHandlers}
-          >
-            <span className="ui-orient-spin flex items-center justify-center">
-              <AnimatePresence mode="wait" initial={false}>
-                {branchActive ? (
-                  <motion.span
-                    key="close"
-                    initial={{ opacity: 0, rotate: -45, scale: 0.8 }}
-                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                    exit={{ opacity: 0, rotate: 45, scale: 0.8 }}
-                    transition={{ duration: 0.16, ease: 'easeOut' }}
-                    className="flex items-center justify-center"
-                  >
-                    <X className="h-5 w-5" />
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    key="settings"
-                    initial={{ opacity: 0, rotate: 45, scale: 0.8 }}
-                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                    exit={{ opacity: 0, rotate: -45, scale: 0.8 }}
-                    transition={{ duration: 0.16, ease: 'easeOut' }}
-                    className="flex items-center justify-center"
-                  >
-                    <SlidersHorizontal className="h-5 w-5" strokeWidth={2.15} />
-                  </motion.span>
+          <div className="audio-control-pill">
+            <Pressable
+              type="button"
+              intensity="icon"
+              squish={false}
+              onClick={onOpenVault}
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              data-tutorial="vault-button"
+              className="control-deck__vault-btn audio-vault-button pointer-events-auto"
+              aria-label={
+                vaultToggleEnabled && isVaultOpen
+                  ? 'Close take vault'
+                  : `View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`
+              }
+            >
+              <span className="ui-orient-spin audio-vault-button__icon-wrap">
+                <ListMusic aria-hidden strokeWidth={1.85} />
+                {takeCount > 0 && (
+                  <span className="audio-vault-button__badge">
+                    {takeCount > 99 ? '99+' : takeCount}
+                  </span>
                 )}
-              </AnimatePresence>
-            </span>
-          </button>
-
-          <div className="ui-orient-spin flex flex-col items-center gap-1">
-            <div
-              ref={recordDropRef}
-              className={`record-delete-drop ${
-                showDeleteDrop ? 'record-delete-drop--active' : ''
-              } ${dragOverDelete ? 'record-delete-drop--hover' : ''}`}
-              aria-hidden={!showDeleteDrop}
-            >
-              {showDeleteDrop ? (
-                <div
-                  className="record-carousel-viewport flex items-center justify-center pointer-events-none"
-                  aria-label="Drop to delete take"
-                >
-                  <div
-                    className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition-transform duration-150 ${
-                      dragOverDelete
-                        ? 'scale-110 border-white/80 bg-red-600 shadow-[0_0_24px_rgba(239,68,68,0.55)]'
-                        : 'border-red-300/50 bg-red-500/85 shadow-lg'
-                    }`}
-                  >
-                    <Trash2 className="h-6 w-6 text-white" strokeWidth={2.25} />
-                  </div>
-                </div>
-              ) : showFinishingTake ? (
-                <div
-                  className="record-carousel-viewport flex items-center justify-center pointer-events-none"
-                  role="status"
-                  aria-live="polite"
-                  aria-label="Finishing take"
-                >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/16 bg-black/45 shadow-[0_0_24px_rgba(255,255,255,0.16)] backdrop-blur-xl">
-                    <span
-                      className="h-6 w-6 animate-spin rounded-full border-2 border-white/25 border-t-white"
-                      aria-hidden
-                    />
-                  </div>
-                </div>
-              ) : (
-                <RecordingModeCarousel
-                  value={recordingMode}
-                  onChange={onRecordingModeChange}
-                  onToggleRecord={onToggleRecord}
-                  isRecording={isRecording}
-                  ready={ready}
-                  autoSoundRecording={autoSoundRecording}
-                  handsFreePhase={handsFreePhase ?? undefined}
-                  hapticFeedback={hapticFeedback}
-                  onAutoSoundRecordingChange={onAutoSoundRecordingChange}
-                />
-              )}
-            </div>
-
-            {showFinishingTake && (
-              <p className="auto-sound-hint auto-sound-hint--finishing max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/90">
-                Finishing your take… longer videos can take a moment
-              </p>
-            )}
-
-            <div
-              className={`hands-free-status ${
-                handsFreePhase ? `hands-free-status--${handsFreePhase}` : ''
-              }`}
-              role="status"
-              aria-live="polite"
-              aria-atomic
-              aria-hidden={!handsFreePhase}
-            >
-              <span className="hands-free-status__dot" aria-hidden />
-              <span className="hands-free-status__copy">
-                <strong>
-                  {handsFreePhase === 'recording'
-                    ? 'Recording'
-                    : handsFreePhase === 'playback'
-                    ? 'Playing back'
-                    : handsFreePhase === 'preparing'
-                    ? 'Getting ready'
-                    : 'Listening'}
-                </strong>
-                <small>
-                  {handsFreePhase === 'recording'
-                    ? 'Take in progress'
-                    : handsFreePhase === 'playback'
-                    ? 'Listen, then play again'
-                    : handsFreePhase === 'preparing'
-                    ? 'Connecting microphone'
-                    : 'Play when you’re ready'}
-                </small>
               </span>
-            </div>
+            </Pressable>
 
-            {isRecording && !handsFreeRecording && (
-              <span
-                className="text-xs font-medium tabular-nums tracking-wide text-white/90"
-                aria-live="polite"
-              >
-                {formatElapsed(elapsed)}
+            {recordStage}
+
+            <Pressable
+              type="button"
+              intensity="soft"
+              squish={false}
+              haptic={false}
+              hapticFeedback={hapticFeedback}
+              className="audio-camera-button pointer-events-auto"
+              disabled={isRecording || isStopping}
+              onClick={() => {
+                triggerModeSwitchHaptic(hapticFeedback)
+                onRecordingModeChange('video')
+              }}
+              aria-label="Open Camera"
+            >
+              <span className="ui-orient-spin audio-camera-button__content">
+                <Camera aria-hidden strokeWidth={1.75} />
+                <span>Camera</span>
               </span>
-            )}
+            </Pressable>
           </div>
+
+          {settingsButton}
         </div>
       )}
     </div>

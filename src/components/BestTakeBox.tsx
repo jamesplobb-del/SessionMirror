@@ -790,7 +790,40 @@ function BestTakeBox({
             </div>
           ) : compact ? (
             <div className="compact-take-card__empty absolute inset-0 flex items-center justify-center">
-              <span aria-hidden>—</span>
+              <div className="compact-take-card__empty-actions">
+                {onUpload && (
+                  <label
+                    htmlFor="benchmark-upload"
+                    className="compact-take-card__empty-action"
+                    onPointerDown={stopEventBubble}
+                    onTouchStart={stopEventBubble}
+                    onTouchEnd={stopEventBubble}
+                    onClick={stopEventBubble}
+                    aria-label="Upload Best Take media"
+                  >
+                    <Upload aria-hidden />
+                  </label>
+                )}
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  squish={false}
+                  haptic="light"
+                  data-tutorial="best-take-youtube"
+                  onPointerDown={stopEventBubble}
+                  onTouchStart={stopEventBubble}
+                  onTouchEnd={stopEventBubble}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    notifyTutorial?.('media-touched')
+                    setYoutubeDialogOpen(true)
+                  }}
+                  className="compact-take-card__empty-action compact-take-card__empty-action--youtube"
+                  aria-label="Load a YouTube reference"
+                >
+                  <Youtube aria-hidden />
+                </Pressable>
+              </div>
             </div>
           ) : (
             <div className={`pip-empty-state absolute inset-0 flex flex-col ${isFill ? 'pip-empty-state--split' : ''}`}>

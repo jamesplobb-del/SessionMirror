@@ -2419,6 +2419,29 @@ html.physical-landscape-right .ui-orient-spin {
 .record-orbit-icon__dot,
 .record-orbit-icon__stop {
   filter: drop-shadow(0 3px 7px rgba(190, 18, 60, 0.42));
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.record-orbit-icon__dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.record-orbit-icon__stop {
+  opacity: 0;
+  transform: scale(0.55) rotate(8deg);
+}
+
+.record-orbit-icon--recording .record-orbit-icon__dot {
+  opacity: 0;
+  transform: scale(0.55);
+}
+
+.record-orbit-icon--recording .record-orbit-icon__stop {
+  opacity: 1;
+  transform: scale(1) rotate(0);
 }
 
 .record-orbit-icon--recording .record-orbit-icon__ring-group {

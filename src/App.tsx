@@ -14,14 +14,12 @@ import {
 import { Capacitor } from '@capacitor/core'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, ChevronUp, Headphones, Maximize2, X } from 'lucide-react'
+import { Headphones, Maximize2, X } from 'lucide-react'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import CameraPermissionPrompt from './components/CameraPermissionPrompt'
-import HudHeader from './components/HudHeader'
 import PipCompareRow from './components/PipCompareRow'
 import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
-import Pressable from './components/ui/Pressable'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
 import type { LabsRoute } from './components/labs/LabsOverlay'
@@ -497,7 +495,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [isSplitView, setIsSplitView] = useState(false)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
-  const [cameraTakeCardsExpanded, setCameraTakeCardsExpanded] = useState(false)
+  // The legacy compact/full card state remains available to the existing
+  // presentation architecture, but Camera Mode no longer exposes its chevron trigger.
+  const [cameraTakeCardsExpanded] = useState(false)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
   const [tutorialTourEnabled, setTutorialTourEnabled] = useState(false)
   const [practiceSessionActive, setPracticeSessionActive] = useState(false)
@@ -4243,29 +4243,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   }}
                 >
                   <AnimatePresence initial={false}>
-                    {recordingMode !== 'audio' && (
-                      <motion.div
-                        key="video-hud-header"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={iosFade}
-                        style={motionGpuLayer}
-                      >
-                        <HudHeader
-                          sessionName={activeProject?.name ?? 'BestTake'}
-                          onOpenVault={handleOpenVault}
-                          className={
-                            quickSettingsOpen || isReviewOpen || isSplitView
-                              ? 'hud-header-hidden'
-                              : undefined
-                          }
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <AnimatePresence initial={false}>
                     {recordingMode === 'audio' &&
                       !quickSettingsOpen &&
                       !practiceSessionActive &&
@@ -4472,7 +4449,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       recordingMode !== 'audio' && (
                         <motion.div
                           key="pip-row"
-                          className={`app-pip-row-wrap pointer-events-auto w-full ${
+                          className={`app-pip-row-wrap app-pip-row-wrap--camera pointer-events-auto w-full ${
                             cameraTakeCardsExpanded ? '' : 'app-pip-row-wrap--compact'
                           }`}
                           data-tutorial="review-mode-button"
@@ -4514,36 +4491,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             hapticFeedback={settings.hapticFeedback}
                           />
                         </motion.div>
-                      )}
-
-                    {!quickSettingsOpen &&
-                      settings.showTakeCards &&
-                      !isSplitView &&
-                      recordingMode !== 'audio' && (
-                        <div className="camera-take-cards-toggle-wrap pointer-events-auto">
-                          <Pressable
-                            type="button"
-                            intensity="icon"
-                            squish={false}
-                            haptic="light"
-                            hapticFeedback={settings.hapticFeedback}
-                            className="camera-take-cards-toggle"
-                            onClick={() => setCameraTakeCardsExpanded((expanded) => !expanded)}
-                            aria-label={
-                              cameraTakeCardsExpanded
-                                ? 'Collapse take cards to quick playback'
-                                : 'Expand take cards and controls'
-                            }
-                            aria-expanded={cameraTakeCardsExpanded}
-                          >
-                            {cameraTakeCardsExpanded ? (
-                              <ChevronDown aria-hidden />
-                            ) : (
-                              <ChevronUp aria-hidden />
-                            )}
-                            <span className="camera-take-cards-toggle__handle" aria-hidden />
-                          </Pressable>
-                        </div>
                       )}
 
                     {!(

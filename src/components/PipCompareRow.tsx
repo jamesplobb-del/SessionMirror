@@ -1,8 +1,9 @@
 import { useRef, memo, type RefObject } from 'react'
 import { motion } from 'framer-motion'
-import { Star } from 'lucide-react'
+import { X } from 'lucide-react'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
+import Pressable from './ui/Pressable'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
@@ -50,30 +51,97 @@ function formatCompactDuration(duration?: number): string | null {
   const rounded = Math.max(0, Math.round(duration))
   const minutes = Math.floor(rounded / 60)
   const seconds = rounded % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
+
+function formatCompactTimestamp(timestamp?: number): string | null {
+  if (!timestamp || !Number.isFinite(timestamp)) return null
+  const age = Date.now() - timestamp
+  if (age >= 0 && age < 45_000) return 'Just now'
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 function CompactTakeCaption({
   label,
   tone,
+  name,
+  timestamp,
   duration,
   hasMedia,
   youtube = false,
+  library = false,
+  onOpen,
+  hapticFeedback,
 }: {
   label: string
   tone: 'best' | 'current'
+  name: string
+  timestamp?: number
   duration?: number
   hasMedia: boolean
   youtube?: boolean
+  library?: boolean
+  onOpen?: () => void
+  hapticFeedback: boolean
 }) {
   const formattedDuration = formatCompactDuration(duration)
-  const detail = formattedDuration ?? (youtube ? 'YouTube' : hasMedia ? 'Tap to play' : 'No take')
+  const formattedTimestamp = formatCompactTimestamp(timestamp)
+  const source = youtube ? 'YouTube' : library ? 'Library' : formattedTimestamp
+  const detail =
+    [source, formattedDuration].filter(Boolean).join(' · ') ||
+    (tone === 'best' ? 'Upload or YouTube' : 'Record a take')
 
-  return (
-    <div className={`compact-take-caption compact-take-caption--${tone}`} aria-hidden>
+  const content = (
+    <>
       <span className="compact-take-caption__label">{label}</span>
+      <span className="compact-take-caption__name">{name}</span>
       <span className="compact-take-caption__detail">{detail}</span>
-    </div>
+    </>
+  )
+
+  return hasMedia && onOpen ? (
+    <Pressable
+      type="button"
+      intensity="soft"
+      squish={false}
+      haptic="light"
+      hapticFeedback={hapticFeedback}
+      className={`compact-take-caption compact-take-caption--${tone}`}
+      onClick={onOpen}
+      aria-label={`Open ${label} full screen`}
+    >
+      {content}
+    </Pressable>
+  ) : (
+    <div className={`compact-take-caption compact-take-caption--${tone}`}>{content}</div>
+  )
+}
+
+function CompactTakeClearButton({
+  label,
+  onClear,
+  hapticFeedback,
+}: {
+  label: string
+  onClear: () => void
+  hapticFeedback: boolean
+}) {
+  return (
+    <Pressable
+      type="button"
+      intensity="icon"
+      squish={false}
+      haptic="light"
+      hapticFeedback={hapticFeedback}
+      className="compact-take-card__clear"
+      onClick={onClear}
+      aria-label={`Unload ${label}`}
+    >
+      <X aria-hidden />
+    </Pressable>
   )
 }
 
@@ -209,6 +277,15 @@ export default memo(function PipCompareRow({
     hapticFeedback,
   })
 
+  const compactBenchmarkHasMedia = Boolean(
+    youtubeEmbedUrl || libraryBenchmarkPlayback || takeHasPlaybackMedia(benchmarkTake),
+  )
+  const clearCompactBenchmark = youtubeEmbedUrl
+    ? onClearYoutube
+    : libraryBenchmarkPlayback
+    ? onClearLibraryReference ?? onUnpinBenchmark
+    : onUnpinBenchmark
+
   return (
     <>
       <div
@@ -221,11 +298,6 @@ export default memo(function PipCompareRow({
             compact ? 'compact-take-slot compact-take-slot--best' : ''
           }`}
         >
-          {compact && (
-            <span className="compact-take-marker compact-take-marker--best" aria-hidden>
-              <Star />
-            </span>
-          )}
           <BestTakeBox
             layout="pip"
             compact={compact}
@@ -261,13 +333,28 @@ export default memo(function PipCompareRow({
             <CompactTakeCaption
               label="Best Take"
               tone="best"
+              name={
+                libraryBenchmarkPlayback?.name ??
+                (youtubeEmbedUrl ? 'YouTube Reference' : benchmarkTake?.name ?? 'No best take')
+              }
+              timestamp={
+                libraryBenchmarkPlayback || youtubeEmbedUrl
+                  ? undefined
+                  : benchmarkTake?.timestamp
+              }
               duration={libraryBenchmarkPlayback?.duration ?? benchmarkTake?.duration}
-              hasMedia={Boolean(
-                youtubeEmbedUrl ||
-                  libraryBenchmarkPlayback ||
-                  takeHasPlaybackMedia(benchmarkTake),
-              )}
+              hasMedia={compactBenchmarkHasMedia}
               youtube={Boolean(youtubeEmbedUrl)}
+              library={Boolean(libraryBenchmarkPlayback)}
+              onOpen={onExpandBenchmark}
+              hapticFeedback={hapticFeedback}
+            />
+          )}
+          {compact && compactBenchmarkHasMedia && (
+            <CompactTakeClearButton
+              label="Best Take"
+              onClear={clearCompactBenchmark}
+              hapticFeedback={hapticFeedback}
             />
           )}
         </div>
@@ -279,9 +366,6 @@ export default memo(function PipCompareRow({
           }`}
           data-tutorial="challenger-card"
         >
-          {compact && (
-            <span className="compact-take-marker compact-take-marker--current" aria-hidden />
-          )}
           <PipWindow
             compact={compact}
             src={challengerTake?.videoUrl ?? null}
@@ -321,8 +405,19 @@ export default memo(function PipCompareRow({
             <CompactTakeCaption
               label="Current Take"
               tone="current"
+              name={challengerTake?.name ?? 'No current take'}
+              timestamp={challengerTake?.timestamp}
               duration={challengerTake?.duration}
               hasMedia={takeHasPlaybackMedia(challengerTake)}
+              onOpen={onExpandChallenger}
+              hapticFeedback={hapticFeedback}
+            />
+          )}
+          {compact && takeHasPlaybackMedia(challengerTake) && (
+            <CompactTakeClearButton
+              label="Current Take"
+              onClear={onUnpinChallenger}
+              hapticFeedback={hapticFeedback}
             />
           )}
         </div>
