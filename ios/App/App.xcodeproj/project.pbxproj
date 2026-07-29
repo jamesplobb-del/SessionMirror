@@ -32,7 +32,39 @@
 		NATIVEDEC2FED79650016851F /* NativeAudioDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = NATIVEDEC1FED79650016851F /* NativeAudioDecoder.swift */; };
 		PORTRAIT2FED79650016851F /* PortraitBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */; };
 		TAKEALGN2FED79650016851F /* TakeAlignmentEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */; };
+		BB6FCA35FB8E433F9535D103 /* QuickTunerLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */; };
+		54237EC25C3F4F819FD8FA05 /* QuickTunerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */; };
+		BC5958393C594FB59C50D9C5 /* OpenQuickTunerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */; };
+		2C57C5F4B910493DB389289B /* QuickTunerLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */; };
+		1374E93445FE40A6A1560F62 /* OpenQuickTunerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */; };
+		A0F6F8A0FA374FA6A0FA9C08 /* QuickTunerControlBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0B12399785435AA9D3D917 /* QuickTunerControlBundle.swift */; };
+		3B66C6F8FB89483E95C8B6AF /* QuickTunerControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06A9742E4D44245B6B437BB /* QuickTunerControl.swift */; };
+		02AB3A7C96C84CAA80A2A948 /* QuickTunerControl.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F0DF5106155249CF971FED8B /* QuickTunerControl.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		97D44430616B472B97632D6E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EAFB84079EDF421A9CAA0B91;
+			remoteInfo = QuickTunerControl;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		74A30BF081C84B3BA5F7922D /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				02AB3A7C96C84CAA80A2A948 /* QuickTunerControl.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -65,6 +97,14 @@
 		NATIVEDEC1FED79650016851F /* NativeAudioDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioDecoder.swift; sourceTree = "<group>"; };
 		PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitBridgeViewController.swift; sourceTree = "<group>"; };
 		TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakeAlignmentEngine.swift; sourceTree = "<group>"; };
+		F0DF5106155249CF971FED8B /* QuickTunerControl.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QuickTunerControl.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerLaunchCoordinator.swift; sourceTree = "<group>"; };
+		180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerPlugin.swift; sourceTree = "<group>"; };
+		A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenQuickTunerIntent.swift; sourceTree = "<group>"; };
+		AE0B12399785435AA9D3D917 /* QuickTunerControlBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerControlBundle.swift; sourceTree = "<group>"; };
+		C06A9742E4D44245B6B437BB /* QuickTunerControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerControl.swift; sourceTree = "<group>"; };
+		5A5F6096A805487BABD6C1F5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		26CC1F5F8BFD47979B1C9E03 /* QuickTunerControl.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QuickTunerControl.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +113,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				CD3239B60F0046097D3181B5 /* Pods_App.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		18A8E5B57BFA4003A1FDDA2D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,6 +147,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3061FED79650016851F /* App */,
+				0BE002D56DC94C55943E298A /* QuickTunerControl */,
 				504EC3051FED79650016851F /* Products */,
 				13462BD1C199847B7A7D96FD /* Pods */,
 				3708A07850267FDB896C914A /* Frameworks */,
@@ -110,6 +158,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				F0DF5106155249CF971FED8B /* QuickTunerControl.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -119,6 +168,9 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */,
+				180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */,
+				A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */,
 				PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */,
 				BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */,
 				INLINEBOX1FED79650016851F /* InlineTakeBoxPlaybackController.swift */,
@@ -147,6 +199,17 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		0BE002D56DC94C55943E298A /* QuickTunerControl */ = {
+			isa = PBXGroup;
+			children = (
+				AE0B12399785435AA9D3D917 /* QuickTunerControlBundle.swift */,
+				C06A9742E4D44245B6B437BB /* QuickTunerControl.swift */,
+				5A5F6096A805487BABD6C1F5 /* Info.plist */,
+				26CC1F5F8BFD47979B1C9E03 /* QuickTunerControl.entitlements */,
+			);
+			path = QuickTunerControl;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -160,15 +223,34 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				64C0F87B8B65D522B63873FD /* [CP] Embed Pods Frameworks */,
+				74A30BF081C84B3BA5F7922D /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				076F3C86F5964900A628F5BE /* PBXTargetDependency */,
 			);
 			name = App;
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		EAFB84079EDF421A9CAA0B91 /* QuickTunerControl */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 69E4E7F42DF348D0A6E39AFC /* Build configuration list for PBXNativeTarget "QuickTunerControl" */;
+			buildPhases = (
+				48E1084611C34F9C842B3D39 /* Sources */,
+				18A8E5B57BFA4003A1FDDA2D /* Frameworks */,
+				5FFBB46B93C044A7AA9BAC93 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QuickTunerControl;
+			productName = QuickTunerControl;
+			productReference = F0DF5106155249CF971FED8B /* QuickTunerControl.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -182,6 +264,10 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
+						ProvisioningStyle = Automatic;
+					};
+					EAFB84079EDF421A9CAA0B91 = {
+						CreatedOnToolsVersion = 26.5;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -200,6 +286,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				EAFB84079EDF421A9CAA0B91 /* QuickTunerControl */,
 			);
 		};
 /* End PBXProject section */
@@ -215,6 +302,13 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5FFBB46B93C044A7AA9BAC93 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,10 +395,32 @@
 				METRONENG2FED79650016851F /* MetronomeEngine.swift in Sources */,
 				METRONPLG2FED79650016851F /* MetronomePlugin.swift in Sources */,
 				METRONPLG4FED79650016851F /* MetronomePlugin.m in Sources */,
+				BB6FCA35FB8E433F9535D103 /* QuickTunerLaunchCoordinator.swift in Sources */,
+				54237EC25C3F4F819FD8FA05 /* QuickTunerPlugin.swift in Sources */,
+				BC5958393C594FB59C50D9C5 /* OpenQuickTunerIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		48E1084611C34F9C842B3D39 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2C57C5F4B910493DB389289B /* QuickTunerLaunchCoordinator.swift in Sources */,
+				1374E93445FE40A6A1560F62 /* OpenQuickTunerIntent.swift in Sources */,
+				A0F6F8A0FA374FA6A0FA9C08 /* QuickTunerControlBundle.swift in Sources */,
+				3B66C6F8FB89483E95C8B6AF /* QuickTunerControl.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		076F3C86F5964900A628F5BE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EAFB84079EDF421A9CAA0B91 /* QuickTunerControl */;
+			targetProxy = 97D44430616B472B97632D6E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -476,6 +592,55 @@
 			};
 			name = Release;
 		};
+		54155FBA9DF344E2BCDEC22B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QuickTunerControl/QuickTunerControl.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = X24D9LKQ58;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuickTunerControl/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.besttake.app.QuickTunerControl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG QUICK_TUNER_CONTROL_EXTENSION";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		653A6497D2E2438786BA4B16 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QuickTunerControl/QuickTunerControl.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = X24D9LKQ58;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QuickTunerControl/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.besttake.app.QuickTunerControl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = QUICK_TUNER_CONTROL_EXTENSION;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -493,6 +658,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		69E4E7F42DF348D0A6E39AFC /* Build configuration list for PBXNativeTarget "QuickTunerControl" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54155FBA9DF344E2BCDEC22B /* Debug */,
+				653A6497D2E2438786BA4B16 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

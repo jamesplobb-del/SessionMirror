@@ -1,5 +1,15 @@
-import { useCallback, useMemo, useState, type MouseEvent } from 'react'
-import { ChevronRight, RotateCcw, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import {
+  Command,
+  Gauge,
+  LockKeyhole,
+  RadioTower,
+  RotateCcw,
+  Smartphone,
+  Sparkles,
+  ChevronRight,
+  X,
+} from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
@@ -34,7 +44,142 @@ interface SettingsDrawerProps {
   onOpenLabs?: () => void
   onOpenCreatorStudio?: () => void
   onOpenMultitrack?: () => void
+  onOpenQuickTuner?: () => void
   recordingMode: 'video' | 'audio'
+}
+
+type QuickTunerSetupId =
+  | 'lockScreen'
+  | 'controlCenter'
+  | 'actionButton'
+  | 'siriOrShortcuts'
+  | 'appIcon'
+
+interface QuickTunerSetup {
+  id: QuickTunerSetupId
+  title: string
+  description: string
+  action: string
+  availability: string
+  steps: string[]
+  note?: string
+}
+
+const QUICK_TUNER_SETUPS: QuickTunerSetup[] = [
+  {
+    id: 'lockScreen',
+    title: 'Lock Screen',
+    description: 'Open the tuner from the bottom of your Lock Screen.',
+    action: 'Set Up',
+    availability: 'iOS 18+',
+    steps: [
+      'Touch and hold your Lock Screen, then tap Customize.',
+      'Choose Lock Screen and tap one of the control positions at the bottom.',
+      'Search for BestTake, then choose Quick Tuner.',
+      'Tap Done. The control now opens the same lightweight tuner.',
+    ],
+  },
+  {
+    id: 'controlCenter',
+    title: 'Control Center',
+    description: 'Open Quick Tuner from anywhere.',
+    action: 'Set Up',
+    availability: 'iOS 18+',
+    steps: [
+      'Open Control Center and touch and hold an empty area.',
+      'Tap Add a Control.',
+      'Search for BestTake, then choose Quick Tuner.',
+      'Drag the control to your preferred position.',
+    ],
+  },
+  {
+    id: 'actionButton',
+    title: 'Action Button',
+    description: 'Hold the Action Button to open Quick Tuner.',
+    action: 'Set Up',
+    availability: 'Supported iPhones',
+    steps: [
+      'Open the iOS Settings app and choose Action Button.',
+      'Choose Controls or Shortcut, depending on the options shown on your iPhone.',
+      'Select BestTake Quick Tuner.',
+      'Press and hold the Action Button to test it.',
+    ],
+    note: 'Action Button availability depends on your iPhone model. BestTake cannot detect or change this assignment for you.',
+  },
+  {
+    id: 'siriOrShortcuts',
+    title: 'Siri & Shortcuts',
+    description: 'Say “Open BestTake Tuner” or add it to Shortcuts.',
+    action: 'Set Up',
+    availability: 'iOS 16+',
+    steps: [
+      'Say “Open BestTake tuner” or “Start BestTake tuner.”',
+      'Or open the Shortcuts app and browse App Shortcuts.',
+      'Choose BestTake, then add Quick Tuner to a shortcut or automation.',
+      'The shortcut opens directly to the same lightweight tuner.',
+    ],
+  },
+  {
+    id: 'appIcon',
+    title: 'App Icon',
+    description: 'Long-press the BestTake icon and choose Open Tuner.',
+    action: 'How It Works',
+    availability: 'Ready after install',
+    steps: [
+      'Find BestTake on your Home Screen or in the App Library.',
+      'Touch and hold the BestTake app icon.',
+      'Tap Open Tuner.',
+      'This static action is available before the app is opened for the first time.',
+    ],
+  },
+]
+
+function QuickTunerAccessRow({
+  setup,
+  onOpen,
+}: {
+  setup: QuickTunerSetup
+  onOpen: () => void
+}) {
+  const Icon =
+    setup.id === 'lockScreen'
+      ? LockKeyhole
+      : setup.id === 'controlCenter'
+        ? RadioTower
+        : setup.id === 'actionButton'
+          ? Sparkles
+          : setup.id === 'siriOrShortcuts'
+            ? Command
+            : Smartphone
+
+  return (
+    <Pressable
+      type="button"
+      intensity="soft"
+      haptic="light"
+      onClick={onOpen}
+      className="settings-group-row flex w-full items-center gap-3 rounded-2xl border border-white/70 bg-white/72 px-4 py-3.5 text-left shadow-sm backdrop-blur-xl"
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+        <Icon className="h-5 w-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <strong className="text-sm font-semibold text-stone-900">{setup.title}</strong>
+          <small className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
+            {setup.availability}
+          </small>
+        </span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-stone-500">
+          {setup.description}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-sky-600">
+        {setup.action}
+        <ChevronRight className="h-4 w-4" aria-hidden />
+      </span>
+    </Pressable>
+  )
 }
 
 function SettingToggle({
@@ -177,10 +322,13 @@ export default function SettingsDrawer({
   onOpenLabs,
   onOpenCreatorStudio,
   onOpenMultitrack,
+  onOpenQuickTuner,
   recordingMode,
 }: SettingsDrawerProps) {
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<HelpTopicId | null>(null)
+  const [activeQuickTunerSetupId, setActiveQuickTunerSetupId] =
+    useState<QuickTunerSetupId | null>(null)
   const helpTopicById = useMemo(
     () => new Map(HELP_TOPICS.map((topic) => [topic.id, topic] as const)),
     [],
@@ -188,6 +336,13 @@ export default function SettingsDrawer({
   const activeHelpTopic: HelpTopic | null = activeHelpTopicId
     ? helpTopicById.get(activeHelpTopicId) ?? null
     : null
+  const activeQuickTunerSetup = activeQuickTunerSetupId
+    ? QUICK_TUNER_SETUPS.find((setup) => setup.id === activeQuickTunerSetupId) ?? null
+    : null
+
+  useEffect(() => {
+    if (!isOpen) setActiveQuickTunerSetupId(null)
+  }, [isOpen])
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -263,6 +418,38 @@ export default function SettingsDrawer({
               checked={settings.darkMode}
               onChange={(checked) => onUpdate({ darkMode: checked })}
             />
+          </section>
+
+          <section className="settings-group space-y-3">
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+                Quick Tuner Access
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-stone-500">
+                Open the tuner without loading Camera Mode, takes, or the media workspace.
+              </p>
+            </div>
+
+            {QUICK_TUNER_SETUPS.map((setup) => (
+              <QuickTunerAccessRow
+                key={setup.id}
+                setup={setup}
+                onOpen={() => setActiveQuickTunerSetupId(setup.id)}
+              />
+            ))}
+
+            {onOpenQuickTuner ? (
+              <Pressable
+                type="button"
+                intensity="soft"
+                haptic="light"
+                onClick={onOpenQuickTuner}
+                className="settings-group-row flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm font-semibold text-sky-700 shadow-sm"
+              >
+                <Gauge className="h-4.5 w-4.5" aria-hidden />
+                Test Quick Tuner
+              </Pressable>
+            ) : null}
           </section>
 
           <section className="settings-group space-y-3">
@@ -587,6 +774,57 @@ export default function SettingsDrawer({
       </div>
       </AnimatedBottomSheet>
       <HelpSheet topic={activeHelpTopic} onClose={() => setActiveHelpTopicId(null)} />
+      <AnimatedBottomSheet
+        isOpen={activeQuickTunerSetup !== null}
+        onClose={() => setActiveQuickTunerSetupId(null)}
+        ariaLabel={activeQuickTunerSetup ? `Set up ${activeQuickTunerSetup.title}` : 'Quick Tuner setup'}
+        elevated
+        elevatedLight
+        maxHeightClass="max-h-[min(72vh,42rem)]"
+        zClass={{ backdrop: 'z-[110]', sheet: 'z-[120]' }}
+      >
+        {activeQuickTunerSetup ? (
+          <>
+            <div className="native-sheet-header flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
+              <div className="native-sheet-title-block min-w-0 flex-1">
+                <span className="native-sheet-kicker">Quick Tuner Access</span>
+                <h2 className="native-sheet-title">{activeQuickTunerSetup.title}</h2>
+                <p className="native-sheet-subtitle">{activeQuickTunerSetup.description}</p>
+              </div>
+              <Pressable
+                type="button"
+                intensity="icon"
+                haptic="light"
+                onClick={() => setActiveQuickTunerSetupId(null)}
+                className="native-sheet-close grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/70 text-stone-500 shadow-sm ring-1 ring-stone-200/70"
+                aria-label="Close setup instructions"
+              >
+                <X className="h-5 w-5" />
+              </Pressable>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-7 pt-5">
+              <ol className="space-y-4">
+                {activeQuickTunerSetup.steps.map((step, index) => (
+                  <li key={step} className="flex gap-3">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">
+                      {index + 1}
+                    </span>
+                    <p className="pt-1 text-sm leading-relaxed text-stone-700">{step}</p>
+                  </li>
+                ))}
+              </ol>
+              {activeQuickTunerSetup.note ? (
+                <p className="mt-5 rounded-2xl border border-amber-200/70 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900/75">
+                  {activeQuickTunerSetup.note}
+                </p>
+              ) : null}
+              <p className="mt-5 text-xs leading-relaxed text-stone-400">
+                iOS owns these customization screens, so BestTake provides the correct steps instead of showing a toggle that cannot change the system assignment.
+              </p>
+            </div>
+          </>
+        ) : null}
+      </AnimatedBottomSheet>
     </>
   )
 }

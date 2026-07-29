@@ -14,6 +14,28 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.besttake.app.quick-tuner</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>besttake</string>
+			</array>
+		</dict>
+	</array>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeAudio</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Open Tuner</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.besttake.app.quickTuner</string>
+		</dict>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

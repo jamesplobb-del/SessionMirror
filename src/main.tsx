@@ -4,29 +4,28 @@ import './index.css'
 import './styles/drone-keyboard.css'
 import './styles/drone-sound-wheel.css'
 import './styles/practice-system.css'
-import App from './App.tsx'
+import './styles/quick-tuner.css'
+import RootRouter from './RootRouter.tsx'
 import AppErrorBoundary from './components/ui/AppErrorBoundary.tsx'
-import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
 import { primeWebStatusBarChrome } from './utils/nativeStatusBar'
-import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
 import { registerAppForegroundLifecycle } from './utils/appForeground'
+import { initializeQuickTunerLaunch } from './utils/quickTunerLaunch'
 
-function bootstrap() {
+async function bootstrap() {
   const rootEl = document.getElementById('root')
   if (!rootEl) return
 
   primeWebStatusBarChrome()
   registerAppForegroundLifecycle()
-  registerKeepAwakeLifecycle()
-  initHeadphoneOutputDetection()
+  await initializeQuickTunerLaunch()
 
   createRoot(rootEl).render(
     <StrictMode>
       <AppErrorBoundary>
-        <App />
+        <RootRouter />
       </AppErrorBoundary>
     </StrictMode>,
   )
 }
 
-bootstrap()
+void bootstrap()

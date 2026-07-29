@@ -13,16 +13,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private let bestTakeAudioPluginClass = BestTakeAudioPlugin.self
     private let dronePluginClass = DronePlugin.self
     private let metronomePluginClass = MetronomePlugin.self
+    private let quickTunerPluginClass = QuickTunerPlugin.self
+    private var isCompletingColdLaunch = true
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         _ = bestTakeAudioPluginClass
         _ = dronePluginClass
         _ = metronomePluginClass
+        _ = quickTunerPluginClass
+        let handledQuickAction: Bool
+        if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem,
+           shortcutItem.type == QuickTunerLaunchCoordinator.homeScreenShortcutType {
+            QuickTunerLaunchCoordinator.shared.enqueue(
+                source: .homeScreenQuickAction,
+                coldLaunch: true
+            )
+            handledQuickAction = true
+        } else {
+            handledQuickAction = false
+        }
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
         installAudioRouteObserver()
         installAudioInterruptionObserver()
-        return true
+        return !handledQuickAction
     }
 
     private func installAudioInterruptionObserver() {
@@ -80,6 +94,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         CameraSessionGuard.markForegroundActivation()
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
+        let coldLaunch = isCompletingColdLaunch
+        isCompletingColdLaunch = false
+        QuickTunerLaunchCoordinator.shared.refreshPendingFromSharedStore(
+            coldLaunch: coldLaunch
+        )
+        for delay in [0.2, 0.65, 1.2] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                QuickTunerLaunchCoordinator.shared.refreshPendingFromSharedStore(
+                    coldLaunch: false
+                )
+            }
+        }
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
@@ -136,7 +162,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        if QuickTunerLaunchCoordinator.shared.handleDeepLink(
+            url,
+            coldLaunch: isCompletingColdLaunch
+        ) {
+            return true
+        }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+    }
+
+    func application(
+        _ application: UIApplication,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        guard shortcutItem.type == QuickTunerLaunchCoordinator.homeScreenShortcutType else {
+            completionHandler(false)
+            return
+        }
+        QuickTunerLaunchCoordinator.shared.enqueue(
+            source: .homeScreenQuickAction,
+            coldLaunch: false
+        )
+        completionHandler(true)
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {

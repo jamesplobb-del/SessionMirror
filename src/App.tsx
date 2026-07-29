@@ -221,6 +221,9 @@ import {
   audioModePlaybackControlsRef,
 } from './context/AudioModePlaybackContext'
 import type { AudioPracticeTab } from './types/audioPractice'
+import { requestQuickTunerFromApp } from './utils/quickTunerLaunch'
+import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
+import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 0
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
@@ -361,6 +364,8 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
 
+    registerKeepAwakeLifecycle()
+    initHeadphoneOutputDetection()
     bootstrapViewport()
     void lockPortraitOrientation()
     void applyDarkHudStatusBar()
@@ -2594,6 +2599,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     settings.hapticFeedback,
   ])
 
+  const handleOpenQuickTunerFromSettings = useCallback(() => {
+    setIsSettingsOpen(false)
+    requestQuickTunerFromApp('inAppSettings')
+  }, [])
+
   const handleOpenMultitrack = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     markOverlayClosed()
@@ -4700,6 +4710,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onOpenLabs={handleOpenLabs}
                     onOpenCreatorStudio={handleOpenCreatorStudioPicker}
                     onOpenMultitrack={handleOpenMultitrack}
+                    onOpenQuickTuner={handleOpenQuickTunerFromSettings}
                     recordingMode={recordingMode}
                   />
 
