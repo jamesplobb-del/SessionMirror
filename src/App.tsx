@@ -4322,6 +4322,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             isRecording={isRecording}
                             elapsed={elapsed}
                             ready={ready}
+                            streamRef={streamRef}
+                            streamGeneration={streamGeneration}
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                             challengerTake={challengerTake}

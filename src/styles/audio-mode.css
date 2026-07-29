@@ -877,6 +877,7 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 }
 
 .audio-recording-waveform {
+  position: relative;
   display: flex;
   width: 100%;
   max-width: 34rem;
@@ -893,19 +894,43 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 
 .audio-recording-waveform__bar {
   width: clamp(1.5px, 0.5vw, 2.7px);
-  min-height: 0.3rem;
+  height: 100%;
   flex: 0 1 2.7px;
   border-radius: 999px;
   background: currentColor;
   opacity: 0.43;
-  transform: scaleY(0.72);
+  transform: scaleY(var(--audio-recording-peak, 0.2));
   transform-origin: center;
+  transition:
+    transform 55ms linear,
+    opacity 120ms ease,
+    color 120ms ease;
 }
 
 .audio-recording-waveform--recording .audio-recording-waveform__bar {
-  opacity: 0.88;
-  animation: audio-recording-wave-live ease-in-out infinite alternate;
-  will-change: transform, opacity;
+  opacity: 0.9;
+}
+
+.audio-recording-waveform--recording .audio-recording-waveform__bar--future {
+  color: var(--audio-divider);
+  opacity: 0.52;
+}
+
+.audio-recording-waveform__bar--current {
+  opacity: 1 !important;
+  box-shadow: 0 0 0.28rem rgba(21, 152, 255, 0.24);
+}
+
+.audio-recording-waveform__live-edge {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  left: 72.6%;
+  width: 1px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-blue) 62%, transparent);
+  box-shadow: 0 0 0.4rem rgba(21, 152, 255, 0.18);
+  pointer-events: none;
 }
 
 .audio-mode-hero p {
@@ -1038,18 +1063,6 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
   outline-color: color-mix(in srgb, var(--audio-gold) 70%, transparent);
 }
 
-@keyframes audio-recording-wave-live {
-  from {
-    opacity: 0.48;
-    transform: scaleY(0.38);
-  }
-
-  to {
-    opacity: 1;
-    transform: scaleY(1.08);
-  }
-}
-
 @media (max-height: 700px) {
   .audio-mode-home {
     gap: 0.38rem;
@@ -1085,9 +1098,6 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 
 @media (prefers-reduced-motion: reduce) {
   .audio-recording-waveform--recording .audio-recording-waveform__bar {
-    animation: none;
-    opacity: 0.88;
-    transform: scaleY(0.88);
-    will-change: auto;
+    transition: none;
   }
 }

@@ -4,14 +4,17 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
+  type RefObject,
 } from 'react'
 import { motion } from 'framer-motion'
 import { LoaderCircle, Pause, Play, RotateCw, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
+import { useLiveRecordingWaveform } from '../../hooks/useLiveRecordingWaveform'
 import { stopEventBubble } from '../../utils/eventBubbling'
 import { triggerDragStartHaptic, triggerLightHaptic } from '../../utils/haptics'
 import { iosHudDim, motionGpuLayer } from '../../utils/motionPresets'
@@ -24,6 +27,12 @@ const EMPTY_WAVEFORM_PEAKS = [
   0.88, 0.8, 0.7, 0.58, 0.44, 0.3, 0.24, 0.36, 0.5, 0.64, 0.78, 0.86, 0.78, 0.64, 0.5, 0.36, 0.24,
   0.2, 0.32, 0.46, 0.6, 0.74, 0.86, 0.74, 0.6, 0.46, 0.32, 0.2, 0.26, 0.38, 0.52, 0.66, 0.8,
 ]
+
+const LIVE_WAVEFORM_FUTURE_PEAKS = [
+  0.055, 0.045, 0.07, 0.04, 0.06, 0.035, 0.05, 0.04, 0.065, 0.035, 0.055, 0.04, 0.05, 0.035, 0.045,
+  0.04, 0.035, 0.04,
+]
+const MIN_VISIBLE_WAVEFORM_PEAK = 0.035
 
 function formatDuration(seconds?: number): string {
   if (!seconds || !Number.isFinite(seconds)) return '00:00'
@@ -48,7 +57,24 @@ interface AudioModeTakeCardProps {
 
 type ScrubPhase = 'start' | 'move' | 'end'
 
-function AudioRecordingWaveform({ isRecording }: { isRecording: boolean }) {
+function AudioRecordingWaveform({
+  isRecording,
+  streamRef,
+  streamGeneration,
+}: {
+  isRecording: boolean
+  streamRef: RefObject<MediaStream | null>
+  streamGeneration: number
+}) {
+  const livePeaks = useLiveRecordingWaveform({
+    active: isRecording,
+    streamRef,
+    streamGeneration,
+  })
+  const displayedPeaks = isRecording
+    ? [...livePeaks, ...LIVE_WAVEFORM_FUTURE_PEAKS]
+    : EMPTY_WAVEFORM_PEAKS
+
   return (
     <div
       className={`audio-recording-waveform ${
@@ -56,17 +82,22 @@ function AudioRecordingWaveform({ isRecording }: { isRecording: boolean }) {
       }`}
       aria-hidden
     >
-      {EMPTY_WAVEFORM_PEAKS.map((peak, index) => (
-        <span
-          key={index}
-          className="audio-recording-waveform__bar"
-          style={{
-            height: `${Math.round(8 + peak * 88)}%`,
-            animationDelay: `${-(index % 13) * 47}ms`,
-            animationDuration: `${620 + (index % 9) * 53}ms`,
-          }}
-        />
-      ))}
+      {displayedPeaks.map((peak, index) => {
+        const isFuture = isRecording && index >= livePeaks.length
+        const isCurrent = isRecording && index === livePeaks.length - 1
+        return (
+          <span
+            key={index}
+            className={`audio-recording-waveform__bar ${
+              isFuture ? 'audio-recording-waveform__bar--future' : ''
+            } ${isCurrent ? 'audio-recording-waveform__bar--current' : ''}`}
+            style={{
+              '--audio-recording-peak': Math.max(MIN_VISIBLE_WAVEFORM_PEAK, peak),
+            } as CSSProperties}
+          />
+        )
+      })}
+      {isRecording && <span className="audio-recording-waveform__live-edge" />}
     </div>
   )
 }
@@ -401,6 +432,8 @@ interface AudioModeHomeProps {
   isRecording: boolean
   elapsed: number
   ready: boolean
+  streamRef: RefObject<MediaStream | null>
+  streamGeneration: number
   challengerTake: Take | null
   benchmarkTake: Take | null
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
@@ -418,6 +451,8 @@ function AudioModeHome({
   isRecording,
   elapsed,
   ready,
+  streamRef,
+  streamGeneration,
   challengerTake,
   benchmarkTake,
   libraryBenchmarkPlayback,
@@ -453,7 +488,11 @@ function AudioModeHome({
           <span className="audio-mode-status-pill__divider" aria-hidden />
           <time>{formatDuration(isRecording ? elapsed : 0)}</time>
         </div>
-        <AudioRecordingWaveform isRecording={isRecording} />
+        <AudioRecordingWaveform
+          isRecording={isRecording}
+          streamRef={streamRef}
+          streamGeneration={streamGeneration}
+        />
         <p>{hint}</p>
       </motion.div>
 

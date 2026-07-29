@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from 'react'
 import { motion } from 'framer-motion'
-import { Columns2, X } from 'lucide-react'
+import { Columns2, Pin, X } from 'lucide-react'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import Pressable from './ui/Pressable'
@@ -189,6 +189,34 @@ function CompactTakeClearButton({
   )
 }
 
+function CompactPinCurrentButton({
+  onPin,
+  hapticFeedback,
+}: {
+  onPin: () => void
+  hapticFeedback: boolean
+}) {
+  return (
+    <Pressable
+      type="button"
+      intensity="icon"
+      squish={false}
+      haptic="light"
+      hapticFeedback={hapticFeedback}
+      className="compact-take-card__pin"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation()
+        onPin()
+      }}
+      aria-label="Pin current take as Best Take"
+      title="Pin as Best Take"
+    >
+      <Pin aria-hidden />
+    </Pressable>
+  )
+}
+
 function CompactCompareButton({
   onToggle,
   hapticFeedback,
@@ -205,10 +233,10 @@ function CompactCompareButton({
       hapticFeedback={hapticFeedback}
       className="camera-compare-toggle pointer-events-auto"
       onClick={onToggle}
-      aria-label="Open split comparison"
+      aria-label="Open expanded comparison view"
     >
       <Columns2 aria-hidden />
-      <span>Compare</span>
+      <span>Expand view</span>
     </Pressable>
   )
 }
@@ -354,6 +382,13 @@ export default memo(function PipCompareRow({
     : libraryBenchmarkPlayback
     ? onClearLibraryReference ?? onUnpinBenchmark
     : onUnpinBenchmark
+  const compactCurrentHasMedia = takeHasPlaybackMedia(challengerTake)
+  const compactCurrentShowPin = Boolean(
+    compact &&
+    compactCurrentHasMedia &&
+    showPinCurrentAsBest &&
+    onPinCurrentAsBest,
+  )
 
   return (
     <>
@@ -444,6 +479,8 @@ export default memo(function PipCompareRow({
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--current' : ''
           } ${
+            compactCurrentShowPin ? 'compact-take-slot--has-pin' : ''
+          } ${
             compact && benchmarkGhost?.overPin ? 'compact-take-slot--drop-active' : ''
           }`}
           data-tutorial="challenger-card"
@@ -476,7 +513,7 @@ export default memo(function PipCompareRow({
           autoPlayRequestId={challengerAutoPlayRequestId}
           takeId={challengerTake?.id ?? null}
           onAutoPlayComplete={onChallengerAutoPlayComplete}
-          showPinAsBest={showPinCurrentAsBest}
+          showPinAsBest={!compact && showPinCurrentAsBest}
           onPinAsBest={onPinCurrentAsBest}
           posterUrl={
             challengerTake?.thumbnailUrl ??
@@ -490,11 +527,11 @@ export default memo(function PipCompareRow({
               name={challengerTake?.name ?? 'No current take'}
               timestamp={challengerTake?.timestamp}
               duration={challengerTake?.duration}
-              hasMedia={takeHasPlaybackMedia(challengerTake)}
+              hasMedia={compactCurrentHasMedia}
               onOpen={onExpandChallenger}
               hapticFeedback={hapticFeedback}
               dragSourceProps={
-                takeHasPlaybackMedia(challengerTake)
+                compactCurrentHasMedia
                   ? challengerDragSourceProps
                   : undefined
               }
@@ -502,10 +539,16 @@ export default memo(function PipCompareRow({
               dragSourceArming={challengerArming}
             />
           )}
-          {compact && takeHasPlaybackMedia(challengerTake) && (
+          {compact && compactCurrentHasMedia && (
             <CompactTakeClearButton
               label="Current Take"
               onClear={onUnpinChallenger}
+              hapticFeedback={hapticFeedback}
+            />
+          )}
+          {compactCurrentShowPin && onPinCurrentAsBest && (
+            <CompactPinCurrentButton
+              onPin={onPinCurrentAsBest}
               hapticFeedback={hapticFeedback}
             />
           )}

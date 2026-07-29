@@ -1208,7 +1208,7 @@ button.compact-take-caption:active {
 .compact-take-card__pin {
   position: absolute;
   bottom: 0.24rem;
-  left: 0.24rem;
+  right: 0.3rem;
   z-index: 34;
   display: grid;
   width: 1.42rem;
@@ -1235,6 +1235,11 @@ button.compact-take-caption:active {
   width: 0.7rem;
   height: 0.7rem;
   stroke-width: 2;
+}
+
+.compact-take-slot--has-pin .compact-take-caption__detail {
+  box-sizing: border-box;
+  padding-right: 1.45rem;
 }
 
 .compact-take-caption[role='button'] {
