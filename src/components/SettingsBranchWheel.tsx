@@ -65,6 +65,7 @@ export default function SettingsBranchWheel({
   onTunerTakePillsChange,
 }: SettingsBranchWheelProps) {
   const notifyTutorial = useTutorialAction()
+  const isCameraOverlays = layoutMode === 'camera'
   const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
     null,
   )
@@ -76,9 +77,19 @@ export default function SettingsBranchWheel({
       const node = anchorRef.current
       if (!node) return
       const rect = node.getBoundingClientRect()
+      const visualViewport = window.visualViewport
+      const viewportLeft = visualViewport?.offsetLeft ?? 0
+      const viewportTop = visualViewport?.offsetTop ?? 0
+      const viewportWidth = visualViewport?.width ?? window.innerWidth
+      const viewportHeight = visualViewport?.height ?? window.innerHeight
+
       setAnchor({
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
+        x: isCameraOverlays
+          ? viewportLeft + viewportWidth / 2
+          : rect.left + rect.width / 2,
+        y: isCameraOverlays
+          ? viewportTop + viewportHeight / 2
+          : rect.top + rect.height / 2,
         rect,
       })
     }
@@ -95,7 +106,7 @@ export default function SettingsBranchWheel({
       window.visualViewport?.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('scroll', measure)
     }
-  }, [anchorRef, open])
+  }, [anchorRef, isCameraOverlays, open])
 
   const handleExitComplete = () => {
     setAnchor(null)
@@ -214,7 +225,7 @@ export default function SettingsBranchWheel({
             exit={{ opacity: 0 }}
             transition={BRANCH_MOTION}
             style={motionGpuLayer}
-            aria-label="Close quick settings"
+            aria-label="Close overlays"
             onPointerDown={(event) => event.preventDefault()}
             onClick={onClose}
           />
@@ -230,7 +241,7 @@ export default function SettingsBranchWheel({
             <motion.div
               className={`settings-branch-wheel settings-branch-wheel--${layoutMode} relative`}
               role="menu"
-              aria-label="Quick settings"
+              aria-label="Overlays"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

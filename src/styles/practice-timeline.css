@@ -1860,6 +1860,14 @@
   inset: 0;
   overflow: hidden;
   background: var(--audio-bg-base);
+  color: var(--audio-text-primary);
+  font-family: var(--audio-font);
+}
+
+.practice-timeline-editor button,
+.practice-timeline-editor input,
+.practice-timeline-editor textarea {
+  font-family: inherit;
 }
 
 .practice-timeline-editor__header {
@@ -1938,7 +1946,7 @@
   border: 1px solid var(--audio-divider);
   border-radius: var(--audio-radius-card);
   background: var(--audio-surface);
-  box-shadow: 0 8px 24px rgba(23, 26, 34, 0.045);
+  box-shadow: var(--audio-shadow-card);
 }
 
 .practice-timeline-editor__group-heading {
@@ -1952,15 +1960,15 @@
 .practice-timeline-editor__group-heading h2 {
   margin: 0;
   color: var(--audio-text-primary);
-  font-size: 0.95rem;
-  font-weight: 760;
+  font-size: 0.98rem;
+  font-weight: 750;
   letter-spacing: -0.01em;
 }
 
 .practice-timeline-editor__group-heading p {
-  margin: 0.18rem 0 0;
+  margin: 0.2rem 0 0;
   color: var(--audio-text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   font-weight: 550;
   line-height: 1.4;
 }
@@ -1977,23 +1985,43 @@
 
 .practice-timeline-editor__field--control {
   padding: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--audio-divider) 78%, transparent);
+  border: 1px solid var(--audio-divider);
   border-radius: 0.9rem;
   background: color-mix(in srgb, var(--audio-bg-base) 70%, transparent);
 }
 
 .practice-timeline-editor__label {
   margin-bottom: 0.38rem;
-  font-size: 0.75rem;
-  font-weight: 680;
+  color: var(--audio-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.3;
+  text-transform: none;
 }
 
 .practice-timeline-editor__input {
   min-height: 3.25rem;
   padding: 0.75rem 0.85rem;
+  border: 1px solid var(--audio-divider);
   border-radius: 0.85rem;
+  background: var(--audio-surface);
+  color: var(--audio-text-primary);
   box-shadow: none;
-  font-size: 0.93rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.practice-timeline-editor__input:focus {
+  border-color: var(--audio-blue-border);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--audio-blue-soft);
+}
+
+.practice-timeline-editor__input::placeholder {
+  color: var(--audio-text-secondary);
+  opacity: 0.62;
 }
 
 .practice-timeline-editor__input[aria-invalid='true'] {
@@ -2015,12 +2043,17 @@
   width: 2.75rem;
   height: 2.75rem;
   flex-shrink: 0;
+  border: 1px solid var(--audio-divider);
   border-radius: 0.85rem;
+  background: var(--audio-surface);
+  color: var(--audio-text-primary);
   box-shadow: none;
 }
 
 .practice-timeline-editor__stepper-value {
+  color: var(--audio-text-primary);
   font-size: clamp(1.2rem, 3.4vh, 1.55rem);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2037,41 +2070,104 @@
   margin-bottom: 0.85rem;
 }
 
-.practice-timeline-editor .metronome-audio-select__label {
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select__label {
+  position: static;
+  width: auto;
   margin-bottom: 0.38rem;
-  font-size: 0.75rem;
-  font-weight: 680;
+  padding: 0;
+  color: var(--audio-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.3;
+  text-align: left;
+  text-transform: none;
+  transform: none;
 }
 
-.practice-timeline-editor .metronome-audio-select__control {
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select__control {
+  align-items: center;
+  justify-content: flex-start;
   min-height: 3.2rem;
   padding: 0.72rem 2.2rem 0.72rem 0.85rem;
-  border-width: 1px;
+  border: 1px solid var(--audio-divider);
   border-radius: 0.85rem;
+  background: var(--audio-surface);
+  color: var(--audio-text-primary);
   box-shadow: none;
   font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: left;
 }
 
-.practice-timeline-editor .metronome-audio-select__menu {
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select--open
+  .metronome-audio-select__control {
+  border-color: var(--audio-blue-border);
+  background: var(--audio-surface);
+  box-shadow: 0 0 0 3px var(--audio-blue-soft);
+}
+
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select__chevron {
+  top: 50%;
+  right: 0.72rem;
+  bottom: auto;
+  width: 0.9rem;
+  height: 0.9rem;
+  transform: translateY(-50%);
+}
+
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select--open
+  .metronome-audio-select__chevron {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select__menu {
+  top: calc(100% + 0.35rem);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  width: auto;
   max-height: min(18rem, 48vh);
   border-radius: 0.9rem;
+  border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
   box-shadow: 0 16px 44px rgba(23, 26, 34, 0.16);
+  transform: none;
 }
 
-.practice-timeline-editor .metronome-audio-select__option {
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select__option {
   min-height: 2.8rem;
   padding: 0.68rem 0.85rem;
   border-top: 1px solid color-mix(in srgb, var(--audio-divider) 65%, transparent);
+  color: var(--audio-text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
-.practice-timeline-editor .metronome-audio-select__option:first-child,
-.practice-timeline-editor
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
+  .metronome-audio-select__option:first-child,
+.app-ui-overlay--audio-mode
+  .practice-timeline-editor
   .metronome-audio-select__option--header
   + .metronome-audio-select__option {
   border-top: 0;
 }
-
 .practice-timeline-editor__advanced-toggle {
   display: flex;
   min-height: 4rem;
@@ -2079,8 +2175,8 @@
   gap: 0.65rem;
   margin: 0 0 0.85rem;
   padding: 0.75rem;
-  border-color: var(--audio-blue-border);
-  background: color-mix(in srgb, var(--audio-blue-soft) 58%, var(--audio-surface));
+  border-color: var(--audio-divider);
+  background: var(--audio-surface);
   color: var(--audio-text-primary);
   text-align: left;
 }

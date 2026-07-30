@@ -907,6 +907,40 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
     color 120ms ease;
 }
 
+.audio-recording-waveform--idle {
+  max-width: 32rem;
+  padding-inline: clamp(0.65rem, 3vw, 1.1rem);
+  color: color-mix(in srgb, var(--audio-blue) 68%, var(--audio-text-secondary));
+}
+
+.audio-recording-waveform--idle::before {
+  position: absolute;
+  right: 7%;
+  left: 7%;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--audio-blue) 13%, transparent) 16%,
+    color-mix(in srgb, var(--audio-blue) 24%, transparent) 50%,
+    color-mix(in srgb, var(--audio-blue) 13%, transparent) 84%,
+    transparent
+  );
+  content: '';
+}
+
+.audio-recording-waveform--idle .audio-recording-waveform__bar {
+  width: clamp(1.25px, 0.42vw, 2.25px);
+  flex-basis: 2.25px;
+  opacity: 0.36;
+  transition: none;
+}
+
+.audio-recording-waveform--idle .audio-recording-waveform__bar:nth-child(4n + 2) {
+  opacity: 0.5;
+}
+
 .audio-recording-waveform--recording .audio-recording-waveform__bar {
   opacity: 0.9;
 }

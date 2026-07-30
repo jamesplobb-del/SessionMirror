@@ -26,7 +26,7 @@ interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
   settings: AppSettings
-  /** Shared quick-settings values — must match the long-press branch wheel. */
+  /** Shared overlay values — must match the Camera Mode Overlays menu. */
   hudQuickSettings: HudQuickSettings
   onUpdate: (patch: Partial<AppSettings>) => void
   onPitchTrackerChange: (enabled: boolean) => void
@@ -790,7 +790,7 @@ export default function SettingsDrawer({
               {[
                 ['recording-modes', 'Recording Modes'],
                 ['hands-free-recording', 'Hands-Free Recording'],
-                ['quick-settings-widgets', 'Quick Settings Widgets'],
+                ['quick-settings-widgets', 'Overlays'],
                 ['take-vault', 'Take Vault'],
                 ['pinning-best-takes', 'Best Take Pinning'],
                 ['media-youtube', 'Media & YouTube'],

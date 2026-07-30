@@ -4475,6 +4475,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         >
                           <PipCompareRow
                             compact={!cameraTakeCardsExpanded}
+                            boundaryRef={appShellRef}
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                             challengerTake={challengerTake}

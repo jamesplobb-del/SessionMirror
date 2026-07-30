@@ -1,5 +1,6 @@
 const EDGE_INSET = 12
 const POSITION_STORAGE_PREFIX = 'sessionmirror:widget-pos:'
+const PERSISTENT_POSITION_STORAGE_PREFIX = 'sessionmirror:persistent-widget-pos:'
 const SIZE_STORAGE_PREFIX = 'sessionmirror:widget-size:'
 
 export interface WidgetPosition {
@@ -55,6 +56,31 @@ export function saveWidgetPosition(id: string, x: number, y: number): void {
   try {
     sessionStorage.setItem(
       `${POSITION_STORAGE_PREFIX}${id}`,
+      JSON.stringify({ x: Math.round(x), y: Math.round(y) }),
+    )
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+/** Persistent positions for user-arranged UI that should survive an app relaunch. */
+export function loadPersistentWidgetPosition(id: string): WidgetPosition | null {
+  try {
+    const raw = localStorage.getItem(`${PERSISTENT_POSITION_STORAGE_PREFIX}${id}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<WidgetPosition>
+    if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') return null
+    if (!Number.isFinite(parsed.x) || !Number.isFinite(parsed.y)) return null
+    return { x: parsed.x, y: parsed.y }
+  } catch {
+    return null
+  }
+}
+
+export function savePersistentWidgetPosition(id: string, x: number, y: number): void {
+  try {
+    localStorage.setItem(
+      `${PERSISTENT_POSITION_STORAGE_PREFIX}${id}`,
       JSON.stringify({ x: Math.round(x), y: Math.round(y) }),
     )
   } catch {

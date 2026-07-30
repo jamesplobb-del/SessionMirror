@@ -1200,6 +1200,54 @@ html.app-dark-mode .review-overlay--camera .review-nav-button {
   backdrop-filter: blur(18px) saturate(1.2);
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .app-pip-row--compact
+  > .compact-take-slot--movable {
+  cursor: grab;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+  will-change: transform, box-shadow;
+  transition:
+    border-color 160ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .app-pip-row--compact
+  > .compact-take-slot--layout-editing {
+  z-index: 44;
+  border-color: rgba(255, 255, 255, 0.46) !important;
+  box-shadow:
+    0 0.9rem 2.1rem rgba(0, 0, 0, 0.26),
+    0 0 0 0.1rem rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.19) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .app-pip-row--compact
+  > .compact-take-slot--move-armed {
+  z-index: 46;
+  border-color: rgba(255, 255, 255, 0.72) !important;
+  box-shadow:
+    0 1rem 2.5rem rgba(0, 0, 0, 0.32),
+    0 0 0 0.16rem rgba(255, 255, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  filter: saturate(1.08) brightness(1.04);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .app-pip-row--compact
+  > .compact-take-slot--repositioning {
+  z-index: 48;
+  cursor: grabbing;
+  box-shadow:
+    0 1.25rem 3rem rgba(0, 0, 0, 0.38),
+    0 0 0 0.16rem rgba(255, 255, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+}
+
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-slot--best {
   border-color: rgba(247, 174, 28, 0.82) !important;
   box-shadow:
@@ -1438,6 +1486,18 @@ button.compact-take-caption:active {
     inset 0 1px 0 rgba(95, 190, 255, 0.12);
 }
 
+.take-card-top-control {
+  position: fixed;
+  top: auto;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.45rem);
+  left: 50%;
+  z-index: 58;
+  width: max-content;
+  max-width: calc(100vw - 1.25rem);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
 .camera-compare-toggle {
   display: flex;
   width: max-content;
@@ -1445,7 +1505,7 @@ button.compact-take-caption:active {
   align-items: center;
   justify-content: center;
   gap: 0.34rem;
-  margin: 0.48rem auto 0;
+  margin: 0;
   padding: 0.35rem 0.68rem;
   border: 0.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
@@ -1474,6 +1534,70 @@ button.compact-take-caption:active {
   height: 0.8rem;
   color: #61bdff;
   stroke-width: 1.75;
+}
+
+.take-card-layout-toolbar {
+  display: flex;
+  width: min(20rem, calc(100vw - 1.25rem));
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.32rem 0.38rem 0.32rem 0.82rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(7, 11, 18, 0.72);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 0.75rem 2rem rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  backdrop-filter: blur(22px) saturate(1.18);
+}
+
+.take-card-layout-toolbar__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.08rem;
+  line-height: 1.08;
+}
+
+.take-card-layout-toolbar__copy strong {
+  font-size: 0.68rem;
+  font-weight: 680;
+  letter-spacing: 0.015em;
+}
+
+.take-card-layout-toolbar__copy small {
+  color: rgba(219, 224, 231, 0.6);
+  font-size: 0.55rem;
+  font-weight: 500;
+}
+
+.take-card-layout-toolbar__reset {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.62rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.6rem;
+  font-weight: 640;
+  line-height: 1;
+}
+
+.take-card-layout-toolbar__reset svg {
+  width: 0.78rem;
+  height: 0.78rem;
+  color: #61bdff;
+  stroke-width: 1.85;
 }
 
 .compact-take-card__play-surface {
@@ -1571,7 +1695,7 @@ button.compact-take-caption:active {
   stroke-width: 1.8;
 }
 
-/* Centered Camera Mode bottom capsule. Settings remains a separate right-edge control. */
+/* Unified Camera Mode capsule: Vault · Overlays · Record · Practice · Settings. */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
   display: flex !important;
   width: 100% !important;
@@ -1588,18 +1712,21 @@ button.compact-take-caption:active {
   max-width: none !important;
   align-items: center;
   justify-content: center;
+  transform: translateY(0.58rem);
 }
 
 .camera-control-pill {
   position: relative;
   isolation: isolate;
   display: grid;
-  width: clamp(13.35rem, 57vw, 14.5rem);
+  width: min(calc(100vw - 1rem), 21.25rem);
   height: 4rem;
-  grid-template-columns: minmax(0, 1fr) 3.45rem minmax(0, 1fr);
+  grid-template-columns:
+    2.7rem minmax(0, 1fr) 3.75rem minmax(0, 1fr) 2.7rem;
   align-items: center;
   justify-items: stretch;
   overflow: visible;
+  padding-inline: 0.28rem;
   border: 0.75px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background:
@@ -1636,8 +1763,7 @@ button.compact-take-caption:active {
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
-  .camera-vault-button,
-.camera-tools-button {
+  .camera-pill-action {
   position: relative;
   z-index: 2;
   display: flex;
@@ -1655,8 +1781,67 @@ button.compact-take-caption:active {
   filter: none !important;
 }
 
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  > .camera-vault-button,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  > .camera-control-deck__settings-btn {
+  position: relative !important;
+  inset: auto !important;
+  display: grid !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 2.75rem !important;
+  min-height: 2.75rem !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  line-height: 0;
+  place-items: center;
+  transform: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  > .camera-vault-button::before,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  > .camera-control-deck__settings-btn::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  transform: translate(-50%, -50%);
+  content: '';
+  pointer-events: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  > .camera-vault-button:active,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  > .camera-control-deck__settings-btn:active {
+  transform: scale(0.92);
+}
+
 .camera-vault-button__icon-wrap {
   position: relative;
+  z-index: 1;
   display: flex;
   width: 2.35rem;
   height: 2.7rem;
@@ -1692,7 +1877,7 @@ button.compact-take-caption:active {
   line-height: 1;
 }
 
-.camera-tools-button__content {
+.camera-pill-action__content {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -1705,37 +1890,51 @@ button.compact-take-caption:active {
   line-height: 1;
 }
 
-.camera-tools-button__waveform {
+.camera-overlays-button__icon {
+  width: 1.45rem;
+  height: 1.45rem;
+  color: #f7ae1c;
+  filter: drop-shadow(0 0 0.2rem rgba(247, 174, 28, 0.16));
+  stroke-width: 1.65;
+}
+
+.camera-practice-button__waveform {
   width: 2.25rem;
   height: 1.52rem;
   color: #20a9ef;
   filter: drop-shadow(0 0 0.22rem rgba(21, 152, 255, 0.16));
 }
 
-.camera-tools-button__waveform path {
+.camera-practice-button__waveform path {
   stroke: currentColor;
   stroke-width: 1.45;
   stroke-linecap: round;
 }
 
-.camera-tools-button:disabled {
+.camera-pill-action:disabled {
   opacity: 0.42;
 }
 
 .camera-vault-button,
-.camera-tools-button {
+.camera-pill-action {
   transition: opacity 140ms ease, background-color 140ms ease;
 }
 
 .camera-vault-button:active,
-.camera-tools-button:active:not(:disabled) {
+.camera-pill-action:active:not(:disabled) {
   opacity: 0.72;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  .camera-overlays-button[aria-expanded='true'] {
+  background: rgba(247, 174, 28, 0.08) !important;
 }
 
 .camera-control-deck__record-stack {
   position: relative;
   z-index: 4;
-  width: 3.45rem;
+  width: 3.75rem;
   height: 4rem;
   align-self: center;
   justify-content: center;
@@ -1750,24 +1949,25 @@ button.compact-take-caption:active {
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-deck__record-stack
   .record-carousel-viewport {
-  --record-carousel-viewport-width: 3.45rem;
-  --record-slot-active-size: 2.9rem;
-  width: 3.45rem !important;
-  height: 3.45rem !important;
+  --record-carousel-viewport-width: 3.7rem;
+  --record-slot-active-size: 3.3rem;
+  width: 3.7rem !important;
+  height: 3.7rem !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-carousel-slot--camera {
-  width: 2.9rem !important;
-  height: 2.9rem !important;
-  border: 0.75px solid rgba(255, 255, 255, 0.28) !important;
-  background: rgba(5, 9, 15, 0.32) !important;
+  width: 3.3rem !important;
+  height: 3.3rem !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.3) !important;
+  background:
+    linear-gradient(145deg, #ff5e66 0%, #ed334b 56%, #cf1f3d 100%) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.11),
-    0 0.18rem 0.6rem rgba(0, 0, 0, 0.19) !important;
-  -webkit-backdrop-filter: blur(7px) saturate(1.06);
-  backdrop-filter: blur(7px) saturate(1.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 0.35rem 0.9rem rgba(151, 19, 48, 0.34) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -1788,22 +1988,25 @@ button.compact-take-caption:active {
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-carousel-slot--camera.record-carousel-slot--recording {
-  border-color: rgba(255, 198, 198, 0.35) !important;
-  background: rgba(24, 8, 12, 0.3) !important;
+  border-color: rgba(255, 226, 226, 0.38) !important;
+  background:
+    linear-gradient(145deg, #ec3b50 0%, #cf1f3d 58%, #a81231 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 0.4rem 1rem rgba(142, 16, 43, 0.4) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-orbit-icon {
-  width: 2.58rem;
-  height: 2.58rem;
+  width: 2.92rem;
+  height: 2.92rem;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-orbit-icon__ring {
-  stroke: rgba(236, 242, 248, 0.72);
-  stroke-width: 1;
+  stroke: transparent;
   filter: none;
 }
 
@@ -1813,7 +2016,16 @@ button.compact-take-caption:active {
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-orbit-icon__stop {
-  filter: drop-shadow(0 0.12rem 0.2rem rgba(165, 18, 46, 0.28));
+  fill: rgba(255, 255, 255, 0.96);
+  filter: drop-shadow(0 0.1rem 0.18rem rgba(103, 8, 28, 0.24));
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  .record-carousel-slot--recording
+  .record-orbit-icon__ring {
+  stroke: transparent;
+  filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -1865,28 +2077,6 @@ button.compact-take-caption:active {
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
-  .control-deck__settings-btn.camera-control-deck__settings-btn {
-  position: absolute !important;
-  top: 50%;
-  right: max(0.8rem, calc(env(safe-area-inset-right, 0px) + 0.55rem)) !important;
-  z-index: 12;
-  width: 2.75rem !important;
-  height: 2.75rem !important;
-  min-width: 2.75rem !important;
-  min-height: 2.75rem !important;
-  display: grid !important;
-  padding: 0 !important;
-  line-height: 0;
-  place-items: center;
-  transform: translateY(-50%);
-}
-
-.app-ui-overlay:not(.app-ui-overlay--audio-mode)
-  .control-deck__settings-btn.camera-control-deck__settings-btn:active {
-  transform: translateY(-50%) scale(0.92);
-}
-
-.app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-deck__settings-btn
   > .ui-orient-spin,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -1901,12 +2091,19 @@ button.compact-take-caption:active {
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-deck__settings-btn
+  > .ui-orient-spin {
+  position: relative;
+  z-index: 1;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-deck__settings-btn
   svg {
   display: block;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.52rem;
+  height: 1.52rem;
   margin: 0;
-  stroke-width: 1.9;
+  stroke-width: 1.85;
 }
 
 @media (max-width: 350px) {
@@ -1945,12 +2142,14 @@ button.compact-take-caption:active {
   }
 
   .camera-control-pill {
-    width: 12.8rem;
+    width: calc(100vw - 1rem);
+    grid-template-columns:
+      2.55rem minmax(0, 1fr) 3.65rem minmax(0, 1fr) 2.55rem;
+    padding-inline: 0.2rem;
   }
 
-  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
-    .control-deck__settings-btn.camera-control-deck__settings-btn {
-    right: max(0.25rem, env(safe-area-inset-right, 0px)) !important;
+  .camera-pill-action__content {
+    font-size: 0.63rem;
   }
 }
 
@@ -1985,19 +2184,19 @@ button.compact-take-caption:active {
   }
 
   .camera-control-pill {
-    width: 15.5rem;
-    height: 4.25rem;
-    grid-template-columns: minmax(0, 1fr) 3.75rem minmax(0, 1fr);
+    width: 22rem;
+    height: 4.2rem;
+    grid-template-columns:
+      2.85rem minmax(0, 1fr) 3.95rem minmax(0, 1fr) 2.85rem;
   }
 
   .camera-control-deck__record-stack {
-    width: 3.75rem;
-    height: 4.25rem;
+    width: 3.95rem;
+    height: 4.2rem;
   }
 
-  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
-    .control-deck__settings-btn.camera-control-deck__settings-btn {
-    right: max(2rem, calc(env(safe-area-inset-right, 0px) + 1.25rem)) !important;
+  .take-card-top-control {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.65rem);
   }
 }
 

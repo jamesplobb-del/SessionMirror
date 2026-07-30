@@ -32,6 +32,13 @@ const LIVE_WAVEFORM_FUTURE_PEAKS = [
   0.055, 0.045, 0.07, 0.04, 0.06, 0.035, 0.05, 0.04, 0.065, 0.035, 0.055, 0.04, 0.05, 0.035, 0.045,
   0.04, 0.035, 0.04,
 ]
+const IDLE_RECORDING_WAVEFORM_PEAKS = [
+  0.1, 0.13, 0.09, 0.17, 0.12, 0.21, 0.16, 0.25, 0.19, 0.32, 0.24, 0.38, 0.29, 0.46, 0.34, 0.41,
+  0.27, 0.36, 0.22, 0.3, 0.18, 0.26, 0.15, 0.22, 0.12, 0.19, 0.14, 0.24, 0.17, 0.31, 0.23, 0.4,
+  0.28, 0.48, 0.35, 0.43, 0.3, 0.37, 0.24, 0.33, 0.2, 0.29, 0.16, 0.25, 0.13, 0.21, 0.15, 0.27,
+  0.19, 0.35, 0.25, 0.42, 0.31, 0.38, 0.26, 0.32, 0.21, 0.28, 0.17, 0.23, 0.14, 0.19, 0.11, 0.15,
+  0.1, 0.12,
+]
 const MIN_VISIBLE_WAVEFORM_PEAK = 0.035
 
 function formatDuration(seconds?: number): string {
@@ -73,12 +80,14 @@ function AudioRecordingWaveform({
   })
   const displayedPeaks = isRecording
     ? [...livePeaks, ...LIVE_WAVEFORM_FUTURE_PEAKS]
-    : EMPTY_WAVEFORM_PEAKS
+    : IDLE_RECORDING_WAVEFORM_PEAKS
 
   return (
     <div
       className={`audio-recording-waveform ${
-        isRecording ? 'audio-recording-waveform--recording' : ''
+        isRecording
+          ? 'audio-recording-waveform--recording'
+          : 'audio-recording-waveform--idle'
       }`}
       aria-hidden
     >

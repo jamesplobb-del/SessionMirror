@@ -193,10 +193,10 @@ export const COACH_MARKS: CoachMarkContent[] = [
   },
   {
     id: 'quick-settings',
-    title: 'One Last Shortcut',
-    body: 'Tap Settings for the full menu, or long-press it for quick access to the tools you use most.',
-    selector: '[data-tutorial="settings-button"]',
-    placement: 'left',
+    title: 'Overlays at Hand',
+    body: 'Tap Overlays to show or hide Pitch Analysis, Take Cards, Metronome, and Audio Enhancer without leaving Camera Mode.',
+    selector: '[data-tutorial="overlays-button"]',
+    placement: 'right',
     advance: 'tap-screen',
     continueHint: 'Tap anywhere to finish.',
     requiresSplitView: 'closed',
@@ -223,12 +223,12 @@ export const HELP_TOPICS: HelpTopic[] = [
   },
   {
     id: 'quick-settings-widgets',
-    title: 'Quick Settings Widgets',
-    body: 'In Camera Mode, long-press the Settings button to open the widget wheel without leaving practice.',
+    title: 'Overlays',
+    body: 'In Camera Mode, tap Overlays beside Record to open the on-screen widget controls.',
     bullets: [
       'Toggle Pitch Analysis, Take Cards, Metronome, and Audio Enhancer',
       'Tap a widget to show or hide it on screen',
-      'Tap Settings normally to open the full settings drawer',
+      'Use the corner cog to open the full settings drawer',
     ],
   },
   {
@@ -246,8 +246,12 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'take-cards',
     title: 'Take Cards',
-    body: 'Take cards are quick handles for playback, comparison, and organization.',
-    bullets: ['Tap to open or play', 'Long-press for more actions', 'Use Current Take and Best Take together'],
+    body: 'Take cards are quick handles for playback, comparison, and organization. In Camera Mode, hold either card to enter layout mode, then arrange both cards freely.',
+    bullets: [
+      'Drag either card after layout mode begins',
+      'Tap outside the cards when finished',
+      'Reset restores the default layout; custom positions persist after closing the app',
+    ],
   },
   {
     id: 'pinning-best-takes',

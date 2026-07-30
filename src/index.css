@@ -5524,6 +5524,37 @@ html.app-dark-mode .pitch-spectrogram--glass {
   pointer-events: none;
 }
 
+.settings-branch-wheel--camera::before {
+  width: min(15.75rem, calc(100vw - 2rem));
+  height: 13.25rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 2rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035)),
+    rgba(7, 11, 18, 0.68);
+  box-shadow:
+    0 1.25rem 3.5rem rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(24px) saturate(1.18);
+  backdrop-filter: blur(24px) saturate(1.18);
+}
+
+.settings-branch-wheel--camera .settings-branch-wheel__item > .ui-orient-spin {
+  gap: 0.48rem;
+}
+
+.settings-branch-wheel--camera .settings-branch-wheel__icon {
+  width: 3rem;
+  height: 3rem;
+  background: rgba(12, 18, 28, 0.78);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.settings-branch-wheel--camera .settings-branch-wheel__label {
+  font-size: 0.71rem;
+  font-weight: 650;
+}
+
 .settings-branch-wheel--audio::before {
   width: 20rem;
   height: 20rem;
@@ -6933,7 +6964,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__label {
   left: 50%;
-  top: 0.36rem;
+  top: 0.38rem;
   width: calc(100% - 0.75rem);
   overflow: hidden;
   color: var(--audio-text-secondary);
@@ -6946,10 +6977,10 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__control {
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
-  min-height: 3.25rem;
-  padding: 1.15rem 1.05rem 0.42rem 0.35rem;
+  min-height: 2.95rem;
+  padding: 1.08rem 1.05rem 0.38rem 0.35rem;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -6968,7 +6999,8 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__chevron {
   right: 0.28rem;
-  bottom: 0.6rem;
+  top: 1.06rem;
+  bottom: auto;
   width: 0.68rem;
   height: 0.68rem;
 }

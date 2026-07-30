@@ -1,13 +1,18 @@
 import {
+  useCallback,
+  useEffect,
   useRef,
+  useState,
   memo,
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
   type RefObject,
 } from 'react'
-import { motion } from 'framer-motion'
-import { Columns2, Pin, X } from 'lucide-react'
+import { motion, useDragControls, useMotionValue } from 'framer-motion'
+import { Columns2, Pin, RotateCcw, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
 import Pressable from './ui/Pressable'
@@ -15,12 +20,24 @@ import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
-import { iosDragGhostTransition, motionGpuLayer } from '../utils/motionPresets'
+import { iosDragGhostTransition, iosDragRelease, motionGpuLayer } from '../utils/motionPresets'
 import { takeHasPlaybackMedia } from '../utils/takes'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
+import {
+  loadPersistentWidgetPosition,
+  savePersistentWidgetPosition,
+} from '../utils/floatingWidgetLayout'
+import {
+  triggerConfirmedLongPressHaptic,
+  triggerDragStartHaptic,
+  triggerLightHaptic,
+  warmHaptics,
+} from '../utils/haptics'
+import { readPhysicalUiPortal } from '../utils/physicalUiPortal'
 
 export interface PipCompareRowProps {
   compact?: boolean
+  boundaryRef: RefObject<HTMLElement | null>
   benchmarkTake: Take | null
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
   challengerTake: Take | null
@@ -164,6 +181,262 @@ function CompactTakeCaption({
   )
 }
 
+const TAKE_CARD_MOVE_HOLD_MS = 425
+const TAKE_CARD_MOVE_CANCEL_PX = 12
+
+function MovableTakeSlot({
+  movable,
+  editing,
+  onEnterEditing,
+  resetNonce,
+  wiggleDirection,
+  positionId,
+  boundaryRef,
+  dropRef,
+  className,
+  dataTutorial,
+  hapticFeedback,
+  children,
+}: {
+  movable: boolean
+  editing: boolean
+  onEnterEditing: () => void
+  resetNonce: number
+  wiggleDirection: -1 | 1
+  positionId: string
+  boundaryRef: RefObject<HTMLElement | null>
+  dropRef: RefObject<HTMLDivElement | null>
+  className: string
+  dataTutorial?: string
+  hapticFeedback: boolean
+  children: ReactNode
+}) {
+  const dragControls = useDragControls()
+  const savedPosition = useRef(loadPersistentWidgetPosition(positionId))
+  const dragX = useMotionValue(savedPosition.current?.x ?? 0)
+  const dragY = useMotionValue(savedPosition.current?.y ?? 0)
+  const handledResetNonceRef = useRef(resetNonce)
+  const pressRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    event: globalThis.PointerEvent
+  } | null>(null)
+  const holdTimerRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+  const enteringEditingRef = useRef(false)
+  const suppressClickRef = useRef(false)
+  const suppressReleaseTimerRef = useRef<number | null>(null)
+  const [armed, setArmed] = useState(false)
+  const [dragging, setDragging] = useState(false)
+
+  useEffect(() => {
+    if (handledResetNonceRef.current === resetNonce) return
+    handledResetNonceRef.current = resetNonce
+    dragX.set(0)
+    dragY.set(0)
+    savePersistentWidgetPosition(positionId, 0, 0)
+  }, [dragX, dragY, positionId, resetNonce])
+
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+  }, [])
+
+  const releaseClickSuppressionSoon = useCallback(() => {
+    if (suppressReleaseTimerRef.current !== null) {
+      window.clearTimeout(suppressReleaseTimerRef.current)
+    }
+    suppressReleaseTimerRef.current = window.setTimeout(() => {
+      suppressClickRef.current = false
+      suppressReleaseTimerRef.current = null
+    }, 250)
+  }, [])
+
+  const finishPress = useCallback(
+    (pointerId?: number) => {
+      if (
+        pointerId !== undefined &&
+        pressRef.current &&
+        pressRef.current.pointerId !== pointerId
+      ) {
+        return
+      }
+      clearHoldTimer()
+      pressRef.current = null
+      if (!draggingRef.current) {
+        setArmed(false)
+        releaseClickSuppressionSoon()
+      }
+    },
+    [clearHoldTimer, releaseClickSuppressionSoon],
+  )
+
+  useEffect(() => {
+    const handleGlobalPointerEnd = (event: globalThis.PointerEvent) => {
+      finishPress(event.pointerId)
+    }
+    const handleBlur = () => finishPress()
+
+    window.addEventListener('pointerup', handleGlobalPointerEnd)
+    window.addEventListener('pointercancel', handleGlobalPointerEnd)
+    window.addEventListener('blur', handleBlur)
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerEnd)
+      window.removeEventListener('pointercancel', handleGlobalPointerEnd)
+      window.removeEventListener('blur', handleBlur)
+      clearHoldTimer()
+      if (suppressReleaseTimerRef.current !== null) {
+        window.clearTimeout(suppressReleaseTimerRef.current)
+      }
+    }
+  }, [clearHoldTimer, finishPress])
+
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (!movable || event.button !== 0) return
+      if ((event.target as HTMLElement).closest('[data-card-move-ignore]')) return
+
+      clearHoldTimer()
+      if (hapticFeedback) warmHaptics()
+      pressRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        event: event.nativeEvent,
+      }
+
+      if (editing) {
+        enteringEditingRef.current = false
+        suppressClickRef.current = true
+        setArmed(true)
+        dragControls.start(event.nativeEvent, { snapToCursor: false })
+        return
+      }
+
+      holdTimerRef.current = window.setTimeout(() => {
+        const press = pressRef.current
+        if (!press) return
+        suppressClickRef.current = true
+        setArmed(true)
+        enteringEditingRef.current = true
+        onEnterEditing()
+        if (hapticFeedback) {
+          void triggerConfirmedLongPressHaptic()
+        }
+        dragControls.start(press.event, { snapToCursor: false })
+      }, TAKE_CARD_MOVE_HOLD_MS)
+    },
+    [
+      clearHoldTimer,
+      dragControls,
+      editing,
+      hapticFeedback,
+      movable,
+      onEnterEditing,
+    ],
+  )
+
+  const handlePointerMove = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      const press = pressRef.current
+      if (!press || press.pointerId !== event.pointerId || armed) return
+      const distance = Math.hypot(
+        event.clientX - press.startX,
+        event.clientY - press.startY,
+      )
+      if (distance > TAKE_CARD_MOVE_CANCEL_PX) {
+        clearHoldTimer()
+        pressRef.current = null
+      }
+    },
+    [armed, clearHoldTimer],
+  )
+
+  const handleDragStart = useCallback(() => {
+    draggingRef.current = true
+    suppressClickRef.current = true
+    setDragging(true)
+    if (editing && hapticFeedback && !enteringEditingRef.current) {
+      void triggerDragStartHaptic()
+    }
+    enteringEditingRef.current = false
+  }, [editing, hapticFeedback])
+
+  const handleDragEnd = useCallback(() => {
+    savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
+    draggingRef.current = false
+    pressRef.current = null
+    setDragging(false)
+    setArmed(false)
+    releaseClickSuppressionSoon()
+  }, [dragX, dragY, positionId, releaseClickSuppressionSoon])
+
+  const assignDropRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      dropRef.current = node
+    },
+    [dropRef],
+  )
+
+  return (
+    <motion.div
+      ref={assignDropRef}
+      className={`${className} ${
+        movable ? 'compact-take-slot--movable' : ''
+      } ${editing ? 'compact-take-slot--layout-editing' : ''} ${
+        editing && wiggleDirection > 0 ? 'compact-take-slot--wiggle-reverse' : ''
+      } ${armed ? 'compact-take-slot--move-armed' : ''} ${
+        dragging ? 'compact-take-slot--repositioning' : ''
+      }`}
+      data-tutorial={dataTutorial}
+      data-movable-take-card={movable ? 'true' : undefined}
+      drag={movable}
+      dragListener={false}
+      dragControls={dragControls}
+      dragConstraints={boundaryRef}
+      dragElastic={0.045}
+      dragMomentum={false}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={(event) => finishPress(event.pointerId)}
+      onPointerCancel={(event) => finishPress(event.pointerId)}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onClickCapture={(event) => {
+        if (!suppressClickRef.current) return
+        event.preventDefault()
+        event.stopPropagation()
+        suppressClickRef.current = false
+      }}
+      animate={
+        editing && !dragging
+          ? {
+              scale: 1.018,
+              rotate:
+                wiggleDirection < 0
+                  ? [-0.38, 0.38, -0.38]
+                  : [0.38, -0.38, 0.38],
+            }
+          : { scale: armed || dragging ? 1.04 : 1, rotate: 0 }
+      }
+      transition={
+        editing && !dragging
+          ? {
+              ...iosDragRelease,
+              rotate: { duration: 0.24, repeat: Infinity, ease: 'linear' },
+            }
+          : iosDragRelease
+      }
+      style={movable ? { x: dragX, y: dragY } : undefined}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
 function CompactTakeClearButton({
   label,
   onClear,
@@ -181,6 +454,7 @@ function CompactTakeClearButton({
       haptic="light"
       hapticFeedback={hapticFeedback}
       className="compact-take-card__clear"
+      data-card-move-ignore
       onClick={onClear}
       aria-label={`Unload ${label}`}
     >
@@ -204,6 +478,7 @@ function CompactPinCurrentButton({
       haptic="light"
       hapticFeedback={hapticFeedback}
       className="compact-take-card__pin"
+      data-card-move-ignore
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation()
@@ -238,6 +513,45 @@ function CompactCompareButton({
       <Columns2 aria-hidden />
       <span>Expand view</span>
     </Pressable>
+  )
+}
+
+function TakeCardLayoutToolbar({
+  onReset,
+  hapticFeedback,
+}: {
+  onReset: () => void
+  hapticFeedback: boolean
+}) {
+  return (
+    <motion.div
+      className="take-card-layout-toolbar pointer-events-auto"
+      data-take-card-layout-toolbar
+      role="status"
+      aria-label="Take card layout editing is active. Tap outside the cards when finished."
+      initial={{ opacity: 0, y: -6, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={iosDragRelease}
+    >
+      <span className="take-card-layout-toolbar__copy">
+        <strong>Arrange Take Cards</strong>
+        <small>Tap outside to finish</small>
+      </span>
+      <Pressable
+        type="button"
+        intensity="soft"
+        squish={false}
+        haptic="success"
+        hapticFeedback={hapticFeedback}
+        className="take-card-layout-toolbar__reset"
+        data-card-move-ignore
+        onClick={onReset}
+        aria-label="Reset take cards to their default positions"
+      >
+        <RotateCcw aria-hidden />
+        <span>Reset</span>
+      </Pressable>
+    </motion.div>
   )
 }
 
@@ -303,6 +617,7 @@ export function PipDragGhost({
 
 export default memo(function PipCompareRow({
   compact = false,
+  boundaryRef,
   benchmarkTake,
   libraryBenchmarkPlayback,
   challengerTake,
@@ -336,6 +651,48 @@ export default memo(function PipCompareRow({
 }: PipCompareRowProps) {
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
   const challengerDropRef = useRef<HTMLDivElement>(null)
+  const [layoutEditing, setLayoutEditing] = useState(false)
+  const [layoutResetNonce, setLayoutResetNonce] = useState(0)
+
+  const enterLayoutEditing = useCallback(() => {
+    setLayoutEditing(true)
+  }, [])
+
+  useEffect(() => {
+    if (compact) return
+    setLayoutEditing(false)
+  }, [compact])
+
+  useEffect(() => {
+    if (!layoutEditing) return
+
+    document.body.classList.add('take-card-layout-editing')
+    const finishOnOutsideTap = (event: globalThis.PointerEvent) => {
+      const target = event.target as HTMLElement | null
+      if (
+        target?.closest(
+          '[data-movable-take-card], [data-take-card-layout-toolbar]',
+        )
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      setLayoutEditing(false)
+      if (hapticFeedback) triggerLightHaptic()
+    }
+
+    window.addEventListener('pointerdown', finishOnOutsideTap, true)
+    return () => {
+      document.body.classList.remove('take-card-layout-editing')
+      window.removeEventListener('pointerdown', finishOnOutsideTap, true)
+    }
+  }, [hapticFeedback, layoutEditing])
+
+  const resetTakeCardLayout = useCallback(() => {
+    setLayoutResetNonce((nonce) => nonce + 1)
+  }, [])
 
   const {
     ghost: challengerGhost,
@@ -350,8 +707,8 @@ export default memo(function PipCompareRow({
     onDelete: onDeleteTake,
     onTap: onExpandChallenger,
     onDragStateChange,
-    enabled: takeHasPlaybackMedia(challengerTake),
-    activationMode: compact ? 'move' : 'hold',
+    enabled: !compact && takeHasPlaybackMedia(challengerTake),
+    activationMode: 'hold',
     hapticFeedback,
   })
 
@@ -367,10 +724,11 @@ export default memo(function PipCompareRow({
     onTap: onExpandBenchmark,
     onDragStateChange,
     enabled:
+      !compact &&
       takeHasPlaybackMedia(benchmarkTake) &&
       !libraryBenchmarkPlayback &&
       !youtubeEmbedUrl,
-    activationMode: compact ? 'move' : 'hold',
+    activationMode: 'hold',
     hapticFeedback,
   })
 
@@ -396,8 +754,16 @@ export default memo(function PipCompareRow({
         className={`app-pip-row ${compact ? 'app-pip-row--compact' : ''}`}
         data-tutorial="pip-row"
       >
-        <div
-          ref={benchmarkDropRef}
+        <MovableTakeSlot
+          movable={compact}
+          editing={layoutEditing}
+          onEnterEditing={enterLayoutEditing}
+          resetNonce={layoutResetNonce}
+          wiggleDirection={-1}
+          positionId="camera-best-take-card"
+          boundaryRef={boundaryRef}
+          dropRef={benchmarkDropRef}
+          hapticFeedback={hapticFeedback}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--best' : ''
           } ${
@@ -430,7 +796,10 @@ export default memo(function PipCompareRow({
             dragSourceActive={benchmarkDragging}
             dragSourceArming={benchmarkArming}
             dragSourceProps={
-              takeHasPlaybackMedia(benchmarkTake) && !libraryBenchmarkPlayback && !youtubeEmbedUrl
+              !compact &&
+              takeHasPlaybackMedia(benchmarkTake) &&
+              !libraryBenchmarkPlayback &&
+              !youtubeEmbedUrl
                 ? benchmarkDragSourceProps
                 : undefined
             }
@@ -454,15 +823,6 @@ export default memo(function PipCompareRow({
               library={Boolean(libraryBenchmarkPlayback)}
               onOpen={onExpandBenchmark}
               hapticFeedback={hapticFeedback}
-              dragSourceProps={
-                takeHasPlaybackMedia(benchmarkTake) &&
-                !libraryBenchmarkPlayback &&
-                !youtubeEmbedUrl
-                  ? benchmarkDragSourceProps
-                  : undefined
-              }
-              dragSourceActive={benchmarkDragging}
-              dragSourceArming={benchmarkArming}
             />
           )}
           {compact && compactBenchmarkHasMedia && (
@@ -472,10 +832,18 @@ export default memo(function PipCompareRow({
               hapticFeedback={hapticFeedback}
             />
           )}
-        </div>
+        </MovableTakeSlot>
 
-        <div
-          ref={challengerDropRef}
+        <MovableTakeSlot
+          movable={compact}
+          editing={layoutEditing}
+          onEnterEditing={enterLayoutEditing}
+          resetNonce={layoutResetNonce}
+          wiggleDirection={1}
+          positionId="camera-current-take-card"
+          boundaryRef={boundaryRef}
+          dropRef={challengerDropRef}
+          hapticFeedback={hapticFeedback}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--current' : ''
           } ${
@@ -483,7 +851,7 @@ export default memo(function PipCompareRow({
           } ${
             compact && benchmarkGhost?.overPin ? 'compact-take-slot--drop-active' : ''
           }`}
-          data-tutorial="challenger-card"
+          dataTutorial="challenger-card"
         >
           <PipWindow
             compact={compact}
@@ -507,7 +875,9 @@ export default memo(function PipCompareRow({
           dragSourceActive={challengerDragging}
           dragSourceArming={challengerArming}
           dragSourceProps={
-            takeHasPlaybackMedia(challengerTake) ? challengerDragSourceProps : undefined
+            !compact && takeHasPlaybackMedia(challengerTake)
+              ? challengerDragSourceProps
+              : undefined
           }
           onPlaybackChange={onChallengerPlaybackChange}
           autoPlayRequestId={challengerAutoPlayRequestId}
@@ -530,13 +900,6 @@ export default memo(function PipCompareRow({
               hasMedia={compactCurrentHasMedia}
               onOpen={onExpandChallenger}
               hapticFeedback={hapticFeedback}
-              dragSourceProps={
-                compactCurrentHasMedia
-                  ? challengerDragSourceProps
-                  : undefined
-              }
-              dragSourceActive={challengerDragging}
-              dragSourceArming={challengerArming}
             />
           )}
           {compact && compactCurrentHasMedia && (
@@ -552,15 +915,27 @@ export default memo(function PipCompareRow({
               hapticFeedback={hapticFeedback}
             />
           )}
-        </div>
+        </MovableTakeSlot>
       </div>
 
-      {compact && (
-        <CompactCompareButton
-          onToggle={onToggleSplitView}
-          hapticFeedback={hapticFeedback}
-        />
-      )}
+      {compact &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="take-card-top-control">
+            {layoutEditing ? (
+              <TakeCardLayoutToolbar
+                onReset={resetTakeCardLayout}
+                hapticFeedback={hapticFeedback}
+              />
+            ) : (
+              <CompactCompareButton
+                onToggle={onToggleSplitView}
+                hapticFeedback={hapticFeedback}
+              />
+            )}
+          </div>,
+          readPhysicalUiPortal(),
+        )}
 
       {challengerGhost && challengerTake && (
         <PipDragGhost

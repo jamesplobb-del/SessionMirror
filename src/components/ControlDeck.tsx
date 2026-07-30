@@ -1,15 +1,13 @@
-import { AnimatePresence, motion } from 'framer-motion'
 import {
   Camera,
   ChevronDown,
+  Layers3,
   ListMusic,
   Mic,
   Settings,
   Trash2,
-  X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
-import { useLongPress } from '../hooks/useLongPress'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel, { type HandsFreePhase } from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
@@ -66,11 +64,11 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-function ToolsWaveformIcon() {
+function PracticeWaveformIcon() {
   return (
     <svg
       viewBox="0 0 32 24"
-      className="camera-tools-button__waveform"
+      className="camera-practice-button__waveform"
       fill="none"
       aria-hidden
     >
@@ -132,10 +130,11 @@ function ControlDeck({
         ? 'listening'
         : 'preparing'
       : null
-  const settingsButtonRef = useRef<HTMLButtonElement>(null)
+  const overlaysButtonRef = useRef<HTMLButtonElement>(null)
   const [branchOpen, setBranchOpen] = useState(false)
   const [branchActive, setBranchActive] = useState(false)
   const [deckExpanded, setDeckExpanded] = useState(!collapsible)
+  const isCameraPresentation = recordingMode === 'video'
 
   useEffect(() => {
     const expanded = !collapsible
@@ -169,74 +168,25 @@ function ControlDeck({
     }
   }, [branchOpen, settingsBranchDisabled])
 
-  const settingsPress = useLongPress({
-    onClick: () => {
-      if (branchActive) {
-        closeBranch()
-        return
-      }
-      onOpenSettings()
-    },
-    onLongPress: () => openBranch(),
-    disabled: settingsBranchDisabled,
-    hapticFeedback,
-    primeHapticsOnPointerDown: true,
-    strongHapticFeedback: true,
-    targetRef: settingsButtonRef,
-  })
-
-  const { onClickCapture, ...settingsPressHandlers } = settingsPress
-  const isCameraPresentation = recordingMode === 'video'
-
   const settingsButton = (
     <button
       type="button"
-      ref={settingsButtonRef}
       data-tutorial="settings-button"
       className={`control-deck__settings-btn ${
         isCameraPresentation
           ? 'camera-control-deck__settings-btn'
           : 'audio-control-deck__settings-btn'
-      } flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN} ${
-        branchActive
-          ? 'bg-sky-500/10 text-sky-400 ring-1 ring-sky-400/30 shadow-[0_0_15px_rgba(56,189,248,0.3)]'
-          : 'bg-black/40 text-white hover:bg-black/55'
-      }`}
-      aria-label={
-        branchActive ? 'Close quick settings' : 'Open settings. Long press for quick settings.'
-      }
-      aria-expanded={branchActive}
-      aria-haspopup="menu"
+      } flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN} bg-black/40 text-white hover:bg-black/55`}
+      aria-label="Open settings"
       onContextMenu={(event) => event.preventDefault()}
-      onClickCapture={onClickCapture}
-      {...settingsPressHandlers}
+      onClick={() => {
+        if (!settingsBranchDisabled) onOpenSettings()
+      }}
     >
       <span className="ui-orient-spin flex items-center justify-center">
-        <AnimatePresence mode="wait" initial={false}>
-          {branchActive ? (
-            <motion.span
-              key="close"
-              initial={{ opacity: 0, rotate: -45, scale: 0.8 }}
-              animate={{ opacity: 1, rotate: 0, scale: 1 }}
-              exit={{ opacity: 0, rotate: 45, scale: 0.8 }}
-              transition={{ duration: 0.16, ease: 'easeOut' }}
-              className="flex items-center justify-center"
-            >
-              <X className="h-5 w-5" />
-            </motion.span>
-          ) : (
-            <motion.span
-              key={isCameraPresentation ? 'camera-settings' : 'audio-settings'}
-              initial={{ opacity: 0, rotate: 45, scale: 0.8 }}
-              animate={{ opacity: 1, rotate: 0, scale: 1 }}
-              exit={{ opacity: 0, rotate: -45, scale: 0.8 }}
-              transition={{ duration: 0.16, ease: 'easeOut' }}
-              className="flex items-center justify-center"
-            >
-              <Settings className="h-5 w-5" strokeWidth={1.9} />
-            </motion.span>
-          )}
-        </AnimatePresence>
+        <span className="flex items-center justify-center">
+          <Settings className="h-5 w-5" strokeWidth={1.9} />
+        </span>
       </span>
     </button>
   )
@@ -361,7 +311,7 @@ function ControlDeck({
         open={branchOpen}
         onClose={closeBranch}
         onExitComplete={handleBranchExitComplete}
-        anchorRef={settingsButtonRef}
+        anchorRef={overlaysButtonRef}
         pitchTrackerEnabled={pitchTrackerEnabled}
         showTakeCards={showTakeCards}
         showMetronome={showMetronome}
@@ -402,6 +352,33 @@ function ControlDeck({
               </span>
             </Pressable>
 
+            <Pressable
+              ref={overlaysButtonRef}
+              type="button"
+              intensity="soft"
+              squish={false}
+              onClick={() => {
+                if (branchActive) {
+                  closeBranch()
+                  return
+                }
+                openBranch()
+              }}
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              data-tutorial="overlays-button"
+              className="camera-pill-action camera-overlays-button pointer-events-auto"
+              disabled={settingsBranchDisabled}
+              aria-label={branchActive ? 'Close overlays' : 'Open overlays'}
+              aria-expanded={branchActive}
+              aria-haspopup="menu"
+            >
+              <span className="ui-orient-spin camera-pill-action__content">
+                <Layers3 aria-hidden className="camera-overlays-button__icon" />
+                <span>Overlays</span>
+              </span>
+            </Pressable>
+
             {recordStage}
 
             <Pressable
@@ -410,22 +387,22 @@ function ControlDeck({
               squish={false}
               haptic={false}
               hapticFeedback={hapticFeedback}
-              className="camera-tools-button pointer-events-auto"
+              className="camera-pill-action camera-practice-button pointer-events-auto"
               disabled={isRecording || isStopping}
               onClick={() => {
                 triggerModeSwitchHaptic(hapticFeedback)
                 onRecordingModeChange('audio')
               }}
-              aria-label="Open Tools"
+              aria-label="Open Practice"
             >
-              <span className="ui-orient-spin camera-tools-button__content">
-                <ToolsWaveformIcon />
-                <span>Tools</span>
+              <span className="ui-orient-spin camera-pill-action__content">
+                <PracticeWaveformIcon />
+                <span>Practice</span>
               </span>
             </Pressable>
-          </div>
 
-          {settingsButton}
+            {settingsButton}
+          </div>
         </div>
       ) : collapsible && !deckExpanded ? (
         <Pressable
@@ -488,6 +465,33 @@ function ControlDeck({
               </span>
             </Pressable>
 
+            <Pressable
+              ref={overlaysButtonRef}
+              type="button"
+              intensity="soft"
+              squish={false}
+              onClick={() => {
+                if (branchActive) {
+                  closeBranch()
+                  return
+                }
+                openBranch()
+              }}
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              data-tutorial="overlays-button"
+              className="audio-pill-action audio-overlays-button pointer-events-auto"
+              disabled={settingsBranchDisabled}
+              aria-label={branchActive ? 'Close overlays' : 'Open overlays'}
+              aria-expanded={branchActive}
+              aria-haspopup="menu"
+            >
+              <span className="ui-orient-spin audio-pill-action__content">
+                <Layers3 aria-hidden className="audio-overlays-button__icon" />
+                <span>Overlays</span>
+              </span>
+            </Pressable>
+
             {recordStage}
 
             <Pressable
@@ -509,9 +513,9 @@ function ControlDeck({
                 <span>Camera</span>
               </span>
             </Pressable>
-          </div>
 
-          {settingsButton}
+            {settingsButton}
+          </div>
         </div>
       )}
     </div>

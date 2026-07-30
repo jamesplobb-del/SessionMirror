@@ -10,6 +10,7 @@ const ITEM_GAP = 10
 const COG_CLEARANCE = 20
 const DECK_TEXT_CLEARANCE = 28
 const VIEWPORT_MARGIN = 16
+const CAMERA_GRID_COLUMNS = 2
 
 export type SettingsBranchLayoutMode = 'camera' | 'audio' | 'tuner'
 
@@ -40,12 +41,33 @@ function clampBranchPoint(
   }
 }
 
-/** Stack quick settings vertically above the settings anchor. */
+function layoutCameraGrid(count: number): ViewportPoint[] {
+  const rowCount = Math.ceil(count / CAMERA_GRID_COLUMNS)
+  const columnStep = ITEM_WIDTH + ITEM_GAP
+  const rowStep = ITEM_HEIGHT + ITEM_GAP
+
+  return Array.from({ length: count }, (_, index) => {
+    const row = Math.floor(index / CAMERA_GRID_COLUMNS)
+    const column = index % CAMERA_GRID_COLUMNS
+    const itemsInRow = Math.min(CAMERA_GRID_COLUMNS, count - row * CAMERA_GRID_COLUMNS)
+
+    return {
+      x: (column - (itemsInRow - 1) / 2) * columnStep,
+      y: (row - (rowCount - 1) / 2) * rowStep,
+    }
+  })
+}
+
+/** Camera uses a centered palette; audio and tuner retain the anchored stack. */
 export function layoutBranchItems(
   count: number,
   anchorRect: DOMRect,
-  _mode: SettingsBranchLayoutMode = 'camera',
+  mode: SettingsBranchLayoutMode = 'camera',
 ): ViewportPoint[] {
+  if (mode === 'camera') {
+    return layoutCameraGrid(count)
+  }
+
   const visualViewport = window.visualViewport
   const viewportTop = visualViewport?.offsetTop ?? 0
   const minCenterY = viewportTop + VIEWPORT_MARGIN + ITEM_HEIGHT / 2
