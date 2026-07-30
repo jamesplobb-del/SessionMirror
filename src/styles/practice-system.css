@@ -1608,10 +1608,7 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode
   .audio-control-pill
-  > .audio-vault-button::before,
-.app-ui-overlay--audio-mode
-  .audio-control-pill
-  > .audio-control-deck__settings-btn::before {
+  > .audio-vault-button::before {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1890,11 +1887,7 @@ html.app-dark-mode
 html.app-dark-mode
   .app-ui-overlay--audio-mode
   .audio-control-pill
-  > .audio-vault-button::before,
-html.app-dark-mode
-  .app-ui-overlay--audio-mode
-  .audio-control-pill
-  > .audio-control-deck__settings-btn::before {
+  > .audio-vault-button::before {
   border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.025);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);

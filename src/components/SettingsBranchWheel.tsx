@@ -65,7 +65,6 @@ export default function SettingsBranchWheel({
   onTunerTakePillsChange,
 }: SettingsBranchWheelProps) {
   const notifyTutorial = useTutorialAction()
-  const isCameraOverlays = layoutMode === 'camera'
   const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
     null,
   )
@@ -84,12 +83,8 @@ export default function SettingsBranchWheel({
       const viewportHeight = visualViewport?.height ?? window.innerHeight
 
       setAnchor({
-        x: isCameraOverlays
-          ? viewportLeft + viewportWidth / 2
-          : rect.left + rect.width / 2,
-        y: isCameraOverlays
-          ? viewportTop + viewportHeight / 2
-          : rect.top + rect.height / 2,
+        x: viewportLeft + viewportWidth / 2,
+        y: viewportTop + viewportHeight / 2,
         rect,
       })
     }
@@ -106,7 +101,7 @@ export default function SettingsBranchWheel({
       window.visualViewport?.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('scroll', measure)
     }
-  }, [anchorRef, isCameraOverlays, open])
+  }, [anchorRef, open])
 
   const handleExitComplete = () => {
     setAnchor(null)
@@ -207,7 +202,7 @@ export default function SettingsBranchWheel({
   ])
 
   const positions = anchor
-    ? layoutBranchItems(branchItems.length, anchor.rect, layoutMode)
+    ? layoutBranchItems(branchItems.length, anchor.rect, 'camera')
     : []
 
   if (typeof document === 'undefined') return null

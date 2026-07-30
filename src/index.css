@@ -5524,7 +5524,9 @@ html.app-dark-mode .pitch-spectrogram--glass {
   pointer-events: none;
 }
 
-.settings-branch-wheel--camera::before {
+.settings-branch-wheel--camera::before,
+.settings-branch-wheel--audio::before,
+.settings-branch-wheel--tuner::before {
   width: min(15.75rem, calc(100vw - 2rem));
   height: 13.25rem;
   border: 0.5px solid rgba(255, 255, 255, 0.18);
@@ -5539,30 +5541,26 @@ html.app-dark-mode .pitch-spectrogram--glass {
   backdrop-filter: blur(24px) saturate(1.18);
 }
 
-.settings-branch-wheel--camera .settings-branch-wheel__item > .ui-orient-spin {
+.settings-branch-wheel--camera .settings-branch-wheel__item > .ui-orient-spin,
+.settings-branch-wheel--audio .settings-branch-wheel__item > .ui-orient-spin,
+.settings-branch-wheel--tuner .settings-branch-wheel__item > .ui-orient-spin {
   gap: 0.48rem;
 }
 
-.settings-branch-wheel--camera .settings-branch-wheel__icon {
+.settings-branch-wheel--camera .settings-branch-wheel__icon,
+.settings-branch-wheel--audio .settings-branch-wheel__icon,
+.settings-branch-wheel--tuner .settings-branch-wheel__icon {
   width: 3rem;
   height: 3rem;
   background: rgba(12, 18, 28, 0.78);
   border-color: rgba(255, 255, 255, 0.16);
 }
 
-.settings-branch-wheel--camera .settings-branch-wheel__label {
+.settings-branch-wheel--camera .settings-branch-wheel__label,
+.settings-branch-wheel--audio .settings-branch-wheel__label,
+.settings-branch-wheel--tuner .settings-branch-wheel__label {
   font-size: 0.71rem;
   font-weight: 650;
-}
-
-.settings-branch-wheel--audio::before {
-  width: 20rem;
-  height: 20rem;
-}
-
-.settings-branch-wheel--tuner::before {
-  width: 22rem;
-  height: 22rem;
 }
 
 .settings-branch-wheel__icon {
@@ -5606,12 +5604,12 @@ html.app-dark-mode .pitch-spectrogram--glass {
 
 .settings-branch-wheel--audio .settings-branch-wheel__item,
 .settings-branch-wheel--tuner .settings-branch-wheel__item {
-  min-height: 5rem;
+  min-height: 5.375rem;
 }
 
 .settings-branch-wheel--audio .settings-branch-wheel__item > .ui-orient-spin,
 .settings-branch-wheel--tuner .settings-branch-wheel__item > .ui-orient-spin {
-  gap: 0.28rem;
+  gap: 0.48rem;
 }
 
 .pitch-tuner--widget {
