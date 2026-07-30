@@ -748,17 +748,17 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overlay--split-open .split-compare-host {
-  padding: 0.05rem 0.35rem 0.35rem;
+  padding: 0.05rem 0.55rem 0.35rem;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout {
-  gap: 0.34rem;
-  padding: 0.34rem;
-  border-color: rgba(23, 26, 34, 0.08) !important;
-  background: var(--audio-bg-base, #f7f8fa) !important;
-  box-shadow:
-    0 14px 36px rgba(23, 26, 34, 0.07),
-    0 2px 8px rgba(23, 26, 34, 0.04) !important;
+  --split-panel-radius: clamp(1.15rem, 4.6vw, 1.45rem);
+  gap: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: var(--split-panel-radius);
+  background: transparent !important;
+  box-shadow: none !important;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -772,41 +772,77 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom {
   overflow: visible;
-  padding-bottom: 0.3rem;
+  padding-bottom: 0;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom-inner,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout__bottom > .split-compare-panel--current {
   height: 100%;
-  max-height: calc(100% - 0.15rem);
+  max-height: none;
   min-height: 0;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel {
-  border-width: 2px !important;
-  background: var(--audio-surface, #ffffff) !important;
-  box-shadow: var(
-    --audio-shadow-card,
-    0 14px 36px rgba(23, 26, 34, 0.07),
-    0 2px 8px rgba(23, 26, 34, 0.04)
-  ) !important;
+  border: 0 !important;
+  border-radius: var(--split-panel-radius);
+  background: #080b10 !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 8px 22px rgba(15, 23, 42, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.34) !important;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--best {
-  border-color: var(--audio-gold-border, rgba(247, 166, 0, 0.45)) !important;
+  border: 0 !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
-  border: 2px solid var(--audio-blue-border, rgba(21, 152, 255, 0.45)) !important;
+  border: 0 !important;
   box-shadow:
-    var(
-      --audio-shadow-card,
-      0 14px 36px rgba(23, 26, 34, 0.07),
-      0 2px 8px rgba(23, 26, 34, 0.04)
-    ),
-    0 0 0 1px rgba(21, 152, 255, 0.12) !important;
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 8px 22px rgba(15, 23, 42, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.34) !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel__label {
+  top: 0.58rem;
+  left: 0.58rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.3rem 0.58rem 0.28rem 0.48rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(10, 16, 26, 0.58);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 0.55rem;
+  font-weight: 680;
+  letter-spacing: 0.11em;
+  box-shadow:
+    0 5px 16px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel__label::before {
+  width: 0.38rem;
+  height: 0.38rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  content: '';
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel__label--best::before {
+  background: var(--sm-gold, #f7a600);
+  box-shadow: 0 0 8px rgba(247, 166, 0, 0.62);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel__label--current::before {
+  background: var(--sm-blue, #1598ff);
+  box-shadow: 0 0 8px rgba(21, 152, 255, 0.62);
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -817,20 +853,100 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
   .pip-window--fill
   > .relative
   > .relative {
-  background: var(--audio-bg-base, #f7f8fa) !important;
+  border-radius: calc(var(--split-panel-radius) - 1px) !important;
+  background: #080b10 !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .split-compare-layout
   .pip-chrome-btn--expand.hud-glass-badge--ghost {
   border: 0 !important;
-  background: rgba(255, 255, 255, 0.9) !important;
-  color: var(--audio-text-primary, #171a22) !important;
+  background: rgba(10, 16, 26, 0.58) !important;
+  color: rgba(255, 255, 255, 0.96) !important;
   box-shadow:
-    0 8px 20px rgba(23, 26, 34, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.08);
-  backdrop-filter: blur(16px) saturate(1.08);
+    0 5px 16px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .split-ratio-handle {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  margin: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle__grip {
+  width: 3.15rem;
+  height: 1.15rem;
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: rgba(75, 85, 99, 0.72);
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backdrop-filter: blur(14px) saturate(1.08);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle__grip
+  svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke-width: 1.55;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle--arming,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle--active {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle--arming
+  .split-ratio-handle__grip,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle--active
+  .split-ratio-handle__grip {
+  border-color: rgba(247, 166, 0, 0.22);
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--sm-gold, #f7a600);
+  box-shadow:
+    0 4px 14px rgba(15, 23, 42, 0.13),
+    0 0 0 3px rgba(247, 166, 0, 0.08),
+    inset 0 1px 0 #ffffff;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle:focus-visible {
+  outline: none;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle:focus-visible
+  .split-ratio-handle__grip {
+  box-shadow:
+    0 4px 14px rgba(15, 23, 42, 0.13),
+    0 0 0 3px rgba(21, 152, 255, 0.18),
+    inset 0 1px 0 #ffffff;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -896,35 +1012,32 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode).app-ui-overl
 }
 
 html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout {
-  border-color: rgba(226, 232, 240, 0.12) !important;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.06), transparent 48%),
-    rgba(15, 23, 42, 0.76) !important;
-  box-shadow:
-    0 18px 46px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.18);
-  backdrop-filter: blur(24px) saturate(1.18);
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel {
-  background:
-    radial-gradient(circle at 72% 0%, rgba(255, 255, 255, 0.07), transparent 56%),
-    rgba(15, 23, 42, 0.88) !important;
+  border: 0 !important;
+  background: #02050a !important;
   box-shadow:
-    0 16px 38px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    0 1px 2px rgba(0, 0, 0, 0.24),
+    0 10px 26px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
 }
 
 html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--best {
-  border-color: rgba(247, 166, 0, 0.6) !important;
+  border: 0 !important;
 }
 
 html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
-  border-color: rgba(21, 152, 255, 0.64) !important;
+  border: 0 !important;
   box-shadow:
-    0 16px 38px rgba(0, 0, 0, 0.32),
-    inset 0 0 0 1.5px rgba(21, 152, 255, 0.64) !important;
+    0 1px 2px rgba(0, 0, 0, 0.24),
+    0 10px 26px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
 }
 
 html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -935,7 +1048,47 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .pip-window--fill
   > .relative
   > .relative {
-  background: rgba(2, 6, 23, 0.42) !important;
+  background: #02050a !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle__grip {
+  border-color: rgba(226, 232, 240, 0.12);
+  background: rgba(15, 23, 42, 0.8);
+  color: rgba(226, 232, 240, 0.68);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle--arming
+  .split-ratio-handle__grip,
+html.app-dark-mode
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .split-compare-layout
+  .split-ratio-handle--active
+  .split-ratio-handle__grip {
+  border-color: rgba(247, 166, 0, 0.24);
+  background: rgba(20, 28, 43, 0.94);
+  color: var(--sm-gold, #f7a600);
+  box-shadow:
+    0 5px 16px rgba(0, 0, 0, 0.32),
+    0 0 0 3px rgba(247, 166, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -1721,6 +1874,10 @@ button.compact-take-caption:active {
   height: 2.75rem !important;
   min-width: 2.75rem !important;
   min-height: 2.75rem !important;
+  display: grid !important;
+  padding: 0 !important;
+  line-height: 0;
+  place-items: center;
   transform: translateY(-50%);
 }
 
@@ -1731,9 +1888,24 @@ button.compact-take-caption:active {
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-deck__settings-btn
+  > .ui-orient-spin,
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-deck__settings-btn
+  > .ui-orient-spin
+  > span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-deck__settings-btn
   svg {
-  width: 1.55rem;
-  height: 1.55rem;
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
   stroke-width: 1.9;
 }
 

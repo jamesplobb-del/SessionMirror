@@ -23,8 +23,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ = quickTunerPluginClass
         let handledQuickAction: Bool
         if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem,
-           shortcutItem.type == QuickTunerLaunchCoordinator.homeScreenShortcutType {
+           let destination = QuickTunerLaunchCoordinator.homeScreenDestination(
+               for: shortcutItem.type
+           ) {
             QuickTunerLaunchCoordinator.shared.enqueue(
+                destination: destination,
                 source: .homeScreenQuickAction,
                 coldLaunch: true
             )
@@ -176,11 +179,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         performActionFor shortcutItem: UIApplicationShortcutItem,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        guard shortcutItem.type == QuickTunerLaunchCoordinator.homeScreenShortcutType else {
+        guard let destination = QuickTunerLaunchCoordinator.homeScreenDestination(
+            for: shortcutItem.type
+        ) else {
             completionHandler(false)
             return
         }
         QuickTunerLaunchCoordinator.shared.enqueue(
+            destination: destination,
             source: .homeScreenQuickAction,
             coldLaunch: false
         )

@@ -10,11 +10,104 @@
     max(1rem, env(safe-area-inset-right, 0px))
     calc(env(safe-area-inset-bottom, 0px) + 0.85rem)
     max(1rem, env(safe-area-inset-left, 0px));
-  color: #f8fafc;
-  background:
-    radial-gradient(circle at 50% 24%, rgba(14, 165, 233, 0.16), transparent 38%),
-    linear-gradient(180deg, #07111d 0%, #02060b 58%, #000 100%);
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  color: var(--audio-text-primary, #171a22);
+  background: var(--audio-bg-base, #f7f8fa) !important;
+  font-family: var(
+    --audio-font,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro Display",
+    sans-serif
+  );
+}
+
+.quick-tool-loading,
+.quick-metronome-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  color: var(--audio-text-primary, #171a22);
+  background: var(--audio-bg-base, #f7f8fa) !important;
+  font-family: var(
+    --audio-font,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro Display",
+    sans-serif
+  );
+}
+
+.quick-tool-loading {
+  display: grid;
+  place-items: center;
+  color: var(--audio-text-secondary, #6c7077);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.quick-metronome-screen {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 0.75rem)
+    max(1rem, env(safe-area-inset-right, 0px))
+    calc(env(safe-area-inset-bottom, 0px) + 0.85rem)
+    max(1rem, env(safe-area-inset-left, 0px));
+}
+
+.quick-metronome-stage {
+  display: flex;
+  width: min(100%, 54rem);
+  min-height: 0;
+  margin: clamp(0.65rem, 2vh, 1.15rem) auto 0;
+  overflow: hidden;
+}
+
+.quick-metronome-stage .audio-practice-metronome-shell,
+.quick-metronome-stage .audio-practice-metronome {
+  width: 100%;
+  min-height: 0;
+}
+
+.quick-metronome-status {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.72rem;
+  border: 1px solid var(--audio-divider, rgba(23, 26, 34, 0.08));
+  border-radius: 999px;
+  color: var(--audio-text-secondary, #6c7077);
+  background: var(--audio-surface, #fff);
+  box-shadow: 0 4px 14px rgba(23, 26, 34, 0.05);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.quick-metronome-status > span {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--audio-blue, #1598ff);
+  box-shadow: 0 0 0 0.2rem var(--audio-blue-soft, rgba(21, 152, 255, 0.12));
+}
+
+.quick-metronome-status--playing {
+  color: var(--audio-gold, #f7a600);
+  border-color: var(--audio-gold-border, rgba(247, 166, 0, 0.45));
+}
+
+.quick-metronome-status--playing > span {
+  background: var(--audio-gold, #f7a600);
+  box-shadow: 0 0 0 0.2rem var(--audio-gold-soft, rgba(247, 166, 0, 0.12));
+}
+
+.quick-metronome-footer {
+  width: min(100%, 42rem);
+  margin: 0.6rem auto 0;
 }
 
 .quick-tuner-header {
@@ -32,7 +125,7 @@
 
 .quick-tuner-header p {
   margin: 0 0 0.12rem;
-  color: rgba(148, 163, 184, 0.88);
+  color: var(--audio-gold, #f7a600);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -51,12 +144,15 @@
   width: 2.75rem;
   height: 2.75rem;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--audio-divider, rgba(23, 26, 34, 0.08));
   border-radius: 999px;
-  color: #f8fafc;
-  background: rgba(255, 255, 255, 0.07);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  color: var(--audio-text-primary, #171a22);
+  background: var(--audio-surface, #fff);
+  box-shadow: var(
+    --audio-shadow-fab,
+    0 8px 22px rgba(23, 26, 34, 0.1),
+    0 2px 6px rgba(23, 26, 34, 0.05)
+  );
 }
 
 .quick-tuner-icon-button svg {
@@ -70,10 +166,11 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0 0.75rem;
-  border: 1px solid rgba(56, 189, 248, 0.22);
+  border: 1px solid var(--audio-blue-border, rgba(21, 152, 255, 0.45));
   border-radius: 999px;
-  color: #7dd3fc;
-  background: rgba(14, 165, 233, 0.08);
+  color: var(--audio-blue, #1598ff);
+  background: var(--audio-surface, #fff);
+  box-shadow: 0 4px 14px rgba(23, 26, 34, 0.05);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -94,7 +191,7 @@
   gap: 0.42rem;
   width: min(100%, 40rem);
   margin: 0.7rem auto 0;
-  color: rgba(203, 213, 225, 0.72);
+  color: var(--audio-text-secondary, #6c7077);
   font-size: clamp(0.68rem, 2.7vw, 0.78rem);
   font-weight: 620;
 }
@@ -115,20 +212,28 @@
 }
 
 .quick-tuner-stage .pitch-audio-stage--besttake {
-  border: 1px solid rgba(125, 211, 252, 0.13);
+  border: 1px solid var(--audio-divider, rgba(23, 26, 34, 0.08));
   border-radius: 1.75rem;
-  background: rgba(7, 18, 31, 0.52);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 1rem 3rem rgba(0, 0, 0, 0.28);
+  background: var(--audio-surface, #fff);
+  box-shadow: var(
+    --audio-shadow-card,
+    0 14px 36px rgba(23, 26, 34, 0.07),
+    0 2px 8px rgba(23, 26, 34, 0.04)
+  );
 }
 
 .quick-tuner-stage .pitch-living-canvas::before {
-  opacity: 0.55;
+  opacity: 0.82;
 }
 
 .quick-tuner-stage .pitch-living-canvas::after {
-  background: linear-gradient(180deg, rgba(2, 6, 11, 0.02), rgba(2, 6, 11, 0.34));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--audio-blue, #1598ff) 6%, var(--audio-bg-base, #f7f8fa))
+      0%,
+    color-mix(in srgb, var(--audio-bg-base, #f7f8fa) 74%, transparent) 42%,
+    transparent 100%
+  );
 }
 
 .quick-tuner-permission {
@@ -139,10 +244,15 @@
   justify-content: center;
   flex-direction: column;
   padding: 2rem;
-  border: 1px solid rgba(125, 211, 252, 0.13);
+  border: 1px solid var(--audio-divider, rgba(23, 26, 34, 0.08));
   border-radius: 1.75rem;
   text-align: center;
-  background: rgba(7, 18, 31, 0.52);
+  background: var(--audio-surface, #fff);
+  box-shadow: var(
+    --audio-shadow-card,
+    0 14px 36px rgba(23, 26, 34, 0.07),
+    0 2px 8px rgba(23, 26, 34, 0.04)
+  );
 }
 
 .quick-tuner-permission__icon {
@@ -151,10 +261,10 @@
   height: 4rem;
   margin-bottom: 1rem;
   place-items: center;
-  border: 1px solid rgba(125, 211, 252, 0.24);
+  border: 1px solid var(--audio-blue-border, rgba(21, 152, 255, 0.45));
   border-radius: 50%;
-  color: #7dd3fc;
-  background: rgba(14, 165, 233, 0.1);
+  color: var(--audio-blue, #1598ff);
+  background: var(--audio-blue-soft, rgba(21, 152, 255, 0.12));
 }
 
 .quick-tuner-permission__icon svg {
@@ -170,7 +280,7 @@
 .quick-tuner-permission p {
   max-width: 24rem;
   margin: 0.65rem auto 1.25rem;
-  color: rgba(203, 213, 225, 0.7);
+  color: var(--audio-text-secondary, #6c7077);
   font-size: 0.86rem;
   line-height: 1.55;
 }
@@ -179,10 +289,10 @@
 .quick-tuner-retry,
 .quick-tuner-return {
   min-height: 2.85rem;
-  border: 1px solid rgba(125, 211, 252, 0.28);
+  border: 1px solid var(--audio-blue-border, rgba(21, 152, 255, 0.45));
   border-radius: 999px;
-  color: #effaff;
-  background: rgba(14, 165, 233, 0.18);
+  color: var(--audio-blue, #1598ff);
+  background: var(--audio-blue-soft, rgba(21, 152, 255, 0.12));
   font-size: 0.84rem;
   font-weight: 700;
 }
@@ -198,7 +308,8 @@
   bottom: 1rem;
   padding: 0 1.05rem;
   transform: translateX(50%);
-  background: rgba(15, 23, 42, 0.82);
+  background: var(--audio-surface, #fff);
+  box-shadow: var(--audio-shadow-fab);
 }
 
 .quick-tuner-footer {
@@ -211,41 +322,50 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 0.2rem;
   padding: 0.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--audio-divider, rgba(23, 26, 34, 0.08));
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.055);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  background: var(--audio-surface, #fff);
+  box-shadow: var(
+    --audio-shadow-segment,
+    0 10px 28px rgba(23, 26, 34, 0.08),
+    0 2px 6px rgba(23, 26, 34, 0.04)
+  );
 }
 
 .quick-tuner-instrument-picker button {
   min-height: 2.5rem;
   border: 0;
   border-radius: 999px;
-  color: rgba(203, 213, 225, 0.68);
+  color: var(--audio-text-secondary, #6c7077);
   background: transparent;
   font-size: 0.75rem;
   font-weight: 700;
 }
 
 .quick-tuner-instrument-picker button[aria-pressed="true"] {
-  color: #f8fafc;
-  background: rgba(14, 165, 233, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.18);
+  color: var(--audio-gold, #f7a600);
+  background: var(--audio-gold-soft, rgba(247, 166, 0, 0.12));
+  box-shadow: inset 0 0 0 1px var(--audio-gold-border, rgba(247, 166, 0, 0.45));
 }
 
 .quick-tuner-return {
   width: 100%;
   margin-top: 0.55rem;
-  color: rgba(226, 232, 240, 0.82);
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--audio-text-primary, #171a22);
+  border-color: var(--audio-divider, rgba(23, 26, 34, 0.08));
+  background: var(--audio-surface, #fff);
+  box-shadow: 0 4px 14px rgba(23, 26, 34, 0.04);
 }
 
 .quick-tuner-screen button {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   transition: transform 120ms ease, opacity 120ms ease, background-color 120ms ease;
+}
+
+.quick-metronome-screen button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .quick-tuner-screen button:active {
@@ -276,6 +396,19 @@
   .quick-tuner-return {
     min-height: 2.35rem;
   }
+
+  .quick-metronome-screen {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.4rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.45rem);
+  }
+
+  .quick-metronome-stage {
+    margin-top: 0.35rem;
+  }
+
+  .quick-metronome-footer {
+    margin-top: 0.3rem;
+  }
 }
 
 @media (min-width: 768px) {
@@ -287,10 +420,19 @@
   .quick-tuner-stage {
     max-height: 52rem;
   }
+
+  .quick-metronome-screen {
+    padding-left: max(2rem, env(safe-area-inset-left, 0px));
+    padding-right: max(2rem, env(safe-area-inset-right, 0px));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .quick-tuner-screen button {
+    transition: none;
+  }
+
+  .quick-metronome-screen button {
     transition: none;
   }
 }

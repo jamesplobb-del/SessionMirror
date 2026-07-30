@@ -112,6 +112,8 @@ export default function SplitCompareLayout({
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
   const challengerDropRef = useRef<HTMLDivElement>(null)
   const bottomHeight = 100 - splitRatio
+  const cameraPanelHeight = (ratio: number) =>
+    recordingMode === 'video' ? `calc(${ratio}% - 0.875rem)` : `${ratio}%`
   const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
   const challengerDragEnabled = showCurrentTake && Boolean(onPinBenchmark)
   const benchmarkDragEnabled =
@@ -173,7 +175,7 @@ export default function SplitCompareLayout({
       <div ref={layoutRef} className="split-compare-layout flex h-full w-full min-h-0 flex-col">
         <div
           className="split-compare-layout__top relative min-h-0 w-full shrink-0"
-          style={{ height: `${splitRatio}%` }}
+          style={{ height: cameraPanelHeight(splitRatio) }}
         >
           <div
             ref={benchmarkDropRef}
@@ -219,7 +221,7 @@ export default function SplitCompareLayout({
 
         <div
           className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col"
-          style={{ height: `${bottomHeight}%` }}
+          style={{ height: cameraPanelHeight(bottomHeight) }}
         >
           {showCurrentTake && challengerTake ? (
             <div ref={challengerDropRef} className={`split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0${

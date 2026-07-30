@@ -5,7 +5,6 @@ import {
   ListMusic,
   Mic,
   Settings,
-  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react'
@@ -234,11 +233,7 @@ function ControlDeck({
               transition={{ duration: 0.16, ease: 'easeOut' }}
               className="flex items-center justify-center"
             >
-              {isCameraPresentation ? (
-                <SlidersHorizontal className="h-5 w-5" strokeWidth={2.15} />
-              ) : (
-                <Settings className="h-5 w-5" strokeWidth={1.9} />
-              )}
+              <Settings className="h-5 w-5" strokeWidth={1.9} />
             </motion.span>
           )}
         </AnimatePresence>

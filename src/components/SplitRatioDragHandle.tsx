@@ -1,5 +1,12 @@
-import { useCallback, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { ChevronsUpDown } from 'lucide-react'
+import {
+  useCallback,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type RefObject,
+} from 'react'
+import { GripHorizontal } from 'lucide-react'
 import { stopEventBubble } from '../utils/eventBubbling'
 import { triggerDragStartHaptic, triggerLightHaptic } from '../utils/haptics'
 
@@ -173,6 +180,19 @@ export default function SplitRatioDragHandle({
     [finishDrag],
   )
 
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const delta = event.key === 'ArrowUp' ? -2 : event.key === 'ArrowDown' ? 2 : 0
+      if (delta === 0) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      triggerLightHaptic(hapticFeedback)
+      onChange(clampRatio(ratio + delta, minRatio, maxRatio))
+    },
+    [hapticFeedback, maxRatio, minRatio, onChange, ratio],
+  )
+
   return (
     <div
       className={`split-ratio-handle pointer-events-auto shrink-0 touch-none select-none ${
@@ -184,13 +204,15 @@ export default function SplitRatioDragHandle({
       aria-valuemin={minRatio}
       aria-valuemax={maxRatio}
       aria-label={ariaLabel}
+      tabIndex={0}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
+      onKeyDown={handleKeyDown}
     >
       <div className="split-ratio-handle__grip" aria-hidden>
-        <ChevronsUpDown className="h-4 w-4 stroke-[1.75]" />
+        <GripHorizontal className="h-4 w-4 stroke-[1.75]" />
       </div>
     </div>
   )

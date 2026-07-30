@@ -1,5 +1,10 @@
 import Foundation
 
+enum QuickFunctionDestination: String, Codable {
+    case tuner
+    case metronome
+}
+
 enum QuickTunerLaunchSource: String, Codable {
     case lockScreen
     case controlCenter
@@ -13,13 +18,48 @@ enum QuickTunerLaunchSource: String, Codable {
 
 struct QuickTunerLaunchRequest: Codable, Equatable {
     let id: String
+    let destination: QuickFunctionDestination
     let source: QuickTunerLaunchSource
     let requestedAt: Double
     var coldLaunch: Bool
 
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case destination
+        case source
+        case requestedAt
+        case coldLaunch
+    }
+
+    init(
+        id: String,
+        destination: QuickFunctionDestination,
+        source: QuickTunerLaunchSource,
+        requestedAt: Double,
+        coldLaunch: Bool
+    ) {
+        self.id = id
+        self.destination = destination
+        self.source = source
+        self.requestedAt = requestedAt
+        self.coldLaunch = coldLaunch
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        destination =
+            try container.decodeIfPresent(QuickFunctionDestination.self, forKey: .destination)
+            ?? .tuner
+        source = try container.decode(QuickTunerLaunchSource.self, forKey: .source)
+        requestedAt = try container.decode(Double.self, forKey: .requestedAt)
+        coldLaunch = try container.decode(Bool.self, forKey: .coldLaunch)
+    }
+
     var bridgePayload: [String: Any] {
         [
             "id": id,
+            "destination": destination.rawValue,
             "source": source.rawValue,
             "requestedAt": requestedAt,
             "coldLaunch": coldLaunch,
@@ -36,7 +76,8 @@ extension Notification.Name {
 final class QuickTunerLaunchCoordinator {
     static let shared = QuickTunerLaunchCoordinator()
     static let appGroupIdentifier = "group.com.besttake.app.quicktuner"
-    static let homeScreenShortcutType = "com.besttake.app.quickTuner"
+    static let tunerHomeScreenShortcutType = "com.besttake.app.quickTuner"
+    static let metronomeHomeScreenShortcutType = "com.besttake.app.quickMetronome"
 
     private let pendingKey = "quickTuner.pendingLaunches.v1"
     private let lastConsumedKey = "quickTuner.lastConsumedLaunchID.v1"
@@ -52,6 +93,7 @@ final class QuickTunerLaunchCoordinator {
 
     @discardableResult
     func enqueue(
+        destination: QuickFunctionDestination,
         source: QuickTunerLaunchSource,
         coldLaunch: Bool
     ) -> QuickTunerLaunchRequest {
@@ -60,17 +102,20 @@ final class QuickTunerLaunchCoordinator {
             let now = Date().timeIntervalSince1970 * 1_000
 
             if let recent = pending.last,
+               recent.destination == destination,
                recent.source == source,
                now - recent.requestedAt < 750 {
                 print(
                     "[QuickTuner] duplicate launch coalesced " +
-                    "source=\(source.rawValue) id=\(recent.id)"
+                    "destination=\(destination.rawValue) source=\(source.rawValue) " +
+                    "id=\(recent.id)"
                 )
                 return recent
             }
 
             let request = QuickTunerLaunchRequest(
                 id: UUID().uuidString,
+                destination: destination,
                 source: source,
                 requestedAt: now,
                 coldLaunch: coldLaunch
@@ -81,8 +126,8 @@ final class QuickTunerLaunchCoordinator {
             }
             storePending(pending)
             print(
-                "[QuickTuner] pending destination stored source=\(source.rawValue) " +
-                "cold=\(coldLaunch) id=\(request.id)"
+                "[QuickTuner] pending destination stored destination=\(destination.rawValue) " +
+                "source=\(source.rawValue) cold=\(coldLaunch) id=\(request.id)"
             )
             return request
         }
@@ -105,8 +150,10 @@ final class QuickTunerLaunchCoordinator {
                 defaults.set(request.id, forKey: lastConsumedKey)
                 storePending(pending)
                 print(
-                    "[QuickTuner] destination delivered source=\(request.source.rawValue) " +
-                    "cold=\(request.coldLaunch) id=\(request.id)"
+                    "[QuickTuner] destination delivered " +
+                    "destination=\(request.destination.rawValue) " +
+                    "source=\(request.source.rawValue) cold=\(request.coldLaunch) " +
+                    "id=\(request.id)"
                 )
                 return request
             }
@@ -136,7 +183,17 @@ final class QuickTunerLaunchCoordinator {
 
     func handleDeepLink(_ url: URL, coldLaunch: Bool) -> Bool {
         guard url.scheme?.lowercased() == "besttake",
-              url.host?.lowercased() == "quick-tuner" else {
+              let host = url.host?.lowercased() else {
+            return false
+        }
+
+        let destination: QuickFunctionDestination
+        switch host {
+        case "quick-tuner", "tuner":
+            destination = .tuner
+        case "quick-metronome", "metronome":
+            destination = .metronome
+        default:
             return false
         }
 
@@ -145,8 +202,19 @@ final class QuickTunerLaunchCoordinator {
             .first(where: { $0.name == "source" })?
             .value
         let source = rawSource.flatMap(QuickTunerLaunchSource.init(rawValue:)) ?? .deepLink
-        enqueue(source: source, coldLaunch: coldLaunch)
+        enqueue(destination: destination, source: source, coldLaunch: coldLaunch)
         return true
+    }
+
+    static func homeScreenDestination(for shortcutType: String) -> QuickFunctionDestination? {
+        switch shortcutType {
+        case tunerHomeScreenShortcutType:
+            return .tuner
+        case metronomeHomeScreenShortcutType:
+            return .metronome
+        default:
+            return nil
+        }
     }
 
     private func announcePendingAvailability() {

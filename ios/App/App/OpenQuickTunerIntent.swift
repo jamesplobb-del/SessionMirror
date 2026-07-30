@@ -23,6 +23,37 @@ struct OpenQuickTunerIntent: AppIntent {
         let source: QuickTunerLaunchSource = .siriOrShortcuts
         #endif
         QuickTunerLaunchCoordinator.shared.enqueue(
+            destination: .tuner,
+            source: source,
+            coldLaunch: false
+        )
+        return .result()
+    }
+}
+
+@available(iOS 16.0, *)
+struct OpenQuickMetronomeIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open Quick Metronome"
+    static let description = IntentDescription(
+        "Opens BestTake directly to the metronome."
+    )
+
+    @available(iOS, introduced: 16.0, obsoleted: 26.0)
+    static var openAppWhenRun: Bool { true }
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes {
+        .foreground(.immediate)
+    }
+
+    func perform() async throws -> some IntentResult {
+        #if QUICK_TUNER_CONTROL_EXTENSION
+        let source: QuickTunerLaunchSource = .systemControl
+        #else
+        let source: QuickTunerLaunchSource = .siriOrShortcuts
+        #endif
+        QuickTunerLaunchCoordinator.shared.enqueue(
+            destination: .metronome,
             source: source,
             coldLaunch: false
         )
@@ -45,6 +76,18 @@ struct BestTakeAppShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Quick Tuner",
             systemImageName: "tuningfork"
+        )
+        AppShortcut(
+            intent: OpenQuickMetronomeIntent(),
+            phrases: [
+                "Open \(.applicationName) metronome",
+                "Open the metronome in \(.applicationName)",
+                "Start \(.applicationName) metronome",
+                "Practice with \(.applicationName) metronome",
+                "\(.applicationName) quick metronome",
+            ],
+            shortTitle: "Metronome",
+            systemImageName: "metronome"
         )
     }
 }

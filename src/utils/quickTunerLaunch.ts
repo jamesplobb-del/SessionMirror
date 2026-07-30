@@ -10,18 +10,26 @@ export type QuickTunerLaunchSource =
   | 'deepLink'
   | 'systemControl'
 
-export interface QuickTunerLaunchRequest {
+export type QuickFunctionDestination = 'tuner' | 'metronome'
+
+export interface QuickFunctionLaunchRequest {
   id: string
+  destination: QuickFunctionDestination
   source: QuickTunerLaunchSource
   requestedAt: number
   coldLaunch: boolean
 }
 
+interface NativeQuickFunctionLaunchRequest
+  extends Omit<QuickFunctionLaunchRequest, 'destination'> {
+  destination?: QuickFunctionDestination
+}
+
 type PermissionStatus = 'notDetermined' | 'granted' | 'denied' | 'unavailable'
 
 interface QuickTunerPluginApi {
-  markWebReady(): Promise<{ request?: QuickTunerLaunchRequest }>
-  consumePendingLaunch(): Promise<{ request?: QuickTunerLaunchRequest }>
+  markWebReady(): Promise<{ request?: NativeQuickFunctionLaunchRequest }>
+  consumePendingLaunch(): Promise<{ request?: NativeQuickFunctionLaunchRequest }>
   getMicrophonePermissionStatus(): Promise<{ status: PermissionStatus }>
   requestMicrophonePermission(): Promise<{ status: PermissionStatus }>
   openAppSettings(): Promise<void>
@@ -33,7 +41,7 @@ interface QuickTunerPluginApi {
 
 export const QuickTunerPlugin = registerPlugin<QuickTunerPluginApi>('QuickTunerPlugin')
 
-let currentRequest: QuickTunerLaunchRequest | null = null
+let currentRequest: QuickFunctionLaunchRequest | null = null
 let initialized = false
 let initializationPromise: Promise<void> | null = null
 let nativeListener: PluginListenerHandle | null = null
@@ -41,13 +49,17 @@ let pullInFlight = false
 let pullQueued = false
 const subscribers = new Set<() => void>()
 
-function emitRequest(request: QuickTunerLaunchRequest): void {
+function emitRequest(request: NativeQuickFunctionLaunchRequest): void {
   if (currentRequest?.id === request.id) return
-  currentRequest = request
-  console.info('[QuickTuner] route requested', {
-    id: request.id,
-    source: request.source,
-    coldLaunch: request.coldLaunch,
+  currentRequest = {
+    ...request,
+    destination: request.destination ?? 'tuner',
+  }
+  console.info('[QuickAccess] route requested', {
+    id: currentRequest.id,
+    destination: currentRequest.destination,
+    source: currentRequest.source,
+    coldLaunch: currentRequest.coldLaunch,
   })
   for (const subscriber of subscribers) subscriber()
 }
@@ -110,15 +122,23 @@ export async function initializeQuickTunerLaunch(): Promise<void> {
   return initializationPromise
 }
 
-export function requestQuickTunerFromApp(
+export function requestQuickFunctionFromApp(
+  destination: QuickFunctionDestination,
   source: Extract<QuickTunerLaunchSource, 'inAppSettings'>,
 ): void {
   emitRequest({
-    id: globalThis.crypto?.randomUUID?.() ?? `quick-tuner-${Date.now()}`,
+    id: globalThis.crypto?.randomUUID?.() ?? `quick-${destination}-${Date.now()}`,
+    destination,
     source,
     requestedAt: Date.now(),
     coldLaunch: false,
   })
+}
+
+export function requestQuickTunerFromApp(
+  source: Extract<QuickTunerLaunchSource, 'inAppSettings'>,
+): void {
+  requestQuickFunctionFromApp('tuner', source)
 }
 
 export function dismissQuickTuner(requestId: string): void {
@@ -136,7 +156,7 @@ export function subscribeQuickTunerLaunch(subscriber: () => void): () => void {
   return () => subscribers.delete(subscriber)
 }
 
-export function getQuickTunerLaunchSnapshot(): QuickTunerLaunchRequest | null {
+export function getQuickTunerLaunchSnapshot(): QuickFunctionLaunchRequest | null {
   return currentRequest
 }
 
@@ -145,4 +165,5 @@ export async function disposeQuickTunerLaunch(): Promise<void> {
   nativeListener = null
 }
 
+export type QuickTunerLaunchRequest = QuickFunctionLaunchRequest
 export type { PermissionStatus as QuickTunerMicrophonePermissionStatus }

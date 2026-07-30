@@ -7,6 +7,7 @@ import {
 } from './utils/quickTunerLaunch'
 
 const FullBestTakeApp = lazy(() => import('./App'))
+const QuickMetronomeScreen = lazy(() => import('./components/QuickMetronomeScreen'))
 
 export default function RootRouter() {
   const quickTunerRequest = useSyncExternalStore(
@@ -16,6 +17,28 @@ export default function RootRouter() {
   )
 
   if (quickTunerRequest) {
+    if (quickTunerRequest.destination === 'metronome') {
+      return (
+        <Suspense
+          fallback={
+            <div
+              className="quick-tool-loading app-ui-overlay--audio-mode"
+              role="status"
+              aria-label="Opening Quick Metronome"
+            >
+              <span>Opening Metronome…</span>
+            </div>
+          }
+        >
+          <QuickMetronomeScreen
+            key={quickTunerRequest.id}
+            request={quickTunerRequest}
+            onExit={() => dismissQuickTuner(quickTunerRequest.id)}
+          />
+        </Suspense>
+      )
+    }
+
     return (
       <QuickTunerScreen
         key={quickTunerRequest.id}

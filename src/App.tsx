@@ -221,7 +221,7 @@ import {
   audioModePlaybackControlsRef,
 } from './context/AudioModePlaybackContext'
 import type { AudioPracticeTab } from './types/audioPractice'
-import { requestQuickTunerFromApp } from './utils/quickTunerLaunch'
+import { requestQuickFunctionFromApp } from './utils/quickTunerLaunch'
 import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
 import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
 
@@ -2601,7 +2601,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleOpenQuickTunerFromSettings = useCallback(() => {
     setIsSettingsOpen(false)
-    requestQuickTunerFromApp('inAppSettings')
+    requestQuickFunctionFromApp('tuner', 'inAppSettings')
+  }, [])
+
+  const handleOpenQuickMetronomeFromSettings = useCallback(() => {
+    setIsSettingsOpen(false)
+    requestQuickFunctionFromApp('metronome', 'inAppSettings')
   }, [])
 
   const handleOpenMultitrack = useCallback(() => {
@@ -4711,6 +4716,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onOpenCreatorStudio={handleOpenCreatorStudioPicker}
                     onOpenMultitrack={handleOpenMultitrack}
                     onOpenQuickTuner={handleOpenQuickTunerFromSettings}
+                    onOpenQuickMetronome={handleOpenQuickMetronomeFromSettings}
                     recordingMode={recordingMode}
                   />
 

@@ -5,5 +5,6 @@ import WidgetKit
 struct QuickTunerControlBundle: WidgetBundle {
     var body: some Widget {
         QuickTunerControl()
+        QuickMetronomeControl()
     }
 }

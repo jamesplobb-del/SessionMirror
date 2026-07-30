@@ -35,6 +35,14 @@
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.besttake.app.quickTuner</string>
 		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeTime</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Open Metronome</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.besttake.app.quickMetronome</string>
+		</dict>
 	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>

@@ -70,6 +70,17 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
   useEffect(() => subscribeAppForeground(setAppForeground), [])
 
   useEffect(() => {
+    const root = document.documentElement
+    root.classList.add('app-audio-mode')
+    root.classList.toggle('app-dark-mode', settings.darkMode)
+    root.style.colorScheme = settings.darkMode ? 'dark' : 'light'
+    return () => {
+      root.classList.remove('app-audio-mode', 'app-dark-mode')
+      root.style.removeProperty('color-scheme')
+    }
+  }, [settings.darkMode])
+
+  useEffect(() => {
     console.info('[QuickTuner] lightweight shell mounted', {
       source: request.source,
       coldLaunch: request.coldLaunch,
@@ -224,7 +235,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
   const permissionMessage = permissionCopy(permission)
 
   return (
-    <main className="quick-tuner-screen">
+    <main className="quick-tuner-screen app-ui-overlay--audio-mode">
       <header className="quick-tuner-header">
         <button
           type="button"
