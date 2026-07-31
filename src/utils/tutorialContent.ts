@@ -1,40 +1,71 @@
-export type OnboardingCardId =
-  | 'welcome'
-  | 'capture'
-  | 'practice-tools'
-  | 'take-vault'
+export type OnboardingCardId = 'welcome'
 
 export type CoachMarkId =
-  | 'camera-recording'
-  | 'hands-free-recording'
-  | 'switch-to-audio'
-  | 'audio-workspace'
+  | 'record-camera-take'
+  | 'pin-current-as-best'
+  | 'move-take-cards'
+  | 'open-expand-view'
+  | 'resize-expand-view'
+  | 'close-expand-view'
+  | 'switch-to-practice'
   | 'visit-metronome'
   | 'visit-tuner'
+  | 'visit-practice'
+  | 'return-to-audio'
   | 'open-take-vault'
-  | 'take-vault-overview'
   | 'close-take-vault'
-  | 'quick-settings'
+  | 'open-settings'
+  | 'open-quick-tools'
 
 export type TutorialActionId =
   | 'youtube-opened'
   | 'media-touched'
   | 'branch-widget-selected'
-  | 'hands-free-toggled'
+  | 'camera-take-stopped'
+  | 'current-take-pinned'
+  | 'take-card-layout-entered'
+  | 'take-card-layout-finished'
+  | 'split-divider-dragged'
+  | 'hands-free-enabled'
+  | 'hands-free-disabled'
+  | 'overlays-opened'
+  | 'overlays-closed'
+  | 'metronome-tempo-tapped'
+  | 'tuner-drone-opened'
+  | 'tuner-drone-closed'
+  | 'quick-tools-opened'
+  | 'quick-tools-metronome-selected'
+  | 'quick-tool-setup-opened'
+  | 'quick-tool-setup-closed'
+  | 'practice-section-added'
+  | 'practice-section-finished'
 
 export type CoachMarkAdvance =
+  | TutorialActionId
   | 'tap-screen'
+  | 'recording-start'
+  | 'recording-stop'
   | 'audio-mode'
+  | 'audio-tab-audio'
   | 'audio-tab-metronome'
   | 'audio-tab-tuner'
+  | 'audio-tab-practice'
+  | 'split-view-open'
+  | 'split-view-close'
   | 'vault-open'
   | 'vault-close'
+  | 'settings-open'
+  | 'settings-close'
 
 export type HelpTopicId =
-  | 'recording-modes'
-  | 'hands-free-recording'
-  | 'quick-settings-widgets'
+  | 'camera-mode'
   | 'audio-mode'
+  | 'hands-free-recording'
+  | 'overlays'
+  | 'practice-sessions'
+  | 'metronome'
+  | 'tuner-drones'
+  | 'quick-tools-access'
   | 'take-vault'
   | 'take-cards'
   | 'pinning-best-takes'
@@ -42,14 +73,14 @@ export type HelpTopicId =
   | 'expand-mode'
   | 'vault-settings'
   | 'media-youtube'
-  | 'metronome'
-  | 'tuner-drones'
   | 'reset-tutorials'
 
 export interface OnboardingCard {
   id: OnboardingCardId
+  kicker?: string
   title: string
   body: string
+  highlights: string[]
 }
 
 export interface CoachMarkContent {
@@ -62,7 +93,10 @@ export interface CoachMarkContent {
   continueHint: string
   requiresSplitView?: 'open' | 'closed'
   requiresRecordingMode?: 'video' | 'audio'
+  requiresAudioPracticeTab?: 'audio' | 'metronome' | 'tuner' | 'practice'
   requiresVault?: 'open' | 'closed'
+  requiresSettings?: 'open' | 'closed'
+  requiresCurrentTake?: boolean
 }
 
 export interface HelpTopic {
@@ -76,244 +110,362 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
     id: 'welcome',
     title: 'Welcome to BestTake',
-    body: 'A focused practice space for capturing performances, hearing the details, and keeping the takes that move you forward.',
-  },
-  {
-    id: 'capture',
-    title: 'Easy Recording and Playback',
-    body: 'Record with video when technique matters, or switch to Audio for fast listening. Long-press Record when you want hands-free practice.',
-  },
-  {
-    id: 'practice-tools',
-    title: 'Tools That Stay Close',
-    body: 'Move between the metronome, tuner, drones, and practice timeline without leaving your session.',
-  },
-  {
-    id: 'take-vault',
-    title: 'Build Your Take Vault',
-    body: 'Every take is saved automatically. Compare performances, pin your best, trim recordings, and return to any session later.',
+    body: 'This short guided tour will walk you through Camera, comparison, Practice, Take Vault, and the iPhone quick tools.',
+    highlights: ['Use each control to continue', 'Skip the tour at any time'],
   },
 ]
 
 export const COACH_MARKS: CoachMarkContent[] = [
   {
-    id: 'camera-recording',
+    id: 'record-camera-take',
     title: 'Record a Take',
-    body: 'Tap once to record, then tap again to stop. Camera captures technique and movement; Audio keeps repetitions fast and focused.',
+    body: 'Tap Record, capture a few seconds, then tap it again to stop. Your take saves automatically.',
     selector: '[data-tutorial="record-controls"]',
     placement: 'top',
-    advance: 'tap-screen',
-    continueHint: 'Tap anywhere to continue.',
+    advance: 'camera-take-stopped',
+    continueHint: 'Record and stop a short take.',
     requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
   },
   {
-    id: 'hands-free-recording',
-    title: 'Hands-Free Practice',
-    body: 'Long-press Record to listen for your playing, capture the full first note with pre-roll, and play each take back automatically.',
-    selector: '[data-tutorial="record-controls"]',
+    id: 'pin-current-as-best',
+    title: 'Choose Your Best Take',
+    body: 'Pin the Current Take as your Best Take before arranging the comparison cards.',
+    selector: '[data-tutorial="pin-current-as-best"]',
     placement: 'top',
-    advance: 'tap-screen',
-    continueHint: 'Tap anywhere to continue.',
+    advance: 'current-take-pinned',
+    continueHint: 'Tap the pin on Current Take.',
     requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+    requiresCurrentTake: true,
   },
   {
-    id: 'switch-to-audio',
-    title: 'Switch to Audio',
-    body: 'Audio Mode is built for quick listening and focused repetitions. Open it now to see the practice tools.',
-    selector: '[data-tutorial-mode="audio"]',
+    id: 'move-take-cards',
+    title: 'Arrange the Take Cards',
+    body: 'Press and hold either card, move it where you want, then tap an empty area when you are done.',
+    selector: '[data-movable-take-card="true"]',
+    placement: 'top',
+    advance: 'take-card-layout-finished',
+    continueHint: 'Hold, move, then tap outside.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'open-expand-view',
+    title: 'Easy Comparison',
+    body: 'Tap Expand View to open the larger Best Take and Current Camera layout.',
+    selector: '[data-tutorial="expand-view-button"]',
+    placement: 'top',
+    advance: 'split-view-open',
+    continueHint: 'Tap Expand View.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'resize-expand-view',
+    title: 'Resize the Comparison',
+    body: 'Drag the middle handle up or down to resize the two areas.',
+    selector: '[data-tutorial="split-divider"]',
+    placement: 'right',
+    advance: 'split-divider-dragged',
+    continueHint: 'Drag the middle handle.',
+    requiresSplitView: 'open',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'close-expand-view',
+    title: 'Close Expand View',
+    body: 'Tap the collapse button to return to Camera Mode.',
+    selector: '[data-tutorial="best-take-collapse"]',
+    placement: 'left',
+    advance: 'split-view-close',
+    continueHint: 'Tap the collapse button.',
+    requiresSplitView: 'open',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'switch-to-practice',
+    title: 'Open Practice',
+    body: 'Tap Practice to open Audio, Metronome, Tuner, and Practice routines.',
+    selector: '[data-tutorial="practice-button"]',
     placement: 'top',
     advance: 'audio-mode',
-    continueHint: 'Tap the Audio button to continue.',
+    continueHint: 'Tap Practice.',
     requiresSplitView: 'closed',
-  },
-  {
-    id: 'audio-workspace',
-    title: 'Your Audio Workspace',
-    body: 'These tabs keep recording, timing, tuning, and structured practice together in one place.',
-    selector: '[data-tutorial="audio-mode-tabs"]',
-    placement: 'bottom',
-    advance: 'tap-screen',
-    continueHint: 'Tap anywhere to continue.',
-    requiresSplitView: 'closed',
-    requiresRecordingMode: 'audio',
+    requiresRecordingMode: 'video',
+    requiresVault: 'closed',
   },
   {
     id: 'visit-metronome',
-    title: 'Meet the Metronome',
-    body: 'Set tempo, meter, subdivision, beat grouping, accents, and click sound from the full metronome workspace.',
+    title: 'Open the Metronome',
+    body: 'Tap Metronome.',
     selector: '[data-tutorial="audio-tab-metronome"]',
     placement: 'bottom',
     advance: 'audio-tab-metronome',
-    continueHint: 'Tap Metronome to continue.',
+    continueHint: 'Tap Metronome.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'audio',
+    requiresAudioPracticeTab: 'audio',
   },
   {
     id: 'visit-tuner',
-    title: 'Tune and Build Intonation',
-    body: 'The Tuner gives you live pitch feedback, instrument-aware note guidance, and a radial drone wheel.',
+    title: 'Try the Tuner',
+    body: 'Tap Tuner for live pitch feedback and reference drones.',
     selector: '[data-tutorial="audio-tab-tuner"]',
     placement: 'bottom',
     advance: 'audio-tab-tuner',
-    continueHint: 'Tap Tuner to continue.',
+    continueHint: 'Tap Tuner.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'audio',
+    requiresAudioPracticeTab: 'metronome',
+  },
+  {
+    id: 'visit-practice',
+    title: 'See Practice Routines',
+    body: 'Tap Practice to build reusable routines from timed sections.',
+    selector: '[data-tutorial="audio-tab-practice"]',
+    placement: 'bottom',
+    advance: 'audio-tab-practice',
+    continueHint: 'Tap Practice.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'audio',
+    requiresAudioPracticeTab: 'tuner',
+  },
+  {
+    id: 'return-to-audio',
+    title: 'Return to Audio',
+    body: 'Tap Audio to return to recording and take comparison.',
+    selector: '[data-tutorial="audio-tab-audio"]',
+    placement: 'bottom',
+    advance: 'audio-tab-audio',
+    continueHint: 'Tap Audio.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'audio',
+    requiresAudioPracticeTab: 'practice',
   },
   {
     id: 'open-take-vault',
     title: 'Open the Take Vault',
-    body: 'All of your recordings are stored here, ready to search, compare, favorite, trim, or share.',
+    body: 'Tap Take Vault to see saved recordings.',
     selector: '[data-tutorial="vault-button"]',
     placement: 'top',
     advance: 'vault-open',
-    continueHint: 'Tap the Take Vault button to continue.',
+    continueHint: 'Tap Take Vault.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'audio',
+    requiresAudioPracticeTab: 'audio',
     requiresVault: 'closed',
-  },
-  {
-    id: 'take-vault-overview',
-    title: 'Everything You Record, Organized',
-    body: 'Takes stay grouped with your session. Search, select, pin a reference performance, or open any take full screen.',
-    selector: '[data-tutorial="vault-sheet"]',
-    placement: 'bottom',
-    advance: 'tap-screen',
-    continueHint: 'Tap anywhere to continue.',
-    requiresVault: 'open',
   },
   {
     id: 'close-take-vault',
-    title: 'Back to Practice',
-    body: 'Close the Vault whenever you are ready. Your takes remain saved and waiting for you.',
+    title: 'Close the Take Vault',
+    body: 'Search, sort, pin, trim, and share takes here. Tap Close to continue.',
     selector: '[data-tutorial="vault-close"]',
     placement: 'left',
     advance: 'vault-close',
-    continueHint: 'Tap Close to continue.',
+    continueHint: 'Tap Close.',
     requiresVault: 'open',
   },
   {
-    id: 'quick-settings',
-    title: 'Overlays at Hand',
-    body: 'Tap Overlays to show or hide Pitch Analysis, Take Cards, Metronome, and Audio Enhancer without leaving Camera Mode.',
-    selector: '[data-tutorial="overlays-button"]',
-    placement: 'right',
-    advance: 'tap-screen',
-    continueHint: 'Tap anywhere to finish.',
-    requiresSplitView: 'closed',
+    id: 'open-settings',
+    title: 'Open Settings',
+    body: 'Tap the cog to open Settings.',
+    selector: '[data-tutorial="settings-button"]',
+    placement: 'top',
+    advance: 'settings-open',
+    continueHint: 'Tap the cog.',
+    requiresRecordingMode: 'audio',
+    requiresAudioPracticeTab: 'audio',
     requiresVault: 'closed',
+    requiresSettings: 'closed',
+  },
+  {
+    id: 'open-quick-tools',
+    title: 'iPhone Quick Tools',
+    body: 'Open Quick Tools Access. Tuner and Metronome each include setup for the Action Button, Lock Screen widget/control, and Control Center.',
+    selector: '[data-tutorial="quick-tools-access"]',
+    placement: 'bottom',
+    advance: 'quick-tools-opened',
+    continueHint: 'Tap Quick Tools Access.',
+    requiresSettings: 'open',
   },
 ]
 
 export const HELP_TOPICS: HelpTopic[] = [
   {
-    id: 'recording-modes',
-    title: 'Recording Modes',
-    body: 'Use Camera Mode when posture, framing, or technique matters. Use Audio Mode when you want faster listening and focused sound.',
-    bullets: ['Camera for video practice', 'Audio for quick reps', 'Switch modes from the record control'],
-  },
-  {
-    id: 'hands-free-recording',
-    title: 'Hands-Free Recording',
-    body: 'Long-press Record to toggle hands-free practice that starts and stops around your playing.',
+    id: 'camera-mode',
+    title: 'Camera Mode',
+    body: 'Camera Mode keeps visual technique, quick comparison, and the controls you use most in one view.',
     bullets: [
-      'Works in Camera Mode and Audio Mode',
-      'BestTake plays takes back automatically',
-      'Stay with your instrument between takes',
-    ],
-  },
-  {
-    id: 'quick-settings-widgets',
-    title: 'Overlays',
-    body: 'In Camera Mode, tap Overlays beside Record to open the on-screen widget controls.',
-    bullets: [
-      'Toggle Pitch Analysis, Take Cards, Metronome, and Audio Enhancer',
-      'Tap a widget to show or hide it on screen',
-      'Use the corner cog to open the full settings drawer',
+      'Bottom pill: Take Vault, Overlays, Record, Practice, Settings',
+      'Tap the full red Record button to start or stop a video take',
+      'Use Expand View directly above Record for a larger comparison',
+      'Tap Practice to move to the Audio workspace',
     ],
   },
   {
     id: 'audio-mode',
     title: 'Audio Mode',
-    body: 'Audio Mode keeps recording, playback, metronome, tuner, and take review in one focused practice space.',
-    bullets: ['Record audio takes', 'Review Current and Best takes', 'Use tools without leaving practice'],
-  },
-  {
-    id: 'take-vault',
-    title: 'Take Vault',
-    body: 'The Take Vault stores your recordings automatically and helps you find the ones worth keeping.',
-    bullets: ['Search and sort takes', 'Pin favorites', 'Open takes fullscreen'],
-  },
-  {
-    id: 'take-cards',
-    title: 'Take Cards',
-    body: 'Take cards are quick handles for playback, comparison, and organization. In Camera Mode, hold either card to enter layout mode, then arrange both cards freely.',
+    body: 'Audio Mode is the fast-listening home inside Practice, with a calm idle waveform and immediate playback after each take.',
     bullets: [
-      'Drag either card after layout mode begins',
-      'Tap outside the cards when finished',
-      'Reset restores the default layout; custom positions persist after closing the app',
+      'Bottom pill: Take Vault, Overlays, Record, Camera, Settings',
+      'Use Audio, Metronome, Tuner, and Practice from the top tabs',
+      'Tap Camera to return to video recording',
+      'Best Take and Current Take stay ready for quick comparison',
     ],
   },
   {
-    id: 'pinning-best-takes',
-    title: 'Pinning Best Takes',
-    body: 'Pinning marks a performance as your current reference so you can compare future takes against it.',
-    bullets: ['Pin from cards or the Vault', 'Replace it anytime', 'Use it as your practice benchmark'],
-  },
-  {
-    id: 'drag-to-best-take',
-    title: 'Drag to Best Take',
-    body: 'Long-press a take and drag it into Best Take when you want it featured on the main screen.',
-    bullets: ['Works with saved takes', 'Keeps the original recording', 'Helps compare fast'],
-  },
-  {
-    id: 'expand-mode',
-    title: 'Expand Mode',
-    body: 'Expand Mode gives Best Take more room for imported media, playback, and comparison.',
+    id: 'hands-free-recording',
+    title: 'Hands-Free Recording',
+    body: 'Press and hold Record to toggle practice that starts and stops around your playing.',
     bullets: [
-      'Tap expand on Best Take to open split view',
-      'Upload or load YouTube while expanded',
-      'Tap expand again to return to normal view',
+      'Works with both Camera and Audio recording',
+      'Pre-roll helps preserve the beginning of the first note',
+      'Recording stops after the silence duration set in Settings',
+      'BestTake plays each completed take back automatically',
     ],
   },
   {
-    id: 'vault-settings',
-    title: 'Vault Settings',
-    body: 'Vault settings keep organization and display controls close to your saved takes.',
-    bullets: ['Long-press supported controls', 'Adjust how takes are shown', 'Keep cleanup actions nearby'],
+    id: 'overlays',
+    title: 'Overlays',
+    body: 'Tap Overlays beside Record in Camera or Audio Mode to open the centered on-screen tools menu.',
+    bullets: [
+      'Camera: Pitch Analysis, Take Cards, Metronome, and Audio Enhancer',
+      'Audio and tool tabs show the overlays that fit the current workspace',
+      'Tap an overlay to show or hide it without opening Settings',
+      'Use the cog at the right end of the pill for full settings',
+    ],
   },
   {
-    id: 'media-youtube',
-    title: 'Media & YouTube',
-    body: 'Practice with reference material directly beside your recordings. Open expand view for the easiest access.',
+    id: 'practice-sessions',
+    title: 'Practice Routines',
+    body: 'The Practice tab turns a difficult passage or full program into a reusable sequence of timed sections.',
     bullets: [
-      'Use YouTube for play-alongs',
-      'Upload audio or video references',
-      'Keep media separate from your takes',
+      'Add sections with bars, tempo, time signature, feel, and repeats',
+      'Drag section cards to reorder the routine',
+      'Use count-ins, looping, tempo changes, and meter patterns',
+      'Enable recording before Start Practice to save the run as a take',
     ],
   },
   {
     id: 'metronome',
     title: 'Metronome',
-    body: 'Build timing with tempo, time signatures, subdivisions, and click sounds.',
+    body: 'Use the full Metronome tab for detailed timing work, or show its floating overlay while recording.',
     bullets: [
-      'Spin the tempo wheel in Audio Mode',
-      'Long-press Settings in Camera Mode to toggle the metronome widget',
-      'Choose subdivisions and accents',
+      'Swipe vertically on BPM, use +/−, type a tempo, or tap it in',
+      'Choose Time, Rhythm, pulse, beat grouping, accents, and Sound',
+      'Open Overlays to show the draggable metronome in Camera or Audio Mode',
+      'Pinch the floating metronome to resize; double-tap to reset its size',
     ],
   },
   {
     id: 'tuner-drones',
     title: 'Tuner & Drones',
-    body: 'Use the tuner to see pitch in real time and drones to practice intonation against a steady reference.',
-    bullets: ['Play to see pitch', 'Tap drone notes on or off', 'Use chords for harmony practice'],
+    body: 'The Tuner tab combines responsive live pitch with sustained reference tones for intonation practice.',
+    bullets: [
+      'Choose Voice, Strings, or Winds in Settings for note guidance',
+      'Play to see pitch direction and cents in real time',
+      'Tap drone notes on or off, or combine notes into chords',
+      'Adjust drone volume and waveform in Settings',
+    ],
+  },
+  {
+    id: 'quick-tools-access',
+    title: 'Quick Tuner & Metronome',
+    body: 'Open either lightweight tool directly from iOS. In BestTake, open Settings › Quick Tools Access and select Tuner or Metronome for the full setup guides.',
+    bullets: [
+      'Lock Screen widget/control (iOS 18+): customize a bottom control slot and search BestTake',
+      'Control Center (iOS 18+): Add a Control, search BestTake, then place Quick Tuner or Metronome',
+      'Action Button: choose Controls or Shortcut in iOS Settings, then select the BestTake tool',
+      'Siri, Shortcuts, and long-press app icon actions can also open either tool directly',
+    ],
+  },
+  {
+    id: 'take-vault',
+    title: 'Take Vault',
+    body: 'The Take Vault saves recordings automatically and keeps each session’s references and new work together.',
+    bullets: [
+      'Open it from the left end of the Camera or Audio pill',
+      'Search, sort, select, favorite, trim, share, or delete takes',
+      'Pin a take as Best Take or Current Take',
+      'Open any recording full screen for focused review',
+    ],
+  },
+  {
+    id: 'take-cards',
+    title: 'Take Cards',
+    body: 'Best Take and Current Take are quick handles for playback, comparison, and organization.',
+    bullets: [
+      'Press and hold either Camera card until layout mode begins',
+      'Drag both cards anywhere within the screen',
+      'Tap outside the cards when finished',
+      'Positions persist after closing the app; Reset restores the original layout',
+    ],
+  },
+  {
+    id: 'pinning-best-takes',
+    title: 'Best Take Pinning',
+    body: 'Pin a performance as Best Take when you want a stable reference for the repetitions that follow.',
+    bullets: [
+      'Pin Current Take from its card or choose a take in the Vault',
+      'Replace the reference whenever a stronger performance appears',
+      'Pinning does not duplicate or remove the original recording',
+    ],
+  },
+  {
+    id: 'drag-to-best-take',
+    title: 'Drag to Best Take',
+    body: 'In supported take layouts, press and hold a saved take and drag it to the Best Take position.',
+    bullets: [
+      'Wait for the haptic before moving the take',
+      'Drop on Best Take to make it the comparison reference',
+      'The original recording remains safely stored in the Vault',
+    ],
+  },
+  {
+    id: 'expand-mode',
+    title: 'Expand View',
+    body: 'Expand View creates a larger split comparison for takes, imported references, and YouTube practice material.',
+    bullets: [
+      'In Camera Mode, tap Expand View directly above Record',
+      'Drag the middle divider to give either side more room',
+      'Load YouTube or upload audio and video references while expanded',
+      'Tap the collapse control to return to the normal Camera layout',
+    ],
+  },
+  {
+    id: 'vault-settings',
+    title: 'Vault Settings',
+    body: 'Vault controls keep organization, selection, and cleanup actions close to saved recordings.',
+    bullets: [
+      'Use search and sort to narrow a long session',
+      'Select multiple takes for batch actions',
+      'Use destructive actions carefully; deleted takes cannot always be recovered',
+    ],
+  },
+  {
+    id: 'media-youtube',
+    title: 'Media & YouTube',
+    body: 'Practice beside a reference recording without mixing it into your saved takes.',
+    bullets: [
+      'Open Expand View for the clearest side-by-side layout',
+      'Load a YouTube play-along or upload an audio or video reference',
+      'Reference media stays separate from your Take Vault recordings',
+      'Use headphones to reduce reference sound bleeding into the microphone',
+    ],
   },
   {
     id: 'reset-tutorials',
     title: 'Reset Tutorials',
-    body: 'Bring back onboarding and coach marks whenever you want a fresh walkthrough.',
-    bullets: ['Resets first-launch cards', 'Resets contextual tips', 'Does not affect recordings or settings'],
+    body: 'Replay the updated introduction and contextual coach marks whenever you want a fresh walkthrough.',
+    bullets: [
+      'Restarts the onboarding cards',
+      'Restarts the guided Camera and Practice tour',
+      'Does not change recordings, routines, or app settings',
+    ],
   },
 ]
 
-export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v1'
-export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v2'
+// Versioned so users who completed the older interface tutorial see this revised walkthrough.
+export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v4'
+export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v5'

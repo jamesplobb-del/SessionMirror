@@ -177,13 +177,25 @@ function RecordingModeCarousel({
           triggerRecordStartHaptic(hapticFeedback)
         }
         onToggleRecord()
+        if (isRecording && mode === 'video') {
+          notifyTutorial?.('camera-take-stopped')
+        }
         return
       }
       if (modeSwitchLocked) return
       triggerModeSwitchHaptic(hapticFeedback)
       onChange(mode)
     },
-    [handsFreePhase, hapticFeedback, isRecording, modeSwitchLocked, onChange, onToggleRecord, value]
+    [
+      handsFreePhase,
+      hapticFeedback,
+      isRecording,
+      modeSwitchLocked,
+      notifyTutorial,
+      onChange,
+      onToggleRecord,
+      value,
+    ]
   )
 
   const handleRecordLongPress = useCallback(() => {
@@ -200,7 +212,7 @@ function RecordingModeCarousel({
     autoSoundRecordingRef.current = nextEnabled
     triggerLightHaptic(hapticFeedback)
     onAutoSoundRecordingChange(nextEnabled)
-    notifyTutorial?.('hands-free-toggled')
+    notifyTutorial?.(nextEnabled ? 'hands-free-enabled' : 'hands-free-disabled')
   }, [hapticFeedback, isRecording, notifyTutorial, onAutoSoundRecordingChange])
 
   const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {

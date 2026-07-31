@@ -17,6 +17,7 @@ import {
   type PitchReadout,
 } from '../utils/pitchUtils'
 import type { TunerInstrument } from '../utils/pitchConfig'
+import { useTutorialAction } from '../context/TutorialContext'
 interface LivePitchTunerProps {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -157,6 +158,7 @@ function LiveAudioTunerPane({
   drone?: LivePitchTunerProps['drone']
   onDroneInteraction?: () => void
 }) {
+  const notifyTutorial = useTutorialAction()
   const [droneOpen, setDroneOpen] = useState(false)
   const pitchActive = readout.noteName !== '—'
   const pitchZone = pitchActive ? getIntonationZone(readout.cents) : 'idle'
@@ -167,6 +169,7 @@ function LiveAudioTunerPane({
 
   const toggleDrone = () => {
     triggerLightHaptic(drone?.hapticsEnabled)
+    notifyTutorial?.(droneOpen ? 'tuner-drone-closed' : 'tuner-drone-opened')
     setDroneOpen((open) => !open)
   }
 
@@ -187,6 +190,7 @@ function LiveAudioTunerPane({
           <>
             <button
               type="button"
+              data-tutorial="tuner-drone-button"
               className={`pitch-living-drone-trigger ${
                 droneActive ? 'pitch-living-drone-trigger--active' : ''
               }`}

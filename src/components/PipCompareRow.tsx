@@ -34,6 +34,7 @@ import {
   warmHaptics,
 } from '../utils/haptics'
 import { readPhysicalUiPortal } from '../utils/physicalUiPortal'
+import { useTutorialAction } from '../context/TutorialContext'
 
 export interface PipCompareRowProps {
   compact?: boolean
@@ -470,6 +471,8 @@ function CompactPinCurrentButton({
   onPin: () => void
   hapticFeedback: boolean
 }) {
+  const notifyTutorial = useTutorialAction()
+
   return (
     <Pressable
       type="button"
@@ -478,11 +481,13 @@ function CompactPinCurrentButton({
       haptic="light"
       hapticFeedback={hapticFeedback}
       className="compact-take-card__pin"
+      data-tutorial="pin-current-as-best"
       data-card-move-ignore
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation()
         onPin()
+        notifyTutorial?.('current-take-pinned')
       }}
       aria-label="Pin current take as Best Take"
       title="Pin as Best Take"
@@ -506,6 +511,7 @@ function CompactCompareButton({
       squish={false}
       haptic="light"
       hapticFeedback={hapticFeedback}
+      data-tutorial="expand-view-button"
       className="camera-compare-toggle pointer-events-auto"
       onClick={onToggle}
       aria-label="Open expanded comparison view"
@@ -649,6 +655,7 @@ export default memo(function PipCompareRow({
   onYoutubeHostChange,
   youtubeIframeRef,
 }: PipCompareRowProps) {
+  const notifyTutorial = useTutorialAction()
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
   const challengerDropRef = useRef<HTMLDivElement>(null)
   const [layoutEditing, setLayoutEditing] = useState(false)
@@ -656,7 +663,8 @@ export default memo(function PipCompareRow({
 
   const enterLayoutEditing = useCallback(() => {
     setLayoutEditing(true)
-  }, [])
+    notifyTutorial?.('take-card-layout-entered')
+  }, [notifyTutorial])
 
   useEffect(() => {
     if (compact) return
@@ -680,6 +688,7 @@ export default memo(function PipCompareRow({
       event.preventDefault()
       event.stopPropagation()
       setLayoutEditing(false)
+      notifyTutorial?.('take-card-layout-finished')
       if (hapticFeedback) triggerLightHaptic()
     }
 
@@ -688,7 +697,7 @@ export default memo(function PipCompareRow({
       document.body.classList.remove('take-card-layout-editing')
       window.removeEventListener('pointerdown', finishOnOutsideTap, true)
     }
-  }, [hapticFeedback, layoutEditing])
+  }, [hapticFeedback, layoutEditing, notifyTutorial])
 
   const resetTakeCardLayout = useCallback(() => {
     setLayoutResetNonce((nonce) => nonce + 1)

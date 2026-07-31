@@ -1708,7 +1708,7 @@ button.compact-take-caption:active {
   position: relative;
   display: flex !important;
   width: 100%;
-  min-height: 4rem;
+  min-height: 3.7rem;
   max-width: none !important;
   align-items: center;
   justify-content: center;
@@ -1719,14 +1719,14 @@ button.compact-take-caption:active {
   position: relative;
   isolation: isolate;
   display: grid;
-  width: min(calc(100vw - 1rem), 21.25rem);
-  height: 4rem;
+  width: min(calc(100vw - 1.5rem), 20.25rem);
+  height: 3.7rem;
   grid-template-columns:
-    2.7rem minmax(0, 1fr) 3.75rem minmax(0, 1fr) 2.7rem;
+    2.75rem minmax(0, 1fr) 3.55rem minmax(0, 1fr) 2.75rem;
   align-items: center;
   justify-items: stretch;
   overflow: visible;
-  padding-inline: 0.28rem;
+  padding-inline: 0.22rem;
   border: 0.75px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background:
@@ -1819,8 +1819,8 @@ button.compact-take-caption:active {
   top: 50%;
   left: 50%;
   z-index: 0;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.2rem;
+  height: 2.2rem;
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.025);
@@ -1843,16 +1843,16 @@ button.compact-take-caption:active {
   position: relative;
   z-index: 1;
   display: flex;
-  width: 2.35rem;
-  height: 2.7rem;
+  width: 2.2rem;
+  height: 2.5rem;
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.94);
 }
 
 .camera-vault-button__icon-wrap > svg {
-  width: 1.62rem;
-  height: 1.62rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -1885,22 +1885,22 @@ button.compact-take-caption:active {
   justify-content: center;
   gap: 0.05rem;
   color: rgba(255, 255, 255, 0.94);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 480;
   line-height: 1;
 }
 
 .camera-overlays-button__icon {
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 1.34rem;
+  height: 1.34rem;
   color: #f7ae1c;
   filter: drop-shadow(0 0 0.2rem rgba(247, 174, 28, 0.16));
   stroke-width: 1.65;
 }
 
 .camera-practice-button__waveform {
-  width: 2.25rem;
-  height: 1.52rem;
+  width: 2.08rem;
+  height: 1.42rem;
   color: #20a9ef;
   filter: drop-shadow(0 0 0.22rem rgba(21, 152, 255, 0.16));
 }
@@ -1934,8 +1934,8 @@ button.compact-take-caption:active {
 .camera-control-deck__record-stack {
   position: relative;
   z-index: 4;
-  width: 3.75rem;
-  height: 4rem;
+  width: 3.55rem;
+  height: 3.7rem;
   align-self: center;
   justify-content: center;
 }
@@ -1949,17 +1949,17 @@ button.compact-take-caption:active {
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-deck__record-stack
   .record-carousel-viewport {
-  --record-carousel-viewport-width: 3.7rem;
-  --record-slot-active-size: 3.3rem;
-  width: 3.7rem !important;
-  height: 3.7rem !important;
+  --record-carousel-viewport-width: 3.5rem;
+  --record-slot-active-size: 3.15rem;
+  width: 3.5rem !important;
+  height: 3.5rem !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-carousel-slot--camera {
-  width: 3.3rem !important;
-  height: 3.3rem !important;
+  width: 3.15rem !important;
+  height: 3.15rem !important;
   border: 0.5px solid rgba(255, 255, 255, 0.3) !important;
   background:
     linear-gradient(145deg, #ff5e66 0%, #ed334b 56%, #cf1f3d 100%) !important;
@@ -1999,8 +1999,8 @@ button.compact-take-caption:active {
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-orbit-icon {
-  width: 2.92rem;
-  height: 2.92rem;
+  width: 2.78rem;
+  height: 2.78rem;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -2100,8 +2100,8 @@ button.compact-take-caption:active {
   .camera-control-deck__settings-btn
   svg {
   display: block;
-  width: 1.52rem;
-  height: 1.52rem;
+  width: 1.43rem;
+  height: 1.43rem;
   margin: 0;
   stroke-width: 1.85;
 }
@@ -2142,10 +2142,10 @@ button.compact-take-caption:active {
   }
 
   .camera-control-pill {
-    width: calc(100vw - 1rem);
+    width: calc(100vw - 1.25rem);
     grid-template-columns:
-      2.55rem minmax(0, 1fr) 3.65rem minmax(0, 1fr) 2.55rem;
-    padding-inline: 0.2rem;
+      2.75rem minmax(0, 1fr) 3.5rem minmax(0, 1fr) 2.75rem;
+    padding-inline: 0.16rem;
   }
 
   .camera-pill-action__content {
@@ -2184,15 +2184,15 @@ button.compact-take-caption:active {
   }
 
   .camera-control-pill {
-    width: 22rem;
-    height: 4.2rem;
+    width: 21rem;
+    height: 3.95rem;
     grid-template-columns:
-      2.85rem minmax(0, 1fr) 3.95rem minmax(0, 1fr) 2.85rem;
+      2.7rem minmax(0, 1fr) 3.7rem minmax(0, 1fr) 2.7rem;
   }
 
   .camera-control-deck__record-stack {
-    width: 3.95rem;
-    height: 4.2rem;
+    width: 3.7rem;
+    height: 3.95rem;
   }
 
   .take-card-top-control {

@@ -25,6 +25,7 @@ import {
 } from './audioPracticeMetronome'
 import MetronomeAudioSelect from './MetronomeAudioSelect'
 import MetronomeBeatDisplay from './MetronomeBeatDisplay'
+import { useTutorialAction } from '../../context/TutorialContext'
 
 const TEMPO_PIXELS_PER_BPM = 5
 
@@ -35,6 +36,7 @@ function PracticeControlButton({
   onPress,
   children,
   className = '',
+  dataTutorial,
 }: {
   label: string
   active?: boolean
@@ -42,12 +44,14 @@ function PracticeControlButton({
   onPress: () => void
   children?: React.ReactNode
   className?: string
+  dataTutorial?: string
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
+      data-tutorial={dataTutorial}
       onPointerUp={(event) => {
         if (event.button !== 0) return
         if (haptic === 'light') triggerLightHaptic()
@@ -61,6 +65,7 @@ function PracticeControlButton({
 }
 
 export default function AudioPracticeMetronomeView() {
+  const notifyTutorial = useTutorialAction()
   const bpmInputId = useId()
   const didNormalizeBpmRef = useRef(false)
   const tempoDragRef = useRef<{
@@ -142,7 +147,8 @@ export default function AudioPracticeMetronomeView() {
   const handleTapTempo = useCallback(() => {
     triggerMetronomeTapHaptic()
     registerTap()
-  }, [registerTap])
+    notifyTutorial?.('metronome-tempo-tapped')
+  }, [notifyTutorial, registerTap])
 
   const handleMeterChange = useCallback(
     (nextMeter: MetronomeMeter) => {
@@ -450,6 +456,7 @@ export default function AudioPracticeMetronomeView() {
             label="Tap tempo"
             haptic={false}
             onPress={handleTapTempo}
+            dataTutorial="metronome-tap-tempo"
             className="metronome-audio-stage__tap-btn audio-practice-metronome__tap-btn"
           >
             Tap Tempo

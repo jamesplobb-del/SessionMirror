@@ -5719,6 +5719,8 @@ html.native-dark-chrome body {
 }
 
 .onboarding-lite__card {
+  --onboarding-accent: #0ea5e9;
+  --onboarding-accent-soft: rgba(14, 165, 233, 0.1);
   position: relative;
   z-index: 1;
   width: min(100%, 24rem);
@@ -5745,6 +5747,10 @@ html.native-dark-chrome body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.9rem 1rem 0;
+}
+
+.onboarding-lite__top--single {
+  grid-template-columns: 1fr;
 }
 
 .onboarding-lite__icon-btn {
@@ -5777,8 +5783,15 @@ html.native-dark-chrome body {
   justify-self: center;
   overflow: hidden;
   border-radius: 0.82rem;
-  background: #ffffff;
+  background: var(--onboarding-accent-soft);
+  color: var(--onboarding-accent);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.76);
+}
+
+.onboarding-lite__glyph svg {
+  height: 1.45rem;
+  width: 1.45rem;
+  stroke-width: 2;
 }
 
 .onboarding-lite__glyph img {
@@ -5789,26 +5802,72 @@ html.native-dark-chrome body {
 }
 
 .onboarding-lite__copy {
-  min-height: 9.75rem;
-  padding: 1.25rem 1.45rem 0.7rem;
+  min-height: 17.25rem;
+  padding: 1.15rem 1.35rem 0.6rem;
   text-align: center;
+}
+
+.onboarding-lite__card--welcome .onboarding-lite__copy {
+  min-height: 12.75rem;
+}
+
+.onboarding-lite__kicker {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--onboarding-accent);
+  font-size: 0.7rem;
+  font-weight: 820;
+  letter-spacing: 0.105em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .onboarding-lite__copy h1 {
   color: #101828;
-  font-size: 1.75rem;
+  font-size: 1.62rem;
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 1.03;
+  line-height: 1.06;
 }
 
 .onboarding-lite__copy p {
-  margin: 0.85rem auto 0;
+  margin: 0.72rem auto 0;
   max-width: 19.5rem;
   color: rgba(51, 65, 85, 0.76);
-  font-size: 1rem;
+  font-size: 0.94rem;
   font-weight: 560;
-  line-height: 1.45;
+  line-height: 1.43;
+}
+
+.onboarding-lite__highlights {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.42rem;
+  margin: 1rem auto 0;
+  max-width: 20rem;
+}
+
+.onboarding-lite__highlights span {
+  display: inline-flex;
+  min-height: 1.9rem;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--onboarding-accent) 16%, transparent);
+  border-radius: 999px;
+  background: var(--onboarding-accent-soft);
+  padding: 0.36rem 0.62rem;
+  color: color-mix(in srgb, var(--onboarding-accent) 80%, #101828);
+  font-size: 0.72rem;
+  font-weight: 740;
+  line-height: 1.15;
+}
+
+.onboarding-lite__highlights svg {
+  height: 0.76rem;
+  width: 0.76rem;
+  flex: 0 0 auto;
+  stroke-width: 2.8;
 }
 
 .onboarding-lite__dots {
@@ -5968,6 +6027,24 @@ html.native-dark-chrome body {
   font-weight: 760;
 }
 
+.settings-learn-sections {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.settings-learn-section {
+  min-width: 0;
+}
+
+.settings-learn-section__title {
+  margin: 0 0 0.38rem 0.45rem;
+  color: rgba(100, 116, 139, 0.72);
+  font-size: 0.66rem;
+  font-weight: 790;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
 .settings-learn-list {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -5976,6 +6053,14 @@ html.native-dark-chrome body {
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
   backdrop-filter: blur(18px) saturate(1.12);
+}
+
+.settings-learn-list--reset {
+  margin-top: 0.1rem;
+}
+
+.settings-learn-row--reset {
+  color: rgba(71, 85, 105, 0.82);
 }
 
 .settings-learn-row {
@@ -6048,6 +6133,14 @@ html.dark .coach-mark-card__skip {
   color: rgba(226, 232, 240, 0.74);
 }
 
+html.dark .onboarding-lite__glyph {
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+html.dark .onboarding-lite__highlights span {
+  color: color-mix(in srgb, var(--onboarding-accent) 65%, white);
+}
+
 html.dark .onboarding-lite__tap-hint {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.82);
@@ -6065,6 +6158,10 @@ html.dark .settings-learn-list,
 html.dark .help-sheet__bullet {
   border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .settings-learn-section__title {
+  color: rgba(148, 163, 184, 0.72);
 }
 
 html.dark .settings-learn-row {

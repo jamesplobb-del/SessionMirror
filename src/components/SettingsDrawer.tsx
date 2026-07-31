@@ -21,6 +21,7 @@ import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
 import HelpSheet from './HelpSheet'
 import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorialContent'
 import { resetTutorials } from '../utils/onboardingTutorial'
+import { useTutorialAction } from '../context/TutorialContext'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -155,6 +156,40 @@ const QUICK_FUNCTION_SETUPS: Record<QuickFunctionDestination, QuickFunctionSetup
   metronome: createQuickFunctionSetups('metronome'),
 }
 
+const LEARN_APP_SECTIONS: {
+  title: string
+  topics: { id: HelpTopicId; label: string }[]
+}[] = [
+  {
+    title: 'Recording',
+    topics: [
+      { id: 'camera-mode', label: 'Camera Mode' },
+      { id: 'audio-mode', label: 'Audio Mode' },
+      { id: 'hands-free-recording', label: 'Hands-Free Recording' },
+      { id: 'overlays', label: 'Overlays' },
+    ],
+  },
+  {
+    title: 'Practice Tools',
+    topics: [
+      { id: 'practice-sessions', label: 'Practice Routines' },
+      { id: 'metronome', label: 'Metronome' },
+      { id: 'tuner-drones', label: 'Tuner & Drones' },
+      { id: 'quick-tools-access', label: 'iPhone Quick Tools' },
+    ],
+  },
+  {
+    title: 'Takes & References',
+    topics: [
+      { id: 'take-vault', label: 'Take Vault' },
+      { id: 'take-cards', label: 'Move Take Cards' },
+      { id: 'pinning-best-takes', label: 'Best Take Pinning' },
+      { id: 'expand-mode', label: 'Expand View' },
+      { id: 'media-youtube', label: 'Media & YouTube' },
+    ],
+  },
+]
+
 function QuickFunctionAccessRow({
   setup,
   onOpen,
@@ -165,6 +200,7 @@ function QuickFunctionAccessRow({
   return (
     <Pressable
       type="button"
+      data-tutorial={`quick-tools-${setup.destination}-${setup.id}`}
       intensity="soft"
       haptic="light"
       onClick={onOpen}
@@ -333,6 +369,7 @@ export default function SettingsDrawer({
   onOpenQuickMetronome,
   recordingMode,
 }: SettingsDrawerProps) {
+  const notifyTutorial = useTutorialAction()
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<HelpTopicId | null>(null)
   const [activeQuickFunctionSetup, setActiveQuickFunctionSetup] =
@@ -384,6 +421,35 @@ export default function SettingsDrawer({
     onReplayTutorial?.()
   }, [onReplayTutorial])
 
+  const handleQuickFunctionsAccessToggle = useCallback(() => {
+    const nextOpen = !quickFunctionsAccessOpen
+    setQuickFunctionsAccessOpen(nextOpen)
+    if (nextOpen) notifyTutorial?.('quick-tools-opened')
+  }, [notifyTutorial, quickFunctionsAccessOpen])
+
+  const handleQuickAccessDestinationChange = useCallback(
+    (destination: QuickFunctionDestination) => {
+      setQuickAccessDestination(destination)
+      if (destination === 'metronome') {
+        notifyTutorial?.('quick-tools-metronome-selected')
+      }
+    },
+    [notifyTutorial],
+  )
+
+  const handleOpenQuickFunctionSetup = useCallback(
+    (setup: QuickFunctionSetup) => {
+      setActiveQuickFunctionSetup(setup)
+      notifyTutorial?.('quick-tool-setup-opened')
+    },
+    [notifyTutorial],
+  )
+
+  const handleCloseQuickFunctionSetup = useCallback(() => {
+    setActiveQuickFunctionSetup(null)
+    notifyTutorial?.('quick-tool-setup-closed')
+  }, [notifyTutorial])
+
   return (
     <>
       <AnimatedBottomSheet
@@ -403,6 +469,7 @@ export default function SettingsDrawer({
         </div>
         <Pressable
           type="button"
+          data-tutorial="settings-close"
           intensity="icon"
           onClick={handleCloseClick}
           haptic="light"
@@ -496,9 +563,10 @@ export default function SettingsDrawer({
             <div className="settings-group-row overflow-hidden rounded-2xl border border-white/70 bg-white/72 shadow-sm backdrop-blur-xl">
               <Pressable
                 type="button"
+                data-tutorial="quick-tools-access"
                 intensity="soft"
                 haptic="light"
-                onClick={() => setQuickFunctionsAccessOpen((open) => !open)}
+                onClick={handleQuickFunctionsAccessToggle}
                 className="flex min-h-[4.75rem] w-full items-center gap-3 px-4 py-4 text-left"
                 aria-expanded={quickFunctionsAccessOpen}
                 aria-controls="quick-functions-access-settings"
@@ -524,10 +592,10 @@ export default function SettingsDrawer({
                   id="quick-functions-access-settings"
                   className="border-t border-stone-100"
                 >
-                  <div className="px-4 pb-2 pt-3">
+                  <div className="px-4 pb-2 pt-3" data-tutorial="quick-tools-destination">
                     <IOSSegmentedControl
                       value={quickAccessDestination}
-                      onChange={setQuickAccessDestination}
+                      onChange={handleQuickAccessDestinationChange}
                       segments={[
                         { id: 'tuner', label: 'Quick Tuner' },
                         { id: 'metronome', label: 'Metronome' },
@@ -543,7 +611,7 @@ export default function SettingsDrawer({
                       <QuickFunctionAccessRow
                         key={`${setup.destination}-${setup.id}`}
                         setup={setup}
-                        onOpen={() => setActiveQuickFunctionSetup(setup)}
+                        onOpen={() => handleOpenQuickFunctionSetup(setup)}
                       />
                     ))}
                   </div>
@@ -786,40 +854,39 @@ export default function SettingsDrawer({
               Learn the App
             </h3>
 
-            <div className="settings-learn-list">
-              {[
-                ['recording-modes', 'Recording Modes'],
-                ['hands-free-recording', 'Hands-Free Recording'],
-                ['quick-settings-widgets', 'Overlays'],
-                ['take-vault', 'Take Vault'],
-                ['pinning-best-takes', 'Best Take Pinning'],
-                ['media-youtube', 'Media & YouTube'],
-                ['expand-mode', 'Expand Mode'],
-                ['metronome', 'Metronome'],
-                ['tuner-drones', 'Tuner & Drones'],
-              ].map(([id, label]) => (
+            <div className="settings-learn-sections">
+              {LEARN_APP_SECTIONS.map((section) => (
+                <div key={section.title} className="settings-learn-section">
+                  <p className="settings-learn-section__title">{section.title}</p>
+                  <div className="settings-learn-list">
+                    {section.topics.map(({ id, label }) => (
+                      <Pressable
+                        key={id}
+                        type="button"
+                        intensity="soft"
+                        haptic="light"
+                        onClick={() => setActiveHelpTopicId(id)}
+                        className="settings-learn-row"
+                      >
+                        <span>{label}</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </Pressable>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="settings-learn-list settings-learn-list--reset">
                 <Pressable
-                  key={id}
                   type="button"
                   intensity="soft"
                   haptic="light"
-                  onClick={() => setActiveHelpTopicId(id as HelpTopicId)}
-                  className="settings-learn-row"
+                  onClick={handleResetTutorials}
+                  className="settings-learn-row settings-learn-row--reset"
                 >
-                  <span>{label}</span>
-                  <ChevronRight className="h-4 w-4" />
+                  <span>Reset Tutorials</span>
+                  <RotateCcw className="h-4 w-4" />
                 </Pressable>
-              ))}
-              <Pressable
-                type="button"
-                intensity="soft"
-                haptic="light"
-                onClick={handleResetTutorials}
-                className="settings-learn-row settings-learn-row--reset"
-              >
-                <span>Reset Tutorials</span>
-                <RotateCcw className="h-4 w-4" />
-              </Pressable>
+              </div>
             </div>
           </section>
 
@@ -839,7 +906,7 @@ export default function SettingsDrawer({
       <HelpSheet topic={activeHelpTopic} onClose={() => setActiveHelpTopicId(null)} />
       <AnimatedBottomSheet
         isOpen={activeQuickFunctionSetup !== null}
-        onClose={() => setActiveQuickFunctionSetup(null)}
+        onClose={handleCloseQuickFunctionSetup}
         ariaLabel={
           activeQuickFunctionSetup
             ? `Set up ${activeQuickFunctionSetup.toolName} ${activeQuickFunctionSetup.title}`
@@ -862,9 +929,10 @@ export default function SettingsDrawer({
               </div>
               <Pressable
                 type="button"
+                data-tutorial="quick-tool-setup-close"
                 intensity="icon"
                 haptic="light"
-                onClick={() => setActiveQuickFunctionSetup(null)}
+                onClick={handleCloseQuickFunctionSetup}
                 className="native-sheet-close grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/70 text-stone-500 shadow-sm ring-1 ring-stone-200/70"
                 aria-label="Close setup instructions"
               >

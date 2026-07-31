@@ -604,22 +604,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const handleCompleteOnboardingTutorial = useCallback(() => {
+    showTakeCardsRef.current = true
+    updateSettings({
+      autoSoundRecording: false,
+      showTakeCards: true,
+    })
     setShowOnboardingTutorial(false)
     setTutorialTourEnabled(true)
-  }, [])
+  }, [updateSettings])
 
   const handleSkipOnboardingTutorial = useCallback(() => {
     markAllCoachMarksSeen()
     setShowOnboardingTutorial(false)
     setTutorialTourEnabled(false)
-  }, [])
-
-  const handleReplayOnboardingTutorial = useCallback(() => {
-    setIsSettingsOpen(false)
-    setTutorialTourEnabled(false)
-    scheduleAfterPaint(() => {
-      setShowOnboardingTutorial(true)
-    })
   }, [])
 
   useEffect(() => {
@@ -2504,6 +2501,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     ]
   )
 
+  const handleReplayOnboardingTutorial = useCallback(() => {
+    setIsSettingsOpen(false)
+    setIsVaultOpen(false)
+    setIsSplitView(false)
+    setQuickSettingsOpen(false)
+    setPracticeSessionActive(false)
+    setTutorialTourEnabled(false)
+    showTakeCardsRef.current = true
+    updateSettings({
+      autoSoundRecording: false,
+      showTakeCards: true,
+    })
+    handleRecordingModeChange('video')
+    scheduleAfterPaint(() => {
+      setShowOnboardingTutorial(true)
+    })
+  }, [handleRecordingModeChange, updateSettings])
+
   const handleToggleRecord = useCallback(() => {
     if (recordingModeRef.current === 'audio' && !ready && !isRecording) {
       requestCameraAccess('audio')
@@ -3868,8 +3883,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const tutorialSignals = useMemo(
     () => ({
       isRecording,
+      hasCurrentTake: Boolean(challengerId && challengerTake),
       isReviewOpen,
       isVaultOpen,
+      isSettingsOpen,
       isSplitView,
       autoSoundRecording: settings.autoSoundRecording,
       recordingMode,
@@ -3877,8 +3894,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }),
     [
       audioPracticeTab,
+      challengerId,
+      challengerTake,
       isRecording,
       isReviewOpen,
+      isSettingsOpen,
       isSplitView,
       isVaultOpen,
       recordingMode,

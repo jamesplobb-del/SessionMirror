@@ -154,6 +154,7 @@ export default function TimelineSectionEditor({
         </span>
         <Pressable
           type="button"
+          data-tutorial="practice-section-done"
           intensity="soft"
           haptic="success"
           className="practice-timeline-editor__done"

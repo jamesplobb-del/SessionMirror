@@ -9,6 +9,7 @@ import {
 import { GripHorizontal } from 'lucide-react'
 import { stopEventBubble } from '../utils/eventBubbling'
 import { triggerDragStartHaptic, triggerLightHaptic } from '../utils/haptics'
+import { useTutorialAction } from '../context/TutorialContext'
 
 const DEFAULT_MIN_RATIO = 20
 const DEFAULT_MAX_RATIO = 80
@@ -38,6 +39,7 @@ export default function SplitRatioDragHandle({
   maxRatio = DEFAULT_MAX_RATIO,
   ariaLabel = 'Drag up for larger camera, drag down for larger reference',
 }: SplitRatioDragHandleProps) {
+  const notifyTutorial = useTutorialAction()
   const [active, setActive] = useState(false)
   const [arming, setArming] = useState(false)
   const dragRef = useRef<{
@@ -47,6 +49,7 @@ export default function SplitRatioDragHandle({
     armed: boolean
     holdTimer: number | null
     dragHapticFired: boolean
+    changed: boolean
   } | null>(null)
 
   const clearHoldTimer = useCallback(() => {
@@ -67,6 +70,7 @@ export default function SplitRatioDragHandle({
 
   const finishDrag = useCallback(
     (target: HTMLElement, pointerId: number) => {
+      const changed = dragRef.current?.changed === true
       clearHoldTimer()
       dragRef.current = null
       setActive(false)
@@ -78,8 +82,9 @@ export default function SplitRatioDragHandle({
       } catch {
         /* ignore */
       }
+      if (changed) notifyTutorial?.('split-divider-dragged')
     },
-    [clearHoldTimer],
+    [clearHoldTimer, notifyTutorial],
   )
 
   const applyDrag = useCallback(
@@ -92,7 +97,9 @@ export default function SplitRatioDragHandle({
       if (rect.height <= 0) return
 
       const deltaRatio = ((clientY - drag.startY) / rect.height) * 100
-      onChange(clampRatio(drag.startRatio + deltaRatio, minRatio, maxRatio))
+      const nextRatio = clampRatio(drag.startRatio + deltaRatio, minRatio, maxRatio)
+      if (nextRatio !== drag.startRatio) drag.changed = true
+      onChange(nextRatio)
     },
     [layoutRef, maxRatio, minRatio, onChange],
   )
@@ -127,6 +134,7 @@ export default function SplitRatioDragHandle({
           }
         }, HOLD_MS),
         dragHapticFired: false,
+        changed: false,
       }
 
       setArming(true)
@@ -189,8 +197,9 @@ export default function SplitRatioDragHandle({
       event.stopPropagation()
       triggerLightHaptic(hapticFeedback)
       onChange(clampRatio(ratio + delta, minRatio, maxRatio))
+      notifyTutorial?.('split-divider-dragged')
     },
-    [hapticFeedback, maxRatio, minRatio, onChange, ratio],
+    [hapticFeedback, maxRatio, minRatio, notifyTutorial, onChange, ratio],
   )
 
   return (
@@ -199,6 +208,7 @@ export default function SplitRatioDragHandle({
         active ? 'split-ratio-handle--active' : ''
       } ${arming ? 'split-ratio-handle--arming' : ''}`}
       role="separator"
+      data-tutorial="split-divider"
       aria-orientation="horizontal"
       aria-valuenow={ratio}
       aria-valuemin={minRatio}

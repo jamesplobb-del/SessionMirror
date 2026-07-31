@@ -1442,7 +1442,7 @@ html.app-dark-mode
   position: relative;
   display: flex !important;
   width: 100%;
-  min-height: 4rem;
+  min-height: 3.7rem;
   max-width: none !important;
   align-items: center;
   justify-content: center;
@@ -1453,14 +1453,14 @@ html.app-dark-mode
   position: relative;
   isolation: isolate;
   display: grid;
-  width: min(calc(100vw - 1rem), 21.25rem);
-  height: 4rem;
+  width: min(calc(100vw - 1.5rem), 20.25rem);
+  height: 3.7rem;
   grid-template-columns:
-    2.7rem minmax(0, 1fr) 3.45rem minmax(0, 1fr) 2.7rem;
+    2.75rem minmax(0, 1fr) 3.3rem minmax(0, 1fr) 2.75rem;
   align-items: center;
   justify-items: stretch;
   overflow: visible;
-  padding-inline: 0.28rem;
+  padding-inline: 0.22rem;
   border: 0.75px solid rgba(255, 255, 255, 0.82);
   border-radius: 999px;
   background:
@@ -1493,7 +1493,7 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode .audio-control-pill::after {
   right: 0;
   border-radius: 0 999px 999px 0;
-  background: radial-gradient(circle at 100% 100%, rgba(21, 152, 255, 0.11), transparent 66%);
+  background: transparent;
 }
 
 .app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,
@@ -1520,16 +1520,16 @@ html.app-dark-mode
   position: relative;
   z-index: 1;
   display: flex;
-  width: 2.35rem;
-  height: 2.7rem;
+  width: 2.2rem;
+  height: 2.5rem;
   align-items: center;
   justify-content: center;
   color: rgba(35, 58, 74, 0.9);
 }
 
 .app-ui-overlay--audio-mode .audio-vault-button__icon-wrap > svg {
-  width: 1.62rem;
-  height: 1.62rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .app-ui-overlay--audio-mode
@@ -1563,21 +1563,21 @@ html.app-dark-mode
   justify-content: center;
   gap: 0.08rem;
   color: rgba(36, 67, 88, 0.92);
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 520;
   line-height: 1;
 }
 
 .app-ui-overlay--audio-mode .audio-camera-button__content > svg {
-  width: 1.68rem;
-  height: 1.42rem;
+  width: 1.55rem;
+  height: 1.32rem;
   color: #1598ff;
   filter: drop-shadow(0 0 0.2rem rgba(21, 152, 255, 0.13));
 }
 
 .app-ui-overlay--audio-mode .audio-overlays-button__icon {
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 1.34rem;
+  height: 1.34rem;
   color: #c78100;
   filter: drop-shadow(0 0 0.2rem rgba(247, 166, 0, 0.13));
   stroke-width: 1.65;
@@ -1613,8 +1613,8 @@ html.app-dark-mode
   top: 50%;
   left: 50%;
   z-index: 0;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.2rem;
+  height: 2.2rem;
   border: 0.5px solid rgba(66, 91, 109, 0.1);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.15);
@@ -1627,8 +1627,8 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode .audio-control-deck__record-stack {
   position: relative;
   z-index: 4;
-  width: 3.45rem;
-  height: 4rem;
+  width: 3.3rem;
+  height: 3.7rem;
   align-self: center;
   justify-content: center;
 }
@@ -1642,17 +1642,17 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode
   .audio-control-deck__record-stack
   .record-carousel-viewport--audio-compact {
-  --record-carousel-viewport-width: 3.45rem;
-  --record-slot-active-size: 2.9rem;
-  width: 3.45rem !important;
-  height: 3.45rem !important;
+  --record-carousel-viewport-width: 3.3rem;
+  --record-slot-active-size: 2.8rem;
+  width: 3.3rem !important;
+  height: 3.3rem !important;
 }
 
 .app-ui-overlay--audio-mode
   .audio-control-pill
   .record-carousel-slot--center {
-  width: 2.9rem !important;
-  height: 2.9rem !important;
+  width: 2.8rem !important;
+  height: 2.8rem !important;
   border: 0.75px solid rgba(66, 91, 109, 0.26) !important;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.13)),
@@ -1768,7 +1768,7 @@ html.app-dark-mode
   border: 0 !important;
   border-radius: 0;
   background: transparent !important;
-  color: rgba(35, 58, 74, 0.88) !important;
+  color: rgba(35, 58, 74, 0.9) !important;
   box-shadow: none !important;
   filter: none;
   line-height: 0;
@@ -1783,13 +1783,13 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode
   .control-deck__settings-btn.audio-control-deck__settings-btn[aria-expanded="true"] {
-  color: rgba(35, 58, 74, 0.88) !important;
+  color: rgba(35, 58, 74, 0.9) !important;
 }
 
 .app-ui-overlay--audio-mode .audio-control-deck__settings-btn svg {
   display: block;
-  width: 1.52rem;
-  height: 1.52rem;
+  width: 1.43rem;
+  height: 1.43rem;
   margin: 0;
   stroke-width: 1.85;
 }
@@ -1952,10 +1952,10 @@ html.app-dark-mode
 
 @media (max-width: 350px) {
   .app-ui-overlay--audio-mode .audio-control-pill {
-    width: calc(100vw - 1rem);
+    width: calc(100vw - 1.25rem);
     grid-template-columns:
-      2.55rem minmax(0, 1fr) 3.45rem minmax(0, 1fr) 2.55rem;
-    padding-inline: 0.2rem;
+      2.75rem minmax(0, 1fr) 3.3rem minmax(0, 1fr) 2.75rem;
+    padding-inline: 0.16rem;
   }
 
   .app-ui-overlay--audio-mode .audio-pill-action__content,
@@ -1972,15 +1972,15 @@ html.app-dark-mode
 
 @media (min-width: 744px) {
   .app-ui-overlay--audio-mode .audio-control-pill {
-    width: 22rem;
-    height: 4.2rem;
+    width: 21rem;
+    height: 3.95rem;
     grid-template-columns:
-      2.85rem minmax(0, 1fr) 3.75rem minmax(0, 1fr) 2.85rem;
+      2.7rem minmax(0, 1fr) 3.55rem minmax(0, 1fr) 2.7rem;
   }
 
   .app-ui-overlay--audio-mode .audio-control-deck__record-stack {
-    width: 3.75rem;
-    height: 4.25rem;
+    width: 3.55rem;
+    height: 3.95rem;
   }
 
 }

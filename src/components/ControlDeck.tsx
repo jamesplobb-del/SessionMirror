@@ -15,6 +15,7 @@ import type { RecordingMode } from '../types'
 import { triggerModeSwitchHaptic } from '../utils/haptics'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
+import { useTutorialAction } from '../context/TutorialContext'
 
 interface ControlDeckProps {
   isRecording: boolean
@@ -131,6 +132,7 @@ function ControlDeck({
         : 'preparing'
       : null
   const overlaysButtonRef = useRef<HTMLButtonElement>(null)
+  const notifyTutorial = useTutorialAction()
   const [branchOpen, setBranchOpen] = useState(false)
   const [branchActive, setBranchActive] = useState(false)
   const [deckExpanded, setDeckExpanded] = useState(!collapsible)
@@ -151,10 +153,12 @@ function ControlDeck({
     setBranchOpen(true)
     setBranchActive(true)
     onBranchOpenChange?.(true)
+    notifyTutorial?.('overlays-opened')
   }
 
   const closeBranch = () => {
     setBranchOpen(false)
+    notifyTutorial?.('overlays-closed')
   }
 
   const handleBranchExitComplete = () => {
@@ -387,6 +391,7 @@ function ControlDeck({
               squish={false}
               haptic={false}
               hapticFeedback={hapticFeedback}
+              data-tutorial="practice-button"
               className="camera-pill-action camera-practice-button pointer-events-auto"
               disabled={isRecording || isStopping}
               onClick={() => {

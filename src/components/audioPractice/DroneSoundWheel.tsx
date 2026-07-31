@@ -320,6 +320,7 @@ function DroneSoundWheel({
         {onClose ? (
           <button
             type="button"
+            data-tutorial="tuner-drone-close"
             className="harmonic-ribbon__close"
             aria-label="Hide drone"
             title="Hide drone"

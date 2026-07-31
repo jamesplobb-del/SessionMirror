@@ -11,6 +11,7 @@ import TimelinePracticeSessionView from './TimelinePracticeSessionView'
 import TimelineSectionCard from './TimelineSectionCard'
 import TimelineSectionEditor from './TimelineSectionEditor'
 import TrackSettingsPanel from './TrackSettingsPanel'
+import { useTutorialAction } from '../../context/TutorialContext'
 
 export interface PracticeTimelineViewProps {
   isRecording?: boolean
@@ -25,6 +26,7 @@ export default function PracticeTimelineView({
   onStopRecording,
   onPracticeSessionActiveChange,
 }: PracticeTimelineViewProps) {
+  const notifyTutorial = useTutorialAction()
   const {
     timeline,
     editingSectionId,
@@ -69,6 +71,16 @@ export default function PracticeTimelineView({
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(timeline.name)
   const practiceRecordingStartedRef = useRef(false)
+
+  const handleAddSection = () => {
+    addSection()
+    notifyTutorial?.('practice-section-added')
+  }
+
+  const handleCloseSectionEditor = () => {
+    setEditingSectionId(null)
+    notifyTutorial?.('practice-section-finished')
+  }
 
   const trackSettings = {
     countInBars: timeline.settings?.countInBars ?? 0,
@@ -160,7 +172,7 @@ export default function PracticeTimelineView({
         <TimelineSectionEditor
           section={editingSection}
           onChange={(patch) => updateSection(editingSection.id, patch)}
-          onClose={() => setEditingSectionId(null)}
+          onClose={handleCloseSectionEditor}
         />
       ) : null}
 
@@ -264,10 +276,11 @@ export default function PracticeTimelineView({
 
               <Pressable
                 type="button"
+                data-tutorial="practice-add-section"
                 intensity="soft"
                 haptic="light"
                 className="practice-timeline__add-btn"
-                onClick={addSection}
+                onClick={handleAddSection}
               >
                 <Plus size={20} />
                 Add Section

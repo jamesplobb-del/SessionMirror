@@ -33,8 +33,10 @@ const TutorialContext = createContext<TutorialContextValue | null>(null)
 
 export interface TutorialSignals {
   isRecording: boolean
+  hasCurrentTake: boolean
   isReviewOpen: boolean
   isVaultOpen: boolean
+  isSettingsOpen: boolean
   isSplitView: boolean
   autoSoundRecording: boolean
   recordingMode: 'video' | 'audio'
@@ -51,12 +53,21 @@ interface TutorialProviderProps {
 
 function findVisibleTarget(selector: string): Element | null {
   const candidates = Array.from(document.querySelectorAll(selector))
-  return (
-    candidates.find((candidate) => {
-      const rect = candidate.getBoundingClientRect()
-      return rect.width > 12 && rect.height > 12 && rect.bottom > 0 && rect.top < window.innerHeight
-    }) ?? null
-  )
+  const isVisible = (candidate: Element) => {
+    const rect = candidate.getBoundingClientRect()
+    return rect.width > 12 && rect.height > 12 && rect.bottom > 0 && rect.top < window.innerHeight
+  }
+  const visibleTarget = candidates.find(isVisible)
+  if (visibleTarget) return visibleTarget
+
+  const revealTarget = candidates.find((candidate) => {
+    const rect = candidate.getBoundingClientRect()
+    return rect.width > 12 && rect.height > 12
+  })
+  if (!revealTarget) return null
+
+  revealTarget.scrollIntoView({ block: 'center', inline: 'nearest' })
+  return isVisible(revealTarget) ? revealTarget : null
 }
 
 function coachMarkIsVisible(coachMark: CoachMarkContent, signals?: TutorialSignals): boolean {
@@ -65,8 +76,17 @@ function coachMarkIsVisible(coachMark: CoachMarkContent, signals?: TutorialSigna
   if (coachMark.requiresRecordingMode && signals?.recordingMode !== coachMark.requiresRecordingMode) {
     return false
   }
+  if (
+    coachMark.requiresAudioPracticeTab &&
+    signals?.audioPracticeTab !== coachMark.requiresAudioPracticeTab
+  ) {
+    return false
+  }
   if (coachMark.requiresVault === 'open' && !signals?.isVaultOpen) return false
   if (coachMark.requiresVault === 'closed' && signals?.isVaultOpen) return false
+  if (coachMark.requiresSettings === 'open' && !signals?.isSettingsOpen) return false
+  if (coachMark.requiresSettings === 'closed' && signals?.isSettingsOpen) return false
+  if (coachMark.requiresCurrentTake && !signals?.hasCurrentTake) return false
   return Boolean(findVisibleTarget(coachMark.selector))
 }
 
@@ -110,7 +130,13 @@ export function TutorialProvider({
     onCompleteRef.current?.()
   }, [clearCoachMark])
 
-  const markCoachMark = useCallback((_id: TutorialActionId) => {}, [])
+  const markCoachMark = useCallback(
+    (id: TutorialActionId) => {
+      if (!activeCoachMark || activeCoachMark.advance !== id) return
+      advanceCoachMark(activeCoachMark)
+    },
+    [activeCoachMark, advanceCoachMark],
+  )
 
   const skipCoachMarks = useCallback(() => {
     completeInteractiveTutorial()
@@ -157,7 +183,9 @@ export function TutorialProvider({
     enabled,
     showNextCoachMark,
     signals?.audioPracticeTab,
+    signals?.hasCurrentTake,
     signals?.isSplitView,
+    signals?.isSettingsOpen,
     signals?.isVaultOpen,
     signals?.recordingMode,
   ])
@@ -165,7 +193,25 @@ export function TutorialProvider({
   useEffect(() => {
     if (!activeCoachMark) return
 
+    if (activeCoachMark.advance === 'recording-start' && signals?.isRecording) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'recording-stop' && !signals?.isRecording) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
     if (activeCoachMark.advance === 'audio-mode' && signals?.recordingMode === 'audio') {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (
+      activeCoachMark.advance === 'audio-tab-audio' &&
+      signals?.audioPracticeTab === 'audio'
+    ) {
       advanceCoachMark(activeCoachMark)
       return
     }
@@ -173,6 +219,14 @@ export function TutorialProvider({
     if (
       activeCoachMark.advance === 'audio-tab-metronome' &&
       signals?.audioPracticeTab === 'metronome'
+    ) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (
+      activeCoachMark.advance === 'audio-tab-practice' &&
+      signals?.audioPracticeTab === 'practice'
     ) {
       advanceCoachMark(activeCoachMark)
       return
@@ -193,11 +247,34 @@ export function TutorialProvider({
 
     if (activeCoachMark.advance === 'vault-close' && !signals?.isVaultOpen) {
       advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'split-view-open' && signals?.isSplitView) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'split-view-close' && !signals?.isSplitView) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'settings-open' && signals?.isSettingsOpen) {
+      advanceCoachMark(activeCoachMark)
+      return
+    }
+
+    if (activeCoachMark.advance === 'settings-close' && !signals?.isSettingsOpen) {
+      advanceCoachMark(activeCoachMark)
     }
   }, [
     activeCoachMark,
     advanceCoachMark,
     signals?.audioPracticeTab,
+    signals?.isRecording,
+    signals?.isSettingsOpen,
+    signals?.isSplitView,
     signals?.isVaultOpen,
     signals?.recordingMode,
   ])

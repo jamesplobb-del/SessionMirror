@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, MousePointer2 } from 'lucide-react'
+import { Check, MousePointer2 } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
@@ -49,11 +49,6 @@ export default function OnboardingTutorial({
     setIndex((value) => Math.min(ONBOARDING_CARDS.length - 1, value + 1))
   }, [finish, hapticFeedback, isLast])
 
-  const handleBack = useCallback(() => {
-    void triggerLightHaptic(hapticFeedback)
-    setIndex((value) => Math.max(0, value - 1))
-  }, [hapticFeedback])
-
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.key !== 'Enter' && event.key !== ' ') return
@@ -82,33 +77,18 @@ export default function OnboardingTutorial({
         exit={{ opacity: 0 }}
       />
       <motion.div
-        className="onboarding-lite__card"
+        className={`onboarding-lite__card onboarding-lite__card--${card.id}`}
+        data-onboarding-card={card.id}
         initial={{ opacity: 0, y: 28, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.98 }}
         transition={iosSpringSnappy}
         style={motionGpuLayer}
       >
-        <header className="onboarding-lite__top">
-          <Pressable
-            type="button"
-            intensity="icon"
-            onClick={(event) => {
-              event.stopPropagation()
-              handleBack()
-            }}
-            disabled={index === 0}
-            className="onboarding-lite__icon-btn"
-            aria-label="Previous card"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Pressable>
+        <header className="onboarding-lite__top onboarding-lite__top--single">
           <div className="onboarding-lite__glyph" aria-hidden>
             <img src="/icons/icon.png" alt="" draggable={false} />
           </div>
-          <span className="onboarding-lite__step" aria-label={`Step ${index + 1} of ${ONBOARDING_CARDS.length}`}>
-            {index + 1}/{ONBOARDING_CARDS.length}
-          </span>
         </header>
 
         <AnimatePresence mode="wait">
@@ -120,16 +100,21 @@ export default function OnboardingTutorial({
             exit={{ opacity: 0, x: -14 }}
             transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
           >
+            {card.kicker ? (
+              <span className="onboarding-lite__kicker">{card.kicker}</span>
+            ) : null}
             <h1>{card.title}</h1>
             <p>{card.body}</p>
+            <div className="onboarding-lite__highlights" aria-label="Highlights">
+              {card.highlights.map((highlight) => (
+                <span key={highlight}>
+                  <Check aria-hidden />
+                  {highlight}
+                </span>
+              ))}
+            </div>
           </motion.section>
         </AnimatePresence>
-
-        <div className="onboarding-lite__dots" aria-hidden>
-          {ONBOARDING_CARDS.map((item, dotIndex) => (
-            <span key={item.id} className={dotIndex === index ? 'is-active' : undefined} />
-          ))}
-        </div>
 
         <footer className="onboarding-lite__footer">
           <Pressable
@@ -143,11 +128,11 @@ export default function OnboardingTutorial({
             }}
             className="onboarding-lite__skip"
           >
-            Skip
+            Skip Tour
           </Pressable>
           <div className="onboarding-lite__tap-hint" aria-hidden>
             <MousePointer2 className="h-4 w-4" />
-            {isLast ? 'Tap to start the guided tour' : 'Tap anywhere to continue'}
+            Start guided tour
           </div>
         </footer>
       </motion.div>
