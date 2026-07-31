@@ -977,6 +977,7 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 .audio-mode-take-stack {
   flex: 0 0 auto;
   gap: clamp(0.5rem, 1vh, 0.72rem);
+  margin-bottom: clamp(1rem, 2.2vh, 1.4rem);
   padding-bottom: 0.15rem;
 }
 
@@ -1118,6 +1119,10 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 
   .audio-mode-take-card {
     min-height: 6.4rem;
+  }
+
+  .audio-mode-take-stack {
+    margin-bottom: 0.65rem;
   }
 
   .audio-mode-take-card__chrome {
