@@ -34,6 +34,7 @@
 		TAKEALGN2FED79650016851F /* TakeAlignmentEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAKEALGN1FED79650016851F /* TakeAlignmentEngine.swift */; };
 		BB6FCA35FB8E433F9535D103 /* QuickTunerLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */; };
 		54237EC25C3F4F819FD8FA05 /* QuickTunerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */; };
+		QKTNRPGL2FED79650016851F /* QuickTunerPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = QKTNRPGL1FED79650016851F /* QuickTunerPlugin.m */; };
 		BC5958393C594FB59C50D9C5 /* OpenQuickTunerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */; };
 		2C57C5F4B910493DB389289B /* QuickTunerLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */; };
 		1374E93445FE40A6A1560F62 /* OpenQuickTunerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */; };
@@ -100,6 +101,7 @@
 		F0DF5106155249CF971FED8B /* QuickTunerControl.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QuickTunerControl.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerLaunchCoordinator.swift; sourceTree = "<group>"; };
 		180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerPlugin.swift; sourceTree = "<group>"; };
+		QKTNRPGL1FED79650016851F /* QuickTunerPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = QuickTunerPlugin.m; sourceTree = "<group>"; };
 		A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenQuickTunerIntent.swift; sourceTree = "<group>"; };
 		AE0B12399785435AA9D3D917 /* QuickTunerControlBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerControlBundle.swift; sourceTree = "<group>"; };
 		C06A9742E4D44245B6B437BB /* QuickTunerControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerControl.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */,
 				180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */,
+				QKTNRPGL1FED79650016851F /* QuickTunerPlugin.m */,
 				A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */,
 				PORTRAIT1FED79650016851F /* PortraitBridgeViewController.swift */,
 				BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */,
@@ -397,6 +400,7 @@
 				METRONPLG4FED79650016851F /* MetronomePlugin.m in Sources */,
 				BB6FCA35FB8E433F9535D103 /* QuickTunerLaunchCoordinator.swift in Sources */,
 				54237EC25C3F4F819FD8FA05 /* QuickTunerPlugin.swift in Sources */,
+				QKTNRPGL2FED79650016851F /* QuickTunerPlugin.m in Sources */,
 				BC5958393C594FB59C50D9C5 /* OpenQuickTunerIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

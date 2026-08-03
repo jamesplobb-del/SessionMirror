@@ -185,12 +185,12 @@
 
 .quick-tuner-meta {
   display: flex;
-  min-height: 2.6rem;
+  min-height: 2.15rem;
   align-items: center;
   justify-content: center;
   gap: 0.42rem;
   width: min(100%, 40rem);
-  margin: 0.7rem auto 0;
+  margin: 0.3rem auto 0;
   color: var(--audio-text-secondary, #6c7077);
   font-size: clamp(0.68rem, 2.7vw, 0.78rem);
   font-weight: 620;
@@ -234,6 +234,10 @@
     color-mix(in srgb, var(--audio-bg-base, #f7f8fa) 74%, transparent) 42%,
     transparent 100%
   );
+}
+
+.quick-tuner-stage .pitch-living-readout {
+  top: clamp(0.65rem, 2.8vh, 1.55rem);
 }
 
 .quick-tuner-permission {

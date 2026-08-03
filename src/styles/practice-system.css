@@ -575,18 +575,20 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 .pitch-living-tool-rail {
   position: absolute;
   z-index: 5;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(4px, calc(env(safe-area-inset-bottom) - 8px));
+  right: auto;
+  bottom: max(6px, calc(env(safe-area-inset-bottom) - 6px));
+  left: 50%;
   display: grid;
-  width: 110px;
-  max-width: calc(100% - 24px);
-  grid-template-columns: minmax(0, 110px);
-  grid-auto-rows: minmax(46px, auto);
+  width: min(360px, calc(100% - 24px));
+  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+  grid-auto-rows: 46px;
+  align-items: center;
   gap: 8px;
+  transform: translateX(-50%);
 }
 
 .pitch-living-tool-rail > .pitch-living-drone-trigger {
-  grid-column: 1;
+  height: 46px;
 }
 
 .pitch-living-drone-trigger {
@@ -677,9 +679,9 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   height: 44px;
   min-height: 44px;
   align-self: center;
-  justify-self: end;
-  grid-column: 1;
-  grid-row: auto;
+  justify-self: center;
+  grid-column: 2;
+  grid-row: 1;
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
   place-items: center;
@@ -692,8 +694,8 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 
 .pitch-living-tool-rail--with-drone .pitch-living-insights-trigger {
   align-self: center;
-  justify-self: end;
-  grid-row: auto;
+  justify-self: center;
+  grid-row: 1;
 }
 
 .pitch-living-insights-trigger svg {
@@ -707,7 +709,7 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   position: absolute;
   z-index: 7;
   right: max(8px, env(safe-area-inset-right));
-  bottom: max(8px, env(safe-area-inset-bottom));
+  bottom: max(62px, calc(env(safe-area-inset-bottom) + 54px));
   left: max(8px, env(safe-area-inset-left));
   max-height: min(40%, 176px);
   padding: 8px;
@@ -726,7 +728,7 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   position: absolute;
   z-index: 8;
   right: max(8px, env(safe-area-inset-right));
-  bottom: max(8px, env(safe-area-inset-bottom));
+  bottom: max(62px, calc(env(safe-area-inset-bottom) + 54px));
   left: max(8px, env(safe-area-inset-left));
   display: flex;
   max-height: min(72%, 540px);

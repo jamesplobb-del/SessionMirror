@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, useSyncExternalStore, type ReactNode } from 'react'
 import QuickTunerScreen from './components/QuickTunerScreen'
+import { ActionSheetProvider } from './context/ActionSheetContext'
 import {
   dismissQuickTuner,
   getQuickTunerLaunchSnapshot,
@@ -67,36 +68,40 @@ export default function RootRouter() {
 
     if (quickTunerRequest.destination === 'metronome') {
       return (
-        <QuickToolErrorBoundary requestId={quickTunerRequest.id} onExit={handleExit}>
-          <Suspense
-            fallback={
-              <div
-                className="quick-tool-loading app-ui-overlay--audio-mode"
-                role="status"
-                aria-label="Opening Quick Metronome"
-              >
-                <span>Opening Metronome…</span>
-              </div>
-            }
-          >
-            <QuickMetronomeScreen
-              key={quickTunerRequest.id}
-              request={quickTunerRequest}
-              onExit={handleExit}
-            />
-          </Suspense>
-        </QuickToolErrorBoundary>
+        <ActionSheetProvider>
+          <QuickToolErrorBoundary requestId={quickTunerRequest.id} onExit={handleExit}>
+            <Suspense
+              fallback={
+                <div
+                  className="quick-tool-loading app-ui-overlay--audio-mode"
+                  role="status"
+                  aria-label="Opening Quick Metronome"
+                >
+                  <span>Opening Metronome…</span>
+                </div>
+              }
+            >
+              <QuickMetronomeScreen
+                key={quickTunerRequest.id}
+                request={quickTunerRequest}
+                onExit={handleExit}
+              />
+            </Suspense>
+          </QuickToolErrorBoundary>
+        </ActionSheetProvider>
       )
     }
 
     return (
-      <QuickToolErrorBoundary requestId={quickTunerRequest.id} onExit={handleExit}>
-        <QuickTunerScreen
-          key={quickTunerRequest.id}
-          request={quickTunerRequest}
-          onExit={handleExit}
-        />
-      </QuickToolErrorBoundary>
+      <ActionSheetProvider>
+        <QuickToolErrorBoundary requestId={quickTunerRequest.id} onExit={handleExit}>
+          <QuickTunerScreen
+            key={quickTunerRequest.id}
+            request={quickTunerRequest}
+            onExit={handleExit}
+          />
+        </QuickToolErrorBoundary>
+      </ActionSheetProvider>
     )
   }
 

@@ -1,6 +1,7 @@
 ﻿import UIKit
 import Capacitor
 import AVFoundation
+import AppIntents
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -21,6 +22,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ = dronePluginClass
         _ = metronomePluginClass
         _ = quickTunerPluginClass
+        if #available(iOS 16.0, *) {
+            // Refresh the system catalog after app updates so existing Quick
+            // Tuner shortcuts do not remain bound to stale intent metadata.
+            BestTakeAppShortcuts.updateAppShortcutParameters()
+        }
         let handledQuickAction: Bool
         if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem,
            let destination = QuickTunerLaunchCoordinator.homeScreenDestination(
@@ -162,6 +168,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
+        if let observer = audioRouteObserver {
+            NotificationCenter.default.removeObserver(observer)
+            audioRouteObserver = nil
+        }
+        if let observer = audioInterruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+            audioInterruptionObserver = nil
+        }
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {

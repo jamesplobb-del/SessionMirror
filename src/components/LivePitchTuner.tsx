@@ -55,6 +55,8 @@ interface LivePitchTunerProps {
   liveMicOnly?: boolean
   /** Audio tuner only: reports whether live PCM is actually arriving. */
   onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
+  /** Audio tuner: show Drone, Transpose, and Pitch Insights controls. */
+  audioToolsEnabled?: boolean
   /** Multi-select drone keyboard (audio tuner tab). */
   drone?: {
     activeNotes: number[]
@@ -75,11 +77,13 @@ function PitchChartCanvas({
   glass = false,
   fill = false,
   living = false,
+  toolFree = false,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
   glass?: boolean
   fill?: boolean
   living?: boolean
+  toolFree?: boolean
 }) {
   return (
     <div
@@ -92,7 +96,9 @@ function PitchChartCanvas({
         ref={canvasRef}
         className={`pitch-spectrogram absolute inset-0 h-full w-full ${
           glass ? 'pitch-spectrogram--glass' : ''
-        } ${living ? 'pitch-spectrogram--living' : ''}`}
+        } ${living ? 'pitch-spectrogram--living' : ''} ${
+          toolFree ? 'pitch-spectrogram--tool-free' : ''
+        }`}
         style={fill ? { minHeight: '100%' } : { minHeight: 140 }}
       />
     </div>
@@ -171,19 +177,23 @@ function LiveAudioTunerPane({
   canvasRef,
   drone,
   onDroneInteraction,
+  tunerInstrument,
   tunerTransposition,
   onTunerTranspositionChange,
   hapticsEnabled,
   insightsEnabled = false,
+  audioToolsEnabled = true,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
   drone?: LivePitchTunerProps['drone']
   onDroneInteraction?: () => void
+  tunerInstrument?: TunerInstrument
   tunerTransposition: TunerTranspositionId
   onTunerTranspositionChange?: (value: TunerTranspositionId) => void
   hapticsEnabled?: boolean
   insightsEnabled?: boolean
+  audioToolsEnabled?: boolean
 }) {
   const notifyTutorial = useTutorialAction()
   const [droneOpen, setDroneOpen] = useState(false)
@@ -238,7 +248,7 @@ function LiveAudioTunerPane({
       className={`pitch-audio-stage pitch-audio-stage--besttake pitch-audio-stage--${pitchZone} flex min-h-0 flex-1 flex-col overflow-hidden`}
     >
       <div className="pitch-living-canvas">
-        <PitchChartCanvas canvasRef={canvasRef} fill living />
+        <PitchChartCanvas canvasRef={canvasRef} fill living toolFree={!audioToolsEnabled} />
         <TuningGauge readout={readout} />
 
         <div className="pitch-living-canvas__direction" aria-hidden>
@@ -246,7 +256,7 @@ function LiveAudioTunerPane({
           <span>Flat</span>
         </div>
 
-        {drone || onTunerTranspositionChange || insightsEnabled ? (
+        {audioToolsEnabled && (drone || onTunerTranspositionChange || insightsEnabled) ? (
           <>
             <div
               className={`pitch-living-tool-rail ${
@@ -273,6 +283,19 @@ function LiveAudioTunerPane({
                 </button>
               ) : null}
 
+              {insightsEnabled ? (
+                <button
+                  type="button"
+                  className="pitch-living-drone-trigger pitch-living-insights-trigger"
+                  onClick={openInsights}
+                  aria-haspopup="dialog"
+                  aria-label="Open Pitch Insights"
+                  title="Open Pitch Insights"
+                >
+                  <BarChart3 aria-hidden />
+                </button>
+              ) : null}
+
               {onTunerTranspositionChange ? (
                 <button
                   type="button"
@@ -289,19 +312,6 @@ function LiveAudioTunerPane({
                   <ArrowRightLeft aria-hidden />
                   <span>Transpose</span>
                   <small>{transposition.shortLabel}</small>
-                </button>
-              ) : null}
-
-              {insightsEnabled ? (
-                <button
-                  type="button"
-                  className="pitch-living-drone-trigger pitch-living-insights-trigger"
-                  onClick={openInsights}
-                  aria-haspopup="dialog"
-                  aria-label="Open Pitch Insights"
-                  title="Open Pitch Insights"
-                >
-                  <BarChart3 aria-hidden />
                 </button>
               ) : null}
             </div>
@@ -354,13 +364,14 @@ function LiveAudioTunerPane({
         ) : null}
       </div>
 
-      {insightsEnabled ? (
+      {audioToolsEnabled && insightsEnabled ? (
         <PitchInsightsScreen
           isOpen={insightsOpen}
           onClose={() => {
             setInsightsOpen(false)
           }}
           transpositionId={tunerTransposition}
+          tunerInstrument={tunerInstrument}
           formatNoteName={(midiNote) =>
             midiToNoteName(
               midiNote + getTunerTransposition(tunerTransposition).writtenOffsetSemitones,
@@ -423,6 +434,7 @@ function LivePitchTunerAudio({
   liveMicOnly = false,
   drone,
   onLiveSourceHealthChange,
+  audioToolsEnabled = true,
 }: {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -438,6 +450,7 @@ function LivePitchTunerAudio({
   liveMicOnly?: boolean
   drone?: LivePitchTunerProps['drone']
   onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
+  audioToolsEnabled?: boolean
 }) {
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -592,10 +605,12 @@ function LivePitchTunerAudio({
               canvasRef={playbackCanvasRef}
               drone={drone}
               onDroneInteraction={suppressDroneAnalysis}
+              tunerInstrument={tunerInstrument}
               tunerTransposition={tunerTransposition}
               onTunerTranspositionChange={onTunerTranspositionChange}
               hapticsEnabled={hapticsEnabled}
-              insightsEnabled={liveMicOnly}
+              insightsEnabled={audioToolsEnabled && liveMicOnly}
+              audioToolsEnabled={audioToolsEnabled}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
@@ -603,10 +618,12 @@ function LivePitchTunerAudio({
               canvasRef={liveCanvasRef}
               drone={drone}
               onDroneInteraction={suppressDroneAnalysis}
+              tunerInstrument={tunerInstrument}
               tunerTransposition={tunerTransposition}
               onTunerTranspositionChange={onTunerTranspositionChange}
               hapticsEnabled={hapticsEnabled}
-              insightsEnabled={liveMicOnly}
+              insightsEnabled={audioToolsEnabled && liveMicOnly}
+              audioToolsEnabled={audioToolsEnabled}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -642,6 +659,7 @@ export default function LivePitchTuner({
   liveMicOnly = false,
   drone,
   onLiveSourceHealthChange,
+  audioToolsEnabled = true,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -687,6 +705,7 @@ export default function LivePitchTuner({
         liveMicOnly={liveMicOnly}
         drone={drone}
         onLiveSourceHealthChange={onLiveSourceHealthChange}
+        audioToolsEnabled={audioToolsEnabled}
       />
     )
   }

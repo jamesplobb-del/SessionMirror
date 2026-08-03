@@ -392,7 +392,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'The Tuner tab combines responsive live pitch with sustained reference tones for intonation practice.',
     bullets: [
       'Choose Voice, Strings, or Winds in Settings for note guidance',
-      'Use Transpose below Drone so displayed notes match your instrument’s written pitch',
+      'Use Transpose on the right so displayed notes match your instrument’s written pitch',
       'Play to see pitch direction and cents in real time',
       'Tap drone notes on or off, or combine notes into chords',
       'Adjust drone volume and waveform in Settings',
@@ -403,7 +403,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Pitch Insights',
     body: 'Pitch Insights learns where your stable notes tend to sit while you use the tuner. Everything stays on your device.',
     bullets: [
-      'Open Insights from the tool rail beneath Drone and Transpose',
+      'Open Insights from the center button beneath the pitch graph',
       'BestTake saves one derived observation per stable held note—not raw audio or tuner frames',
       'Each note moves from Collecting Data to Early and Established tendencies as evidence grows',
       'Open a note for recent versus overall tendency, consistency, and a lightweight trend',

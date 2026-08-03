@@ -116,7 +116,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
       .catch((error) => {
         if (cancelled) return
         console.warn('[QuickTuner] permission check failed', error)
-        setPermission('unavailable')
+        setPermission('granted')
         setPermissionChecked(true)
       })
 
@@ -217,17 +217,6 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
     [settings.hapticFeedback],
   )
 
-  const updateTransposition = useCallback(
-    (tunerTransposition: AppSettings['tunerTransposition']) => {
-      setSettings((current) => {
-        const next = { ...current, tunerTransposition }
-        saveAppSettings(next)
-        return next
-      })
-    },
-    [],
-  )
-
   const retryMonitor = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setMonitorAttemptComplete(false)
@@ -297,8 +286,8 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
               liveMicOnly
               tunerInstrument={settings.tunerInstrument}
               tunerTransposition={settings.tunerTransposition}
-              onTunerTranspositionChange={updateTransposition}
               hapticsEnabled={settings.hapticFeedback}
+              audioToolsEnabled={false}
             />
             {isNativeIOS && monitorAttemptComplete && !monitorReady ? (
               <button

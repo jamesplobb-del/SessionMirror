@@ -1077,9 +1077,14 @@ function drawTraceEndpointDot(
   ctx.shadowBlur = 0
 }
 
-function getGlassLayoutMetrics(height: number, centerVertically = false) {
-  const pitchTop = height * 0.06
-  const pitchBottom = height * (centerVertically ? 0.94 : 0.96)
+function getGlassLayoutMetrics(
+  height: number,
+  centerVertically = false,
+  bottomInset = 0,
+) {
+  const graphHeight = Math.max(1, height - bottomInset)
+  const pitchTop = graphHeight * 0.06
+  const pitchBottom = graphHeight * (centerVertically ? 0.94 : 0.96)
   const pitchHeight = pitchBottom - pitchTop
   const midPitchY = pitchTop + pitchHeight * 0.5
   const centsToY = (cents: number) =>
@@ -1427,7 +1432,13 @@ function drawPitchCanvas(
     const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'widget')
     centsToY = metrics.centsToY
   } else if (isLivingAudio) {
-    const metrics = getGlassLayoutMetrics(height, true)
+    // Keep the high-refresh pitch trace clear of the tuner tool row. The row
+    // remains inside the canvas surface, but now occupies reserved space below
+    // the graph instead of covering the flat end of the pitch scale.
+    const toolRowInset = canvas.classList.contains('pitch-spectrogram--tool-free')
+      ? 0
+      : Math.min(64, height * 0.22)
+    const metrics = getGlassLayoutMetrics(height, true, toolRowInset)
     centsToY = metrics.centsToY
     drawLivingPitchSurface(ctx, width, centsToY, inTuneHighlight)
   } else if (isAudioGlass) {
