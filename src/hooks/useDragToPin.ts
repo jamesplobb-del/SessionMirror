@@ -10,15 +10,22 @@ import {
   triggerConfirmedLongPressHaptic,
   triggerDragStartHaptic,
   triggerLightHaptic,
+  triggerSuccessHaptic,
   warmHaptics,
 } from '../utils/haptics'
 
 const LONG_PRESS_MS = 200
 const DRAG_THRESHOLD_PX = 8
 const MOVEMENT_CANCEL_PX = 12
+const DROP_TARGET_SLOP_PX = 8
 
-function pointInRect(x: number, y: number, rect: DOMRect): boolean {
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+function pointInRect(x: number, y: number, rect: DOMRect, slop = 0): boolean {
+  return (
+    x >= rect.left - slop &&
+    x <= rect.right + slop &&
+    y >= rect.top - slop &&
+    y <= rect.bottom + slop
+  )
 }
 
 export interface DragGhostState {
@@ -44,6 +51,8 @@ interface UseDragToPinOptions {
   onDragStateChange?: (state: PipDragUiState) => void
   enabled: boolean
   activationMode?: 'hold' | 'move'
+  dragThresholdPx?: number
+  commitHaptic?: boolean
   hapticFeedback?: boolean
 }
 
@@ -57,6 +66,8 @@ export function useDragToPin({
   onDragStateChange,
   enabled,
   activationMode = 'hold',
+  dragThresholdPx = DRAG_THRESHOLD_PX,
+  commitHaptic = false,
   hapticFeedback = true,
 }: UseDragToPinOptions) {
   const draggingRef = useRef(false)
@@ -66,6 +77,7 @@ export function useDragToPin({
   const longPressTimerRef = useRef<number | null>(null)
   const ghostFrameRef = useRef<number | null>(null)
   const pendingGhostRef = useRef<DragGhostState | null>(null)
+  const dropZoneRef = useRef<'pin' | 'delete' | null>(null)
   const [ghost, setGhost] = useState<DragGhostState | null>(null)
   const [isArming, setIsArming] = useState(false)
   const onDragStateChangeRef = useRef(onDragStateChange)
@@ -131,23 +143,28 @@ export function useDragToPin({
     draggingRef.current = false
     armedRef.current = false
     pointerIdRef.current = null
+    dropZoneRef.current = null
     setIsArming(false)
     setGhost(null)
     emitDragState(false, false, false)
   }, [clearLongPressTimer, emitDragState])
 
   useEffect(() => {
+    if (!enabled) reset()
+  }, [enabled, reset])
+
+  useEffect(() => {
     const handleGlobalPointerEnd = (event: globalThis.PointerEvent) => {
       if (pointerIdRef.current !== null && event.pointerId !== pointerIdRef.current) {
         return
       }
-      if (draggingRef.current || armedRef.current) {
+      if (pointerIdRef.current !== null || draggingRef.current || armedRef.current) {
         reset()
       }
     }
 
     const handleWindowBlur = () => {
-      if (draggingRef.current || armedRef.current) {
+      if (pointerIdRef.current !== null || draggingRef.current || armedRef.current) {
         reset()
       }
     }
@@ -188,7 +205,9 @@ export function useDragToPin({
         ? pointInRect(clientX, clientY, deleteRect)
         : false
       const overPin =
-        !overDelete && pinRect ? pointInRect(clientX, clientY, pinRect) : false
+        !overDelete && pinRect
+          ? pointInRect(clientX, clientY, pinRect, DROP_TARGET_SLOP_PX)
+          : false
 
       return { overPin, overDelete }
     },
@@ -197,7 +216,7 @@ export function useDragToPin({
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      if (!enabled || !sourceTakeId) return
+      if (!enabled || !sourceTakeId || event.button !== 0) return
       // Chrome buttons (X/pin/unpin) layered over the drag surface must never
       // arm a drag — bail defensively on any interactive-element ancestor,
       // not just <button>, so this holds regardless of the exact element the
@@ -257,7 +276,7 @@ export function useDragToPin({
 
       if (!armedRef.current && !draggingRef.current) {
         if (activationMode === 'move') {
-          if (distance < DRAG_THRESHOLD_PX) return
+          if (distance < dragThresholdPx) return
           armedRef.current = true
         } else {
           if (distance > MOVEMENT_CANCEL_PX) {
@@ -268,7 +287,7 @@ export function useDragToPin({
       }
 
       if (armedRef.current && !draggingRef.current) {
-        if (distance < DRAG_THRESHOLD_PX) return
+        if (distance < dragThresholdPx) return
 
         draggingRef.current = true
         setIsArming(false)
@@ -287,6 +306,16 @@ export function useDragToPin({
         event.clientY,
       )
 
+      const nextDropZone = overDelete ? 'delete' : overPin ? 'pin' : null
+      if (
+        hapticFeedback &&
+        nextDropZone !== null &&
+        nextDropZone !== dropZoneRef.current
+      ) {
+        triggerLightHaptic()
+      }
+      dropZoneRef.current = nextDropZone
+
       scheduleGhost({
         x: event.clientX,
         y: event.clientY,
@@ -298,6 +327,7 @@ export function useDragToPin({
     [
       clearLongPressTimer,
       activationMode,
+      dragThresholdPx,
       emitDragState,
       hapticFeedback,
       resolveDropTargets,
@@ -331,6 +361,9 @@ export function useDragToPin({
         if (overDelete) {
           onDelete?.(sourceTakeId)
         } else if (overPin) {
+          if (commitHaptic && hapticFeedback) {
+            triggerSuccessHaptic()
+          }
           onPin(sourceTakeId)
         }
       } else if (
@@ -351,6 +384,7 @@ export function useDragToPin({
     },
     [
       clearLongPressTimer,
+      commitHaptic,
       hapticFeedback,
       onDelete,
       onPin,
@@ -361,16 +395,32 @@ export function useDragToPin({
     ],
   )
 
+  const handlePointerCancel = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (pointerIdRef.current !== event.pointerId) return
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+      } catch {
+        /* ignore pointer capture cleanup races */
+      }
+      reset()
+    },
+    [reset],
+  )
+
   return {
     ghost,
     isDragging: ghost !== null,
     isArming,
+    cancelDrag: reset,
     dragSourceProps: {
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
       onPointerUp: handlePointerEnd,
-      onPointerCancel: handlePointerEnd,
-      style: { touchAction: 'none' as const },
+      onPointerCancel: handlePointerCancel,
+      style: { touchAction: 'none' as const, userSelect: 'none' as const },
     },
   }
 }

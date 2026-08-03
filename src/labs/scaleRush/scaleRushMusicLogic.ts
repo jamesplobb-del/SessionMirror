@@ -320,6 +320,10 @@ function pitchClassForDegree(key: ScaleRushKey, scaleMode: ScaleRushScaleMode, d
 }
 
 export function pitchClassForSequenceStep(config: ScaleRushConfig, stepIndex: number): number {
+  if (config.endless) {
+    return pitchClassForDegree(config.key, config.scaleMode, stepIndex)
+  }
+
   const introLen = scaleIntroStepCount(config)
   if (stepIndex < introLen) {
     const path = buildScaleIntroPath(config)
@@ -442,10 +446,20 @@ export function getDetectedWrittenPitchClass(
   readout: PitchReadout,
   config: ScaleRushConfig,
 ): number | null {
+  const writtenMidi = getDetectedWrittenMidi(readout, config)
+  if (writtenMidi == null) return null
+  return ((writtenMidi % 12) + 12) % 12
+}
+
+/** Convert the sounding MIDI note into the written note, including octave rollover. */
+export function getDetectedWrittenMidi(
+  readout: PitchReadout,
+  config: Pick<ScaleRushConfig, 'pitchAccuracyStrict' | 'transposition'>,
+): number | null {
   const concert = readoutToConcertPitchClass(readout)
-  if (concert == null) return null
+  if (concert == null || !Number.isFinite(readout.midi)) return null
   if (!hasGameplaySignal(readout, config.pitchAccuracyStrict)) return null
-  return concertToWrittenPitchClass(concert, config.transposition)
+  return Math.round(readout.midi) + transpositionSemitones(config.transposition)
 }
 
 export function isGameplayPitchSignal(readout: PitchReadout, config: ScaleRushConfig): boolean {
@@ -471,9 +485,7 @@ export function isReadoutWrongPitch(
 ): boolean {
   const detected = getDetectedWrittenPitchClass(readout, config)
   if (detected == null) return false
-  if (pitchClassesMatch(detected, targetWrittenPitchClass)) return false
-  if (!config.pitchAccuracyStrict) return true
-  return Math.abs(readout.cents) <= STRICT_PITCH_CENTS
+  return !pitchClassesMatch(detected, targetWrittenPitchClass)
 }
 
 export function loadBestScore(): number {

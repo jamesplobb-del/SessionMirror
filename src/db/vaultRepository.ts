@@ -210,6 +210,27 @@ export async function setProjectBestTake(projectId: string, takeId: string): Pro
   await persistWebStore()
 }
 
+/** Clear one persisted Best Take without overwriting a newer benchmark selection. */
+export async function clearProjectBestTake(projectId: string, takeId: string): Promise<void> {
+  const db = getVaultDatabase()
+  await db.executeSet(
+    [
+      {
+        statement: 'UPDATE takes SET is_best_take = 0 WHERE project_id = ? AND id = ?',
+        values: [projectId, takeId],
+      },
+      {
+        statement: `UPDATE projects
+                    SET benchmark_source = NULL, benchmark_ref_id = NULL
+                    WHERE id = ? AND benchmark_source = 'take' AND benchmark_ref_id = ?`,
+        values: [projectId, takeId],
+      },
+    ],
+    true,
+  )
+  await persistWebStore()
+}
+
 export async function getTakesByProject(projectId: string): Promise<VaultTake[]> {
   const db = getVaultDatabase()
   const result = await db.query(

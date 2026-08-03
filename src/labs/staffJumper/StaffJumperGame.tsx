@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Pause } from 'lucide-react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import { STAFF_JUMPER_ASSETS } from './staffJumperAssets'
 import {
   computeAccuracy,
+  DIFFICULTY_LABELS,
   getDetectedPitchClass,
   getKeySignatureMarkers,
   getTargetNoteAtStep,
@@ -24,7 +25,7 @@ import {
   STAFF_CLEF_X,
   STAFF_FIRST_NOTE_X,
   STAFF_LINE_Y_LIST,
-  STAFF_LINE_YPX,
+  STAFF_MIDDLE_Y,
   STAFF_TOP_Y,
   NOTE_SPACING_PX,
   TREBLE_CLEF_FONT_SIZE,
@@ -35,13 +36,20 @@ interface StaffJumperGameProps {
   state: StaffJumperState
   readout: PitchReadout
   onPause: () => void
+  hapticFeedback: boolean
   onFallComplete: () => void
+  turnRemainingMs: number
+  turnDurationMs: number
 }
 
-/** Screen height of the trumpet player image (CSS px). */
-const PLAYER_IMG_HEIGHT = 52
-const STAFF_WORLD_WIDTH_PX = 5000
+/** Visible feet sit above the transparent bottom padding in the source PNG. */
+const PLAYER_FEET_OFFSET_PX = 45
 const VISIBLE_NOTE_COUNT = 7
+const LANDING_ANIMATION_MS = 430
+
+function accidentalGlyph(accidental: '#' | 'b'): string {
+  return accidental === '#' ? '♯' : '♭'
+}
 
 function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   return (
@@ -63,33 +71,55 @@ export default function StaffJumperGame({
   state,
   readout,
   onPause,
+  hapticFeedback,
   onFallComplete,
+  turnRemainingMs,
+  turnDurationMs,
 }: StaffJumperGameProps) {
   const config = state.config!
   const target = getTargetNoteAtStep(config, state.sequenceStep)
   const detectedPc = getDetectedPitchClass(readout)
-  const detectedNote = detectedPc != null ? pitchClassLabel(detectedPc, config.key) : '—'
   const isMatch = detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
+  const detectedNote =
+    detectedPc != null ? (isMatch ? target.noteLabel : pitchClassLabel(detectedPc, config.key)) : '—'
+  const isPlayableMatch = isMatch && (config.difficulty !== 'hard' || Math.abs(readout.cents) <= 20)
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
+  const cents = Math.round(readout.cents)
+  const targetDisplay = config.difficulty === 'easy' ? target.noteLabel : 'See staff'
+  const responseHint =
+    detectedPc == null
+      ? config.difficulty === 'easy'
+        ? `Play ${target.noteLabel}`
+        : 'Play the note under the player'
+      : isPlayableMatch
+        ? Math.abs(cents) <= 8
+          ? 'Centered'
+          : 'Hold steady'
+        : isMatch
+          ? `${cents > 0 ? '+' : ''}${cents}¢ from center`
+          : 'Try again'
 
   const playfieldRef = useRef<HTMLDivElement>(null)
 
   /**
    * layout.scale: world-px → screen-px multiplier.
-   * Scale the full canvas (staff + ledger room) to ~46% of playfield height
-   * so the staff dominates without feeling zoomed in.
+   * Size from the five-line staff itself, then place its midpoint just above
+   * the vertical center. This keeps C4–B6 readable without making the staff
+   * drift when its world-space safety margins change.
    *
-   * layout.baseY: screen Y of world Y=0 — vertically centers the canvas.
+   * layout.baseY: screen Y of world Y=0 after aligning the staff midpoint.
    */
-  const [layout, setLayout] = useState({ scale: 1.1, baseY: 40 })
+  const [layout, setLayout] = useState({ scale: 1.1, baseY: 40, viewportWidth: 390 })
 
   useLayoutEffect(() => {
     const measure = () => {
       const el = playfieldRef.current
       if (!el) return
-      const scale = (el.clientHeight * 0.46) / STAFF_CANVAS_HEIGHT
-      const baseY = (el.clientHeight - STAFF_CANVAS_HEIGHT * scale) / 2
-      setLayout({ scale, baseY })
+      const staffHeight = STAFF_BOTTOM_Y - STAFF_TOP_Y
+      const scale = Math.max(0.62, Math.min(1.05, (el.clientHeight * 0.19) / staffHeight))
+      const staffCenterScreenY = el.clientHeight * 0.47
+      const baseY = staffCenterScreenY - STAFF_MIDDLE_Y * scale
+      setLayout({ scale, baseY, viewportWidth: el.clientWidth })
     }
     measure()
     window.addEventListener('resize', measure)
@@ -107,24 +137,51 @@ export default function StaffJumperGame({
   )
 
   /**
-   * Scroll so the "focus" note (the one the player stands on, or the first target)
-   * aligns with PLAYER_ANCHOR_X_PX on screen.
-   *
-   * Screen X of a world point wx = wx * scale + scrollX
-   * ⇒  scrollX = PLAYER_ANCHOR_X_PX - focusWorldX * scale
+   * Keep the camera on the previous note during the hop. The character moves
+   * to the new target first; only after landing does the staff pan to recenter
+   * both of them. That makes the character do the jumping, not the platform.
    */
-  const focusStep = state.sequenceStep > 0 ? state.sequenceStep - 1 : 0
-  const focusWorldX = STAFF_FIRST_NOTE_X + focusStep * NOTE_SPACING_PX
-  const scrollX = PLAYER_ANCHOR_X_PX - focusWorldX * layout.scale
+  const [cameraStep, setCameraStep] = useState(state.sequenceStep)
 
-  // Player position — feet on top surface of notehead
-  const landedPlatform = platforms.find((p) => p.role === 'landed')
+  useEffect(() => {
+    if (cameraStep === state.sequenceStep) return
+    const timer = window.setTimeout(() => setCameraStep(state.sequenceStep), LANDING_ANIMATION_MS)
+    return () => window.clearTimeout(timer)
+  }, [cameraStep, state.sequenceStep])
+
+  const focusWorldX = STAFF_FIRST_NOTE_X + cameraStep * NOTE_SPACING_PX
+  const scrollX = PLAYER_ANCHOR_X_PX - focusWorldX * layout.scale
+  const visibleWorldWidth = layout.viewportWidth / Math.max(layout.scale, 0.1)
+  const staffWorldWidth = Math.max(
+    1200,
+    focusWorldX + visibleWorldWidth + NOTE_SPACING_PX * 3,
+    STAFF_FIRST_NOTE_X + (state.sequenceStep + VISIBLE_NOTE_COUNT + 3) * NOTE_SPACING_PX,
+  )
+
+  const feedbackAnnouncement =
+    state.feedback === 'perfect'
+      ? 'Perfect pitch.'
+      : state.feedback === 'good'
+        ? 'Landed.'
+        : state.feedback === 'timeout'
+          ? `Time is up. ${state.hearts} hearts left.`
+          : state.feedback === 'wrong'
+            ? `Wrong note. ${state.hearts} hearts left.`
+            : ''
+  const targetAnnouncement =
+    config.difficulty === 'easy'
+      ? `Target ${target.noteLabel}.`
+      : `Read the next note for jump ${state.sequenceStep + 1}.`
+  const turnFraction = Math.max(0, Math.min(1, turnRemainingMs / Math.max(1, turnDurationMs)))
+
+  // Player position — visible feet meet the top edge of the current target notehead.
   const targetPlatform = platforms.find((p) => p.role === 'target')
-  const standNote = landedPlatform?.note ?? targetPlatform?.note ?? target
+  const standNote = targetPlatform?.note ?? target
+  const targetWorldX = targetPlatform?.xPx ?? STAFF_FIRST_NOTE_X + state.sequenceStep * NOTE_SPACING_PX
   const headTopWorld = standNote.yPx - noteheadHalfHeight()
   const playerFeetScreen = layout.baseY + headTopWorld * layout.scale
-  const playerScreenY = playerFeetScreen - PLAYER_IMG_HEIGHT
-  const playerScreenX = PLAYER_ANCHOR_X_PX - (state.sequenceStep === 0 && !landedPlatform ? 40 : 0)
+  const playerScreenY = playerFeetScreen - PLAYER_FEET_OFFSET_PX
+  const playerScreenX = targetWorldX * layout.scale + scrollX
 
   const prevAdvanceRef = useRef(state.advanceToken)
   const prevMissRef = useRef(state.missToken)
@@ -160,7 +217,7 @@ export default function StaffJumperGame({
               transform: `translateX(${scrollX}px) translateY(${layout.baseY}px) scale(${layout.scale})`,
               transformOrigin: '0 0',
               height: `${STAFF_CANVAS_HEIGHT}px`,
-              width: `${STAFF_WORLD_WIDTH_PX}px`,
+              width: `${staffWorldWidth}px`,
             }}
           >
             {/* Light band behind the staff */}
@@ -169,7 +226,7 @@ export default function StaffJumperGame({
               style={{
                 top: `${STAFF_TOP_Y}px`,
                 height: `${STAFF_BOTTOM_Y - STAFF_TOP_Y}px`,
-                width: `${STAFF_WORLD_WIDTH_PX}px`,
+                width: `${staffWorldWidth}px`,
               }}
             />
 
@@ -179,16 +236,16 @@ export default function StaffJumperGame({
                 <div
                   key={yPx}
                   className="sj-staff-line"
-                  style={{ top: `${yPx}px`, width: `${STAFF_WORLD_WIDTH_PX}px` }}
+                  style={{ top: `${yPx}px`, width: `${staffWorldWidth}px` }}
                 />
               ))}
             </div>
 
-            {/* Treble clef — curl centered on G4 (second line), engraved scale. */}
+            {/* Treble clef centered across the five-line staff. */}
             <span
               className="sj-treble-clef"
               style={{
-                top: `${STAFF_LINE_YPX.G4}px`,
+                top: `${STAFF_MIDDLE_Y}px`,
                 left: `${STAFF_CLEF_X}px`,
                 fontSize: `${TREBLE_CLEF_FONT_SIZE}px`,
               }}
@@ -202,11 +259,12 @@ export default function StaffJumperGame({
               <div className="sj-key-signature" style={{ left: `${STAFF_CLEF_X + 60}px` }}>
                 {keySignature.map((marker, index) => (
                   <span
-                    key={`${marker.symbol}-${marker.yPx}`}
+                    key={`${marker.symbol}-${marker.yPx}-${index}`}
                     className="sj-key-signature__symbol"
+                    data-accidental={marker.symbol}
                     style={{ top: `${marker.yPx}px`, left: `${index * 14}px` }}
                   >
-                    {marker.symbol}
+                    {accidentalGlyph(marker.symbol)}
                   </span>
                 ))}
               </div>
@@ -217,7 +275,6 @@ export default function StaffJumperGame({
               {platforms.map((slot) => {
                 const shake = missActive && !state.isFalling && slot.role === 'target'
                 const crack = state.isFalling && slot.role === 'target'
-                const isLedger = slot.note.kind === 'ledger'
 
                 return (
                   /**
@@ -239,19 +296,27 @@ export default function StaffJumperGame({
                       .join(' ')}
                     style={{ left: `${slot.xPx}px`, top: `${slot.note.yPx}px` }}
                   >
-                    {/* Ledger line — same center as the notehead */}
-                    {isLedger && (
+                    {/* Draw every ledger rule required between the staff and this note. */}
+                    {slot.note.ledgerLineYPx.map((ledgerY) => (
                       <span
+                        key={ledgerY}
                         className="sj-note__ledger"
-                        style={{ width: `${LEDGER_LINE_W}px` }}
+                        style={{
+                          top: `${ledgerY - slot.note.yPx}px`,
+                          width: `${LEDGER_LINE_W}px`,
+                        }}
                         aria-hidden
                       />
-                    )}
+                    ))}
 
                     {/* Accidental to the left */}
                     {slot.note.accidental && (
-                      <span className="sj-note__accidental" aria-hidden>
-                        {slot.note.accidental}
+                      <span
+                        className="sj-note__accidental"
+                        data-accidental={slot.note.accidental}
+                        aria-hidden
+                      >
+                        {accidentalGlyph(slot.note.accidental)}
                       </span>
                     )}
 
@@ -294,43 +359,90 @@ export default function StaffJumperGame({
         {/* ── HUD ── */}
         <div className="sj-hud">
           <div className="sj-hud-top">
-            <Hearts count={state.hearts} />
+            <div className="sj-hud-statusbar">
+              <Hearts count={state.hearts} />
+              <span className="sj-hud-statusbar__rule" aria-hidden />
+              <span className="sj-hud-mini-stat">
+                <small>Score</small>
+                <strong>{state.score}</strong>
+              </span>
+              <span className="sj-hud-mini-stat">
+                <small>Accuracy</small>
+                <strong>{accuracy}%</strong>
+              </span>
+            </div>
             <Pressable
               type="button"
-              intensity="soft"
+              intensity="icon"
+              hapticFeedback={hapticFeedback}
               onClick={onPause}
               className="sj-hud-pause"
-              aria-label="Pause"
+              aria-label="Pause Staff Jumper"
             >
-              <Pause className="h-4 w-4" strokeWidth={2.5} />
+              <Pause aria-hidden />
             </Pressable>
           </div>
 
-          <div className="sj-hud-stats">
-            <div className="sj-hud-panel">
-              <p className="sj-hud-panel__label">Score</p>
-              <p className="sj-hud-panel__value">{state.score}</p>
+          {state.streak >= 3 && (
+            <div className="sj-combo-chip">
+              Streak {state.streak}
             </div>
-            <div className="sj-hud-panel">
-              <p className="sj-hud-panel__label">Streak</p>
-              <p className="sj-hud-panel__value">{state.streak}</p>
-            </div>
-            <div className="sj-hud-panel">
-              <p className="sj-hud-panel__label">Accuracy</p>
-              <p className="sj-hud-panel__value">{accuracy}%</p>
-            </div>
-          </div>
+          )}
 
-          <div className="sj-hud-bottom">
-            <div className="sj-hud-panel sj-hud-panel--target">
-              <p className="sj-hud-panel__label">Target</p>
-              <p className="sj-hud-panel__value">{target.noteLabel}</p>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {feedbackAnnouncement} {targetAnnouncement}
+          </p>
+
+          {state.feedback && state.feedbackToken > 0 && (
+            <div
+              key={`sj-feedback-${state.feedbackToken}`}
+              className={`sj-feedback-toast sj-feedback-toast--${state.feedback}`}
+              aria-hidden
+            >
+              {state.feedback === 'perfect'
+                ? 'Perfect pitch'
+                : state.feedback === 'good'
+                  ? 'Landed'
+                  : state.feedback === 'timeout'
+                    ? 'Time’s up'
+                    : 'Wrong note'}
             </div>
-            <div className={`sj-hud-panel sj-hud-panel--detected ${isMatch ? 'sj-hud-panel--match' : ''}`}>
-              <p className="sj-hud-panel__label">Detected</p>
-              <p className="sj-hud-panel__value">{detectedNote}</p>
+          )}
+
+          {!state.isFalling && (
+            <div className="sj-target-dock">
+              <div className="sj-target-dock__meta">
+                <span>Note {state.sequenceStep + 1}</span>
+                <span>{DIFFICULTY_LABELS[config.difficulty]}</span>
+              </div>
+              <div className="sj-target-dock__notes">
+                <div className="sj-target-note">
+                  <small>Target</small>
+                  <strong>{targetDisplay}</strong>
+                </div>
+                <div className={`sj-detected-note ${isPlayableMatch ? 'sj-detected-note--match' : ''}`}>
+                  <small>Detected</small>
+                  <strong>{detectedNote}</strong>
+                </div>
+              </div>
+              <p className={`sj-target-dock__hint ${isPlayableMatch ? 'sj-target-dock__hint--match' : ''}`}>
+                {responseHint}
+              </p>
+              <div
+                className="sj-turn-timer"
+                key={`sj-turn-${state.sequenceStep}-${state.missToken}`}
+                style={
+                  {
+                    '--sj-turn-remaining': `${turnRemainingMs}ms`,
+                    '--sj-turn-fraction': turnFraction,
+                  } as CSSProperties
+                }
+                aria-hidden
+              >
+                <span />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

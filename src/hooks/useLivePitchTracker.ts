@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { PitchDetector } from 'pitchy'
 import {
   getTunerProfile,
@@ -239,15 +239,21 @@ interface NativeTapBinding {
   sampleRate: number
   sequence: number
   processedSequence: number
+  hasAnalyzedFrame: boolean
+  cachedSignalStrong: boolean
+  cachedRawPitch: number
+  cachedClarity: number
   receivedAny: boolean
   startedAt: number
   lastFrameAt: number
+  disposed: boolean
   dispose: () => void
 }
 interface MicPitchGraph {
-  context: AudioContext
+  /** WebKit microphone graphs own Web Audio resources; native PCM graphs do not need them. */
+  context: AudioContext | null
   source: MediaStreamAudioSourceNode | null
-  analyser: AnalyserNode
+  analyser: AnalyserNode | null
   detector: PitchDetector<Float32Array>
   buffer: Float32Array
   smoothed: number | null
@@ -264,6 +270,7 @@ function isMediaPitchGraph(graph: ActivePitchGraph): graph is PitchGraph {
 }
 
 function nativeTapIsStale(binding: NativeTapBinding, now = performance.now()): boolean {
+  if (binding.disposed) return true
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false
   const lastDeliveryAt =
     binding.receivedAny && binding.lastFrameAt > 0 ? binding.lastFrameAt : binding.startedAt
@@ -275,6 +282,10 @@ const MIC_PITCH_ATTACH_DEFER_MS = 400
 const MIC_ECONOMY_TICK_MS = 72
 /** Throttle React readout publishes in economy mode only. */
 const READOUT_PUBLISH_ECONOMY_MS = 100
+/** Canvas analysis remains display-rate; React labels do not need more than 30fps. */
+const READOUT_PUBLISH_REALTIME_MS = 32
+/** Rebuilding smoothed traces allocates several short arrays; cap visual redraws at 30fps. */
+const CANVAS_DRAW_REALTIME_MS = 32
 /** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
 const REALTIME_MIC_FRAME_SIZE = 2048
 /** Native tap can survive while its AVCapture output stops delivering; rebuild when stale. */
@@ -282,6 +293,13 @@ const NATIVE_TAP_STALE_MS = 2600
 
 export type PitchTrackerSource = 'media' | 'microphone'
 export type PitchSourceHealth = 'idle' | 'connecting' | 'healthy' | 'stalled'
+
+export interface AcceptedPitchFrame {
+  readout: PitchReadout
+  confidence: number
+  /** Unix epoch milliseconds. */
+  timestamp: number
+}
 
 export interface PitchTrackerOptions {
   source?: PitchTrackerSource
@@ -304,6 +322,8 @@ export interface PitchTrackerOptions {
   retryNativeTapOnInteractiveRecovery?: boolean
   /** Reports source delivery health without treating musical silence as a failure. */
   onSourceHealthChange?: (health: PitchSourceHealth) => void
+  /** Accepted detector frames for lightweight derived analytics such as Pitch Insights. */
+  onAcceptedPitchFrame?: (frame: AcceptedPitchFrame | null) => void
 }
 
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
@@ -414,10 +434,6 @@ async function createNativeTapPitchGraph(
 ): Promise<MicPitchGraph> {
   const frameSize = REALTIME_MIC_FRAME_SIZE
 
-  const context = new AudioContext({ latencyHint: 'playback' })
-  const analyser = context.createAnalyser()
-  analyser.fftSize = frameSize
-
   const detector = PitchDetector.forFloat32Array(frameSize)
   detector.clarityThreshold = profile.clarityMinMic
   detector.minVolumeDecibels = profile.rmsGateDbMic
@@ -427,14 +443,20 @@ async function createNativeTapPitchGraph(
     sampleRate: 48_000,
     sequence: 0,
     processedSequence: -1,
+    hasAnalyzedFrame: false,
+    cachedSignalStrong: false,
+    cachedRawPitch: 0,
+    cachedClarity: 0,
     receivedAny: false,
     startedAt: performance.now(),
     lastFrameAt: 0,
+    disposed: false,
     dispose: () => {},
   }
 
   await acquireNativeAudioTap()
   const subscription = subscribeNativeAudioPitchFrames((chunk) => {
+    if (binding.disposed) return
     binding.latest = chunk.samples
     binding.sampleRate = chunk.sampleRate
     binding.sequence += 1
@@ -447,14 +469,18 @@ async function createNativeTapPitchGraph(
   binding.dispose = () => {
     if (disposed) return
     disposed = true
+    binding.disposed = true
     void subscription?.then((handle) => handle.remove()).catch(() => {})
     void releaseNativeAudioTap()
   }
 
   return {
-    context,
+    // Native PCM is copied straight into `buffer`; a silent AudioContext and
+    // disconnected AnalyserNode only consumed scarce iOS audio resources and
+    // accumulated during repeated metronome/tuner route recovery.
+    context: null,
     source: null,
-    analyser,
+    analyser: null,
     detector,
     buffer: new Float32Array(frameSize),
     smoothed: null,
@@ -480,7 +506,7 @@ function safeDisposeMicGraph(graph: MicPitchGraph | null): void {
 
   try {
     graph.source?.disconnect()
-    graph.analyser.disconnect()
+    graph.analyser?.disconnect()
   } catch {
     /* graph may already be disconnected */
   }
@@ -491,7 +517,7 @@ function safeDisposeMicGraph(graph: MicPitchGraph | null): void {
     }
   }
 
-  void graph.context.close().catch(() => {})
+  void graph.context?.close().catch(() => {})
 }
 
 function safeDisposeActiveGraph(graph: ActivePitchGraph | null): void {
@@ -642,7 +668,7 @@ async function createPitchGraph(
     safeDisposePitchGraph(existing)
   }
 
-  if (existing) {
+  if (existing && elementGraphs.get(media) === existing) {
     elementGraphs.delete(media)
   }
 
@@ -718,7 +744,11 @@ function safeDisposePitchGraph(graph: PitchGraph | null): void {
   if (!graph) return
 
   const { media, mode } = graph
-  elementGraphs.delete(media)
+  // An older async attachment may finish after a newer graph has replaced it.
+  // Never remove the newer graph's registry entry while disposing the stale one.
+  if (elementGraphs.get(media) === graph) {
+    elementGraphs.delete(media)
+  }
 
   const speakerNodes = getTakePlaybackSpeakerNodes(media)
   const onSharedSpeakerBus = Boolean(speakerNodes && graph.source === speakerNodes.source)
@@ -1584,16 +1614,25 @@ export function useLivePitchTracker(
     options.retryNativeTapOnInteractiveRecovery ?? false
   const onSourceHealthChangeRef = useRef(options.onSourceHealthChange)
   onSourceHealthChangeRef.current = options.onSourceHealthChange
+  const onAcceptedPitchFrameRef = useRef(options.onAcceptedPitchFrame)
+  onAcceptedPitchFrameRef.current = options.onAcceptedPitchFrame
   const profile = getTunerProfile(tunerInstrument)
   const profileRef = useRef(profile)
   profileRef.current = profile
 
-  const emptyReadout = frequencyToPitchReadout(0, profile.minHz, profile.maxHz)
+  // This value participates in the analysis-loop effect dependencies. Keeping
+  // it referentially stable prevents every pitch-label render from cancelling
+  // and recreating the requestAnimationFrame loop.
+  const emptyReadout = useMemo(
+    () => frequencyToPitchReadout(0, profile.minHz, profile.maxHz),
+    [profile.maxHz, profile.minHz],
+  )
   const [readout, setReadout] = useState<PitchReadout>(emptyReadout)
   const [inTuneGlow, setInTuneGlow] = useState(0)
   const graphRef = useRef<ActivePitchGraph | null>(null)
   const tickRef = useRef<number | null>(null)
   const readoutRef = useRef<PitchReadout>(emptyReadout)
+  const publishedReadoutRef = useRef<PitchReadout>(emptyReadout)
   const lastPitchAtRef = useRef(0)
   const historyRef = useRef<number[]>([])
   const mountedRef = useRef(true)
@@ -1603,6 +1642,7 @@ export function useLivePitchTracker(
   const goodFrameCountRef = useRef(0)
   const lastStableCentsRef = useRef<number | null>(null)
   const isAttaching = useRef(false)
+  const attachGenerationRef = useRef(0)
   const sourceRef = useRef(source)
   sourceRef.current = source
   const realtimeModeRef = useRef(realtimeMode)
@@ -1623,8 +1663,28 @@ export function useLivePitchTracker(
   const inTuneGlowEligibleRef = useRef(false)
   const lastPublishedGlowRef = useRef(0)
   const lastMicTickAtRef = useRef(0)
+  const lastCanvasDrawAtRef = useRef(0)
   const lastReadoutPublishAtRef = useRef(0)
   const sourceHealthRef = useRef<PitchSourceHealth>('idle')
+  const acceptedPitchActiveRef = useRef(false)
+
+  const endAcceptedPitchEvent = () => {
+    if (!acceptedPitchActiveRef.current) return
+    acceptedPitchActiveRef.current = false
+    onAcceptedPitchFrameRef.current?.(null)
+  }
+
+  const publishAcceptedPitchFrame = (
+    next: PitchReadout,
+    confidence: number,
+  ) => {
+    acceptedPitchActiveRef.current = true
+    onAcceptedPitchFrameRef.current?.({
+      readout: next,
+      confidence,
+      timestamp: Date.now(),
+    })
+  }
 
   const publishSourceHealth = useCallback((health: PitchSourceHealth) => {
     if (sourceHealthRef.current === health) return
@@ -1633,24 +1693,29 @@ export function useLivePitchTracker(
   }, [])
 
   const publishReadout = (next: PitchReadout, force = false) => {
-    const noteChanged = next.noteName !== readoutRef.current.noteName
+    const previouslyPublished = publishedReadoutRef.current
+    const noteChanged = next.noteName !== previouslyPublished.noteName
     const centsChanged =
-      Math.abs(next.cents - readoutRef.current.cents) >=
+      Math.abs(next.cents - previouslyPublished.cents) >=
       profileRef.current.readoutCentsStep * 0.5
+    const frequencyChanged =
+      Math.abs(next.frequencyHz - previouslyPublished.frequencyHz) >= 0.1
     const now = performance.now()
-    const economyInterval = realtimeModeRef.current ? 0 : READOUT_PUBLISH_ECONOMY_MS
+    const publishInterval = realtimeModeRef.current
+      ? READOUT_PUBLISH_REALTIME_MS
+      : READOUT_PUBLISH_ECONOMY_MS
 
     if (
       !force &&
       !noteChanged &&
-      !centsChanged &&
-      economyInterval > 0 &&
-      now - lastReadoutPublishAtRef.current < economyInterval
+      (!centsChanged && !frequencyChanged ||
+        now - lastReadoutPublishAtRef.current < publishInterval)
     ) {
       return
     }
 
     readoutRef.current = next
+    publishedReadoutRef.current = next
     lastReadoutPublishAtRef.current = now
     if (mountedRef.current) setReadout(next)
   }
@@ -1665,10 +1730,15 @@ export function useLivePitchTracker(
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      if (acceptedPitchActiveRef.current) {
+        acceptedPitchActiveRef.current = false
+        onAcceptedPitchFrameRef.current?.(null)
+      }
     }
   }, [])
 
   useEffect(() => {
+    endAcceptedPitchEvent()
     historyRef.current = []
     readoutSmoothedHzRef.current = null
     needleCentsRef.current = null
@@ -1677,6 +1747,8 @@ export function useLivePitchTracker(
     lastNoteRef.current = '—'
     framesSinceAttachAttemptRef.current = 0
     lastPitchAtRef.current = 0
+    lastCanvasDrawAtRef.current = 0
+    lastReadoutPublishAtRef.current = 0
     inTuneGlowRef.current = 0
     inTuneSinceRef.current = 0
     inTuneBandFrameRef.current = 0
@@ -1691,10 +1763,6 @@ export function useLivePitchTracker(
     publishSourceHealth(enabled ? 'connecting' : 'idle')
     return () => publishSourceHealth('idle')
   }, [enabled, mediaKey, publishSourceHealth, source])
-
-  useEffect(() => {
-    readoutRef.current = readout
-  }, [readout])
 
   useEffect(() => {
     return () => {
@@ -1726,13 +1794,16 @@ export function useLivePitchTracker(
       lastPitchAtRef.current = 0
       const seekEmpty = frequencyToPitchReadout(0, profileRef.current.minHz, profileRef.current.maxHz)
       readoutRef.current = seekEmpty
+      publishedReadoutRef.current = seekEmpty
       if (mountedRef.current) setReadout(seekEmpty)
 
       const graph = graphRef.current
       if (graph && isMediaPitchGraph(graph)) {
         graph.smoothed = null
         if (graph.mode === 'stream' && !refreshMediaPitchStreamSource(graph)) {
-          elementGraphs.delete(graph.media)
+          if (elementGraphs.get(graph.media) === graph) {
+            elementGraphs.delete(graph.media)
+          }
           graphRef.current = null
           void tryAttachRef.current?.()
         }
@@ -1746,7 +1817,9 @@ export function useLivePitchTracker(
   }, [enabled, mediaKey, mediaRef, source])
 
   useEffect(() => {
+    const attachGeneration = ++attachGenerationRef.current
     if (!enabled) {
+      endAcceptedPitchEvent()
       if (tickRef.current !== null) {
         cancelAnimationFrame(tickRef.current)
         tickRef.current = null
@@ -1769,6 +1842,7 @@ export function useLivePitchTracker(
       graphRef.current = null
       if (mountedRef.current) {
         readoutRef.current = disabledEmpty
+        publishedReadoutRef.current = disabledEmpty
         setReadout(disabledEmpty)
       }
       return
@@ -1777,11 +1851,15 @@ export function useLivePitchTracker(
     let cancelled = false
     let retryTimer: number | null = null
     let initTimer: number | null = null
+    const nativeTapWatchdogs = new Set<number>()
     let attachAttempt = 0
     const MAX_ATTACH_ATTEMPTS = sourceRef.current === 'microphone' ? 120 : 36
 
     const scheduleRetry = (delayMs: number) => {
       if (cancelled || attachAttempt >= MAX_ATTACH_ATTEMPTS) return
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
+      }
       retryTimer = window.setTimeout(() => {
         retryTimer = null
         void tryAttach()
@@ -1798,21 +1876,23 @@ export function useLivePitchTracker(
       ) {
         const micGraph = graphRef.current
         // Native-tap graphs have no WebKit stream to go stale — keep them as
-        // long as their context is open.
+        // long as native PCM continues to arrive.
         if (micGraph.nativeTap) {
-          if (micGraph.context.state !== 'closed' && !nativeTapIsStale(micGraph.nativeTap)) {
+          if (!nativeTapIsStale(micGraph.nativeTap)) {
             publishSourceHealth(micGraph.nativeTap.receivedAny ? 'healthy' : 'connecting')
             return
           }
+          endAcceptedPitchEvent()
           publishSourceHealth('stalled')
           safeDisposeMicGraph(micGraph)
           graphRef.current = null
         } else if (
           preferNativeAudioTapRef.current &&
           isNativeCaptureSessionActive() &&
-          micGraph.context.state !== 'closed'
+          micGraph.context?.state !== 'closed'
         ) {
           // WebKit mic was stopped for native capture — switch to the native tap.
+          endAcceptedPitchEvent()
           safeDisposeMicGraph(micGraph)
           graphRef.current = null
         } else {
@@ -1826,12 +1906,13 @@ export function useLivePitchTracker(
           if (
             graphStreamLive &&
             graphMatchesShared &&
-            micGraph.context.state !== 'closed'
+            micGraph.context?.state !== 'closed'
           ) {
             publishSourceHealth('healthy')
             return
           }
 
+          endAcceptedPitchEvent()
           publishSourceHealth('stalled')
           safeDisposeMicGraph(micGraph)
           graphRef.current = null
@@ -1876,9 +1957,11 @@ export function useLivePitchTracker(
             publishSourceHealth('connecting')
             // Watchdog: if the tap never delivers, temporarily fall back to
             // WebKit. Foreground and interactive recovery retry the native tap.
-            window.setTimeout(() => {
+            const watchdog = window.setTimeout(() => {
+              nativeTapWatchdogs.delete(watchdog)
               if (cancelled || graphRef.current !== graph) return
               if (graph.nativeTap?.receivedAny) return
+              endAcceptedPitchEvent()
               console.warn('[PitchTracker] native audio tap silent; falling back to WebKit mic path')
               publishSourceHealth('stalled')
               nativeTapUnavailableRef.current = true
@@ -1886,6 +1969,7 @@ export function useLivePitchTracker(
               graphRef.current = null
               scheduleRetry(50)
             }, 2000)
+            nativeTapWatchdogs.add(watchdog)
             return
           }
 
@@ -1943,6 +2027,10 @@ export function useLivePitchTracker(
 
         const graph = await createPitchGraph(media, profileRef.current)
         if (cancelled) {
+          // createPitchGraph connects nodes and registers the graph before its
+          // promise resolves. A tab/mode switch during that await must release
+          // those resources instead of leaving a detached analysis route alive.
+          safeDisposePitchGraph(graph)
           return
         }
         safeDisposeActiveGraph(graphRef.current && !isMediaPitchGraph(graphRef.current) ? graphRef.current : null)
@@ -1953,7 +2041,11 @@ export function useLivePitchTracker(
         }
         scheduleRetry(sourceRef.current === 'microphone' ? 120 : 80)
       } finally {
-        isAttaching.current = false
+        // A previous media-key generation may finish after a new attachment
+        // has started. It must not clear the new generation's in-flight guard.
+        if (attachGenerationRef.current === attachGeneration) {
+          isAttaching.current = false
+        }
       }
     }
 
@@ -1991,6 +2083,7 @@ export function useLivePitchTracker(
         return
       }
       if (graph && !isMediaPitchGraph(graph)) {
+        endAcceptedPitchEvent()
         safeDisposeMicGraph(graph)
         graphRef.current = null
       }
@@ -2016,6 +2109,7 @@ export function useLivePitchTracker(
       ) {
         nativeTapUnavailableRef.current = false
         if (graph && !isMediaPitchGraph(graph)) {
+          endAcceptedPitchEvent()
           safeDisposeMicGraph(graph)
           graphRef.current = null
         }
@@ -2027,22 +2121,14 @@ export function useLivePitchTracker(
       }
 
       if (graph && !isMediaPitchGraph(graph) && graph.nativeTap) {
-        // Native-tap graphs pull PCM via manual buffer copy from the native
-        // plugin (see createNativeTapPitchGraph) — the AnalyserNode is never
-        // connected to anything, so the AudioContext drives no actual audio
-        // and iOS is free to auto-suspend it as "silent" while the tap keeps
-        // working perfectly. This handler runs on EVERY pointerdown/touchstart
-        // across the whole app (see the listeners below), so gating health on
-        // `context.state === 'running'` here — which a previous fix briefly
-        // did — meant nearly every tap anywhere in the app (including in
-        // Take Vault, Settings, etc.) tore down and rebuilt the entire native
-        // audio tap (real native-bridge round-trips) for no reason. Only a
-        // truly closed context indicates the graph needs rebuilding.
-        if (graph.context.state !== 'closed' && !nativeTapIsStale(graph.nativeTap)) return
+        // Native-tap graphs pull PCM via manual buffer copy from the plugin and
+        // intentionally own no Web Audio context. Health is delivery-based.
+        if (!nativeTapIsStale(graph.nativeTap)) return
         if (nativeTapIsStale(graph.nativeTap)) {
           console.warn('[PitchTracker] native audio tap stale during recovery; rebuilding')
           publishSourceHealth('stalled')
         }
+        endAcceptedPitchEvent()
         safeDisposeMicGraph(graph)
         graphRef.current = null
         if (!isAttaching.current) {
@@ -2053,7 +2139,9 @@ export function useLivePitchTracker(
 
       if (graph && !isMediaPitchGraph(graph)) {
         void (async () => {
-          if (graph.context.state === 'suspended') {
+          const context = graph.context
+          if (!context) return
+          if (context.state === 'suspended') {
             // iOS frequently resolves resume() without error yet leaves the
             // context stuck 'suspended' when it's called outside a direct
             // user-gesture callback (visibilitychange/appStateChange are not
@@ -2066,11 +2154,11 @@ export function useLivePitchTracker(
             // WebKit getUserMedia path genuinely does need 'running' — unlike
             // the native-tap path above, its analyser IS fed by a real
             // MediaStreamAudioSourceNode in the standard WebAudio graph.
-            await graph.context.resume().catch(() => {})
+            await context.resume().catch(() => {})
           }
           if (cancelled || graphRef.current !== graph) return
 
-          const isHealthy = graph.context.state === 'running'
+          const isHealthy = context.state === 'running'
           const sharedStream = micStreamRefStable.current?.current
           const graphStreamLive = micStreamIsLive(graph.stream)
           const graphMatchesShared =
@@ -2082,6 +2170,7 @@ export function useLivePitchTracker(
             return
           }
 
+          endAcceptedPitchEvent()
           safeDisposeMicGraph(graph)
           graphRef.current = null
 
@@ -2100,6 +2189,8 @@ export function useLivePitchTracker(
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         recoverMicGraph()
+      } else {
+        endAcceptedPitchEvent()
       }
     }
 
@@ -2110,23 +2201,36 @@ export function useLivePitchTracker(
     document.addEventListener('touchstart', recoverMicGraph)
 
     let removeAppListener: (() => void) | undefined
+    let appListenerDisposed = false
     if (typeof window !== 'undefined') {
-      void import('@capacitor/core').then(({ Capacitor }) => {
-        if (!Capacitor.isNativePlatform()) return
-        void import('@capacitor/app').then(({ App }) => {
-          void App.addListener('appStateChange', ({ isActive }) => {
+      void (async () => {
+        try {
+          const { Capacitor } = await import('@capacitor/core')
+          if (!Capacitor.isNativePlatform() || appListenerDisposed) return
+          const { App } = await import('@capacitor/app')
+          if (appListenerDisposed) return
+          const sub = await App.addListener('appStateChange', ({ isActive }) => {
             if (isActive) recoverMicGraph()
-          }).then((sub) => {
-            removeAppListener = () => {
-              void sub.remove()
-            }
+            else endAcceptedPitchEvent()
           })
-        })
-      })
+          if (appListenerDisposed) {
+            await sub.remove()
+            return
+          }
+          removeAppListener = () => {
+            void sub.remove()
+          }
+        } catch (error) {
+          if (!appListenerDisposed) {
+            console.warn('[PitchTracker] app lifecycle listener unavailable', error)
+          }
+        }
+      })()
     }
 
     return () => {
       cancelled = true
+      appListenerDisposed = true
       tryAttachRef.current = null
       pitchGraphReattachListeners.delete(reattachForNativeCapture)
       unsubscribeNativeCapture()
@@ -2142,12 +2246,19 @@ export function useLivePitchTracker(
       if (retryTimer !== null) {
         window.clearTimeout(retryTimer)
       }
+      for (const watchdog of nativeTapWatchdogs) {
+        window.clearTimeout(watchdog)
+      }
+      nativeTapWatchdogs.clear()
       const graph = graphRef.current
       if (graph && !isMediaPitchGraph(graph)) {
+        endAcceptedPitchEvent()
         safeDisposeMicGraph(graph)
       }
       graphRef.current = null
-      isAttaching.current = false
+      if (attachGenerationRef.current === attachGeneration) {
+        isAttaching.current = false
+      }
     }
   }, [enabled, mediaKey])
 
@@ -2161,6 +2272,7 @@ export function useLivePitchTracker(
         tickRef.current = null
       }
       if (!isPlaying && !persistWhenPaused) {
+        endAcceptedPitchEvent()
         if (graphRef.current && isMediaPitchGraph(graphRef.current)) {
           graphRef.current.smoothed = null
         } else if (graphRef.current && !isMediaPitchGraph(graphRef.current)) {
@@ -2174,6 +2286,7 @@ export function useLivePitchTracker(
         lastNoteRef.current = '—'
         if (mountedRef.current) {
           readoutRef.current = emptyReadout
+          publishedReadoutRef.current = emptyReadout
           setReadout(emptyReadout)
         }
         lastPitchAtRef.current = 0
@@ -2201,6 +2314,17 @@ export function useLivePitchTracker(
           return
         }
         lastMicTickAtRef.current = frameNow
+      }
+
+      const canvasForThisFrame = (): HTMLCanvasElement | null => {
+        const canvas = canvasRef?.current ?? null
+        if (!canvas) return null
+        const interval = realtimeModeRef.current
+          ? CANVAS_DRAW_REALTIME_MS
+          : MIC_ECONOMY_TICK_MS
+        if (frameNow - lastCanvasDrawAtRef.current < interval) return null
+        lastCanvasDrawAtRef.current = frameNow
+        return canvas
       }
 
       const activeProfile = profileRef.current
@@ -2231,6 +2355,7 @@ export function useLivePitchTracker(
       let graph = graphRef.current
 
       if (shouldSuppressMicAnalysis) {
+        endAcceptedPitchEvent()
         historyRef.current = []
         readoutSmoothedHzRef.current = null
         needleCentsRef.current = null
@@ -2241,7 +2366,7 @@ export function useLivePitchTracker(
         if (graph) graph.smoothed = null
         publishReadout(emptyReadout, true)
 
-        const canvas = canvasRef?.current
+        const canvas = canvasForThisFrame()
         if (canvas) {
           drawPitchCanvasIfDue(
             canvas,
@@ -2261,11 +2386,13 @@ export function useLivePitchTracker(
       }
 
       if (graph && isMediaPitchGraph(graph) && elementGraphs.get(graph.media) !== graph) {
+        endAcceptedPitchEvent()
         graphRef.current = null
         graph = null
       }
 
       if (!graph) {
+        endAcceptedPitchEvent()
         if (source === 'microphone') {
           if (
             enabled &&
@@ -2297,7 +2424,7 @@ export function useLivePitchTracker(
           }
         }
 
-        const canvas = canvasRef?.current
+        const canvas = canvasForThisFrame()
         if (canvas) {
           const bandGlow = sampleInTuneBandGlow(
             inTuneGlowRef,
@@ -2323,12 +2450,15 @@ export function useLivePitchTracker(
         return
       }
 
-      if (graph.context.state === 'closed') {
+      if (graph.context?.state === 'closed') {
+        endAcceptedPitchEvent()
         if (sourceRef.current === 'microphone') {
           publishSourceHealth('stalled')
         }
         if (isMediaPitchGraph(graph)) {
-          elementGraphs.delete(graph.media)
+          if (elementGraphs.get(graph.media) === graph) {
+            elementGraphs.delete(graph.media)
+          }
         }
         graphRef.current = null
         if (framesSinceAttachAttemptRef.current % 12 === 0) {
@@ -2338,7 +2468,7 @@ export function useLivePitchTracker(
         return
       }
 
-      if (graph.context.state === 'suspended') {
+      if (graph.context?.state === 'suspended') {
         void graph.context.resume()
       }
 
@@ -2347,6 +2477,7 @@ export function useLivePitchTracker(
         !graph.nativeTap &&
         !micStreamIsLive(graph.stream)
       ) {
+        endAcceptedPitchEvent()
         console.info('[PitchTracker] WebKit mic source unavailable; reacquiring')
         publishSourceHealth('stalled')
         safeDisposeMicGraph(graph)
@@ -2375,11 +2506,13 @@ export function useLivePitchTracker(
         return
       }
 
-      let analysisSampleRate = graph.context.sampleRate
+      let analysisSampleRate = graph.context?.sampleRate ?? 48_000
+      let nativeFrameFresh = true
 
       if (!isMediaPitchGraph(graph) && graph.nativeTap) {
         const nativeTap = graph.nativeTap
         if (nativeTapIsStale(nativeTap, frameNow)) {
+          endAcceptedPitchEvent()
           console.warn('[PitchTracker] native audio tap stale; reacquiring')
           publishSourceHealth('stalled')
           safeDisposeMicGraph(graph)
@@ -2403,12 +2536,15 @@ export function useLivePitchTracker(
         // first chunk arrives the buffer stays zeroed — the RMS gate below
         // treats that as silence, which renders as an idle (not broken) tuner.
         const latest = nativeTap.latest
+        nativeFrameFresh = Boolean(
+          latest && nativeTap.processedSequence !== nativeTap.sequence,
+        )
         // Keep analysis and canvas motion on the display's animation cadence.
         // Native PCM arrives in larger chunks, but reusing the latest complete
         // chunk between deliveries prevents the trace from dropping to the
         // audio chunk rate (roughly 23fps at 48kHz).
-        if (latest) nativeTap.processedSequence = nativeTap.sequence
-        if (latest) {
+        if (latest && nativeFrameFresh) {
+          nativeTap.processedSequence = nativeTap.sequence
           publishSourceHealth('healthy')
           if (latest.length === graph.buffer.length) {
             graph.buffer.set(latest)
@@ -2419,7 +2555,7 @@ export function useLivePitchTracker(
         }
         analysisSampleRate = nativeTap.sampleRate
       } else {
-        graph.analyser.getFloatTimeDomainData(graph.buffer)
+        graph.analyser?.getFloatTimeDomainData(graph.buffer)
       }
 
       const now = performance.now()
@@ -2456,6 +2592,7 @@ export function useLivePitchTracker(
       }
 
       const clearReadoutAfterSilence = () => {
+        endAcceptedPitchEvent()
         publishReadout(emptyReadout, true)
         graph.smoothed = null
         readoutSmoothedHzRef.current = null
@@ -2471,7 +2608,32 @@ export function useLivePitchTracker(
         const rmsGate =
           source === 'microphone' ? activeProfile.rmsGateDbMic : activeProfile.rmsGateDbMedia
         const holdMs = source === 'microphone' ? activeProfile.holdMsMic : activeProfile.holdMs
-        const signalStrong = isSignalAboveRmsGate(graph.buffer, rmsGate)
+        const nativeTap = !isMediaPitchGraph(graph) ? graph.nativeTap : undefined
+        let signalStrong: boolean
+        let rawPitch = 0
+        let clarity = 0
+
+        if (nativeTap && !nativeFrameFresh && nativeTap.hasAnalyzedFrame) {
+          signalStrong = nativeTap.cachedSignalStrong
+          rawPitch = nativeTap.cachedRawPitch
+          clarity = nativeTap.cachedClarity
+        } else {
+          signalStrong = isSignalAboveRmsGate(graph.buffer, rmsGate)
+          if (signalStrong) {
+            const detected = graph.detector.findPitch(
+              graph.buffer,
+              analysisSampleRate,
+            )
+            rawPitch = detected[0]
+            clarity = detected[1]
+          }
+          if (nativeTap) {
+            nativeTap.hasAnalyzedFrame = true
+            nativeTap.cachedSignalStrong = signalStrong
+            nativeTap.cachedRawPitch = rawPitch
+            nativeTap.cachedClarity = clarity
+          }
+        }
 
         if (!signalStrong) {
           goodFrameCountRef.current = 0
@@ -2484,11 +2646,6 @@ export function useLivePitchTracker(
             active = true
           }
         } else {
-          const [rawPitch, clarity] = graph.detector.findPitch(
-            graph.buffer,
-            analysisSampleRate,
-          )
-
           const pitch = normalizeInstrumentFrequency(
             rawPitch,
             activeProfile.minHz,
@@ -2575,6 +2732,14 @@ export function useLivePitchTracker(
                   cents: displayCents,
                 }
 
+                publishAcceptedPitchFrame(
+                  {
+                    ...next,
+                    cents: smoothedNeedle,
+                  },
+                  clarity,
+                )
+
                 readoutRef.current = displayReadout
                 publishReadout(displayReadout)
 
@@ -2613,7 +2778,7 @@ export function useLivePitchTracker(
         active = true
       }
 
-      const canvas = canvasRef?.current
+      const canvas = canvasForThisFrame()
       if (canvas) {
         const bandGlow = sampleInTuneBandGlow(
           inTuneGlowRef,

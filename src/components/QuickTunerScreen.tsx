@@ -14,6 +14,7 @@ import {
   type AppSettings,
 } from '../utils/appSettings'
 import { getTunerProfile, TUNER_INSTRUMENTS } from '../utils/pitchConfig'
+import { getTunerTransposition } from '../utils/tunerTransposition'
 import {
   isAppInForeground,
   subscribeAppForeground,
@@ -216,6 +217,17 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
     [settings.hapticFeedback],
   )
 
+  const updateTransposition = useCallback(
+    (tunerTransposition: AppSettings['tunerTransposition']) => {
+      setSettings((current) => {
+        const next = { ...current, tunerTransposition }
+        saveAppSettings(next)
+        return next
+      })
+    },
+    [],
+  )
+
   const retryMonitor = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setMonitorAttemptComplete(false)
@@ -231,6 +243,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
     () => getTunerProfile(settings.tunerInstrument),
     [settings.tunerInstrument],
   )
+  const activeTransposition = getTunerTransposition(settings.tunerTransposition)
   const showTuner = permissionChecked && permission === 'granted'
   const permissionMessage = permissionCopy(permission)
 
@@ -260,7 +273,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
         <span aria-hidden>·</span>
         <span>{activeProfile.label}</span>
         <span aria-hidden>·</span>
-        <span>Concert pitch</span>
+        <span>{activeTransposition.shortLabel}</span>
       </section>
 
       <section className="quick-tuner-stage" aria-label="Live tuner">
@@ -283,6 +296,9 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
               micStreamRef={streamRef}
               liveMicOnly
               tunerInstrument={settings.tunerInstrument}
+              tunerTransposition={settings.tunerTransposition}
+              onTunerTranspositionChange={updateTransposition}
+              hapticsEnabled={settings.hapticFeedback}
             />
             {isNativeIOS && monitorAttemptComplete && !monitorReady ? (
               <button

@@ -146,6 +146,8 @@ class SharedMetronomeEngine {
   private readonly useNativeAudio = isNativeIosMetronome()
   private playbackWatchCtx: AudioContext | null = null
   private onPlaybackStateChange: (() => void) | null = null
+  private webAudioResumeCtx: AudioContext | null = null
+  private webAudioResumeInFlight: Promise<void> | null = null
   /**
    * Exact time of the first click scheduled by the most recent start(), on both
    * the Web Audio clock (for slaving media playback) and performance.now()
@@ -489,7 +491,7 @@ class SharedMetronomeEngine {
 
     const onStateChange = () => {
       if (ctx.state !== 'running' && this.snapshot.playing) {
-        void ctx.resume().catch(() => {})
+        this.requestWebAudioResume(ctx)
         return
       }
       if (ctx.state === 'running' && this.resumeOnForeground) {
@@ -500,6 +502,21 @@ class SharedMetronomeEngine {
     this.playbackWatchCtx = ctx
     this.onPlaybackStateChange = onStateChange
     ctx.addEventListener('statechange', onStateChange)
+  }
+
+  /** Avoid piling up WebKit resume promises while an interrupted context is stalled. */
+  private requestWebAudioResume(ctx: AudioContext): void {
+    if (ctx.state === 'running' || ctx.state === 'closed') return
+    if (this.webAudioResumeCtx === ctx && this.webAudioResumeInFlight) return
+
+    this.webAudioResumeCtx = ctx
+    const resumePromise = ctx.resume().catch(() => {})
+    this.webAudioResumeInFlight = resumePromise
+    void resumePromise.finally(() => {
+      if (this.webAudioResumeCtx !== ctx) return
+      this.webAudioResumeCtx = null
+      this.webAudioResumeInFlight = null
+    })
   }
 
   private reconcileAfterInterrupt(): void {
@@ -968,7 +985,7 @@ class SharedMetronomeEngine {
       }
 
       if (activeCtx.state !== 'running') {
-        void activeCtx.resume().catch(() => {})
+        this.requestWebAudioResume(activeCtx)
         this.schedulerTimer = window.setTimeout(tick, LOOKAHEAD_MS)
         return
       }
@@ -981,6 +998,21 @@ class SharedMetronomeEngine {
       const outputNode = this.ensureMasterGain(activeCtx)
       const muted = this.shouldMuteOutput()
       const sound = this.snapshot.soundId
+
+      // A throttled tab or interrupted Web Audio context can leave the next
+      // scheduled tick far behind the audio clock. Catching up one tick at a
+      // time would create every missed oscillator at once and can exhaust
+      // WebKit after a long interruption. Advance the musical phase directly
+      // to the first current tick instead.
+      if (this.nextBeatTime < activeCtx.currentTime - SCHEDULE_AHEAD_SEC) {
+        const skippedTicks = Math.max(
+          1,
+          Math.floor((activeCtx.currentTime - this.nextBeatTime) / secondsPerTick) + 1,
+        )
+        this.nextBeatTime += skippedTicks * secondsPerTick
+        this.tickCounter += skippedTicks
+        this.debugLog(`scheduler skipped ${skippedTicks} stale ticks`)
+      }
 
       while (this.nextBeatTime < activeCtx.currentTime + SCHEDULE_AHEAD_SEC) {
         const tickInBar = this.tickCounter % barTicks

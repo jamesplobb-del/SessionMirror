@@ -1470,6 +1470,80 @@ button.compact-take-caption:active {
   transform: scale(1.018);
 }
 
+.compact-take-slot--transfer-ready {
+  filter: saturate(1.06) brightness(1.035);
+}
+
+.compact-take-transfer-target {
+  position: absolute;
+  inset: 0.34rem;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+  pointer-events: none;
+  border: 0.75px solid rgba(255, 255, 255, 0.22);
+  border-radius: calc(clamp(0.78rem, 3vw, 0.98rem) - 0.24rem);
+  background: rgba(8, 12, 18, 0.72);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 0.42rem 1rem rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-size: clamp(0.52rem, 2.25vw, 0.66rem);
+  font-weight: 680;
+  letter-spacing: 0.015em;
+  opacity: 0.9;
+  transform: scale(0.965);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+  -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+
+.compact-take-transfer-target svg {
+  width: 0.82rem;
+  height: 0.82rem;
+  stroke-width: 2;
+}
+
+.compact-take-transfer-target--best {
+  border-color: rgba(247, 174, 28, 0.42);
+  color: #ffc654;
+}
+
+.compact-take-transfer-target--current {
+  border-color: rgba(37, 164, 241, 0.42);
+  color: #69c5ff;
+}
+
+.compact-take-transfer-target--active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.compact-take-transfer-target--best.compact-take-transfer-target--active {
+  border-color: rgba(255, 195, 65, 0.82);
+  background: rgba(54, 38, 8, 0.82);
+  box-shadow:
+    0 0.48rem 1.1rem rgba(0, 0, 0, 0.28),
+    0 0 0 0.1rem rgba(247, 174, 28, 0.18),
+    inset 0 1px 0 rgba(255, 226, 157, 0.15);
+}
+
+.compact-take-transfer-target--current.compact-take-transfer-target--active {
+  border-color: rgba(88, 190, 255, 0.82);
+  background: rgba(8, 35, 55, 0.82);
+  box-shadow:
+    0 0.48rem 1.1rem rgba(0, 0, 0, 0.28),
+    0 0 0 0.1rem rgba(37, 164, 241, 0.18),
+    inset 0 1px 0 rgba(151, 216, 255, 0.15);
+}
+
 .compact-take-slot--best.compact-take-slot--drop-active {
   box-shadow:
     0 0.55rem 1.35rem rgba(0, 0, 0, 0.2),

@@ -113,6 +113,7 @@ import {
   reResolveCachedTakeThumbnail,
 } from './utils/takeThumbnailCache'
 import {
+  clearProjectBestTake,
   createProject,
   DEFAULT_PROJECT_NAME,
   deleteProject,
@@ -3680,14 +3681,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [projects, activeProjectId]
   )
 
+  const clearBenchmarkTake = useCallback(
+    (takeId: string) => {
+      audioModePlaybackControlsRef.pause?.()
+      teardownPipMedia(benchmarkPipVideoRef.current)
+      void releaseTakePlaybackAudio()
+      stabilizeViewportAfterMediaInteraction()
+      setBenchmarkPipPlaying(false)
+      setBenchmarkBinding((current) =>
+        current?.source === 'take' && current.refId === takeId ? null : current,
+      )
+      setBenchmarkId((current) => (current === takeId ? null : current))
+      if (activeProjectIdRef.current) {
+        void clearProjectBestTake(activeProjectIdRef.current, takeId)
+      }
+    },
+    [teardownPipMedia],
+  )
+
   const handleUnpinBenchmark = useCallback(() => {
-    audioModePlaybackControlsRef.pause?.()
-    teardownPipMedia(benchmarkPipVideoRef.current)
-    void releaseTakePlaybackAudio()
-    stabilizeViewportAfterMediaInteraction()
-    setBenchmarkPipPlaying(false)
-    setBenchmarkId(null)
-  }, [teardownPipMedia])
+    if (!benchmarkTake?.id) return
+    clearBenchmarkTake(benchmarkTake.id)
+  }, [benchmarkTake?.id, clearBenchmarkTake])
+
+  const handleMoveBenchmarkToCurrent = useCallback(
+    (takeId: string) => {
+      handlePinChallenger(takeId)
+      clearBenchmarkTake(takeId)
+    },
+    [clearBenchmarkTake, handlePinChallenger],
+  )
 
   const handleUnpinChallenger = useCallback(() => {
     audioModePlaybackControlsRef.pause?.()
@@ -4164,6 +4187,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           layoutRegion="main"
                           liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
                           tunerInstrument={settings.tunerInstrument}
+                          tunerTransposition={settings.tunerTransposition}
                           onClose={handleClosePitch}
                         />
                       )}
@@ -4222,6 +4246,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             layoutRegion="main"
                             positionId="main-pitch-video"
                             tunerInstrument={settings.tunerInstrument}
+                            tunerTransposition={settings.tunerTransposition}
                             onClose={handleClosePitch}
                           />
                         </div>
@@ -4335,6 +4360,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           permissionRequestInFlight={cameraPermissionRequestInFlight}
                           isRecording={isRecording}
                           tunerInstrument={settings.tunerInstrument}
+                          tunerTransposition={settings.tunerTransposition}
+                          onTunerTranspositionChange={(tunerTransposition) =>
+                            updateSettings({ tunerTransposition })
+                          }
                           liveMicTunerEnabled={settings.liveMicTunerEnabled}
                           droneVolume={settings.droneVolume}
                           droneWaveform={settings.droneWaveform}
@@ -4429,7 +4458,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           youtubeIframeRef={youtubeIframeRef}
                           deleteDropRef={recordDeleteDropRef}
                           onPinBenchmark={handlePinBenchmark}
-                          onPinChallenger={handlePinChallenger}
+                          onMoveBenchmarkToCurrent={handleMoveBenchmarkToCurrent}
                           onDeleteTake={handleDragDeleteTake}
                           onDragStateChange={handlePipDragStateChange}
                           hapticFeedback={settings.hapticFeedback}
@@ -4505,7 +4534,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             challengerPipVideoRef={challengerPipVideoRef}
                             deleteDropRef={recordDeleteDropRef}
                             onPinBenchmark={handlePinBenchmark}
-                            onPinChallenger={handlePinChallenger}
+                            onMoveBenchmarkToCurrent={handleMoveBenchmarkToCurrent}
                             onDeleteTake={handleDragDeleteTake}
                             onUnpinBenchmark={handleUnpinBenchmark}
                             onClearLibraryReference={handleClearLibraryReference}
@@ -4652,6 +4681,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         challengerRecordingOrientation={challengerTake?.recordingOrientation}
                         liveMicTunerEnabled={settings.liveMicTunerEnabled}
                         tunerInstrument={settings.tunerInstrument}
+                        tunerTransposition={settings.tunerTransposition}
                         micStreamRef={streamRef}
                         isOpen
                         onClose={handleCloseReview}
@@ -4747,6 +4777,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     streamRef={streamRef}
                     streamGeneration={streamGeneration}
                     tunerInstrument={settings.tunerInstrument}
+                    hapticFeedback={settings.hapticFeedback}
                     onClose={handleCloseLabs}
                     onNavigate={handleLabsNavigate}
                     onRequestMicStream={handleRequestLabsMicStream}

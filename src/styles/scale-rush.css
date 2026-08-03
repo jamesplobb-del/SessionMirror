@@ -1007,3 +1007,322 @@
     height: 100%;
   }
 }
+
+.sr-setup-summary {
+  margin: 1.1rem 0 0.8rem;
+  color: #667085;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.sr-player-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sr-player-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.48rem;
+}
+
+.sr-player-option {
+  display: grid;
+  min-width: 0;
+  min-height: 5.4rem;
+  place-items: center;
+  gap: 0.25rem;
+  padding: 0.42rem 0.25rem 0.52rem;
+  border: 1px solid rgba(23, 32, 51, 0.09);
+  border-radius: 0.9rem;
+  color: #667085;
+  background: #f7f9fc;
+  font-size: 0.66rem;
+  font-weight: 700;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.sr-player-option--selected {
+  border-color: #f1a51e;
+  color: #8b5707;
+  background: #fff9eb;
+  box-shadow: inset 0 0 0 1px rgba(241, 165, 30, 0.16);
+}
+
+.sr-player-option__preview {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: end center;
+}
+
+.sr-player-option__preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* ── Practice Arcade HUD refresh ───────────────────────────── */
+
+.sr-hud-top {
+  align-items: center;
+  padding:
+    max(0.7rem, env(safe-area-inset-top, 0px))
+    max(0.72rem, env(safe-area-inset-right, 0px))
+    0
+    max(0.72rem, env(safe-area-inset-left, 0px));
+}
+
+.sr-hud-statusbar {
+  display: flex;
+  min-height: 2.7rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.38rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 1rem;
+  background: rgba(13, 24, 36, 0.75);
+  box-shadow: 0 8px 22px rgba(5, 14, 24, 0.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.sr-hud-statusbar .sr-hud-hearts {
+  gap: 0.12rem;
+}
+
+.sr-hud-statusbar .sr-hud-heart {
+  font-size: 1.05rem;
+}
+
+.sr-hud-statusbar__rule {
+  width: 1px;
+  height: 1.45rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.sr-hud-mini-stat {
+  display: grid;
+  gap: 0.02rem;
+}
+
+.sr-hud-mini-stat small {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.5rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sr-hud-mini-stat strong {
+  color: #fff;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sr-hud-pause {
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 1rem;
+  background: rgba(13, 24, 36, 0.75);
+  border-color: rgba(255, 255, 255, 0.17);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.sr-hud-pause svg {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2.7;
+}
+
+.sr-combo-chip {
+  position: absolute;
+  top: max(4.15rem, calc(env(safe-area-inset-top, 0px) + 3.5rem));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.38rem 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #fff4d0;
+  background: rgba(129, 70, 5, 0.72);
+  box-shadow: 0 6px 18px rgba(71, 36, 0, 0.22);
+  font-size: 0.67rem;
+  font-weight: 800;
+  transform: translateX(-50%);
+  animation: sr-combo-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.sr-combo-chip svg {
+  width: 0.86rem;
+  height: 0.86rem;
+  fill: #ffbf3f;
+  color: #ffbf3f;
+}
+
+@keyframes sr-combo-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-5px) scale(0.94); }
+}
+
+.sr-target-dock {
+  position: absolute;
+  left: max(0.7rem, env(safe-area-inset-left, 0px));
+  right: max(0.7rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  max-width: 25rem;
+  margin: 0 auto;
+  overflow: hidden;
+  padding: 0.65rem 0.72rem 0.52rem;
+  border: 1px solid rgba(255, 255, 255, 0.19);
+  border-radius: 1.25rem;
+  color: #fff;
+  background: rgba(13, 24, 36, 0.81);
+  box-shadow: 0 14px 32px rgba(5, 14, 24, 0.32);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+}
+
+.sr-target-dock__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.5rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sr-target-dock__notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.3rem;
+}
+
+.sr-target-note,
+.sr-detected-note {
+  display: grid;
+  min-width: 0;
+}
+
+.sr-detected-note {
+  text-align: right;
+}
+
+.sr-target-note small,
+.sr-detected-note small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.5rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sr-target-note strong,
+.sr-detected-note strong {
+  margin-top: 0.04rem;
+  overflow: hidden;
+  color: #ffe36f;
+  font-size: clamp(1.55rem, 7vw, 2rem);
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: ellipsis;
+}
+
+.sr-detected-note strong {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sr-detected-note--match strong {
+  color: #5bea9f;
+  text-shadow: 0 0 16px rgba(91, 234, 159, 0.38);
+}
+
+.sr-detected-note sup {
+  margin-left: 0.08rem;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.55);
+  vertical-align: super;
+}
+
+.sr-target-dock__hint {
+  margin: 0.26rem 0 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.58rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+.sr-target-dock__hint--match {
+  color: #7ef0b6;
+}
+
+.sr-turn-timer {
+  height: 0.18rem;
+  margin-top: 0.42rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sr-turn-timer span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5bea9f, #ffe36f 68%, #ff8d69);
+  transform-origin: left;
+  transform: scaleX(var(--sr-turn-fraction, 1));
+  animation: sr-turn-countdown var(--sr-turn-remaining, 12s) linear forwards;
+}
+
+@keyframes sr-turn-countdown {
+  to { transform: scaleX(0); }
+}
+
+@keyframes sr-world-feedback-reduced {
+  0%, 99% { opacity: 1; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+@media (max-height: 610px) {
+  .sr-target-dock {
+    padding-top: 0.5rem;
+  }
+
+  .sr-target-note strong,
+  .sr-detected-note strong {
+    font-size: 1.4rem;
+  }
+
+  .sr-target-dock__hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sr-combo-chip {
+    animation: none;
+  }
+
+  .sr-turn-timer span {
+    animation: sr-turn-countdown var(--sr-turn-remaining, 12s) steps(12, end) forwards;
+  }
+
+  .sr-world__feedback {
+    animation: sr-world-feedback-reduced 0.85s step-end forwards;
+  }
+}

@@ -10,7 +10,7 @@ export function createScaleRushPhaserGame(parent: HTMLElement): Phaser.Game {
     parent,
     width,
     height,
-    backgroundColor: '#2d8a3e',
+    backgroundColor: '#091522',
     audio: {
       noAudio: true,
     },
@@ -27,8 +27,8 @@ export function createScaleRushPhaserGame(parent: HTMLElement): Phaser.Game {
     },
     render: {
       antialias: true,
-      pixelArt: true,
-      roundPixels: true,
+      pixelArt: false,
+      roundPixels: false,
     },
   })
 }

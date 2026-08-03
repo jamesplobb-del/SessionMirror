@@ -730,7 +730,7 @@ function BestTakeBox({
                     role="button"
                     tabIndex={0}
                     className="pip-drag-layer absolute inset-0 z-[1] cursor-grab touch-none select-none border-0 bg-transparent p-0 active:cursor-grabbing"
-                    aria-label="Hold then drag Best Take to Current Take, or tap to open full screen"
+                    aria-label="Drag Best Take to Current Take, or tap to open full screen"
                     {...dragSourceProps}
                   />
                 ) : (
@@ -753,9 +753,9 @@ function BestTakeBox({
                     intensity="icon"
                     squish={false}
                     haptic="light"
-                    onPointerDown={stopEventBubble}
-                    onTouchStart={stopEventBubble}
-                    onTouchEnd={stopEventBubble}
+                    onPointerDown={compact ? undefined : stopEventBubble}
+                    onTouchStart={compact ? undefined : stopEventBubble}
+                    onTouchEnd={compact ? undefined : stopEventBubble}
                     onClick={handlePlayPauseClick}
                     className={pipPlayButtonClass}
                     aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}

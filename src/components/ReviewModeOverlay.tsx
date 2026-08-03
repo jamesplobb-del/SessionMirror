@@ -22,6 +22,7 @@ import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
 import type { MediaType, ReviewContext, ReviewSlot, Take, TakeUpdate } from '../types'
 import type { TunerInstrument } from '../utils/pitchConfig'
+import type { TunerTranspositionId } from '../utils/tunerTransposition'
 import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/useLivePitchTracker'
 import { finalizeInlineTakeBoxPlaybackCleanup } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
@@ -196,6 +197,7 @@ interface ReviewModeOverlayProps {
   challengerRecordingOrientation?: Take['recordingOrientation']
   liveMicTunerEnabled?: boolean
   tunerInstrument?: TunerInstrument
+  tunerTransposition?: TunerTranspositionId
   micStreamRef?: RefObject<MediaStream | null>
   isOpen: boolean
   onClose: () => void
@@ -230,6 +232,7 @@ export default function ReviewModeOverlay({
   challengerRecordingOrientation,
   liveMicTunerEnabled = true,
   tunerInstrument = 'voice',
+  tunerTransposition,
   micStreamRef,
   isOpen,
   onClose,
@@ -1470,6 +1473,7 @@ export default function ReviewModeOverlay({
                 liveMicEnabled={liveMicTunerEnabled}
                 micStreamRef={micStreamRef}
                 tunerInstrument={tunerInstrument}
+                tunerTransposition={tunerTransposition}
                 layoutRegion="review"
                 onClose={() => setShowPitch(false)}
               />

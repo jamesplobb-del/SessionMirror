@@ -1,55 +1,101 @@
+import {
+  ChevronRight,
+  X,
+} from 'lucide-react'
+import { loadBestScore as loadScaleRushBestScore } from '../../labs/scaleRush/scaleRushMusicLogic'
+import { loadBestScore as loadStaffJumperBestScore } from '../../labs/staffJumper/staffJumperMusicLogic'
 import Pressable from '../ui/Pressable'
 
 interface LabsMenuProps {
+  hapticFeedback: boolean
   onOpenScaleRush: () => void
   onOpenStaffJumper: () => void
   onBack: () => void
 }
 
-export default function LabsMenu({ onOpenScaleRush, onOpenStaffJumper, onBack }: LabsMenuProps) {
+export default function LabsMenu({
+  hapticFeedback,
+  onOpenScaleRush,
+  onOpenStaffJumper,
+  onBack,
+}: LabsMenuProps) {
+  const scaleRushBest = loadScaleRushBestScore()
+  const staffJumperBest = loadStaffJumperBestScore()
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-6 py-8">
-      <header className="mb-10">
+    <div className="arcade-menu flex min-h-0 flex-1 flex-col">
+      <div className="arcade-menu__topbar">
+        <div className="arcade-wordmark">
+          <span>
+            <strong>Practice Games</strong>
+            <span>BestTake</span>
+          </span>
+        </div>
         <Pressable
           type="button"
-          intensity="soft"
+          intensity="icon"
+          hapticFeedback={hapticFeedback}
           onClick={onBack}
-          className="mb-6 text-sm font-medium text-stone-500"
+          className="arcade-icon-button"
+          aria-label="Close Practice Arcade"
         >
-          ← Back
+          <X aria-hidden />
         </Pressable>
-        <h1 className="text-2xl font-semibold text-stone-900">BestTake Labs</h1>
-        <p className="mt-2 text-sm text-stone-500">Experimental prototypes. Not for production use.</p>
+      </div>
+
+      <header className="arcade-menu__hero">
+        <h1>Choose a game</h1>
+        <p>Play using your instrument and microphone.</p>
       </header>
 
-      <ul className="space-y-3">
+      <ul className="arcade-game-list">
         <li>
           <Pressable
             type="button"
-            intensity="soft"
+            intensity="normal"
+            hapticFeedback={hapticFeedback}
             onClick={onOpenScaleRush}
-            className="flex w-full items-center justify-between rounded-2xl border border-stone-200 bg-white px-5 py-4 text-left"
+            className="arcade-game-card arcade-game-card--rush"
+            aria-label={`Play Scale Rush. Personal best ${scaleRushBest}`}
           >
-            <span className="text-base font-semibold text-stone-900">Scale Rush</span>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-              Beta
+            <span className="arcade-game-card__copy">
+              <h3>Scale Rush</h3>
+              <p>Scale patterns</p>
+              <span className="arcade-game-card__meta">
+                Best {scaleRushBest || '—'}
+              </span>
+            </span>
+            <span className="arcade-game-card__arrow" aria-hidden>
+              <ChevronRight />
             </span>
           </Pressable>
         </li>
         <li>
           <Pressable
             type="button"
-            intensity="soft"
+            intensity="normal"
+            hapticFeedback={hapticFeedback}
             onClick={onOpenStaffJumper}
-            className="flex w-full items-center justify-between rounded-2xl border border-stone-200 bg-white px-5 py-4 text-left"
+            className="arcade-game-card arcade-game-card--staff"
+            aria-label={`Play Staff Jumper. Personal best ${staffJumperBest}`}
           >
-            <span className="text-base font-semibold text-stone-900">Staff Jumper</span>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-              Beta
+            <span className="arcade-game-card__copy">
+              <h3>Staff Jumper</h3>
+              <p>Staff reading</p>
+              <span className="arcade-game-card__meta">
+                Best {staffJumperBest || '—'}
+              </span>
+            </span>
+            <span className="arcade-game-card__arrow" aria-hidden>
+              <ChevronRight />
             </span>
           </Pressable>
         </li>
       </ul>
+
+      <p className="arcade-menu__footer-note">
+        Microphone access is required.
+      </p>
     </div>
   )
 }

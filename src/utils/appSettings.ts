@@ -1,4 +1,9 @@
 import type { TunerInstrument } from './pitchConfig'
+import {
+  DEFAULT_TUNER_TRANSPOSITION,
+  isTunerTranspositionId,
+  type TunerTranspositionId,
+} from './tunerTransposition'
 import type { DroneWaveform } from './droneEngine'
 import {
   DEFAULT_AUDIO_ENHANCER_SETTINGS,
@@ -30,6 +35,8 @@ export interface AppSettings {
   liveMicTunerEnabled: boolean
   /** Pitch detection profile — voice, strings, or winds. */
   tunerInstrument: TunerInstrument
+  /** Written-note display for concert and transposing instruments. */
+  tunerTransposition: TunerTranspositionId
   /** Reference drone output level (0–100). */
   droneVolume: number
   /** Reference drone waveform timbre. */
@@ -67,6 +74,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   pitchTrackerEnabled: false,
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
+  tunerTransposition: DEFAULT_TUNER_TRANSPOSITION,
   droneVolume: 75,
   droneWaveform: 'warmSynth',
   showTakeCards: true,
@@ -100,6 +108,10 @@ function parseTunerInstrument(value: unknown): TunerInstrument {
     return value
   }
   return DEFAULT_APP_SETTINGS.tunerInstrument
+}
+
+function parseTunerTransposition(value: unknown): TunerTranspositionId {
+  return isTunerTranspositionId(value) ? value : DEFAULT_TUNER_TRANSPOSITION
 }
 
 function parseMicInputPreference(
@@ -159,6 +171,7 @@ export function loadAppSettings(): AppSettings {
           ? Boolean(parsed.liveMicTunerEnabled)
           : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
       tunerInstrument: parseTunerInstrument(parsed.tunerInstrument),
+      tunerTransposition: parseTunerTransposition(parsed.tunerTransposition),
       droneVolume:
         parsed.droneVolume === undefined || Number(parsed.droneVolume) <= 55
           ? DEFAULT_APP_SETTINGS.droneVolume

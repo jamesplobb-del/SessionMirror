@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   memo,
@@ -11,7 +12,7 @@ import {
   type RefObject,
 } from 'react'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { Columns2, Pin, RotateCcw, X } from 'lucide-react'
+import { ArrowLeftRight, Columns2, Pin, RotateCcw, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
@@ -48,7 +49,7 @@ export interface PipCompareRowProps {
   challengerPipVideoRef: RefObject<HTMLMediaElement | null>
   deleteDropRef: RefObject<HTMLElement | null>
   onPinBenchmark: (takeId: string) => void
-  onPinChallenger: (takeId: string) => void
+  onMoveBenchmarkToCurrent: (takeId: string) => void
   onDeleteTake: (takeId: string) => void
   onUnpinBenchmark: () => void
   onClearLibraryReference?: () => void
@@ -103,6 +104,7 @@ function CompactTakeCaption({
   dragSourceProps,
   dragSourceActive = false,
   dragSourceArming = false,
+  dataTutorial,
 }: {
   label: string
   tone: 'best' | 'current'
@@ -123,6 +125,7 @@ function CompactTakeCaption({
   }
   dragSourceActive?: boolean
   dragSourceArming?: boolean
+  dataTutorial?: string
 }) {
   const formattedDuration = formatCompactDuration(duration)
   const formattedTimestamp = formatCompactTimestamp(timestamp)
@@ -155,7 +158,8 @@ function CompactTakeCaption({
         role="button"
         tabIndex={0}
         className={captionClassName}
-        aria-label={`Drag ${label} to the other box, or tap to open full screen`}
+        data-tutorial={dataTutorial}
+        aria-label={`Drag ${label} directly to the other card, or tap to open full screen. Long press the card to reposition it.`}
         onKeyDown={handleKeyDown}
         {...dragSourceProps}
       >
@@ -172,6 +176,7 @@ function CompactTakeCaption({
       haptic="light"
       hapticFeedback={hapticFeedback}
       className={captionClassName}
+      data-tutorial={dataTutorial}
       onClick={onOpen}
       aria-label={`Open ${label} full screen`}
     >
@@ -184,11 +189,14 @@ function CompactTakeCaption({
 
 const TAKE_CARD_MOVE_HOLD_MS = 425
 const TAKE_CARD_MOVE_CANCEL_PX = 12
+const TAKE_CARD_BOUNDARY_INSET = 8
+const TAKE_CARD_DRAG_COMPLETION_PX = 3
 
 function MovableTakeSlot({
   movable,
   editing,
   onEnterEditing,
+  onLayoutDragCompleted,
   resetNonce,
   wiggleDirection,
   positionId,
@@ -202,6 +210,7 @@ function MovableTakeSlot({
   movable: boolean
   editing: boolean
   onEnterEditing: () => void
+  onLayoutDragCompleted: () => void
   resetNonce: number
   wiggleDirection: -1 | 1
   positionId: string
@@ -213,6 +222,7 @@ function MovableTakeSlot({
   children: ReactNode
 }) {
   const dragControls = useDragControls()
+  const slotNodeRef = useRef<HTMLDivElement | null>(null)
   const savedPosition = useRef(loadPersistentWidgetPosition(positionId))
   const dragX = useMotionValue(savedPosition.current?.x ?? 0)
   const dragY = useMotionValue(savedPosition.current?.y ?? 0)
@@ -226,10 +236,87 @@ function MovableTakeSlot({
   const holdTimerRef = useRef<number | null>(null)
   const draggingRef = useRef(false)
   const enteringEditingRef = useRef(false)
+  const dragTravelRef = useRef(0)
   const suppressClickRef = useRef(false)
   const suppressReleaseTimerRef = useRef<number | null>(null)
   const [armed, setArmed] = useState(false)
   const [dragging, setDragging] = useState(false)
+
+  const clampPositionToBoundary = useCallback(() => {
+    if (!movable || editing || draggingRef.current) return
+    const node = slotNodeRef.current
+    const boundary = boundaryRef.current
+    if (!node || !boundary) return
+
+    const currentX = dragX.get()
+    const currentY = dragY.get()
+    const rect = node.getBoundingClientRect()
+    const bounds = boundary.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0 || bounds.width <= 0 || bounds.height <= 0) {
+      return
+    }
+
+    const baseLeft = rect.left - currentX
+    const baseRight = rect.right - currentX
+    const baseTop = rect.top - currentY
+    const baseBottom = rect.bottom - currentY
+    const minX = bounds.left + TAKE_CARD_BOUNDARY_INSET - baseLeft
+    const maxX = bounds.right - TAKE_CARD_BOUNDARY_INSET - baseRight
+    const minY = bounds.top + TAKE_CARD_BOUNDARY_INSET - baseTop
+    const maxY = bounds.bottom - TAKE_CARD_BOUNDARY_INSET - baseBottom
+    const clampAxis = (value: number, min: number, max: number) =>
+      min <= max
+        ? Math.min(max, Math.max(min, value))
+        : (min + max) / 2
+    const nextX = clampAxis(currentX, minX, maxX)
+    const nextY = clampAxis(currentY, minY, maxY)
+    if (Math.abs(nextX - currentX) < 0.5 && Math.abs(nextY - currentY) < 0.5) {
+      return
+    }
+
+    dragX.set(nextX)
+    dragY.set(nextY)
+    savePersistentWidgetPosition(positionId, nextX, nextY)
+  }, [boundaryRef, dragX, dragY, editing, movable, positionId])
+
+  useLayoutEffect(() => {
+    clampPositionToBoundary()
+  }, [clampPositionToBoundary])
+
+  useEffect(() => {
+    const node = slotNodeRef.current
+    const boundary = boundaryRef.current
+    let frame: number | null = null
+    const scheduleClamp = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        frame = null
+        clampPositionToBoundary()
+      })
+    }
+    const visualViewport = window.visualViewport
+
+    window.addEventListener('resize', scheduleClamp)
+    window.addEventListener('orientationchange', scheduleClamp)
+    visualViewport?.addEventListener('resize', scheduleClamp)
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleClamp)
+    if (node) observer?.observe(node)
+    if (boundary) observer?.observe(boundary)
+    scheduleClamp()
+    // The camera row enters with a short y-axis animation. Re-clamp once its
+    // parent transform has settled so a restored edge position stays reachable.
+    const settledClampTimer = window.setTimeout(scheduleClamp, 360)
+
+    return () => {
+      window.removeEventListener('resize', scheduleClamp)
+      window.removeEventListener('orientationchange', scheduleClamp)
+      visualViewport?.removeEventListener('resize', scheduleClamp)
+      observer?.disconnect()
+      window.clearTimeout(settledClampTimer)
+      if (frame !== null) window.cancelAnimationFrame(frame)
+    }
+  }, [boundaryRef, clampPositionToBoundary])
 
   useEffect(() => {
     if (handledResetNonceRef.current === resetNonce) return
@@ -358,6 +445,7 @@ function MovableTakeSlot({
 
   const handleDragStart = useCallback(() => {
     draggingRef.current = true
+    dragTravelRef.current = 0
     suppressClickRef.current = true
     setDragging(true)
     if (editing && hapticFeedback && !enteringEditingRef.current) {
@@ -367,16 +455,20 @@ function MovableTakeSlot({
   }, [editing, hapticFeedback])
 
   const handleDragEnd = useCallback(() => {
+    const completedLayoutDrag = dragTravelRef.current >= TAKE_CARD_DRAG_COMPLETION_PX
     savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
     draggingRef.current = false
     pressRef.current = null
     setDragging(false)
     setArmed(false)
     releaseClickSuppressionSoon()
-  }, [dragX, dragY, positionId, releaseClickSuppressionSoon])
+    dragTravelRef.current = 0
+    if (completedLayoutDrag) onLayoutDragCompleted()
+  }, [dragX, dragY, onLayoutDragCompleted, positionId, releaseClickSuppressionSoon])
 
   const assignDropRef = useCallback(
     (node: HTMLDivElement | null) => {
+      slotNodeRef.current = node
       dropRef.current = node
     },
     [dropRef],
@@ -398,13 +490,19 @@ function MovableTakeSlot({
       dragListener={false}
       dragControls={dragControls}
       dragConstraints={boundaryRef}
-      dragElastic={0.045}
+      dragElastic={0}
       dragMomentum={false}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={(event) => finishPress(event.pointerId)}
       onPointerCancel={(event) => finishPress(event.pointerId)}
       onDragStart={handleDragStart}
+      onDrag={(_event, info) => {
+        dragTravelRef.current = Math.max(
+          dragTravelRef.current,
+          Math.hypot(info.offset.x, info.offset.y),
+        )
+      }}
       onDragEnd={handleDragEnd}
       onClickCapture={(event) => {
         if (!suppressClickRef.current) return
@@ -541,7 +639,7 @@ function TakeCardLayoutToolbar({
     >
       <span className="take-card-layout-toolbar__copy">
         <strong>Arrange Take Cards</strong>
-        <small>Tap outside to finish</small>
+        <small>Layout only · tap outside to finish</small>
       </span>
       <Pressable
         type="button"
@@ -565,14 +663,18 @@ export function PipDragGhost({
   take,
   x,
   y,
+  overPin,
   overDelete,
-  actionLabel = 'Pin',
+  actionLabel = 'Move',
+  actionTone = 'best',
 }: {
   take: Take
   x: number
   y: number
+  overPin: boolean
   overDelete: boolean
   actionLabel?: string
+  actionTone?: 'best' | 'current'
 }) {
   const poster =
     take.thumbnailUrl ||
@@ -590,10 +692,14 @@ export function PipDragGhost({
       aria-hidden
     >
       <motion.div
-        className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-xl border-[0.5px] border-white/10 bg-black shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
+        className={`pip-drag-ghost-inner ui-orient-spin overflow-hidden rounded-xl border-[0.5px] bg-black shadow-[0_8px_32px_rgba(0,0,0,0.55)] ring-2 ${
           overDelete
             ? 'border-red-400/70 ring-red-400/50'
-            : 'border-cyan-400/60 ring-cyan-400/40'
+            : overPin && actionTone === 'best'
+              ? 'border-amber-300/80 ring-amber-300/55'
+              : overPin
+                ? 'border-sky-300/80 ring-sky-300/55'
+                : 'border-white/20 ring-white/20'
         }`}
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: overDelete ? 1.05 : 1 }}
@@ -611,10 +717,14 @@ export function PipDragGhost({
         )}
         <span
           className={`absolute bottom-1 left-1 rounded px-1 py-px text-[7px] font-semibold uppercase tracking-wide text-white ${
-            overDelete ? 'bg-red-500/90' : 'bg-sky-500/90'
+            overDelete
+              ? 'bg-red-500/90'
+              : overPin && actionTone === 'best'
+                ? 'bg-amber-500/95'
+                : 'bg-sky-500/90'
           }`}
         >
-          {overDelete ? 'Delete' : actionLabel}
+          {overDelete ? 'Delete' : overPin ? `Release · ${actionLabel}` : actionLabel}
         </span>
       </motion.div>
     </div>
@@ -633,7 +743,7 @@ export default memo(function PipCompareRow({
   challengerPipVideoRef,
   deleteDropRef,
   onPinBenchmark,
-  onPinChallenger,
+  onMoveBenchmarkToCurrent,
   onDeleteTake,
   onUnpinBenchmark,
   onClearLibraryReference,
@@ -658,10 +768,14 @@ export default memo(function PipCompareRow({
   const notifyTutorial = useTutorialAction()
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
   const challengerDropRef = useRef<HTMLDivElement>(null)
+  const cancelTransferDragsRef = useRef<() => void>(() => {})
+  const layoutMovedRef = useRef(false)
   const [layoutEditing, setLayoutEditing] = useState(false)
   const [layoutResetNonce, setLayoutResetNonce] = useState(0)
 
   const enterLayoutEditing = useCallback(() => {
+    cancelTransferDragsRef.current()
+    layoutMovedRef.current = false
     setLayoutEditing(true)
     notifyTutorial?.('take-card-layout-entered')
   }, [notifyTutorial])
@@ -687,8 +801,12 @@ export default memo(function PipCompareRow({
 
       event.preventDefault()
       event.stopPropagation()
+      const completedLayoutDrag = layoutMovedRef.current
+      layoutMovedRef.current = false
       setLayoutEditing(false)
-      notifyTutorial?.('take-card-layout-finished')
+      if (completedLayoutDrag) {
+        notifyTutorial?.('take-card-layout-finished')
+      }
       if (hapticFeedback) triggerLightHaptic()
     }
 
@@ -703,21 +821,65 @@ export default memo(function PipCompareRow({
     setLayoutResetNonce((nonce) => nonce + 1)
   }, [])
 
+  const transferCurrentToBest = useCallback(
+    (takeId: string) => {
+      onPinBenchmark(takeId)
+      notifyTutorial?.('take-card-transfer-completed')
+    },
+    [notifyTutorial, onPinBenchmark],
+  )
+
+  const transferBestToCurrent = useCallback(
+    (takeId: string) => {
+      // When both slots are occupied, promoting Current through the normal Best
+      // handler performs a true swap: the old Best becomes Current. Copying the
+      // Best id into Current would leave two identical cards.
+      if (challengerTake?.id && challengerTake.id !== takeId) {
+        onPinBenchmark(challengerTake.id)
+      } else {
+        onMoveBenchmarkToCurrent(takeId)
+      }
+      notifyTutorial?.('take-card-transfer-completed')
+    },
+    [
+      challengerTake?.id,
+      notifyTutorial,
+      onMoveBenchmarkToCurrent,
+      onPinBenchmark,
+    ],
+  )
+
+  const markLayoutDragCompleted = useCallback(() => {
+    layoutMovedRef.current = true
+  }, [])
+
+  const benchmarkAcceptsTakeTransfer = !libraryBenchmarkPlayback && !youtubeEmbedUrl
+  const benchmarkTransferIsSwap = Boolean(
+    challengerTake?.id && challengerTake.id !== benchmarkTake?.id,
+  )
+  const benchmarkTransferLabel = benchmarkTransferIsSwap ? 'Swap Takes' : 'Move to Current'
+  const challengerTransferEnabled =
+    !layoutEditing &&
+    benchmarkAcceptsTakeTransfer &&
+    takeHasPlaybackMedia(challengerTake)
+
   const {
     ghost: challengerGhost,
     isDragging: challengerDragging,
     isArming: challengerArming,
     dragSourceProps: challengerDragSourceProps,
+    cancelDrag: cancelChallengerDrag,
   } = useDragToPin({
     sourceTakeId: challengerTake?.id ?? null,
     dropTargetRef: benchmarkDropRef,
     deleteDropTargetRef: deleteDropRef,
-    onPin: onPinBenchmark,
+    onPin: transferCurrentToBest,
     onDelete: onDeleteTake,
     onTap: onExpandChallenger,
     onDragStateChange,
-    enabled: !compact && takeHasPlaybackMedia(challengerTake),
-    activationMode: 'hold',
+    enabled: challengerTransferEnabled,
+    activationMode: compact ? 'move' : 'hold',
+    dragThresholdPx: compact ? 16 : undefined,
     hapticFeedback,
   })
 
@@ -726,20 +888,27 @@ export default memo(function PipCompareRow({
     isDragging: benchmarkDragging,
     isArming: benchmarkArming,
     dragSourceProps: benchmarkDragSourceProps,
+    cancelDrag: cancelBenchmarkDrag,
   } = useDragToPin({
     sourceTakeId: libraryBenchmarkPlayback || youtubeEmbedUrl ? null : benchmarkTake?.id ?? null,
     dropTargetRef: challengerDropRef,
-    onPin: onPinChallenger,
+    onPin: transferBestToCurrent,
     onTap: onExpandBenchmark,
-    onDragStateChange,
     enabled:
-      !compact &&
+      !layoutEditing &&
       takeHasPlaybackMedia(benchmarkTake) &&
       !libraryBenchmarkPlayback &&
       !youtubeEmbedUrl,
-    activationMode: 'hold',
+    activationMode: compact ? 'move' : 'hold',
+    dragThresholdPx: compact ? 16 : undefined,
+    commitHaptic: !challengerTake,
     hapticFeedback,
   })
+
+  cancelTransferDragsRef.current = () => {
+    cancelChallengerDrag()
+    cancelBenchmarkDrag()
+  }
 
   const compactBenchmarkHasMedia = Boolean(
     youtubeEmbedUrl || libraryBenchmarkPlayback || takeHasPlaybackMedia(benchmarkTake),
@@ -767,6 +936,7 @@ export default memo(function PipCompareRow({
           movable={compact}
           editing={layoutEditing}
           onEnterEditing={enterLayoutEditing}
+          onLayoutDragCompleted={markLayoutDragCompleted}
           resetNonce={layoutResetNonce}
           wiggleDirection={-1}
           positionId="camera-best-take-card"
@@ -775,6 +945,10 @@ export default memo(function PipCompareRow({
           hapticFeedback={hapticFeedback}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--best' : ''
+          } ${
+            compact && challengerDragging && !challengerGhost?.overDelete
+              ? 'compact-take-slot--transfer-ready'
+              : ''
           } ${
             compact && challengerGhost?.overPin ? 'compact-take-slot--drop-active' : ''
           }`}
@@ -805,10 +979,9 @@ export default memo(function PipCompareRow({
             dragSourceActive={benchmarkDragging}
             dragSourceArming={benchmarkArming}
             dragSourceProps={
+              benchmarkAcceptsTakeTransfer &&
               !compact &&
-              takeHasPlaybackMedia(benchmarkTake) &&
-              !libraryBenchmarkPlayback &&
-              !youtubeEmbedUrl
+              takeHasPlaybackMedia(benchmarkTake)
                 ? benchmarkDragSourceProps
                 : undefined
             }
@@ -832,6 +1005,15 @@ export default memo(function PipCompareRow({
               library={Boolean(libraryBenchmarkPlayback)}
               onOpen={onExpandBenchmark}
               hapticFeedback={hapticFeedback}
+              dragSourceProps={
+                benchmarkAcceptsTakeTransfer &&
+                !layoutEditing &&
+                takeHasPlaybackMedia(benchmarkTake)
+                  ? benchmarkDragSourceProps
+                  : undefined
+              }
+              dragSourceActive={benchmarkDragging}
+              dragSourceArming={benchmarkArming}
             />
           )}
           {compact && compactBenchmarkHasMedia && (
@@ -841,12 +1023,26 @@ export default memo(function PipCompareRow({
               hapticFeedback={hapticFeedback}
             />
           )}
+          {compact && challengerDragging && !challengerGhost?.overDelete && (
+            <span
+              className={`compact-take-transfer-target compact-take-transfer-target--best ${
+                challengerGhost?.overPin
+                  ? 'compact-take-transfer-target--active'
+                  : ''
+              }`}
+              aria-hidden
+            >
+              <Pin />
+              <span>{challengerGhost?.overPin ? 'Release for Best' : 'Make Best'}</span>
+            </span>
+          )}
         </MovableTakeSlot>
 
         <MovableTakeSlot
           movable={compact}
           editing={layoutEditing}
           onEnterEditing={enterLayoutEditing}
+          onLayoutDragCompleted={markLayoutDragCompleted}
           resetNonce={layoutResetNonce}
           wiggleDirection={1}
           positionId="camera-current-take-card"
@@ -855,6 +1051,8 @@ export default memo(function PipCompareRow({
           hapticFeedback={hapticFeedback}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--current' : ''
+          } ${
+            compact && benchmarkDragging ? 'compact-take-slot--transfer-ready' : ''
           } ${
             compactCurrentShowPin ? 'compact-take-slot--has-pin' : ''
           } ${
@@ -884,7 +1082,7 @@ export default memo(function PipCompareRow({
           dragSourceActive={challengerDragging}
           dragSourceArming={challengerArming}
           dragSourceProps={
-            !compact && takeHasPlaybackMedia(challengerTake)
+            !compact && challengerTransferEnabled
               ? challengerDragSourceProps
               : undefined
           }
@@ -909,6 +1107,14 @@ export default memo(function PipCompareRow({
               hasMedia={compactCurrentHasMedia}
               onOpen={onExpandChallenger}
               hapticFeedback={hapticFeedback}
+              dragSourceProps={
+                challengerTransferEnabled && compactCurrentHasMedia
+                  ? challengerDragSourceProps
+                  : undefined
+              }
+              dragSourceActive={challengerDragging}
+              dragSourceArming={challengerArming}
+              dataTutorial="drag-current-to-best"
             />
           )}
           {compact && compactCurrentHasMedia && (
@@ -923,6 +1129,25 @@ export default memo(function PipCompareRow({
               onPin={onPinCurrentAsBest}
               hapticFeedback={hapticFeedback}
             />
+          )}
+          {compact && benchmarkDragging && (
+            <span
+              className={`compact-take-transfer-target compact-take-transfer-target--current ${
+                benchmarkGhost?.overPin
+                  ? 'compact-take-transfer-target--active'
+                  : ''
+              }`}
+              aria-hidden
+            >
+              <ArrowLeftRight />
+              <span>
+                {benchmarkGhost?.overPin
+                  ? benchmarkTransferIsSwap
+                    ? 'Release to Swap'
+                    : 'Release for Current'
+                  : benchmarkTransferLabel}
+              </span>
+            </span>
           )}
         </MovableTakeSlot>
       </div>
@@ -951,7 +1176,10 @@ export default memo(function PipCompareRow({
           take={challengerTake}
           x={challengerGhost.x}
           y={challengerGhost.y}
+          overPin={challengerGhost.overPin}
           overDelete={challengerGhost.overDelete}
+          actionLabel="Make Best"
+          actionTone="best"
         />
       )}
 
@@ -960,8 +1188,10 @@ export default memo(function PipCompareRow({
           take={benchmarkTake}
           x={benchmarkGhost.x}
           y={benchmarkGhost.y}
+          overPin={benchmarkGhost.overPin}
           overDelete={benchmarkGhost.overDelete}
-          actionLabel="Current"
+          actionLabel={benchmarkTransferLabel}
+          actionTone="current"
         />
       )}
     </>

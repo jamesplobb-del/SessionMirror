@@ -1,10 +1,12 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import {
-  getStaffPositionForMidi,
+  getStaffPositionForNote,
   NOTE_SPACING_PX,
   STAFF_FIRST_NOTE_X,
+  STAFF_NOTE_LETTERS,
   TREBLE_NOTE_YPX,
+  type StaffNoteLetter,
 } from './staffNotationMap'
 
 export const STAFF_JUMPER_MAJOR_KEYS = [
@@ -68,9 +70,15 @@ export const DIFFICULTY_LABELS: Record<StaffJumperDifficulty, string> = {
 }
 
 export const DIFFICULTY_DESCRIPTIONS: Record<StaffJumperDifficulty, string> = {
-  easy: 'Letter names shown on noteheads',
-  medium: 'No letter names — read the staff',
-  hard: 'Key signatures and accidentals',
+  easy: 'Note names are shown.',
+  medium: 'Read directly from the staff.',
+  hard: 'Key signatures and tighter tuning.',
+}
+
+export const DIFFICULTY_TIMEOUT_SECONDS: Record<StaffJumperDifficulty, number> = {
+  easy: 15,
+  medium: 12,
+  hard: 9,
 }
 
 const KEY_TO_PITCH_CLASS: Record<string, number> = {
@@ -99,9 +107,9 @@ const SHARP_LABELS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#'
 const MAJOR_PATTERN = [0, 2, 4, 5, 7, 9, 11] as const
 const MINOR_PATTERN = [0, 2, 3, 5, 7, 8, 10] as const
 
-export type StaffJumperPhase = 'setup' | 'playing' | 'gameover'
+export type StaffJumperPhase = 'setup' | 'playing' | 'paused' | 'gameover'
 
-export type StaffJumperFeedback = 'good' | 'wrong' | 'timeout' | null
+export type StaffJumperFeedback = 'perfect' | 'good' | 'wrong' | 'timeout' | null
 
 export interface StaffJumperConfig {
   key: StaffJumperKey
@@ -129,6 +137,9 @@ export interface StaffJumperState {
   feedbackToken: number
   isFalling: boolean
   startedAtMs: number | null
+  endedAtMs: number | null
+  pausedAtMs: number | null
+  pausedDurationMs: number
 }
 
 export interface TargetNote {
@@ -138,6 +149,9 @@ export interface TargetNote {
   noteLabel: string
   yPx: number
   kind: 'ledger' | 'space' | 'line'
+  ledgerLineYPx: number[]
+  writtenLetter: StaffNoteLetter
+  writtenOctave: number
   accidental: '#' | 'b' | null
   showLabel: boolean
 }
@@ -151,7 +165,7 @@ export interface KeySignatureMarker {
 const SHARP_SIG_YPX = [
   TREBLE_NOTE_YPX.F5!,
   TREBLE_NOTE_YPX.C5!,
-  TREBLE_NOTE_YPX.G4!,
+  TREBLE_NOTE_YPX.G5!,
   TREBLE_NOTE_YPX.D5!,
   TREBLE_NOTE_YPX.A4!,
   TREBLE_NOTE_YPX.E5!,
@@ -166,7 +180,7 @@ const FLAT_SIG_YPX = [
   TREBLE_NOTE_YPX.D5!,
   TREBLE_NOTE_YPX.G4!,
   TREBLE_NOTE_YPX.C5!,
-  TREBLE_NOTE_YPX.F5!,
+  TREBLE_NOTE_YPX.F4!,
 ] as const
 
 const MAJOR_SHARP_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
@@ -176,7 +190,6 @@ const MAJOR_SHARP_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
   A: 3,
   E: 4,
   B: 5,
-  Gb: 6,
 }
 
 const MAJOR_FLAT_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
@@ -189,8 +202,9 @@ const MAJOR_FLAT_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
   Gb: 6,
 }
 
-const SHARP_PCS = [5, 0, 7, 2, 9, 4, 11] as const
-const FLAT_PCS = [11, 4, 9, 2, 7, 0, 5] as const
+/** Resulting pitch classes after each signature accidental is applied. */
+const SHARP_PCS = [6, 1, 8, 3, 10, 5, 0] as const
+const FLAT_PCS = [10, 3, 8, 1, 6, 11, 4] as const
 
 function signatureMajorKey(key: StaffJumperKey, scaleMode: StaffJumperScaleMode): StaffJumperMajorKey {
   if (scaleMode === 'major') return key as StaffJumperMajorKey
@@ -254,17 +268,17 @@ export function getKeySignatureMarkers(
 
 function accidentalForNote(
   pitchClass: number,
+  writtenAccidental: '#' | 'b' | null,
   key: StaffJumperKey,
   scaleMode: StaffJumperScaleMode,
   difficulty: StaffJumperDifficulty,
 ): '#' | 'b' | null {
-  if (difficulty !== 'hard') return null
+  if (writtenAccidental == null) return null
   const normalized = ((pitchClass % 12) + 12) % 12
-  if (keySignaturePitchClasses(key, scaleMode).has(normalized)) return null
-  const label = pitchClassLabel(pitchClass, key)
-  if (label.includes('#')) return '#'
-  if (label.includes('b')) return 'b'
-  return null
+  if (difficulty === 'hard' && keySignaturePitchClasses(key, scaleMode).has(normalized)) {
+    return null
+  }
+  return writtenAccidental
 }
 
 export function showNoteLabels(difficulty: StaffJumperDifficulty): boolean {
@@ -293,6 +307,46 @@ function keyPitchClass(key: StaffJumperKey): number {
 
 function scalePattern(scaleMode: StaffJumperScaleMode): readonly number[] {
   return scaleMode === 'major' ? MAJOR_PATTERN : MINOR_PATTERN
+}
+
+const NATURAL_PITCH_CLASS: Record<StaffNoteLetter, number> = {
+  C: 0,
+  D: 2,
+  E: 4,
+  F: 5,
+  G: 7,
+  A: 9,
+  B: 11,
+}
+
+interface WrittenScaleNote {
+  letter: StaffNoteLetter
+  octave: number
+  accidental: '#' | 'b' | null
+  label: string
+}
+
+function writtenScaleNote(
+  key: StaffJumperKey,
+  pitchClass: number,
+  degreeIndex: number,
+  rootOctave = 4,
+): WrittenScaleNote {
+  const rootLetter = key[0] as StaffNoteLetter
+  const rootLetterIndex = STAFF_NOTE_LETTERS.indexOf(rootLetter)
+  const absoluteLetterIndex = rootLetterIndex + degreeIndex
+  const letter = STAFF_NOTE_LETTERS[((absoluteLetterIndex % 7) + 7) % 7]!
+  const octave = rootOctave + Math.floor(absoluteLetterIndex / 7)
+  const naturalPitchClass = NATURAL_PITCH_CLASS[letter]
+  const accidentalOffset = ((pitchClass - naturalPitchClass) % 12 + 12) % 12
+  const accidental = accidentalOffset === 1 ? '#' : accidentalOffset === 11 ? 'b' : null
+
+  return {
+    letter,
+    octave,
+    accidental,
+    label: `${letter}${accidental ?? ''}`,
+  }
 }
 
 export function pitchClassLabel(pitchClass: number, key: StaffJumperKey): string {
@@ -328,6 +382,11 @@ function midiAtStep(config: StaffJumperConfig, sequenceStep: number): number {
   return sequence[sequenceStep % sequence.length]!
 }
 
+function degreeAtStep(config: StaffJumperConfig, sequenceStep: number): number {
+  const sequenceLength = buildScaleMidiSequence(config).length
+  return sequenceStep % sequenceLength
+}
+
 /**
  * Single source of truth for the note sequence.
  * HUD target, platform label, staff Y, and pitch check all derive from here.
@@ -335,15 +394,26 @@ function midiAtStep(config: StaffJumperConfig, sequenceStep: number): number {
 export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: number): TargetNote {
   const midi = midiAtStep(config, sequenceStep)
   const pitchClass = ((midi % 12) + 12) % 12
-  const staff = getStaffPositionForMidi(midi)
+  const degreeIndex = degreeAtStep(config, sequenceStep)
+  const written = writtenScaleNote(config.key, pitchClass, degreeIndex)
+  const staff = getStaffPositionForNote(written.letter, written.octave)
   return {
     sequenceIndex: sequenceStep,
     midi,
     pitchClass,
-    noteLabel: pitchClassLabel(pitchClass, config.key),
+    noteLabel: written.label,
     yPx: staff.yPx,
     kind: staff.kind,
-    accidental: accidentalForNote(pitchClass, config.key, config.scaleMode, config.difficulty),
+    ledgerLineYPx: staff.ledgerLineYPx,
+    writtenLetter: written.letter,
+    writtenOctave: written.octave,
+    accidental: accidentalForNote(
+      pitchClass,
+      written.accidental,
+      config.key,
+      config.scaleMode,
+      config.difficulty,
+    ),
     showLabel: showNoteLabels(config.difficulty),
   }
 }
@@ -408,13 +478,22 @@ export function getDetectedPitchClass(readout: PitchReadout): number | null {
   return readoutToConcertPitchClass(readout)
 }
 
-export function isReadoutCorrectPitch(readout: PitchReadout, targetPitchClass: number): boolean {
+export function isReadoutCorrectPitch(
+  readout: PitchReadout,
+  targetPitchClass: number,
+  config: Pick<StaffJumperConfig, 'difficulty'>,
+): boolean {
   const detected = getDetectedPitchClass(readout)
   if (detected == null) return false
-  return pitchClassesMatch(detected, targetPitchClass)
+  if (!pitchClassesMatch(detected, targetPitchClass)) return false
+  return config.difficulty !== 'hard' || Math.abs(readout.cents) <= 20
 }
 
-export function isReadoutWrongPitch(readout: PitchReadout, targetPitchClass: number): boolean {
+export function isReadoutWrongPitch(
+  readout: PitchReadout,
+  targetPitchClass: number,
+  _config: Pick<StaffJumperConfig, 'difficulty'>,
+): boolean {
   const detected = getDetectedPitchClass(readout)
   if (detected == null) return false
   return !pitchClassesMatch(detected, targetPitchClass)

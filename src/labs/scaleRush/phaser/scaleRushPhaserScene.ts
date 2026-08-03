@@ -1,61 +1,45 @@
 import Phaser from 'phaser'
-import { SCALE_RUSH_ASSETS } from '../scaleRushAssets'
 import { buildCourseRows, type CourseRow } from '../scaleRushMusicLogic'
+import { getScaleRushPlayerModel, SCALE_RUSH_PLAYER_MODELS } from '../scaleRushPlayerModels'
 import type { ScaleRushFeedback } from '../scaleRushTypes'
 import { scaleRushPhaserBridgeRef } from './scaleRushPhaserBridge'
 
 const SCENE_KEY = 'ScaleRushWorld'
-/** Upcoming note rows only — player row is separate. */
 const VISIBLE_AHEAD = 5
 
-/** Visual lane order — does not affect note logic. */
-const LANE_PATTERN = ['grass', 'road', 'grass', 'river', 'grass', 'tracks', 'grass'] as const
-type LaneVisual = (typeof LANE_PATTERN)[number]
-
-const LANE_FILL: Record<LaneVisual, number> = {
-  grass: 0x3d9a4a,
-  road: 0x5c5752,
-  river: 0x2f7fbf,
-  tracks: 0x78716c,
-}
-
 const FEEDBACK_LABELS = {
-  perfect: '★ Perfect!',
-  good: 'Good!',
-  wrong: 'Wrong note',
-  timeout: '⚠ Too late',
+  perfect: 'Perfect',
+  good: 'Good',
+  wrong: 'Try the next note',
+  timeout: 'Time up',
 } as const
 
-function laneVisualForRow(row: CourseRow): LaneVisual {
-  return LANE_PATTERN[row.rowOffset % LANE_PATTERN.length]!
+type PadVariant = 'ahead' | 'target' | 'landed' | 'start'
+
+interface CourseLayout {
+  width: number
+  height: number
+  stepY: number
+  padW: number
+  padH: number
+  characterH: number
+  playerY: number
+  sideOffset: number
 }
 
-type TileVariant = 'ahead' | 'target' | 'landed' | 'start'
-
-/** Isometric grass-block layout (sprite origin 0.5, 1 at dirt base). */
-const PATH_BLOCK_TOP_FACE_Y = 0.52
-const PATH_BLOCK_LABEL_Y = 0.63
-const PATH_BLOCK_GLOW_Y = 0.61
-
-interface LaneLayout {
-  laneH: number
-  pathBlockSize: number
-  charH: number
-  playerAnchorY: number
-  laneW: number
-  pathCorridorW: number
+function positiveModulo(value: number, divisor: number): number {
+  return ((value % divisor) + divisor) % divisor
 }
 
 export class ScaleRushPhaserScene extends Phaser.Scene {
-  private worldRoot!: Phaser.GameObjects.Container
-  private pathCorridorGfx!: Phaser.GameObjects.Graphics
-  private lanesRoot!: Phaser.GameObjects.Container
-  private playerLaneRoot!: Phaser.GameObjects.Container
-  private playerObjectsRoot!: Phaser.GameObjects.Container
+  private backgroundGfx!: Phaser.GameObjects.Graphics
+  private trailGfx!: Phaser.GameObjects.Graphics
+  private padsRoot!: Phaser.GameObjects.Container
+  private playerRoot!: Phaser.GameObjects.Container
   private playerSprite!: Phaser.GameObjects.Image
   private playerShadow!: Phaser.GameObjects.Ellipse
   private feedbackText!: Phaser.GameObjects.Text
-  private skyGfx!: Phaser.GameObjects.Graphics
+  private layout!: CourseLayout
 
   private lastAdvanceToken = 0
   private lastMissToken = 0
@@ -63,55 +47,41 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
   private lastSequenceStep = -1
   private isHopping = false
   private idleTween: Phaser.Tweens.Tween | null = null
-  private layout!: LaneLayout
+
   constructor() {
     super(SCENE_KEY)
   }
 
   preload() {
-    this.load.image('sr-grass-lane', SCALE_RUSH_ASSETS.grassLane)
-    this.load.image('sr-grass-path', SCALE_RUSH_ASSETS.grassPath)
-    this.load.image('sr-water-lane', SCALE_RUSH_ASSETS.waterLane)
-    this.load.image('sr-road-lane', SCALE_RUSH_ASSETS.roadLane)
-    this.load.image('sr-log', SCALE_RUSH_ASSETS.log)
-    this.load.image('sr-rock', SCALE_RUSH_ASSETS.rock)
-    this.load.image('sr-crate', SCALE_RUSH_ASSETS.crate)
-    this.load.image('sr-player', SCALE_RUSH_ASSETS.trumpetPlayer)
+    SCALE_RUSH_PLAYER_MODELS.forEach((model) => {
+      this.load.image(`sr-player-${model.id}`, model.asset)
+    })
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#2a7d3c')
+    this.cameras.main.setBackgroundColor('#091522')
 
-    this.skyGfx = this.add.graphics().setDepth(0).setScrollFactor(0)
-
-    this.worldRoot = this.add.container(0, 0).setDepth(10)
-    this.pathCorridorGfx = this.add.graphics()
-    this.lanesRoot = this.add.container(0, 0)
-    this.playerLaneRoot = this.add.container(0, 0)
-    this.playerObjectsRoot = this.add.container(0, 0)
-    this.worldRoot.add([
-      this.pathCorridorGfx,
-      this.lanesRoot,
-      this.playerLaneRoot,
-      this.playerObjectsRoot,
-    ])
-
-    this.playerShadow = this.add.ellipse(0, 0, 40, 10, 0x000000, 0.32).setDepth(20)
-    this.playerSprite = this.add.image(0, 0, 'sr-player').setOrigin(0.5, 1).setDepth(21)
-    this.playerObjectsRoot.add([this.playerShadow, this.playerSprite])
+    this.backgroundGfx = this.add.graphics().setDepth(0)
+    this.trailGfx = this.add.graphics().setDepth(5)
+    this.padsRoot = this.add.container(0, 0).setDepth(10)
+    this.playerRoot = this.add.container(0, 0).setDepth(30)
+    this.playerShadow = this.add.ellipse(0, 0, 44, 11, 0x020817, 0.4)
+    this.playerSprite = this.add
+      .image(0, 0, 'sr-player-trumpeter')
+      .setOrigin(0.5, 1)
+    this.playerRoot.add([this.playerShadow, this.playerSprite])
 
     this.feedbackText = this.add
       .text(0, 0, '', {
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: '14px',
-        fontStyle: 'bold',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+        fontSize: '13px',
+        fontStyle: '600',
         color: '#ffffff',
-        backgroundColor: '#16a34a',
-        padding: { x: 12, y: 6 },
+        backgroundColor: '#178C5B',
+        padding: { x: 13, y: 7 },
       })
       .setOrigin(0.5)
       .setDepth(100)
-      .setScrollFactor(0)
       .setVisible(false)
 
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this)
@@ -124,63 +94,89 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
   }
 
   private onResize() {
-    const w = this.scale.width
-    const h = this.scale.height
-    const laneH = Phaser.Math.Clamp(Math.round(h * 0.108), 52, 76)
-    const pathBlockSize = Math.round(laneH * 0.86)
-    const charH = Phaser.Math.Clamp(Math.round(h * 0.126), 56, 92)
-    const playerAnchorY = Math.round(h * 0.76)
-    const laneW = w + 52
-    const pathCorridorW = pathBlockSize * 1.22
+    const width = this.scale.width
+    const height = this.scale.height
+    const shortViewport = height < 650
+    const stepY = Phaser.Math.Clamp(Math.round(height * (shortViewport ? 0.09 : 0.085)), 52, 70)
+    const padW = Phaser.Math.Clamp(Math.round(width * 0.25), 78, 108)
+    const padH = Math.round(padW * 0.44)
 
     this.layout = {
-      laneH,
-      pathBlockSize,
-      charH,
-      playerAnchorY,
-      laneW,
-      pathCorridorW,
+      width,
+      height,
+      stepY,
+      padW,
+      padH,
+      characterH: Phaser.Math.Clamp(Math.round(height * 0.09), 54, 76),
+      playerY: Math.round(height * (shortViewport ? 0.65 : 0.67)),
+      sideOffset: Phaser.Math.Clamp(Math.round(width * 0.17), 48, 74),
     }
 
-    this.skyGfx.clear()
-    this.skyGfx.fillStyle(0x9fe8ff, 1)
-    this.skyGfx.fillRect(0, 0, w, Math.max(6, h * 0.03))
-
-    this.feedbackText.setPosition(w * 0.5, h * 0.1)
-
-    this.worldRoot.setPosition(w * 0.5, 0)
-    this.worldRoot.setScale(1)
-
-    this.cameras.main.stopFollow()
-    this.cameras.main.setZoom(1)
-    this.cameras.main.setScroll(0, 0)
-    this.playerLaneRoot.setPosition(0, playerAnchorY)
-    this.playerObjectsRoot.setPosition(0, playerAnchorY)
-    this.lanesRoot.setPosition(0, playerAnchorY)
-
-    const playerTex = this.textures.exists('sr-player') ? this.textures.get('sr-player') : null
-    const src = playerTex?.getSourceImage() as HTMLImageElement | undefined
-    const aspect = src && src.width > 0 ? src.height / src.width : 1
-    this.playerSprite.setDisplaySize(charH / aspect, charH)
-    this.playerShadow.setSize(charH * 0.5, charH * 0.1)
+    this.drawBackground()
+    this.feedbackText.setPosition(width * 0.5, Math.max(84, height * 0.14))
 
     if (this.lastSequenceStep >= 0) {
-      this.rebuildWorld()
+      this.rebuildCourse()
     }
+  }
+
+  private drawBackground() {
+    const { width, height, playerY, stepY } = this.layout
+    const g = this.backgroundGfx
+    g.clear()
+
+    const bands = [0x081522, 0x0a1b2a, 0x0c2233, 0x10293b, 0x133246, 0x16394c]
+    bands.forEach((color, index) => {
+      const bandH = Math.ceil(height / bands.length)
+      g.fillStyle(color, 1)
+      g.fillRect(0, index * bandH, width, bandH + 1)
+    })
+
+    // A quiet stage keeps the note pads legible without competing scenery.
+    g.fillStyle(0x4cc9f0, 0.035)
+    g.fillTriangle(width * 0.04, height, width * 0.5, 0, width * 0.47, height)
+    g.fillStyle(0x8b5cf6, 0.045)
+    g.fillTriangle(width * 0.96, height, width * 0.54, 0, width * 0.53, height)
+
+    for (let row = -1; row <= VISIBLE_AHEAD + 1; row += 1) {
+      const y = playerY - row * stepY
+      g.lineStyle(1, 255, 0.055)
+      g.lineBetween(width * 0.08, y, width * 0.92, y)
+    }
+
+    const dots = [
+      [0.12, 0.18, 2.2],
+      [0.86, 0.24, 2.8],
+      [0.18, 0.43, 1.8],
+      [0.8, 0.5, 1.8],
+      [0.1, 0.66, 2.4],
+      [0.9, 0.7, 2],
+    ]
+    dots.forEach(([x, y, radius], index) => {
+      g.fillStyle(index % 2 === 0 ? 0x7dd3fc : 0xc4b5fd, 0.25)
+      g.fillCircle(width * x!, height * y!, radius!)
+    })
+  }
+
+  private pathX(sequenceIndex: number): number {
+    const side = positiveModulo(sequenceIndex, 2) === 0 ? 1 : -1
+    return this.layout.width * 0.5 + side * this.layout.sideOffset
   }
 
   private syncFromBridge(force: boolean) {
     const bridge = scaleRushPhaserBridgeRef.current
-    if (!bridge) return
+    if (!bridge || !this.layout) return
 
-    if (force || bridge.sequenceStep !== this.lastSequenceStep) {
+    const oldPlayerX = this.playerRoot.x || this.pathX(bridge.sequenceStep - 1)
+    const sequenceChanged = force || bridge.sequenceStep !== this.lastSequenceStep
+    if (sequenceChanged) {
       this.lastSequenceStep = bridge.sequenceStep
-      this.rebuildWorld()
+      this.rebuildCourse()
     }
 
     if (bridge.advanceToken !== this.lastAdvanceToken) {
       this.lastAdvanceToken = bridge.advanceToken
-      this.playHop()
+      this.playHop(oldPlayerX)
     }
 
     if (bridge.missToken !== this.lastMissToken) {
@@ -194,394 +190,203 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
     }
   }
 
-  private rebuildWorld() {
+  private rebuildCourse() {
     const bridge = scaleRushPhaserBridgeRef.current
     if (!bridge || !this.layout) return
 
-    this.lanesRoot.removeAll(true)
-    this.playerLaneRoot.removeAll(true)
-    this.drawPathCorridor()
-    this.pathCorridorGfx.y = 0
+    this.padsRoot.removeAll(true)
+    this.trailGfx.clear()
 
     const rows = buildCourseRows(bridge.config, bridge.sequenceStep, VISIBLE_AHEAD)
-    const aheadRows = rows.filter((row) => !row.isPlayerRow).reverse()
-    const playerRow = rows.find((row) => row.isPlayerRow)
-    const { laneH } = this.layout
-    const maxDepth = aheadRows.length
+      .sort((a, b) => a.rowOffset - b.rowOffset)
+    const positions = rows.map((row) => ({
+      row,
+      x: this.pathX(row.sequenceIndex),
+      y: this.layout.playerY - row.rowOffset * this.layout.stepY,
+    }))
 
-    aheadRows.forEach((row, index) => {
-      const depth = aheadRows.length - index
-      const y = -depth * laneH
-      this.buildLane(
-        row,
-        y,
-        row.isTarget ? 'target' : 'ahead',
-        depth,
-        maxDepth,
-        this.lanesRoot,
-      )
-    })
+    this.drawTrail(positions)
 
-    if (playerRow) {
-      this.buildLane(
-        playerRow,
-        0,
-        playerRow.isStart ? 'start' : 'landed',
-        0,
-        maxDepth,
-        this.playerLaneRoot,
-      )
+    positions
+      .slice()
+      .reverse()
+      .forEach(({ row, x, y }) => {
+        const variant: PadVariant = row.isPlayerRow
+          ? row.isStart
+            ? 'start'
+            : 'landed'
+          : row.isTarget
+            ? 'target'
+            : 'ahead'
+        this.padsRoot.add(this.buildNotePad(row, variant, x, y))
+      })
 
-      const feetY = -this.layout.pathBlockSize * PATH_BLOCK_TOP_FACE_Y
-      this.playerSprite.setPosition(0, feetY)
-      this.playerShadow.setPosition(2, feetY + 3)
+    const playerRow = positions.find(({ row }) => row.isPlayerRow)
+    if (!playerRow) return
 
-      if (!this.isHopping) {
-        this.startIdleBounce(feetY)
-      }
-    }
+    const model = getScaleRushPlayerModel(bridge.config.playerModel)
+    const textureKey = `sr-player-${model.id}`
+    if (this.textures.exists(textureKey)) this.playerSprite.setTexture(textureKey)
+
+    const source = this.textures.get(textureKey).getSourceImage() as
+      | { width?: number; height?: number }
+      | undefined
+    const aspect = source?.width && source?.height ? source.width / source.height : 1
+    const displayH = this.layout.characterH * model.scale
+    this.playerSprite.setDisplaySize(displayH * aspect, displayH)
+
+    const feetY = -this.layout.padH * 0.18
+    this.playerRoot.setPosition(playerRow.x, playerRow.y)
+    this.playerSprite.setPosition(0, feetY)
+    this.playerShadow
+      .setPosition(0, feetY + 3)
+      .setSize(Math.max(34, displayH * 0.55), Math.max(8, displayH * 0.12))
+
+    if (!this.isHopping) this.startIdleBounce(feetY)
   }
 
-  private drawPathCorridor() {
-    const { laneH, playerAnchorY, pathCorridorW } = this.layout
-    const bridge = scaleRushPhaserBridgeRef.current
-    if (!bridge) return
+  private drawTrail(positions: Array<{ row: CourseRow; x: number; y: number }>) {
+    if (positions.length < 2) return
 
-    const rows = buildCourseRows(bridge.config, bridge.sequenceStep, VISIBLE_AHEAD)
-    const span = (rows.length + 0.5) * laneH
+    const g = this.trailGfx
+    g.lineStyle(9, 0x020817, 0.22)
+    g.beginPath()
+    g.moveTo(positions[0]!.x, positions[0]!.y)
+    positions.slice(1).forEach(({ x, y }) => g.lineTo(x, y))
+    g.strokePath()
 
-    this.pathCorridorGfx.clear()
-    this.pathCorridorGfx.fillStyle(0x2f6b38, 0.55)
-    this.pathCorridorGfx.fillRoundedRect(
-      -pathCorridorW * 0.5,
-      playerAnchorY - span,
-      pathCorridorW,
-      span + laneH * 0.35,
-      10,
-    )
-    this.pathCorridorGfx.lineStyle(2, 0x4ade80, 0.35)
-    this.pathCorridorGfx.strokeRoundedRect(
-      -pathCorridorW * 0.5,
-      playerAnchorY - span,
-      pathCorridorW,
-      span + laneH * 0.35,
-      10,
-    )
+    g.lineStyle(2, 0x8bdcff, 0.35)
+    g.beginPath()
+    g.moveTo(positions[0]!.x, positions[0]!.y)
+    positions.slice(1).forEach(({ x, y }) => g.lineTo(x, y))
+    g.strokePath()
   }
 
-  private buildLane(
-    row: CourseRow,
-    y: number,
-    variant: TileVariant,
-    depth: number,
-    maxDepth: number,
-    parent: Phaser.GameObjects.Container,
-  ) {
-    const { laneH, laneW } = this.layout
-    const visual = laneVisualForRow(row)
-    const lane = this.add.container(0, y)
-    parent.add(lane)
+  private buildNotePad(row: CourseRow, variant: PadVariant, x: number, y: number) {
+    const { padW, padH } = this.layout
+    const container = this.add.container(x, y)
+    const isTarget = variant === 'target'
+    const isLanded = variant === 'landed' || variant === 'start'
+    const depthFade = Phaser.Math.Clamp(1 - row.rowOffset * 0.1, 0.48, 1)
 
-    const depthT = maxDepth > 1 ? (depth - 1) / (maxDepth - 1) : 0
-    const depthScale = Phaser.Math.Linear(0.94, 1, 1 - depthT * 0.06)
-    const depthAlpha = Phaser.Math.Linear(0.42, 1, 1 - depthT * 0.58)
-    lane.setScale(depthScale)
-    lane.setAlpha(depth === 0 ? 1 : depthAlpha)
-
-    this.addLaneBackdrop(lane, visual, laneW, laneH, row.rowOffset)
-
-    if (visual === 'grass' && row.rowOffset % 3 === 1) {
-      this.addGrassDecor(lane, laneH, laneW, row.rowOffset)
-    } else if (visual === 'river' && row.rowOffset % 2 === 0) {
-      this.addRiverLog(lane, laneH, laneW, row.rowOffset)
-    } else if (visual === 'road' && row.rowOffset % 4 === 2) {
-      this.addRoadDecor(lane, laneH, laneW, row.rowOffset)
-    }
-
-    const pathTile = this.buildPathTile(row, variant, depth, maxDepth)
-    lane.add(pathTile)
-  }
-
-  private addLaneBackdrop(
-    lane: Phaser.GameObjects.Container,
-    visual: LaneVisual,
-    laneW: number,
-    laneH: number,
-    rowOffset: number,
-  ) {
-    const fill = LANE_FILL[visual]
-    const g = this.add.graphics()
-    g.fillStyle(fill, 0.92)
-    g.fillRect(-laneW * 0.5, -laneH, laneW, laneH)
-
-    const accentKey =
-      visual === 'grass'
-        ? 'sr-grass-lane'
-        : visual === 'river'
-          ? 'sr-water-lane'
-          : visual === 'road'
-            ? 'sr-road-lane'
-            : null
-
-    if (accentKey) {
-      const stripW = laneW * 0.22
-      const side = rowOffset % 2 === 0 ? -1 : 1
-      const accent = this.add.tileSprite(side * (laneW * 0.39), 0, stripW, laneH, accentKey)
-      accent.setOrigin(0.5, 1)
-      accent.setAlpha(0.22)
-      accent.setTileScale(2.2, 1.4)
-      lane.add(accent)
-    }
-
-    if (visual === 'tracks') {
-      g.fillStyle(0x6b4f2a, 0.5)
-      for (let x = -laneW * 0.5; x < laneW * 0.5; x += 28) {
-        g.fillRect(x, -laneH, 9, laneH)
-      }
-    }
-
-    lane.add(g)
-  }
-
-  private addGrassDecor(
-    lane: Phaser.GameObjects.Container,
-    laneH: number,
-    laneW: number,
-    rowOffset: number,
-  ) {
-    const decorH = laneH * 0.28
-    const side = rowOffset % 2 === 0 ? -1 : 1
-    const rock = this.add
-      .image(side * laneW * 0.34, -laneH * 0.42, 'sr-rock')
-      .setOrigin(0.5, 1)
-      .setDisplaySize(decorH, decorH)
-      .setAlpha(0.38)
-    lane.add(rock)
-  }
-
-  private addRiverLog(
-    lane: Phaser.GameObjects.Container,
-    laneH: number,
-    laneW: number,
-    rowOffset: number,
-  ) {
-    const logH = laneH * 0.22
-    const logY = -laneH * 0.4
-    const startX = rowOffset % 2 === 0 ? -laneW * 0.38 : laneW * 0.22
-    const log = this.add
-      .image(startX, logY, 'sr-log')
-      .setOrigin(0.5, 1)
-      .setDisplaySize(logH * 1.5, logH)
-      .setAlpha(0.35)
-    lane.add(log)
-
-    this.tweens.add({
-      targets: log,
-      x: startX + (rowOffset % 2 === 0 ? laneW * 0.35 : -laneW * 0.35),
-      duration: 4200,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Linear',
-    })
-  }
-
-  private addRoadDecor(
-    lane: Phaser.GameObjects.Container,
-    laneH: number,
-    laneW: number,
-    rowOffset: number,
-  ) {
-    const crateH = laneH * 0.26
-    const side = rowOffset % 2 === 0 ? 1 : -1
-    const crate = this.add
-      .image(side * laneW * 0.36, -laneH * 0.38, 'sr-crate')
-      .setOrigin(0.5, 1)
-      .setDisplaySize(crateH, crateH)
-      .setAlpha(0.32)
-    lane.add(crate)
-  }
-
-  private buildPathTile(
-    row: CourseRow,
-    variant: TileVariant,
-    depth: number,
-    maxDepth: number,
-  ) {
-    const { pathBlockSize } = this.layout
-    const isStart = variant === 'start' || row.isStart
-    const isTarget = !isStart && (variant === 'target' || row.isTarget)
-    const isLanded = variant === 'landed'
-    const isAhead = variant === 'ahead'
-
-    const tile = this.add.container(0, 0)
-    const grass = this.add.image(0, 0, 'sr-grass-path')
-    grass.setOrigin(0.5, 1)
-    grass.setDisplaySize(pathBlockSize, pathBlockSize)
-    tile.add(grass)
-
-    const topFaceY = -pathBlockSize * PATH_BLOCK_GLOW_Y
-    const labelY = -pathBlockSize * PATH_BLOCK_LABEL_Y
+    const shadow = this.add.ellipse(2, 5, padW * 0.88, padH * 0.72, 0x020817, 0.32)
+    const pad = this.add.graphics()
 
     if (isTarget) {
-      const glow = this.add.ellipse(
-        0,
-        topFaceY,
-        pathBlockSize * 0.62,
-        pathBlockSize * 0.28,
-        0xfde047,
-        0.3,
-      )
-      tile.addAt(glow, 0)
+      const glow = this.add.ellipse(0, 0, padW * 1.23, padH * 1.65, 0xfacb4b, 0.16)
+      container.add(glow)
       this.tweens.add({
         targets: glow,
-        alpha: { from: 0.2, to: 0.42 },
+        alpha: { from: 0.11, to: 0.28 },
         scaleX: { from: 0.94, to: 1.08 },
         scaleY: { from: 0.94, to: 1.08 },
-        duration: 700,
+        duration: 760,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut',
       })
     }
 
-    const label = isStart ? 'GO' : row.noteLabel
-    const fontSize = Math.max(13, Math.round(pathBlockSize * (isStart ? 0.19 : 0.24)))
+    pad.fillStyle(isTarget ? 0xf9cf58 : isLanded ? 0x27516a : 0x1f4962, depthFade)
+    pad.fillRoundedRect(-padW * 0.5, -padH * 0.5, padW, padH, padH * 0.46)
+    pad.lineStyle(
+      isTarget ? 3 : 1.5,
+      isTarget ? 0xfff1ae : 0x8bdcff,
+      isTarget ? 0.95 : 0.4 * depthFade,
+    )
+    pad.strokeRoundedRect(-padW * 0.5, -padH * 0.5, padW, padH, padH * 0.46)
+
+    const label = row.isStart ? 'START' : row.noteLabel
     const text = this.add
-      .text(0, labelY, label, {
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: `${fontSize}px`,
-        fontStyle: 'bold',
-        color: '#ffffff',
-        stroke: '#14532d',
-        strokeThickness: 4,
+      .text(0, 0, label, {
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+        fontSize: `${Math.round(padH * (row.isStart ? 0.28 : 0.48))}px`,
+        fontStyle: '700',
+        color: isTarget ? '#15283A' : '#F4FAFF',
       })
-      .setOrigin(0.5, 0.5)
-    tile.add(text)
+      .setOrigin(0.5)
+      .setAlpha(depthFade)
+
+    container.add([shadow, pad, text])
 
     if (isTarget) {
-      grass.clearTint()
-      this.tweens.add({
-        targets: [grass, text],
-        alpha: { from: 0.92, to: 1 },
-        duration: 600,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
-      })
-    } else if (isLanded) {
-      grass.setAlpha(0.78)
-      text.setAlpha(0.65)
-    } else if (isAhead && depth > 0) {
-      const depthT = maxDepth > 1 ? (depth - 1) / (maxDepth - 1) : 0
-      const fade = Phaser.Math.Linear(0.88, 0.52, depthT)
-      grass.setAlpha(fade)
-      text.setAlpha(fade * 0.95)
-    } else if (!isStart) {
-      text.setAlpha(0.9)
+      const next = this.add
+        .text(0, -padH * 0.9, 'NEXT', {
+          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+          fontSize: '10px',
+          fontStyle: '700',
+          color: '#F9E8A6',
+          backgroundColor: '#26384B',
+          padding: { x: 7, y: 3 },
+        })
+        .setOrigin(0.5)
+      container.add(next)
     }
 
-    return tile
+    return container
   }
 
   private startIdleBounce(baseY: number) {
     this.stopIdleBounce()
+    this.playerSprite.y = baseY
+    this.playerShadow.y = baseY + 3
     this.idleTween = this.tweens.add({
-      targets: [this.playerSprite, this.playerShadow],
-      y: `-=${Math.max(2, this.layout.charH * 0.035)}`,
-      duration: 720,
+      targets: this.playerSprite,
+      y: baseY - 2.5,
+      duration: 820,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     })
-    this.playerSprite.y = baseY
-    this.playerShadow.y = baseY + 3
   }
 
   private stopIdleBounce() {
-    if (this.idleTween) {
-      this.idleTween.stop()
-      this.idleTween = null
-    }
+    this.idleTween?.stop()
+    this.idleTween = null
   }
 
-  private playHop() {
+  private playHop(fromX: number) {
     if (!this.layout) return
-    const { laneH, playerAnchorY } = this.layout
-    const hopDist = laneH * 0.92
-    const baseSpriteY = this.playerSprite.y
-    const baseShadowY = this.playerShadow.y
-
+    const destinationX = this.playerRoot.x
+    const baseY = this.playerSprite.y
     this.isHopping = true
     this.stopIdleBounce()
+    this.playerRoot.x = fromX
 
-    const lanesBaseY = playerAnchorY
     this.tweens.add({
-      targets: this.lanesRoot,
-      y: lanesBaseY + laneH,
-      duration: 420,
-      ease: 'Cubic.easeOut',
+      targets: this.playerRoot,
+      x: destinationX,
+      duration: 430,
+      ease: 'Sine.easeInOut',
     })
-    this.tweens.add({
-      targets: this.pathCorridorGfx,
-      y: `+=${laneH}`,
-      duration: 420,
-      ease: 'Cubic.easeOut',
-      onComplete: () => {
-        this.lanesRoot.y = lanesBaseY
-        this.pathCorridorGfx.y = 0
-        this.rebuildWorld()
-      },
-    })
-
     this.tweens.add({
       targets: this.playerSprite,
-      y: baseSpriteY - hopDist,
-      duration: 200,
-      ease: 'Quad.easeOut',
+      y: baseY - this.layout.stepY * 0.72,
+      duration: 215,
       yoyo: true,
-      onYoyo: () => {
-        this.tweens.add({
-          targets: this.playerSprite,
-          scaleY: 0.88,
-          scaleX: 1.06,
-          duration: 80,
-          yoyo: true,
-          ease: 'Quad.easeOut',
-        })
-      },
+      ease: 'Quad.easeOut',
       onComplete: () => {
         this.isHopping = false
-        this.playerSprite.y = baseSpriteY
-        this.startIdleBounce(baseSpriteY)
+        this.playerSprite.y = baseY
+        this.startIdleBounce(baseY)
       },
     })
-
     this.tweens.add({
       targets: this.playerShadow,
-      y: baseShadowY - hopDist * 0.45,
-      scaleX: 0.4,
-      alpha: 0.4,
-      duration: 200,
-      ease: 'Quad.easeOut',
+      scaleX: 0.55,
+      alpha: 0.18,
+      duration: 215,
       yoyo: true,
-      onComplete: () => {
-        this.playerShadow.y = baseShadowY
-        this.playerShadow.setScale(1)
-        this.playerShadow.setAlpha(0.32)
-      },
-    })
-
-    this.cameras.main.zoomTo(1.03, 110, 'Sine.easeOut', true, () => {
-      this.cameras.main.zoomTo(1, 170, 'Sine.easeOut')
+      ease: 'Quad.easeOut',
     })
   }
 
   private playMiss() {
-    this.cameras.main.shake(420, 0.005)
+    this.cameras.main.shake(300, 0.004)
     this.tweens.add({
       targets: this.playerSprite,
-      alpha: 0.55,
-      duration: 90,
+      alpha: 0.48,
+      duration: 80,
       yoyo: true,
       repeat: 1,
       onComplete: () => this.playerSprite.setAlpha(1),
@@ -589,43 +394,30 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
   }
 
   private showFeedback(feedback: ScaleRushFeedback) {
-    if (!feedback) {
-      this.feedbackText.setVisible(false)
-      return
-    }
+    if (!feedback) return
 
-    const label = FEEDBACK_LABELS[feedback]
-    const bg =
-      feedback === 'perfect' || feedback === 'good'
-        ? '#16a34a'
-        : feedback === 'timeout'
-          ? '#ea580c'
-          : '#dc2626'
-
-    this.feedbackText.setText(label)
-    this.feedbackText.setBackgroundColor(bg)
-    this.feedbackText.setVisible(true)
-    this.feedbackText.setAlpha(0)
-    this.feedbackText.setScale(0.9)
+    const success = feedback === 'perfect' || feedback === 'good'
+    this.feedbackText
+      .setText(FEEDBACK_LABELS[feedback])
+      .setBackgroundColor(success ? '#178C5B' : feedback === 'timeout' ? '#B05D24' : '#A93E4C')
+      .setVisible(true)
+      .setAlpha(0)
+      .setY(Math.max(84, this.layout.height * 0.14))
 
     this.tweens.killTweensOf(this.feedbackText)
     this.tweens.add({
       targets: this.feedbackText,
       alpha: 1,
-      scale: 1.04,
-      duration: 160,
-      ease: 'Back.easeOut',
+      y: `+=4`,
+      duration: 140,
+      ease: 'Sine.easeOut',
       onComplete: () => {
         this.tweens.add({
           targets: this.feedbackText,
           alpha: 0,
-          y: `-=12`,
-          delay: 520,
-          duration: 280,
-          onComplete: () => {
-            this.feedbackText.setVisible(false)
-            this.feedbackText.y = this.scale.height * 0.1
-          },
+          delay: 500,
+          duration: 240,
+          onComplete: () => this.feedbackText.setVisible(false),
         })
       },
     })
@@ -633,7 +425,6 @@ export class ScaleRushPhaserScene extends Phaser.Scene {
 
   shutdown() {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this)
-    this.cameras.main.stopFollow()
     this.stopIdleBounce()
   }
 }

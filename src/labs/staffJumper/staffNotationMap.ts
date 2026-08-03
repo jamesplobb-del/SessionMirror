@@ -17,11 +17,13 @@ export const STAFF_LINE_GAP = 46
 export const STAFF_HALF_STEP = STAFF_LINE_GAP / 2
 
 /**
- * Y of the TOP staff line (F5) in world pixels.
- * Small value so the canvas does not waste space above the staff.
- * A5 sits STAFF_LINE_GAP above F5, so we need at least that much room.
+ * Y of the top staff line (F5) in world pixels.
+ *
+ * Staff Jumper can generate C4 through B6. B6 needs four ledger lines above
+ * the staff, so the top line deliberately sits far enough down the canvas to
+ * keep that entire written range in bounds.
  */
-export const STAFF_TOP_Y = 72
+export const STAFF_TOP_Y = 250
 
 /** Y of the bottom staff line (E4). */
 export const STAFF_BOTTOM_Y = STAFF_TOP_Y + STAFF_LINE_GAP * 4
@@ -43,10 +45,15 @@ export const STAFF_LINE_Y_LIST = [
   STAFF_LINE_YPX.E4,
 ] as const
 
+/** Visual midpoint of the five-line staff. */
+export const STAFF_MIDDLE_Y = (STAFF_TOP_Y + STAFF_BOTTOM_Y) / 2
+
 export interface StaffVisualPosition {
   noteId: string
   yPx: number
   kind: 'ledger' | 'space' | 'line'
+  /** Every ledger rule needed to read this note, ordered from the staff outward. */
+  ledgerLineYPx: number[]
 }
 
 /**
@@ -78,8 +85,11 @@ export const NOTEHEAD_H = 40
 /** Ledger line extends beyond each side of the notehead. */
 export const LEDGER_LINE_W = NOTEHEAD_W + 14
 
-/** Total canvas height — enough room for A5 above and C4 below with padding. */
-export const STAFF_CANVAS_HEIGHT = STAFF_TOP_Y + STAFF_LINE_GAP * 7
+/**
+ * Vertical world span includes all generated targets and their ledger rules.
+ * The highest possible target is B6 at y=20; the lowest is C4 at y=480.
+ */
+export const STAFF_CANVAS_HEIGHT = STAFF_BOTTOM_Y + STAFF_LINE_GAP * 2
 
 /** First notehead X in the scrolling world. */
 export const STAFF_FIRST_NOTE_X = 168
@@ -91,17 +101,47 @@ export const STAFF_CLEF_X = 8
  * Treble clef glyph size in world px.
  * Spans roughly one staff height plus ledger curl — matches engraved proportions.
  */
-export const TREBLE_CLEF_FONT_SIZE = STAFF_LINE_GAP * 5.75
+export const TREBLE_CLEF_FONT_SIZE = STAFF_LINE_GAP * 4.9
 
 /** Horizontal spacing between noteheads (world px). */
 export const NOTE_SPACING_PX = 100
 
-/** Player is anchored here in screen pixels. */
-export const PLAYER_ANCHOR_X_PX = 120
+/** Player anchor leaves the clef visible and the next target clear on phones. */
+export const PLAYER_ANCHOR_X_PX = 150
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const
-const DIATONIC_FROM_E = [4, 5, 6, 0, 1, 2, 3] as const
-const LINE_NOTE_IDS = new Set(['E4', 'G4', 'B4', 'D5', 'F5'])
+export const STAFF_NOTE_LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
+export type StaffNoteLetter = (typeof STAFF_NOTE_LETTERS)[number]
+
+const E4_DIATONIC_INDEX = 4 * 7 + STAFF_NOTE_LETTERS.indexOf('E')
+
+function diatonicIndex(letter: StaffNoteLetter, octave: number): number {
+  return octave * 7 + STAFF_NOTE_LETTERS.indexOf(letter)
+}
+
+function relativeStepFromE4(letter: StaffNoteLetter, octave: number): number {
+  return diatonicIndex(letter, octave) - E4_DIATONIC_INDEX
+}
+
+function yForRelativeStep(relativeStep: number): number {
+  return STAFF_BOTTOM_Y - relativeStep * STAFF_HALF_STEP
+}
+
+function ledgerLinesForRelativeStep(relativeStep: number): number[] {
+  const ledgerLines: number[] = []
+
+  if (relativeStep < 0) {
+    for (let step = -2; step >= relativeStep; step -= 2) {
+      ledgerLines.push(yForRelativeStep(step))
+    }
+  } else if (relativeStep > 8) {
+    for (let step = 10; step <= relativeStep; step += 2) {
+      ledgerLines.push(yForRelativeStep(step))
+    }
+  }
+
+  return ledgerLines
+}
 
 export function midiToNoteId(midi: number): string {
   const octave = Math.floor(midi / 12) - 1
@@ -109,34 +149,42 @@ export function midiToNoteId(midi: number): string {
   return `${NOTE_NAMES[pc]}${octave}`
 }
 
-function diatonicStepFromE4(midi: number): number {
-  const octave = Math.floor(midi / 12) - 1
-  const pc = ((midi % 12) + 12) % 12
-  const diatonicIndex = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][pc]!
-  return (octave - 4) * 7 + DIATONIC_FROM_E[diatonicIndex]!
-}
-
-function kindForNoteId(noteId: string): StaffVisualPosition['kind'] {
-  if (noteId === 'C4' || noteId === 'A5') return 'ledger'
-  if (LINE_NOTE_IDS.has(noteId)) return 'line'
-  return 'space'
-}
-
 export function getNoteYpxForMidi(midi: number): number {
-  const noteId = midiToNoteId(midi)
-  const mapped = TREBLE_NOTE_YPX[noteId]
-  if (mapped != null) return mapped
-  // Extrapolate: each diatonic step = STAFF_HALF_STEP from E4
-  return STAFF_BOTTOM_Y - diatonicStepFromE4(midi) * STAFF_HALF_STEP
+  const octave = Math.floor(midi / 12) - 1
+  const pitchClass = ((midi % 12) + 12) % 12
+  const letter = NOTE_NAMES[pitchClass]![0] as StaffNoteLetter
+  return getStaffPositionForNote(letter, octave).yPx
 }
 
 export function getStaffPositionForMidi(midi: number): StaffVisualPosition {
-  const noteId = midiToNoteId(midi)
-  const yPx = getNoteYpxForMidi(midi)
+  const octave = Math.floor(midi / 12) - 1
+  const pitchClass = ((midi % 12) + 12) % 12
+  const letter = NOTE_NAMES[pitchClass]![0] as StaffNoteLetter
+  const position = getStaffPositionForNote(letter, octave)
   return {
-    noteId,
-    yPx,
-    kind: kindForNoteId(noteId),
+    ...position,
+    noteId: midiToNoteId(midi),
+  }
+}
+
+/**
+ * Resolve notation from the written letter and octave, not the sounding MIDI
+ * pitch. This is essential for enharmonics: C♭5 belongs on the C5 space even
+ * though it sounds as MIDI B4, while F♯4 remains on the F4 space.
+ */
+export function getStaffPositionForNote(
+  letter: StaffNoteLetter,
+  octave: number,
+): StaffVisualPosition {
+  const relativeStep = relativeStepFromE4(letter, octave)
+  const isLine = relativeStep % 2 === 0
+  const isOutsideStaff = relativeStep < 0 || relativeStep > 8
+
+  return {
+    noteId: `${letter}${octave}`,
+    yPx: yForRelativeStep(relativeStep),
+    kind: isLine ? (isOutsideStaff ? 'ledger' : 'line') : 'space',
+    ledgerLineYPx: ledgerLinesForRelativeStep(relativeStep),
   }
 }
 

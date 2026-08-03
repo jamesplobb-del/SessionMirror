@@ -1,10 +1,12 @@
-import type { RefObject } from 'react'
+import type { CSSProperties, RefObject } from 'react'
 import { Pause } from 'lucide-react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
   computeAccuracy,
+  getDetectedWrittenMidi,
   getDetectedWrittenPitchClass,
   getTargetNoteAtStep,
+  getTranspositionLabel,
   pitchClassLabel,
   pitchClassesMatch,
 } from '../../labs/scaleRush/scaleRushMusicLogic'
@@ -17,6 +19,9 @@ interface ScaleRushGameProps {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
   onPause: () => void
+  hapticFeedback: boolean
+  turnRemainingMs: number
+  turnDurationMs: number
 }
 
 function Hearts({ count, max = 3 }: { count: number; max?: number }) {
@@ -35,19 +40,44 @@ function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   )
 }
 
-export default function ScaleRushGame({ state, readout, onPause }: ScaleRushGameProps) {
+export default function ScaleRushGame({
+  state,
+  readout,
+  onPause,
+  hapticFeedback,
+  turnRemainingMs,
+  turnDurationMs,
+}: ScaleRushGameProps) {
   const config = state.config!
   const target = getTargetNoteAtStep(config, state.sequenceStep)
+  const detectedWrittenMidi = getDetectedWrittenMidi(readout, config)
   const detectedPc = getDetectedWrittenPitchClass(readout, config)
-  const detectedNote =
-    detectedPc != null ? pitchClassLabel(detectedPc, config.key) : '—'
+  const detectedNote = detectedPc != null ? pitchClassLabel(detectedPc, config.key) : '—'
   const detectedOctave =
-    detectedPc != null && Number.isFinite(readout.midi)
-      ? Math.floor(readout.midi / 12) - 1
-      : null
-  const isMatch =
-    detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
+    detectedWrittenMidi != null ? Math.floor(detectedWrittenMidi / 12) - 1 : null
+  const isMatch = detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
+  const cents = Math.round(readout.cents)
+  const hasSignal = detectedPc != null
+  const precisionReady = !config.pitchAccuracyStrict || Math.abs(cents) <= 15
+  const matchLabel = !hasSignal
+    ? 'Play the target note'
+    : isMatch && precisionReady
+      ? 'Hold it steady…'
+      : isMatch
+        ? `${cents > 0 ? '+' : ''}${cents}¢ · center the pitch`
+        : 'Listen, then try the target'
+  const feedbackAnnouncement =
+    state.feedback === 'perfect'
+      ? 'Perfect.'
+      : state.feedback === 'good'
+        ? 'Good.'
+        : state.feedback === 'timeout'
+          ? `Time is up. ${state.hearts} hearts left.`
+          : state.feedback === 'wrong'
+            ? `Wrong note. ${state.hearts} hearts left.`
+            : ''
+  const turnFraction = Math.max(0, Math.min(1, turnRemainingMs / Math.max(1, turnDurationMs)))
 
   return (
     <div className="scale-rush-screen scale-rush-screen--playing">
@@ -63,54 +93,73 @@ export default function ScaleRushGame({ state, readout, onPause }: ScaleRushGame
 
         <div className="sr-hud-overlay">
           <div className="sr-hud-top">
-            <Hearts count={state.hearts} />
+            <div className="sr-hud-statusbar">
+              <Hearts count={state.hearts} />
+              <span className="sr-hud-statusbar__rule" aria-hidden />
+              <span className="sr-hud-mini-stat">
+                <small>Score</small>
+                <strong>{state.score}</strong>
+              </span>
+              <span className="sr-hud-mini-stat">
+                <small>Accuracy</small>
+                <strong>{accuracy}%</strong>
+              </span>
+            </div>
             <Pressable
               type="button"
-              intensity="soft"
+              intensity="icon"
+              hapticFeedback={hapticFeedback}
               onClick={onPause}
               className="sr-hud-pause"
-              aria-label="Pause"
+              aria-label="Pause Scale Rush"
             >
-              <Pause className="h-4 w-4" strokeWidth={3} />
+              <Pause aria-hidden />
             </Pressable>
           </div>
 
-          <div className="sr-hud-side sr-hud-side--left">
-            <div className="sr-hud-panel">
-              <p className="sr-hud-panel__label">Score</p>
-              <p className="sr-hud-panel__value sr-hud-panel__value--score tabular-nums">
-                {state.score}
-              </p>
+          {state.streak >= 3 && (
+            <div className="sr-combo-chip">
+              {state.streak} streak
             </div>
-            <div className="sr-hud-panel">
-              <p className="sr-hud-panel__label">Streak</p>
-              <p className="sr-hud-panel__value sr-hud-panel__value--streak tabular-nums">
-                {state.streak}
-              </p>
-            </div>
-          </div>
+          )}
 
-          <div className="sr-hud-side sr-hud-side--right">
-            <div className="sr-hud-panel sr-hud-panel--target">
-              <p className="sr-hud-panel__label">Target Note</p>
-              <p className="sr-hud-panel__value sr-hud-panel__value--target">
-                {target.noteLabel}
-              </p>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {feedbackAnnouncement} Target {target.noteLabel}.
+          </p>
+
+          <div className="sr-target-dock">
+            <div className="sr-target-dock__meta">
+              <span>{getTranspositionLabel(config.transposition).split(' — ')[0]}</span>
+              <span>{config.pitchAccuracyStrict ? 'Precision ±15¢' : 'Note match'}</span>
             </div>
-            <div className="sr-hud-panel sr-hud-panel--detected">
-              <p className="sr-hud-panel__label">Detected</p>
-              <p className="sr-hud-panel__value sr-hud-panel__value--detected">
-                <span className={isMatch ? 'sr-hud-detected--match' : ''}>{detectedNote}</span>
-                {detectedOctave != null && (
-                  <span className="sr-hud-detected-octave">{detectedOctave}</span>
-                )}
-              </p>
+            <div className="sr-target-dock__notes">
+              <div className="sr-target-note">
+                <small>Target</small>
+                <strong>{target.noteLabel}</strong>
+              </div>
+              <div className={`sr-detected-note ${isMatch ? 'sr-detected-note--match' : ''}`}>
+                <small>Heard</small>
+                <strong>
+                  {detectedNote}
+                  {detectedOctave != null && <sup>{detectedOctave}</sup>}
+                </strong>
+              </div>
             </div>
-            <div className="sr-hud-panel">
-              <p className="sr-hud-panel__label">Accuracy</p>
-              <p className="sr-hud-panel__value sr-hud-panel__value--accuracy tabular-nums">
-                {accuracy}%
-              </p>
+            <p className={`sr-target-dock__hint ${isMatch && precisionReady ? 'sr-target-dock__hint--match' : ''}`}>
+              {matchLabel}
+            </p>
+            <div
+              className="sr-turn-timer"
+              key={`sr-turn-${state.sequenceStep}-${state.missToken}`}
+              style={
+                {
+                  '--sr-turn-remaining': `${turnRemainingMs}ms`,
+                  '--sr-turn-fraction': turnFraction,
+                } as CSSProperties
+              }
+              aria-hidden
+            >
+              <span />
             </div>
           </div>
         </div>

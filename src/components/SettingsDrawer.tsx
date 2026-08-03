@@ -175,6 +175,7 @@ const LEARN_APP_SECTIONS: {
       { id: 'practice-sessions', label: 'Practice Routines' },
       { id: 'metronome', label: 'Metronome' },
       { id: 'tuner-drones', label: 'Tuner & Drones' },
+      { id: 'pitch-insights', label: 'Pitch Insights' },
       { id: 'quick-tools-access', label: 'iPhone Quick Tools' },
     ],
   },

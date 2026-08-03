@@ -10,6 +10,12 @@ import {
 } from 'react'
 import { DRONE_NOTE_STRIP } from '../../utils/droneEngine'
 import { triggerLightHaptic } from '../../utils/haptics'
+import {
+  DEFAULT_TUNER_TRANSPOSITION,
+  getTunerTransposition,
+  getWrittenPitchLabel,
+  type TunerTranspositionId,
+} from '../../utils/tunerTransposition'
 
 const NOTE_COUNT = 12
 const MIN_OCTAVE = 0
@@ -33,17 +39,14 @@ export interface DroneSoundWheelProps {
   onDroneInteraction?: () => void
   onClose?: () => void
   hapticsEnabled?: boolean
+  /** Changes written labels only; all callbacks continue to receive concert pitch. */
+  tunerTransposition?: TunerTranspositionId
 }
 
 interface RibbonPitch {
   absolute: number
   octave: number
   pitchClass: number
-  label: string
-}
-
-function shortNoteLabel(label: string): string {
-  return label.split('/')[0] ?? label
 }
 
 function triadFor(root: number, quality: ChordQuality): number[] {
@@ -67,7 +70,6 @@ function buildRibbonPitches(): RibbonPitch[] {
         absolute: octave * NOTE_COUNT + note.pitchClass,
         octave,
         pitchClass: note.pitchClass,
-        label: shortNoteLabel(note.label),
       })
     }
   }
@@ -87,6 +89,7 @@ function DroneSoundWheel({
   onDroneInteraction,
   onClose,
   hapticsEnabled = true,
+  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
 }: DroneSoundWheelProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const scrollFrameRef = useRef<number | null>(null)
@@ -102,6 +105,23 @@ function DroneSoundWheel({
   const enabled = activeNotes.length > 0
   const majorActive = enabled && sameNotes(activeNotes, triadFor(root, 'major'))
   const minorActive = enabled && sameNotes(activeNotes, triadFor(root, 'minor'))
+  const transposition = getTunerTransposition(tunerTransposition)
+  const writtenRoot = getWrittenPitchLabel(root, octave, tunerTransposition)
+  const concertRoot = getWrittenPitchLabel(
+    root,
+    octave,
+    DEFAULT_TUNER_TRANSPOSITION,
+  )
+  const lowerWrittenRoot = getWrittenPitchLabel(
+    root,
+    Math.max(MIN_OCTAVE, octave - 1),
+    tunerTransposition,
+  )
+  const higherWrittenRoot = getWrittenPitchLabel(
+    root,
+    Math.min(MAX_OCTAVE, octave + 1),
+    tunerTransposition,
+  )
 
   useEffect(() => {
     if (activeNotes.length === 0) return
@@ -231,14 +251,17 @@ function DroneSoundWheel({
   }, [majorActive, minorActive])
 
   return (
-    <section className="harmonic-ribbon pointer-events-auto" aria-label="Drone controls">
+    <section
+      className="harmonic-ribbon pointer-events-auto"
+      aria-label={`Drone controls. Pitches shown as written for ${transposition.label}`}
+    >
       <div className="harmonic-ribbon__viewport-shell">
         <span className="harmonic-ribbon__center-mark" aria-hidden />
         <div
           ref={viewportRef}
           className="harmonic-ribbon__viewport"
           role="group"
-          aria-label="Swipe or tap to choose a drone pitch"
+          aria-label={`Swipe or tap to choose a drone pitch. Written pitch for ${transposition.label}`}
           onScroll={handleScroll}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerEnd}
@@ -250,6 +273,16 @@ function DroneSoundWheel({
               const active = activeNotes.includes(pitch.pitchClass) && pitch.octave === octave
               const isRoot = pitch.pitchClass === root && pitch.octave === octave
               const glissing = pitch.absolute === glissAbsolute
+              const writtenPitch = getWrittenPitchLabel(
+                pitch.pitchClass,
+                pitch.octave,
+                tunerTransposition,
+              )
+              const soundingPitch = getWrittenPitchLabel(
+                pitch.pitchClass,
+                pitch.octave,
+                DEFAULT_TUNER_TRANSPOSITION,
+              )
               return (
                 <button
                   key={pitch.absolute}
@@ -258,11 +291,12 @@ function DroneSoundWheel({
                   className={`harmonic-ribbon__note ${active ? 'harmonic-ribbon__note--active' : ''} ${
                     isRoot ? 'harmonic-ribbon__note--root' : ''
                   } ${glissing ? 'harmonic-ribbon__note--gliss' : ''}`}
-                  aria-label={`${pitch.label}${pitch.octave}${active ? ', active drone note' : ''}`}
+                  aria-label={`Written ${writtenPitch.noteName}; sounds concert ${soundingPitch.noteName}${active ? '; active drone note' : ''}`}
                   aria-pressed={active}
                   onClick={() => handleNoteClick(pitch)}
                 >
-                  <span>{pitch.label}</span>
+                  <span>{writtenPitch.label}</span>
+                  <small>{writtenPitch.octave}</small>
                 </button>
               )
             })}
@@ -274,42 +308,55 @@ function DroneSoundWheel({
         <button
           type="button"
           className={`harmonic-ribbon__power ${enabled ? 'harmonic-ribbon__power--active' : ''}`}
-          aria-label={enabled ? 'Turn drone off' : 'Turn drone on'}
+          aria-label={
+            enabled
+              ? `Turn off drone. Written root ${writtenRoot.noteName}, sounding concert ${concertRoot.noteName}`
+              : `Turn on ${writtenRoot.noteName} drone. Sounds concert ${concertRoot.noteName}`
+          }
           aria-pressed={enabled}
           onClick={toggleDrone}
         >
           <Power aria-hidden />
         </button>
 
-        <div className="harmonic-ribbon__mode" role="group" aria-label="Drone mode">
+        <div
+          className="harmonic-ribbon__mode"
+          role="group"
+          aria-label={`Drone chord mode. Written root ${writtenRoot.noteName}`}
+        >
           {(['major', 'minor'] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               className={activeMode === mode ? 'harmonic-ribbon__mode--active' : ''}
               aria-pressed={activeMode === mode}
+              aria-label={`${writtenRoot.noteName} ${mode} drone chord. Root sounds concert ${concertRoot.noteName}`}
               onClick={() => applyMode(mode)}
             >
-              {mode === 'major' ? 'Maj' : 'Min'}
+              {writtenRoot.label} {mode === 'major' ? 'Maj' : 'Min'}
             </button>
           ))}
         </div>
 
-        <div className="harmonic-ribbon__octave" aria-label={`Drone octave ${octave}`}>
+        <div
+          className="harmonic-ribbon__octave"
+          aria-label={`Written drone root ${writtenRoot.noteName}; sounding concert ${concertRoot.noteName}`}
+        >
           <button
             type="button"
-            aria-label="Lower drone octave"
+            aria-label={`Lower drone one octave to written ${lowerWrittenRoot.noteName}`}
             disabled={octave <= MIN_OCTAVE}
             onClick={onDecrementOctave}
           >
             <Minus aria-hidden />
           </button>
           <span>
-            <strong>{octave}</strong>
+            <small>{writtenRoot.label}</small>
+            <strong>{writtenRoot.octave}</strong>
           </span>
           <button
             type="button"
-            aria-label="Raise drone octave"
+            aria-label={`Raise drone one octave to written ${higherWrittenRoot.noteName}`}
             disabled={octave >= MAX_OCTAVE}
             onClick={onIncrementOctave}
           >

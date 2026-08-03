@@ -6,7 +6,15 @@ import type {
 } from './scaleRushMusicLogic'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 
-export type ScaleRushPhase = 'setup' | 'playing' | 'gameover'
+export type ScaleRushPhase = 'setup' | 'playing' | 'paused' | 'gameover'
+
+export type ScaleRushPlayerModelId =
+  | 'trumpeter'
+  | 'cat'
+  | 'robot'
+  | 'bird'
+  | 'fox'
+  | 'astronaut'
 
 export type ScaleRushFeedback = 'perfect' | 'good' | 'wrong' | 'timeout' | null
 
@@ -17,7 +25,8 @@ export interface ScaleRushConfig {
   endless: boolean
   tunerInstrument: TunerInstrument
   transposition: ScaleRushTransposition
-  /** v0.1 default: pitch-class match only (octave ignored). */
+  playerModel: ScaleRushPlayerModelId
+  /** When disabled, pitch-class matching accepts any octave and does not score cents. */
   pitchAccuracyStrict: boolean
   /** Set when a run starts — drives post-scale pattern randomization. */
   sessionSeed?: number
@@ -40,4 +49,7 @@ export interface ScaleRushState {
   feedback: ScaleRushFeedback
   feedbackToken: number
   startedAtMs: number | null
+  endedAtMs: number | null
+  pausedAtMs: number | null
+  pausedDurationMs: number
 }

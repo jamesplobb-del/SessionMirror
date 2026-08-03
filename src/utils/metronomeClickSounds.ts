@@ -58,6 +58,22 @@ function scheduleOscillatorClick(
   osc.connect(gain)
   gain.connect(outputNode)
 
+  // WebKit can retain ended nodes that remain connected to a long-lived
+  // destination graph. A continuous metronome creates thousands of these
+  // short voices, so explicitly detach each one as soon as it finishes.
+  osc.addEventListener(
+    'ended',
+    () => {
+      try {
+        osc.disconnect()
+        gain.disconnect()
+      } catch {
+        /* graph may already have been released during a route transition */
+      }
+    },
+    { once: true },
+  )
+
   osc.start(when)
   osc.stop(when + decaySec + 0.01)
 }

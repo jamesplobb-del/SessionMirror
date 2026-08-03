@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import './staff-jumper.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import {
   computeAccuracy,
   DIFFICULTY_DESCRIPTIONS,
   DIFFICULTY_LABELS,
+  DIFFICULTY_TIMEOUT_SECONDS,
   keysForScaleMode,
   RANGE_LABELS,
   SCALE_MODE_LABELS,
@@ -26,14 +27,22 @@ interface StaffJumperScreenProps {
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   tunerInstrument: TunerInstrument
+  hapticFeedback: boolean
   onRequestMicStream: () => void
   onBack: () => void
+}
+
+function formatRunTime(seconds: number): string {
+  const rounded = Math.max(0, Math.round(seconds))
+  const minutes = Math.floor(rounded / 60)
+  return `${minutes}:${String(rounded % 60).padStart(2, '0')}`
 }
 
 export default function StaffJumperScreen({
   streamRef,
   streamGeneration,
   tunerInstrument,
+  hapticFeedback,
   onRequestMicStream,
   onBack,
 }: StaffJumperScreenProps) {
@@ -74,135 +83,165 @@ export default function StaffJumperScreen({
     },
   )
 
-  const { state, start, restart, backToSetup, completeFall } = useStaffJumperGame(
-    readout,
-    pitchEnabled,
-  )
+  const {
+    state,
+    start,
+    restart,
+    backToSetup,
+    completeFall,
+    pause,
+    resume,
+    noteRemainingMs,
+    noteTimeoutMs,
+  } = useStaffJumperGame(readout, pitchEnabled, hapticFeedback)
   const instrumentProfile = getTunerProfile(tunerInstrument)
+  const hasPitchSignal =
+    Number.isFinite(readout.frequencyHz) &&
+    readout.frequencyHz > 0 &&
+    Boolean(readout.noteName && readout.noteName !== '—')
 
   if (state.phase === 'setup') {
     return (
       <div className="sj-screen sj-screen--setup">
-        <header className="mb-5 flex items-center gap-3">
-          <Pressable type="button" intensity="soft" onClick={onBack} aria-label="Back to Labs">
-            <ChevronLeft className="h-6 w-6 text-stone-600" />
-          </Pressable>
-          <div>
-            <h1 className="text-2xl font-bold text-stone-900">Staff Jumper</h1>
-            <p className="text-xs text-stone-400">Play your way through the staff</p>
-          </div>
-        </header>
-
-        <p className="mb-1 text-sm font-medium text-stone-700">
-          Travel through sheet music one note at a time.
-        </p>
-        <p className="mb-6 text-sm text-stone-500">
-          Concert pitch · treble clef. Land on each notehead by playing the correct pitch. Three
-          misses and you fall off the staff.
-        </p>
-
-        <div className="space-y-5">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Difficulty
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {STAFF_JUMPER_DIFFICULTIES.map((level) => (
-                <Pressable
-                  key={level}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftDifficulty(level)}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftDifficulty === level
-                      ? 'border-stone-800 bg-stone-800 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {DIFFICULTY_LABELS[level]}
-                </Pressable>
-              ))}
-            </div>
-            <p className="mt-1.5 text-xs text-stone-500">
-              {DIFFICULTY_DESCRIPTIONS[draftDifficulty]}
-            </p>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Scale</p>
-            <div className="flex flex-wrap gap-2">
-              {(['major', 'minor'] as const).map((mode) => (
-                <Pressable
-                  key={mode}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftScaleMode(mode)}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftScaleMode === mode
-                      ? 'border-stone-800 bg-stone-800 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {SCALE_MODE_LABELS[mode]}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Key</p>
-            <div className="flex flex-wrap gap-2">
-              {availableKeys.map((key) => (
-                <Pressable
-                  key={key}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftKey(key)}
-                  className={`min-w-[2.75rem] rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftKey === key
-                      ? 'border-stone-800 bg-stone-800 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {scaleDisplayName(key, draftScaleMode)}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Range</p>
-            <div className="flex flex-wrap gap-2">
-              {STAFF_JUMPER_RANGES.map((range) => (
-                <Pressable
-                  key={range}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftRange(range)}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftRange === range
-                      ? 'border-stone-800 bg-stone-800 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {RANGE_LABELS[range]}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-xs text-stone-500">
-            Mic profile: {instrumentProfile.label} · change in Settings → Pitch &amp; Tuning
-          </p>
-        </div>
-
-        <div className="mt-auto space-y-3 pt-8">
-          {state.bestScore > 0 && (
-            <p className="text-center text-xs text-stone-500">Best score: {state.bestScore}</p>
-          )}
+        <header className="sj-setup-header">
           <Pressable
             type="button"
-            intensity="soft"
+            intensity="icon"
+            hapticFeedback={hapticFeedback}
+            onClick={onBack}
+            className="arcade-icon-button"
+            aria-label="Back to Practice Arcade"
+          >
+            <ArrowLeft aria-hidden />
+          </Pressable>
+          <div className="sj-setup-header__title">
+            <h1>Staff Jumper</h1>
+            <p>Sight reading</p>
+          </div>
+          <p className="sj-setup-best" aria-label={`Personal best ${state.bestScore}`}>
+            <span>Best</span>
+            <strong>{state.bestScore || '—'}</strong>
+          </p>
+        </header>
+
+        <section className="sj-setup-intro">
+          <h2>Play the note under the player.</h2>
+          <p>The player jumps when the pitch is correct. Three misses end the run.</p>
+        </section>
+
+        <section className={`sj-mic-status ${hasPitchSignal ? 'sj-mic-status--live' : ''}`}>
+          <span className="sj-mic-status__dot" aria-hidden />
+          <div>
+            <strong>{hasPitchSignal ? 'Microphone ready' : 'Play a note to check your microphone'}</strong>
+            <small>{instrumentProfile.label} profile, concert pitch</small>
+          </div>
+          <p aria-live="polite">
+            <strong>{hasPitchSignal ? readout.noteName : '—'}</strong>
+            <small>
+              {hasPitchSignal
+                ? Math.round(readout.cents) === 0
+                  ? 'Centered'
+                  : `${Math.round(readout.cents) > 0 ? '+' : ''}${Math.round(readout.cents)}¢`
+                : 'Listening'}
+            </small>
+          </p>
+        </section>
+
+        <section className="arcade-config-card">
+          <div className="arcade-config-card__heading">
+            <h2>Setup</h2>
+            <span>{DIFFICULTY_TIMEOUT_SECONDS[draftDifficulty]} sec per note</span>
+          </div>
+
+          <div className="arcade-fields">
+            <div>
+              <p className="arcade-field-label">Difficulty</p>
+              <div className="arcade-segment-grid" style={{ '--arcade-segments': 3 } as CSSProperties}>
+                {STAFF_JUMPER_DIFFICULTIES.map((level) => (
+                  <Pressable
+                    key={level}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => setDraftDifficulty(level)}
+                    className={`arcade-segment ${draftDifficulty === level ? 'arcade-segment--selected' : ''}`}
+                    data-accent="staff"
+                    aria-pressed={draftDifficulty === level}
+                  >
+                    {DIFFICULTY_LABELS[level]}
+                  </Pressable>
+                ))}
+              </div>
+              <p className="sj-difficulty-detail">{DIFFICULTY_DESCRIPTIONS[draftDifficulty]}</p>
+            </div>
+
+            <div>
+              <p className="arcade-field-label">Scale</p>
+              <div className="arcade-segment-grid" style={{ '--arcade-segments': 2 } as CSSProperties}>
+                {(['major', 'minor'] as const).map((mode) => (
+                  <Pressable
+                    key={mode}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => setDraftScaleMode(mode)}
+                    className={`arcade-segment ${draftScaleMode === mode ? 'arcade-segment--selected' : ''}`}
+                    data-accent="staff"
+                    aria-pressed={draftScaleMode === mode}
+                  >
+                    {SCALE_MODE_LABELS[mode]}
+                  </Pressable>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="arcade-field-label">Key</p>
+              <div className="arcade-key-grid">
+                {availableKeys.map((key) => (
+                  <Pressable
+                    key={key}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => setDraftKey(key)}
+                    className={`arcade-key-button ${draftKey === key ? 'arcade-key-button--selected' : ''}`}
+                    data-accent="staff"
+                    aria-pressed={draftKey === key}
+                  >
+                    {key}
+                  </Pressable>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="arcade-field-label">Range</p>
+              <div className="arcade-segment-grid" style={{ '--arcade-segments': 2 } as CSSProperties}>
+                {STAFF_JUMPER_RANGES.map((range) => (
+                  <Pressable
+                    key={range}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => setDraftRange(range)}
+                    className={`arcade-segment ${draftRange === range ? 'arcade-segment--selected' : ''}`}
+                    data-accent="staff"
+                    aria-pressed={draftRange === range}
+                  >
+                    {RANGE_LABELS[range]}
+                  </Pressable>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="arcade-setup-footer">
+          <Pressable
+            type="button"
+            haptic="medium"
+            hapticFeedback={hapticFeedback}
             onClick={() =>
               start({
                 key: draftKey,
@@ -212,11 +251,40 @@ export default function StaffJumperScreen({
                 tunerInstrument,
               })
             }
-            className="w-full rounded-2xl bg-stone-900 py-4 text-lg font-semibold text-white"
+            className="arcade-primary-button"
           >
-            Start
+            Start {scaleDisplayName(draftKey, draftScaleMode)}
           </Pressable>
+          <p className="arcade-setup-footer__detail">
+            3 lives <span aria-hidden>·</span> {DIFFICULTY_TIMEOUT_SECONDS[draftDifficulty]} seconds per note
+          </p>
         </div>
+      </div>
+    )
+  }
+
+  if (state.phase === 'paused') {
+    return (
+      <div className="sj-state-screen">
+        <section className="sj-state-card">
+          <p className="sj-state-label">Paused</p>
+          <h1>Staff Jumper</h1>
+          <dl className="sj-state-stats sj-state-stats--compact">
+            <div><dt>Score</dt><dd>{state.score}</dd></div>
+            <div><dt>Streak</dt><dd>{state.streak}</dd></div>
+          </dl>
+          <div className="sj-state-actions">
+            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={resume} className="arcade-primary-button">
+              Resume
+            </Pressable>
+            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="arcade-secondary-button">
+              Change settings
+            </Pressable>
+            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack} className="arcade-text-button">
+              Exit game
+            </Pressable>
+          </div>
+        </section>
       </div>
     )
   }
@@ -224,57 +292,40 @@ export default function StaffJumperScreen({
   if (state.phase === 'gameover' && state.config) {
     const accuracy = computeAccuracy(state.correctCount, state.missCount)
     const scaleName = scaleDisplayName(state.config.key, state.config.scaleMode)
+    const endTime = state.endedAtMs ?? Date.now()
+    const durationSeconds = state.startedAtMs
+      ? Math.max(0, endTime - state.startedAtMs - state.pausedDurationMs) / 1000
+      : 0
+
     return (
-      <div className="sj-screen sj-screen--gameover">
-        <h1 className="mb-2 text-2xl font-bold text-stone-900">Game Over</h1>
-        <p className="mb-6 text-sm text-stone-500">
-          {scaleName} · {RANGE_LABELS[state.config.range]} ·{' '}
-          {DIFFICULTY_LABELS[state.config.difficulty]}
-        </p>
-        <dl className="space-y-3 text-sm text-stone-700">
-          <div className="flex justify-between">
-            <dt>Final score</dt>
-            <dd className="font-semibold tabular-nums">{state.score}</dd>
+      <div className="sj-state-screen">
+        <section className="sj-state-card">
+          <p className="sj-state-label">Run complete</p>
+          <h1>{state.score}</h1>
+          <p className="sj-state-run-label">
+            {scaleName} · {RANGE_LABELS[state.config.range]} · {DIFFICULTY_LABELS[state.config.difficulty]}
+          </p>
+          <dl className="sj-state-stats">
+            <div><dt>Accuracy</dt><dd>{accuracy}%</dd></div>
+            <div><dt>Best streak</dt><dd>{state.bestStreak}</dd></div>
+            <div><dt>Correct notes</dt><dd>{state.correctCount}</dd></div>
+            <div><dt>Time</dt><dd>{formatRunTime(durationSeconds)}</dd></div>
+          </dl>
+          <p className="sj-state-summary">
+            {state.missCount} {state.missCount === 1 ? 'miss' : 'misses'} · Best {state.bestScore}
+          </p>
+          <div className="sj-state-actions">
+            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={restart} className="arcade-primary-button">
+              Play again
+            </Pressable>
+            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="arcade-secondary-button">
+              Change settings
+            </Pressable>
+            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack} className="arcade-text-button">
+              Back to Practice Arcade
+            </Pressable>
           </div>
-          <div className="flex justify-between">
-            <dt>Best score</dt>
-            <dd className="font-semibold tabular-nums">{state.bestScore}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Longest streak</dt>
-            <dd className="font-semibold tabular-nums">{state.bestStreak}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Accuracy</dt>
-            <dd className="font-semibold tabular-nums">{accuracy}%</dd>
-          </div>
-        </dl>
-        <div className="mt-auto space-y-3 pt-10">
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={restart}
-            className="w-full rounded-2xl bg-stone-900 py-4 text-base font-semibold text-white"
-          >
-            Restart
-          </Pressable>
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={backToSetup}
-            className="w-full rounded-2xl border border-stone-200 py-3 text-sm font-semibold text-stone-700"
-          >
-            Home
-          </Pressable>
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={onBack}
-            className="w-full py-2 text-sm font-medium text-stone-500"
-          >
-            Back to Labs
-          </Pressable>
-        </div>
+        </section>
       </div>
     )
   }
@@ -283,8 +334,11 @@ export default function StaffJumperScreen({
     <StaffJumperGame
       state={state}
       readout={readout}
-      onPause={backToSetup}
+      onPause={pause}
+      hapticFeedback={hapticFeedback}
       onFallComplete={completeFall}
+      turnRemainingMs={noteRemainingMs}
+      turnDurationMs={noteTimeoutMs}
     />
   )
 }

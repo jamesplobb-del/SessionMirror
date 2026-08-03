@@ -46,6 +46,29 @@ export async function migrateVaultSchema(db: SQLiteDBConnection): Promise<void> 
     'CREATE INDEX IF NOT EXISTS idx_library_items_created_at ON library_items(created_at DESC)',
   )
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS pitch_observations (
+      id TEXT PRIMARY KEY NOT NULL,
+      midi_note INTEGER NOT NULL,
+      note_name TEXT NOT NULL,
+      octave INTEGER NOT NULL,
+      cents_offset REAL NOT NULL,
+      observed_at INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      sample_count INTEGER NOT NULL,
+      variability_cents REAL NOT NULL DEFAULT 0,
+      tuner_instrument TEXT NOT NULL DEFAULT 'voice',
+      transposition_id TEXT NOT NULL DEFAULT 'concert',
+      session_id TEXT
+    )
+  `)
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_pitch_observations_note ON pitch_observations(midi_note, observed_at DESC)',
+  )
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_pitch_observations_observed_at ON pitch_observations(observed_at DESC)',
+  )
+
   const projectColumns = await db.query('PRAGMA table_info(projects)')
   const projectExisting = new Set(
     (projectColumns.values ?? []).map((row) =>

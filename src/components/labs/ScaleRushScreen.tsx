@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import '../../styles/scale-rush.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import {
@@ -16,15 +15,28 @@ import {
   type ScaleRushTransposition,
 } from '../../labs/scaleRush/scaleRushMusicLogic'
 import { useScaleRushGame } from '../../labs/scaleRush/useScaleRushGame'
+import {
+  loadScaleRushPlayerModel,
+  saveScaleRushPlayerModel,
+  SCALE_RUSH_PLAYER_MODELS,
+} from '../../labs/scaleRush/scaleRushPlayerModels'
+import type { ScaleRushPlayerModelId } from '../../labs/scaleRush/scaleRushTypes'
 import { getTunerProfile, type TunerInstrument } from '../../utils/pitchConfig'
 import IOSSwitch from '../ui/IOSSwitch'
 import Pressable from '../ui/Pressable'
+import {
+  ArcadeGameHeader,
+  ArcadeMicCheck,
+  ArcadePauseScreen,
+  ArcadeResults,
+} from './ArcadeChrome'
 import ScaleRushGame from './ScaleRushGame'
 
 interface ScaleRushScreenProps {
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   tunerInstrument: TunerInstrument
+  hapticFeedback: boolean
   onRequestMicStream: () => void
   onBack: () => void
 }
@@ -33,6 +45,7 @@ export default function ScaleRushScreen({
   streamRef,
   streamGeneration,
   tunerInstrument,
+  hapticFeedback,
   onRequestMicStream,
   onBack,
 }: ScaleRushScreenProps) {
@@ -43,6 +56,9 @@ export default function ScaleRushScreen({
   const [draftRange, setDraftRange] = useState<ScaleRushRange>('1-octave')
   const [draftEndless, setDraftEndless] = useState(false)
   const [draftTransposition, setDraftTransposition] = useState<ScaleRushTransposition>('concert')
+  const [draftPlayerModel, setDraftPlayerModel] = useState<ScaleRushPlayerModelId>(
+    loadScaleRushPlayerModel,
+  )
   const [pitchAccuracyStrict, setPitchAccuracyStrict] = useState(false)
 
   const availableKeys = keysForScaleMode(draftScaleMode)
@@ -75,158 +91,185 @@ export default function ScaleRushScreen({
     },
   )
 
-  const { state, start, restart, backToSetup } = useScaleRushGame(readout, pitchEnabled)
+  const {
+    state,
+    start,
+    restart,
+    backToSetup,
+    pause,
+    resume,
+    noteRemainingMs,
+    noteTimeoutMs,
+  } = useScaleRushGame(readout, pitchEnabled, hapticFeedback)
   const instrumentProfile = getTunerProfile(tunerInstrument)
 
   if (state.phase === 'setup') {
     return (
       <div className="scale-rush-screen scale-rush-screen--setup">
-        <header className="scale-rush-header mb-5 flex items-center gap-3">
-          <Pressable type="button" intensity="soft" onClick={onBack} aria-label="Back to Labs">
-            <ChevronLeft className="h-6 w-6 text-stone-600" />
-          </Pressable>
-          <div>
-            <h1 className="text-2xl font-bold text-stone-900">Scale Rush</h1>
-            <p className="text-xs text-stone-400">v0.1 · Crossy Road for musicians</p>
-          </div>
-        </header>
+        <ArcadeGameHeader
+          accent="rush"
+          title="Scale Rush"
+          subtitle="Play the next note"
+          bestScore={state.bestScore}
+          icon={null}
+          hapticFeedback={hapticFeedback}
+          onBack={onBack}
+        />
 
-        <p className="mb-1 text-sm font-medium text-stone-700">Play your scale to cross the course.</p>
-        <p className="mb-6 text-sm text-stone-500">
-          Hop one tile per correct note. Wrong notes and timeouts cost a heart. Any octave of the
-          target note counts in v0.1.
+        <p className="sr-setup-summary">
+          Play each target note to move. Three misses ends the run.
         </p>
 
-        <div className="space-y-5">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Instrument
-            </p>
-            <label htmlFor="scale-rush-transposition" className="sr-only">
-              Transposing instrument
-            </label>
-            <select
-              id="scale-rush-transposition"
-              value={draftTransposition}
-              onChange={(event) =>
-                setDraftTransposition(event.target.value as ScaleRushTransposition)
-              }
-              className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-medium text-stone-800"
-            >
-              {SCALE_RUSH_TRANSPOSITIONS.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-stone-500">
-              Mic profile: {instrumentProfile.label} · change in Settings → Pitch &amp; Tuning
-            </p>
+        <ArcadeMicCheck
+          readout={readout}
+          profileLabel={instrumentProfile.label}
+          detail={`${instrumentProfile.label} microphone profile`}
+        />
+
+        <section className="arcade-config-card">
+          <div className="arcade-config-card__heading">
+            <h2>Game settings</h2>
           </div>
 
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Scale
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {(['major', 'minor'] as const).map((mode) => (
-                <Pressable
-                  key={mode}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftScaleMode(mode)}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftScaleMode === mode
-                      ? 'border-sky-600 bg-sky-600 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {SCALE_MODE_LABELS[mode]}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Key</p>
-            <div className="flex flex-wrap gap-2">
-              {availableKeys.map((key) => (
-                <Pressable
-                  key={key}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftKey(key)}
-                  className={`min-w-[2.75rem] rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftKey === key
-                      ? 'border-sky-600 bg-sky-600 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {scaleDisplayName(key, draftScaleMode)}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">Range</p>
-            <div className="flex flex-wrap gap-2">
-              {SCALE_RUSH_RANGES.map((range) => (
-                <Pressable
-                  key={range}
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setDraftRange(range)}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    draftRange === range
-                      ? 'border-sky-600 bg-sky-600 text-white'
-                      : 'border-stone-200 bg-white text-stone-700'
-                  }`}
-                >
-                  {RANGE_LABELS[range]}
-                </Pressable>
-              ))}
-            </div>
-          </div>
-
-          <label className="flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3">
+          <div className="arcade-fields">
             <div>
-              <p className="text-sm font-semibold text-stone-900">Endless mode</p>
-              <p className="mt-0.5 text-xs text-stone-500">
-                Ascend the scale continuously without turning back
-              </p>
+              <label htmlFor="scale-rush-transposition" className="arcade-field-label">
+                Written pitch
+              </label>
+              <select
+                id="scale-rush-transposition"
+                value={draftTransposition}
+                onChange={(event) =>
+                  setDraftTransposition(event.target.value as ScaleRushTransposition)
+                }
+                className="arcade-select"
+              >
+                {SCALE_RUSH_TRANSPOSITIONS.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            <IOSSwitch
-              checked={draftEndless}
-              onChange={setDraftEndless}
-              ariaLabel="Enable endless mode"
-            />
-          </label>
 
-          <label className="flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3">
+            <fieldset className="sr-player-picker">
+              <legend className="arcade-field-label">Player</legend>
+              <div className="sr-player-picker__grid">
+                {SCALE_RUSH_PLAYER_MODELS.map((model) => (
+                  <Pressable
+                    key={model.id}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => {
+                      setDraftPlayerModel(model.id)
+                      saveScaleRushPlayerModel(model.id)
+                    }}
+                    className={`sr-player-option ${draftPlayerModel === model.id ? 'sr-player-option--selected' : ''}`}
+                    aria-pressed={draftPlayerModel === model.id}
+                    aria-label={`Choose ${model.name}`}
+                  >
+                    <span className="sr-player-option__preview" aria-hidden>
+                      <img src={model.asset} alt="" draggable={false} />
+                    </span>
+                    <span>{model.name}</span>
+                  </Pressable>
+                ))}
+              </div>
+            </fieldset>
+
             <div>
-              <p className="text-sm font-semibold text-stone-900">Pitch accuracy</p>
-              <p className="mt-0.5 text-xs text-stone-500">
-                {pitchAccuracyStrict
-                  ? 'Must be within ±15¢ of the target note'
-                  : 'Note name match only (recommended for v0.1)'}
-              </p>
+              <p className="arcade-field-label">Scale</p>
+              <div className="arcade-segment-grid" style={{ '--arcade-segments': 2 } as CSSProperties}>
+                {(['major', 'minor'] as const).map((mode) => (
+                  <Pressable
+                    key={mode}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => setDraftScaleMode(mode)}
+                    className={`arcade-segment ${draftScaleMode === mode ? 'arcade-segment--selected' : ''}`}
+                    data-accent="rush"
+                    aria-pressed={draftScaleMode === mode}
+                  >
+                    {SCALE_MODE_LABELS[mode]}
+                  </Pressable>
+                ))}
+              </div>
             </div>
-            <IOSSwitch
-              checked={pitchAccuracyStrict}
-              onChange={setPitchAccuracyStrict}
-              ariaLabel="Require pitch accuracy within 15 cents"
-            />
-          </label>
-        </div>
 
-        <div className="mt-auto space-y-3 pt-8">
-          {state.bestScore > 0 && (
-            <p className="text-center text-xs text-stone-500">Best score: {state.bestScore}</p>
-          )}
+            <div>
+              <p className="arcade-field-label">Key</p>
+              <div className="arcade-key-grid">
+                {availableKeys.map((key) => (
+                  <Pressable
+                    key={key}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => setDraftKey(key)}
+                    className={`arcade-key-button ${draftKey === key ? 'arcade-key-button--selected' : ''}`}
+                    aria-pressed={draftKey === key}
+                  >
+                    {key}
+                  </Pressable>
+                ))}
+              </div>
+            </div>
+
+            {!draftEndless && (
+              <div>
+                <p className="arcade-field-label">Range</p>
+                <div className="arcade-segment-grid" style={{ '--arcade-segments': 2 } as CSSProperties}>
+                  {SCALE_RUSH_RANGES.map((range) => (
+                    <Pressable
+                      key={range}
+                      type="button"
+                      intensity="soft"
+                      hapticFeedback={hapticFeedback}
+                      onClick={() => setDraftRange(range)}
+                      className={`arcade-segment ${draftRange === range ? 'arcade-segment--selected' : ''}`}
+                      data-accent="rush"
+                      aria-pressed={draftRange === range}
+                    >
+                      {RANGE_LABELS[range]}
+                    </Pressable>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="arcade-option-row">
+              <div>
+                <strong>Repeat the scale</strong>
+              </div>
+              <IOSSwitch
+                checked={draftEndless}
+                onChange={setDraftEndless}
+                ariaLabel="Enable scale-only mode"
+                hapticFeedback={hapticFeedback}
+              />
+            </div>
+
+            <div className="arcade-option-row">
+              <div>
+                <strong>Require pitch within ±15¢</strong>
+              </div>
+              <IOSSwitch
+                checked={pitchAccuracyStrict}
+                onChange={setPitchAccuracyStrict}
+                ariaLabel="Require pitch accuracy within 15 cents"
+                hapticFeedback={hapticFeedback}
+              />
+            </div>
+          </div>
+        </section>
+
+        <div className="arcade-setup-footer">
           <Pressable
             type="button"
-            intensity="soft"
+            haptic="medium"
+            hapticFeedback={hapticFeedback}
             onClick={() =>
               start({
                 key: draftKey,
@@ -235,70 +278,61 @@ export default function ScaleRushScreen({
                 endless: draftEndless,
                 tunerInstrument,
                 transposition: draftTransposition,
+                playerModel: draftPlayerModel,
                 pitchAccuracyStrict,
               })
             }
-            className="w-full rounded-2xl bg-stone-900 py-4 text-lg font-semibold text-white"
+            className="arcade-primary-button"
           >
-            Start
+            Start {scaleDisplayName(draftKey, draftScaleMode)}
           </Pressable>
+          <p className="arcade-setup-footer__detail">3 lives · 12 seconds per note</p>
         </div>
       </div>
+    )
+  }
+
+  if (state.phase === 'paused') {
+    return (
+      <ArcadePauseScreen
+        accent="rush"
+        title="Scale Rush"
+        score={state.score}
+        streak={state.streak}
+        icon={null}
+        hapticFeedback={hapticFeedback}
+        onResume={resume}
+        onSetup={backToSetup}
+        onLabs={onBack}
+      />
     )
   }
 
   if (state.phase === 'gameover' && state.config) {
     const accuracy = computeAccuracy(state.correctCount, state.missCount)
     const scaleName = scaleDisplayName(state.config.key, state.config.scaleMode)
+    const endTime = state.endedAtMs ?? Date.now()
+    const durationSeconds = state.startedAtMs
+      ? Math.max(0, endTime - state.startedAtMs - state.pausedDurationMs) / 1000
+      : 0
+
     return (
-      <div className="scale-rush-screen scale-rush-screen--gameover">
-        <h1 className="mb-2 text-2xl font-bold text-stone-900">Game Over</h1>
-        <p className="mb-6 text-sm text-stone-500">{scaleName} · {RANGE_LABELS[state.config.range]}</p>
-        <dl className="space-y-3 text-sm text-stone-700">
-          <div className="flex justify-between">
-            <dt>Final score</dt>
-            <dd className="font-semibold tabular-nums">{state.score}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Best score</dt>
-            <dd className="font-semibold tabular-nums">{state.bestScore}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Longest streak</dt>
-            <dd className="font-semibold tabular-nums">{state.bestStreak}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Accuracy</dt>
-            <dd className="font-semibold tabular-nums">{accuracy}%</dd>
-          </div>
-        </dl>
-        <div className="mt-auto space-y-3 pt-10">
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={restart}
-            className="w-full rounded-2xl bg-stone-900 py-4 text-base font-semibold text-white"
-          >
-            Restart
-          </Pressable>
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={backToSetup}
-            className="w-full rounded-2xl border border-stone-200 py-3 text-sm font-semibold text-stone-700"
-          >
-            Home
-          </Pressable>
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={onBack}
-            className="w-full py-2 text-sm font-medium text-stone-500"
-          >
-            Back to Labs
-          </Pressable>
-        </div>
-      </div>
+      <ArcadeResults
+        accent="rush"
+        gameTitle="Scale Rush"
+        runLabel={`${scaleName} · ${state.config.endless ? 'Scale only' : RANGE_LABELS[state.config.range]}`}
+        score={state.score}
+        bestScore={state.bestScore}
+        bestStreak={state.bestStreak}
+        accuracy={accuracy}
+        correctCount={state.correctCount}
+        missCount={state.missCount}
+        durationSeconds={durationSeconds}
+        hapticFeedback={hapticFeedback}
+        onReplay={restart}
+        onSetup={backToSetup}
+        onLabs={onBack}
+      />
     )
   }
 
@@ -307,7 +341,10 @@ export default function ScaleRushScreen({
       state={state}
       readout={readout}
       canvasRef={canvasRef}
-      onPause={backToSetup}
+      onPause={pause}
+      hapticFeedback={hapticFeedback}
+      turnRemainingMs={noteRemainingMs}
+      turnDurationMs={noteTimeoutMs}
     />
   )
 }

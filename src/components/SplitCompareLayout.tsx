@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react'
+import { useCallback, useRef, type RefObject } from 'react'
 import BestTakeBox from './BestTakeBox'
 import LiveCameraBackground from './LiveCameraBackground'
 import PipWindow from './PipWindow'
@@ -54,7 +54,7 @@ interface SplitCompareLayoutProps {
   youtubeIframeRef?: RefObject<HTMLIFrameElement | null>
   deleteDropRef?: RefObject<HTMLElement | null>
   onPinBenchmark?: (takeId: string) => void
-  onPinChallenger?: (takeId: string) => void
+  onMoveBenchmarkToCurrent: (takeId: string) => void
   onDeleteTake?: (takeId: string) => void
   onDragStateChange?: (state: PipDragUiState) => void
   hapticFeedback?: boolean
@@ -103,7 +103,7 @@ export default function SplitCompareLayout({
   youtubeIframeRef,
   deleteDropRef,
   onPinBenchmark,
-  onPinChallenger,
+  onMoveBenchmarkToCurrent,
   onDeleteTake,
   onDragStateChange,
   hapticFeedback = true,
@@ -115,13 +115,28 @@ export default function SplitCompareLayout({
   const cameraPanelHeight = (ratio: number) =>
     recordingMode === 'video' ? `calc(${ratio}% - 0.875rem)` : `${ratio}%`
   const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
-  const challengerDragEnabled = showCurrentTake && Boolean(onPinBenchmark)
+  const benchmarkAcceptsTakeTransfer = !libraryBenchmarkPlayback && !youtubeEmbedUrl
+  const benchmarkTransferLabel =
+    challengerTake?.id && challengerTake.id !== benchmarkTake?.id
+      ? 'Swap Takes'
+      : 'Move to Current'
+  const challengerDragEnabled =
+    showCurrentTake && Boolean(onPinBenchmark) && benchmarkAcceptsTakeTransfer
   const benchmarkDragEnabled =
     !isRecording &&
-    Boolean(onPinChallenger) &&
     takeHasPlaybackMedia(benchmarkTake) &&
-    !libraryBenchmarkPlayback &&
-    !youtubeEmbedUrl
+    benchmarkAcceptsTakeTransfer
+
+  const transferBestToCurrent = useCallback(
+    (takeId: string) => {
+      if (challengerTake?.id && challengerTake.id !== takeId && onPinBenchmark) {
+        onPinBenchmark(challengerTake.id)
+        return
+      }
+      onMoveBenchmarkToCurrent(takeId)
+    },
+    [challengerTake?.id, onMoveBenchmarkToCurrent, onPinBenchmark],
+  )
 
   const {
     ghost: challengerGhost,
@@ -137,6 +152,8 @@ export default function SplitCompareLayout({
     onTap: onExpandChallenger,
     onDragStateChange,
     enabled: challengerDragEnabled,
+    activationMode: 'move',
+    dragThresholdPx: 16,
     hapticFeedback,
   })
 
@@ -148,10 +165,12 @@ export default function SplitCompareLayout({
   } = useDragToPin({
     sourceTakeId: benchmarkTake?.id ?? null,
     dropTargetRef: challengerDropRef,
-    onPin: onPinChallenger ?? (() => {}),
+    onPin: transferBestToCurrent,
     onTap: onExpandBenchmark,
-    onDragStateChange,
     enabled: benchmarkDragEnabled,
+    activationMode: 'move',
+    dragThresholdPx: 16,
+    commitHaptic: !challengerTake || !onPinBenchmark,
     hapticFeedback,
   })
 
@@ -304,7 +323,10 @@ export default function SplitCompareLayout({
           take={challengerTake}
           x={challengerGhost.x}
           y={challengerGhost.y}
+          overPin={challengerGhost.overPin}
           overDelete={challengerGhost.overDelete}
+          actionLabel="Make Best"
+          actionTone="best"
         />
       )}
 
@@ -313,8 +335,10 @@ export default function SplitCompareLayout({
           take={benchmarkTake}
           x={benchmarkGhost.x}
           y={benchmarkGhost.y}
+          overPin={benchmarkGhost.overPin}
           overDelete={benchmarkGhost.overDelete}
-          actionLabel="Current"
+          actionLabel={benchmarkTransferLabel}
+          actionTone="current"
         />
       )}
     </>

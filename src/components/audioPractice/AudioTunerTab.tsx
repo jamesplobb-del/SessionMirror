@@ -4,6 +4,7 @@ import LivePitchTuner from '../LivePitchTuner'
 import { useDrone } from '../../hooks/useDrone'
 import type { PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import type { TunerInstrument } from '../../utils/pitchConfig'
+import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import type { DroneWaveform } from '../../utils/droneEngine'
 import type { MicInputPreference } from '../../utils/appSettings'
 import {
@@ -29,6 +30,8 @@ interface AudioTunerTabProps {
   permissionRequestInFlight: boolean
   isRecording: boolean
   tunerInstrument: TunerInstrument
+  tunerTransposition: TunerTranspositionId
+  onTunerTranspositionChange: (value: TunerTranspositionId) => void
   liveMicTunerEnabled: boolean
   droneVolume: number
   droneWaveform: DroneWaveform
@@ -62,6 +65,8 @@ export default function AudioTunerTab({
   permissionRequestInFlight,
   isRecording,
   tunerInstrument,
+  tunerTransposition,
+  onTunerTranspositionChange,
   liveMicTunerEnabled: _liveMicTunerEnabled,
   droneVolume,
   droneWaveform,
@@ -77,6 +82,7 @@ export default function AudioTunerTab({
   const [showRecoveryPrompt, setShowRecoveryPrompt] = useState(false)
   const [appForeground, setAppForeground] = useState(isAppInForeground)
   const automaticRecoveryAttemptsRef = useRef(0)
+  const previousRecordingRef = useRef(isRecording)
 
   const drone = useDrone({
     volume: normalizedVolume,
@@ -140,10 +146,19 @@ export default function AudioTunerTab({
   }, [handsFreeEnabled, micInputPreference])
 
   useEffect(() => {
-    if (isRecording) return
+    const wasRecording = previousRecordingRef.current
+    previousRecordingRef.current = isRecording
+    // The monitor-acquisition effect above owns initial startup. Recover only
+    // after recording actually relinquishes the microphone; running both on
+    // mount needlessly reconfigured the same AVCaptureSession twice.
+    if (isRecording || !wasRecording) return
+    let cancelled = false
     void recoverNativeSource().then((active) => {
-      if (active) setMicLiveEpoch((epoch) => epoch + 1)
+      if (!cancelled && active) setMicLiveEpoch((epoch) => epoch + 1)
     })
+    return () => {
+      cancelled = true
+    }
   }, [isRecording, recoverNativeSource])
 
   const handleSourceHealthChange = useCallback((health: PitchSourceHealth) => {
@@ -293,21 +308,17 @@ export default function AudioTunerTab({
   useEffect(() => {
     if (!appForeground) return
     let cancelled = false
-    let sourceWasLive = micStreamIsLive(
-      streamRef.current,
-      nativeLivePreviewActive,
-      isRecording,
-    ) || (handsFreeEnabled && isNativeCaptureSessionActive())
+    let sourceWasLive =
+      micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording) ||
+      isNativeCaptureSessionActive()
     let retryTimer: number | null = null
 
     const verifyMicSource = () => {
       if (cancelled) return
 
-      const sourceIsLive = micStreamIsLive(
-        streamRef.current,
-        nativeLivePreviewActive,
-        isRecording,
-      ) || (handsFreeEnabled && isNativeCaptureSessionActive())
+      const sourceIsLive =
+        micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording) ||
+        isNativeCaptureSessionActive()
 
       if (sourceIsLive && !sourceWasLive) {
         setMicLiveEpoch((epoch) => epoch + 1)
@@ -371,6 +382,8 @@ export default function AudioTunerTab({
         micStreamRef={streamRef}
         liveMicOnly
         tunerInstrument={tunerInstrument}
+        tunerTransposition={tunerTransposition}
+        onTunerTranspositionChange={onTunerTranspositionChange}
         drone={droneKeyboard}
         onLiveSourceHealthChange={handleSourceHealthChange}
       />

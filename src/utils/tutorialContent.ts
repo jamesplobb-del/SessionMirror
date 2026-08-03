@@ -3,6 +3,8 @@ export type OnboardingCardId = 'welcome'
 export type CoachMarkId =
   | 'record-camera-take'
   | 'pin-current-as-best'
+  | 'record-comparison-take'
+  | 'swap-take-cards'
   | 'move-take-cards'
   | 'open-expand-view'
   | 'resize-expand-view'
@@ -23,6 +25,7 @@ export type TutorialActionId =
   | 'branch-widget-selected'
   | 'camera-take-stopped'
   | 'current-take-pinned'
+  | 'take-card-transfer-completed'
   | 'take-card-layout-entered'
   | 'take-card-layout-finished'
   | 'split-divider-dragged'
@@ -65,6 +68,7 @@ export type HelpTopicId =
   | 'practice-sessions'
   | 'metronome'
   | 'tuner-drones'
+  | 'pitch-insights'
   | 'quick-tools-access'
   | 'take-vault'
   | 'take-cards'
@@ -140,13 +144,36 @@ export const COACH_MARKS: CoachMarkContent[] = [
     requiresCurrentTake: true,
   },
   {
+    id: 'record-comparison-take',
+    title: 'Record One More Take',
+    body: 'Record and stop a second short take so you have a Current Take to compare with your Best Take.',
+    selector: '[data-tutorial="record-controls"]',
+    placement: 'top',
+    advance: 'camera-take-stopped',
+    continueHint: 'Record and stop one more take.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'swap-take-cards',
+    title: 'Swap Takes',
+    body: 'Drag the Current Take label directly onto Best Take. The previous Best moves to Current. Dragging the other way swaps them back.',
+    selector: '[data-tutorial="drag-current-to-best"]',
+    placement: 'top',
+    advance: 'take-card-transfer-completed',
+    continueHint: 'Drag Current Take directly onto Best Take.',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+    requiresCurrentTake: true,
+  },
+  {
     id: 'move-take-cards',
     title: 'Arrange the Take Cards',
-    body: 'Press and hold either card, move it where you want, then tap an empty area when you are done.',
+    body: 'This is a different gesture: press and hold a card until it wiggles, then reposition it. Tap an empty area when done.',
     selector: '[data-movable-take-card="true"]',
     placement: 'top',
     advance: 'take-card-layout-finished',
-    continueHint: 'Hold, move, then tap outside.',
+    continueHint: 'Hold for the haptic, move, then tap outside.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'video',
   },
@@ -299,6 +326,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     bullets: [
       'Bottom pill: Take Vault, Overlays, Record, Practice, Settings',
       'Tap the full red Record button to start or stop a video take',
+      'Drag a take label directly to swap Best and Current; hold a card to move its layout',
       'Use Expand View directly above Record for a larger comparison',
       'Tap Practice to move to the Audio workspace',
     ],
@@ -364,9 +392,21 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'The Tuner tab combines responsive live pitch with sustained reference tones for intonation practice.',
     bullets: [
       'Choose Voice, Strings, or Winds in Settings for note guidance',
+      'Use Transpose below Drone so displayed notes match your instrument’s written pitch',
       'Play to see pitch direction and cents in real time',
       'Tap drone notes on or off, or combine notes into chords',
       'Adjust drone volume and waveform in Settings',
+    ],
+  },
+  {
+    id: 'pitch-insights',
+    title: 'Pitch Insights',
+    body: 'Pitch Insights learns where your stable notes tend to sit while you use the tuner. Everything stays on your device.',
+    bullets: [
+      'Open Insights from the tool rail beneath Drone and Transpose',
+      'BestTake saves one derived observation per stable held note—not raw audio or tuner frames',
+      'Each note moves from Collecting Data to Early and Established tendencies as evidence grows',
+      'Open a note for recent versus overall tendency, consistency, and a lightweight trend',
     ],
   },
   {
@@ -394,11 +434,11 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'take-cards',
     title: 'Take Cards',
-    body: 'Best Take and Current Take are quick handles for playback, comparison, and organization.',
+    body: 'Best Take and Current Take support two distinct gestures: a direct take swap and a held layout move.',
     bullets: [
-      'Press and hold either Camera card until layout mode begins',
-      'Drag both cards anywhere within the screen',
-      'Tap outside the cards when finished',
+      'To swap takes, drag immediately from one card’s text label onto the other card',
+      'To change the layout, hold a card until the haptic and wiggle begin, then move it',
+      'In layout mode, drag either card anywhere within the screen and tap outside when finished',
       'Positions persist after closing the app; Reset restores the original layout',
     ],
   },
@@ -408,18 +448,19 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'Pin a performance as Best Take when you want a stable reference for the repetitions that follow.',
     bullets: [
       'Pin Current Take from its card or choose a take in the Vault',
-      'Replace the reference whenever a stronger performance appears',
+      'Drag Current Take directly onto Best Take to promote it; the previous Best moves to Current',
       'Pinning does not duplicate or remove the original recording',
     ],
   },
   {
     id: 'drag-to-best-take',
-    title: 'Drag to Best Take',
-    body: 'In supported take layouts, press and hold a saved take and drag it to the Best Take position.',
+    title: 'Swap Best & Current',
+    body: 'Drag immediately from a take’s text label to the other card. This is intentionally different from holding a card to rearrange the layout.',
     bullets: [
-      'Wait for the haptic before moving the take',
-      'Drop on Best Take to make it the comparison reference',
-      'The original recording remains safely stored in the Vault',
+      'Current to Best promotes the new reference and moves the previous Best to Current',
+      'Best to Current performs the same two-way swap in reverse',
+      'For layout changes, wait for the haptic and wiggle before dragging',
+      'Swapping never deletes either recording from the Take Vault',
     ],
   },
   {
@@ -467,5 +508,5 @@ export const HELP_TOPICS: HelpTopic[] = [
 ]
 
 // Versioned so users who completed the older interface tutorial see this revised walkthrough.
-export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v4'
-export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v5'
+export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v5'
+export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v6'

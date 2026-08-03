@@ -3,5 +3,6 @@ export type {
   ScaleRushConfig,
   ScaleRushFeedback,
   ScaleRushPhase,
+  ScaleRushPlayerModelId,
   ScaleRushState,
 } from './scaleRushTypes'

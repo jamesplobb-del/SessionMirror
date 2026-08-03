@@ -1,11 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Music2 } from 'lucide-react'
-import { useCallback, useMemo, useRef, useState, type RefObject } from 'react'
+import { ArrowRightLeft, BarChart3, Music2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
   useLivePitchTracker,
+  type AcceptedPitchFrame,
   type PitchSourceHealth,
 } from '../hooks/useLivePitchTracker'
 import DroneSoundWheel from './audioPractice/DroneSoundWheel'
+import PitchInsightsScreen from './audioPractice/PitchInsightsScreen'
+import TunerTranspositionMenu from './audioPractice/TunerTranspositionMenu'
 import TuningGauge from './audioPractice/TuningGauge'
 import { triggerLightHaptic } from '../utils/haptics'
 import {
@@ -14,9 +17,19 @@ import {
   getIntonationColor,
   getIntonationZone,
   isInTune,
+  midiToNoteName,
   type PitchReadout,
 } from '../utils/pitchUtils'
 import type { TunerInstrument } from '../utils/pitchConfig'
+import {
+  DEFAULT_TUNER_TRANSPOSITION,
+  getTunerTransposition,
+  getWrittenPitchLabel,
+  transposePitchReadout,
+  type TunerTranspositionId,
+} from '../utils/tunerTransposition'
+import { savePitchObservation } from '../db/pitchInsightsRepository'
+import { StableNoteTracker } from '../utils/stableNoteTracker'
 import { useTutorialAction } from '../context/TutorialContext'
 interface LivePitchTunerProps {
   mediaRef: RefObject<HTMLMediaElement | null>
@@ -30,6 +43,11 @@ interface LivePitchTunerProps {
   micStreamRef?: RefObject<MediaStream | null>
   persistWhenPaused?: boolean
   tunerInstrument?: TunerInstrument
+  /** Display detected concert pitch as the selected instrument's written note. */
+  tunerTransposition?: TunerTranspositionId
+  /** Audio tuner: opens the written-pitch picker and persists a selection upstream. */
+  onTunerTranspositionChange?: (value: TunerTranspositionId) => void
+  hapticsEnabled?: boolean
   /** Widget-only: analyze live mic instead of media element. */
   pitchSource?: 'media' | 'microphone'
   /** Audio mode: analyze live mic stream (recording or idle tuner). */
@@ -152,25 +170,66 @@ function LiveAudioTunerPane({
   canvasRef,
   drone,
   onDroneInteraction,
+  tunerTransposition,
+  onTunerTranspositionChange,
+  hapticsEnabled,
+  insightsEnabled = false,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
   drone?: LivePitchTunerProps['drone']
   onDroneInteraction?: () => void
+  tunerTransposition: TunerTranspositionId
+  onTunerTranspositionChange?: (value: TunerTranspositionId) => void
+  hapticsEnabled?: boolean
+  insightsEnabled?: boolean
 }) {
   const notifyTutorial = useTutorialAction()
   const [droneOpen, setDroneOpen] = useState(false)
+  const [transpositionOpen, setTranspositionOpen] = useState(false)
+  const [insightsOpen, setInsightsOpen] = useState(false)
   const pitchActive = readout.noteName !== '—'
   const pitchZone = pitchActive ? getIntonationZone(readout.cents) : 'idle'
   const droneActive = Boolean(drone?.activeNotes.length)
-  const droneStatus = droneActive
-    ? `${drone?.activeNotes.length ?? 0} ${drone?.activeNotes.length === 1 ? 'note' : 'notes'}`
-    : 'Off'
+  const transposition = getTunerTransposition(tunerTransposition)
+  const activeDronePitchNames = (drone?.activeNotes ?? []).map((pitchClass) =>
+    getWrittenPitchLabel(pitchClass, drone?.octave ?? 4, tunerTransposition).noteName,
+  )
+  const droneStatus =
+    activeDronePitchNames.length === 0
+      ? 'Off'
+      : activeDronePitchNames.length <= 3
+        ? activeDronePitchNames.join(' · ')
+        : `${activeDronePitchNames.slice(0, 2).join(' · ')} +${activeDronePitchNames.length - 2}`
+  const droneAccessibleStatus = droneActive
+    ? `Drone active. Written pitches ${activeDronePitchNames.join(', ')} for ${transposition.label}`
+    : `Drone off. Pitches will be shown as written for ${transposition.label}`
+  const tunerHapticsEnabled = drone?.hapticsEnabled ?? hapticsEnabled
 
   const toggleDrone = () => {
-    triggerLightHaptic(drone?.hapticsEnabled)
+    triggerLightHaptic(tunerHapticsEnabled)
     notifyTutorial?.(droneOpen ? 'tuner-drone-closed' : 'tuner-drone-opened')
+    setTranspositionOpen(false)
     setDroneOpen((open) => !open)
+  }
+
+  const toggleTransposition = () => {
+    triggerLightHaptic(tunerHapticsEnabled)
+    setDroneOpen(false)
+    setTranspositionOpen((open) => !open)
+  }
+
+  const selectTransposition = (value: TunerTranspositionId) => {
+    triggerLightHaptic(tunerHapticsEnabled)
+    onTunerTranspositionChange?.(value)
+    setTranspositionOpen(false)
+  }
+
+  const openInsights = () => {
+    triggerLightHaptic(tunerHapticsEnabled)
+    setDroneOpen(false)
+    setTranspositionOpen(false)
+    setInsightsOpen(true)
   }
 
   return (
@@ -186,26 +245,70 @@ function LiveAudioTunerPane({
           <span>Flat</span>
         </div>
 
-        {drone ? (
+        {drone || onTunerTranspositionChange || insightsEnabled ? (
           <>
-            <button
-              type="button"
-              data-tutorial="tuner-drone-button"
-              className={`pitch-living-drone-trigger ${
-                droneActive ? 'pitch-living-drone-trigger--active' : ''
+            <div
+              className={`pitch-living-tool-rail ${
+                drone ? 'pitch-living-tool-rail--with-drone' : ''
               }`}
-              onClick={toggleDrone}
-              aria-expanded={droneOpen}
-              aria-controls="pitch-living-drone-panel"
-              title={droneOpen ? 'Hide drone' : 'Open drone'}
+              aria-label="Tuner tools"
             >
-              <Music2 aria-hidden />
-              <span>Drone</span>
-              <small>{droneStatus}</small>
-            </button>
+              {drone ? (
+                <button
+                  type="button"
+                  data-tutorial="tuner-drone-button"
+                  className={`pitch-living-drone-trigger ${
+                    droneActive ? 'pitch-living-drone-trigger--active' : ''
+                  }`}
+                  onClick={toggleDrone}
+                  aria-expanded={droneOpen}
+                  aria-controls="pitch-living-drone-panel"
+                  aria-label={`${droneOpen ? 'Hide' : 'Open'} drone. ${droneAccessibleStatus}`}
+                  title={droneOpen ? 'Hide drone' : `Open drone · ${droneStatus}`}
+                >
+                  <Music2 aria-hidden />
+                  <span>Drone</span>
+                  <small>{droneStatus}</small>
+                </button>
+              ) : null}
+
+              {onTunerTranspositionChange ? (
+                <button
+                  type="button"
+                  className={`pitch-living-drone-trigger pitch-living-transposition-trigger ${
+                    tunerTransposition !== DEFAULT_TUNER_TRANSPOSITION
+                      ? 'pitch-living-transposition-trigger--active'
+                      : ''
+                  }`}
+                  onClick={toggleTransposition}
+                  aria-expanded={transpositionOpen}
+                  aria-controls="pitch-living-transposition-panel"
+                  title={transpositionOpen ? 'Hide transposition' : 'Choose transposition'}
+                >
+                  <ArrowRightLeft aria-hidden />
+                  <span>Transpose</span>
+                  <small>{transposition.shortLabel}</small>
+                </button>
+              ) : null}
+
+              {insightsEnabled ? (
+                <button
+                  type="button"
+                  className="pitch-living-drone-trigger pitch-living-insights-trigger"
+                  onClick={openInsights}
+                  aria-haspopup="dialog"
+                  aria-label="Open Pitch Insights"
+                  title="Open Pitch Insights"
+                >
+                  <BarChart3 aria-hidden />
+                  <span>Pitch Insights</span>
+                  <small>History</small>
+                </button>
+              ) : null}
+            </div>
 
             <AnimatePresence>
-              {droneOpen ? (
+              {droneOpen && drone ? (
                 <motion.section
                   id="pitch-living-drone-panel"
                   className="pitch-living-drone-panel"
@@ -226,6 +329,24 @@ function LiveAudioTunerPane({
                     onDroneInteraction={onDroneInteraction}
                     onClose={toggleDrone}
                     hapticsEnabled={drone.hapticsEnabled}
+                    tunerTransposition={tunerTransposition}
+                  />
+                </motion.section>
+              ) : null}
+
+              {transpositionOpen && onTunerTranspositionChange ? (
+                <motion.section
+                  id="pitch-living-transposition-panel"
+                  className="pitch-living-transposition-panel"
+                  initial={{ y: '105%', opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: '105%', opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 390, damping: 36 }}
+                >
+                  <TunerTranspositionMenu
+                    value={tunerTransposition}
+                    onChange={selectTransposition}
+                    onClose={toggleTransposition}
                   />
                 </motion.section>
               ) : null}
@@ -233,6 +354,22 @@ function LiveAudioTunerPane({
           </>
         ) : null}
       </div>
+
+      {insightsEnabled ? (
+        <PitchInsightsScreen
+          isOpen={insightsOpen}
+          onClose={() => {
+            setInsightsOpen(false)
+          }}
+          transpositionId={tunerTransposition}
+          formatNoteName={(midiNote) =>
+            midiToNoteName(
+              midiNote + getTunerTransposition(tunerTransposition).writtenOffsetSemitones,
+            )
+          }
+          hapticFeedback={tunerHapticsEnabled}
+        />
+      ) : null}
     </div>
   )
 }
@@ -281,6 +418,9 @@ function LivePitchTunerAudio({
   liveMicEnabled,
   micStreamRef,
   tunerInstrument = 'voice',
+  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  onTunerTranspositionChange,
+  hapticsEnabled,
   liveMicOnly = false,
   drone,
   onLiveSourceHealthChange,
@@ -293,6 +433,9 @@ function LivePitchTunerAudio({
   liveMicEnabled: boolean
   micStreamRef?: RefObject<MediaStream | null>
   tunerInstrument?: TunerInstrument
+  tunerTransposition?: TunerTranspositionId
+  onTunerTranspositionChange?: (value: TunerTranspositionId) => void
+  hapticsEnabled?: boolean
   liveMicOnly?: boolean
   drone?: LivePitchTunerProps['drone']
   onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
@@ -300,6 +443,63 @@ function LivePitchTunerAudio({
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
   const droneAnalysisSuppressUntilRef = useRef(0)
+  const insightsSessionIdRef = useRef<string | null>(null)
+  if (!insightsSessionIdRef.current) {
+    insightsSessionIdRef.current = crypto.randomUUID()
+  }
+  const insightsContextRef = useRef({
+    tunerInstrument,
+    transpositionId: tunerTransposition,
+    sessionId: insightsSessionIdRef.current,
+  })
+  insightsContextRef.current = {
+    ...insightsContextRef.current,
+    tunerInstrument,
+    transpositionId: tunerTransposition,
+  }
+  const stableNoteTrackerRef = useRef<StableNoteTracker | null>(null)
+  if (!stableNoteTrackerRef.current) {
+    stableNoteTrackerRef.current = new StableNoteTracker((observation) => {
+      void savePitchObservation(observation).catch((error: unknown) => {
+        console.warn('[PitchInsights] Failed to save stable observation', error)
+      })
+    })
+  }
+  // A sustained in-app drone is valid tuner context, but it is not reliable
+  // evidence of the musician's own pitch. With music capture processing the
+  // speaker can bleed into the microphone, so keep the live readout running
+  // while excluding those frames from long-term Insights.
+  const insightsSuppressedRef = useRef(Boolean(drone?.activeNotes.length))
+  const insightsSuppressed = Boolean(drone?.activeNotes.length)
+  insightsSuppressedRef.current = insightsSuppressed
+
+  const handleAcceptedPitchFrame = useCallback((frame: AcceptedPitchFrame | null) => {
+    const tracker = stableNoteTrackerRef.current
+    if (!tracker) return
+    if (!frame || insightsSuppressedRef.current) {
+      tracker.finish()
+      return
+    }
+    tracker.ingest(
+      {
+        midiNote: frame.readout.midi,
+        noteName: frame.readout.noteName,
+        centsOffset: frame.readout.cents,
+        frequencyHz: frame.readout.frequencyHz,
+        confidence: frame.confidence,
+        timestamp: frame.timestamp,
+      },
+      insightsContextRef.current,
+    )
+  }, [])
+
+  useEffect(() => {
+    return () => stableNoteTrackerRef.current?.finish()
+  }, [])
+
+  useEffect(() => {
+    if (insightsSuppressed) stableNoteTrackerRef.current?.finish()
+  }, [insightsSuppressed])
 
   const suppressDroneAnalysis = useCallback(() => {
     droneAnalysisSuppressUntilRef.current = performance.now() + DRONE_ANALYSIS_SUPPRESS_MS
@@ -324,8 +524,15 @@ function LivePitchTunerAudio({
       preferNativeAudioTap: true,
       retryNativeTapOnInteractiveRecovery: liveMicOnly,
       onSourceHealthChange: onLiveSourceHealthChange,
+      onAcceptedPitchFrame: liveMicOnly ? handleAcceptedPitchFrame : undefined,
     }),
-    [liveMicOnly, micStreamRef, onLiveSourceHealthChange, tunerInstrument],
+    [
+      handleAcceptedPitchFrame,
+      liveMicOnly,
+      micStreamRef,
+      onLiveSourceHealthChange,
+      tunerInstrument,
+    ],
   )
 
   const playbackTrackerOptions = useMemo(
@@ -358,6 +565,15 @@ function LivePitchTunerAudio({
     playbackTrackerOptions,
   )
 
+  const liveReadout = useMemo(
+    () => transposePitchReadout(liveTracker.readout, tunerTransposition),
+    [liveTracker.readout, tunerTransposition],
+  )
+  const playbackReadout = useMemo(
+    () => transposePitchReadout(playbackTracker.readout, tunerTransposition),
+    [playbackTracker.readout, tunerTransposition],
+  )
+
   const paneKey = showPlayback ? 'playback' : showLive ? 'live' : 'idle'
 
   return (
@@ -373,17 +589,25 @@ function LivePitchTunerAudio({
         >
           {showPlayback ? (
             <LiveAudioTunerPane
-              readout={playbackTracker.readout}
+              readout={playbackReadout}
               canvasRef={playbackCanvasRef}
               drone={drone}
               onDroneInteraction={suppressDroneAnalysis}
+              tunerTransposition={tunerTransposition}
+              onTunerTranspositionChange={onTunerTranspositionChange}
+              hapticsEnabled={hapticsEnabled}
+              insightsEnabled={liveMicOnly}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
-              readout={liveTracker.readout}
+              readout={liveReadout}
               canvasRef={liveCanvasRef}
               drone={drone}
               onDroneInteraction={suppressDroneAnalysis}
+              tunerTransposition={tunerTransposition}
+              onTunerTranspositionChange={onTunerTranspositionChange}
+              hapticsEnabled={hapticsEnabled}
+              insightsEnabled={liveMicOnly}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -412,6 +636,9 @@ export default function LivePitchTuner({
   micStreamRef,
   persistWhenPaused = false,
   tunerInstrument = 'voice',
+  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  onTunerTranspositionChange,
+  hapticsEnabled,
   pitchSource = 'media',
   liveMicOnly = false,
   drone,
@@ -455,6 +682,9 @@ export default function LivePitchTuner({
         liveMicEnabled={liveMicEnabled}
         micStreamRef={micStreamRef}
         tunerInstrument={tunerInstrument}
+        tunerTransposition={tunerTransposition}
+        onTunerTranspositionChange={onTunerTranspositionChange}
+        hapticsEnabled={hapticsEnabled}
         liveMicOnly={liveMicOnly}
         drone={drone}
         onLiveSourceHealthChange={onLiveSourceHealthChange}
@@ -462,11 +692,13 @@ export default function LivePitchTuner({
     )
   }
 
-  const active = tracker.readout.noteName !== '—'
-  const displayCents = active ? tracker.readout.cents : 0
+  const displayReadout = transposePitchReadout(tracker.readout, tunerTransposition)
+
+  const active = displayReadout.noteName !== '—'
+  const displayCents = active ? displayReadout.cents : 0
   const accent = active ? getIntonationColor(displayCents) : 'rgba(255,255,255,0.55)'
-  const inTune = active && isInTune(tracker.readout.cents)
-  const zone = active ? getIntonationZone(tracker.readout.cents) : null
+  const inTune = active && isInTune(displayReadout.cents)
+  const zone = active ? getIntonationZone(displayReadout.cents) : null
   const spectrogramHeight = isStage
     ? 'min-h-0 flex-1'
     : 'h-[6.5rem]'
@@ -476,7 +708,7 @@ export default function LivePitchTuner({
       <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col">
         <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget pitch-glass-panel--elevated relative flex h-full min-h-0 w-full flex-col overflow-hidden">
           <CompactPitchWidgetPane
-            readout={tracker.readout}
+            readout={displayReadout}
             canvasRef={canvasRef}
             isPlaying={trackerPlaying}
           />
@@ -500,10 +732,10 @@ export default function LivePitchTuner({
                 className="pitch-readout-display text-2xl font-bold leading-none tracking-tight"
                 style={{ color: accent }}
               >
-                {tracker.readout.noteName}
+                {displayReadout.noteName}
                 {active && (
                   <span className="ml-2 text-lg font-semibold">
-                    {formatDisplayCents(tracker.readout.cents)}
+                    {formatDisplayCents(displayReadout.cents)}
                   </span>
                 )}
               </p>
@@ -512,7 +744,7 @@ export default function LivePitchTuner({
               className="pitch-readout-display shrink-0 text-sm font-bold"
               style={{ color: accent }}
             >
-              {formatFrequencyHz(tracker.readout.frequencyHz)}
+              {formatFrequencyHz(displayReadout.frequencyHz)}
             </p>
           </div>
 
@@ -540,10 +772,10 @@ export default function LivePitchTuner({
                 className="mt-2 font-mono text-6xl font-bold leading-none tabular-nums sm:text-7xl"
                 style={{ color: accent }}
               >
-                {tracker.readout.noteName}
+                {displayReadout.noteName}
               </p>
               <p className="mt-1.5 font-mono text-xs text-white/35">
-                {formatFrequencyHz(tracker.readout.frequencyHz)}
+                {formatFrequencyHz(displayReadout.frequencyHz)}
               </p>
             </div>
 
@@ -552,7 +784,7 @@ export default function LivePitchTuner({
                 className="font-mono text-3xl font-semibold tabular-nums"
                 style={{ color: accent }}
               >
-                {active ? formatDisplayCents(tracker.readout.cents) : '—'}
+                {active ? formatDisplayCents(displayReadout.cents) : '—'}
               </p>
               <div className="mt-1.5">
                 <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
@@ -561,7 +793,7 @@ export default function LivePitchTuner({
           </div>
 
           <div className="mt-4">
-            <CentsNeedle cents={tracker.readout.cents} active={active} />
+            <CentsNeedle cents={displayReadout.cents} active={active} />
             <div className="mt-1.5 flex justify-between font-mono text-[10px] text-white/25">
               <span>-50</span>
               <span className="text-emerald-400/60">0</span>
@@ -592,10 +824,10 @@ export default function LivePitchTuner({
               className="mt-1 font-mono text-5xl font-bold leading-none tabular-nums"
               style={{ color: accent }}
             >
-              {tracker.readout.noteName}
+              {displayReadout.noteName}
             </p>
             <p className="mt-1 font-mono text-[11px] text-white/35">
-              {formatFrequencyHz(tracker.readout.frequencyHz)}
+              {formatFrequencyHz(displayReadout.frequencyHz)}
             </p>
           </div>
 
@@ -604,7 +836,7 @@ export default function LivePitchTuner({
               className="font-mono text-2xl font-semibold tabular-nums"
               style={{ color: accent }}
             >
-              {active ? formatDisplayCents(tracker.readout.cents) : '—'}
+              {active ? formatDisplayCents(displayReadout.cents) : '—'}
             </p>
             <div className="mt-1">
               <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
@@ -613,7 +845,7 @@ export default function LivePitchTuner({
         </div>
 
         <div className="mt-3">
-          <CentsNeedle cents={tracker.readout.cents} active={active} />
+          <CentsNeedle cents={displayReadout.cents} active={active} />
           <div className="mt-1 flex justify-between font-mono text-[9px] text-white/25">
             <span>-50</span>
             <span className="text-emerald-400/60">0</span>

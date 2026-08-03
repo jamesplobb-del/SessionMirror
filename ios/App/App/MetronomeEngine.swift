@@ -462,36 +462,39 @@ final class MetronomeEngine {
 
         stateLock.lock()
         var clicks = activeClicks
-        let pendingSnapshot = pendingClicks
-        pendingClicks = []
+        var pending = pendingClicks
+        pendingClicks.removeAll(keepingCapacity: true)
         let bufferStart = globalSampleIndex
         globalSampleIndex += Int64(frames)
+        let capturedEventGeneration = eventGeneration
         stateLock.unlock()
-
-        var pending = pendingSnapshot
 
         let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
         let channelCount = ablPointer.count
+        if pending.count > 1 {
+            pending.sort { $0.startSample < $1.startSample }
+        }
+        var nextPendingIndex = 0
 
         for frame in 0..<frames {
             let absoluteSample = bufferStart + Int64(frame)
 
-            var stillPending: [PendingClick] = []
-            for item in pending {
-                if item.startSample == absoluteSample {
-                    clicks.append(makeVoice(for: item, sound: item.sound))
-                } else if item.startSample > absoluteSample {
-                    stillPending.append(item)
-                } else {
-                    clicks.append(makeVoice(for: item, sound: item.sound))
-                }
+            // The audio render callback runs tens of thousands of times per
+            // second. Compact these tiny queues in place instead of allocating
+            // two fresh arrays for every rendered sample. Besides reducing CPU,
+            // this avoids sustained allocator pressure when the metronome and
+            // microphone-based tuner are left running for a long session.
+            while nextPendingIndex < pending.count,
+                  pending[nextPendingIndex].startSample <= absoluteSample {
+                let item = pending[nextPendingIndex]
+                clicks.append(makeVoice(for: item, sound: item.sound))
+                nextPendingIndex += 1
             }
-            pending = stillPending
 
             var mixed: Float = 0
-            var nextClicks: [ClickVoice] = []
-
-            for var voice in clicks {
+            var voiceIndex = 0
+            while voiceIndex < clicks.count {
+                var voice = clicks[voiceIndex]
                 let gain: Float
                 if voice.elapsed < voice.attackSamples {
                     let t = Float(voice.elapsed + 1) / Float(max(1, voice.attackSamples))
@@ -509,10 +512,12 @@ final class MetronomeEngine {
                 if voice.phase > twoPi { voice.phase -= twoPi }
                 voice.elapsed += 1
                 if voice.elapsed < voice.totalSamples {
-                    nextClicks.append(voice)
+                    clicks[voiceIndex] = voice
+                    voiceIndex += 1
+                } else {
+                    clicks.remove(at: voiceIndex)
                 }
             }
-            clicks = nextClicks
 
             let sample = speakerClip(mixed * speakerBusGain)
             for channel in 0..<channelCount {
@@ -522,8 +527,18 @@ final class MetronomeEngine {
         }
 
         stateLock.lock()
-        activeClicks = clicks
-        pendingClicks.append(contentsOf: pending)
+        // A stop/restart may race an in-flight render buffer. Never restore
+        // voices from the previous generation, and do not resurrect voices that
+        // setMuted intentionally cleared while this buffer was rendering.
+        if eventGeneration == capturedEventGeneration && !muted {
+            activeClicks = clicks
+            while nextPendingIndex < pending.count {
+                pendingClicks.append(pending[nextPendingIndex])
+                nextPendingIndex += 1
+            }
+        } else {
+            activeClicks.removeAll(keepingCapacity: true)
+        }
         stateLock.unlock()
         return noErr
     }

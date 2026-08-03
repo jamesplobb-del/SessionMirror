@@ -1,7 +1,7 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
 
 /** Lifecycle phases shared across Practice Arcade games. */
-export type GamePhase = 'setup' | 'playing' | 'gameover'
+export type GamePhase = 'setup' | 'playing' | 'paused' | 'gameover'
 
 /** Base statistics tracked during play and shown at game over. */
 export interface GameStatistics {

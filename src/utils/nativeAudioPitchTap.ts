@@ -235,16 +235,23 @@ export function subscribeNativeAudioPitchFrames(
   if (!isNativeCameraTestAvailable()) return null
   pitchFrameSubscribers.add(onChunk)
   let removed = false
+  const listenerReady = ensureSharedPitchFrameListener()
 
-  return ensureSharedPitchFrameListener().then(() => ({
+  // Return the subscription wrapper immediately. Waiting for Capacitor's
+  // asynchronous addListener call before exposing remove() meant a quick tab
+  // switch could retain an abandoned graph callback until the bridge replied.
+  void listenerReady.catch(() => {
+    pitchFrameSubscribers.delete(onChunk)
+    void releaseSharedPitchFrameListenerIfIdle()
+  })
+
+  return Promise.resolve({
     remove: async () => {
       if (removed) return
       removed = true
       pitchFrameSubscribers.delete(onChunk)
+      await listenerReady.catch(() => undefined)
       await releaseSharedPitchFrameListenerIfIdle()
     },
-  })).catch((error) => {
-    pitchFrameSubscribers.delete(onChunk)
-    throw error
   })
 }
