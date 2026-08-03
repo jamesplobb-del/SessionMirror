@@ -301,8 +301,6 @@ function LiveAudioTunerPane({
                   title="Open Pitch Insights"
                 >
                   <BarChart3 aria-hidden />
-                  <span>Pitch Insights</span>
-                  <small>History</small>
                 </button>
               ) : null}
             </div>

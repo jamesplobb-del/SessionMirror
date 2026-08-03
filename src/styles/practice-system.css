@@ -576,7 +576,7 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   position: absolute;
   z-index: 5;
   right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
+  bottom: max(4px, calc(env(safe-area-inset-bottom) - 8px));
   display: grid;
   width: 110px;
   max-width: calc(100% - 24px);
@@ -673,36 +673,33 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 }
 
 .pitch-living-insights-trigger {
-  width: 100%;
-  min-height: 46px;
-  align-self: stretch;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  align-self: center;
+  justify-self: center;
   grid-column: 1;
   grid-row: auto;
-  grid-template-columns: 20px 1fr;
-  grid-template-rows: auto auto;
-  justify-items: stretch;
-  padding: 6px 11px;
-  border-radius: 12px;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  place-items: center;
+  padding: 0;
+  border-radius: 14px;
   border-color: rgba(21, 152, 255, 0.18);
   background: rgba(248, 252, 255, 0.88);
-  text-align: left;
+  text-align: center;
 }
 
 .pitch-living-tool-rail--with-drone .pitch-living-insights-trigger {
-  align-self: stretch;
+  align-self: center;
   grid-row: auto;
 }
 
 .pitch-living-insights-trigger svg {
-  width: 18px;
-  height: 18px;
-  grid-row: 1 / 3;
+  width: 20px;
+  height: 20px;
+  grid-row: auto;
   color: #197cbf;
-}
-
-.pitch-living-insights-trigger span,
-.pitch-living-insights-trigger small {
-  display: block;
 }
 
 .pitch-living-drone-panel {
