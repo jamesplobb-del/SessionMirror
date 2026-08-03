@@ -284,8 +284,8 @@ const MIC_ECONOMY_TICK_MS = 72
 const READOUT_PUBLISH_ECONOMY_MS = 100
 /** Canvas analysis remains display-rate; React labels do not need more than 30fps. */
 const READOUT_PUBLISH_REALTIME_MS = 32
-/** Rebuilding smoothed traces allocates several short arrays; cap visual redraws at 30fps. */
-const CANVAS_DRAW_REALTIME_MS = 32
+/** Realtime mode updates synchronously on every requestAnimationFrame for fluid 60fps/120fps pitch rendering. */
+const CANVAS_DRAW_REALTIME_MS = 0
 /** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
 const REALTIME_MIC_FRAME_SIZE = 2048
 /** Native tap can survive while its AVCapture output stops delivering; rebuild when stale. */
@@ -820,13 +820,9 @@ function drawColoredTraceSegments(
     const strokeColor = getTraceColor(points[runEnd].cents)
 
     if (glow && !isSilenceFloorSample(points[runEnd].cents)) {
-      ctx.save()
-      ctx.shadowColor = glowColorForCents(points[runEnd].cents)
-      ctx.shadowBlur = lineWidth >= 6 ? 10 : 8
-      ctx.strokeStyle = strokeColor
+      ctx.strokeStyle = glowColorForCents(points[runEnd].cents)
       strokeRun(runStart, runEnd)
       ctx.stroke()
-      ctx.restore()
     }
 
     ctx.strokeStyle = strokeColor

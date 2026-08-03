@@ -4,6 +4,7 @@ import {
   SQLiteConnection,
   type SQLiteDBConnection,
 } from '@capacitor-community/sqlite'
+import { safeRandomUUID } from '../utils/uuid'
 import { CREATE_SCHEMA_SQL, DB_NAME, DB_VERSION, DEFAULT_PROJECT_NAME } from './schema'
 import { migrateVaultSchema } from './migrations'
 
@@ -71,7 +72,7 @@ async function ensureDefaultProjectRow(db: SQLiteDBConnection): Promise<void> {
   const count = Number(result.values?.[0]?.count ?? 0)
   if (count > 0) return
 
-  const id = crypto.randomUUID()
+  const id = safeRandomUUID()
   const createdAt = Date.now()
   await db.run(
     'INSERT INTO projects (id, name, created_at) VALUES (?, ?, ?)',

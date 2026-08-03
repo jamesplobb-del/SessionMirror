@@ -1,4 +1,5 @@
 import { initVaultDatabase, persistVaultWebStore } from './connection'
+import { safeRandomUUID } from '../utils/uuid'
 
 export const PITCH_INSIGHTS_UPDATED_EVENT = 'besttake:pitch-insights-updated'
 
@@ -96,7 +97,7 @@ async function performSavePitchObservation(
 ): Promise<PitchObservation> {
   const observation: PitchObservation = {
     ...input,
-    id: input.id ?? crypto.randomUUID(),
+    id: input.id ?? safeRandomUUID(),
     midiNote: Math.round(input.midiNote),
     octave: Math.round(input.octave),
     centsOffset: Number(input.centsOffset.toFixed(3)),

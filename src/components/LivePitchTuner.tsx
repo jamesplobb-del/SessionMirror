@@ -31,6 +31,7 @@ import {
 import { savePitchObservation } from '../db/pitchInsightsRepository'
 import { StableNoteTracker } from '../utils/stableNoteTracker'
 import { useTutorialAction } from '../context/TutorialContext'
+import { safeRandomUUID } from '../utils/uuid'
 interface LivePitchTunerProps {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -443,7 +444,7 @@ function LivePitchTunerAudio({
   const droneAnalysisSuppressUntilRef = useRef(0)
   const insightsSessionIdRef = useRef<string | null>(null)
   if (!insightsSessionIdRef.current) {
-    insightsSessionIdRef.current = crypto.randomUUID()
+    insightsSessionIdRef.current = safeRandomUUID()
   }
   const insightsContextRef = useRef({
     tunerInstrument,
