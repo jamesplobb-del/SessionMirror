@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { AudioLines, ChevronLeft, FileMusic, FolderOpen, Music4, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -54,6 +54,13 @@ import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOver
 /** Sheets portal to document.body; the overlay itself sits at z-135. */
 const MULTITRACK_SHEET_Z = { backdrop: 'z-[140]', sheet: 'z-[145]' }
 const MULTITRACK_MONITOR_CACHE_DIR = 'multitrack-monitor-assets'
+
+const SHEET_FRAME_OPTIONS = [
+  { value: 'top', label: 'Above', detail: 'Full-width row above the videos', Icon: ArrowUp },
+  { value: 'bottom', label: 'Below', detail: 'Full-width row below the videos', Icon: ArrowDown },
+  { value: 'left', label: 'Left side', detail: 'Vertical panel beside the videos', Icon: ArrowLeft },
+  { value: 'right', label: 'Right side', detail: 'Vertical panel beside the videos', Icon: ArrowRight },
+] as const
 
 interface MultitrackOverlayProps {
   isOpen: boolean
@@ -142,7 +149,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take } | null>(null)
   const discardNextRecordingRef = useRef(false)
   /** Bottom sheets: backing source, mixer, or a tile's action sheet. */
-  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'mixer' | 'export' | null>(null)
+  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'mixer' | 'export' | 'visual' | null>(null)
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
   const [alignStageOpen, setAlignStageOpen] = useState(false)
   const sheetMusicInputRef = useRef<HTMLInputElement>(null)
@@ -184,6 +191,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
     updatePractice(patch)
   }, [session.practice.bpm, updatePractice])
+
+  const updateSheetMusicAsset = useCallback((patch: Partial<NonNullable<typeof session.sheetMusic.asset>>) => {
+    const asset = session.sheetMusic.asset
+    if (!asset) return
+    assignSheetMusic(session.sheetMusic.id, { ...asset, ...patch })
+  }, [assignSheetMusic, session.sheetMusic])
+
+  const handleSheetMusicAssetChange = useCallback((panelId: string, asset: typeof session.sheetMusic.asset) => {
+    assignSheetMusic(panelId, asset)
+    if (!asset) setActiveSourceSheet(null)
+  }, [assignSheetMusic])
 
   const clearYoutubeStartSchedule = useCallback(() => {
     youtubeStartGenerationRef.current += 1
@@ -1001,7 +1019,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 <Pressable
                   type="button"
                   intensity="soft"
-                  onClick={() => sheetMusicInputRef.current?.click()}
+                  onClick={() => {
+                    if (session.sheetMusic.asset) setActiveSourceSheet('visual')
+                    else sheetMusicInputRef.current?.click()
+                  }}
                   className={`multitrack-source-chip ${session.sheetMusic.asset ? 'multitrack-source-chip--active' : ''}`}
                 >
                   <FileMusic className="h-3.5 w-3.5" />
@@ -1033,7 +1054,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 reviewTake={pendingReview?.panelId === activePanelId ? pendingReview.take : null}
                 reviewMediaRef={inGridReviewMediaRef}
                 onTapPerformance={(id) => { triggerLightHaptic(hapticFeedback); setTileSheetPanelId(id) }}
-                onRemoveTake={(id) => assignTakeToPanel(id, null)} onSheetMusicChange={assignSheetMusic}
+                onRemoveTake={(id) => assignTakeToPanel(id, null)}
+                onSheetMusicChange={handleSheetMusicAssetChange}
+                onEditSheetMusic={() => setActiveSourceSheet('visual')}
                 onRegisterMedia={registerPanelMedia} />
             </div>
             <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
@@ -1188,10 +1211,135 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           if (!file) return
           void loadSheetMusicFile(file).then((asset) => {
             assignSheetMusic(session.sheetMusic.id, asset)
+            setActiveSourceSheet('visual')
           })
           event.currentTarget.value = ''
         }}
       />
+
+      {session.sheetMusic.asset ? (
+        <AnimatedBottomSheet
+          isOpen={activeSourceSheet === 'visual' && isOpen}
+          onClose={() => setActiveSourceSheet(null)}
+          ariaLabel="Image and sheet layout"
+          elevated
+          elevatedLight
+          zClass={MULTITRACK_SHEET_Z}
+          maxHeightClass="max-h-[78vh]"
+        >
+          <div className="multitrack-sheet multitrack-visual-editor">
+            <div className="multitrack-visual-editor__heading">
+              <div>
+                <p className="multitrack-sheet__title">Image &amp; sheet layout</p>
+                <p>Choose where its panel sits. After closing this sheet, drag the image or pinch it directly to zoom.</p>
+              </div>
+              <Pressable
+                type="button"
+                intensity="normal"
+                className="multitrack-visual-editor__done"
+                onClick={() => setActiveSourceSheet(null)}
+              >
+                Done
+              </Pressable>
+            </div>
+
+            <section className="multitrack-visual-editor__section">
+              <div className="multitrack-visual-editor__section-title">
+                <strong>Place panel</strong>
+                <span>This moves the whole image panel around your videos.</span>
+              </div>
+              <div className="multitrack-visual-editor__placements" role="radiogroup" aria-label="Image panel placement">
+                {SHEET_FRAME_OPTIONS.map(({ value, label, detail, Icon }) => {
+                  const active = (session.sheetMusic.asset?.framePosition ?? 'top') === value
+                  return (
+                    <Pressable
+                      key={value}
+                      type="button"
+                      intensity="soft"
+                      role="radio"
+                      aria-checked={active}
+                      className={`multitrack-visual-editor__placement ${active ? 'is-active' : ''}`}
+                      onClick={() => updateSheetMusicAsset({ framePosition: value })}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>
+                        <strong>{label}</strong>
+                        <small>{detail}</small>
+                      </span>
+                    </Pressable>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="multitrack-visual-editor__section multitrack-visual-editor__sliders">
+              <label className="multitrack-visual-editor__slider-row">
+                <span>
+                  <strong>Panel size</strong>
+                  <small>How much layout space it receives</small>
+                </span>
+                <output>{Math.round((session.sheetMusic.asset.frameScale ?? 1) * 100)}%</output>
+                <input
+                  type="range"
+                  min={0.65}
+                  max={1.8}
+                  step={0.05}
+                  value={session.sheetMusic.asset.frameScale ?? 1}
+                  onChange={(event) => updateSheetMusicAsset({ frameScale: Number(event.target.value) })}
+                />
+              </label>
+              <label className="multitrack-visual-editor__slider-row">
+                <span>
+                  <strong>Image zoom</strong>
+                  <small>You can also pinch directly on the image</small>
+                </span>
+                <output>{Math.round((session.sheetMusic.asset.scale ?? 1) * 100)}%</output>
+                <input
+                  type="range"
+                  min={0.6}
+                  max={2.5}
+                  step={0.05}
+                  value={session.sheetMusic.asset.scale ?? 1}
+                  onChange={(event) => updateSheetMusicAsset({ scale: Number(event.target.value) })}
+                />
+              </label>
+            </section>
+
+            <div className="multitrack-visual-editor__actions">
+              <Pressable
+                type="button"
+                intensity="soft"
+                onClick={() => updateSheetMusicAsset({ x: 0.5, y: 0.5, scale: 1 })}
+              >
+                <Crosshair className="h-4 w-4" />
+                Center &amp; fit image
+              </Pressable>
+              <Pressable
+                type="button"
+                intensity="soft"
+                onClick={() => updateSheetMusicAsset({
+                  x: 0.5,
+                  y: 0.5,
+                  scale: 1,
+                  frameScale: 1,
+                  framePosition: 'top',
+                })}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset layout
+              </Pressable>
+              <Pressable
+                type="button"
+                intensity="soft"
+                onClick={() => sheetMusicInputRef.current?.click()}
+              >
+                <FileMusic className="h-4 w-4" />
+                Replace file
+              </Pressable>
+            </div>
+          </div>
+        </AnimatedBottomSheet>
+      ) : null}
 
       {/* Tile action sheet: "What do you want here?" */}
       <AnimatedBottomSheet

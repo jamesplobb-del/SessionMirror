@@ -30,10 +30,6 @@
 .multitrack-grid {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 0.8rem;
-  background: #1c1917;
 }
 
 .multitrack-music-adder {
@@ -282,18 +278,16 @@
 .multitrack-grid__cell {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
 }
 
 .multitrack-panel {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 0;
+  border-radius: 0.75rem;
   overflow: hidden;
   background: #1c1917;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .multitrack-panel--empty {
@@ -302,7 +296,7 @@
   align-items: center;
   justify-content: center;
   background: #fafaf9;
-  border: 0;
+  border: 2px dashed #d6d3d1;
   color: #57534e;
 }
 
@@ -516,45 +510,231 @@
   user-select: none;
 }
 
-.multitrack-panel__sheet-tools {
+.multitrack-panel__sheet-actions {
   position: absolute;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: 0.5rem;
+  top: 0.45rem;
+  right: 0.45rem;
   z-index: 4;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.375rem;
-  pointer-events: none;
-}
-
-.multitrack-panel__sheet-tool-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.48);
-  color: #fff;
+  gap: 0.35rem;
   pointer-events: auto;
-  backdrop-filter: blur(14px);
 }
 
-.multitrack-panel__sheet-tool-row button {
+.multitrack-panel__sheet-edit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
+  gap: 0.3rem;
+  min-height: 2rem;
+  padding: 0 0.65rem;
   border-radius: 999px;
-  color: inherit;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  backdrop-filter: blur(14px);
 }
 
-.multitrack-panel__sheet-tool-row button.is-active {
+.multitrack-panel__gesture-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 0.5rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  max-width: calc(100% - 1rem);
+  min-height: 1.75rem;
+  transform: translateX(-50%);
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+
+.multitrack-visual-editor {
+  gap: 0.85rem;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+
+.multitrack-visual-editor__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.multitrack-visual-editor__heading > div {
+  min-width: 0;
+}
+
+.multitrack-visual-editor__heading p:last-child {
+  margin: 0.2rem 0 0;
+  color: #78716c;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.multitrack-visual-editor__done {
+  flex-shrink: 0;
+  min-height: 2.25rem;
+  border-radius: 999px;
+  background: #1c1917;
+  padding: 0 0.9rem;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.multitrack-visual-editor__section {
+  border: 1px solid #e7e5e4;
+  border-radius: 1rem;
   background: #fff;
-  color: #1c1917;
+  padding: 0.75rem;
+}
+
+.multitrack-visual-editor__section-title strong,
+.multitrack-visual-editor__section-title span {
+  display: block;
+}
+
+.multitrack-visual-editor__section-title strong {
+  color: #292524;
+  font-size: 0.82rem;
+}
+
+.multitrack-visual-editor__section-title span {
+  margin-top: 0.12rem;
+  color: #78716c;
+  font-size: 0.7rem;
+}
+
+.multitrack-visual-editor__placements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.multitrack-visual-editor__placement {
+  display: flex;
+  min-width: 0;
+  min-height: 3.5rem;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid #e7e5e4;
+  border-radius: 0.8rem;
+  background: #fafaf9;
+  padding: 0.55rem 0.65rem;
+  color: #57534e;
+  text-align: left;
+}
+
+.multitrack-visual-editor__placement > span,
+.multitrack-visual-editor__placement strong,
+.multitrack-visual-editor__placement small {
+  display: block;
+  min-width: 0;
+}
+
+.multitrack-visual-editor__placement strong {
+  color: #292524;
+  font-size: 0.75rem;
+}
+
+.multitrack-visual-editor__placement small {
+  margin-top: 0.08rem;
+  color: #78716c;
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
+
+.multitrack-visual-editor__placement.is-active {
+  border-color: #1c1917;
+  background: #1c1917;
+  color: #fff;
+}
+
+.multitrack-visual-editor__placement.is-active strong,
+.multitrack-visual-editor__placement.is-active small {
+  color: #fff;
+}
+
+.multitrack-visual-editor__sliders {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.multitrack-visual-editor__slider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+
+.multitrack-visual-editor__slider-row span,
+.multitrack-visual-editor__slider-row strong,
+.multitrack-visual-editor__slider-row small {
+  display: block;
+}
+
+.multitrack-visual-editor__slider-row strong {
+  color: #292524;
+  font-size: 0.78rem;
+}
+
+.multitrack-visual-editor__slider-row small {
+  margin-top: 0.08rem;
+  color: #78716c;
+  font-size: 0.65rem;
+}
+
+.multitrack-visual-editor__slider-row output {
+  color: #57534e;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.multitrack-visual-editor__slider-row input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: #1c1917;
+}
+
+.multitrack-visual-editor__actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.multitrack-visual-editor__actions button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid #e7e5e4;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.45rem;
+  color: #44403c;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+@media (max-width: 420px) {
+  .multitrack-visual-editor__actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .multitrack-toolbar {

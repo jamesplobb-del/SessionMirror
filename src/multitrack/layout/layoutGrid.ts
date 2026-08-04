@@ -10,7 +10,7 @@ export function layoutGridStyle(preset: MultitrackLayoutPreset, musicAsset: Shee
     gridTemplateAreas: areas.map((row) => `"${row}"`).join(' '),
     gridTemplateColumns: columnWeights.map((weight) => `minmax(0, ${weight}fr)`).join(' '),
     gridTemplateRows: rowWeights.map((weight) => `minmax(0, ${weight}fr)`).join(' '),
-    gap: 0,
+    gap: '0.375rem',
     width: '100%',
     height: '100%',
     minHeight: 0,

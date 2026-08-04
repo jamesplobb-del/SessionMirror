@@ -11,11 +11,12 @@ import type {
   SheetMusicPanelState,
 } from '../types'
 
-export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onRegisterMedia }: {
+export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onEditSheetMusic, onRegisterMedia }: {
   layout: MultitrackLayoutPreset; panels: MultitrackPanelState[]; sheetMusicPanel: SheetMusicPanelState; recordingTargetPanelId: string | null; recordingPhase: MultitrackRecordingPhase
   streamRef?: RefObject<MediaStream | null>; streamGeneration?: number; nativeLivePreviewActive?: boolean; nativeCameraBridgeEnabled?: boolean
   countInRemaining?: number; recordingElapsed?: number; reviewTake?: Take | null; reviewMediaRef?: RefObject<HTMLMediaElement | null>
   onTapPerformance: (id: string) => void; onRemoveTake: (id: string) => void; onSheetMusicChange: (id: string, asset: SheetMusicAsset | null) => void
+  onEditSheetMusic?: () => void
   onRegisterMedia: (id: string, el: HTMLMediaElement | null) => void
 }) {
   const hasMusic = Boolean(sheetMusicPanel.asset)
@@ -23,7 +24,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
     <div className="multitrack-grid" style={layoutGridStyle(layout, sheetMusicPanel.asset)}>
       {hasMusic ? (
         <div style={panelAreaStyle(sheetMusicPanel.id)} className="multitrack-grid__cell">
-          <SheetMusicPanel panel={sheetMusicPanel} onAssetChange={(asset) => onSheetMusicChange(sheetMusicPanel.id, asset)} />
+          <SheetMusicPanel panel={sheetMusicPanel} onAssetChange={(asset) => onSheetMusicChange(sheetMusicPanel.id, asset)} onEdit={onEditSheetMusic} />
         </div>
       ) : null}
       {panels.map((panel) => (
@@ -46,7 +47,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
               onRegisterMedia={onRegisterMedia}
             />
           ) : (
-            <SheetMusicPanel panel={panel} onAssetChange={(asset) => onSheetMusicChange(panel.id, asset)} />
+            <SheetMusicPanel panel={panel} onAssetChange={(asset) => onSheetMusicChange(panel.id, asset)} onEdit={onEditSheetMusic} />
           )}
         </div>
       ))}
