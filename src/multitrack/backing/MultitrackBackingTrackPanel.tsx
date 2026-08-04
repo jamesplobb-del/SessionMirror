@@ -20,11 +20,34 @@ export function MultitrackBackingMediaHost({
   backing,
   audioRef,
   youtubeIframeRef,
+  playYoutubeWhenReady = false,
 }: {
   backing: MultitrackBackingTrack
   audioRef: RefObject<HTMLAudioElement | null>
   youtubeIframeRef: RefObject<HTMLIFrameElement | null>
+  playYoutubeWhenReady?: boolean
 }) {
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (backing.kind !== 'audio') {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      return
+    }
+    audio.src = backing.src
+    audio.volume = backing.volume
+    audio.preload = 'auto'
+    audio.load()
+  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || backing.kind !== 'audio') return
+    audio.volume = backing.volume
+  }, [audioRef, backing])
+
   return (
     <div className="multitrack-backing-media-host" aria-hidden>
       <audio ref={audioRef} className="hidden" preload="metadata" />
@@ -42,7 +65,10 @@ export function MultitrackBackingMediaHost({
             onLoad={() => {
               const iframe = youtubeIframeRef.current
               registerYoutubeIframe(iframe)
-              wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume: backing.volume })
+              wakeYoutubeReference(iframe, {
+                attemptPlay: playYoutubeWhenReady,
+                uiVolume: backing.volume,
+              })
             }}
           />
         </div>
@@ -79,7 +105,6 @@ export default function MultitrackBackingTrackPanel({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragRef = useRef<{ pointerId: number; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null)
-  const uploadedAudioUrlRef = useRef<string | null>(null)
   const [youtubeInputOpen, setYoutubeInputOpen] = useState(false)
   const [youtubeValue, setYoutubeValue] = useState('')
   const [youtubeError, setYoutubeError] = useState<string | null>(null)
@@ -92,26 +117,8 @@ export default function MultitrackBackingTrackPanel({
     setYoutubeProxyVolumeFromUi(youtubeIframeRef.current, backing.volume)
   }, [backing, youtubeIframeRef])
 
-  // Revoke the uploaded MP3's blob URL once it's no longer the active backing
-  // track (cleared, replaced, or the panel unmounts) to avoid leaking memory.
   useEffect(() => {
-    if (backing.kind === 'audio' && backing.src === uploadedAudioUrlRef.current) return
-    if (uploadedAudioUrlRef.current) {
-      URL.revokeObjectURL(uploadedAudioUrlRef.current)
-      uploadedAudioUrlRef.current = null
-    }
-  }, [backing])
-
-  useEffect(() => {
-    return () => {
-      if (uploadedAudioUrlRef.current) {
-        URL.revokeObjectURL(uploadedAudioUrlRef.current)
-        uploadedAudioUrlRef.current = null
-      }
-    }
-  }, [])
-
-  useEffect(() => {
+    if (!renderMedia) return
     const audio = audioRef.current
     if (!audio) return
 
@@ -125,13 +132,14 @@ export default function MultitrackBackingTrackPanel({
     audio.src = backing.src
     audio.preload = 'auto'
     audio.load()
-  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null])
+  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null, renderMedia])
 
   useEffect(() => {
+    if (!renderMedia) return
     const audio = audioRef.current
     if (!audio || backing.kind !== 'audio') return
     audio.volume = backing.volume
-  }, [audioRef, backing])
+  }, [audioRef, backing, renderMedia])
 
   const loadYoutube = () => {
     const embedUrl = parseYoutubeEmbedUrl(youtubeValue)
@@ -249,11 +257,7 @@ export default function MultitrackBackingTrackPanel({
         onChange={(event) => {
           const file = event.currentTarget.files?.[0]
           if (!file) return
-          if (uploadedAudioUrlRef.current) {
-            URL.revokeObjectURL(uploadedAudioUrlRef.current)
-          }
           const src = URL.createObjectURL(file)
-          uploadedAudioUrlRef.current = src
           onBackingChange({
             kind: 'audio',
             src,
@@ -270,7 +274,13 @@ export default function MultitrackBackingTrackPanel({
           {backing.kind === 'youtube' ? <Youtube className="h-4 w-4 text-red-500" /> : <FileAudio className="h-4 w-4" />}
           <div>
             <p>{backing.kind === 'none' ? 'Backing track' : backing.kind === 'audio' ? backing.fileName : backing.label}</p>
-            <span>{backing.kind === 'none' ? 'Add MP3 or YouTube for recording' : 'Starts after count-in while recording'}</span>
+            <span>
+              {backing.kind === 'none'
+                ? 'Add MP3 or YouTube for recording'
+                : backing.kind === 'audio'
+                  ? 'Synced with every recording'
+                  : 'Plays while recording · not included in export'}
+            </span>
           </div>
         </div>
         <Pressable type="button" intensity="icon" onClick={onTogglePlayback} disabled={!hasBacking} className="multitrack-backing-strip__play" aria-label={isPlaying ? 'Pause backing track' : 'Play backing track'}>

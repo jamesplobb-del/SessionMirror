@@ -14,13 +14,8 @@ export async function prepareNativeMultitrackMonitor(
   sources: MultitrackMonitorSource[],
 ): Promise<boolean> {
   if (!isNativeMultitrackTransportAvailable()) return false
-  try {
-    const result = await BestTakeAudioPlugin.prepareMultitrackMonitor({ sources })
-    return result.prepared
-  } catch (error) {
-    console.error('[MultitrackTransport] native prepare failed', error)
-    return false
-  }
+  const result = await BestTakeAudioPlugin.prepareMultitrackMonitor({ sources })
+  return result.prepared
 }
 
 export async function startNativeMultitrackTransport(options: {
@@ -31,12 +26,7 @@ export async function startNativeMultitrackTransport(options: {
   soundId: string
 }): Promise<NativeMultitrackTransportStartResult | null> {
   if (!isNativeMultitrackTransportAvailable()) return null
-  try {
-    return await BestTakeAudioPlugin.startMultitrackTransport(options)
-  } catch (error) {
-    console.error('[MultitrackTransport] native start failed', error)
-    return null
-  }
+  return BestTakeAudioPlugin.startMultitrackTransport(options)
 }
 
 export async function stopNativeMultitrackTransport(): Promise<void> {

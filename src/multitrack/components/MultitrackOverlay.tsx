@@ -40,6 +40,7 @@ import {
   stopNativeMultitrackTransport,
   type MultitrackMonitorSource,
 } from '../synchronization/nativeMultitrackTransport'
+import { getWebKitBackingStartLeadSec } from '../synchronization/metronomePlaybackCompensation'
 import { exportMultitrackSession, type MultitrackExportFailureReason } from '../export/multitrackExport'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
@@ -123,6 +124,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const inGridReviewMediaRef = useRef<HTMLMediaElement | null>(null)
   const backingAudioRef = useRef<HTMLAudioElement>(null)
   const backingYoutubeIframeRef = useRef<HTMLIFrameElement>(null)
+  const youtubeStartTimerRef = useRef<number | null>(null)
+  const youtubeStartGenerationRef = useRef(0)
+  const youtubeScheduledPerformanceRef = useRef<number | null>(null)
+  const ownedBackingBlobUrlsRef = useRef<Set<string>>(new Set())
+  const nativeBackingCacheRef = useRef<{ src: string; path: string } | null>(null)
   const [takePickerPanelId, setTakePickerPanelId] = useState<string | null>(null)
   const [activePanelId, setActivePanelId] = useState<string | null>(null)
   const [backingPlaying, setBackingPlaying] = useState(false)
@@ -158,7 +164,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     updatePractice(patch)
   }, [session.practice.bpm, updatePractice])
 
+  const clearYoutubeStartSchedule = useCallback(() => {
+    youtubeStartGenerationRef.current += 1
+    youtubeScheduledPerformanceRef.current = null
+    if (youtubeStartTimerRef.current !== null) {
+      window.clearTimeout(youtubeStartTimerRef.current)
+      youtubeStartTimerRef.current = null
+    }
+  }, [])
+
   const pauseBacking = useCallback(() => {
+    clearYoutubeStartSchedule()
     const backing = session.backing
     if (backing.kind === 'audio') {
       backingAudioRef.current?.pause()
@@ -166,7 +182,36 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       pauseYoutubeProxy(backingYoutubeIframeRef.current)
     }
     setBackingPlaying(false)
-  }, [session.backing])
+  }, [clearYoutubeStartSchedule, session.backing])
+
+  const handleBackingChange = useCallback((nextBacking: typeof session.backing) => {
+    const currentBacking = session.backing
+    if (
+      currentBacking.kind !== 'audio' ||
+      nextBacking.kind !== 'audio' ||
+      currentBacking.src !== nextBacking.src
+    ) {
+      nativeBackingCacheRef.current = null
+    }
+    if (
+      currentBacking.kind === 'audio' &&
+      currentBacking.src.startsWith('blob:') &&
+      (nextBacking.kind !== 'audio' || nextBacking.src !== currentBacking.src)
+    ) {
+      URL.revokeObjectURL(currentBacking.src)
+      ownedBackingBlobUrlsRef.current.delete(currentBacking.src)
+    }
+    if (nextBacking.kind === 'audio' && nextBacking.src.startsWith('blob:')) {
+      ownedBackingBlobUrlsRef.current.add(nextBacking.src)
+    }
+    pauseBacking()
+    updateBacking(nextBacking)
+  }, [pauseBacking, session.backing, updateBacking])
+
+  useEffect(() => () => {
+    for (const url of ownedBackingBlobUrlsRef.current) URL.revokeObjectURL(url)
+    ownedBackingBlobUrlsRef.current.clear()
+  }, [])
 
   const prepareBackingForRecord = useCallback(() => {
     const backing = session.backing
@@ -233,10 +278,28 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
 
     const iframe = backingYoutubeIframeRef.current
-    startYoutubeProxyPlayback(iframe, backing.volume)
+    if (iframe) startYoutubeProxyPlayback(iframe, backing.volume)
+    // Preserve the user's/playback transport's intent if the iframe is still
+    // loading. Its onLoad handler will start it once the player is ready.
     setBackingPlaying(true)
-    return true
+    return iframe !== null
   }, [session.backing])
+
+  const scheduleYoutubeBackingStart = useCallback(async (performanceEpochMs: number) => {
+    clearYoutubeStartSchedule()
+    if (session.backing.kind !== 'youtube') return
+
+    const generation = youtubeStartGenerationRef.current
+    const leadSec = await getWebKitBackingStartLeadSec()
+    if (generation !== youtubeStartGenerationRef.current) return
+    youtubeScheduledPerformanceRef.current = performanceEpochMs
+    const delayMs = Math.max(0, performanceEpochMs - Date.now() - leadSec * 1000)
+    youtubeStartTimerRef.current = window.setTimeout(() => {
+      if (generation !== youtubeStartGenerationRef.current) return
+      youtubeStartTimerRef.current = null
+      void startBackingPlayback()
+    }, delayMs)
+  }, [clearYoutubeStartSchedule, session.backing, startBackingPlayback])
 
   const playBackingFromStart = useCallback(async () => {
     await prepareBackingAtStart()
@@ -307,7 +370,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   ): Promise<MultitrackMonitorSource[]> => {
     const sources: MultitrackMonitorSource[] = []
 
-    for (const panel of session.panels) {
+    for (const [panelIndex, panel] of session.panels.entries()) {
       if (
         panel.kind !== 'performance' ||
         panel.id === targetPanelId ||
@@ -317,10 +380,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       ) continue
 
       const path = await resolveNativeFileUri(panel.take)
-      if (!path) throw new Error(`Missing monitor source ${panel.id}`)
+      if (!path) {
+        throw new Error(`${panel.take.name || `Box ${panelIndex + 1}`} is missing from this device. Choose the take again.`)
+      }
       const offsetSec = timelineOffsetMsForTake(panel.take, session.practice.bpm) / 1000
       sources.push({
         id: panel.id,
+        label: panel.take.name || `Box ${panelIndex + 1}`,
         path,
         sourceInSec: (panel.trimStartSec ?? 0) + Math.max(0, offsetSec),
         ...(panel.trimEndSec !== undefined ? { sourceOutSec: panel.trimEndSec } : null),
@@ -333,19 +399,33 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       session.backing.kind === 'audio' &&
       !monitorMutesRef.current.has('backing')
     ) {
-      const blob = await fetch(session.backing.src).then((response) => response.blob())
-      const extension = extensionForBlob(blob, session.backing.fileName)
-      const path = await writeBlobToNativeCache(
-        MULTITRACK_MONITOR_CACHE_DIR,
-        `backing-monitor.${extension}`,
-        blob,
-      )
-      sources.push({
-        id: 'backing',
-        path,
-        sourceInSec: 0,
-        volume: session.backing.volume,
-      })
+      try {
+        let path = nativeBackingCacheRef.current?.src === session.backing.src
+          ? nativeBackingCacheRef.current.path
+          : null
+        if (!path) {
+          const response = await fetch(session.backing.src)
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          const blob = await response.blob()
+          const extension = extensionForBlob(blob, session.backing.fileName)
+          path = await writeBlobToNativeCache(
+            MULTITRACK_MONITOR_CACHE_DIR,
+            `backing-monitor.${extension}`,
+            blob,
+          )
+          nativeBackingCacheRef.current = { src: session.backing.src, path }
+        }
+        sources.push({
+          id: 'backing',
+          label: session.backing.fileName || 'Backing track',
+          path,
+          sourceInSec: 0,
+          volume: session.backing.volume,
+        })
+      } catch (error) {
+        console.error('[Multitrack] backing track preparation failed', error)
+        throw new Error(`${session.backing.fileName || 'The backing track'} could not be loaded. Choose the file again.`)
+      }
     }
 
     return sources
@@ -374,6 +454,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     onArmPlayback: async (panelId) => {
       sync.pause()
       pauseBacking()
+      if (session.backing.kind === 'youtube') {
+        await prepareBackingAtStart()
+      }
       const sources = await buildNativeMonitorSources(panelId)
       nativeTransportActiveRef.current = await prepareNativeMultitrackMonitor(sources)
       if (nativeTransportActiveRef.current) {
@@ -423,6 +506,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         beatDurationSec,
       }
     },
+    onTransportScheduled: async (transport) => {
+      if (!monitorMutesRef.current.has('backing')) {
+        await scheduleYoutubeBackingStart(transport.performanceEpochMs)
+      }
+    },
     onStopTransport: () => {
       if (nativeTransportActiveRef.current) {
         void stopNativeMultitrackTransport()
@@ -448,7 +536,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       }
       if (
         session.backing.kind === 'youtube' &&
-        !monitorMutesRef.current.has('backing')
+        !monitorMutesRef.current.has('backing') &&
+        youtubeScheduledPerformanceRef.current === null
       ) {
         await startBackingPlayback()
       }
@@ -912,6 +1001,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           backing={session.backing}
           audioRef={backingAudioRef}
           youtubeIframeRef={backingYoutubeIframeRef}
+          playYoutubeWhenReady={backingPlaying}
         />
       ) : null}
 
@@ -1059,10 +1149,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             isPlaying={backingPlaying}
             placement="setup"
             renderMedia={false}
-            onBackingChange={(backing) => {
-              pauseBacking()
-              updateBacking(backing)
-            }}
+            onBackingChange={handleBackingChange}
             onTogglePlayback={toggleBackingPlayback}
           />
         </div>

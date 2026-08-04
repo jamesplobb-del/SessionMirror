@@ -897,6 +897,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             sources.append(
                 MultitrackTransportEngine.Source(
                     id: id,
+                    label: (raw["label"] as? String) ?? id,
                     url: url,
                     sourceInSec: max(0, (raw["sourceInSec"] as? NSNumber)?.doubleValue ?? 0),
                     sourceOutSec: (raw["sourceOutSec"] as? NSNumber)?.doubleValue,
@@ -913,7 +914,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 DispatchQueue.main.async { call.resolve(result) }
             } catch {
                 DispatchQueue.main.async {
-                    call.reject("Could not prepare multitrack monitor", error.localizedDescription)
+                    call.reject(error.localizedDescription, "MULTITRACK_MONITOR_PREPARE_FAILED")
                 }
             }
         }
@@ -953,15 +954,21 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             } catch {
                 DispatchQueue.main.async {
-                    call.reject("Could not start multitrack transport", error.localizedDescription)
+                    call.reject(error.localizedDescription, "MULTITRACK_TRANSPORT_START_FAILED")
                 }
             }
         }
     }
 
     @objc func stopMultitrackTransport(_ call: CAPPluginCall) {
-        MultitrackTransportEngine.shared.stop()
-        call.resolve(["stopped": true])
+        // `stop()` serializes behind any in-flight source extraction. Keep that
+        // wait off Capacitor's UI/bridge thread when the user cancels arming.
+        DispatchQueue.global(qos: .userInitiated).async {
+            MultitrackTransportEngine.shared.stop()
+            DispatchQueue.main.async {
+                call.resolve(["stopped": true])
+            }
+        }
     }
 
     @objc func renderMultitrackVideo(_ call: CAPPluginCall) {

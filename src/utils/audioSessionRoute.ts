@@ -147,6 +147,8 @@ export interface NativeMultitrackRenderResult {
 
 export interface NativeMultitrackMonitorSource {
   id: string
+  /** Friendly name used when a source cannot be decoded. */
+  label?: string
   path: string
   /** Media time that corresponds to project timeline zero. */
   sourceInSec: number

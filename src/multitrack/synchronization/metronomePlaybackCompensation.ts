@@ -33,6 +33,18 @@ async function getBluetoothExtraLatencyMs(): Promise<number> {
   return 0
 }
 
+/**
+ * Head start for a WKWebView media source so its audible frame zero lands near
+ * an already-scheduled native performance downbeat.
+ */
+export async function getWebKitBackingStartLeadSec(): Promise<number> {
+  const [outputMs, btExtra] = await Promise.all([
+    getAudioOutputLatencyMs(),
+    getBluetoothExtraLatencyMs(),
+  ])
+  return (WEBKIT_MEDIA_RENDER_OVERHEAD_MS + outputMs + btExtra) / 1000
+}
+
 /** Used by getMetronomeCountInDelaySec when reference takes are playing. */
 export async function getMetronomeDelayAfterReferenceSec(): Promise<number> {
   const [outputMs, btExtra] = await Promise.all([

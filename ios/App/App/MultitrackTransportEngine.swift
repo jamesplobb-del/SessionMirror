@@ -12,6 +12,7 @@ final class MultitrackTransportEngine {
 
     struct Source {
         let id: String
+        let label: String
         let url: URL
         let sourceInSec: Double
         let sourceOutSec: Double?
@@ -37,6 +38,12 @@ final class MultitrackTransportEngine {
         let node: AVAudioPlayerNode
     }
 
+    private struct ExtractedAudioCacheEntry {
+        let sourceSize: Int64
+        let sourceModificationDate: Date?
+        let audioURL: URL
+    }
+
     private let engine = AVAudioEngine()
     private let clickNode = AVAudioPlayerNode()
     private let controlQueue = DispatchQueue(label: "BestTake.MultitrackTransport", qos: .userInitiated)
@@ -44,12 +51,15 @@ final class MultitrackTransportEngine {
     private var clickBuffer: AVAudioPCMBuffer?
     private var isPrepared = false
     private var isRolling = false
+    private var extractedAudioCache: [String: ExtractedAudioCacheEntry] = [:]
+    private var didPrepareExtractionDirectory = false
 
     private init() {}
 
     func prepare(sources: [Source]) throws -> [String: Any] {
         try controlQueue.sync {
             stopLocked(resetPreparedSources: true)
+            do {
 
             // Multitrack owns the native output graph while its recorder is
             // armed. Leaving the ordinary metronome engine running would create
@@ -76,7 +86,19 @@ final class MultitrackTransportEngine {
             nextSources.reserveCapacity(sources.count)
 
             for source in sources where !source.muted && source.volume > 0.0001 {
-                let file = try AVAudioFile(forReading: source.url)
+                let file: AVAudioFile
+                do {
+                    file = try monitorAudioFile(for: source)
+                } catch {
+                    throw NSError(
+                        domain: "BestTake.MultitrackTransport",
+                        code: 2,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "\(source.label) could not be added to the monitor mix. \(error.localizedDescription)"
+                        ]
+                    )
+                }
                 guard file.length > 0 else { continue }
 
                 let node = AVAudioPlayerNode()
@@ -107,6 +129,12 @@ final class MultitrackTransportEngine {
                 "usesHeadphones": route["usesHeadphones"] ?? false,
                 "usesBluetoothOutput": route["usesBluetoothOutput"] ?? false,
             ]
+            } catch {
+                // A bad/missing source must not leave attached nodes or a live
+                // engine behind. The next record tap starts from a clean graph.
+                stopLocked(resetPreparedSources: true)
+                throw error
+            }
         }
     }
 
@@ -268,6 +296,116 @@ final class MultitrackTransportEngine {
             engine.reset()
             isPrepared = false
         }
+    }
+
+    /// `AVAudioFile` can read uploaded MP3/M4A files directly, but it cannot
+    /// reliably open the MP4/MOV containers produced by camera recordings.
+    /// Extract their audio track once and cache it for later overdubs.
+    private func monitorAudioFile(for source: Source) throws -> AVAudioFile {
+        do {
+            return try AVAudioFile(forReading: source.url)
+        } catch {
+            let extractedURL = try extractedAudioURL(for: source)
+            return try AVAudioFile(forReading: extractedURL)
+        }
+    }
+
+    private func extractedAudioURL(for source: Source) throws -> URL {
+        let sourceValues = try source.url.resourceValues(forKeys: [
+            .fileSizeKey,
+            .contentModificationDateKey,
+        ])
+        let sourceSize = Int64(sourceValues.fileSize ?? 0)
+        let cacheKey = source.url.standardizedFileURL.path
+
+        if let cached = extractedAudioCache[cacheKey],
+           cached.sourceSize == sourceSize,
+           cached.sourceModificationDate == sourceValues.contentModificationDate,
+           FileManager.default.fileExists(atPath: cached.audioURL.path) {
+            return cached.audioURL
+        }
+
+        let asset = AVURLAsset(url: source.url)
+        guard asset.tracks(withMediaType: .audio).first != nil else {
+            throw NSError(
+                domain: "BestTake.MultitrackTransport",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "This recording does not contain an audio track."]
+            )
+        }
+
+        let directory = try extractionDirectoryURL()
+        let outputURL = directory.appendingPathComponent("\(UUID().uuidString).m4a")
+        guard let exporter = AVAssetExportSession(
+            asset: asset,
+            presetName: AVAssetExportPresetAppleM4A
+        ) else {
+            throw NSError(
+                domain: "BestTake.MultitrackTransport",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "Its audio could not be decoded."]
+            )
+        }
+
+        exporter.outputURL = outputURL
+        exporter.outputFileType = .m4a
+        let completed = DispatchSemaphore(value: 0)
+        exporter.exportAsynchronously {
+            completed.signal()
+        }
+
+        guard completed.wait(timeout: .now() + 45) == .success else {
+            exporter.cancelExport()
+            try? FileManager.default.removeItem(at: outputURL)
+            throw NSError(
+                domain: "BestTake.MultitrackTransport",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Audio preparation timed out."]
+            )
+        }
+
+        guard exporter.status == .completed,
+              FileManager.default.fileExists(atPath: outputURL.path) else {
+            let reason = exporter.error?.localizedDescription ?? "Audio extraction failed."
+            try? FileManager.default.removeItem(at: outputURL)
+            throw NSError(
+                domain: "BestTake.MultitrackTransport",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: reason]
+            )
+        }
+
+        if let previous = extractedAudioCache[cacheKey]?.audioURL,
+           previous != outputURL {
+            try? FileManager.default.removeItem(at: previous)
+        }
+        extractedAudioCache[cacheKey] = ExtractedAudioCacheEntry(
+            sourceSize: sourceSize,
+            sourceModificationDate: sourceValues.contentModificationDate,
+            audioURL: outputURL
+        )
+        print(
+            "[MultitrackTransport] extracted audio source=\(source.label) " +
+            "file=\(source.url.lastPathComponent)"
+        )
+        return outputURL
+    }
+
+    private func extractionDirectoryURL() throws -> URL {
+        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("BestTakeMultitrackAudio", isDirectory: true)
+        if !didPrepareExtractionDirectory {
+            // Files are only a launch-local decode cache. Clearing stale files
+            // bounds disk use without touching the user's original takes.
+            try? FileManager.default.removeItem(at: directory)
+            didPrepareExtractionDirectory = true
+        }
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        return directory
     }
 
     private func makeClickBar(

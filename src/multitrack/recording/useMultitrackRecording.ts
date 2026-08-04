@@ -2,6 +2,12 @@ import { useCallback, useRef, useState } from 'react'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
 import type { MultitrackRecordingPhase } from '../types'
 
+function recordingErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message
+  if (typeof error === 'string' && error.trim()) return error
+  return fallback
+}
+
 export interface MultitrackTransportStart {
   firstClickEpochMs: number
   performanceEpochMs: number
@@ -38,6 +44,8 @@ export function useMultitrackRecording(options: {
     countInBars: number
     clickEnabled: boolean
   }) => Promise<MultitrackTransportStart | null>
+  /** Gives non-native monitor sources the exact scheduled performance anchor. */
+  onTransportScheduled?: (transport: MultitrackTransportStart) => Promise<void> | void
   onStopTransport?: () => void
   onPerformanceStart?: () => Promise<void>
   onCountInComplete?: (panelId: string) => void
@@ -50,6 +58,7 @@ export function useMultitrackRecording(options: {
     onStartMicRecording,
     onAbortMicRecording,
     onStartTransport,
+    onTransportScheduled,
     onStopTransport,
     onPerformanceStart,
     onCountInComplete,
@@ -148,13 +157,27 @@ export function useMultitrackRecording(options: {
       onPrepareRecording?.(panelId)
 
       let armed = true
+      let armError: unknown = null
       try {
         armed = (await onArmPlayback?.(panelId)) !== false
-      } catch {
+      } catch (error) {
+        armError = error
         armed = false
       }
-      if (!armed || !activeRef.current) {
-        if (activeRef.current) fail("The monitor mix couldn't load. Check your takes and try again.")
+      if (!activeRef.current) {
+        // Arming may finish after the user closed/cancelled. Tear down anything
+        // the asynchronous native prepare completed in the meantime.
+        sharedMetronomeEngine.stop()
+        onStopTransport?.()
+        return
+      }
+      if (!armed) {
+        if (activeRef.current) {
+          fail(recordingErrorMessage(
+            armError,
+            "The monitor mix couldn't load. Check your takes and try again.",
+          ))
+        }
         return
       }
 
@@ -173,13 +196,20 @@ export function useMultitrackRecording(options: {
       }
 
       let transport: MultitrackTransportStart | null = null
+      let transportError: unknown = null
       try {
         transport = await onStartTransport?.({ bpm, countInBars, clickEnabled }) ?? null
-      } catch {
+      } catch (error) {
+        transportError = error
         transport = null
       }
       if (!transport || !activeRef.current) {
-        if (activeRef.current) fail("The synchronized monitor couldn't start. Try again.")
+        if (activeRef.current) {
+          fail(recordingErrorMessage(
+            transportError,
+            "The synchronized monitor couldn't start. Try again.",
+          ))
+        }
         return
       }
 
@@ -189,6 +219,12 @@ export function useMultitrackRecording(options: {
         recordingBpm: bpm,
         performanceStartBeat: transport.countInBeats + 1,
         timelineOffsetMs: Math.round(estimatedSourceInMs),
+      }
+
+      try {
+        await onTransportScheduled?.(transport)
+      } catch (error) {
+        console.warn('[MultitrackRecording] auxiliary monitor scheduling failed', error)
       }
 
       if (transport.countInBeats > 0) {
@@ -222,7 +258,7 @@ export function useMultitrackRecording(options: {
       if (!activeRef.current) return
       onCountInComplete?.(panelId)
     })()
-  }, [fail, onAbortMicRecording, onArmPlayback, onCountInComplete, onPerformanceStart, onPrepareRecording, onStartMicRecording, onStartTransport, waitUntil])
+  }, [fail, onAbortMicRecording, onArmPlayback, onCountInComplete, onPerformanceStart, onPrepareRecording, onStartMicRecording, onStartTransport, onStopTransport, onTransportScheduled, waitUntil])
 
   return {
     phase,

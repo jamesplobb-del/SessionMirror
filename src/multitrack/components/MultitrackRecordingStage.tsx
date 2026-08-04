@@ -439,10 +439,11 @@ export default function MultitrackRecordingStage({
         onClose={() => setSettingsOpen(false)}
         ariaLabel="Count-in settings"
         elevated
+        elevatedLight
         zClass={STAGE_SHEET_Z}
         maxHeightClass="max-h-[60vh]"
       >
-        <div className="multitrack-sheet multitrack-sheet--dark">
+        <div className="multitrack-sheet multitrack-sheet--countin">
           <p className="multitrack-sheet__title">Count-in</p>
           <div className="multitrack-countin-sheet">
             <label className="multitrack-countin-sheet__row">
@@ -458,6 +459,7 @@ export default function MultitrackRecordingStage({
                 <Pressable
                   type="button"
                   intensity="icon"
+                  aria-label="Decrease count-in bars"
                   onClick={() => onPracticeChange({ countInBars: Math.max(0, practice.countInBars - 1) })}
                 >
                   -
@@ -466,6 +468,7 @@ export default function MultitrackRecordingStage({
                 <Pressable
                   type="button"
                   intensity="icon"
+                  aria-label="Increase count-in bars"
                   onClick={() => onPracticeChange({ countInBars: Math.min(8, practice.countInBars + 1) })}
                 >
                   +
@@ -476,6 +479,7 @@ export default function MultitrackRecordingStage({
               <span>BPM</span>
               <input
                 type="number"
+                aria-label="Count-in tempo"
                 inputMode="numeric"
                 min={40}
                 max={300}
