@@ -51,7 +51,7 @@ export default function SheetMusicPanel({ panel, onAssetChange }: { panel: Sheet
         />
         <Pressable type="button" intensity="soft" onClick={() => fileInputRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center" aria-label="Add sheet music">
           <Upload className="h-8 w-8 text-stone-400" />
-          <span className="mt-2 text-sm font-medium text-stone-500">Add sheet music</span>
+          <span className="mt-2 text-sm font-medium text-stone-500">Add music, photo, or PDF</span>
         </Pressable>
       </div>
     )

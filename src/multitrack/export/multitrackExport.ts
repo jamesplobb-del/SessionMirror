@@ -18,8 +18,12 @@ export type MultitrackExportFailureReason =
   | 'unsupported'
 
 export type MultitrackExportResult =
-  | { ok: true; backingSkipped?: 'youtube' }
+  | { ok: true; renderedPath: string; durationSeconds: number; backingSkipped?: 'youtube' }
   | { ok: false; reason: MultitrackExportFailureReason }
+
+export interface MultitrackExportOptions {
+  share?: boolean
+}
 
 async function fetchBlob(url: string): Promise<Blob> {
   const response = await fetch(url)
@@ -29,13 +33,15 @@ async function fetchBlob(url: string): Promise<Blob> {
 /**
  * Renders every performance panel's take into one grid-composited video
  * (matching the on-screen layout), burns in the sheet-music overlay if
- * present, mixes in an uploaded MP3 backing track, and opens the share sheet.
+ * present and mixes in an uploaded backing track. Sharing is optional so the
+ * exact same rendered file can instead be persisted into the Take Vault.
  * iOS-native only — the multitrack recording pipeline itself is native-only.
  */
 export async function exportMultitrackSession(
   session: MultitrackSession,
   layout: MultitrackLayoutPreset,
   durationSeconds: number,
+  options: MultitrackExportOptions = {},
 ): Promise<MultitrackExportResult> {
   if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')) {
     return { ok: false, reason: 'unsupported' }
@@ -82,7 +88,14 @@ export async function exportMultitrackSession(
   }
   if (sources.length === 0) return { ok: false, reason: 'missing_takes' }
 
-  let sheetMusic: { path: string; fileType: string; rect: LayoutRectPercent } | null = null
+  let sheetMusic: {
+    path: string
+    fileType: string
+    rect: LayoutRectPercent
+    x: number
+    y: number
+    scale: number
+  } | null = null
   let backingAudio: { path: string; gain: number } | null = null
   let backingSkipped: 'youtube' | undefined
 
@@ -101,6 +114,9 @@ export async function exportMultitrackSession(
         path,
         fileType: musicAsset.mimeType === 'application/pdf' ? 'pdf' : 'image',
         rect: musicRect,
+        x: musicAsset.x ?? 0.5,
+        y: musicAsset.y ?? 0.5,
+        scale: musicAsset.scale ?? 1,
       }
     }
 
@@ -124,25 +140,31 @@ export async function exportMultitrackSession(
       aspectRatio: MULTITRACK_EXPORT_ASPECT_RATIO,
       durationSeconds,
       sources,
+      gridRects: Object.values(panelRects),
       sheetMusic,
       backingAudio,
     })
     renderedPath = rendered.path
+    durationSeconds = rendered.durationSeconds ?? durationSeconds
   } catch (error) {
     console.warn('[Multitrack] export render failed', error)
     return { ok: false, reason: 'render_failed' }
   }
 
-  try {
-    await BestTakeAudioPlugin.shareMediaFile({
-      path: renderedPath,
-      title: 'BestTake Multitrack',
-      audioGain: 1,
-    })
-  } catch (error) {
-    console.warn('[Multitrack] export share failed', error)
-    return { ok: false, reason: 'share_failed' }
+  if (options.share) {
+    try {
+      await BestTakeAudioPlugin.shareMediaFile({
+        path: renderedPath,
+        title: 'BestTake Multitrack',
+        audioGain: 1,
+      })
+    } catch (error) {
+      console.warn('[Multitrack] export share failed', error)
+      return { ok: false, reason: 'share_failed' }
+    }
   }
 
-  return backingSkipped ? { ok: true, backingSkipped } : { ok: true }
+  return backingSkipped
+    ? { ok: true, renderedPath, durationSeconds, backingSkipped }
+    : { ok: true, renderedPath, durationSeconds }
 }

@@ -18,6 +18,12 @@ import { multitrackTransport } from './multitrackTransport'
 
 /** Timeline drift past which a slaved element is hard-seeked back onto the transport. */
 const SLAVE_TOLERANCE_SEC = 0.12
+/** Native audio is authoritative; avoid decoder-stalling seeks for small visual drift. */
+const VISUAL_SLAVE_TOLERANCE_SEC = 0.9
+/** Transport text/scrubber updates do not need animation-frame frequency. */
+const UI_TIME_UPDATE_INTERVAL_MS = 100
+/** Leave most main-thread frames available to WebKit's video decoders. */
+const VISUAL_SYNC_INTERVAL_MS = 50
 /** Gross deviation (stall / external scrub) past which the transport re-locks to real playback. */
 const TRANSPORT_RELOCK_SEC = 0.25
 
@@ -44,6 +50,8 @@ export function useMultitrackSync() {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const rafRef = useRef<number | null>(null)
+  const lastUiTimeUpdateRef = useRef(0)
+  const lastVisualSyncRef = useRef(0)
   const visualStartTimersRef = useRef<number[]>([])
   const visualPlaybackGenerationRef = useRef(0)
   const visualOnlyModeRef = useRef(false)
@@ -76,6 +84,18 @@ export function useMultitrackSync() {
     const volume = panelVolumeRef.current.get(panelId) ?? 1
     const muted =
       panelMutedRef.current.has(panelId) || monitorMutedRef.current.has(panelId)
+    if (visualOnlyModeRef.current) {
+      // Native AVAudioEngine owns the audible mix during overdub monitoring
+      // and iOS Play All. Muting only the HTML element is insufficient once a
+      // MediaElementAudioSourceNode exists: its Web-Audio branch can continue
+      // rendering a delayed duplicate. Silence both paths explicitly.
+      element.muted = true
+      element.volume = 0
+      if (hasTakePlaybackSpeakerRoute(element)) {
+        updateTakePlaybackSpeakerGain(element, 0, true)
+      }
+      return
+    }
     if (hasTakePlaybackSpeakerRoute(element)) {
       // Element output flows through the Web Audio bus. Muting the ELEMENT
       // makes iOS WKWebView stop decoding it (~1s) and starves the graph, so
@@ -208,6 +228,15 @@ export function useMultitrackSync() {
     // Offsets shift where clips end on the timeline, so total duration changes.
     refreshDuration()
   }, [refreshDuration, setPanelOffsetInternal])
+
+  const getPanelTimelineSettings = useCallback((panelId: string) => {
+    const trim = trimFor(panelId)
+    return {
+      offsetMs: (panelOffsetRef.current.get(panelId) ?? 0),
+      trimStartSec: trim.start,
+      trimEndSec: trim.end,
+    }
+  }, [trimFor])
 
   const setExcludePanelId = useCallback((panelId: string | null) => {
     excludePanelIdRef.current = panelId
@@ -468,8 +497,7 @@ export function useMultitrackSync() {
     visualStartTimersRef.current = []
     for (const [panelId, element] of getEntries()) {
       element.pause()
-      element.muted = true
-      element.volume = 0
+      applyMixState(panelId, element)
       element.setAttribute('playsinline', 'true')
       try {
         const win = clipWindowFor(panelId, element)
@@ -478,7 +506,7 @@ export function useMultitrackSync() {
         /* metadata may finish loading during the count-in */
       }
     }
-  }, [clipWindowFor, getEntries])
+  }, [applyMixState, clipWindowFor, getEntries])
 
   const startVisualPrepared = useCallback(() => {
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
@@ -750,6 +778,17 @@ export function useMultitrackSync() {
     }
 
     const tick = () => {
+      const visualOnly = visualOnlyModeRef.current
+      const tickNow = performance.now()
+      if (
+        visualOnly &&
+        tickNow - lastVisualSyncRef.current < VISUAL_SYNC_INTERVAL_MS
+      ) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+      if (visualOnly) lastVisualSyncRef.current = tickNow
+
       const entries = getEntries()
       const pending = pendingStartRef.current
       const chasing = chaseModeRef.current
@@ -762,7 +801,7 @@ export function useMultitrackSync() {
       let masterEntry: [string, HTMLMediaElement] | null = null
       let masterDuration = 0
       for (const entry of entries) {
-        if (chasing) break
+        if (chasing || visualOnly) break
         if (pending.has(entry[0])) continue
         const dur = effectiveDuration(entry[0], entry[1])
         if (dur > masterDuration) {
@@ -797,7 +836,10 @@ export function useMultitrackSync() {
           // Playback follows the transport — never the other way around.
           timeline = transportLockedRef.current ? multitrackTransport.position() : refPos
         }
-        setCurrentTime(timeline)
+        if (tickNow - lastUiTimeUpdateRef.current >= UI_TIME_UPDATE_INTERVAL_MS) {
+          lastUiTimeUpdateRef.current = tickNow
+          setCurrentTime(timeline)
+        }
 
         const allDone = entries.every(
           ([panelId, el]) => (el.paused || el.ended) && !pending.has(panelId),
@@ -859,13 +901,18 @@ export function useMultitrackSync() {
             }
 
             const deviation = Math.abs(el.currentTime - win.trimStart - win.offset - timeline)
+            const slaveTolerance = visualOnly
+              ? VISUAL_SLAVE_TOLERANCE_SEC
+              : SLAVE_TOLERANCE_SEC
 
-            // Slave every non-reference element to the transport with a tight tolerance.
+            // Native-audio playback lets videos free-run unless they are
+            // visibly far off. Frequent seeks make iOS restart H.264 decode
+            // and were the source of the laggy/stuttering Play All visuals.
             if (
               (!masterEntry || el !== masterEntry[1]) &&
               !el.paused &&
               !el.ended &&
-              deviation > SLAVE_TOLERANCE_SEC
+              deviation > slaveTolerance
             ) {
               el.currentTime = Math.max(win.trimStart, timeline + win.trimStart + win.offset)
             }
@@ -890,6 +937,7 @@ export function useMultitrackSync() {
     setPanelMuted,
     setPanelTrim,
     setPanelOffset,
+    getPanelTimelineSettings,
     getPanelMediaDuration,
     setMonitorMutedPanelIds,
     prepareAtStart,

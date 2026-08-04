@@ -554,6 +554,38 @@ export async function persistUploadedVideo(
   }
 }
 
+/**
+ * Promote a native renderer's temporary movie into durable Take Vault storage.
+ * Filesystem.copy keeps the MP4 byte-for-byte and avoids loading a full export
+ * into WebKit memory as base64.
+ */
+export async function persistRenderedTakeVideo(
+  renderedUri: string,
+  takeId: string,
+): Promise<PersistedTakeVideo> {
+  if (!Capacitor.isNativePlatform() || !renderedUri) {
+    throw new Error('Rendered Take Vault saves require a native file.')
+  }
+
+  await ensureTakesDirectory()
+  const filePath = `${TAKES_DIR}/${takeId}.mp4`
+  await deleteTakeFile(filePath)
+
+  const copied = await Filesystem.copy({
+    from: renderedUri,
+    to: filePath,
+    toDirectory: Directory.Data,
+  })
+  const uri = copied.uri || (
+    await Filesystem.getUri({ path: filePath, directory: Directory.Data })
+  ).uri
+
+  return {
+    filePath,
+    videoUrl: rememberPlaybackSrc(filePath, Capacitor.convertFileSrc(uri)),
+  }
+}
+
 export async function resolveTakePlaybackUrl(
   filePath: string,
   fallbackUrl: string,

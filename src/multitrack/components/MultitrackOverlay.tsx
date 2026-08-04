@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { ChevronLeft, FileMusic, FolderOpen, Music4, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
+import { AudioLines, ChevronLeft, FileMusic, FolderOpen, Music4, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -49,6 +49,7 @@ import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../back
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
 import MultitrackRecordingStage from './MultitrackRecordingStage'
 import MultitrackAlignStage from './MultitrackAlignStage'
+import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
 
 /** Sheets portal to document.body; the overlay itself sits at z-135. */
 const MULTITRACK_SHEET_Z = { backdrop: 'z-[140]', sheet: 'z-[145]' }
@@ -80,6 +81,10 @@ interface MultitrackOverlayProps {
   pendingRecordingTakeId: string | null
   onClearPendingRecording: () => void
   onOpenRecordingStage?: () => void
+  onSaveRenderedTakeToVault: (rendered: {
+    path: string
+    durationSeconds: number
+  }) => Promise<void>
 }
 
 function describeMultitrackExportFailure(reason: MultitrackExportFailureReason): string {
@@ -118,6 +123,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     pendingRecordingTakeId,
     onClearPendingRecording,
     onOpenRecordingStage,
+    onSaveRenderedTakeToVault,
   } = props
   const shellRef = useRef<HTMLDivElement>(null)
   const masterMediaRef = useRef<HTMLMediaElement | null>(null)
@@ -136,7 +142,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take } | null>(null)
   const discardNextRecordingRef = useRef(false)
   /** Bottom sheets: backing source, mixer, or a tile's action sheet. */
-  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'mixer' | null>(null)
+  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'mixer' | 'export' | null>(null)
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
   const [alignStageOpen, setAlignStageOpen] = useState(false)
   const sheetMusicInputRef = useRef<HTMLInputElement>(null)
@@ -329,7 +335,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     void playBackingFromStart()
   }, [backingPlaying, pauseBacking, playBackingFromStart])
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback((destination: 'share' | 'vault') => {
     if (isExporting) return
 
     void (async () => {
@@ -342,20 +348,39 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         if (!proceed) return
       }
 
+      setActiveSourceSheet(null)
       sync.pause()
       pauseBacking()
       await stopNativeGridPlayback()
       setIsExporting(true)
       try {
-        const result = await exportMultitrackSession(session, layout, sync.state.duration)
+        const result = await exportMultitrackSession(
+          session,
+          layout,
+          sync.state.duration,
+          { share: destination === 'share' },
+        )
         if (!result.ok) {
           await showAlert({ message: describeMultitrackExportFailure(result.reason), tone: 'error' })
+          return
+        }
+        if (destination === 'vault') {
+          try {
+            await onSaveRenderedTakeToVault({
+              path: result.renderedPath,
+              durationSeconds: result.durationSeconds,
+            })
+            await showAlert({ message: 'Saved to your Take Vault.' })
+          } catch (error) {
+            console.warn('[Multitrack] could not save rendered video to vault', error)
+            await showAlert({ message: 'The video rendered, but could not be saved to your Take Vault.', tone: 'error' })
+          }
         }
       } finally {
         setIsExporting(false)
       }
     })()
-  }, [isExporting, layout, pauseBacking, session, showAlert, showConfirm, stopNativeGridPlayback, sync])
+  }, [isExporting, layout, onSaveRenderedTakeToVault, pauseBacking, session, showAlert, showConfirm, stopNativeGridPlayback, sync])
 
   const registerPanelMedia = useCallback((id: string, el: HTMLMediaElement | null) => {
     sync.registerMedia(id, el)
@@ -400,13 +425,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       if (!path) {
         throw new Error(`${panel.take.name || `Box ${panelIndex + 1}`} is missing from this device. Choose the take again.`)
       }
-      const offsetSec = timelineOffsetMsForTake(panel.take, session.practice.bpm) / 1000
+      // The sync timeline is authoritative here. During Align, it contains the
+      // live unsaved drag/trim values, so Preview audio now follows the same
+      // edits as the video instead of rebuilding from stale session metadata.
+      const timeline = sync.getPanelTimelineSettings(panel.id)
+      const offsetSec = timeline.offsetMs / 1000
       sources.push({
         id: panel.id,
         label: panel.take.name || `Box ${panelIndex + 1}`,
         path,
-        sourceInSec: (panel.trimStartSec ?? 0) + Math.max(0, offsetSec),
-        ...(panel.trimEndSec !== undefined ? { sourceOutSec: panel.trimEndSec } : null),
+        sourceInSec: timeline.trimStartSec + Math.max(0, offsetSec),
+        ...(timeline.trimEndSec !== null ? { sourceOutSec: timeline.trimEndSec } : null),
         ...(offsetSec < 0 ? { timelineDelaySec: -offsetSec } : null),
         volume: panel.volume ?? 1,
       })
@@ -446,7 +475,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
 
     return sources
-  }, [session.backing, session.panels, session.practice.bpm])
+  }, [session.backing, session.panels, sync.getPanelTimelineSettings])
 
   const playAllFromStart = useCallback(async () => {
     sync.pause()
@@ -768,6 +797,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     assignTakeToPanel(pendingReview.panelId, pendingReview.take)
     setPendingReview(null)
     recording.cancel()
+    setActivePanelId(null)
     restoreRecordingReadiness()
     // One-time discoverability nudge: recordings auto-save to the vault.
     try {
@@ -937,12 +967,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               <Pressable
                 type="button"
                 intensity="normal"
-                onClick={handleExport}
+                onClick={() => setActiveSourceSheet('export')}
                 disabled={shareDisabled}
                 className="multitrack-share-btn"
               >
                 <Share2 className="h-4 w-4" />
-                {isExporting ? 'Rendering…' : 'Share'}
+                {isExporting ? 'Rendering…' : 'Export'}
               </Pressable>
             </header>
             <div className="multitrack-overlay__body">
@@ -966,6 +996,33 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   <span className="multitrack-source-chip__label">Click</span>
                   <span className="multitrack-source-chip__state">
                     {session.practice.clickEnabled ? 'on' : 'off'}
+                  </span>
+                </Pressable>
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={() => sheetMusicInputRef.current?.click()}
+                  className={`multitrack-source-chip ${session.sheetMusic.asset ? 'multitrack-source-chip--active' : ''}`}
+                >
+                  <FileMusic className="h-3.5 w-3.5" />
+                  <span className="multitrack-source-chip__label">
+                    {session.sheetMusic.asset?.fileName ?? 'Music / photo / PDF'}
+                  </span>
+                  {session.sheetMusic.asset ? <span className="multitrack-source-chip__dot" /> : null}
+                </Pressable>
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={() => handlePracticeChange({
+                    showPitch: !session.practice.showPitch,
+                    practiceOverlayEnabled: true,
+                  })}
+                  className={`multitrack-source-chip ${session.practice.showPitch ? 'multitrack-source-chip--active' : ''}`}
+                >
+                  <AudioLines className="h-3.5 w-3.5" />
+                  <span className="multitrack-source-chip__label">Pitch overlay</span>
+                  <span className="multitrack-source-chip__state">
+                    {session.practice.showPitch ? 'on' : 'off'}
                   </span>
                 </Pressable>
               </div>
@@ -996,6 +1053,19 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 }
                 sync.seek(time)
               }} />
+            {!activePanel ? (
+              <MultitrackPracticeOverlay
+                boundaryRef={shellRef}
+                practice={session.practice}
+                isPlaying={sync.state.isPlaying || backingPlaying}
+                streamRef={streamRef}
+                tunerInstrument={tunerInstrument}
+                mediaRef={masterMediaRef}
+                mediaKey="multitrack-grid"
+                onHideMetronome={() => handlePracticeChange({ showMetronome: false })}
+                onHidePitch={() => handlePracticeChange({ showPitch: false })}
+              />
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1175,7 +1245,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 }}
               >
                 <FileMusic className="h-4 w-4" />
-                Sheet music / image
+                Music / photo / PDF
               </Pressable>
             </div>
           ) : (
@@ -1262,6 +1332,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         panels={session.panels.filter(
           (panel): panel is PerformancePanelState => panel.kind === 'performance',
         )}
+        bpm={session.practice.bpm}
         sync={sync}
         onClose={() => {
           pauseAllPlayback()
@@ -1276,6 +1347,42 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         }}
         onDone={handleSaveAlignChanges}
       />
+
+      <AnimatedBottomSheet
+        isOpen={activeSourceSheet === 'export' && isOpen}
+        onClose={() => setActiveSourceSheet(null)}
+        ariaLabel="Export multitrack video"
+        elevated
+        elevatedLight
+        zClass={MULTITRACK_SHEET_Z}
+        maxHeightClass="max-h-[55vh]"
+      >
+        <div className="multitrack-sheet">
+          <p className="multitrack-sheet__title">Export finished video</p>
+          <p className="multitrack-sheet__empty">Your layout, trims, alignment, borders, sheet image, and audio mix will be rendered together.</p>
+          <div className="multitrack-sheet__primary-row">
+            <Pressable
+              type="button"
+              intensity="normal"
+              haptic="medium"
+              className="multitrack-sheet__primary"
+              onClick={() => handleExport('share')}
+            >
+              <Share2 className="h-6 w-6" />
+              Share video
+            </Pressable>
+            <Pressable
+              type="button"
+              intensity="soft"
+              className="multitrack-sheet__primary"
+              onClick={() => handleExport('vault')}
+            >
+              <Save className="h-6 w-6" />
+              Save to Take Vault
+            </Pressable>
+          </div>
+        </div>
+      </AnimatedBottomSheet>
 
       {/* Mixer sheet: playback balance per tile + backing volume. */}
       <AnimatedBottomSheet

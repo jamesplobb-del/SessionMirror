@@ -5,6 +5,7 @@ import type { PerformancePanelState } from '../types'
 import type { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { extractNativeWaveformPeaks } from '../../utils/nativeWaveform'
+import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
 
 type SyncApi = ReturnType<typeof useMultitrackSync>
 
@@ -29,6 +30,7 @@ export interface AlignClipState {
 interface MultitrackAlignStageProps {
   isOpen: boolean
   panels: PerformancePanelState[]
+  bpm: number
   sync: SyncApi
   onClose: () => void
   onPreviewToggle: () => void
@@ -116,9 +118,13 @@ function ClipWaveform({
 function ClipTrack({
   clip,
   onChange,
+  selected,
+  onSelect,
 }: {
   clip: AlignClipState
   onChange: (next: Partial<Pick<AlignClipState, 'offsetMs' | 'trimStart' | 'trimEnd'>>) => void
+  selected: boolean
+  onSelect: () => void
 }) {
   const dragRef = useRef<{
     mode: 'move' | 'trim-start' | 'trim-end'
@@ -137,6 +143,7 @@ function ClipTrack({
 
   const beginDrag = (mode: 'move' | 'trim-start' | 'trim-end') => (event: ReactPointerEvent) => {
     event.stopPropagation()
+    onSelect()
     ;(event.target as Element).setPointerCapture(event.pointerId)
     dragRef.current = {
       mode,
@@ -154,7 +161,7 @@ function ClipTrack({
     const deltaSec = pxToSec(deltaPx)
 
     if (drag.mode === 'move') {
-      onChange({ offsetMs: drag.startOffsetMs - deltaSec * 1000 })
+      onChange({ offsetMs: Math.round(drag.startOffsetMs - deltaSec * 1000) })
       return
     }
 
@@ -162,14 +169,17 @@ function ClipTrack({
       const maxStart = drag.startTrimEnd - MIN_CLIP_SEC
       const nextStart = Math.max(0, Math.min(maxStart, drag.startTrimStart + deltaSec))
       const actualDelta = nextStart - drag.startTrimStart
-      onChange({ trimStart: nextStart, offsetMs: drag.startOffsetMs - actualDelta * 1000 })
+      onChange({
+        trimStart: Math.round(nextStart * 1000) / 1000,
+        offsetMs: Math.round(drag.startOffsetMs - actualDelta * 1000),
+      })
       return
     }
 
     // trim-end
     const minEnd = drag.startTrimStart + MIN_CLIP_SEC
     const nextEnd = Math.max(minEnd, Math.min(duration, drag.startTrimEnd + deltaSec))
-    onChange({ trimEnd: nextEnd >= duration - 0.02 ? undefined : nextEnd })
+    onChange({ trimEnd: nextEnd >= duration - 0.02 ? undefined : Math.round(nextEnd * 1000) / 1000 })
   }
 
   const endDrag = (event: ReactPointerEvent) => {
@@ -183,7 +193,7 @@ function ClipTrack({
   }
 
   return (
-    <div className="multitrack-align-stage__track">
+    <div className={`multitrack-align-stage__track ${selected ? 'is-selected' : ''}`} onPointerDown={onSelect}>
       <div className="multitrack-align-stage__track-label">{clip.label}</div>
       <div className="multitrack-align-stage__track-lane">
         <div
@@ -225,14 +235,17 @@ function ClipTrack({
 export default function MultitrackAlignStage({
   isOpen,
   panels,
+  bpm,
   sync,
   onClose,
   onPreviewToggle,
   onDone,
 }: MultitrackAlignStageProps) {
   const [clips, setClips] = useState<Record<string, AlignClipState>>({})
+  const initialClipsRef = useRef<Record<string, AlignClipState>>({})
   const dirtyRef = useRef<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
+  const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
@@ -245,14 +258,16 @@ export default function MultitrackAlignStage({
         label: panel.take.name || 'Performance',
         filePath: panel.take.filePath,
         videoUrl: panel.take.videoUrl,
-        duration: sync.getPanelMediaDuration(panel.id) || 0,
-        offsetMs: panel.take.timelineOffsetMs ?? 0,
+        duration: sync.getPanelMediaDuration(panel.id) || panel.take.duration || 0,
+        offsetMs: timelineOffsetMsForTake(panel.take, bpm),
         trimStart: panel.trimStartSec ?? 0,
         trimEnd: panel.trimEndSec,
       }
     }
     setClips(next)
+    initialClipsRef.current = next
     dirtyRef.current = new Set()
+    setSelectedPanelId(Object.keys(next)[0] ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
@@ -289,6 +304,14 @@ export default function MultitrackAlignStage({
     updateClip(panelId, { offsetMs: 0, trimStart: 0, trimEnd: undefined })
   }
 
+  const handleCancel = () => {
+    for (const clip of Object.values(initialClipsRef.current)) {
+      sync.setPanelOffset(clip.panelId, clip.offsetMs)
+      sync.setPanelTrim(clip.panelId, clip.trimStart, clip.trimEnd ?? null)
+    }
+    onClose()
+  }
+
   const handleDone = async () => {
     setSaving(true)
     try {
@@ -310,13 +333,17 @@ export default function MultitrackAlignStage({
   }
 
   const playheadPx = secToPx(sync.state.currentTime)
+  const selectedClip = selectedPanelId ? clips[selectedPanelId] : undefined
+  const selectedTrimEnd = selectedClip
+    ? selectedClip.trimEnd ?? (selectedClip.duration > 0 ? selectedClip.duration : 0)
+    : 0
 
   if (!isOpen) return null
 
   return (
     <div className="multitrack-align-stage" role="dialog" aria-modal="true" aria-label="Align tracks">
       <header className="multitrack-align-stage__header">
-        <Pressable type="button" intensity="icon" className="multitrack-align-stage__close" onClick={onClose} aria-label="Close">
+        <Pressable type="button" intensity="icon" className="multitrack-align-stage__close" onClick={handleCancel} aria-label="Cancel alignment changes">
           <X className="h-5 w-5" />
         </Pressable>
         <p className="multitrack-align-stage__title">Align tracks</p>
@@ -333,8 +360,24 @@ export default function MultitrackAlignStage({
       </header>
 
       <p className="multitrack-align-stage__hint">
-        Drag a clip to shift its timing. Drag the edges to trim. Preview plays everything in sync.
+        Drag a clip to shift it. Drag either edge to trim it. Saved edits are used by Play All and the final export.
       </p>
+
+      {selectedClip ? (
+        <div className="multitrack-align-stage__inspector">
+          <div className="multitrack-align-stage__selection">
+            <strong>{selectedClip.label}</strong>
+            <span>
+              Starts {(-selectedClip.offsetMs / 1000).toFixed(3)}s · keeps {selectedClip.trimStart.toFixed(3)}–{selectedTrimEnd.toFixed(3)}s
+            </span>
+          </div>
+          <div className="multitrack-align-stage__nudge" aria-label="Fine alignment controls">
+            <Pressable type="button" intensity="soft" onClick={() => updateClip(selectedClip.panelId, { offsetMs: selectedClip.offsetMs + 10 })}>−10ms</Pressable>
+            <Pressable type="button" intensity="soft" onClick={() => updateClip(selectedClip.panelId, { offsetMs: selectedClip.offsetMs - 10 })}>+10ms</Pressable>
+            <Pressable type="button" intensity="soft" onClick={() => handleReset(selectedClip.panelId)}>Reset track</Pressable>
+          </div>
+        </div>
+      ) : null}
 
       <div className="multitrack-align-stage__scroll">
         <div className="multitrack-align-stage__timeline" style={{ width: timelineWidth }}>
@@ -349,7 +392,13 @@ export default function MultitrackAlignStage({
           <div className="multitrack-align-stage__playhead" style={{ left: playheadPx }} />
           <div className="multitrack-align-stage__tracks">
             {clipList.map((clip) => (
-              <ClipTrack key={clip.panelId} clip={clip} onChange={(patch) => updateClip(clip.panelId, patch)} />
+              <ClipTrack
+                key={clip.panelId}
+                clip={clip}
+                selected={clip.panelId === selectedPanelId}
+                onSelect={() => setSelectedPanelId(clip.panelId)}
+                onChange={(patch) => updateClip(clip.panelId, patch)}
+              />
             ))}
           </div>
         </div>

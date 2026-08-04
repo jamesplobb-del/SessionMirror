@@ -83,6 +83,7 @@ import {
   deleteTakeFile,
   NATIVE_AUDIO_MIME,
   NATIVE_VIDEO_MIME,
+  persistRenderedTakeVideo,
   persistUploadedVideo,
   readCachedPlaybackSrc,
   resolveTakePlaybackUrl,
@@ -2689,6 +2690,63 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     multitrackRecordingActiveRef.current = false
   }, [])
 
+  const handleSaveRenderedMultitrackToVault = useCallback(async ({
+    path,
+    durationSeconds,
+  }: {
+    path: string
+    durationSeconds: number
+  }) => {
+    const projectId = activeProjectIdRef.current
+    if (!projectId) throw new Error('No active project is available for the Take Vault.')
+
+    const takeId = crypto.randomUUID()
+    const persisted = await persistRenderedTakeVideo(path, takeId)
+    const safeVideoUrl = await resolveTakePlaybackUrl(persisted.filePath, persisted.videoUrl)
+    const existing = await getTakesByProject(projectId)
+    const renderedTake: Take = {
+      ...createTake(
+        takeId,
+        takesRef.current.length + 1,
+        safeVideoUrl,
+        persisted.filePath,
+        NATIVE_VIDEO_MIME,
+        'video',
+      ),
+      name: `Multitrack ${existing.length + 1}`,
+      duration: Math.max(0, durationSeconds),
+      recordingOrientation: 'portrait',
+    }
+
+    try {
+      await saveTake({
+        projectId,
+        filePath: persisted.filePath,
+        duration: renderedTake.duration ?? 0,
+        takeId,
+        mimeType: NATIVE_VIDEO_MIME,
+        mediaType: 'video',
+        recordingOrientation: 'portrait',
+        name: renderedTake.name,
+      })
+    } catch (error) {
+      await deleteTakeFile(persisted.filePath)
+      throw error
+    }
+
+    setTakes((current) => [...current, renderedTake])
+    void captureAndPersistTakeThumbnail(renderedTake)
+      .then((thumbnailUrl) => {
+        if (!thumbnailUrl) return
+        setTakes((current) =>
+          current.map((take) => (take.id === takeId ? { ...take, thumbnailUrl } : take)),
+        )
+      })
+      .catch(() => {
+        /* the vault can show its normal video placeholder until a later refresh */
+      })
+  }, [])
+
   const handleCloseMultitrack = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     if (isRecording) stopRecording()
@@ -4804,6 +4862,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     pendingRecordingTakeId={multitrackPendingRecordingTakeId}
                     onClearPendingRecording={handleClearMultitrackPendingRecording}
                     onOpenRecordingStage={handleMultitrackOpenRecordingStage}
+                    onSaveRenderedTakeToVault={handleSaveRenderedMultitrackToVault}
                   />
                 </Suspense>
 

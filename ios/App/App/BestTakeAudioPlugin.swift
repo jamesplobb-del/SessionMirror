@@ -656,31 +656,61 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func multitrackRectFrame(_ rectDict: [String: Any], renderSize: CGSize) -> CGRect {
-        let x = percentValue(rectDict["xPercent"], fallback: 0) / 100 * renderSize.width
-        let y = percentValue(rectDict["yPercent"], fallback: 0) / 100 * renderSize.height
-        let width = percentValue(rectDict["widthPercent"], fallback: 100) / 100 * renderSize.width
-        let height = percentValue(rectDict["heightPercent"], fallback: 100) / 100 * renderSize.height
-        return CGRect(x: x, y: y, width: width, height: height)
+        let xPercent = percentValue(rectDict["xPercent"], fallback: 0) / 100
+        let yPercent = percentValue(rectDict["yPercent"], fallback: 0) / 100
+        let widthPercent = percentValue(rectDict["widthPercent"], fallback: 100) / 100
+        let heightPercent = percentValue(rectDict["heightPercent"], fallback: 100) / 100
+        // Round shared boundaries, not widths independently. Adjacent cells now
+        // land on the exact same output pixel and cannot expose a black seam.
+        let minX = round(xPercent * renderSize.width)
+        let minY = round(yPercent * renderSize.height)
+        let maxX = round((xPercent + widthPercent) * renderSize.width)
+        let maxY = round((yPercent + heightPercent) * renderSize.height)
+        return CGRect(
+            x: minX,
+            y: minY,
+            width: max(1, maxX - minX),
+            height: max(1, maxY - minY)
+        )
     }
 
-    /// Contain-fits (letterboxes) each source within its grid cell rather than
-    /// cover-cropping. AVFoundation's per-layer-instruction crop rectangle has
-    /// coordinate-space subtleties around `preferredTransform` that are hard to
-    /// verify without on-device testing, so v1 avoids any risk of one panel's
-    /// video bleeding into an adjacent cell by guaranteeing every source stays
-    /// fully within its own target rect. Revisit with true cover-fit + cropping
-    /// once verified live on device.
-    private func multitrackVideoTransform(track: AVAssetTrack, targetRect: CGRect) -> CGAffineTransform {
+    /// Aspect-fills a panel and returns a crop in the track's natural coordinate
+    /// space. The crop prevents cover-scaled pixels from bleeding into a neighbor.
+    private func multitrackVideoGeometry(
+        track: AVAssetTrack,
+        targetRect: CGRect
+    ) -> (transform: CGAffineTransform, cropRect: CGRect) {
         let (normalize, orientedSize) = normalizedTrackOrientation(track)
-        let scale = min(targetRect.width / max(orientedSize.width, 1), targetRect.height / max(orientedSize.height, 1))
-        let scaledSize = CGSize(width: orientedSize.width * scale, height: orientedSize.height * scale)
-        let translate = CGAffineTransform(
-            translationX: targetRect.origin.x + (targetRect.width - scaledSize.width) / 2,
-            y: targetRect.origin.y + (targetRect.height - scaledSize.height) / 2
+        let sourceAspect = orientedSize.width / max(orientedSize.height, 1)
+        let targetAspect = targetRect.width / max(targetRect.height, 1)
+        let cropSize: CGSize
+        if sourceAspect > targetAspect {
+            cropSize = CGSize(width: orientedSize.height * targetAspect, height: orientedSize.height)
+        } else {
+            cropSize = CGSize(width: orientedSize.width, height: orientedSize.width / max(targetAspect, 0.0001))
+        }
+        let orientedCrop = CGRect(
+            x: (orientedSize.width - cropSize.width) / 2,
+            y: (orientedSize.height - cropSize.height) / 2,
+            width: cropSize.width,
+            height: cropSize.height
         )
-        return normalize
+        let naturalCrop = orientedCrop.applying(normalize.inverted()).standardized
+        let scale = max(
+            targetRect.width / max(orientedCrop.width, 1),
+            targetRect.height / max(orientedCrop.height, 1)
+        )
+        let transform = normalize
+            .concatenating(CGAffineTransform(
+                translationX: -orientedCrop.origin.x,
+                y: -orientedCrop.origin.y
+            ))
             .concatenating(CGAffineTransform(scaleX: scale, y: scale))
-            .concatenating(translate)
+            .concatenating(CGAffineTransform(
+                translationX: targetRect.origin.x,
+                y: targetRect.origin.y
+            ))
+        return (transform, naturalCrop)
     }
 
     private func addCreatorStudioObjectLayer(
@@ -1044,10 +1074,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
             let targetRect = multitrackRectFrame(rectDict, renderSize: renderSize)
             let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideo)
-            layerInstruction.setTransform(
-                multitrackVideoTransform(track: videoTrack, targetRect: targetRect),
-                at: .zero
-            )
+            let geometry = multitrackVideoGeometry(track: videoTrack, targetRect: targetRect)
+            layerInstruction.setCropRectangle(geometry.cropRect, at: .zero)
+            layerInstruction.setTransform(geometry.transform, at: .zero)
             layerInstructions.append(layerInstruction)
 
             // Mixer state from Play All — muted panels export silent, others at
@@ -1126,6 +1155,22 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         videoLayer.frame = parentLayer.bounds
         parentLayer.addSublayer(videoLayer)
 
+        let decorationLayer = CALayer()
+        decorationLayer.frame = parentLayer.bounds
+        parentLayer.addSublayer(decorationLayer)
+
+        // Draw every layout cell, including empty ones, so the final frame is a
+        // deliberate connected grid instead of a set of floating rectangles.
+        let gridRects = call.getArray("gridRects", JSObject.self) ?? []
+        for rectAny in gridRects {
+            let rect = rectAny as [String: Any]
+            let borderLayer = CALayer()
+            borderLayer.frame = multitrackRectFrame(rect, renderSize: renderSize)
+            borderLayer.borderColor = UIColor.white.withAlphaComponent(0.42).cgColor
+            borderLayer.borderWidth = 2
+            decorationLayer.addSublayer(borderLayer)
+        }
+
         if let sheetMusicDict = call.getObject("sheetMusic"),
            let sheetPath = sheetMusicDict["path"] as? String,
            let sheetRectDict = sheetMusicDict["rect"] as? [String: Any],
@@ -1133,19 +1178,28 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 path: sheetPath,
                 fileType: sheetMusicDict["fileType"] as? String ?? "image"
            ) {
-            let overlayLayer = CALayer()
-            overlayLayer.frame = parentLayer.bounds
-            parentLayer.addSublayer(overlayLayer)
+            let sheetFrame = multitrackRectFrame(sheetRectDict, renderSize: renderSize)
+            let sheetViewport = CALayer()
+            sheetViewport.frame = sheetFrame
+            sheetViewport.backgroundColor = UIColor.white.cgColor
+            sheetViewport.masksToBounds = true
+            sheetViewport.borderColor = UIColor.white.withAlphaComponent(0.65).cgColor
+            sheetViewport.borderWidth = 2
 
             let sheetLayer = CALayer()
+            sheetLayer.frame = sheetViewport.bounds
             sheetLayer.contents = image.cgImage
             sheetLayer.contentsGravity = .resizeAspect
-            sheetLayer.masksToBounds = true
-            sheetLayer.cornerRadius = 18
-            sheetLayer.borderColor = UIColor.white.withAlphaComponent(0.55).cgColor
-            sheetLayer.borderWidth = 2
-            sheetLayer.frame = multitrackRectFrame(sheetRectDict, renderSize: renderSize)
-            overlayLayer.addSublayer(sheetLayer)
+            let x = min(1.25, max(-0.25, (sheetMusicDict["x"] as? NSNumber)?.doubleValue ?? 0.5))
+            let y = min(1.25, max(-0.25, (sheetMusicDict["y"] as? NSNumber)?.doubleValue ?? 0.5))
+            let scale = min(2.5, max(0.6, (sheetMusicDict["scale"] as? NSNumber)?.doubleValue ?? 1))
+            sheetLayer.position = CGPoint(
+                x: sheetViewport.bounds.midX + (x - 0.5) * 0.7 * sheetViewport.bounds.width,
+                y: sheetViewport.bounds.midY + (y - 0.5) * 0.7 * sheetViewport.bounds.height
+            )
+            sheetLayer.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
+            sheetViewport.addSublayer(sheetLayer)
+            decorationLayer.addSublayer(sheetViewport)
         }
 
         videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
@@ -1180,7 +1234,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     print("[Multitrack] native render complete path=\(outputURL.path)")
                     call.resolve([
                         "success": true,
-                        "path": outputURL.absoluteString
+                        "path": outputURL.absoluteString,
+                        "durationSeconds": CMTimeGetSeconds(longestDuration)
                     ])
                 } else if let error = exportSession.error {
                     print("[Multitrack] native render failed: \(error.localizedDescription)")

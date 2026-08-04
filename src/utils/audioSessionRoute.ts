@@ -143,6 +143,7 @@ export interface NativeRectPercent {
 export interface NativeMultitrackRenderResult {
   success: boolean
   path: string
+  durationSeconds?: number
 }
 
 export interface NativeMultitrackMonitorSource {
@@ -284,7 +285,15 @@ export interface BestTakeAudioPluginType {
       volume?: number
       muted?: boolean
     }>
-    sheetMusic: { path: string; fileType: string; rect: NativeRectPercent } | null
+    gridRects: NativeRectPercent[]
+    sheetMusic: {
+      path: string
+      fileType: string
+      rect: NativeRectPercent
+      x: number
+      y: number
+      scale: number
+    } | null
     backingAudio: { path: string; gain: number } | null
   }): Promise<NativeMultitrackRenderResult>
   prepareMultitrackMonitor(options: {

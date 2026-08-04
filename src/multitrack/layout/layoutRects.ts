@@ -1,9 +1,5 @@
 import type { MultitrackLayoutPreset, SheetMusicAsset } from '../types'
 
-// Numeric twin of layoutGrid.ts's CSS grid math (areasWithMusic/performanceRows/
-// clampMusicScale) — duplicated rather than shared so refactoring this export-only
-// path can never regress the on-screen CSS layout. Keep in sync with layoutGrid.ts.
-
 const PANEL_IDS = ['a', 'b', 'c', 'd', 'e', 'f']
 
 function clampMusicScale(asset: SheetMusicAsset | null): number {
@@ -18,13 +14,21 @@ function performanceRows(panelCount: number, columns: number): string[] {
   })
 }
 
-interface GridModel {
+export interface MultitrackGridModel {
   areas: string[]
   columnWeights: number[]
   rowWeights: number[]
 }
 
-function resolveGridModel(preset: MultitrackLayoutPreset, musicAsset: SheetMusicAsset | null): GridModel {
+/**
+ * One grid model drives both the CSS preview and the native renderer. Keeping
+ * the area map and fr weights here prevents sheet-music placement from subtly
+ * changing between the editor and the exported movie.
+ */
+export function resolveMultitrackGridModel(
+  preset: MultitrackLayoutPreset,
+  musicAsset: SheetMusicAsset | null,
+): MultitrackGridModel {
   if (!musicAsset) {
     return {
       areas: preset.areas,
@@ -89,7 +93,7 @@ export function computeMultitrackLayoutRects(
   preset: MultitrackLayoutPreset,
   musicAsset: SheetMusicAsset | null,
 ): { panelRects: Record<string, LayoutRectPercent>; musicRect: LayoutRectPercent | null } {
-  const { areas, columnWeights, rowWeights } = resolveGridModel(preset, musicAsset)
+  const { areas, columnWeights, rowWeights } = resolveMultitrackGridModel(preset, musicAsset)
   const colBounds = cumulativePercents(columnWeights)
   const rowBounds = cumulativePercents(rowWeights)
   const cells = areas.map((row) => row.trim().split(/\s+/))
