@@ -23,6 +23,8 @@ import {
 import { triggerLightHaptic } from '../../utils/haptics'
 
 interface AudioTunerTabProps {
+  /** False while a sheet or another full-screen surface covers the tuner. */
+  active: boolean
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   nativeLivePreviewActive: boolean
@@ -58,6 +60,7 @@ function micStreamIsLive(
 }
 
 export default function AudioTunerTab({
+  active,
   streamRef,
   streamGeneration,
   nativeLivePreviewActive,
@@ -113,13 +116,13 @@ export default function AudioTunerTab({
     ],
   )
 
-  const liveMicReady = appForeground
+  const liveMicReady = active && appForeground
 
   useEffect(() => subscribeAppForeground(setAppForeground), [])
 
   useEffect(() => {
     let cancelled = false
-    if (!appForeground) return
+    if (!active || !appForeground) return
     if (handsFreeEnabled) {
       if (isNativeCaptureSessionActive()) {
         setMicLiveEpoch((epoch) => epoch + 1)
@@ -135,15 +138,15 @@ export default function AudioTunerTab({
       cancelled = true
       void releaseNativeTunerMonitor()
     }
-  }, [appForeground, handsFreeEnabled, micInputPreference])
+  }, [active, appForeground, handsFreeEnabled, micInputPreference])
 
   const recoverNativeSource = useCallback(async (): Promise<boolean> => {
-    if (!isAppInForeground()) return false
+    if (!active || !isAppInForeground()) return false
     if (handsFreeEnabled) {
       return isNativeCaptureSessionActive()
     }
     return recoverNativeTunerMonitor(micInputPreference)
-  }, [handsFreeEnabled, micInputPreference])
+  }, [active, handsFreeEnabled, micInputPreference])
 
   useEffect(() => {
     const wasRecording = previousRecordingRef.current
@@ -151,7 +154,7 @@ export default function AudioTunerTab({
     // The monitor-acquisition effect above owns initial startup. Recover only
     // after recording actually relinquishes the microphone; running both on
     // mount needlessly reconfigured the same AVCaptureSession twice.
-    if (isRecording || !wasRecording) return
+    if (!active || isRecording || !wasRecording) return
     let cancelled = false
     void recoverNativeSource().then((active) => {
       if (!cancelled && active) setMicLiveEpoch((epoch) => epoch + 1)
@@ -159,7 +162,7 @@ export default function AudioTunerTab({
     return () => {
       cancelled = true
     }
-  }, [isRecording, recoverNativeSource])
+  }, [active, isRecording, recoverNativeSource])
 
   const handleSourceHealthChange = useCallback((health: PitchSourceHealth) => {
     setSourceHealth(health)
@@ -173,7 +176,7 @@ export default function AudioTunerTab({
     let cancelled = false
 
     const recoverTunerMic = async (event: Event) => {
-      if (!isAppInForeground()) return
+      if (!active || !isAppInForeground()) return
       const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
       if (!reason?.startsWith('tuner-')) return
       if (reason !== 'tuner-auto-source-stalled') {
@@ -195,6 +198,7 @@ export default function AudioTunerTab({
       window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     }
   }, [
+    active,
     handsFreeEnabled,
     onRequestMicStream,
     permissionRequestInFlight,
@@ -243,7 +247,7 @@ export default function AudioTunerTab({
       // The foreground state subscriber drives a fresh native monitor
       // acquisition. Ignore this recovery event until that render commits so
       // it cannot race ahead and open a second WebKit microphone.
-      if (!appForeground) return
+      if (!active || !appForeground) return
       const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
       if (reason?.endsWith(':settled')) return
 
@@ -278,6 +282,7 @@ export default function AudioTunerTab({
       window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverAfterForeground)
     }
   }, [
+    active,
     appForeground,
     handsFreeEnabled,
     isRecording,
@@ -288,6 +293,7 @@ export default function AudioTunerTab({
 
   useEffect(() => {
     if (
+      !active ||
       !appForeground ||
       sourceHealth !== 'stalled' ||
       isRecording ||
@@ -303,10 +309,10 @@ export default function AudioTunerTab({
 
     automaticRecoveryAttemptsRef.current += 1
     requestInteractiveMediaRecovery('tuner-auto-source-stalled')
-  }, [appForeground, isRecording, permissionRequestInFlight, sourceHealth])
+  }, [active, appForeground, isRecording, permissionRequestInFlight, sourceHealth])
 
   useEffect(() => {
-    if (!appForeground) return
+    if (!active || !appForeground) return
     let cancelled = false
     let sourceWasLive =
       micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording) ||
@@ -345,6 +351,7 @@ export default function AudioTunerTab({
       }
     }
   }, [
+    active,
     appForeground,
     isRecording,
     handsFreeEnabled,
@@ -374,7 +381,7 @@ export default function AudioTunerTab({
       <LivePitchTuner
         variant="audio"
         mediaRef={mediaRef}
-        enabled
+        enabled={active}
         isPlaying={isRecording}
         mediaKey={`tuner-tab-${streamGeneration}-${micLiveEpoch}-${isRecording ? 'recording' : 'idle'}-${nativeLivePreviewActive || isRecording ? 'native' : 'webkit'}`}
         label="Pitch Analysis"

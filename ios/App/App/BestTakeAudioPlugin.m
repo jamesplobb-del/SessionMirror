@@ -24,6 +24,9 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(trimTakeMedia, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(renderCreatorStudioVideo, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(renderMultitrackVideo, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(prepareMultitrackMonitor, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(startMultitrackTransport, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(stopMultitrackTransport, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setNativeExperimentalAudioMode, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startNativeCameraBridge, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopNativeCameraBridge, CAPPluginReturnPromise);

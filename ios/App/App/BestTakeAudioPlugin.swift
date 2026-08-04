@@ -32,6 +32,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "trimTakeMedia", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderCreatorStudioVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderMultitrackVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "prepareMultitrackMonitor", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startMultitrackTransport", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopMultitrackTransport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraBridge", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraBridge", returnType: CAPPluginReturnPromise),
@@ -878,6 +881,88 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     // MARK: - Multitrack grid export (N synced videos + optional sheet music + mixed audio)
+
+    @objc func prepareMultitrackMonitor(_ call: CAPPluginCall) {
+        let rawSources = call.getArray("sources", JSObject.self) ?? []
+        var sources: [MultitrackTransportEngine.Source] = []
+
+        for rawAny in rawSources {
+            let raw = rawAny as [String: Any]
+            guard
+                let id = raw["id"] as? String,
+                let path = raw["path"] as? String,
+                let url = fileURL(from: path)
+            else { continue }
+
+            sources.append(
+                MultitrackTransportEngine.Source(
+                    id: id,
+                    url: url,
+                    sourceInSec: max(0, (raw["sourceInSec"] as? NSNumber)?.doubleValue ?? 0),
+                    sourceOutSec: (raw["sourceOutSec"] as? NSNumber)?.doubleValue,
+                    timelineDelaySec: max(0, (raw["timelineDelaySec"] as? NSNumber)?.doubleValue ?? 0),
+                    volume: Float((raw["volume"] as? NSNumber)?.doubleValue ?? 1),
+                    muted: (raw["muted"] as? NSNumber)?.boolValue ?? false
+                )
+            )
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let result = try MultitrackTransportEngine.shared.prepare(sources: sources)
+                DispatchQueue.main.async { call.resolve(result) }
+            } catch {
+                DispatchQueue.main.async {
+                    call.reject("Could not prepare multitrack monitor", error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    @objc func startMultitrackTransport(_ call: CAPPluginCall) {
+        let bpm = call.getDouble("bpm") ?? 120
+        let beatsPerBar = call.getInt("beatsPerBar") ?? 4
+        let countInBars = call.getInt("countInBars") ?? 1
+        let clickEnabled = call.getBool("clickEnabled") ?? true
+        let soundId = call.getString("soundId") ?? "classic"
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let result = try MultitrackTransportEngine.shared.start(
+                    bpm: bpm,
+                    beatsPerBar: beatsPerBar,
+                    countInBars: countInBars,
+                    clickEnabled: clickEnabled,
+                    soundId: soundId
+                )
+                self.nativeCameraEngine.setMultitrackPerformanceAnchor(
+                    hostTimeSec: result.captureAlignmentHostTimeSec
+                )
+                DispatchQueue.main.async {
+                    call.resolve([
+                        "started": true,
+                        "firstClickHostTimeSec": result.firstClickHostTimeSec,
+                        "performanceHostTimeSec": result.performanceHostTimeSec,
+                        "captureAlignmentHostTimeSec": result.captureAlignmentHostTimeSec,
+                        "firstClickEpochMs": result.firstClickEpochMs,
+                        "performanceEpochMs": result.performanceEpochMs,
+                        "countInBeats": result.countInBeats,
+                        "beatDurationSec": result.beatDurationSec,
+                        "audibleSourceCount": result.audibleSourceCount,
+                    ])
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    call.reject("Could not start multitrack transport", error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    @objc func stopMultitrackTransport(_ call: CAPPluginCall) {
+        MultitrackTransportEngine.shared.stop()
+        call.resolve(["stopped": true])
+    }
 
     @objc func renderMultitrackVideo(_ call: CAPPluginCall) {
         let aspectRatio = call.getString("aspectRatio") ?? "9:16"

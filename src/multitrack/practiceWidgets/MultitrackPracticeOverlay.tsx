@@ -20,7 +20,7 @@ export default function MultitrackPracticeOverlay({ boundaryRef, practice, isPla
   return (
     <div className="multitrack-practice-overlay">
       <Suspense fallback={null}>
-        {practice.showMetronome && <DraggableMetronomeWidget boundaryRef={boundaryRef} positionId="multitrack-metronome" isTakePlaying={isPlaying} muteDuringPlayback={false} onClose={onHideMetronome} />}
+        {practice.showMetronome && <DraggableMetronomeWidget boundaryRef={boundaryRef} positionId="multitrack-metronome" isTakePlaying={isPlaying} muteDuringPlayback={false} controlsLocked={isPlaying} onClose={onHideMetronome} />}
         {practice.showPitch && <DraggablePitchWidget boundaryRef={boundaryRef} positionId="multitrack-pitch" mediaRef={mediaRef} isPlaying={isPlaying} mediaKey={mediaKey} tunerInstrument={tunerInstrument} pitchSource="microphone" liveMicEnabled micStreamRef={streamRef} onClose={onHidePitch} />}
       </Suspense>
       {(practice.showMetronome || practice.showPitch) && <div className="multitrack-practice-badge">Practice overlay — excluded from export</div>}

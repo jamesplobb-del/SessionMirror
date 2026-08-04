@@ -41,6 +41,7 @@ export function useMultitrackSync() {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const rafRef = useRef<number | null>(null)
+  const visualStartTimersRef = useRef<number[]>([])
   /** Timeline position playback was prepared/started at (used to anchor the transport). */
   const preparedStartRef = useRef(0)
   /**
@@ -207,7 +208,7 @@ export function useMultitrackSync() {
     excludePanelIdRef.current = panelId
   }, [])
 
-  /** During overdub recording, only these panels are armed/played as reference (MVP: Track 1). */
+  /** During recording, only filled non-target panels are armed as references. */
   const setReferencePanelIds = useCallback((panelIds: string[] | null) => {
     referencePanelIdsRef.current = panelIds
   }, [])
@@ -408,6 +409,43 @@ export function useMultitrackSync() {
     return true
   }, [clipWindowFor, getEntries])
 
+  /**
+   * Native AVAudioEngine owns the audible recording monitor. These two helpers
+   * keep the corresponding videos moving in their layout tiles without routing
+   * any WebKit audio or introducing a second audible clock.
+   */
+  const prepareVisualAtStart = useCallback(() => {
+    for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
+    visualStartTimersRef.current = []
+    for (const [panelId, element] of getEntries()) {
+      element.pause()
+      element.muted = true
+      element.volume = 0
+      element.setAttribute('playsinline', 'true')
+      try {
+        const win = clipWindowFor(panelId, element)
+        element.currentTime = Math.max(win.trimStart, win.trimStart + win.offset)
+      } catch {
+        /* metadata may finish loading during the count-in */
+      }
+    }
+  }, [clipWindowFor, getEntries])
+
+  const startVisualPrepared = useCallback(() => {
+    for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
+    visualStartTimersRef.current = []
+    for (const [panelId, element] of getEntries()) {
+      const startElement = () => {
+        element.muted = true
+        element.volume = 0
+        void element.play().catch(() => {})
+      }
+      const entryDelayMs = Math.max(0, -offsetFor(panelId) * 1000)
+      if (entryDelayMs <= 5) startElement()
+      else visualStartTimersRef.current.push(window.setTimeout(startElement, entryDelayMs))
+    }
+  }, [getEntries, offsetFor])
+
   const startPrepared = useCallback(async () => {
     const entries = getEntries()
     if (entries.length === 0) {
@@ -548,6 +586,8 @@ export function useMultitrackSync() {
   const pause = useCallback(() => {
     chaseModeRef.current = false
     pendingStartRef.current.clear()
+    for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
+    visualStartTimersRef.current = []
     for (const el of mediaMapRef.current.values()) el.pause()
     multitrackTransport.pause()
     setIsPlaying(false)
@@ -733,6 +773,8 @@ export function useMultitrackSync() {
     getPanelMediaDuration,
     setMonitorMutedPanelIds,
     prepareAtStart,
+    prepareVisualAtStart,
+    startVisualPrepared,
     startPrepared,
     startAnchoredToClick,
     playAllFromUserGesture,

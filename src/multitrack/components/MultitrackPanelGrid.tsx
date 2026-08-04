@@ -1,6 +1,8 @@
+import type { RefObject } from 'react'
 import PerformancePanel from '../performance/PerformancePanel'
 import SheetMusicPanel from '../sheetMusic/SheetMusicPanel'
 import { layoutGridStyle, panelAreaStyle } from '../layout/layoutGrid'
+import type { Take } from '../../types'
 import type {
   MultitrackLayoutPreset,
   MultitrackPanelState,
@@ -9,8 +11,10 @@ import type {
   SheetMusicPanelState,
 } from '../types'
 
-export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, onTapPerformance, onRemoveTake, onSheetMusicChange, onRegisterMedia }: {
+export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onRegisterMedia }: {
   layout: MultitrackLayoutPreset; panels: MultitrackPanelState[]; sheetMusicPanel: SheetMusicPanelState; recordingTargetPanelId: string | null; recordingPhase: MultitrackRecordingPhase
+  streamRef?: RefObject<MediaStream | null>; streamGeneration?: number; nativeLivePreviewActive?: boolean; nativeCameraBridgeEnabled?: boolean
+  countInRemaining?: number; recordingElapsed?: number; reviewTake?: Take | null; reviewMediaRef?: RefObject<HTMLMediaElement | null>
   onTapPerformance: (id: string) => void; onRemoveTake: (id: string) => void; onSheetMusicChange: (id: string, asset: SheetMusicAsset | null) => void
   onRegisterMedia: (id: string, el: HTMLMediaElement | null) => void
 }) {
@@ -25,7 +29,22 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
       {panels.map((panel) => (
         <div key={panel.id} style={panelAreaStyle(panel.id)} className="multitrack-grid__cell">
           {panel.kind === 'performance' ? (
-            <PerformancePanel panel={panel} isRecordingTarget={recordingTargetPanelId === panel.id} recordingPhase={recordingPhase} onTap={() => onTapPerformance(panel.id)} onRemoveTake={() => onRemoveTake(panel.id)} onRegisterMedia={onRegisterMedia} />
+            <PerformancePanel
+              panel={panel}
+              isRecordingTarget={recordingTargetPanelId === panel.id}
+              recordingPhase={recordingPhase}
+              streamRef={streamRef}
+              streamGeneration={streamGeneration}
+              nativeLivePreviewActive={nativeLivePreviewActive}
+              nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
+              countInRemaining={countInRemaining}
+              recordingElapsed={recordingElapsed}
+              reviewTake={reviewTake}
+              reviewMediaRef={reviewMediaRef}
+              onTap={() => onTapPerformance(panel.id)}
+              onRemoveTake={() => onRemoveTake(panel.id)}
+              onRegisterMedia={onRegisterMedia}
+            />
           ) : (
             <SheetMusicPanel panel={panel} onAssetChange={(asset) => onSheetMusicChange(panel.id, asset)} />
           )}

@@ -47,6 +47,11 @@ export interface NativeCameraRecordingStopResult extends NativeCameraSessionDiag
   recordedActiveRmsDb?: number
   audioTrackCount?: number
   hasAudioTrack?: boolean
+  /** Measured file source-in for the native multitrack performance downbeat. */
+  multitrackSourceInMs?: number
+  multitrackFirstAudioSampleHostTimeSec?: number
+  multitrackPerformanceAnchorHostTimeSec?: number
+  multitrackPerformanceFileTimeSec?: number
 }
 
 export interface NativeCameraPostProcessPlaybackResult {

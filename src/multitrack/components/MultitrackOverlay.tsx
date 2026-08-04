@@ -20,10 +20,7 @@ import {
 import Pressable from '../../components/ui/Pressable'
 import AnimatedBottomSheet from '../../components/ui/AnimatedBottomSheet'
 import { ensureNativeCameraSessionHealthy } from '../../utils/nativeCameraTest'
-import {
-  completePlaybackRouteRestore,
-  reassertPlaybackRouteForCountIn,
-} from '../../utils/playbackRouteCoordinator'
+import { completePlaybackRouteRestore } from '../../utils/playbackRouteCoordinator'
 import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
 import { APP_FOREGROUND_RECOVERY_EVENT } from '../../utils/appForeground'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
@@ -31,16 +28,18 @@ import { useActionSheet } from '../../context/ActionSheetContext'
 import { useMultitrackSession } from '../state/useMultitrackSession'
 import { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMultitrackRecording } from '../recording/useMultitrackRecording'
-import { computeTakeAlignment } from '../../utils/nativeAlignment'
 import { updateVaultTake } from '../../db/vaultRepository'
-import {
-  isOverdubPanel,
-  timelineOffsetMsForTake,
-  TRACK1_PANEL_ID,
-  TRACK1_COUNT_IN_BEATS,
-  OVERDUB_COUNT_IN_BEATS,
-} from '../synchronization/multitrackBeatSchedule'
+import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
 import type { MultitrackRecordingStopOptions } from '../../utils/takeStorage'
+import { resolveNativeFileUri } from '../../utils/shareTakeVideo'
+import { extensionForBlob, writeBlobToNativeCache } from '../../utils/nativeAssetCache'
+import {
+  isNativeMultitrackTransportAvailable,
+  prepareNativeMultitrackMonitor,
+  startNativeMultitrackTransport,
+  stopNativeMultitrackTransport,
+  type MultitrackMonitorSource,
+} from '../synchronization/nativeMultitrackTransport'
 import { exportMultitrackSession, type MultitrackExportFailureReason } from '../export/multitrackExport'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
@@ -52,6 +51,7 @@ import MultitrackAlignStage from './MultitrackAlignStage'
 
 /** Sheets portal to document.body; the overlay itself sits at z-135. */
 const MULTITRACK_SHEET_Z = { backdrop: 'z-[140]', sheet: 'z-[145]' }
+const MULTITRACK_MONITOR_CACHE_DIR = 'multitrack-monitor-assets'
 
 interface MultitrackOverlayProps {
   isOpen: boolean
@@ -120,6 +120,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   } = props
   const shellRef = useRef<HTMLDivElement>(null)
   const masterMediaRef = useRef<HTMLMediaElement | null>(null)
+  const inGridReviewMediaRef = useRef<HTMLMediaElement | null>(null)
   const backingAudioRef = useRef<HTMLAudioElement>(null)
   const backingYoutubeIframeRef = useRef<HTMLIFrameElement>(null)
   const [takePickerPanelId, setTakePickerPanelId] = useState<string | null>(null)
@@ -127,6 +128,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [backingPlaying, setBackingPlaying] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take } | null>(null)
+  const discardNextRecordingRef = useRef(false)
   /** Bottom sheets: backing source, mixer, or a tile's action sheet. */
   const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'mixer' | null>(null)
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
@@ -146,6 +148,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   } = useMultitrackSession({ takes, isOpen })
   const sync = useMultitrackSync()
   const { showAlert, showConfirm } = useActionSheet()
+
+  const handlePracticeChange = useCallback((patch: Partial<typeof session.practice>) => {
+    if (patch.bpm !== undefined) {
+      sharedMetronomeEngine.setBpm(patch.bpm)
+    } else if (patch.showMetronome === true) {
+      sharedMetronomeEngine.setBpm(session.practice.bpm)
+    }
+    updatePractice(patch)
+  }, [session.practice.bpm, updatePractice])
 
   const pauseBacking = useCallback(() => {
     const backing = session.backing
@@ -284,47 +295,140 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
    */
   const alignedOffsetRef = useRef<Map<string, number>>(new Map())
 
-  const track1Panel = session.panels.find(
-    (panel) => panel.id === TRACK1_PANEL_ID && panel.kind === 'performance',
-  )
-  const track1TakeId = track1Panel?.kind === 'performance' ? track1Panel.take?.id ?? null : null
+  // Per-record monitor mix. Every filled panel except the recording target is
+  // a reference; there is no privileged "Track 1" box.
+  const [monitorMutes, setMonitorMutes] = useState<Set<string>>(() => new Set())
+  const monitorMutesRef = useRef(monitorMutes)
+  monitorMutesRef.current = monitorMutes
+  const nativeTransportActiveRef = useRef(false)
+
+  const buildNativeMonitorSources = useCallback(async (
+    targetPanelId: string,
+  ): Promise<MultitrackMonitorSource[]> => {
+    const sources: MultitrackMonitorSource[] = []
+
+    for (const panel of session.panels) {
+      if (
+        panel.kind !== 'performance' ||
+        panel.id === targetPanelId ||
+        !panel.take ||
+        panel.muted ||
+        monitorMutesRef.current.has(panel.id)
+      ) continue
+
+      const path = await resolveNativeFileUri(panel.take)
+      if (!path) throw new Error(`Missing monitor source ${panel.id}`)
+      const offsetSec = timelineOffsetMsForTake(panel.take, session.practice.bpm) / 1000
+      sources.push({
+        id: panel.id,
+        path,
+        sourceInSec: (panel.trimStartSec ?? 0) + Math.max(0, offsetSec),
+        ...(panel.trimEndSec !== undefined ? { sourceOutSec: panel.trimEndSec } : null),
+        ...(offsetSec < 0 ? { timelineDelaySec: -offsetSec } : null),
+        volume: panel.volume ?? 1,
+      })
+    }
+
+    if (
+      session.backing.kind === 'audio' &&
+      !monitorMutesRef.current.has('backing')
+    ) {
+      const blob = await fetch(session.backing.src).then((response) => response.blob())
+      const extension = extensionForBlob(blob, session.backing.fileName)
+      const path = await writeBlobToNativeCache(
+        MULTITRACK_MONITOR_CACHE_DIR,
+        `backing-monitor.${extension}`,
+        blob,
+      )
+      sources.push({
+        id: 'backing',
+        path,
+        sourceInSec: 0,
+        volume: session.backing.volume,
+      })
+    }
+
+    return sources
+  }, [session.backing, session.panels, session.practice.bpm])
 
   const recording = useMultitrackRecording({
     onPrepareRecording: (panelId) => {
       recordingTargetPanelIdRef.current = panelId
       sync.setExcludePanelId(panelId)
-      const overdub = isOverdubPanel(panelId)
-      sync.setReferencePanelIds(overdub ? [TRACK1_PANEL_ID] : null)
+      const referenceIds = session.panels
+        .filter((panel) =>
+          panel.kind === 'performance' &&
+          panel.id !== panelId &&
+          panel.take !== null &&
+          !panel.muted &&
+          !monitorMutesRef.current.has(panel.id),
+        )
+        .map((panel) => panel.id)
+      sync.setReferencePanelIds(referenceIds)
     },
     onStartMicRecording: () => onStartRecording(),
-    onArmPlayback: async () => {
-      sync.setExcludePanelId(recordingTargetPanelIdRef.current)
-      const overdub = isOverdubPanel(recordingTargetPanelIdRef.current ?? '')
-      sync.setReferencePanelIds(overdub ? [TRACK1_PANEL_ID] : null)
+    onAbortMicRecording: () => {
+      discardNextRecordingRef.current = true
+      onStopRecording()
+    },
+    onArmPlayback: async (panelId) => {
+      sync.pause()
+      pauseBacking()
+      const sources = await buildNativeMonitorSources(panelId)
+      nativeTransportActiveRef.current = await prepareNativeMultitrackMonitor(sources)
+      if (nativeTransportActiveRef.current) {
+        sync.prepareVisualAtStart()
+        return true
+      }
+      if (isNativeMultitrackTransportAvailable()) return false
+
+      // Browser development fallback. iOS production must use the native
+      // transport; this path keeps the feature testable without AVFoundation.
       await sync.prepareAtStart(0)
       await prepareBackingAtStart()
+      return true
     },
-    requiresReferencePlayback: () => {
-      const targetId = recordingTargetPanelIdRef.current
-      return (
-        targetId !== null &&
-        isOverdubPanel(targetId) &&
-        track1Panel?.kind === 'performance' &&
-        track1Panel.take !== null
-      )
-    },
-    getReferenceTakeId: () => track1TakeId,
-    onStartReferencePlayback: async () => {
-      return sync.startPrepared()
-    },
-    onPrepareCountInAudio: async () => {
-      try {
-        await reassertPlaybackRouteForCountIn()
-      } catch {
-        return false
+    onStartTransport: async ({ bpm, countInBars, clickEnabled }) => {
+      const snapshot = sharedMetronomeEngine.getSnapshot()
+      const beatsPerBar = Math.max(1, Number.parseInt(snapshot.meter.split('/')[0] ?? '4', 10) || 4)
+      if (nativeTransportActiveRef.current) {
+        return startNativeMultitrackTransport({
+          bpm,
+          beatsPerBar,
+          countInBars,
+          clickEnabled,
+          soundId: snapshot.soundId,
+        })
       }
-      await resumePlaybackAudioContext()
-      return sharedMetronomeEngine.prepareForCountIn()
+
+      sharedMetronomeEngine.applySectionConfig(
+        {
+          bpm,
+          meter: '4/4',
+          subdivision: 'off',
+          pulseModeId: 'default',
+          accentLevels: ['strong', 'weak', 'weak', 'weak'],
+        },
+        { resetBeat: true },
+      )
+      const started = await sharedMetronomeEngine.start()
+      if (!started) return null
+      const beatDurationSec = 60 / bpm
+      const countInBeats = beatsPerBar * countInBars
+      const firstClickEpochMs = Date.now() + 50
+      return {
+        firstClickEpochMs,
+        performanceEpochMs: firstClickEpochMs + countInBeats * beatDurationSec * 1000,
+        countInBeats,
+        beatDurationSec,
+      }
+    },
+    onStopTransport: () => {
+      if (nativeTransportActiveRef.current) {
+        void stopNativeMultitrackTransport()
+      }
+      nativeTransportActiveRef.current = false
+      sync.pause()
     },
     recoverFromInterrupt: () => {
       sync.pause()
@@ -334,7 +438,18 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       sharedMetronomeEngine.stop()
     },
     onPerformanceStart: async () => {
-      if (!monitorMutesRef.current.has('backing')) {
+      // Native transport already started panel audio and uploaded backings on
+      // the exact downbeat. YouTube cannot join that native graph, so it remains
+      // an explicitly best-effort preview source.
+      if (!nativeTransportActiveRef.current) {
+        await sync.startPrepared()
+      } else {
+        sync.startVisualPrepared()
+      }
+      if (
+        session.backing.kind === 'youtube' &&
+        !monitorMutesRef.current.has('backing')
+      ) {
         await startBackingPlayback()
       }
     },
@@ -343,6 +458,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       pauseBacking()
       sync.setExcludePanelId(null)
       sync.setReferencePanelIds(null)
+      nativeTransportActiveRef.current = false
       void showAlert({ message, tone: 'error' })
     },
   })
@@ -411,48 +527,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     if (!pendingRecordingTakeId || !targetPanelId) return
     const take = takes.find((t) => t.id === pendingRecordingTakeId)
     if (!take) return
+    if (discardNextRecordingRef.current) {
+      discardNextRecordingRef.current = false
+      onDeleteTakes([take.id])
+      onRecordingComplete()
+      onClearPendingRecording()
+      return
+    }
     setPendingReview({ panelId: targetPanelId, take })
     onRecordingComplete()
     onClearPendingRecording()
-
-    // Layer-2 automatic alignment: refine the deterministic latency estimate by
-    // correlating the recorded count-in clicks against the ideal beat grid. Runs
-    // off the main path; only applied when the correlation is confident.
-    const practice = session.practice
-    const countInBeats = targetPanelId && isOverdubPanel(targetPanelId)
-      ? OVERDUB_COUNT_IN_BEATS
-      : TRACK1_COUNT_IN_BEATS
-    if (practice.clickEnabled && countInBeats >= 2 && take.videoUrl) {
-      const alignTakeId = take.id
-      void (async () => {
-        try {
-          const result = await computeTakeAlignment(take, {
-            bpm: practice.bpm,
-            countInBeats,
-            deterministicOffsetMs: take.timelineOffsetMs ?? 0,
-          })
-          if (!result.applied) return
-          alignedOffsetRef.current.set(alignTakeId, result.refinedOffsetMs)
-          console.log(
-            `[multitrack autoAlign] take=${alignTakeId} refined=${result.refinedOffsetMs}ms ` +
-              `residual=${result.residualMs}ms confidence=${result.confidence.toFixed(2)}`,
-          )
-          // Apply live to any panel already holding this take, and refresh the
-          // panel's take object so export (which reads panel.take.timelineOffsetMs)
-          // sees the refined offset instead of the stale deterministic one.
-          for (const panel of session.panels) {
-            if (panel.kind === 'performance' && panel.take?.id === alignTakeId && panel.take) {
-              sync.setPanelOffset(panel.id, result.refinedOffsetMs)
-              assignTakeToPanel(panel.id, { ...panel.take, timelineOffsetMs: result.refinedOffsetMs })
-            }
-          }
-          await updateVaultTake(alignTakeId, { timelineOffsetMs: result.refinedOffsetMs })
-        } catch {
-          /* alignment is best-effort — deterministic offset already applied */
-        }
-      })()
-    }
-  }, [activePanelId, assignTakeToPanel, onClearPendingRecording, onRecordingComplete, pendingRecordingTakeId, recording.targetPanelId, session.panels, session.practice, sync, takes])
+  }, [activePanelId, onClearPendingRecording, onDeleteTakes, onRecordingComplete, pendingRecordingTakeId, recording.targetPanelId, takes])
 
   // When Play All (or align-stage preview) finishes naturally, hand the audio
   // route back to recording — but never while a take is arming/counting/rolling,
@@ -541,13 +626,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       onOpenRecordingStage?.()
       setActivePanelId(panelId)
       recordingTargetPanelIdRef.current = panelId
-      const overdub = isOverdubPanel(panelId)
       sync.setExcludePanelId(panelId)
-      sync.setReferencePanelIds(overdub ? [TRACK1_PANEL_ID] : null)
-      void sync.prepareAtStart(0).then(() => prepareBackingAtStart()).catch(() => {})
+      sync.setReferencePanelIds(
+        session.panels
+          .filter((panel) => panel.kind === 'performance' && panel.id !== panelId && panel.take)
+          .map((panel) => panel.id),
+      )
       void ensureNativeCameraSessionHealthy()
     },
-    [hapticFeedback, onOpenRecordingStage, prepareBackingAtStart, sync],
+    [hapticFeedback, onOpenRecordingStage, session.panels, sync],
   )
 
 
@@ -590,10 +677,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   // ── Monitor mix ("You'll hear" chips) ────────────────────────────────────
   // Per-take mute set: panel ids plus the 'backing'/'click' sentinels. All-on
   // by default; reset whenever the stage opens for a different tile.
-  const [monitorMutes, setMonitorMutes] = useState<Set<string>>(() => new Set())
-  const monitorMutesRef = useRef(monitorMutes)
-  monitorMutesRef.current = monitorMutes
-
   useEffect(() => {
     setMonitorMutes(new Set())
   }, [activePanelId])
@@ -683,7 +766,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   </span>
                 </Pressable>
               </div>
-              <MultitrackPanelGrid layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={recording.targetPanelId} recordingPhase={recording.phase}
+              <MultitrackPanelGrid layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
+                streamRef={streamRef} streamGeneration={streamGeneration}
+                nativeLivePreviewActive={nativeLivePreviewActive} nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
+                countInRemaining={recording.countInRemaining} recordingElapsed={elapsed}
+                reviewTake={pendingReview?.panelId === activePanelId ? pendingReview.take : null}
+                reviewMediaRef={inGridReviewMediaRef}
                 onTapPerformance={(id) => { triggerLightHaptic(hapticFeedback); setTileSheetPanelId(id) }}
                 onRemoveTake={(id) => assignTakeToPanel(id, null)} onSheetMusicChange={assignSheetMusic}
                 onRegisterMedia={registerPanelMedia} />
@@ -741,21 +829,31 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   ? pendingReview.take
                   : activePanel.kind === 'performance' ? activePanel.take : null
               }
+              inGrid
+              reviewMediaRef={inGridReviewMediaRef}
               monitorSources={monitorSources}
               onToggleMonitorSource={toggleMonitorSource}
-              onPracticeChange={updatePractice}
+              onPracticeChange={handlePracticeChange}
               onRecord={() => {
                 if (isRecording || isStopping) return
+                discardNextRecordingRef.current = false
                 // Heal a playback-interrupted capture session before starting;
                 // count-in gives it ample time to settle.
                 void ensureNativeCameraSessionHealthy()
                 recordingTargetPanelIdRef.current = activePanel.id
                 sync.setExcludePanelId(activePanel.id)
-                if (!monitorMutesRef.current.has('backing')) {
+                if (
+                  session.backing.kind === 'youtube' &&
+                  !monitorMutesRef.current.has('backing')
+                ) {
                   prepareBackingForRecord()
                 }
+                const recordingBpm = session.practice.showMetronome
+                  ? sharedMetronomeEngine.getSnapshot().bpm
+                  : session.practice.bpm
                 recording.beginCountIn(activePanel.id, {
                   ...session.practice,
+                  bpm: recordingBpm,
                   clickEnabled:
                     session.practice.clickEnabled && !monitorMutesRef.current.has('click'),
                 })
@@ -765,6 +863,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 sync.setReferencePanelIds(null)
                 sync.pause()
                 pauseBacking()
+                if (recording.phase !== 'recording') {
+                  discardNextRecordingRef.current = true
+                  recording.cancel()
+                  return
+                }
                 const timing = recording.getRecordingTiming()
                 onStopRecording(
                   timing
@@ -772,9 +875,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                         timelineOffsetMs: timing.timelineOffsetMs,
                         recordingBpm: timing.recordingBpm,
                         performanceStartBeats: timing.performanceStartBeat,
-                        performanceStartOffsetBeats: timing.performanceStartOffsetBeats,
-                        referenceTrackId: timing.referenceTrackId ?? undefined,
-                        referenceStartBeat: timing.referenceStartBeat ?? undefined,
                       }
                     : undefined,
                 )
@@ -784,7 +884,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               onConfirmTake={handleConfirmTake}
               onRetryTake={handleRetryTake}
               onClose={() => {
-                if (isRecording) onStopRecording()
+                if (isRecording && (recording.phase === 'idle' || recording.phase === 'review')) {
+                  discardNextRecordingRef.current = true
+                  onStopRecording()
+                }
                 if (pendingReview) {
                   onDeleteTakes([pendingReview.take.id])
                   setPendingReview(null)

@@ -3202,6 +3202,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const isAudioPracticeTunerTab = recordingMode === 'audio' && audioPracticeTab === 'tuner'
 
+  const isAudioPracticeTunerActive =
+    isAudioPracticeTunerTab && !audioPracticeSheetOpen && !isReviewOpen
+
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
 
   useEffect(() => {
@@ -3220,12 +3223,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     isAudioPracticeMetronomeTab || isAudioPracticeTunerTab || isAudioPracticeTimelineTab
 
   useEffect(() => {
-    if (!isAudioPracticeTunerTab || quickSettingsOpen || isRecording) return
+    if (!isAudioPracticeTunerActive || quickSettingsOpen || isRecording) return
 
     handleRequestTunerMicStream()
   }, [
     handleRequestTunerMicStream,
-    isAudioPracticeTunerTab,
+    isAudioPracticeTunerActive,
     isRecording,
     quickSettingsOpen,
     streamGeneration,
@@ -4353,6 +4356,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         dataTutorial="audio-tuner-tab"
                       >
                         <AudioTunerTab
+                          active={isAudioPracticeTunerActive}
                           streamRef={streamRef}
                           streamGeneration={streamGeneration}
                           nativeLivePreviewActive={nativeLivePreviewActive}

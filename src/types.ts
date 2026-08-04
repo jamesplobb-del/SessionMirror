@@ -37,7 +37,7 @@ export interface Take {
   pitchSeries?: PitchSample[]
   /** Non-destructive loudness metadata — does not alter the saved file. */
   playbackGainMetadata?: PlaybackGainMetadata
-  /** Playback alignment offset in milliseconds. positive = delayed, negative = early */
+  /** Source-in alignment in milliseconds. Positive skips file head; negative delays clip entry. */
   timelineOffsetMs?: number
   /** BPM used when this take was recorded — enables beat-based alignment. */
   recordingBpm?: number
@@ -47,7 +47,7 @@ export interface Take {
   performanceStartOffsetBeats?: number
   /** Seconds from file start to the hands-free performance trigger. */
   performanceStartSeconds?: number
-  /** Overdub takes: id of the reference take (Track 1). */
+  /** Legacy overdub reference id. New multitrack takes share a project transport instead. */
   referenceTrackId?: string
   /** Overdub takes: count-in beat when the reference started. */
   referenceStartBeat?: number

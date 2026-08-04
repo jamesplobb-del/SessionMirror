@@ -85,6 +85,11 @@ export interface NativeCameraRecordingStopResult {
   recordedPeakDb?: number
   recordedRmsDb?: number
   recordedActiveRmsDb?: number
+  /** Measured file source-in for the native multitrack performance downbeat. */
+  multitrackSourceInMs?: number
+  multitrackFirstAudioSampleHostTimeSec?: number
+  multitrackPerformanceAnchorHostTimeSec?: number
+  multitrackPerformanceFileTimeSec?: number
 }
 
 export interface NativeCameraPostProcessPlaybackResult {
@@ -138,6 +143,30 @@ export interface NativeRectPercent {
 export interface NativeMultitrackRenderResult {
   success: boolean
   path: string
+}
+
+export interface NativeMultitrackMonitorSource {
+  id: string
+  path: string
+  /** Media time that corresponds to project timeline zero. */
+  sourceInSec: number
+  sourceOutSec?: number
+  /** Delay after project timeline zero before this clip enters. */
+  timelineDelaySec?: number
+  volume?: number
+  muted?: boolean
+}
+
+export interface NativeMultitrackTransportStartResult {
+  started: boolean
+  firstClickHostTimeSec: number
+  performanceHostTimeSec: number
+  captureAlignmentHostTimeSec: number
+  firstClickEpochMs: number
+  performanceEpochMs: number
+  countInBeats: number
+  beatDurationSec: number
+  audibleSourceCount: number
 }
 
 export interface NativeTakeAlignmentResult {
@@ -249,10 +278,31 @@ export interface BestTakeAudioPluginType {
       rect: NativeRectPercent
       trimStartSec?: number
       trimEndSec?: number
+      timelineOffsetMs?: number
+      volume?: number
+      muted?: boolean
     }>
     sheetMusic: { path: string; fileType: string; rect: NativeRectPercent } | null
     backingAudio: { path: string; gain: number } | null
   }): Promise<NativeMultitrackRenderResult>
+  prepareMultitrackMonitor(options: {
+    sources: NativeMultitrackMonitorSource[]
+  }): Promise<{
+    prepared: boolean
+    sourceCount: number
+    sampleRate: number
+    outputPort?: string
+    usesHeadphones?: boolean
+    usesBluetoothOutput?: boolean
+  }>
+  startMultitrackTransport(options: {
+    bpm: number
+    beatsPerBar: number
+    countInBars: number
+    clickEnabled: boolean
+    soundId: string
+  }): Promise<NativeMultitrackTransportStartResult>
+  stopMultitrackTransport(): Promise<{ stopped: boolean }>
   setNativeExperimentalAudioMode(options: {
     enabled: boolean
     selectedAudioEngine: string

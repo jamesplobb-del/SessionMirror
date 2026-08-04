@@ -49,7 +49,7 @@ export interface RecordingCompletePayload {
 export interface MultitrackRecordingStopOptions {
   /** Legacy latency-based offset — RTL is subtracted before save. */
   rawOffsetMs?: number
-  /** Beat-based offset — stored as-is (derived from BPM × performanceStartOffsetBeats). */
+  /** Source-in on the recorded file; native multitrack replaces estimates with its measured movie time. */
   timelineOffsetMs?: number
   recordingBpm?: number
   performanceStartBeats?: number

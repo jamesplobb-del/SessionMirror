@@ -4,6 +4,7 @@ import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
 import { resolveNativeFileUri } from '../../utils/shareTakeVideo'
 import { extensionForBlob, writeBlobToNativeCache } from '../../utils/nativeAssetCache'
 import { computeMultitrackLayoutRects, type LayoutRectPercent } from '../layout/layoutRects'
+import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
 import type { MultitrackLayoutPreset, MultitrackSession, PerformancePanelState } from '../types'
 
 const MULTITRACK_EXPORT_DIR = 'multitrack-export-assets'
@@ -64,13 +65,14 @@ export async function exportMultitrackSession(
     if (!rect) continue
     const path = await resolveNativeFileUri(panel.take as Take)
     if (!path) return { ok: false, reason: 'missing_file' }
+    const timelineOffsetMs = timelineOffsetMsForTake(panel.take!, session.practice.bpm)
     sources.push({
       id: panel.id,
       path,
       rect,
       ...(panel.trimStartSec ? { trimStartSec: panel.trimStartSec } : null),
       ...(panel.trimEndSec !== undefined ? { trimEndSec: panel.trimEndSec } : null),
-      ...(panel.take?.timelineOffsetMs ? { timelineOffsetMs: panel.take.timelineOffsetMs } : null),
+      ...(timelineOffsetMs ? { timelineOffsetMs } : null),
       // Carry the mixer state through so the exported video matches what the
       // user hears on Play All (unset volume defaults to unity gain on the
       // native side, so untouched panels export exactly as before).

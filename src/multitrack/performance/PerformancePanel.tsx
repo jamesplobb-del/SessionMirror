@@ -1,14 +1,40 @@
 import { useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import { Film, MoreHorizontal, Pause, Play, Video, X } from 'lucide-react'
 import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
 import Pressable from '../../components/ui/Pressable'
 import TakeVideoPlayer from '../../components/TakeVideoPlayer'
+import type { Take } from '../../types'
 import type { MultitrackRecordingPhase, PerformancePanelState } from '../types'
+import MultitrackCapturePanel from './MultitrackCapturePanel'
 
-export default function PerformancePanel({ panel, isRecordingTarget, recordingPhase, onTap, onRemoveTake, onRegisterMedia }: {
+export default function PerformancePanel({
+  panel,
+  isRecordingTarget,
+  recordingPhase,
+  streamRef,
+  streamGeneration = 0,
+  nativeLivePreviewActive = false,
+  nativeCameraBridgeEnabled = false,
+  countInRemaining = 0,
+  recordingElapsed = 0,
+  reviewTake = null,
+  reviewMediaRef,
+  onTap,
+  onRemoveTake,
+  onRegisterMedia,
+}: {
   panel: PerformancePanelState
   isRecordingTarget: boolean
   recordingPhase: MultitrackRecordingPhase
+  streamRef?: RefObject<MediaStream | null>
+  streamGeneration?: number
+  nativeLivePreviewActive?: boolean
+  nativeCameraBridgeEnabled?: boolean
+  countInRemaining?: number
+  recordingElapsed?: number
+  reviewTake?: Take | null
+  reviewMediaRef?: RefObject<HTMLMediaElement | null>
   onTap: () => void
   onRemoveTake: () => void
   onRegisterMedia: (panelId: string, element: HTMLMediaElement | null) => void
@@ -17,13 +43,29 @@ export default function PerformancePanel({ panel, isRecordingTarget, recordingPh
   const [quickPlaying, setQuickPlaying] = useState(false)
 
   useEffect(() => {
-    onRegisterMedia(panel.id, panel.take ? mediaRef.current : null)
+    onRegisterMedia(panel.id, panel.take && !isRecordingTarget ? mediaRef.current : null)
     return () => onRegisterMedia(panel.id, null)
-  }, [onRegisterMedia, panel.id, panel.take?.id])
+  }, [isRecordingTarget, onRegisterMedia, panel.id, panel.take?.id])
 
   useEffect(() => {
     setQuickPlaying(false)
   }, [panel.take?.id])
+
+  if (isRecordingTarget && streamRef && reviewMediaRef) {
+    return (
+      <MultitrackCapturePanel
+        streamRef={streamRef}
+        streamGeneration={streamGeneration}
+        nativeLivePreviewActive={nativeLivePreviewActive}
+        nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
+        phase={recordingPhase}
+        countInRemaining={countInRemaining}
+        elapsed={recordingElapsed}
+        reviewTake={reviewTake}
+        reviewMediaRef={reviewMediaRef}
+      />
+    )
+  }
 
   if (!panel.take) {
     return (

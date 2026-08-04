@@ -117,10 +117,38 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var audioFallbackCaptureActive = false
     private var audioFallbackStarted = false
     private var audioFallbackSampleCount = 0
+    /// Host-clock timestamp of the first captured audio sample in the current
+    /// movie file. Combined with the native multitrack performance anchor this
+    /// produces a measured source-in offset instead of a JS timer estimate.
+    private var multitrackFirstAudioSampleHostTimeSec: Double?
+    private var multitrackPerformanceAnchorHostTimeSec: Double?
+    /// Performance downbeat expressed directly on the movie file's own time
+    /// axis. This is the canonical multitrack source-in value.
+    private var multitrackPerformanceFileTimeSec: Double?
     /// Audio-mode takes: mic-only session writing AAC via AVAssetWriter (no movie output).
     private var isAudioOnlyRecording = false
     private var isTunerMonitorActive = false
     private var audioOnlyTakeId: String?
+
+    func setMultitrackPerformanceAnchor(hostTimeSec: Double) {
+        let recordedDurationSec: Double? = sessionQueue.sync {
+            guard let movieOutput = self.movieOutput else { return nil }
+            let seconds = CMTimeGetSeconds(movieOutput.recordedDuration)
+            return seconds.isFinite && seconds >= 0 ? seconds : nil
+        }
+        let nowHostTimeSec = AVAudioTime.seconds(forHostTime: mach_absolute_time())
+        let fileTimeSec = recordedDurationSec.map {
+            $0 + max(0, hostTimeSec - nowHostTimeSec)
+        }
+        audioTapQueue.sync {
+            self.multitrackPerformanceAnchorHostTimeSec = hostTimeSec
+            self.multitrackPerformanceFileTimeSec = fileTimeSec
+            print(
+                "[MultitrackCapture] performanceAnchorHost=\(hostTimeSec) " +
+                "recordedDuration=\(recordedDurationSec ?? -1) fileTime=\(fileTimeSec ?? -1)"
+            )
+        }
+    }
 
     private func startRecordingDiagnosticsTimer() {
         recordingDiagnosticsTimer?.cancel()
@@ -1573,6 +1601,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             self.audioFallbackCaptureActive = true
             self.audioFallbackStarted = false
             self.audioFallbackSampleCount = 0
+            self.multitrackFirstAudioSampleHostTimeSec = nil
+            self.multitrackPerformanceAnchorHostTimeSec = nil
+            self.multitrackPerformanceFileTimeSec = nil
             print("[NativeCameraTest] fallback audio armed for \(movieURL.lastPathComponent)")
         }
     }
@@ -1624,6 +1655,23 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     private func appendAudioFallbackSample(_ sampleBuffer: CMSampleBuffer) {
         guard audioFallbackCaptureActive, CMSampleBufferDataIsReady(sampleBuffer) else { return }
+        if multitrackFirstAudioSampleHostTimeSec == nil {
+            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            if presentationTime.isValid {
+                let hostClock = CMClockGetHostTimeClock()
+                let hostTime: CMTime
+                if let masterClock = session.masterClock {
+                    hostTime = CMSyncConvertTime(presentationTime, from: masterClock, to: hostClock)
+                } else {
+                    hostTime = presentationTime
+                }
+                let seconds = CMTimeGetSeconds(hostTime)
+                if seconds.isFinite {
+                    multitrackFirstAudioSampleHostTimeSec = seconds
+                    print("[MultitrackCapture] firstAudioSampleHost=\(seconds)")
+                }
+            }
+        }
         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
               let asbdPointer = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription),
               let fallbackURL = audioFallbackURL else {
@@ -1938,6 +1986,34 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: activeAudioProfile)
         for (key, value) in sessionInfo {
             result[key] = value
+        }
+
+        let multitrackTiming = audioTapQueue.sync { () -> (Double?, Double?, Double?) in
+            (
+                self.multitrackFirstAudioSampleHostTimeSec,
+                self.multitrackPerformanceAnchorHostTimeSec,
+                self.multitrackPerformanceFileTimeSec
+            )
+        }
+        let sourceInMs: Int?
+        if let performanceFileTime = multitrackTiming.2 {
+            sourceInMs = max(0, Int((performanceFileTime * 1000).rounded()))
+            result["multitrackPerformanceFileTimeSec"] = performanceFileTime
+        } else if let firstSampleHost = multitrackTiming.0,
+                  let performanceHost = multitrackTiming.1 {
+            sourceInMs = max(0, Int(((performanceHost - firstSampleHost) * 1000).rounded()))
+        } else {
+            sourceInMs = nil
+        }
+        if let sourceInMs {
+            result["multitrackSourceInMs"] = sourceInMs
+            print("[MultitrackCapture] measuredSourceInMs=\(sourceInMs)")
+        }
+        if let firstSampleHost = multitrackTiming.0 {
+            result["multitrackFirstAudioSampleHostTimeSec"] = firstSampleHost
+        }
+        if let performanceHost = multitrackTiming.1 {
+            result["multitrackPerformanceAnchorHostTimeSec"] = performanceHost
         }
 
         return result

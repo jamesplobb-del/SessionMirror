@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   RotateCcw,
   ChevronRight,
@@ -191,6 +191,17 @@ const LEARN_APP_SECTIONS: {
   },
 ]
 
+type SettingsSectionId = 'general' | 'recording' | 'tuner' | 'overlays' | 'playback' | 'more'
+
+const SETTINGS_SECTIONS: ReadonlyArray<{ id: SettingsSectionId; label: string }> = [
+  { id: 'general', label: 'General' },
+  { id: 'recording', label: 'Recording' },
+  { id: 'tuner', label: 'Tuner' },
+  { id: 'overlays', label: 'Overlays' },
+  { id: 'playback', label: 'Playback' },
+  { id: 'more', label: 'More' },
+]
+
 function QuickFunctionAccessRow({
   setup,
   onOpen,
@@ -378,6 +389,9 @@ export default function SettingsDrawer({
   const [quickFunctionsAccessOpen, setQuickFunctionsAccessOpen] = useState(false)
   const [quickAccessDestination, setQuickAccessDestination] =
     useState<QuickFunctionDestination>('tuner')
+  const settingsScrollRef = useRef<HTMLDivElement>(null)
+  const [activeSettingsSection, setActiveSettingsSection] =
+    useState<SettingsSectionId>('general')
   const helpTopicById = useMemo(
     () => new Map(HELP_TOPICS.map((topic) => [topic.id, topic] as const)),
     [],
@@ -390,8 +404,43 @@ export default function SettingsDrawer({
       setActiveQuickFunctionSetup(null)
       setQuickFunctionsAccessOpen(false)
       setQuickAccessDestination('tuner')
+      setActiveSettingsSection('general')
     }
   }, [isOpen])
+
+  const handleSettingsScroll = useCallback(() => {
+    const container = settingsScrollRef.current
+    if (!container) return
+
+    const threshold = container.getBoundingClientRect().top + 76
+    let nextSection: SettingsSectionId = SETTINGS_SECTIONS[0].id
+    for (const section of SETTINGS_SECTIONS) {
+      const element = container.querySelector<HTMLElement>(`#settings-section-${section.id}`)
+      if (!element) continue
+      if (element.getBoundingClientRect().top <= threshold) nextSection = section.id
+      else break
+    }
+    setActiveSettingsSection((current) => current === nextSection ? current : nextSection)
+  }, [])
+
+  const handleSettingsSectionSelect = useCallback((sectionId: SettingsSectionId) => {
+    const container = settingsScrollRef.current
+    const target = container?.querySelector<HTMLElement>(`#settings-section-${sectionId}`)
+    if (!container || !target) return
+
+    setActiveSettingsSection(sectionId)
+    const containerTop = container.getBoundingClientRect().top
+    const targetTop = target.getBoundingClientRect().top - containerTop + container.scrollTop
+    container.scrollTo({ top: Math.max(0, targetTop - 66), behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const activeButton = settingsScrollRef.current?.querySelector<HTMLElement>(
+      `[data-settings-section="${activeSettingsSection}"]`,
+    )
+    activeButton?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }, [activeSettingsSection, isOpen])
 
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
@@ -466,7 +515,7 @@ export default function SettingsDrawer({
         <div className="native-sheet-title-block min-w-0 flex-1">
           <span className="native-sheet-kicker">BestTake</span>
           <h2 className="native-sheet-title">Settings</h2>
-          <p className="native-sheet-subtitle">Recording, pitch tools, and on-screen controls</p>
+          <p className="native-sheet-subtitle">Choose a section to find what you need quickly</p>
         </div>
         <Pressable
           type="button"
@@ -481,14 +530,36 @@ export default function SettingsDrawer({
         </Pressable>
       </div>
 
-      <div className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-4">
+      <div
+        ref={settingsScrollRef}
+        onScroll={handleSettingsScroll}
+        className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-4"
+      >
         {!contentReady ? (
           <SettingsDrawerSkeleton />
         ) : (
         <div className="space-y-5 pb-2">
-          <section className="settings-group space-y-3">
+          <nav className="settings-category-nav" aria-label="Settings sections">
+            <div className="settings-category-nav__track">
+              {SETTINGS_SECTIONS.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  className="settings-category-nav__button"
+                  data-settings-section={section.id}
+                  aria-controls={`settings-section-${section.id}`}
+                  aria-current={activeSettingsSection === section.id ? 'page' : undefined}
+                  onClick={() => handleSettingsSectionSelect(section.id)}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          <section id="settings-section-general" className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Appearance
+              General
             </h3>
 
             <SettingToggle
@@ -497,9 +568,16 @@ export default function SettingsDrawer({
               checked={settings.darkMode}
               onChange={(checked) => onUpdate({ darkMode: checked })}
             />
+
+            <SettingToggle
+              label="Haptic Feedback"
+              description="Tactile confirmation for important buttons, toggles, recording actions, and long presses."
+              checked={settings.hapticFeedback}
+              onChange={(checked) => onUpdate({ hapticFeedback: checked })}
+            />
           </section>
 
-          <section className="settings-group space-y-3">
+          <section id="settings-section-recording" className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Audio Recording
             </h3>
@@ -549,7 +627,7 @@ export default function SettingsDrawer({
             </div>
           </section>
 
-          <section className="settings-group space-y-3">
+          <section id="settings-section-tuner" className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
               Pitch & Tuning
             </h3>
@@ -696,34 +774,9 @@ export default function SettingsDrawer({
             </div>
           </section>
 
-          <section className="settings-group space-y-3">
+          <section id="settings-section-overlays" className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Playback
-            </h3>
-
-            <div data-tutorial="settings-enhancer">
-              <SettingToggle
-                label="Audio Enhancer"
-                description="Bakes smart EQ, compression, and reverb presets into new recordings, and enhances playback of older takes. Off keeps the original flat mix."
-                checked={hudQuickSettings.audioEnhancerEnabled}
-                onChange={onAudioEnhancerChange}
-              />
-            </div>
-
-            <AnimatedExpand open={hudQuickSettings.audioEnhancerEnabled}>
-              <div className="pt-3">
-                <AudioEnhancer
-                  variant="inline"
-                  settings={settings.audioEnhancerSettings}
-                  onChange={(audioEnhancerSettings) => onUpdate({ audioEnhancerSettings })}
-                />
-              </div>
-            </AnimatedExpand>
-          </section>
-
-          <section className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              On-Screen Tools
+              Overlays & Cards
             </h3>
 
             <SettingToggle
@@ -772,18 +825,31 @@ export default function SettingsDrawer({
               </div>
             </AnimatedExpand>
 
-            <SettingToggle
-              label="Haptic Feedback"
-              description="Tactile confirmation for important buttons, toggles, recording actions, and long presses."
-              checked={settings.hapticFeedback}
-              onChange={(checked) => onUpdate({ hapticFeedback: checked })}
-            />
           </section>
 
-          <section className="settings-group space-y-3">
+          <section id="settings-section-playback" className="settings-group space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Play Along
+              Playback
             </h3>
+
+            <div data-tutorial="settings-enhancer">
+              <SettingToggle
+                label="Audio Enhancer"
+                description="Bakes smart EQ, compression, and reverb presets into new recordings, and enhances playback of older takes. Off keeps the original flat mix."
+                checked={hudQuickSettings.audioEnhancerEnabled}
+                onChange={onAudioEnhancerChange}
+              />
+            </div>
+
+            <AnimatedExpand open={hudQuickSettings.audioEnhancerEnabled}>
+              <div className="pt-3">
+                <AudioEnhancer
+                  variant="inline"
+                  settings={settings.audioEnhancerSettings}
+                  onChange={(audioEnhancerSettings) => onUpdate({ audioEnhancerSettings })}
+                />
+              </div>
+            </AnimatedExpand>
 
             <SettingToggle
               label="Keep YouTube Out of Recordings"
@@ -793,10 +859,11 @@ export default function SettingsDrawer({
             />
           </section>
 
+          <div id="settings-section-more" className="space-y-5">
           {(onOpenLabs || onOpenCreatorStudio || onOpenMultitrack) && (
             <section className="settings-group space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Experimental (In Development)
+                In Development
               </h3>
 
               {onOpenLabs && (
@@ -807,7 +874,7 @@ export default function SettingsDrawer({
                   className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-stone-900">🧪 Labs</p>
+                    <p className="text-sm font-semibold text-stone-900">Labs</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
                       Prototype games like Scale Rush. Does not affect recording or playback.
                     </p>
@@ -900,6 +967,7 @@ export default function SettingsDrawer({
             <RotateCcw className="h-3.5 w-3.5" />
             Reset to Defaults
           </Pressable>
+          </div>
         </div>
         )}
       </div>

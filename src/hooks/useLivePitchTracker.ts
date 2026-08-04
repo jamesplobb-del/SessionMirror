@@ -1763,13 +1763,13 @@ export function useLivePitchTracker(
     lastPublishedGlowRef.current = 0
     nativeTapUnavailableRef.current = false
     setInTuneGlow(0)
-  }, [mediaKey])
+  }, [mediaKey, tunerInstrument])
 
   useEffect(() => {
     if (source !== 'microphone') return
     publishSourceHealth(enabled ? 'connecting' : 'idle')
     return () => publishSourceHealth('idle')
-  }, [enabled, mediaKey, publishSourceHealth, source])
+  }, [enabled, mediaKey, publishSourceHealth, source, tunerInstrument])
 
   useEffect(() => {
     return () => {
@@ -1783,7 +1783,7 @@ export function useLivePitchTracker(
       }
       graphRef.current = null
     }
-  }, [mediaKey])
+  }, [mediaKey, tunerInstrument])
 
   useEffect(() => {
     if (source !== 'media' || !enabled) return
@@ -2267,7 +2267,7 @@ export function useLivePitchTracker(
         isAttaching.current = false
       }
     }
-  }, [enabled, mediaKey])
+  }, [enabled, mediaKey, tunerInstrument])
 
   useEffect(() => {
     const shouldTick = enabled && (isPlaying || persistWhenPaused)

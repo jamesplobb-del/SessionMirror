@@ -31,6 +31,8 @@ interface DraggableMetronomeWidgetProps {
   positionId?: string
   isTakePlaying?: boolean
   muteDuringPlayback?: boolean
+  /** Keep the widget visible but prevent a second metronome clock while a native transport owns timing. */
+  controlsLocked?: boolean
   onClose?: () => void
 }
 
@@ -78,6 +80,7 @@ export default function DraggableMetronomeWidget({
   positionId = 'main-metronome',
   isTakePlaying = false,
   muteDuringPlayback = true,
+  controlsLocked = false,
   onClose,
 }: DraggableMetronomeWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -407,7 +410,7 @@ export default function DraggableMetronomeWidget({
       onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
       onDragEnd={persistPosition}
-      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[104px] min-w-[200px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''}`}
+      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[104px] min-w-[200px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
@@ -461,6 +464,9 @@ export default function DraggableMetronomeWidget({
           </button>
         )}
 
+        {controlsLocked ? <span className="metronome-widget__sync-lock">Recording sync</span> : null}
+
+        <fieldset disabled={controlsLocked} className="metronome-widget__locked-controls">
         <div className="metronome-widget__row metronome-widget__row--main pointer-events-auto">
           <MetronomeControlButton
             label={playing ? 'Pause metronome' : 'Start metronome'}
@@ -528,6 +534,7 @@ export default function DraggableMetronomeWidget({
         <div className="metronome-widget__row metronome-widget__row--subdivisions pointer-events-auto">
           {METRONOME_SUBDIVISIONS.map(({ value, label }) => renderSubdivisionButton(value, label))}
         </div>
+        </fieldset>
       </div>
     </motion.div>
   )

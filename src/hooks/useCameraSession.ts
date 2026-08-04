@@ -906,6 +906,7 @@ export function useCameraSession({
         setReady(true)
         return
       }
+
       void acquireNativeVideoBridge()
       return
     }
@@ -1857,7 +1858,7 @@ export function useCameraSession({
       let timelineOffsetMs: number | undefined
       if (options?.timelineOffsetMs !== undefined) {
         timelineOffsetMs = Math.round(options.timelineOffsetMs)
-        console.log(`[useCameraSession] beat-based timelineOffsetMs=${timelineOffsetMs}`)
+        console.log(`[useCameraSession] fallback timelineOffsetMs=${timelineOffsetMs}`)
       } else if (options?.rawOffsetMs !== undefined) {
         const rtlMs = await getAudioHardwareRtl()
         timelineOffsetMs = Math.round(options.rawOffsetMs - rtlMs)
@@ -1896,6 +1897,16 @@ export function useCameraSession({
         recoverAfterNativeExperimentalFailure()
         setIsStopping(false)
         return
+      }
+
+      const measuredTimelineOffsetMs =
+        typeof result.multitrackSourceInMs === 'number'
+          ? Math.max(0, Math.round(result.multitrackSourceInMs))
+          : timelineOffsetMs
+      if (typeof result.multitrackSourceInMs === 'number') {
+        console.log(
+          `[useCameraSession] native measured multitrack sourceIn=${measuredTimelineOffsetMs}ms`,
+        )
       }
 
       const videoUrl = Capacitor.convertFileSrc(result.fileURL)
@@ -1943,7 +1954,7 @@ export function useCameraSession({
         filePath: result.filePath,
         videoUrl,
         durationSeconds: Math.max(0.1, result.duration || elapsedRef.current),
-        timelineOffsetMs,
+        timelineOffsetMs: measuredTimelineOffsetMs,
         recordingBpm: options?.recordingBpm,
         performanceStartBeats: options?.performanceStartBeats,
         performanceStartOffsetBeats: options?.performanceStartOffsetBeats,

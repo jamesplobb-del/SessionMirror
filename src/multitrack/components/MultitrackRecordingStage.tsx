@@ -58,6 +58,9 @@ interface MultitrackRecordingStageProps {
   /** Recording elapsed seconds (drives the top-bar timer). */
   elapsed: number
   reviewTake: Take | null
+  /** Render camera/review inside the chosen grid tile; this component becomes the control dock. */
+  inGrid?: boolean
+  reviewMediaRef?: RefObject<HTMLMediaElement | null>
   /** "You'll hear" chips: other tiles + backing + click, all-on by default. */
   monitorSources: MultitrackMonitorSource[]
   onToggleMonitorSource: (id: string) => void
@@ -93,6 +96,8 @@ export default function MultitrackRecordingStage({
   isStopping,
   elapsed,
   reviewTake,
+  inGrid = false,
+  reviewMediaRef: externalReviewMediaRef,
   monitorSources,
   onToggleMonitorSource,
   nativeLivePreviewActive = false,
@@ -107,7 +112,8 @@ export default function MultitrackRecordingStage({
 }: MultitrackRecordingStageProps) {
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const reviewVideoRef = useRef<HTMLVideoElement>(null)
+  const internalReviewVideoRef = useRef<HTMLMediaElement | null>(null)
+  const reviewVideoRef = externalReviewMediaRef ?? internalReviewVideoRef
   const emptyMediaRef = useRef<HTMLMediaElement | null>(null)
   const nativePreviewCanvasRef = useRef<HTMLCanvasElement>(null)
   const nativeFramePumpRef = useRef<ReturnType<typeof createNativePreviewFramePump> | null>(null)
@@ -123,7 +129,7 @@ export default function MultitrackRecordingStage({
   // supplying frames. Re-runs on streamGeneration so it re-attaches whenever
   // the shared stream is replaced (e.g. after native recording releases it).
   useEffect(() => {
-    if (nativeLivePreviewActive) return
+    if (inGrid || nativeLivePreviewActive) return
     const video = videoRef.current
     const stream = streamRef.current
     if (!video || !stream) return
@@ -134,13 +140,13 @@ export default function MultitrackRecordingStage({
     return () => {
       video.srcObject = null
     }
-  }, [streamRef, streamGeneration, nativeLivePreviewActive])
+  }, [inGrid, streamRef, streamGeneration, nativeLivePreviewActive])
 
   // Native iOS camera preview — the stage sits on an opaque overlay, so the
   // main passthrough layer can't show through here. Request the JPEG frame
   // pump on demand and paint frames onto the stage canvas.
   useEffect(() => {
-    if (!nativeCameraBridgeEnabled) return
+    if (inGrid || !nativeCameraBridgeEnabled) return
 
     let cancelled = false
     let removeListener: (() => void) | null = null
@@ -180,7 +186,7 @@ export default function MultitrackRecordingStage({
         ctx.clearRect(0, 0, canvas.width, canvas.height)
       }
     }
-  }, [nativeCameraBridgeEnabled])
+  }, [inGrid, nativeCameraBridgeEnabled])
 
   useEffect(() => {
     nativeBridgePrimedRef.current = nativeLivePreviewActive
@@ -191,9 +197,18 @@ export default function MultitrackRecordingStage({
     const video = reviewVideoRef.current
     if (!video) return
     video.pause()
+    if (inGrid) return
     video.removeAttribute('src')
     video.load()
-  }, [reviewTake?.id])
+  }, [inGrid, reviewTake?.id, reviewVideoRef])
+
+  useEffect(() => {
+    const media = reviewVideoRef.current
+    if (!media) return
+    const onEnded = () => setReviewPlaying(false)
+    media.addEventListener('ended', onEnded)
+    return () => media.removeEventListener('ended', onEnded)
+  }, [reviewTake?.id, reviewVideoRef])
 
   const handleReview = useCallback(() => {
     const video = reviewVideoRef.current
@@ -228,8 +243,9 @@ export default function MultitrackRecordingStage({
   const anyMonitorAudible = monitorSources.some((source) => !source.muted)
 
   return (
-    <div ref={stageRef} className="multitrack-recording-stage">
-      {showNativeBridgeCanvas && (
+    <div ref={stageRef} className={`multitrack-recording-stage ${inGrid ? 'multitrack-recording-stage--in-grid' : ''}`}>
+      {inGrid ? <div className="multitrack-recording-stage__interaction-guard" aria-hidden /> : null}
+      {!inGrid && showNativeBridgeCanvas && (
         <canvas
           ref={nativePreviewCanvasRef}
           className={`multitrack-recording-stage__preview-canvas ${
@@ -240,21 +256,25 @@ export default function MultitrackRecordingStage({
           aria-hidden
         />
       )}
-      <video
-        ref={videoRef}
-        className={`multitrack-recording-stage__preview ${
-          nativeLivePreviewActive ? 'multitrack-recording-stage__preview--hidden' : ''
-        }`}
-        muted
-        playsInline
-      />
-      <video
-        ref={reviewVideoRef}
-        className={`multitrack-recording-stage__review-video ${reviewPlaying ? 'is-visible' : ''}`}
-        playsInline
-        onEnded={() => setReviewPlaying(false)}
-      />
-      <div className="multitrack-recording-stage__shade" />
+      {!inGrid ? (
+        <>
+          <video
+            ref={videoRef}
+            className={`multitrack-recording-stage__preview ${
+              nativeLivePreviewActive ? 'multitrack-recording-stage__preview--hidden' : ''
+            }`}
+            muted
+            playsInline
+          />
+          <video
+            ref={reviewVideoRef as RefObject<HTMLVideoElement | null>}
+            className={`multitrack-recording-stage__review-video ${reviewPlaying ? 'is-visible' : ''}`}
+            playsInline
+            onEnded={() => setReviewPlaying(false)}
+          />
+          <div className="multitrack-recording-stage__shade" />
+        </>
+      ) : null}
 
       <header className="multitrack-recording-stage__header">
         <Pressable type="button" intensity="icon" onClick={onClose} aria-label="Close recorder">
@@ -281,6 +301,7 @@ export default function MultitrackRecordingStage({
               type="button"
               intensity="soft"
               onClick={() => onToggleMonitorSource(source.id)}
+              disabled={busy}
               className={`multitrack-monitor-chip ${source.muted ? 'multitrack-monitor-chip--muted' : ''}`}
             >
               {source.muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
@@ -298,11 +319,11 @@ export default function MultitrackRecordingStage({
         </div>
       ) : null}
 
-      {phase === 'arming' ? (
+      {!inGrid && phase === 'arming' ? (
         <div className="multitrack-recording-stage__count multitrack-recording-stage__count--arming">
           …
         </div>
-      ) : phase === 'count-in' && countInRemaining > 0 ? (
+      ) : !inGrid && phase === 'count-in' && countInRemaining > 0 ? (
         <div className="multitrack-recording-stage__count">
           {countInRemaining}
         </div>
@@ -405,7 +426,7 @@ export default function MultitrackRecordingStage({
           <p className="multitrack-recording-stage__hint">Saving…</p>
         ) : null}
 
-        {!streamRef.current && !nativeLivePreviewActive ? (
+        {!inGrid && !streamRef.current && !nativeLivePreviewActive ? (
           <div className="multitrack-recording-stage__missing-camera">
             <Camera className="h-4 w-4" />
             Camera is waking up
