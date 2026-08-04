@@ -4761,9 +4761,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     settings={settings}
                     hudQuickSettings={hudQuickSettings}
                     onUpdate={updateSettings}
-                    onPitchTrackerChange={handlePitchTrackerSettingChange}
-                    onShowTakeCardsChange={handleShowTakeCardsSettingChange}
-                    onShowMetronomeChange={handleShowMetronomeSettingChange}
                     onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                     onReset={handleResetSettings}
                     onReplayTutorial={handleReplayOnboardingTutorial}

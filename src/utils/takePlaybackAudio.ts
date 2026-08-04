@@ -362,6 +362,11 @@ export interface PlayTakeMediaAudibleOptions extends PlaybackAttemptOptions {
    * rest — the sync engine owns route restoration for grouped playback.
    */
   attachEndedRouteRestore?: boolean
+  /**
+   * A failed member of grouped playback must not release the shared route
+   * underneath the members that did start successfully.
+   */
+  restoreRouteOnFailure?: boolean
 }
 
 export async function playTakeMediaAudible(
@@ -417,7 +422,9 @@ export async function playTakeMediaAudible(
         mediaErrorMessage: media.error?.message ?? null,
       })
       options.onFailure?.(error)
-      await completePlaybackRouteRestore()
+      if (options.restoreRouteOnFailure !== false) {
+        await completePlaybackRouteRestore()
+      }
       return false
     }
   }

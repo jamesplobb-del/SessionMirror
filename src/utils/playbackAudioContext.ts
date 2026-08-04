@@ -13,6 +13,10 @@ function needsResume(ctx: AudioContext): boolean {
   return ctx.state !== 'running' && ctx.state !== 'closed'
 }
 
+function isRunning(ctx: AudioContext): boolean {
+  return ctx.state === 'running'
+}
+
 function attachPlaybackContextWatch(ctx: AudioContext): void {
   if (playbackContextWatchAttached) return
   playbackContextWatchAttached = true
@@ -63,6 +67,25 @@ export async function getPlaybackAudioContext(): Promise<AudioContext> {
 
 export async function resumePlaybackAudioContext(): Promise<void> {
   await getPlaybackAudioContext()
+}
+
+/**
+ * Grouped playback cannot tolerate a context that merely accepted resume()
+ * but remained suspended/interrupted. iOS occasionally needs a second resume
+ * after the native AVAudioSession route has finished changing.
+ */
+export async function ensurePlaybackAudioContextRunning(): Promise<boolean> {
+  const ctx = await getPlaybackAudioContext()
+  if (isRunning(ctx)) return true
+
+  await ctx.resume().catch(() => {})
+  if (isRunning(ctx)) return true
+
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve())
+  })
+  await ctx.resume().catch(() => {})
+  return isRunning(ctx)
 }
 
 export function primePlaybackAudioContextSync(): AudioContext {

@@ -5,7 +5,10 @@ import {
 } from '../../utils/takePlaybackAudio'
 import { waitForMediaReady, waitForMediaProgressing } from '../../utils/mediaPlayback'
 import { preparePlaybackRoute } from '../../utils/playbackRouteCoordinator'
-import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
+import {
+  ensurePlaybackAudioContextRunning,
+  resumePlaybackAudioContext,
+} from '../../utils/playbackAudioContext'
 import {
   hasTakePlaybackSpeakerRoute,
   routeTakePlaybackToSpeaker,
@@ -42,6 +45,8 @@ export function useMultitrackSync() {
   const [duration, setDuration] = useState(0)
   const rafRef = useRef<number | null>(null)
   const visualStartTimersRef = useRef<number[]>([])
+  const visualPlaybackGenerationRef = useRef(0)
+  const visualOnlyModeRef = useRef(false)
   /** Timeline position playback was prepared/started at (used to anchor the transport). */
   const preparedStartRef = useRef(0)
   /**
@@ -316,12 +321,28 @@ export function useMultitrackSync() {
     }
 
     primeTakePlaybackForUserGesture(...elements)
-    await resumePlaybackAudioContext()
-    await Promise.allSettled(playNow.map(([, el]) => waitForMediaReady(el, 900)))
+    const contextRunning = await ensurePlaybackAudioContextRunning()
+    if (!contextRunning) {
+      console.error('[useMultitrackSync] shared playback AudioContext did not reach running')
+    }
+    await Promise.allSettled(playNow.map(([, el]) => waitForMediaReady(el, 2500)))
+
+    for (const [panelId, el] of playNow) {
+      if (!hasTakePlaybackSpeakerRoute(el)) {
+        routeTakePlaybackToSpeaker(el, 1, false)
+      }
+      if (!hasTakePlaybackSpeakerRoute(el)) {
+        console.error('[useMultitrackSync] panel is not on shared speaker bus:', panelId)
+      }
+    }
 
     const startResults = await Promise.allSettled(
       playNow.map(([, el]) =>
-        playTakeMediaAudible(el, { skipRoutePrep: true, attachEndedRouteRestore: false }),
+        playTakeMediaAudible(el, {
+          skipRoutePrep: true,
+          attachEndedRouteRestore: false,
+          restoreRouteOnFailure: false,
+        }),
       ),
     )
     const starts = startResults.map((result, index) => {
@@ -334,6 +355,33 @@ export function useMultitrackSync() {
       console.error('[useMultitrackSync] panel failed to start:', playNow[index][0], result.reason)
       return false
     })
+
+    // A busy iPhone decoder can accept most members of a batch while leaving
+    // one paused. Retry only those members once, without allowing a failure to
+    // tear down the route used by the successful members.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 120))
+    const retryIndexes = starts
+      .map((started, index) => (!started || playNow[index][1].paused ? index : -1))
+      .filter((index) => index >= 0)
+    if (retryIndexes.length > 0) {
+      await ensurePlaybackAudioContextRunning()
+      const retryResults = await Promise.allSettled(
+        retryIndexes.map((index) =>
+          playTakeMediaAudible(playNow[index][1], {
+            skipRoutePrep: true,
+            attachEndedRouteRestore: false,
+            restoreRouteOnFailure: false,
+          }),
+        ),
+      )
+      retryResults.forEach((result, retryIndex) => {
+        const index = retryIndexes[retryIndex]
+        starts[index] = result.status === 'fulfilled' && result.value
+        if (!starts[index]) {
+          console.error('[useMultitrackSync] panel failed grouped retry:', playNow[index][0])
+        }
+      })
+    }
     applyMixStateToAll()
     const playing = starts.some(Boolean) || pendingStartRef.current.size > 0
     if (playing) {
@@ -415,6 +463,7 @@ export function useMultitrackSync() {
    * any WebKit audio or introducing a second audible clock.
    */
   const prepareVisualAtStart = useCallback(() => {
+    visualOnlyModeRef.current = true
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
     for (const [panelId, element] of getEntries()) {
@@ -446,6 +495,59 @@ export function useMultitrackSync() {
     }
   }, [getEntries, offsetFor])
 
+  /**
+   * Native Play All owns audible audio. The DOM videos are a muted visual
+   * slave and begin near the native transport's returned wall-clock anchor.
+   */
+  const startVisualPlaybackAtEpoch = useCallback(async (epochMs: number) => {
+    const generation = ++visualPlaybackGenerationRef.current
+    visualOnlyModeRef.current = true
+    chaseModeRef.current = false
+    transportLockedRef.current = true
+    pendingStartRef.current.clear()
+    preparedStartRef.current = 0
+    multitrackTransport.arm(0)
+    prepareVisualAtStart()
+    setCurrentTime(0)
+
+    const delayMs = Math.max(0, epochMs - Date.now())
+    if (delayMs > 0) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, delayMs))
+    }
+    if (generation !== visualPlaybackGenerationRef.current) return false
+
+    const entries = getEntries()
+    const playNow: Array<[string, HTMLMediaElement]> = []
+    for (const [panelId, element] of entries) {
+      const entryDelayMs = Math.max(0, -offsetFor(panelId) * 1000)
+      if (entryDelayMs > 5) {
+        pendingStartRef.current.add(panelId)
+      } else {
+        playNow.push([panelId, element])
+      }
+    }
+
+    const results = await Promise.allSettled(
+      playNow.map(([, element]) => {
+        element.muted = true
+        element.volume = 0
+        return element.play()
+      }),
+    )
+    if (generation !== visualPlaybackGenerationRef.current) return false
+
+    const started =
+      results.some((result) => result.status === 'fulfilled') ||
+      pendingStartRef.current.size > 0
+    if (started) {
+      multitrackTransport.start(0)
+    } else {
+      visualOnlyModeRef.current = false
+    }
+    setIsPlaying(started)
+    return started
+  }, [getEntries, offsetFor, prepareVisualAtStart])
+
   const startPrepared = useCallback(async () => {
     const entries = getEntries()
     if (entries.length === 0) {
@@ -458,7 +560,11 @@ export function useMultitrackSync() {
     const playNow = entries.filter(([panelId]) => !pendingStartRef.current.has(panelId))
     const startResults = await Promise.allSettled(
       playNow.map(([, el]) =>
-        playTakeMediaAudible(el, { skipRoutePrep: true, attachEndedRouteRestore: false }),
+        playTakeMediaAudible(el, {
+          skipRoutePrep: true,
+          attachEndedRouteRestore: false,
+          restoreRouteOnFailure: false,
+        }),
       ),
     )
     const starts = startResults.map((result, index) => {
@@ -521,7 +627,11 @@ export function useMultitrackSync() {
 
     const startResults = await Promise.allSettled(
       playNow.map(([, el]) =>
-        playTakeMediaAudible(el, { skipRoutePrep: true, attachEndedRouteRestore: false }),
+        playTakeMediaAudible(el, {
+          skipRoutePrep: true,
+          attachEndedRouteRestore: false,
+          restoreRouteOnFailure: false,
+        }),
       ),
     )
     const starts = startResults.map((result, index) => {
@@ -585,6 +695,8 @@ export function useMultitrackSync() {
 
   const pause = useCallback(() => {
     chaseModeRef.current = false
+    visualOnlyModeRef.current = false
+    visualPlaybackGenerationRef.current += 1
     pendingStartRef.current.clear()
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
@@ -692,6 +804,7 @@ export function useMultitrackSync() {
         )
         if (allDone) {
           multitrackTransport.pause()
+          visualOnlyModeRef.current = false
           setIsPlaying(false)
           onAllEndedRef.current?.()
           return
@@ -723,10 +836,17 @@ export function useMultitrackSync() {
               if (timeline >= win.entersAt - 0.02) {
                 pending.delete(panelId)
                 el.currentTime = Math.max(win.trimStart, timeline + win.trimStart + win.offset)
-                void playTakeMediaAudible(el, {
-                  skipRoutePrep: true,
-                  attachEndedRouteRestore: false,
-                }).then(() => applyMixState(panelId, el))
+                if (visualOnlyModeRef.current) {
+                  el.muted = true
+                  el.volume = 0
+                  void el.play().catch(() => {})
+                } else {
+                  void playTakeMediaAudible(el, {
+                    skipRoutePrep: true,
+                    attachEndedRouteRestore: false,
+                    restoreRouteOnFailure: false,
+                  }).then(() => applyMixState(panelId, el))
+                }
               }
               continue
             }
@@ -775,6 +895,7 @@ export function useMultitrackSync() {
     prepareAtStart,
     prepareVisualAtStart,
     startVisualPrepared,
+    startVisualPlaybackAtEpoch,
     startPrepared,
     startAnchoredToClick,
     playAllFromUserGesture,

@@ -37,7 +37,7 @@ export interface AppSettings {
   tunerInstrument: TunerInstrument
   /** Written-note display for concert and transposing instruments. */
   tunerTransposition: TunerTranspositionId
-  /** Reference drone output level (0–100). */
+  /** Kept for stored-settings compatibility; drone output is fixed at 100%. */
   droneVolume: number
   /** Reference drone waveform timbre. */
   droneWaveform: DroneWaveform
@@ -75,7 +75,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
   tunerTransposition: DEFAULT_TUNER_TRANSPOSITION,
-  droneVolume: 75,
+  droneVolume: 100,
   droneWaveform: 'warmSynth',
   showTakeCards: true,
   showMetronome: false,
@@ -172,10 +172,7 @@ export function loadAppSettings(): AppSettings {
           : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
       tunerInstrument: parseTunerInstrument(parsed.tunerInstrument),
       tunerTransposition: parseTunerTransposition(parsed.tunerTransposition),
-      droneVolume:
-        parsed.droneVolume === undefined || Number(parsed.droneVolume) <= 55
-          ? DEFAULT_APP_SETTINGS.droneVolume
-          : clamp(Number(parsed.droneVolume) || DEFAULT_APP_SETTINGS.droneVolume, 0, 100),
+      droneVolume: 100,
       droneWaveform: parseDroneWaveform(parsed.droneWaveform),
       showTakeCards:
         parsed.showTakeCards !== undefined

@@ -154,6 +154,21 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   } = useMultitrackSession({ takes, isOpen })
   const sync = useMultitrackSync()
   const { showAlert, showConfirm } = useActionSheet()
+  const nativeGridPlaybackActiveRef = useRef(false)
+  const nativeGridPlaybackPreparingRef = useRef(false)
+  const nativeGridPlaybackGenerationRef = useRef(0)
+  const [isNativeGridPlaybackPreparing, setIsNativeGridPlaybackPreparing] = useState(false)
+
+  const stopNativeGridPlayback = useCallback(async () => {
+    nativeGridPlaybackGenerationRef.current += 1
+    const shouldStop =
+      nativeGridPlaybackActiveRef.current ||
+      nativeGridPlaybackPreparingRef.current
+    nativeGridPlaybackActiveRef.current = false
+    nativeGridPlaybackPreparingRef.current = false
+    setIsNativeGridPlaybackPreparing(false)
+    if (shouldStop) await stopNativeMultitrackTransport()
+  }, [])
 
   const handlePracticeChange = useCallback((patch: Partial<typeof session.practice>) => {
     if (patch.bpm !== undefined) {
@@ -329,6 +344,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
       sync.pause()
       pauseBacking()
+      await stopNativeGridPlayback()
       setIsExporting(true)
       try {
         const result = await exportMultitrackSession(session, layout, sync.state.duration)
@@ -339,7 +355,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         setIsExporting(false)
       }
     })()
-  }, [isExporting, layout, pauseBacking, session, showAlert, showConfirm, sync])
+  }, [isExporting, layout, pauseBacking, session, showAlert, showConfirm, stopNativeGridPlayback, sync])
 
   const registerPanelMedia = useCallback((id: string, el: HTMLMediaElement | null) => {
     sync.registerMedia(id, el)
@@ -366,17 +382,18 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const nativeTransportActiveRef = useRef(false)
 
   const buildNativeMonitorSources = useCallback(async (
-    targetPanelId: string,
+    targetPanelId: string | null,
+    respectRecordingMonitorMutes = true,
   ): Promise<MultitrackMonitorSource[]> => {
     const sources: MultitrackMonitorSource[] = []
 
     for (const [panelIndex, panel] of session.panels.entries()) {
       if (
         panel.kind !== 'performance' ||
-        panel.id === targetPanelId ||
+        (targetPanelId !== null && panel.id === targetPanelId) ||
         !panel.take ||
         panel.muted ||
-        monitorMutesRef.current.has(panel.id)
+        (respectRecordingMonitorMutes && monitorMutesRef.current.has(panel.id))
       ) continue
 
       const path = await resolveNativeFileUri(panel.take)
@@ -397,7 +414,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
     if (
       session.backing.kind === 'audio' &&
-      !monitorMutesRef.current.has('backing')
+      (!respectRecordingMonitorMutes || !monitorMutesRef.current.has('backing'))
     ) {
       try {
         let path = nativeBackingCacheRef.current?.src === session.backing.src
@@ -431,6 +448,101 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     return sources
   }, [session.backing, session.panels, session.practice.bpm])
 
+  const playAllFromStart = useCallback(async () => {
+    sync.pause()
+    pauseBacking()
+    await stopNativeGridPlayback()
+    sync.setExcludePanelId(null)
+    sync.setReferencePanelIds(null)
+
+    if (!isNativeMultitrackTransportAvailable()) {
+      const started = await sync.playAllFromUserGesture()
+      if (started) await playBackingFromStart()
+      return started
+    }
+
+    const generation = ++nativeGridPlaybackGenerationRef.current
+    nativeGridPlaybackPreparingRef.current = true
+    setIsNativeGridPlaybackPreparing(true)
+
+    try {
+      // iOS Play All uses one native AVAudioEngine graph for every take (and
+      // uploaded backing audio). This avoids WebKit's multiple-media-element
+      // limit and gives every source the same sample clock.
+      const sources = await buildNativeMonitorSources(null, false)
+      if (generation !== nativeGridPlaybackGenerationRef.current) return false
+
+      const prepared = await prepareNativeMultitrackMonitor(sources)
+      if (!prepared || generation !== nativeGridPlaybackGenerationRef.current) {
+        await stopNativeMultitrackTransport()
+        return false
+      }
+
+      const snapshot = sharedMetronomeEngine.getSnapshot()
+      const beatsPerBar = Math.max(
+        1,
+        Number.parseInt(snapshot.meter.split('/')[0] ?? '4', 10) || 4,
+      )
+      const transport = await startNativeMultitrackTransport({
+        bpm: session.practice.bpm,
+        beatsPerBar,
+        countInBars: 0,
+        clickEnabled: false,
+        soundId: snapshot.soundId,
+      })
+      if (!transport || generation !== nativeGridPlaybackGenerationRef.current) {
+        await stopNativeMultitrackTransport()
+        return false
+      }
+
+      nativeGridPlaybackActiveRef.current = true
+      if (session.backing.kind === 'youtube') {
+        await scheduleYoutubeBackingStart(transport.performanceEpochMs)
+      }
+      const visualsStarted = await sync.startVisualPlaybackAtEpoch(
+        transport.performanceEpochMs,
+      )
+      if (!visualsStarted || generation !== nativeGridPlaybackGenerationRef.current) {
+        await stopNativeGridPlayback()
+        return false
+      }
+      return true
+    } catch (error) {
+      console.error('[MultitrackOverlay] native Play All failed', error)
+      sync.pause()
+      pauseBacking()
+      await stopNativeGridPlayback()
+      void showAlert({
+        message: error instanceof Error
+          ? error.message
+          : 'The multitrack mix could not start. Try again.',
+        tone: 'error',
+      })
+      return false
+    } finally {
+      if (generation === nativeGridPlaybackGenerationRef.current) {
+        nativeGridPlaybackPreparingRef.current = false
+        setIsNativeGridPlaybackPreparing(false)
+      }
+    }
+  }, [
+    buildNativeMonitorSources,
+    pauseBacking,
+    playBackingFromStart,
+    scheduleYoutubeBackingStart,
+    session.backing.kind,
+    session.practice.bpm,
+    showAlert,
+    stopNativeGridPlayback,
+    sync,
+  ])
+
+  const pauseAllPlayback = useCallback(() => {
+    sync.pause()
+    pauseBacking()
+    void stopNativeGridPlayback()
+  }, [pauseBacking, stopNativeGridPlayback, sync])
+
   const recording = useMultitrackRecording({
     onPrepareRecording: (panelId) => {
       recordingTargetPanelIdRef.current = panelId
@@ -452,6 +564,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       onStopRecording()
     },
     onArmPlayback: async (panelId) => {
+      await stopNativeGridPlayback()
       sync.pause()
       pauseBacking()
       if (session.backing.kind === 'youtube') {
@@ -580,8 +693,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   }, [recording.targetPanelId, sync])
 
   useEffect(() => {
-    if (!isOpen) pauseBacking()
-  }, [isOpen, pauseBacking])
+    if (!isOpen) pauseAllPlayback()
+  }, [isOpen, pauseAllPlayback])
 
   useEffect(() => {
     if (session.backing.kind === 'none') pauseBacking()
@@ -636,10 +749,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   useEffect(() => {
     sync.setOnAllEnded(() => {
       if (recordingPhaseRef.current !== 'idle') return
+      void stopNativeGridPlayback()
       void completePlaybackRouteRestore().catch(() => {})
     })
     return () => sync.setOnAllEnded(null)
-  }, [sync.setOnAllEnded])
+  }, [stopNativeGridPlayback, sync.setOnAllEnded])
 
   /** After review playback (Preview) ends in Keep/Retry, hand the audio route
    * back to recording and heal the capture session before the next take. */
@@ -865,35 +979,23 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onRemoveTake={(id) => assignTakeToPanel(id, null)} onSheetMusicChange={assignSheetMusic}
                 onRegisterMedia={registerPanelMedia} />
             </div>
-            <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying} currentTime={sync.state.currentTime} duration={sync.state.duration}
+            <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
               activeLayoutId={session.layoutId}
               onSelectLayout={setLayout}
               onOpenMixer={() => setActiveSourceSheet('mixer')}
               onOpenAlign={hasAnyTake ? () => setAlignStageOpen(true) : undefined}
-              onTogglePlay={() => void (async () => {
-                try {
-                  if (sync.state.isPlaying || backingPlaying) {
-                    sync.pause()
-                    pauseBacking()
-                    return
-                  }
-                  sync.setExcludePanelId(null)
-                  await sync.playAllFromUserGesture()
-                  await playBackingFromStart()
-                } catch (error) {
-                  console.error('[MultitrackOverlay] Play all failed', error)
+              onTogglePlay={() => {
+                if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
+                  pauseAllPlayback()
+                  return
                 }
-              })()} onRestart={() => void (async () => {
-                try {
-                  sync.pause()
-                  pauseBacking()
-                  sync.setExcludePanelId(null)
-                  await sync.restart()
-                  await playBackingFromStart()
-                } catch (error) {
-                  console.error('[MultitrackOverlay] Restart failed', error)
+                void playAllFromStart()
+              }} onRestart={() => void playAllFromStart()} onSeek={(time) => {
+                if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
+                  pauseAllPlayback()
                 }
-              })()} onSeek={sync.seek} />
+                sync.seek(time)
+              }} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1162,19 +1264,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         )}
         sync={sync}
         onClose={() => {
-          sync.pause()
-          pauseBacking()
+          pauseAllPlayback()
           setAlignStageOpen(false)
         }}
         onPreviewToggle={() => {
-          if (sync.state.isPlaying || backingPlaying) {
-            sync.pause()
-            pauseBacking()
+          if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
+            pauseAllPlayback()
             return
           }
-          sync.setExcludePanelId(null)
-          sync.playAllFromUserGesture()
-          void playBackingFromStart()
+          void playAllFromStart()
         }}
         onDone={handleSaveAlignChanges}
       />

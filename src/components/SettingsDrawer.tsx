@@ -27,12 +27,9 @@ interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
   settings: AppSettings
-  /** Shared overlay values — must match the Camera Mode Overlays menu. */
+  /** Shared overlay values — the on-screen Overlays menu owns their toggles. */
   hudQuickSettings: HudQuickSettings
   onUpdate: (patch: Partial<AppSettings>) => void
-  onPitchTrackerChange: (enabled: boolean) => void
-  onShowTakeCardsChange: (show: boolean) => void
-  onShowMetronomeChange: (show: boolean) => void
   onAudioEnhancerChange: (enabled: boolean) => void
   onReset: () => void
   onReplayTutorial?: () => void
@@ -191,13 +188,12 @@ const LEARN_APP_SECTIONS: {
   },
 ]
 
-type SettingsSectionId = 'general' | 'recording' | 'tuner' | 'overlays' | 'playback' | 'more'
+type SettingsSectionId = 'general' | 'recording' | 'tuner' | 'playback' | 'more'
 
 const SETTINGS_SECTIONS: ReadonlyArray<{ id: SettingsSectionId; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'recording', label: 'Recording' },
   { id: 'tuner', label: 'Tuner' },
-  { id: 'overlays', label: 'Overlays' },
   { id: 'playback', label: 'Playback' },
   { id: 'more', label: 'More' },
 ]
@@ -368,9 +364,6 @@ export default function SettingsDrawer({
   settings,
   hudQuickSettings,
   onUpdate,
-  onPitchTrackerChange,
-  onShowTakeCardsChange,
-  onShowMetronomeChange,
   onAudioEnhancerChange,
   onReset,
   onReplayTutorial,
@@ -445,16 +438,6 @@ export default function SettingsDrawer({
   const handleSheetEnterComplete = useCallback(() => {
     markContentReady()
   }, [markContentReady])
-
-  const handlePitchTrackerToggle = useCallback(
-    (checked: boolean) => {
-      if (recordingMode === 'audio') {
-        onClose()
-      }
-      onPitchTrackerChange(checked)
-    },
-    [onClose, onPitchTrackerChange, recordingMode],
-  )
 
   const handleCloseClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -582,12 +565,12 @@ export default function SettingsDrawer({
               Audio Recording
             </h3>
 
-            <SettingToggle
-              label="Hands-Free Record & Play"
-              description="In Camera and Audio modes, starts the visible take when your playing crosses the trigger level, stops after silence, then plays it back automatically."
-              checked={settings.autoSoundRecording}
-              onChange={(checked) => onUpdate({ autoSoundRecording: checked })}
-            />
+            <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
+              <p className="text-sm font-semibold text-stone-900">Hands-Free Recording</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                Turn this on from the record controls. It waits for your playing, records the visible take, stops after silence, then plays the take back automatically. These settings tune that behavior.
+              </p>
+            </div>
 
             <SettingToggle
               label="Use iPhone Mic"
@@ -601,7 +584,7 @@ export default function SettingsDrawer({
             <div className="space-y-3 pl-1 pt-1">
               <SettingSlider
                 label="Stop After Silence"
-                description="How long the app waits before ending the take and starting playback."
+                description="Used by Hands-Free Recording to decide when to end a quiet take and begin playback."
                 value={settings.soundSilenceSeconds}
                 min={0}
                 max={6}
@@ -613,7 +596,7 @@ export default function SettingsDrawer({
 
               <SettingSlider
                 label="Trigger Sensitivity"
-                description="How loud your playing must be to start recording. Left catches quieter playing; right needs a stronger signal."
+                description="Used by Hands-Free Recording. Left catches quieter playing; right needs a stronger signal."
                 value={settings.soundVolumeThreshold}
                 min={1}
                 max={100}
@@ -632,12 +615,12 @@ export default function SettingsDrawer({
               Pitch & Tuning
             </h3>
 
-            <SettingToggle
-              label="Pitch Analysis"
-              description="Shows a live pitch graph and tuner during playback. With hands-free recording, analysis appears on the main screen while each take plays back."
-              checked={hudQuickSettings.pitchTrackerEnabled}
-              onChange={handlePitchTrackerToggle}
-            />
+            <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
+              <p className="text-sm font-semibold text-stone-900">Pitch Analysis</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                Turn it on from Overlays. The options below choose how pitch is detected and what happens between takes.
+              </p>
+            </div>
 
             <div className="settings-group-row overflow-hidden rounded-2xl border border-white/70 bg-white/72 shadow-sm backdrop-blur-xl">
               <Pressable
@@ -731,27 +714,11 @@ export default function SettingsDrawer({
               />
             </div>
 
-            <AnimatedExpand open={hudQuickSettings.pitchTrackerEnabled}>
-              <div className="space-y-3 pt-3">
-                <SettingToggle
-                  label="Idle Mic Tuner"
-                  description="Between takes, listen through the microphone and show a live tuner on the main screen. Turn off to analyze pitch only during playback."
-                  checked={settings.liveMicTunerEnabled}
-                  onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
-                />
-              </div>
-            </AnimatedExpand>
-
-            <SettingSlider
-              label="Drone Volume"
-              description="Reference-tone loudness for the tuner drone keyboard. Lower levels reduce speaker bleed into the mic."
-              value={settings.droneVolume}
-              min={0}
-              max={100}
-              step={1}
-              unit="%"
-              formatValue={(value) => `${value}%`}
-              onChange={(droneVolume) => onUpdate({ droneVolume })}
+            <SettingToggle
+              label="Idle Mic Tuner"
+              description="When Pitch Analysis is on, listen through the microphone and show a live tuner between takes. Turn this off to analyze only during playback."
+              checked={settings.liveMicTunerEnabled}
+              onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
             />
 
             <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
@@ -772,59 +739,6 @@ export default function SettingsDrawer({
                 }))}
               />
             </div>
-          </section>
-
-          <section id="settings-section-overlays" className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Overlays & Cards
-            </h3>
-
-            <SettingToggle
-              label="Metronome Widget"
-              description="Shows a draggable metronome on the main screen. Pinch to resize; double-tap the widget to reset its size. Metronome audio is not recorded into takes."
-              checked={hudQuickSettings.showMetronome}
-              onChange={onShowMetronomeChange}
-            />
-
-            <AnimatedExpand open={hudQuickSettings.showMetronome}>
-              <div className="pt-3">
-                <SettingToggle
-                  label="Mute During Take Playback"
-                  description="Silences metronome clicks while a take is playing. Timing keeps running so tempo stays locked when playback ends."
-                  checked={settings.muteMetronomeDuringPlayback}
-                  onChange={(checked) => onUpdate({ muteMetronomeDuringPlayback: checked })}
-                />
-              </div>
-            </AnimatedExpand>
-
-            <SettingToggle
-              label="Take Comparison Cards"
-              description="Shows Best Take and Latest Take cards above the record button. Turn off to keep new recordings in the vault only."
-              checked={hudQuickSettings.showTakeCards}
-              onChange={onShowTakeCardsChange}
-            />
-
-            <AnimatedExpand open={hudQuickSettings.showTakeCards}>
-              <div className="space-y-2 pt-3">
-                <label className="block space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-stone-800">Take Card Size</span>
-                    <span className="text-xs tabular-nums text-stone-500">{settings.takeCardScale}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={85}
-                    max={125}
-                    step={5}
-                    value={settings.takeCardScale}
-                    onChange={(e) => onUpdate({ takeCardScale: Number(e.target.value) })}
-                    className="w-full accent-stone-700"
-                    aria-label="Take card size"
-                  />
-                </label>
-              </div>
-            </AnimatedExpand>
-
           </section>
 
           <section id="settings-section-playback" className="settings-group space-y-3">
@@ -850,6 +764,13 @@ export default function SettingsDrawer({
                 />
               </div>
             </AnimatedExpand>
+
+            <SettingToggle
+              label="Mute Metronome During Take Playback"
+              description="When the metronome is shown from Overlays, silence its clicks while a take plays. Its timing keeps running so it stays locked when playback ends."
+              checked={settings.muteMetronomeDuringPlayback}
+              onChange={(checked) => onUpdate({ muteMetronomeDuringPlayback: checked })}
+            />
 
             <SettingToggle
               label="Keep YouTube Out of Recordings"

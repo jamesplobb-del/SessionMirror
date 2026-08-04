@@ -1995,13 +1995,29 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 self.multitrackPerformanceFileTimeSec
             )
         }
+        let audioTrackStartSec = audioTracks.first.map { track in
+            let seconds = CMTimeGetSeconds(track.timeRange.start)
+            return seconds.isFinite ? max(0, seconds) : 0
+        } ?? 0
         let sourceInMs: Int?
-        if let performanceFileTime = multitrackTiming.2 {
+        if let firstSampleHost = multitrackTiming.0,
+           let performanceHost = multitrackTiming.1 {
+            // This is the exact mapping from the shared native transport's
+            // downbeat onto the captured audio samples. recordedDuration is a
+            // live pipeline estimate and can lag by one or more buffers, which
+            // made the previous take begin slightly late on every overdub.
+            let performanceFileTime = audioTrackStartSec + max(
+                0,
+                performanceHost - firstSampleHost
+            )
             sourceInMs = max(0, Int((performanceFileTime * 1000).rounded()))
             result["multitrackPerformanceFileTimeSec"] = performanceFileTime
-        } else if let firstSampleHost = multitrackTiming.0,
-                  let performanceHost = multitrackTiming.1 {
-            sourceInMs = max(0, Int(((performanceHost - firstSampleHost) * 1000).rounded()))
+            result["multitrackAudioTrackStartSec"] = audioTrackStartSec
+            result["multitrackTimingMethod"] = "audioSampleHostClock"
+        } else if let performanceFileTime = multitrackTiming.2 {
+            sourceInMs = max(0, Int((performanceFileTime * 1000).rounded()))
+            result["multitrackPerformanceFileTimeSec"] = performanceFileTime
+            result["multitrackTimingMethod"] = "recordedDurationFallback"
         } else {
             sourceInMs = nil
         }

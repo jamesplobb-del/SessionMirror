@@ -35,6 +35,8 @@ final class MultitrackTransportEngine {
     private struct PreparedSource {
         let source: Source
         let file: AVAudioFile
+        /// Movie timeline time represented by frame zero of `file`.
+        let timelineOriginSec: Double
         let node: AVAudioPlayerNode
     }
 
@@ -86,9 +88,9 @@ final class MultitrackTransportEngine {
             nextSources.reserveCapacity(sources.count)
 
             for source in sources where !source.muted && source.volume > 0.0001 {
-                let file: AVAudioFile
+                let monitorFile: (file: AVAudioFile, timelineOriginSec: Double)
                 do {
-                    file = try monitorAudioFile(for: source)
+                    monitorFile = try monitorAudioFile(for: source)
                 } catch {
                     throw NSError(
                         domain: "BestTake.MultitrackTransport",
@@ -99,13 +101,18 @@ final class MultitrackTransportEngine {
                         ]
                     )
                 }
-                guard file.length > 0 else { continue }
+                guard monitorFile.file.length > 0 else { continue }
 
                 let node = AVAudioPlayerNode()
                 node.volume = max(0, min(1, source.volume))
                 engine.attach(node)
-                engine.connect(node, to: engine.mainMixerNode, format: file.processingFormat)
-                nextSources.append(PreparedSource(source: source, file: file, node: node))
+                engine.connect(node, to: engine.mainMixerNode, format: monitorFile.file.processingFormat)
+                nextSources.append(PreparedSource(
+                    source: source,
+                    file: monitorFile.file,
+                    timelineOriginSec: monitorFile.timelineOriginSec,
+                    node: node
+                ))
             }
 
             preparedSources = nextSources
@@ -193,14 +200,25 @@ final class MultitrackTransportEngine {
                 let sampleRate = prepared.file.processingFormat.sampleRate
                 guard sampleRate > 0 else { continue }
 
-                let sourceInSec = max(0, prepared.source.sourceInSec)
+                // AVAudioFile frame zero is the first decoded audio sample, not
+                // necessarily movie timeline zero. Camera movies often start
+                // their audio track a few buffers into the file; subtract that
+                // origin or every overdub reintroduces that gap at PLAY.
+                let sourceInSec = max(
+                    0,
+                    prepared.source.sourceInSec - prepared.timelineOriginSec
+                )
                 let startFrame = min(
                     prepared.file.length,
                     AVAudioFramePosition((sourceInSec * sampleRate).rounded())
                 )
                 let requestedEndFrame: AVAudioFramePosition
                 if let sourceOutSec = prepared.source.sourceOutSec {
-                    requestedEndFrame = AVAudioFramePosition((max(sourceInSec, sourceOutSec) * sampleRate).rounded())
+                    let localSourceOutSec = max(
+                        sourceInSec,
+                        sourceOutSec - prepared.timelineOriginSec
+                    )
+                    requestedEndFrame = AVAudioFramePosition((localSourceOutSec * sampleRate).rounded())
                 } else {
                     requestedEndFrame = prepared.file.length
                 }
@@ -301,12 +319,19 @@ final class MultitrackTransportEngine {
     /// `AVAudioFile` can read uploaded MP3/M4A files directly, but it cannot
     /// reliably open the MP4/MOV containers produced by camera recordings.
     /// Extract their audio track once and cache it for later overdubs.
-    private func monitorAudioFile(for source: Source) throws -> AVAudioFile {
+    private func monitorAudioFile(
+        for source: Source
+    ) throws -> (file: AVAudioFile, timelineOriginSec: Double) {
+        let asset = AVURLAsset(url: source.url)
+        let audioTrackStartSec = asset.tracks(withMediaType: .audio).first.map {
+            let seconds = CMTimeGetSeconds($0.timeRange.start)
+            return seconds.isFinite ? max(0, seconds) : 0
+        } ?? 0
         do {
-            return try AVAudioFile(forReading: source.url)
+            return (try AVAudioFile(forReading: source.url), audioTrackStartSec)
         } catch {
             let extractedURL = try extractedAudioURL(for: source)
-            return try AVAudioFile(forReading: extractedURL)
+            return (try AVAudioFile(forReading: extractedURL), audioTrackStartSec)
         }
     }
 
