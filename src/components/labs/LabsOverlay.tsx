@@ -150,7 +150,7 @@ export default function LabsOverlay({
           style={motionGpuLayer}
           role="dialog"
           aria-modal="true"
-          aria-label="BestTake Labs"
+          aria-label="Practice Games"
         >
           {route === 'menu' ? (
             <LabsMenu

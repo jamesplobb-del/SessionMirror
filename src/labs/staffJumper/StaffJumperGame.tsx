@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Pause } from 'lucide-react'
 import type { PitchReadout } from '../../utils/pitchUtils'
-import { STAFF_JUMPER_ASSETS } from './staffJumperAssets'
+import { getScaleRushPlayerModel } from '../scaleRush/scaleRushPlayerModels'
 import {
   computeAccuracy,
   DIFFICULTY_LABELS,
@@ -16,6 +16,7 @@ import {
 } from './staffJumperMusicLogic'
 import {
   LEDGER_LINE_W,
+  BASS_CLEF_FONT_SIZE,
   noteheadHalfHeight,
   NOTEHEAD_W,
   NOTEHEAD_H,
@@ -24,6 +25,7 @@ import {
   STAFF_CANVAS_HEIGHT,
   STAFF_CLEF_X,
   STAFF_FIRST_NOTE_X,
+  STAFF_LINE_GAP,
   STAFF_LINE_Y_LIST,
   STAFF_MIDDLE_Y,
   STAFF_TOP_Y,
@@ -45,7 +47,6 @@ interface StaffJumperGameProps {
 /** Visible feet sit above the transparent bottom padding in the source PNG. */
 const PLAYER_FEET_OFFSET_PX = 45
 const VISIBLE_NOTE_COUNT = 7
-const LANDING_ANIMATION_MS = 430
 
 function accidentalGlyph(accidental: '#' | 'b'): string {
   return accidental === '#' ? '♯' : '♭'
@@ -78,7 +79,7 @@ export default function StaffJumperGame({
 }: StaffJumperGameProps) {
   const config = state.config!
   const target = getTargetNoteAtStep(config, state.sequenceStep)
-  const detectedPc = getDetectedPitchClass(readout)
+  const detectedPc = getDetectedPitchClass(readout, config)
   const isMatch = detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
   const detectedNote =
     detectedPc != null ? (isMatch ? target.noteLabel : pitchClassLabel(detectedPc, config.key)) : '—'
@@ -132,24 +133,12 @@ export default function StaffJumperGame({
   )
 
   const keySignature = useMemo(
-    () => (showKeySignature(config.difficulty) ? getKeySignatureMarkers(config.key, config.scaleMode) : []),
-    [config.difficulty, config.key, config.scaleMode],
+    () => (showKeySignature(config.difficulty) ? getKeySignatureMarkers(config.key, config.scaleMode, config.clef) : []),
+    [config.clef, config.difficulty, config.key, config.scaleMode],
   )
 
-  /**
-   * Keep the camera on the previous note during the hop. The character moves
-   * to the new target first; only after landing does the staff pan to recenter
-   * both of them. That makes the character do the jumping, not the platform.
-   */
-  const [cameraStep, setCameraStep] = useState(state.sequenceStep)
-
-  useEffect(() => {
-    if (cameraStep === state.sequenceStep) return
-    const timer = window.setTimeout(() => setCameraStep(state.sequenceStep), LANDING_ANIMATION_MS)
-    return () => window.clearTimeout(timer)
-  }, [cameraStep, state.sequenceStep])
-
-  const focusWorldX = STAFF_FIRST_NOTE_X + cameraStep * NOTE_SPACING_PX
+  // Follow every accepted pitch immediately so fast passages never queue visual movement.
+  const focusWorldX = STAFF_FIRST_NOTE_X + state.sequenceStep * NOTE_SPACING_PX
   const scrollX = PLAYER_ANCHOR_X_PX - focusWorldX * layout.scale
   const visibleWorldWidth = layout.viewportWidth / Math.max(layout.scale, 0.1)
   const staffWorldWidth = Math.max(
@@ -182,6 +171,7 @@ export default function StaffJumperGame({
   const playerFeetScreen = layout.baseY + headTopWorld * layout.scale
   const playerScreenY = playerFeetScreen - PLAYER_FEET_OFFSET_PX
   const playerScreenX = targetWorldX * layout.scale + scrollX
+  const playerModel = getScaleRushPlayerModel(config.playerModel)
 
   const prevAdvanceRef = useRef(state.advanceToken)
   const prevMissRef = useRef(state.missToken)
@@ -241,22 +231,24 @@ export default function StaffJumperGame({
               ))}
             </div>
 
-            {/* Treble clef centered across the five-line staff. */}
+            {/* Clef uses the engraved music glyph and its clef-specific staff anchor. */}
             <span
-              className="sj-treble-clef"
+              className="sj-clef"
+              data-clef={config.clef}
               style={{
-                top: `${STAFF_MIDDLE_Y}px`,
+                top: `${config.clef === 'treble' ? STAFF_TOP_Y - STAFF_LINE_GAP * 1.55 : STAFF_TOP_Y - STAFF_LINE_GAP * 0.35}px`,
                 left: `${STAFF_CLEF_X}px`,
-                fontSize: `${TREBLE_CLEF_FONT_SIZE}px`,
+                fontSize: `${config.clef === 'treble' ? TREBLE_CLEF_FONT_SIZE : BASS_CLEF_FONT_SIZE}px`,
               }}
-              aria-hidden
+              role="img"
+              aria-label={`${config.clef} clef`}
             >
-              𝄞
+              {config.clef === 'treble' ? '𝄞' : '𝄢'}
             </span>
 
             {/* Key signature (hard mode only) */}
             {keySignature.length > 0 && (
-              <div className="sj-key-signature" style={{ left: `${STAFF_CLEF_X + 60}px` }}>
+              <div className="sj-key-signature" style={{ left: `${STAFF_CLEF_X + 125}px` }}>
                 {keySignature.map((marker, index) => (
                   <span
                     key={`${marker.symbol}-${marker.yPx}-${index}`}
@@ -340,21 +332,27 @@ export default function StaffJumperGame({
           </div>
         </div>
 
-        {/* ── Trumpet player — positioned in screen coordinates ── */}
-        <img
-          src={STAFF_JUMPER_ASSETS.trumpetPlayer}
-          alt=""
-          className={[
-            'sj-player',
-            jumpActive ? 'sj-player--hop' : '',
-            missActive && !state.isFalling ? 'sj-player--stumble' : '',
-            state.isFalling ? 'sj-player--fall' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
+        {/* ── Player anchor follows pitch immediately; sprite animation restarts per note. ── */}
+        <div
+          className={`sj-player-anchor ${state.isFalling ? 'sj-player-anchor--fall' : ''}`}
           style={{ left: `${playerScreenX}px`, top: `${playerScreenY}px` }}
-          draggable={false}
-        />
+          aria-hidden
+        >
+          <img
+            key={`sj-player-${state.advanceToken}-${state.missToken}`}
+            src={playerModel.asset}
+            alt=""
+            className={[
+              'sj-player',
+              jumpActive ? 'sj-player--hop' : '',
+              missActive && !state.isFalling ? 'sj-player--stumble' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            style={{ '--sj-player-scale': playerModel.scale } as CSSProperties}
+            draggable={false}
+          />
+        </div>
 
         {/* ── HUD ── */}
         <div className="sj-hud">

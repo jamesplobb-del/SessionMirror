@@ -37,7 +37,7 @@ export default function LabsMenu({
           hapticFeedback={hapticFeedback}
           onClick={onBack}
           className="arcade-icon-button"
-          aria-label="Close Practice Arcade"
+          aria-label="Close Games"
         >
           <X aria-hidden />
         </Pressable>

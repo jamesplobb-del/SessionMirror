@@ -18,6 +18,22 @@ import {
   type StaffJumperRange,
   type StaffJumperScaleMode,
 } from './staffJumperMusicLogic'
+import {
+  getTranspositionLabel,
+  SCALE_RUSH_TRANSPOSITIONS,
+  type ScaleRushTransposition,
+} from '../scaleRush/scaleRushMusicLogic'
+import {
+  loadScaleRushPlayerModel,
+  saveScaleRushPlayerModel,
+  SCALE_RUSH_PLAYER_MODELS,
+} from '../scaleRush/scaleRushPlayerModels'
+import type { ScaleRushPlayerModelId } from '../scaleRush/scaleRushTypes'
+import {
+  CLEF_LABELS,
+  STAFF_JUMPER_CLEFS,
+  type StaffJumperClef,
+} from './staffNotationMap'
 import { useStaffJumperGame } from './useStaffJumperGame'
 import { getTunerProfile, type TunerInstrument } from '../../utils/pitchConfig'
 import Pressable from '../../components/ui/Pressable'
@@ -52,6 +68,11 @@ export default function StaffJumperScreen({
   const [draftKey, setDraftKey] = useState<StaffJumperKey>('C')
   const [draftRange, setDraftRange] = useState<StaffJumperRange>('1-octave')
   const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>('easy')
+  const [draftClef, setDraftClef] = useState<StaffJumperClef>('treble')
+  const [draftTransposition, setDraftTransposition] = useState<ScaleRushTransposition>('concert')
+  const [draftPlayerModel, setDraftPlayerModel] = useState<ScaleRushPlayerModelId>(
+    loadScaleRushPlayerModel,
+  )
 
   const availableKeys = keysForScaleMode(draftScaleMode)
 
@@ -133,7 +154,9 @@ export default function StaffJumperScreen({
           <span className="sj-mic-status__dot" aria-hidden />
           <div>
             <strong>{hasPitchSignal ? 'Microphone ready' : 'Play a note to check your microphone'}</strong>
-            <small>{instrumentProfile.label} profile, concert pitch</small>
+            <small>
+              {instrumentProfile.label} profile, {getTranspositionLabel(draftTransposition).split(' — ')[0].toLowerCase()}
+            </small>
           </div>
           <p aria-live="polite">
             <strong>{hasPitchSignal ? readout.noteName : '—'}</strong>
@@ -154,6 +177,72 @@ export default function StaffJumperScreen({
           </div>
 
           <div className="arcade-fields">
+            <div>
+              <label htmlFor="staff-jumper-transposition" className="arcade-field-label">
+                Written pitch
+              </label>
+              <select
+                id="staff-jumper-transposition"
+                value={draftTransposition}
+                onChange={(event) =>
+                  setDraftTransposition(event.target.value as ScaleRushTransposition)
+                }
+                className="arcade-select"
+              >
+                {SCALE_RUSH_TRANSPOSITIONS.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <fieldset className="sr-player-picker">
+              <legend className="arcade-field-label">Character</legend>
+              <div className="sr-player-picker__grid">
+                {SCALE_RUSH_PLAYER_MODELS.map((model) => (
+                  <Pressable
+                    key={model.id}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => {
+                      setDraftPlayerModel(model.id)
+                      saveScaleRushPlayerModel(model.id)
+                    }}
+                    className={`sr-player-option ${draftPlayerModel === model.id ? 'sr-player-option--selected' : ''}`}
+                    aria-pressed={draftPlayerModel === model.id}
+                    aria-label={`Choose ${model.name}`}
+                  >
+                    <span className="sr-player-option__preview" aria-hidden>
+                      <img src={model.asset} alt="" draggable={false} />
+                    </span>
+                    <span>{model.name}</span>
+                  </Pressable>
+                ))}
+              </div>
+            </fieldset>
+
+            <div>
+              <p className="arcade-field-label">Clef</p>
+              <div className="arcade-segment-grid" style={{ '--arcade-segments': 2 } as CSSProperties}>
+                {STAFF_JUMPER_CLEFS.map((clef) => (
+                  <Pressable
+                    key={clef}
+                    type="button"
+                    intensity="soft"
+                    hapticFeedback={hapticFeedback}
+                    onClick={() => setDraftClef(clef)}
+                    className={`arcade-segment ${draftClef === clef ? 'arcade-segment--selected' : ''}`}
+                    data-accent="staff"
+                    aria-pressed={draftClef === clef}
+                  >
+                    {CLEF_LABELS[clef]} clef
+                  </Pressable>
+                ))}
+              </div>
+            </div>
+
             <div>
               <p className="arcade-field-label">Difficulty</p>
               <div className="arcade-segment-grid" style={{ '--arcade-segments': 3 } as CSSProperties}>
@@ -248,7 +337,10 @@ export default function StaffJumperScreen({
                 scaleMode: draftScaleMode,
                 range: draftRange,
                 difficulty: draftDifficulty,
+                clef: draftClef,
                 tunerInstrument,
+                transposition: draftTransposition,
+                playerModel: draftPlayerModel,
               })
             }
             className="arcade-primary-button"
@@ -303,7 +395,7 @@ export default function StaffJumperScreen({
           <p className="sj-state-label">Run complete</p>
           <h1>{state.score}</h1>
           <p className="sj-state-run-label">
-            {scaleName} · {RANGE_LABELS[state.config.range]} · {DIFFICULTY_LABELS[state.config.difficulty]}
+            {scaleName} · {CLEF_LABELS[state.config.clef]} clef · {RANGE_LABELS[state.config.range]} · {DIFFICULTY_LABELS[state.config.difficulty]}
           </p>
           <dl className="sj-state-stats">
             <div><dt>Accuracy</dt><dd>{accuracy}%</dd></div>

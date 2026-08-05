@@ -18,6 +18,7 @@ import {
   markAllCoachMarksSeen,
   markCoachMarkSeen,
 } from '../utils/onboardingTutorial'
+import type { AudioPracticeTab } from '../types/audioPractice'
 
 interface TutorialContextValue {
   activeCoachMark: CoachMarkContent | null
@@ -40,7 +41,7 @@ export interface TutorialSignals {
   isSplitView: boolean
   autoSoundRecording: boolean
   recordingMode: 'video' | 'audio'
-  audioPracticeTab: 'audio' | 'metronome' | 'tuner' | 'practice'
+  audioPracticeTab: AudioPracticeTab
 }
 
 interface TutorialProviderProps {

@@ -1,11 +1,16 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import {
+  transpositionSemitones,
+  type ScaleRushTransposition,
+} from '../scaleRush/scaleRushMusicLogic'
+import type { ScaleRushPlayerModelId } from '../scaleRush/scaleRushTypes'
+import {
   getStaffPositionForNote,
   NOTE_SPACING_PX,
   STAFF_FIRST_NOTE_X,
   STAFF_NOTE_LETTERS,
-  TREBLE_NOTE_YPX,
+  type StaffJumperClef,
   type StaffNoteLetter,
 } from './staffNotationMap'
 
@@ -70,9 +75,9 @@ export const DIFFICULTY_LABELS: Record<StaffJumperDifficulty, string> = {
 }
 
 export const DIFFICULTY_DESCRIPTIONS: Record<StaffJumperDifficulty, string> = {
-  easy: 'Note names are shown.',
-  medium: 'Read directly from the staff.',
-  hard: 'Key signatures and tighter tuning.',
+  easy: 'Note names are shown and the scale repeats.',
+  medium: 'Starts with the scale, then moves through interval patterns.',
+  hard: 'Starts with the scale, then adds leaps, arpeggios, and key signatures.',
 }
 
 export const DIFFICULTY_TIMEOUT_SECONDS: Record<StaffJumperDifficulty, number> = {
@@ -116,7 +121,11 @@ export interface StaffJumperConfig {
   scaleMode: StaffJumperScaleMode
   range: StaffJumperRange
   difficulty: StaffJumperDifficulty
+  clef: StaffJumperClef
   tunerInstrument: TunerInstrument
+  transposition: ScaleRushTransposition
+  playerModel: ScaleRushPlayerModelId
+  sessionSeed?: number
 }
 
 export interface StaffJumperState {
@@ -161,27 +170,23 @@ export interface KeySignatureMarker {
   yPx: number
 }
 
-/** Order of sharps on treble staff: F C G D A E B. */
-const SHARP_SIG_YPX = [
-  TREBLE_NOTE_YPX.F5!,
-  TREBLE_NOTE_YPX.C5!,
-  TREBLE_NOTE_YPX.G5!,
-  TREBLE_NOTE_YPX.D5!,
-  TREBLE_NOTE_YPX.A4!,
-  TREBLE_NOTE_YPX.E5!,
-  TREBLE_NOTE_YPX.B4!,
-] as const
-
-/** Order of flats on treble staff: B E A D G C F. */
-const FLAT_SIG_YPX = [
-  TREBLE_NOTE_YPX.B4!,
-  TREBLE_NOTE_YPX.E5!,
-  TREBLE_NOTE_YPX.A4!,
-  TREBLE_NOTE_YPX.D5!,
-  TREBLE_NOTE_YPX.G4!,
-  TREBLE_NOTE_YPX.C5!,
-  TREBLE_NOTE_YPX.F4!,
-] as const
+const SIGNATURE_POSITIONS: Record<
+  StaffJumperClef,
+  { sharps: readonly [StaffNoteLetter, number][]; flats: readonly [StaffNoteLetter, number][] }
+> = {
+  treble: {
+    /** F C G D A E B */
+    sharps: [['F', 5], ['C', 5], ['G', 5], ['D', 5], ['A', 4], ['E', 5], ['B', 4]],
+    /** B E A D G C F */
+    flats: [['B', 4], ['E', 5], ['A', 4], ['D', 5], ['G', 4], ['C', 5], ['F', 4]],
+  },
+  bass: {
+    /** F C G D A E B */
+    sharps: [['F', 3], ['C', 3], ['G', 3], ['D', 3], ['A', 3], ['E', 3], ['B', 3]],
+    /** B E A D G C F */
+    flats: [['B', 2], ['E', 3], ['A', 2], ['D', 3], ['G', 2], ['C', 3], ['F', 2]],
+  },
+}
 
 const MAJOR_SHARP_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
   C: 0,
@@ -247,6 +252,7 @@ function keySignaturePitchClasses(key: StaffJumperKey, scaleMode: StaffJumperSca
 export function getKeySignatureMarkers(
   key: StaffJumperKey,
   scaleMode: StaffJumperScaleMode,
+  clef: StaffJumperClef = 'treble',
 ): KeySignatureMarker[] {
   const majorKey = signatureMajorKey(key, scaleMode)
   const sharpCount = MAJOR_SHARP_COUNT[majorKey] ?? 0
@@ -254,13 +260,13 @@ export function getKeySignatureMarkers(
   if (sharpCount > 0) {
     return Array.from({ length: sharpCount }, (_, index) => ({
       symbol: '#' as const,
-      yPx: SHARP_SIG_YPX[index]!,
+      yPx: getStaffPositionForNote(...SIGNATURE_POSITIONS[clef].sharps[index]!, clef).yPx,
     }))
   }
   if (flatCount > 0) {
     return Array.from({ length: flatCount }, (_, index) => ({
       symbol: 'b' as const,
-      yPx: FLAT_SIG_YPX[index]!,
+      yPx: getStaffPositionForNote(...SIGNATURE_POSITIONS[clef].flats[index]!, clef).yPx,
     }))
   }
   return []
@@ -358,7 +364,7 @@ function midiForScaleDegree(
   key: StaffJumperKey,
   scaleMode: StaffJumperScaleMode,
   degreeIndex: number,
-  baseOctave = 4,
+  baseOctave: number,
 ): number {
   const pattern = scalePattern(scaleMode)
   const rootPc = keyPitchClass(key)
@@ -369,22 +375,101 @@ function midiForScaleDegree(
   return rootMidi + semitoneFromRoot
 }
 
-/** Ascending scale through configured range — loops for endless play. */
-export function buildScaleMidiSequence(config: Pick<StaffJumperConfig, 'key' | 'scaleMode' | 'range'>): number[] {
-  const topDegree = config.range === '1-octave' ? 7 : 14
-  return Array.from({ length: topDegree + 1 }, (_, degree) =>
-    midiForScaleDegree(config.key, config.scaleMode, degree),
-  )
+function topDegreeForRange(range: StaffJumperRange): number {
+  return range === '1-octave' ? 7 : 14
 }
 
-function midiAtStep(config: StaffJumperConfig, sequenceStep: number): number {
-  const sequence = buildScaleMidiSequence(config)
-  return sequence[sequenceStep % sequence.length]!
+/** A repeating up-and-down scale with no duplicated turn-around notes. */
+export function buildRepeatingScaleDegreePath(
+  config: Pick<StaffJumperConfig, 'range'>,
+): number[] {
+  const topDegree = topDegreeForRange(config.range)
+  const ascending = Array.from({ length: topDegree + 1 }, (_, degree) => degree)
+  const descending = Array.from({ length: Math.max(0, topDegree - 1) }, (_, index) => topDegree - 1 - index)
+  return [...ascending, ...descending]
 }
 
-function degreeAtStep(config: StaffJumperConfig, sequenceStep: number): number {
-  const sequenceLength = buildScaleMidiSequence(config).length
-  return sequenceStep % sequenceLength
+/** A complete scale statement used before medium and hard pattern work. */
+export function buildScaleIntroDegreePath(
+  config: Pick<StaffJumperConfig, 'range'>,
+): number[] {
+  const topDegree = topDegreeForRange(config.range)
+  return [
+    ...Array.from({ length: topDegree + 1 }, (_, degree) => degree),
+    ...Array.from({ length: topDegree }, (_, index) => topDegree - 1 - index),
+  ]
+}
+
+interface DegreePatternCache {
+  notes: number[]
+  blockCount: number
+}
+
+const degreePatternCache = new WeakMap<StaffJumperConfig, DegreePatternCache>()
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let value = state
+    value = Math.imul(value ^ (value >>> 15), value | 1)
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function appendDifficultyPattern(config: StaffJumperConfig, cache: DegreePatternCache): void {
+  const topDegree = topDegreeForRange(config.range)
+  const rng = mulberry32((config.sessionSeed ?? 1) + cache.blockCount * 7919)
+  let block: number[]
+
+  if (config.difficulty === 'medium') {
+    const start = Math.floor(rng() * Math.max(1, topDegree - 3))
+    const templates = [
+      [start, start + 2, start + 1, start + 3],
+      [start, start + 1, start + 2, start + 1],
+      [start + 3, start + 1, start + 2, start],
+    ]
+    block = [...templates[Math.floor(rng() * templates.length)]!]
+  } else {
+    const start = Math.floor(rng() * Math.max(1, topDegree - 4))
+    const templates = [
+      [start, start + 2, start + 4, start + 2],
+      [start, start + 3, start + 1, start + 4],
+      [start + 4, start + 1, start + 3, start],
+    ]
+    block = [...templates[Math.floor(rng() * templates.length)]!]
+    if (rng() > 0.55) {
+      block.push(Math.floor(rng() * (topDegree + 1)))
+    }
+  }
+
+  block = block.map((degree) => Math.max(0, Math.min(topDegree, degree)))
+  const previousDegree = cache.notes.at(-1) ?? 0
+  while (block.length > 0 && block[0] === previousDegree) block.shift()
+  cache.notes.push(...block)
+  cache.blockCount += 1
+}
+
+function patternDegreeAt(config: StaffJumperConfig, patternIndex: number): number {
+  let cache = degreePatternCache.get(config)
+  if (!cache) {
+    cache = { notes: [], blockCount: 0 }
+    degreePatternCache.set(config, cache)
+  }
+  while (patternIndex >= cache.notes.length) appendDifficultyPattern(config, cache)
+  return cache.notes[patternIndex]!
+}
+
+export function degreeForSequenceStep(config: StaffJumperConfig, sequenceStep: number): number {
+  if (config.difficulty === 'easy') {
+    const path = buildRepeatingScaleDegreePath(config)
+    return path[sequenceStep % path.length]!
+  }
+
+  const intro = buildScaleIntroDegreePath(config)
+  if (sequenceStep < intro.length) return intro[sequenceStep]!
+  return patternDegreeAt(config, sequenceStep - intro.length)
 }
 
 /**
@@ -392,11 +477,12 @@ function degreeAtStep(config: StaffJumperConfig, sequenceStep: number): number {
  * HUD target, platform label, staff Y, and pitch check all derive from here.
  */
 export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: number): TargetNote {
-  const midi = midiAtStep(config, sequenceStep)
+  const degreeIndex = degreeForSequenceStep(config, sequenceStep)
+  const baseOctave = config.clef === 'bass' ? 2 : 4
+  const midi = midiForScaleDegree(config.key, config.scaleMode, degreeIndex, baseOctave)
   const pitchClass = ((midi % 12) + 12) % 12
-  const degreeIndex = degreeAtStep(config, sequenceStep)
-  const written = writtenScaleNote(config.key, pitchClass, degreeIndex)
-  const staff = getStaffPositionForNote(written.letter, written.octave)
+  const written = writtenScaleNote(config.key, pitchClass, degreeIndex, baseOctave)
+  const staff = getStaffPositionForNote(written.letter, written.octave, config.clef)
   return {
     sequenceIndex: sequenceStep,
     midi,
@@ -474,16 +560,22 @@ export function readoutToConcertPitchClass(readout: PitchReadout): number | null
   return ((Math.round(readout.midi) % 12) + 12) % 12
 }
 
-export function getDetectedPitchClass(readout: PitchReadout): number | null {
-  return readoutToConcertPitchClass(readout)
+export function getDetectedPitchClass(
+  readout: PitchReadout,
+  config?: Pick<StaffJumperConfig, 'transposition'>,
+): number | null {
+  const concertPitchClass = readoutToConcertPitchClass(readout)
+  if (concertPitchClass == null) return null
+  const writtenOffset = config ? transpositionSemitones(config.transposition) : 0
+  return ((concertPitchClass + writtenOffset) % 12 + 12) % 12
 }
 
 export function isReadoutCorrectPitch(
   readout: PitchReadout,
   targetPitchClass: number,
-  config: Pick<StaffJumperConfig, 'difficulty'>,
+  config: Pick<StaffJumperConfig, 'difficulty' | 'transposition'>,
 ): boolean {
-  const detected = getDetectedPitchClass(readout)
+  const detected = getDetectedPitchClass(readout, config)
   if (detected == null) return false
   if (!pitchClassesMatch(detected, targetPitchClass)) return false
   return config.difficulty !== 'hard' || Math.abs(readout.cents) <= 20
@@ -492,9 +584,9 @@ export function isReadoutCorrectPitch(
 export function isReadoutWrongPitch(
   readout: PitchReadout,
   targetPitchClass: number,
-  _config: Pick<StaffJumperConfig, 'difficulty'>,
+  config: Pick<StaffJumperConfig, 'difficulty' | 'transposition'>,
 ): boolean {
-  const detected = getDetectedPitchClass(readout)
+  const detected = getDetectedPitchClass(readout, config)
   if (detected == null) return false
   return !pitchClassesMatch(detected, targetPitchClass)
 }

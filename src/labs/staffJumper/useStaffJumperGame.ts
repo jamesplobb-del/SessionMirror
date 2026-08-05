@@ -14,9 +14,9 @@ import {
 import { triggerSuccessHaptic, triggerWarningHaptic } from '../../utils/haptics'
 
 const DIFFICULTY_TIMING = {
-  easy: { correctMs: 160, wrongMs: 700, cooldownMs: 400 },
-  medium: { correctMs: 240, wrongMs: 475, cooldownMs: 475 },
-  hard: { correctMs: 300, wrongMs: 325, cooldownMs: 525 },
+  easy: { correctMs: 34, wrongMs: 620, cooldownMs: 12 },
+  medium: { correctMs: 30, wrongMs: 440, cooldownMs: 12 },
+  hard: { correctMs: 26, wrongMs: 300, cooldownMs: 12 },
 } as const
 
 const INITIAL_HEARTS = 3
@@ -146,7 +146,13 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
 
     case 'RESTART':
       return state.config
-        ? reducer({ ...createInitialState(), config: state.config }, { type: 'START', config: state.config })
+        ? reducer(
+            { ...createInitialState(), config: state.config },
+            {
+              type: 'START',
+              config: { ...state.config, sessionSeed: Date.now() },
+            },
+          )
         : createInitialState()
 
     case 'BACK_TO_SETUP':
@@ -195,7 +201,7 @@ export function useStaffJumperGame(
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000)
-    dispatch({ type: 'START', config })
+    dispatch({ type: 'START', config: { ...config, sessionSeed: config.sessionSeed ?? Date.now() } })
   }, [resetNoteClock])
 
   const restart = useCallback(() => {
@@ -335,7 +341,7 @@ export function useStaffJumperGame(
         }
       } else if (isReadoutWrongPitch(readoutNow, target, current.config)) {
         correctStableMs = 0
-        const wrongPc = getDetectedPitchClass(readoutNow)!
+        const wrongPc = getDetectedPitchClass(readoutNow, current.config)!
         if (wrongPitchClassRef.current !== wrongPc) {
           wrongPitchClassRef.current = wrongPc
           wrongStableMs = 0

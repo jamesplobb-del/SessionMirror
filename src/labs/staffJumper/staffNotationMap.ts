@@ -1,5 +1,5 @@
 /**
- * Hard-coded treble-clef layout in absolute pixels (world coordinates).
+ * Clef-aware staff layout in absolute pixels (world coordinates).
  * These are world-space values; the component scales them to screen.
  *
  * FORMULA (per spec):
@@ -45,6 +45,14 @@ export const STAFF_LINE_Y_LIST = [
   STAFF_LINE_YPX.E4,
 ] as const
 
+export const STAFF_JUMPER_CLEFS = ['treble', 'bass'] as const
+export type StaffJumperClef = (typeof STAFF_JUMPER_CLEFS)[number]
+
+export const CLEF_LABELS: Record<StaffJumperClef, string> = {
+  treble: 'Treble',
+  bass: 'Bass',
+}
+
 /** Visual midpoint of the five-line staff. */
 export const STAFF_MIDDLE_Y = (STAFF_TOP_Y + STAFF_BOTTOM_Y) / 2
 
@@ -80,7 +88,7 @@ export const TREBLE_NOTE_YPX: Record<string, number> = {
 
 /** Notehead dimensions in world pixels. */
 export const NOTEHEAD_W = 50
-export const NOTEHEAD_H = 40
+export const NOTEHEAD_H = 38
 
 /** Ledger line extends beyond each side of the notehead. */
 export const LEDGER_LINE_W = NOTEHEAD_W + 14
@@ -89,38 +97,49 @@ export const LEDGER_LINE_W = NOTEHEAD_W + 14
  * Vertical world span includes all generated targets and their ledger rules.
  * The highest possible target is B6 at y=20; the lowest is C4 at y=480.
  */
-export const STAFF_CANVAS_HEIGHT = STAFF_BOTTOM_Y + STAFF_LINE_GAP * 2
+export const STAFF_CANVAS_HEIGHT = STAFF_BOTTOM_Y + STAFF_LINE_GAP * 3
 
 /** First notehead X in the scrolling world. */
-export const STAFF_FIRST_NOTE_X = 168
+export const STAFF_FIRST_NOTE_X = 250
 
 /** Clef left edge in the scrolling world. */
-export const STAFF_CLEF_X = 8
+export const STAFF_CLEF_X = 12
 
 /**
  * Treble clef glyph size in world px.
  * Spans roughly one staff height plus ledger curl — matches engraved proportions.
  */
-export const TREBLE_CLEF_FONT_SIZE = STAFF_LINE_GAP * 4.9
+export const TREBLE_CLEF_FONT_SIZE = STAFF_LINE_GAP * 8.2
+
+/** Bass clefs occupy less vertical space than a G clef. */
+export const BASS_CLEF_FONT_SIZE = STAFF_LINE_GAP * 3.8
 
 /** Horizontal spacing between noteheads (world px). */
 export const NOTE_SPACING_PX = 100
 
 /** Player anchor leaves the clef visible and the next target clear on phones. */
-export const PLAYER_ANCHOR_X_PX = 150
+export const PLAYER_ANCHOR_X_PX = 206
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const
 export const STAFF_NOTE_LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const
 export type StaffNoteLetter = (typeof STAFF_NOTE_LETTERS)[number]
 
-const E4_DIATONIC_INDEX = 4 * 7 + STAFF_NOTE_LETTERS.indexOf('E')
+const BOTTOM_LINE_NOTE: Record<StaffJumperClef, { letter: StaffNoteLetter; octave: number }> = {
+  treble: { letter: 'E', octave: 4 },
+  bass: { letter: 'G', octave: 2 },
+}
 
 function diatonicIndex(letter: StaffNoteLetter, octave: number): number {
   return octave * 7 + STAFF_NOTE_LETTERS.indexOf(letter)
 }
 
-function relativeStepFromE4(letter: StaffNoteLetter, octave: number): number {
-  return diatonicIndex(letter, octave) - E4_DIATONIC_INDEX
+function relativeStepFromBottomLine(
+  letter: StaffNoteLetter,
+  octave: number,
+  clef: StaffJumperClef,
+): number {
+  const bottomLine = BOTTOM_LINE_NOTE[clef]
+  return diatonicIndex(letter, octave) - diatonicIndex(bottomLine.letter, bottomLine.octave)
 }
 
 function yForRelativeStep(relativeStep: number): number {
@@ -149,18 +168,21 @@ export function midiToNoteId(midi: number): string {
   return `${NOTE_NAMES[pc]}${octave}`
 }
 
-export function getNoteYpxForMidi(midi: number): number {
+export function getNoteYpxForMidi(midi: number, clef: StaffJumperClef = 'treble'): number {
   const octave = Math.floor(midi / 12) - 1
   const pitchClass = ((midi % 12) + 12) % 12
   const letter = NOTE_NAMES[pitchClass]![0] as StaffNoteLetter
-  return getStaffPositionForNote(letter, octave).yPx
+  return getStaffPositionForNote(letter, octave, clef).yPx
 }
 
-export function getStaffPositionForMidi(midi: number): StaffVisualPosition {
+export function getStaffPositionForMidi(
+  midi: number,
+  clef: StaffJumperClef = 'treble',
+): StaffVisualPosition {
   const octave = Math.floor(midi / 12) - 1
   const pitchClass = ((midi % 12) + 12) % 12
   const letter = NOTE_NAMES[pitchClass]![0] as StaffNoteLetter
-  const position = getStaffPositionForNote(letter, octave)
+  const position = getStaffPositionForNote(letter, octave, clef)
   return {
     ...position,
     noteId: midiToNoteId(midi),
@@ -175,8 +197,9 @@ export function getStaffPositionForMidi(midi: number): StaffVisualPosition {
 export function getStaffPositionForNote(
   letter: StaffNoteLetter,
   octave: number,
+  clef: StaffJumperClef = 'treble',
 ): StaffVisualPosition {
-  const relativeStep = relativeStepFromE4(letter, octave)
+  const relativeStep = relativeStepFromBottomLine(letter, octave, clef)
   const isLine = relativeStep % 2 === 0
   const isOutsideStaff = relativeStep < 0 || relativeStep > 8
 

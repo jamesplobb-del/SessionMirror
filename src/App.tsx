@@ -523,6 +523,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         setShowTunerTakePills(false)
       }
       setAudioPracticeTab(tab)
+      if (tab === 'games') {
+        setShowPitch(false)
+        setLabsRoute('menu')
+      }
     },
     [audioPracticeTab, setAudioPracticeTab]
   )
@@ -2583,19 +2587,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [markOverlayClosed, settings.hapticFeedback])
 
-  const handleOpenLabs = useCallback(() => {
-    triggerLightHaptic(settings.hapticFeedback)
-    markOverlayClosed()
-    setIsSettingsOpen(false)
-    setIsVaultOpen(false)
-    setIsCreatorStudioPickerOpen(false)
-    setCreatorStudioTake(null)
-    setMultitrackOpen(false)
-    setShowPitch(false)
-    setLabsRoute('menu')
-    deferHudMediaPause()
-  }, [deferHudMediaPause, markOverlayClosed, settings.hapticFeedback])
-
   const handleOpenCreatorStudioPicker = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     markOverlayClosed()
@@ -2772,8 +2763,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleCloseLabs = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setLabsRoute(null)
+    if (audioPracticeTab === 'games') setAudioPracticeTab('audio')
     recoverCameraAfterSurfaceDismiss('labs-close')
-  }, [recoverCameraAfterSurfaceDismiss, settings.hapticFeedback])
+  }, [audioPracticeTab, recoverCameraAfterSurfaceDismiss, setAudioPracticeTab, settings.hapticFeedback])
 
   const handleLabsNavigate = useCallback((route: LabsRoute) => {
     setLabsRoute(route)
@@ -3265,6 +3257,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
 
+  const isAudioPracticeGamesTab = recordingMode === 'audio' && audioPracticeTab === 'games'
+
   useEffect(() => {
     if (!isAudioPracticeTimelineTab) {
       setPracticeSessionActive(false)
@@ -3278,7 +3272,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [practiceSessionActive])
 
   const isAudioPracticeToolTab =
-    isAudioPracticeMetronomeTab || isAudioPracticeTunerTab || isAudioPracticeTimelineTab
+    isAudioPracticeMetronomeTab ||
+    isAudioPracticeTunerTab ||
+    isAudioPracticeTimelineTab ||
+    isAudioPracticeGamesTab
 
   useEffect(() => {
     if (!isAudioPracticeTunerActive || quickSettingsOpen || isRecording) return
@@ -4824,7 +4821,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                     onReset={handleResetSettings}
                     onReplayTutorial={handleReplayOnboardingTutorial}
-                    onOpenLabs={handleOpenLabs}
                     onOpenCreatorStudio={handleOpenCreatorStudioPicker}
                     onOpenMultitrack={handleOpenMultitrack}
                     onOpenQuickTuner={handleOpenQuickTunerFromSettings}

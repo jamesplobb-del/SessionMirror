@@ -1,1 +1,1 @@
-export type AudioPracticeTab = 'audio' | 'metronome' | 'tuner' | 'practice'
+export type AudioPracticeTab = 'audio' | 'metronome' | 'tuner' | 'practice' | 'games'
