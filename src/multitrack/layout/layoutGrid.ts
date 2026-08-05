@@ -1,9 +1,16 @@
 import type { CSSProperties } from 'react'
 import type { MultitrackLayoutPreset, SheetMusicAsset } from '../types'
-import { resolveMultitrackGridModel } from './layoutRects'
+import { resolveMultitrackGridModel, resolveMultitrackGridModelForIds } from './layoutRects'
 
-export function layoutGridStyle(preset: MultitrackLayoutPreset, musicAsset: SheetMusicAsset | null = null): CSSProperties {
-  const { areas, columnWeights, rowWeights } = resolveMultitrackGridModel(preset, musicAsset)
+export function layoutGridStyle(
+  preset: MultitrackLayoutPreset,
+  musicAsset: SheetMusicAsset | null = null,
+  /** When set, only these box ids hold a slot — the grid reflows around them. */
+  visibleIds?: string[],
+): CSSProperties {
+  const { areas, columnWeights, rowWeights } = visibleIds
+    ? resolveMultitrackGridModelForIds(preset, musicAsset, visibleIds)
+    : resolveMultitrackGridModel(preset, musicAsset)
 
   return {
     display: 'grid',

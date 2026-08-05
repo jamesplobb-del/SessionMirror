@@ -34,6 +34,7 @@ import {
 import { setNativeCameraFrameBridgeEnabled } from '../../utils/nativeCameraTest'
 import type { MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
+import MultitrackClickSettings from './MultitrackClickSettings'
 
 /** Above the stage (z-150). */
 const STAGE_SHEET_Z = { backdrop: 'z-[155]', sheet: 'z-[160]' }
@@ -444,7 +445,7 @@ export default function MultitrackRecordingStage({
         maxHeightClass="max-h-[60vh]"
       >
         <div className="multitrack-sheet multitrack-sheet--countin">
-          <p className="multitrack-sheet__title">Count-in</p>
+          <p className="multitrack-sheet__title">Click &amp; count-in</p>
           <div className="multitrack-countin-sheet">
             <label className="multitrack-countin-sheet__row">
               <span>Click track</span>
@@ -475,22 +476,10 @@ export default function MultitrackRecordingStage({
                 </Pressable>
               </div>
             </label>
-            <label className="multitrack-countin-sheet__row">
-              <span>BPM</span>
-              <input
-                type="number"
-                aria-label="Count-in tempo"
-                inputMode="numeric"
-                min={40}
-                max={300}
-                value={practice.bpm}
-                onChange={(event) =>
-                  onPracticeChange({
-                    bpm: Math.max(40, Math.min(300, Math.round(Number(event.target.value) || 120))),
-                  })
-                }
-              />
-            </label>
+            <MultitrackClickSettings
+              bpm={practice.bpm}
+              onBpmChange={(bpm) => onPracticeChange({ bpm })}
+            />
           </div>
         </div>
       </AnimatedBottomSheet>

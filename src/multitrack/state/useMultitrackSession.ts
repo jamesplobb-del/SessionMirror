@@ -72,6 +72,8 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
           muted: existing.muted,
           trimStartSec: existing.trimStartSec,
           trimEndSec: existing.trimEndSec,
+          sectionStartSec: existing.sectionStartSec,
+          sectionEndSec: existing.sectionEndSec,
         }
       })
       return { ...prev, layoutId, panels: nextPanels }
@@ -117,6 +119,21 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     [],
   )
 
+  /** Pass undefined for both to make the box span the whole song again. */
+  const setPanelSection = useCallback(
+    (panelId: string, sectionStartSec: number | undefined, sectionEndSec: number | undefined) => {
+      setSession((prev) => ({
+        ...prev,
+        panels: prev.panels.map((panel) =>
+          panel.id === panelId && panel.kind === 'performance'
+            ? { ...panel, sectionStartSec, sectionEndSec }
+            : panel,
+        ),
+      }))
+    },
+    [],
+  )
+
   const assignSheetMusic = useCallback((panelId: string, asset: SheetMusicAsset | null) => {
     setSession((prev) => ({
       ...prev,
@@ -140,6 +157,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     setPanelVolume,
     setPanelMuted,
     setPanelTrim,
+    setPanelSection,
     assignSheetMusic,
     updatePractice,
     updateBacking,

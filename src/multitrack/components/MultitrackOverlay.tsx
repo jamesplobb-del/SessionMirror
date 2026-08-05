@@ -45,6 +45,8 @@ import { exportMultitrackSession, type MultitrackExportFailureReason } from '../
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
 import SheetPlacementDiagram from './SheetPlacementDiagram'
+import MultitrackSectionEditor from './MultitrackSectionEditor'
+import { hasSectionWindow } from '../layout/sectionVisibility'
 import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../backing/MultitrackBackingTrackPanel'
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
@@ -162,6 +164,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     setPanelVolume,
     setPanelMuted,
     setPanelTrim,
+    setPanelSection,
     assignSheetMusic,
     updatePractice,
     updateBacking,
@@ -362,6 +365,19 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         const proceed = await showConfirm({
           title: 'Backing track not included',
           message: "YouTube audio can't be captured for export. Continue without the backing track?",
+          confirmLabel: 'Export anyway',
+        })
+        if (!proceed) return
+      }
+
+      // The native renderer composites one fixed rect per source for the whole
+      // video, so a box scoped to a section keeps its slot the entire time in the
+      // export instead of the grid reflowing around it as it does on the canvas.
+      if (session.panels.some((panel) => panel.kind === 'performance' && hasSectionWindow(panel))) {
+        const proceed = await showConfirm({
+          title: 'Section boxes export full length',
+          message:
+            "Boxes set to show for part of the song keep their spot for the whole exported video — the grid won't reshuffle like it does here. Export anyway?",
           confirmLabel: 'Export anyway',
         })
         if (!proceed) return
@@ -999,16 +1015,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             </header>
             <div className="multitrack-overlay__body">
               <div className="multitrack-mix-strip" aria-label="Project audio sources">
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setActiveSourceSheet('backing')}
-                  className={`multitrack-source-chip ${session.backing.kind !== 'none' ? 'multitrack-source-chip--active' : ''}`}
-                >
-                  <Music4 className="h-3.5 w-3.5" />
-                  <span className="multitrack-source-chip__label">{backingChipLabel}</span>
-                  {session.backing.kind !== 'none' ? <span className="multitrack-source-chip__dot" /> : null}
-                </Pressable>
+                {/* Practice toggles lead the strip — they are tapped most and must
+                    stay reachable without scrolling past a long backing/file name. */}
                 <Pressable
                   type="button"
                   intensity="soft"
@@ -1023,21 +1031,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 <Pressable
                   type="button"
                   intensity="soft"
-                  onClick={() => {
-                    if (session.sheetMusic.asset) setActiveSourceSheet('visual')
-                    else sheetMusicInputRef.current?.click()
-                  }}
-                  className={`multitrack-source-chip ${session.sheetMusic.asset ? 'multitrack-source-chip--active' : ''}`}
-                >
-                  <FileMusic className="h-3.5 w-3.5" />
-                  <span className="multitrack-source-chip__label">
-                    {session.sheetMusic.asset?.fileName ?? 'Music / photo / PDF'}
-                  </span>
-                  {session.sheetMusic.asset ? <span className="multitrack-source-chip__dot" /> : null}
-                </Pressable>
-                <Pressable
-                  type="button"
-                  intensity="soft"
                   onClick={() => handlePracticeChange({
                     showPitch: !session.practice.showPitch,
                     practiceOverlayEnabled: true,
@@ -1045,10 +1038,35 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   className={`multitrack-source-chip ${session.practice.showPitch ? 'multitrack-source-chip--active' : ''}`}
                 >
                   <AudioLines className="h-3.5 w-3.5" />
-                  <span className="multitrack-source-chip__label">Pitch overlay</span>
+                  <span className="multitrack-source-chip__label">Pitch</span>
                   <span className="multitrack-source-chip__state">
                     {session.practice.showPitch ? 'on' : 'off'}
                   </span>
+                </Pressable>
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={() => setActiveSourceSheet('backing')}
+                  className={`multitrack-source-chip ${session.backing.kind !== 'none' ? 'multitrack-source-chip--active' : ''}`}
+                >
+                  <Music4 className="h-3.5 w-3.5" />
+                  <span className="multitrack-source-chip__label multitrack-source-chip__label--truncate">{backingChipLabel}</span>
+                  {session.backing.kind !== 'none' ? <span className="multitrack-source-chip__dot" /> : null}
+                </Pressable>
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  onClick={() => {
+                    if (session.sheetMusic.asset) setActiveSourceSheet('visual')
+                    else sheetMusicInputRef.current?.click()
+                  }}
+                  className={`multitrack-source-chip ${session.sheetMusic.asset ? 'multitrack-source-chip--active' : ''}`}
+                >
+                  <FileMusic className="h-3.5 w-3.5" />
+                  <span className="multitrack-source-chip__label multitrack-source-chip__label--truncate">
+                    {session.sheetMusic.asset?.fileName ?? 'Music / photo / PDF'}
+                  </span>
+                  {session.sheetMusic.asset ? <span className="multitrack-source-chip__dot" /> : null}
                 </Pressable>
               </div>
               <MultitrackPanelGrid layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
@@ -1061,6 +1079,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onRemoveTake={(id) => assignTakeToPanel(id, null)}
                 onSheetMusicChange={handleSheetMusicAssetChange}
                 onEditSheetMusic={() => setActiveSourceSheet('visual')}
+                currentTimeSec={sync.state.currentTime}
                 onRegisterMedia={registerPanelMedia} />
             </div>
             <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
@@ -1485,6 +1504,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </Pressable>
             </div>
           )}
+          {tileSheetPanel?.kind === 'performance' ? (
+            <MultitrackSectionEditor
+              panel={tileSheetPanel}
+              durationSec={sync.state.duration}
+              currentTimeSec={sync.state.currentTime}
+              onChange={(startSec, endSec) => {
+                if (tileSheetPanelId) setPanelSection(tileSheetPanelId, startSec, endSec)
+              }}
+            />
+          ) : null}
         </div>
       </AnimatedBottomSheet>
 

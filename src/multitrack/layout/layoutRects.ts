@@ -1,3 +1,4 @@
+import { MULTITRACK_LAYOUT_PRESETS } from './layoutPresets'
 import type { MultitrackLayoutPreset, SheetMusicAsset } from '../types'
 
 const PANEL_IDS = ['a', 'b', 'c', 'd', 'e', 'f']
@@ -62,6 +63,43 @@ export function resolveMultitrackGridModel(
     areas,
     columnWeights: Array(musicCols).fill(1),
     rowWeights: position === 'bottom' ? [...panelRowWeights, musicScale] : [musicScale, ...panelRowWeights],
+  }
+}
+
+/**
+ * Grid model covering only `visibleIds` — used when boxes carry a section window
+ * and drop in and out mid-song. The preset whose panelCount matches the visible
+ * count supplies the arrangement, then its slot letters are remapped onto the
+ * ids that are actually showing, so three visible boxes lay out exactly like the
+ * stock 3-box preset regardless of which slots they came from.
+ */
+export function resolveMultitrackGridModelForIds(
+  preset: MultitrackLayoutPreset,
+  musicAsset: SheetMusicAsset | null,
+  visibleIds: string[],
+): MultitrackGridModel {
+  if (visibleIds.length === 0 || visibleIds.length === preset.panelCount) {
+    // Same set of boxes as the preset — no remap needed, keep their own slots.
+    const identity = visibleIds.every((id, index) => id === PANEL_IDS[index])
+    if (visibleIds.length === 0 || identity) return resolveMultitrackGridModel(preset, musicAsset)
+  }
+
+  const effectivePreset =
+    MULTITRACK_LAYOUT_PRESETS.find((candidate) => candidate.panelCount === visibleIds.length) ?? preset
+  const model = resolveMultitrackGridModel(effectivePreset, musicAsset)
+  const slotToId = new Map(
+    PANEL_IDS.slice(0, visibleIds.length).map((slot, index) => [slot, visibleIds[index]] as const),
+  )
+
+  return {
+    ...model,
+    areas: model.areas.map((row) =>
+      row
+        .trim()
+        .split(/\s+/)
+        .map((token) => slotToId.get(token) ?? token)
+        .join(' '),
+    ),
   }
 }
 

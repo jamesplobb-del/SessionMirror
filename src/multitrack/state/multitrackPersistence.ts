@@ -27,6 +27,8 @@ interface PersistedMultitrackSession {
   panelMutes?: boolean[]
   /** Trim per panel slot: [startSec, endSec|null]. */
   panelTrims?: ([number, number | null] | null)[]
+  /** Section window per panel slot: [startSec|null, endSec|null]. */
+  panelSections?: ([number | null, number | null] | null)[]
   practice: MultitrackPracticeSettings
   backing: { kind: 'youtube'; embedUrl: string; label: string; volume: number } | null
 }
@@ -50,6 +52,12 @@ export function saveMultitrackSession(session: MultitrackSession): void {
       panelTrims: performancePanels.map((panel) =>
         panel.kind === 'performance' && (panel.trimStartSec || panel.trimEndSec !== undefined)
           ? [panel.trimStartSec ?? 0, panel.trimEndSec ?? null]
+          : null,
+      ),
+      panelSections: performancePanels.map((panel) =>
+        panel.kind === 'performance' &&
+        (panel.sectionStartSec !== undefined || panel.sectionEndSec !== undefined)
+          ? [panel.sectionStartSec ?? null, panel.sectionEndSec ?? null]
           : null,
       ),
       practice: session.practice,
@@ -80,6 +88,7 @@ export function loadMultitrackSession(takes: Take[]): MultitrackSession | null {
       const volume = persisted.panelVolumes?.[performanceIndex]
       const muted = persisted.panelMutes?.[performanceIndex]
       const trim = persisted.panelTrims?.[performanceIndex]
+      const section = persisted.panelSections?.[performanceIndex]
       panels[i] = {
         ...panel,
         // Takes deleted since last session are silently dropped.
@@ -90,6 +99,12 @@ export function loadMultitrackSession(takes: Take[]): MultitrackSession | null {
           ? {
               trimStartSec: typeof trim[0] === 'number' ? trim[0] : 0,
               ...(typeof trim[1] === 'number' ? { trimEndSec: trim[1] } : null),
+            }
+          : null),
+        ...(Array.isArray(section)
+          ? {
+              ...(typeof section[0] === 'number' ? { sectionStartSec: section[0] } : null),
+              ...(typeof section[1] === 'number' ? { sectionEndSec: section[1] } : null),
             }
           : null),
       }

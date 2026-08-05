@@ -25,6 +25,13 @@ export interface PerformancePanelState {
   /** Trim: timeline 0 maps to trimStartSec into the take; trimEndSec caps it. */
   trimStartSec?: number
   trimEndSec?: number
+  /**
+   * Optional song-section window. When set, the box only occupies the grid
+   * between these timeline seconds — the remaining boxes reflow to fill the
+   * canvas outside it. Both unset means the box is present for the whole song.
+   */
+  sectionStartSec?: number
+  sectionEndSec?: number
 }
 
 export interface SheetMusicPanelState {

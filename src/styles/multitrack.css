@@ -1435,6 +1435,16 @@
   color: #22c55e;
 }
 
+/* Long backing/file names would otherwise push later chips off the strip. */
+.multitrack-source-chip__label--truncate {
+  display: inline-block;
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 /* ── Toolbar row 2: layout strip + mixer ── */
 .multitrack-toolbar__row2 {
   display: flex;
@@ -1884,6 +1894,117 @@
   font-size: 0.9375rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Per-box song-section window (tile sheet) ── */
+.multitrack-section-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  border: 1px solid #e7e5e4;
+  border-radius: 0.9rem;
+  background: #fafaf9;
+  padding: 0.7rem 0.8rem 0.8rem;
+}
+
+.multitrack-section-editor__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.multitrack-section-editor__toggle strong,
+.multitrack-section-editor__toggle small {
+  display: block;
+}
+
+.multitrack-section-editor__toggle strong {
+  color: #292524;
+  font-size: 0.82rem;
+}
+
+.multitrack-section-editor__toggle small {
+  margin-top: 0.12rem;
+  color: #78716c;
+  font-size: 0.7rem;
+}
+
+.multitrack-section-editor__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.2rem 0.75rem;
+}
+
+.multitrack-section-editor__row span {
+  color: #292524;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.multitrack-section-editor__row output {
+  color: #57534e;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.multitrack-section-editor__row input[type='range'] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: #1c1917;
+}
+
+.multitrack-section-editor__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.multitrack-section-editor__actions button {
+  display: inline-flex;
+  min-height: 2.6rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid #e7e5e4;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #44403c;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* Shared-metronome controls embedded in the click / count-in sheet. */
+.multitrack-click-settings {
+  border: 1px solid #e7e5e4;
+  border-radius: 0.9rem;
+  background: #fafaf9;
+  padding: 0.7rem 0.8rem 0.8rem;
+}
+
+.multitrack-click-settings__title strong,
+.multitrack-click-settings__title span {
+  display: block;
+}
+
+.multitrack-click-settings__title strong {
+  color: #292524;
+  font-size: 0.82rem;
+}
+
+.multitrack-click-settings__title span {
+  margin-top: 0.12rem;
+  color: #78716c;
+  font-size: 0.7rem;
+}
+
+.multitrack-click-settings__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.7rem;
 }
 
 /* ── Persistent backing media host (invisible) ── */
