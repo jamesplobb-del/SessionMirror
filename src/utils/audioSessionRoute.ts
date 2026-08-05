@@ -293,6 +293,7 @@ export interface BestTakeAudioPluginType {
       x: number
       y: number
       scale: number
+      contentMode: 'fill' | 'fit'
     } | null
     backingAudio: { path: string; gain: number } | null
   }): Promise<NativeMultitrackRenderResult>

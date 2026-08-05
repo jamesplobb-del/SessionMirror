@@ -95,6 +95,7 @@ export async function exportMultitrackSession(
     x: number
     y: number
     scale: number
+    contentMode: 'fill' | 'fit'
   } | null = null
   let backingAudio: { path: string; gain: number } | null = null
   let backingSkipped: 'youtube' | undefined
@@ -117,6 +118,7 @@ export async function exportMultitrackSession(
         x: musicAsset.x ?? 0.5,
         y: musicAsset.y ?? 0.5,
         scale: musicAsset.scale ?? 1,
+        contentMode: musicAsset.mimeType === 'application/pdf' ? 'fit' : (musicAsset.contentMode ?? 'fill'),
       }
     }
 

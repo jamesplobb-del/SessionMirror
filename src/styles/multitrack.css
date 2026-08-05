@@ -492,6 +492,10 @@
   background: white;
 }
 
+.multitrack-panel__sheet-viewport--fill {
+  background: #0c0a09;
+}
+
 .multitrack-panel__sheet-viewport:active {
   cursor: grabbing;
 }
@@ -508,6 +512,15 @@
   transform-origin: center center;
   transform: translate(var(--sheet-x, 0%), var(--sheet-y, 0%)) scale(var(--sheet-scale, 1));
   user-select: none;
+}
+
+.multitrack-panel__sheet-image--fill {
+  object-fit: cover;
+  background: transparent;
+}
+
+.multitrack-panel__sheet-image--fit {
+  object-fit: contain;
 }
 
 .multitrack-panel__sheet-actions {
@@ -638,6 +651,49 @@
   text-align: left;
 }
 
+.multitrack-placement-diagram {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.85rem;
+  height: 2.15rem;
+  border-radius: 0.4rem;
+  background: #e7e5e4;
+  overflow: hidden;
+}
+
+.multitrack-placement-diagram__panel,
+.multitrack-placement-diagram__music {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid #e7e5e4;
+  border-radius: 0.18rem;
+}
+
+.multitrack-placement-diagram__panel {
+  background: #a8a29e;
+}
+
+.multitrack-placement-diagram__music {
+  background: #292524;
+}
+
+.multitrack-visual-editor__placement.is-active .multitrack-placement-diagram {
+  background: #44403c;
+}
+
+.multitrack-visual-editor__placement.is-active .multitrack-placement-diagram__panel,
+.multitrack-visual-editor__placement.is-active .multitrack-placement-diagram__music {
+  border-color: #44403c;
+}
+
+.multitrack-visual-editor__placement.is-active .multitrack-placement-diagram__panel {
+  background: #78716c;
+}
+
+.multitrack-visual-editor__placement.is-active .multitrack-placement-diagram__music {
+  background: #fafaf9;
+}
+
 .multitrack-visual-editor__placement > span,
 .multitrack-visual-editor__placement strong,
 .multitrack-visual-editor__placement small {
@@ -665,6 +721,49 @@
 
 .multitrack-visual-editor__placement.is-active strong,
 .multitrack-visual-editor__placement.is-active small {
+  color: #fff;
+}
+
+.multitrack-visual-editor__framing {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.multitrack-visual-editor__frame-choice {
+  display: block;
+  min-height: 3.25rem;
+  border: 1px solid #e7e5e4;
+  border-radius: 0.8rem;
+  background: #fafaf9;
+  padding: 0.55rem 0.65rem;
+  color: #292524;
+  text-align: left;
+}
+
+.multitrack-visual-editor__frame-choice strong,
+.multitrack-visual-editor__frame-choice small {
+  display: block;
+}
+
+.multitrack-visual-editor__frame-choice strong {
+  font-size: 0.75rem;
+}
+
+.multitrack-visual-editor__frame-choice small {
+  margin-top: 0.08rem;
+  color: #78716c;
+  font-size: 0.62rem;
+}
+
+.multitrack-visual-editor__frame-choice.is-active {
+  border-color: #1c1917;
+  background: #1c1917;
+  color: #fff;
+}
+
+.multitrack-visual-editor__frame-choice.is-active small {
   color: #fff;
 }
 
@@ -2256,4 +2355,346 @@
   .multitrack-align-stage__nudge button {
     flex: 1;
   }
+}
+
+/* Camera Mode integration -------------------------------------------------
+   Multitrack remains a focused workspace, but now shares Camera Mode's
+   translucent HUD, blue/gold accents, and compact control geometry. */
+.multitrack-overlay--camera-mode {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(247, 174, 28, 0.08), transparent 30%),
+    radial-gradient(circle at 88% 16%, rgba(37, 164, 241, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(6, 10, 16, 0.86), rgba(5, 8, 13, 0.94));
+  color: rgba(255, 255, 255, 0.96);
+  -webkit-backdrop-filter: blur(20px) saturate(1.18);
+  backdrop-filter: blur(20px) saturate(1.18);
+}
+
+.multitrack-overlay--camera-mode .multitrack-overlay__header {
+  min-height: 4.4rem;
+  gap: 0.65rem;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.018)),
+    rgba(8, 12, 18, 0.28);
+  padding: max(0.7rem, env(safe-area-inset-top)) 0.8rem 0.7rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(22px) saturate(1.16);
+  backdrop-filter: blur(22px) saturate(1.16);
+}
+
+.multitrack-camera-back {
+  display: grid;
+  width: 2.45rem;
+  height: 2.45rem;
+  flex-shrink: 0;
+  place-items: center;
+  border: 0.5px solid rgba(255, 255, 255, 0.17);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.075);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.multitrack-camera-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.multitrack-camera-title > span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: rgba(97, 189, 255, 0.94);
+  font-size: 0.58rem;
+  font-weight: 760;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.multitrack-overlay--camera-mode .multitrack-camera-title h1 {
+  margin-top: 0.18rem;
+  color: rgba(255, 255, 255, 0.98);
+  line-height: 1.1;
+}
+
+.multitrack-overlay--camera-mode .multitrack-share-btn {
+  height: 2.45rem;
+  border: 0.5px solid rgba(125, 211, 252, 0.34);
+  background:
+    linear-gradient(145deg, rgba(97, 189, 255, 0.3), rgba(37, 164, 241, 0.12)),
+    rgba(8, 31, 48, 0.7);
+  color: #fff;
+  box-shadow:
+    0 0.45rem 1.1rem rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.multitrack-overlay--camera-mode .multitrack-overlay__body {
+  gap: 0.45rem;
+  padding: 0.5rem 0.55rem;
+}
+
+.multitrack-overlay--camera-mode .multitrack-mix-strip {
+  padding: 0.05rem 0.05rem 0.25rem;
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip {
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    rgba(8, 12, 18, 0.34);
+  color: rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip--active {
+  border-color: rgba(97, 189, 255, 0.56);
+  background: rgba(20, 89, 132, 0.42);
+  color: #fff;
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip__state {
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip--active .multitrack-source-chip__state {
+  color: #8bd0ff;
+}
+
+.multitrack-overlay--camera-mode .multitrack-grid {
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 0.28rem;
+  box-shadow:
+    0 1rem 2.4rem rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  overflow: hidden;
+}
+
+.multitrack-overlay--camera-mode .multitrack-panel {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.multitrack-overlay--camera-mode .multitrack-panel--empty {
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018)),
+    rgba(8, 12, 18, 0.38);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.multitrack-overlay--camera-mode .multitrack-panel--empty .text-stone-400,
+.multitrack-overlay--camera-mode .multitrack-panel--empty .text-stone-500 {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar {
+  gap: 0.45rem;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.018)),
+    rgba(7, 11, 17, 0.78);
+  padding: 0.62rem 0.75rem max(0.62rem, env(safe-area-inset-bottom));
+  box-shadow:
+    0 -0.75rem 2rem rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  -webkit-backdrop-filter: blur(22px) saturate(1.16);
+  backdrop-filter: blur(22px) saturate(1.16);
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__btn,
+.multitrack-overlay--camera-mode .multitrack-toolbar__chip,
+.multitrack-overlay--camera-mode .multitrack-layout-strip__item {
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__btn--primary {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: linear-gradient(145deg, #2d9cdb, #156fa7);
+  color: #fff;
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__time {
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__scrub {
+  accent-color: #61bdff;
+}
+
+.multitrack-overlay--camera-mode .multitrack-layout-strip__item--active {
+  border-color: rgba(247, 174, 28, 0.62);
+  background: rgba(104, 70, 8, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(247, 174, 28, 0.12),
+    inset 0 1px 0 rgba(255, 226, 157, 0.14);
+}
+
+.multitrack-overlay--camera-mode .multitrack-layout-strip__cell {
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.multitrack-overlay--camera-mode .multitrack-layout-strip__item--active .multitrack-layout-strip__cell {
+  background: #ffd875;
+}
+
+@media (max-width: 380px) {
+  .camera-view-mode-controls .camera-compare-toggle {
+    padding-inline: 0.55rem;
+  }
+
+  .multitrack-overlay--camera-mode .multitrack-share-btn {
+    padding-inline: 0.75rem;
+  }
+}
+
+/* Elevated light Camera Mode variant. The Camera Mode entry and compact HUD
+   geometry stay integrated, while the workspace returns to the brighter
+   visual language used by the multitrack sheets. */
+.multitrack-overlay--camera-mode {
+  background: #f5f5f4;
+  color: #1c1917;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.multitrack-overlay--camera-mode .multitrack-overlay__header {
+  border-bottom-color: rgba(214, 211, 209, 0.9);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 0.65rem 1.8rem rgba(28, 25, 23, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(22px) saturate(1.12);
+  backdrop-filter: blur(22px) saturate(1.12);
+}
+
+.multitrack-overlay--camera-mode .multitrack-camera-back {
+  border-color: #e7e5e4;
+  background: #fff;
+  color: #292524;
+  box-shadow:
+    0 0.25rem 0.8rem rgba(28, 25, 23, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.multitrack-overlay--camera-mode .multitrack-camera-title > span {
+  color: #0284c7;
+}
+
+.multitrack-overlay--camera-mode .multitrack-camera-title h1 {
+  color: #1c1917;
+}
+
+.multitrack-overlay--camera-mode .multitrack-share-btn {
+  border-color: #1c1917;
+  background: #1c1917;
+  color: #fff;
+  box-shadow: 0 0.4rem 1rem rgba(28, 25, 23, 0.16);
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip {
+  border-color: #e7e5e4;
+  background: #fff;
+  color: #57534e;
+  box-shadow:
+    0 0.22rem 0.7rem rgba(28, 25, 23, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip--active {
+  border-color: #292524;
+  background: #fff;
+  color: #1c1917;
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip__state {
+  color: #a8a29e;
+}
+
+.multitrack-overlay--camera-mode .multitrack-source-chip--active .multitrack-source-chip__state {
+  color: #16a34a;
+}
+
+.multitrack-overlay--camera-mode .multitrack-grid {
+  border-color: #e7e5e4;
+  background: #fff;
+  box-shadow:
+    0 0.9rem 2.2rem rgba(28, 25, 23, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.multitrack-overlay--camera-mode .multitrack-panel {
+  border-color: rgba(28, 25, 23, 0.1);
+}
+
+.multitrack-overlay--camera-mode .multitrack-panel--empty {
+  border-color: #d6d3d1;
+  background: #fafaf9;
+  color: #57534e;
+}
+
+.multitrack-overlay--camera-mode .multitrack-panel--empty .text-stone-400 {
+  color: #a8a29e;
+}
+
+.multitrack-overlay--camera-mode .multitrack-panel--empty .text-stone-500 {
+  color: #78716c;
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar {
+  border-top-color: #e7e5e4;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 -0.65rem 1.8rem rgba(28, 25, 23, 0.065),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(22px) saturate(1.1);
+  backdrop-filter: blur(22px) saturate(1.1);
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__btn,
+.multitrack-overlay--camera-mode .multitrack-toolbar__chip,
+.multitrack-overlay--camera-mode .multitrack-layout-strip__item {
+  border-color: #e7e5e4;
+  background: #f5f5f4;
+  color: #57534e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__btn--primary {
+  border-color: #1c1917;
+  background: #1c1917;
+  color: #fff;
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__time {
+  color: #78716c;
+}
+
+.multitrack-overlay--camera-mode .multitrack-toolbar__scrub {
+  accent-color: #1c1917;
+}
+
+.multitrack-overlay--camera-mode .multitrack-layout-strip__item--active {
+  border-color: #1c1917;
+  background: #1c1917;
+  box-shadow: 0 0.3rem 0.85rem rgba(28, 25, 23, 0.14);
+}
+
+.multitrack-overlay--camera-mode .multitrack-layout-strip__cell {
+  background: #d6d3d1;
+}
+
+.multitrack-overlay--camera-mode .multitrack-layout-strip__item--active .multitrack-layout-strip__cell {
+  background: #fff;
 }

@@ -4327,6 +4327,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     audioPracticeSheetOpen ? 'app-ui-overlay--sheet-open' : ''
                   } ${isReviewOpen ? 'app-ui-overlay--review-open' : ''} ${
                     isSplitView ? 'app-ui-overlay--split-open' : ''
+                  } ${multitrackOpen ? 'app-ui-overlay--multitrack-open' : ''
                   } ${
                     isAudioPracticeMetronomeTab ? 'app-ui-overlay--audio-practice-metronome' : ''
                   } ${isAudioPracticeTunerTab ? 'app-ui-overlay--audio-practice-tuner' : ''} ${
@@ -4605,6 +4606,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             onSubmitYoutube={handleSubmitYoutube}
                             onClearYoutube={handleClearYoutube}
                             onToggleSplitView={handleToggleSplitView}
+                            onOpenMultitrack={handleOpenMultitrack}
                             onExpandBenchmark={handleExpandBenchmark}
                             onExpandChallenger={handleExpandChallenger}
                             onDragStateChange={handlePipDragStateChange}

@@ -1178,10 +1178,15 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 path: sheetPath,
                 fileType: sheetMusicDict["fileType"] as? String ?? "image"
            ) {
+            let fileType = sheetMusicDict["fileType"] as? String ?? "image"
+            let requestedContentMode = sheetMusicDict["contentMode"] as? String
+            // Existing image sessions have no contentMode. Default those to
+            // fill as well, while PDFs keep their full-page fit behavior.
+            let fillsViewport = fileType != "pdf" && requestedContentMode != "fit"
             let sheetFrame = multitrackRectFrame(sheetRectDict, renderSize: renderSize)
             let sheetViewport = CALayer()
             sheetViewport.frame = sheetFrame
-            sheetViewport.backgroundColor = UIColor.white.cgColor
+            sheetViewport.backgroundColor = fillsViewport ? UIColor.black.cgColor : UIColor.white.cgColor
             sheetViewport.masksToBounds = true
             sheetViewport.borderColor = UIColor.white.withAlphaComponent(0.65).cgColor
             sheetViewport.borderWidth = 2
@@ -1189,7 +1194,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             let sheetLayer = CALayer()
             sheetLayer.frame = sheetViewport.bounds
             sheetLayer.contents = image.cgImage
-            sheetLayer.contentsGravity = .resizeAspect
+            sheetLayer.contentsGravity = fillsViewport ? .resizeAspectFill : .resizeAspect
             let x = min(1.25, max(-0.25, (sheetMusicDict["x"] as? NSNumber)?.doubleValue ?? 0.5))
             let y = min(1.25, max(-0.25, (sheetMusicDict["y"] as? NSNumber)?.doubleValue ?? 0.5))
             let scale = min(2.5, max(0.6, (sheetMusicDict["scale"] as? NSNumber)?.doubleValue ?? 1))

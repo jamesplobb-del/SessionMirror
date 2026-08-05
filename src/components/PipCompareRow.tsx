@@ -12,7 +12,7 @@ import {
   type RefObject,
 } from 'react'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { ArrowLeftRight, Columns2, Pin, RotateCcw, X } from 'lucide-react'
+import { ArrowLeftRight, Columns2, Layers3, Pin, RotateCcw, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
@@ -58,6 +58,7 @@ export interface PipCompareRowProps {
   onSubmitYoutube: (embedUrl: string) => void
   onClearYoutube: () => void
   onToggleSplitView: () => void
+  onOpenMultitrack: () => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onDragStateChange?: (state: PipDragUiState) => void
@@ -620,6 +621,31 @@ function CompactCompareButton({
   )
 }
 
+function CompactMultitrackButton({
+  onOpen,
+  hapticFeedback,
+}: {
+  onOpen: () => void
+  hapticFeedback: boolean
+}) {
+  return (
+    <Pressable
+      type="button"
+      intensity="soft"
+      squish={false}
+      haptic="light"
+      hapticFeedback={hapticFeedback}
+      className="camera-compare-toggle camera-multitrack-toggle pointer-events-auto"
+      onClick={onOpen}
+      aria-label="Open Multitrack view"
+      aria-haspopup="dialog"
+    >
+      <Layers3 aria-hidden />
+      <span>Multitrack</span>
+    </Pressable>
+  )
+}
+
 function TakeCardLayoutToolbar({
   onReset,
   hapticFeedback,
@@ -752,6 +778,7 @@ export default memo(function PipCompareRow({
   onSubmitYoutube,
   onClearYoutube,
   onToggleSplitView,
+  onOpenMultitrack,
   onExpandBenchmark,
   onExpandChallenger,
   onDragStateChange,
@@ -1162,10 +1189,16 @@ export default memo(function PipCompareRow({
                 hapticFeedback={hapticFeedback}
               />
             ) : (
-              <CompactCompareButton
-                onToggle={onToggleSplitView}
-                hapticFeedback={hapticFeedback}
-              />
+              <div className="camera-view-mode-controls">
+                <CompactCompareButton
+                  onToggle={onToggleSplitView}
+                  hapticFeedback={hapticFeedback}
+                />
+                <CompactMultitrackButton
+                  onOpen={onOpenMultitrack}
+                  hapticFeedback={hapticFeedback}
+                />
+              </div>
             )}
           </div>,
           readPhysicalUiPortal(),

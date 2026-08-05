@@ -113,6 +113,9 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
 
   const asset = panel.asset
   const isPdf = panel.asset.mimeType === 'application/pdf'
+  // Older saved image assets predate contentMode. Treat them as fill so they
+  // receive the same stripe-free behavior as newly imported photos.
+  const contentMode = isPdf ? 'fit' : (asset.contentMode ?? 'fill')
   const contentStyle = {
     '--sheet-x': `${(draftTransform.x - 0.5) * 70}%`,
     '--sheet-y': `${(draftTransform.y - 0.5) * 70}%`,
@@ -223,7 +226,7 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
   return (
     <div className="multitrack-panel multitrack-panel--sheet">
       <div
-        className="multitrack-panel__sheet-viewport"
+        className={`multitrack-panel__sheet-viewport multitrack-panel__sheet-viewport--${contentMode}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endGesture}
@@ -232,7 +235,7 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
         {isPdf ? (
           <object data={asset.src} type="application/pdf" className="multitrack-panel__sheet-pdf" style={contentStyle} />
         ) : (
-          <img src={asset.src} alt={asset.fileName} className="multitrack-panel__sheet-image" style={contentStyle} draggable={false} />
+          <img src={asset.src} alt={asset.fileName} className={`multitrack-panel__sheet-image multitrack-panel__sheet-image--${contentMode}`} style={contentStyle} draggable={false} />
         )}
       </div>
       <div className="multitrack-panel__overlay">

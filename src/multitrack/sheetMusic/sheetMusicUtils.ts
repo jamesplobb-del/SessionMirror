@@ -12,6 +12,7 @@ export async function loadSheetMusicFile(file: File): Promise<SheetMusicAsset> {
     x: 0.5,
     y: 0.5,
     scale: 1,
+    contentMode: file.type === 'application/pdf' ? 'fit' : 'fill',
     framePosition: 'top',
     frameScale: 1,
   }

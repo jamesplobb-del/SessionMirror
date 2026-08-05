@@ -1572,6 +1572,12 @@ button.compact-take-caption:active {
   transform: translateX(-50%);
 }
 
+.camera-view-mode-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
 .camera-compare-toggle {
   display: flex;
   width: max-content;
@@ -1608,6 +1614,18 @@ button.compact-take-caption:active {
   height: 0.8rem;
   color: #61bdff;
   stroke-width: 1.75;
+}
+
+.camera-multitrack-toggle svg {
+  color: #f7ae1c;
+}
+
+/* Multitrack supplies its own Camera Mode HUD while it is active. Keep the
+   live camera layer beneath it, but prevent the standard HUD from showing
+   through or receiving taps. */
+.app-ui-overlay--multitrack-open {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .take-card-layout-toolbar {

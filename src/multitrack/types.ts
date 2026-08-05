@@ -9,6 +9,8 @@ export interface SheetMusicAsset {
   x: number
   y: number
   scale: number
+  /** Fill crops edge-to-edge; fit preserves the whole asset and may show margins. */
+  contentMode?: 'fill' | 'fit'
   framePosition?: 'top' | 'bottom' | 'left' | 'right'
   frameScale?: number
 }

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
+import { AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -44,6 +44,7 @@ import { getWebKitBackingStartLeadSec } from '../synchronization/metronomePlayba
 import { exportMultitrackSession, type MultitrackExportFailureReason } from '../export/multitrackExport'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
+import SheetPlacementDiagram from './SheetPlacementDiagram'
 import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../backing/MultitrackBackingTrackPanel'
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
@@ -56,10 +57,10 @@ const MULTITRACK_SHEET_Z = { backdrop: 'z-[140]', sheet: 'z-[145]' }
 const MULTITRACK_MONITOR_CACHE_DIR = 'multitrack-monitor-assets'
 
 const SHEET_FRAME_OPTIONS = [
-  { value: 'top', label: 'Above', detail: 'Full-width row above the videos', Icon: ArrowUp },
-  { value: 'bottom', label: 'Below', detail: 'Full-width row below the videos', Icon: ArrowDown },
-  { value: 'left', label: 'Left side', detail: 'Vertical panel beside the videos', Icon: ArrowLeft },
-  { value: 'right', label: 'Right side', detail: 'Vertical panel beside the videos', Icon: ArrowRight },
+  { value: 'top', label: 'Above', detail: 'Full-width row above the videos' },
+  { value: 'bottom', label: 'Below', detail: 'Full-width row below the videos' },
+  { value: 'left', label: 'Left side', detail: 'Vertical panel beside the videos' },
+  { value: 'right', label: 'Right side', detail: 'Vertical panel beside the videos' },
 ] as const
 
 interface MultitrackOverlayProps {
@@ -976,12 +977,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     <>
       <AnimatePresence>
         {isOpen && (
-          <motion.div ref={shellRef} key="mt-overlay" className="multitrack-overlay" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={iosSpringSnappy} style={motionGpuLayer} role="dialog" aria-modal="true">
+          <motion.div ref={shellRef} key="mt-overlay" className="multitrack-overlay multitrack-overlay--camera-mode" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={iosSpringSnappy} style={motionGpuLayer} role="dialog" aria-modal="true">
             <header className="multitrack-overlay__header">
-              <Pressable type="button" intensity="soft" onClick={onClose} aria-label="Close multitrack">
+              <Pressable type="button" intensity="soft" onClick={onClose} aria-label="Return to Camera Mode" className="multitrack-camera-back">
                 <ChevronLeft className="h-6 w-6" />
               </Pressable>
-              <h1 className="text-lg font-semibold">Multitrack</h1>
+              <div className="multitrack-camera-title">
+                <span><Video className="h-3 w-3" /> Camera Mode</span>
+                <h1 className="text-lg font-semibold">Multitrack</h1>
+              </div>
               <Pressable
                 type="button"
                 intensity="normal"
@@ -1224,8 +1228,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           ariaLabel="Image and sheet layout"
           elevated
           elevatedLight
+          transparentBackdrop
           zClass={MULTITRACK_SHEET_Z}
-          maxHeightClass="max-h-[78vh]"
+          maxHeightClass="max-h-[60vh]"
         >
           <div className="multitrack-sheet multitrack-visual-editor">
             <div className="multitrack-visual-editor__heading">
@@ -1249,7 +1254,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 <span>This moves the whole image panel around your videos.</span>
               </div>
               <div className="multitrack-visual-editor__placements" role="radiogroup" aria-label="Image panel placement">
-                {SHEET_FRAME_OPTIONS.map(({ value, label, detail, Icon }) => {
+                {SHEET_FRAME_OPTIONS.map(({ value, label, detail }) => {
                   const active = (session.sheetMusic.asset?.framePosition ?? 'top') === value
                   return (
                     <Pressable
@@ -1261,7 +1266,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                       className={`multitrack-visual-editor__placement ${active ? 'is-active' : ''}`}
                       onClick={() => updateSheetMusicAsset({ framePosition: value })}
                     >
-                      <Icon className="h-4 w-4" />
+                      {session.sheetMusic.asset ? (
+                        <SheetPlacementDiagram preset={layout} asset={session.sheetMusic.asset} position={value} />
+                      ) : null}
                       <span>
                         <strong>{label}</strong>
                         <small>{detail}</small>
@@ -1271,6 +1278,37 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 })}
               </div>
             </section>
+
+            {session.sheetMusic.asset.mimeType !== 'application/pdf' ? (
+              <section className="multitrack-visual-editor__section">
+                <div className="multitrack-visual-editor__section-title">
+                  <strong>Image framing</strong>
+                  <span>Fill removes empty bands. Show full image may add margins.</span>
+                </div>
+                <div className="multitrack-visual-editor__framing" role="radiogroup" aria-label="Image framing">
+                  {([
+                    ['fill', 'Fill panel', 'Edge-to-edge; crops if needed'],
+                    ['fit', 'Show full image', 'No cropping; may show margins'],
+                  ] as const).map(([value, label, detail]) => {
+                    const active = (session.sheetMusic.asset?.contentMode ?? 'fill') === value
+                    return (
+                      <Pressable
+                        key={value}
+                        type="button"
+                        intensity="soft"
+                        role="radio"
+                        aria-checked={active}
+                        className={`multitrack-visual-editor__frame-choice ${active ? 'is-active' : ''}`}
+                        onClick={() => updateSheetMusicAsset({ contentMode: value })}
+                      >
+                        <strong>{label}</strong>
+                        <small>{detail}</small>
+                      </Pressable>
+                    )
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             <section className="multitrack-visual-editor__section multitrack-visual-editor__sliders">
               <label className="multitrack-visual-editor__slider-row">
@@ -1312,7 +1350,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onClick={() => updateSheetMusicAsset({ x: 0.5, y: 0.5, scale: 1 })}
               >
                 <Crosshair className="h-4 w-4" />
-                Center &amp; fit image
+                Center image
               </Pressable>
               <Pressable
                 type="button"

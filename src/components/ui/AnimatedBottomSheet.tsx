@@ -35,6 +35,12 @@ interface AnimatedBottomSheetProps {
    * for hosts above the default elevated layer (e.g. multitrack at z-135).
    */
   zClass?: { backdrop: string; sheet: string }
+  /**
+   * Skip the dimmed/blurred backdrop entirely (still tappable to dismiss).
+   * Use for live-preview sheets where the content behind must stay visible,
+   * e.g. layout controls edited while watching the canvas update.
+   */
+  transparentBackdrop?: boolean
 }
 
 export default function AnimatedBottomSheet({
@@ -50,6 +56,7 @@ export default function AnimatedBottomSheet({
   elevatedLight = false,
   vaultTheme = false,
   zClass,
+  transparentBackdrop = false,
 }: AnimatedBottomSheetProps) {
   const [slideDistance, setSlideDistance] = useState(readSheetSlideDistance)
   const enterNotifiedRef = useRef(false)
@@ -122,11 +129,13 @@ export default function AnimatedBottomSheet({
       ? 'native-bottom-sheet--audio-light'
       : 'border border-white/70 bg-white/90 shadow-2xl backdrop-blur-2xl'
 
-  const backdropClass = vaultTheme
-    ? 'native-sheet-backdrop--audio-light'
-    : elevatedLight
+  const backdropClass = transparentBackdrop
+    ? ''
+    : vaultTheme
       ? 'native-sheet-backdrop--audio-light'
-      : 'bg-black/70 backdrop-blur-[10px]'
+      : elevatedLight
+        ? 'native-sheet-backdrop--audio-light'
+        : 'bg-black/70 backdrop-blur-[10px]'
 
   const portalTarget = elevated
     ? document.body
