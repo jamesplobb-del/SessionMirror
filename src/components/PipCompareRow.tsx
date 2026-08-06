@@ -12,7 +12,7 @@ import {
   type RefObject,
 } from 'react'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { ArrowLeftRight, Columns2, Layers3, Pin, RotateCcw, X } from 'lucide-react'
+import { ArrowLeftRight, Columns2, Grid2X2, Pin, RotateCcw, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
@@ -616,7 +616,7 @@ function CompactCompareButton({
       aria-label="Open expanded comparison view"
     >
       <Columns2 aria-hidden />
-      <span>Expand view</span>
+      <span>Expand</span>
     </Pressable>
   )
 }
@@ -640,7 +640,7 @@ function CompactMultitrackButton({
       aria-label="Open Multitrack view"
       aria-haspopup="dialog"
     >
-      <Layers3 aria-hidden />
+      <Grid2X2 aria-hidden />
       <span>Multitrack</span>
     </Pressable>
   )

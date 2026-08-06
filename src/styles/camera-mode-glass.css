@@ -1573,14 +1573,16 @@ button.compact-take-caption:active {
 }
 
 .camera-view-mode-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(13.1rem, calc(100vw - 1.25rem));
   align-items: center;
   gap: 0.42rem;
 }
 
 .camera-compare-toggle {
   display: flex;
-  width: max-content;
+  width: 100%;
   min-height: 1.9rem;
   align-items: center;
   justify-content: center;
@@ -1618,6 +1620,7 @@ button.compact-take-caption:active {
 
 .camera-multitrack-toggle svg {
   color: #f7ae1c;
+  stroke-width: 1.7;
 }
 
 /* Multitrack supplies its own Camera Mode HUD while it is active. Keep the
