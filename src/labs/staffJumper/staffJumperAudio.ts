@@ -79,35 +79,48 @@ export async function startClickTrack(options: ClickTrackOptions): Promise<Click
   let muted = !options.audible
   let spp = secondsPerPulse(bpm)
 
-  const countInPulses = options.countInBars * meter.pulsesPerBar
+  /** Seconds between clicks — a quarter in 4/4, an eighth in 6/8. */
+  const secondsPerTick = () => spp / meter.ticksPerPulse
+
+  const countInTicks = options.countInBars * meter.ticksPerBar
   // A little headroom so the very first click is never scheduled in the past.
   const countInStart = ctx.currentTime + 0.12
-  const startTimeSec = countInStart + countInPulses * spp
+  const startTimeSec = countInStart + countInTicks * secondsPerTick()
 
-  /** Next pulse index to queue, counted from the top of the count-in. */
-  let nextPulse = 0
+  /** Next tick index to queue, counted from the top of the count-in. */
+  let nextTick = 0
   let timer: number | null = null
 
-  const timeOfPulse = (pulseFromCountInStart: number) =>
-    countInStart + pulseFromCountInStart * spp
+  const timeOfTick = (tickFromCountInStart: number) =>
+    countInStart + tickFromCountInStart * secondsPerTick()
+
+  /**
+   * Same tiering the shared metronome uses: ticks landing on a pulse are
+   * accented, everything between them is a quieter subdivision click. In 4/4
+   * every tick is a pulse; in 6/8 two ticks in three are subdivisions, which is
+   * what gives compound time its lilt instead of two bare clicks a bar.
+   */
+  const tierForTick = (tick: number) => {
+    const tickInBar = ((tick % meter.ticksPerBar) + meter.ticksPerBar) % meter.ticksPerBar
+    if (tickInBar % meter.ticksPerPulse !== 0) return 'subdivision' as const
+    return tickInBar === 0 ? ('downbeat' as const) : ('macro' as const)
+  }
 
   const pump = () => {
     const horizon = ctx.currentTime + SCHEDULE_AHEAD_SEC
-    while (timeOfPulse(nextPulse) < horizon) {
-      const when = timeOfPulse(nextPulse)
-      const pulseInBar = nextPulse % meter.pulsesPerBar
+    while (timeOfTick(nextTick) < horizon) {
       // Count-in clicks stay audible even when the click track is muted for the
       // run itself, so the player always gets the tempo before the first note.
-      const inCountIn = nextPulse < countInPulses
+      const inCountIn = nextTick < countInTicks
       scheduleMetronomeClick(
         ctx,
-        when,
-        pulseInBar === 0 ? 'downbeat' : 'macro',
+        timeOfTick(nextTick),
+        tierForTick(nextTick),
         master,
         muted && !inCountIn,
         options.soundId,
       )
-      nextPulse += 1
+      nextTick += 1
     }
   }
 
@@ -116,7 +129,7 @@ export async function startClickTrack(options: ClickTrackOptions): Promise<Click
 
   return {
     startTimeSec,
-    countInPulses,
+    countInPulses: countInTicks / meter.ticksPerPulse,
     pulsesElapsed: () => (ctx.currentTime - startTimeSec) / spp,
     countInRemainingSec: () => Math.max(0, startTimeSec - ctx.currentTime),
     isRunning: () => ctx.state === 'running',

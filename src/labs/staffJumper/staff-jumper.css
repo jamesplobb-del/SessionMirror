@@ -633,12 +633,15 @@
   pointer-events: none;
 }
 
-/* Pinned clef + key signature, drawn over the scrolling noteheads. */
+/* Clef, key signature, and time signature at the score opening. It shares the
+   score's transform so the header is shown once, as in printed music. */
 .sj-staff-head {
   position: absolute;
   top: 0;
   left: 0;
   color: #1c1917;
+  transition: transform 90ms linear;
+  will-change: transform;
   pointer-events: none;
 }
 

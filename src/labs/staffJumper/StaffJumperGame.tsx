@@ -33,6 +33,7 @@ import {
   STAFF_BOTTOM_Y,
   STAFF_CANVAS_HEIGHT,
   STAFF_CLEF_X,
+  STAFF_FIRST_NOTE_X,
   STAFF_LINE_THICKNESS,
   STAFF_LINE_Y_LIST,
   STAFF_MIDDLE_Y,
@@ -78,10 +79,13 @@ const VISIBLE_NOTE_COUNT = 10
  * this buys roughly a bar of lookahead — and because spacing now follows
  * duration, a bar of eighths fits in well under a bar's worth of width.
  */
-const MIN_LOOKAHEAD_NOTES = 4.6
+const MIN_LOOKAHEAD_NOTES = 3.9
 
 /** Fraction of the playfield height the five-line staff should occupy. */
-const STAFF_HEIGHT_FRACTION = 0.22
+const STAFF_HEIGHT_FRACTION = 0.28
+
+/** Screen-space margin that keeps the complete score opening inside the viewport. */
+const SCORE_OPENING_MARGIN_PX = 14
 
 function glyphNameForAccidental(accidental: '#' | 'b') {
   return accidental === '#' ? ('sharp' as const) : ('flat' as const)
@@ -189,13 +193,11 @@ export default function StaffJumperGame({
   )
 
   const meterSpec = METERS[config.meter]
-  const rhythmLayout = useMemo(() => layoutRhythm(platforms), [platforms])
-
   const glyphMetrics = useMusicGlyphMetrics()
 
   /**
-   * The clef and key signature are pinned to the left edge, so their world
-   * width is fixed overhead that the scrolling notes never reclaim.
+   * Opening notation is part of the scrolling score. It appears once at the
+   * beginning, then leaves the playfield instead of crowding every measure.
    */
   const staffHead = useMemo(() => {
     const clefName = config.clef === 'treble' ? ('trebleClef' as const) : ('bassClef' as const)
@@ -225,42 +227,50 @@ export default function StaffJumperGame({
     }
   }, [config.clef, glyphMetrics, keySignature])
 
+  // Wide key signatures can extend beyond the original first-note origin.
+  // Shift the displayed score just enough to preserve a clean gap without
+  // changing the underlying rhythm or pitch sequence.
+  const notationLeadInOffset = Math.max(0, staffHead.width - STAFF_FIRST_NOTE_X)
+  const displayedPlatforms = useMemo(
+    () =>
+      platforms.map((slot) => ({
+        ...slot,
+        xPx: slot.xPx + notationLeadInOffset,
+      })),
+    [notationLeadInOffset, platforms],
+  )
+  const rhythmLayout = useMemo(() => layoutRhythm(displayedPlatforms), [displayedPlatforms])
+
   /**
-   * Scale so the staff reads well vertically, but never so large that the
-   * pinned head crowds out the notes the player still has to read.
+   * Scale so the staff reads well vertically while retaining useful lookahead.
+   * The score opening scrolls away, so it no longer taxes every screenful.
    */
   const staffHeight = STAFF_BOTTOM_Y - STAFF_TOP_Y
   const heightScale = (viewport.height * STAFF_HEIGHT_FRACTION) / staffHeight
   const widthScale =
-    viewport.width / (staffHead.width + NOTE_SPACING_PX * MIN_LOOKAHEAD_NOTES + NOTEHEAD_W)
-  const scale = Math.max(0.46, Math.min(1.05, Math.min(heightScale, widthScale)))
+    (viewport.width - PLAYER_ANCHOR_X_PX) /
+    (NOTE_SPACING_PX * MIN_LOOKAHEAD_NOTES + NOTEHEAD_W)
+  const scale = Math.max(0.5, Math.min(1.15, Math.min(heightScale, widthScale)))
   const baseY = viewport.height * 0.47 - STAFF_MIDDLE_Y * scale
-
-  /** Player sits just clear of the pinned head, and no further left than that. */
-  const playerAnchorX = Math.max(
-    PLAYER_ANCHOR_X_PX,
-    (staffHead.width + NOTEHEAD_W * 0.6) * scale,
-  )
-
-  // Follow every accepted pitch immediately so fast passages never queue visual movement.
-  const focusWorldX = target.xPx
-  const scrollX = playerAnchorX - focusWorldX * scale
+  const focusWorldX = target.xPx + notationLeadInOffset
 
   /**
-   * Fade the scrolling notes out where the pinned clef begins, rather than
-   * painting an opaque panel over them — the playfield behind is a gradient,
-   * so any solid backing would show a seam.
-   *
-   * The mask lives in the world's own coordinate space, which the transform
-   * then scales and shifts, hence undoing both here.
+   * The first target must leave world X=0 on screen or the clef and key
+   * signature are clipped. After the first successful note, return to the
+   * normal reading point and let the score opening scroll away naturally.
    */
-  const maskEndWorldX = staffHead.width - scrollX / Math.max(scale, 0.1)
-  // Fade over several noteheads' width. A short ramp slices a head clean in
-  // half at the boundary, which reads as a rendering glitch rather than a fade.
-  const maskStartWorldX = maskEndWorldX - STAFF_SPACE_PX * 3.4
-  const notesMask = `linear-gradient(to right, transparent ${maskStartWorldX}px, #000 ${maskEndWorldX}px)`
+  const openingAnchorX = focusWorldX * scale + SCORE_OPENING_MARGIN_PX
+  const playerAnchorX =
+    state.sequenceStep === 0
+      ? Math.max(PLAYER_ANCHOR_X_PX, openingAnchorX)
+      : PLAYER_ANCHOR_X_PX
+
+  // Follow every accepted pitch immediately so fast passages never queue visual movement.
+  const scrollX = playerAnchorX - focusWorldX * scale
+
   const visibleWorldWidth = viewport.width / Math.max(scale, 0.1)
-  const lastVisibleX = platforms.length > 0 ? platforms[platforms.length - 1]!.xPx : focusWorldX
+  const lastVisibleX =
+    displayedPlatforms.length > 0 ? displayedPlatforms[displayedPlatforms.length - 1]!.xPx : focusWorldX
   const staffWorldWidth = Math.max(
     1200,
     focusWorldX + visibleWorldWidth + NOTE_SPACING_PX * 3,
@@ -293,7 +303,7 @@ export default function StaffJumperGame({
           : null
 
   // Player position — visible feet meet the top edge of the current target notehead.
-  const targetPlatform = platforms.find((p) => p.role === 'target')
+  const targetPlatform = displayedPlatforms.find((p) => p.role === 'target')
   const standNote = targetPlatform?.note ?? target
   const targetWorldX = targetPlatform?.xPx ?? target.xPx
   const headTopWorld = standNote.yPx - noteheadHalfHeight()
@@ -374,8 +384,6 @@ export default function StaffJumperGame({
               transformOrigin: '0 0',
               height: `${STAFF_CANVAS_HEIGHT}px`,
               width: `${staffWorldWidth}px`,
-              maskImage: notesMask,
-              WebkitMaskImage: notesMask,
             }}
           >
             {/*
@@ -440,7 +448,7 @@ export default function StaffJumperGame({
 
             {/* Noteheads */}
             <div className="sj-noteheads">
-              {platforms.map((slot) => {
+              {displayedPlatforms.map((slot) => {
                 const shake = missActive && !state.isFalling && slot.role === 'target'
                 const crack = state.isFalling && slot.role === 'target'
 
@@ -521,15 +529,11 @@ export default function StaffJumperGame({
             </div>
           </div>
 
-          {/*
-            Clef and key signature stay pinned at the left edge. They used to
-            live in the scrolling world and disappeared after a few notes, which
-            left hard mode with no key signature to read.
-          */}
+          {/* The score opening shares the world's scroll transform and appears once. */}
           <div
             className="sj-staff-head"
             style={{
-              transform: `translateY(${baseY}px) scale(${scale})`,
+              transform: `translateX(${scrollX}px) translateY(${baseY}px) scale(${scale})`,
               transformOrigin: '0 0',
               width: `${staffHead.width}px`,
               height: `${STAFF_CANVAS_HEIGHT}px`,
@@ -556,9 +560,7 @@ export default function StaffJumperGame({
               />
             ))}
 
-            {/* Pinned beside the key signature. It was briefly parked at a fixed
-                world X so it would scroll away, but the pinned head is wider
-                than that on most keys, so it drew straight through the clef. */}
+            {/* Time signature follows the key signature at the score opening. */}
             <svg
               className="sj-time-signature"
               style={{ left: `${staffHead.timeSignatureX}px`, top: 0 }}
@@ -587,8 +589,6 @@ export default function StaffJumperGame({
                 {meterSpec.denominator}
               </text>
             </svg>
-
-
           </div>
         </div>
 

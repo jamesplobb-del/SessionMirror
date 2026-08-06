@@ -32,16 +32,19 @@ export const GLYPH_HEIGHT_IN_SPACES: Record<MusicGlyphName, number> = {
   sharp: 2.8,
   flat: 2.65,
   natural: 2.8,
-  trebleClef: 7.0,
-  bassClef: 3.6,
+  // Under engraved size on purpose. A full 7-space G clef plus a signature ate
+  // close to half the visible staff on a phone; the notes need that room more
+  // than the clef does.
+  trebleClef: 5.9,
+  bassClef: 3.1,
 }
 
 export const GLYPH_WIDTH_IN_SPACES: Record<MusicGlyphName, number> = {
   sharp: 1.0,
   flat: 0.9,
   natural: 0.66,
-  trebleClef: 2.68,
-  bassClef: 2.74,
+  trebleClef: 2.26,
+  bassClef: 2.36,
 }
 
 /**
@@ -160,5 +163,5 @@ export function layoutMusicGlyph(
 
 /** Center-to-center spacing between key-signature accidentals, in world px. */
 export function keySignatureStepPx(symbol: '#' | 'b', spacePx: number): number {
-  return (symbol === '#' ? 0.92 : 0.8) * spacePx
+  return (symbol === '#' ? 0.8 : 0.7) * spacePx
 }

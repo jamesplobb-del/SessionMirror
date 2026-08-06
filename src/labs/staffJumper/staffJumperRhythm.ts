@@ -6,11 +6,9 @@
  * keeps the scale and pattern logic untouched and lets the meter change without
  * disturbing which notes come out.
  *
- * Two units are in play and it matters which is which:
- *   • **beats** — quarter-note units. Every duration and bar length is measured
- *     in these, because a quarter note is a quarter note in any meter.
- *   • **pulses** — what the metronome clicks and what the tempo dial means. In
- *     4/4 a pulse is a quarter; in 6/8 it is a dotted quarter.
+ * Rhythm arithmetic uses integer sixteenth-note units exclusively. A quarter
+ * is 4 units, 4/4 is 16 units, and 6/8 is 12 units. Pulses are the metronome
+ * unit: 4 units in 4/4 and 6 units (a dotted quarter) in 6/8.
  */
 
 export const STAFF_JUMPER_METERS = ['simple', 'compound'] as const
@@ -24,11 +22,22 @@ export interface MeterSpec {
   label: string
   name: string
   description: string
-  /** Bar length in quarter-note units. */
-  barBeats: number
-  /** Quarter-note units in one pulse — what the tempo dial counts. */
-  pulseBeats: number
-  pulsesPerBar: number
+  /** Exact measure capacity in sixteenth-note units. */
+  capacityUnits: number
+  /** Sixteenth-note units in one pulse — what the tempo dial counts. */
+  pulseUnits: number
+  pulsesPerMeasure: number
+  /**
+   * Sixteenth-note units between subdivision clicks.
+   *
+   * The app's metronome ticks the subdivision grid and accents whichever ticks
+   * land on a pulse, so 6/8 clicks all six eighths with the two dotted-quarter
+   * beats emphasised rather than clicking only twice a bar. Staff Jumper
+   * follows the same rule.
+   */
+  tickUnits: number
+  ticksPerPulse: number
+  ticksPerBar: number
 }
 
 export const METERS: Record<StaffJumperMeter, MeterSpec> = {
@@ -39,9 +48,12 @@ export const METERS: Record<StaffJumperMeter, MeterSpec> = {
     label: '4/4',
     name: 'Simple',
     description: 'Four quarter-note beats in a bar.',
-    barBeats: 4,
-    pulseBeats: 1,
-    pulsesPerBar: 4,
+    capacityUnits: 16,
+    pulseUnits: 4,
+    pulsesPerMeasure: 4,
+    tickUnits: 4,
+    ticksPerPulse: 1,
+    ticksPerBar: 4,
   },
   compound: {
     id: 'compound',
@@ -50,10 +62,13 @@ export const METERS: Record<StaffJumperMeter, MeterSpec> = {
     label: '6/8',
     name: 'Compound',
     description: 'Two dotted-quarter beats, each split into three.',
-    // Six eighths = three quarter-note units.
-    barBeats: 3,
-    pulseBeats: 1.5,
-    pulsesPerBar: 2,
+    capacityUnits: 12,
+    pulseUnits: 6,
+    pulsesPerMeasure: 2,
+    // Six eighths a bar, three to each dotted-quarter beat.
+    tickUnits: 2,
+    ticksPerPulse: 3,
+    ticksPerBar: 6,
   },
 }
 
@@ -62,20 +77,25 @@ export type NoteValue = 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'
 export interface RhythmValue {
   value: NoteValue
   dotted: boolean
-  /** Duration in quarter-note beats, dot included. */
-  beats: number
+  /** Exact duration in sixteenth-note units, dot included. */
+  durationUnits: number
 }
 
-const UNDOTTED_BEATS: Record<NoteValue, number> = {
-  whole: 4,
-  half: 2,
-  quarter: 1,
-  eighth: 0.5,
-  sixteenth: 0.25,
+export const DURATION_UNITS: Record<NoteValue, number> = {
+  whole: 16,
+  half: 8,
+  quarter: 4,
+  eighth: 2,
+  sixteenth: 1,
 }
 
 function make(value: NoteValue, dotted = false): RhythmValue {
-  return { value, dotted, beats: UNDOTTED_BEATS[value] * (dotted ? 1.5 : 1) }
+  const undottedUnits = DURATION_UNITS[value]
+  const durationUnits = dotted ? (undottedUnits * 3) / 2 : undottedUnits
+  if (!Number.isInteger(durationUnits)) {
+    throw new Error(`${value} cannot be dotted on the sixteenth-note unit grid`)
+  }
+  return { value, dotted, durationUnits }
 }
 
 const WHOLE = make('whole')
@@ -83,11 +103,13 @@ const DOTTED_HALF = make('half', true)
 const HALF = make('half')
 const DOTTED_QUARTER = make('quarter', true)
 const QUARTER = make('quarter')
+const DOTTED_EIGHTH = make('eighth', true)
 const EIGHTH = make('eighth')
+const SIXTEENTH = make('sixteenth')
 
 /**
- * Bar-length rhythm cells. Every entry sums to exactly the meter's `barBeats`,
- * so bars always line up and barlines land where they should.
+ * Measure-length rhythm cells. Every entry sums to the meter's exact integer
+ * capacity, so barlines can only occur after a complete measure.
  */
 const SIMPLE_BARS: readonly RhythmValue[][] = [
   [QUARTER, QUARTER, QUARTER, QUARTER],
@@ -100,6 +122,7 @@ const SIMPLE_BARS: readonly RhythmValue[][] = [
   [EIGHTH, EIGHTH, EIGHTH, EIGHTH, HALF],
   [DOTTED_QUARTER, EIGHTH, QUARTER, QUARTER],
   [QUARTER, QUARTER, DOTTED_QUARTER, EIGHTH],
+  [DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER, QUARTER],
   [DOTTED_HALF, QUARTER],
   [QUARTER, DOTTED_HALF],
   [WHOLE],
@@ -117,12 +140,44 @@ const COMPOUND_BARS: readonly RhythmValue[][] = [
   [DOTTED_QUARTER, QUARTER, EIGHTH],
   [EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH],
   [QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH],
+  [DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER],
   [DOTTED_HALF],
 ]
 
-const BARS_BY_METER: Record<StaffJumperMeter, readonly RhythmValue[][]> = {
-  simple: SIMPLE_BARS,
-  compound: COMPOUND_BARS,
+export interface RhythmMeasure {
+  index: number
+  capacityUnits: number
+  events: readonly RhythmValue[]
+}
+
+export function measureDurationUnits(measure: Pick<RhythmMeasure, 'events'>): number {
+  return measure.events.reduce((sum, event) => sum + event.durationUnits, 0)
+}
+
+/**
+ * Reject an invalid rhythm cell before it can reach either the preview or the
+ * game. Integer sixteenth-note units avoid float comparisons and make 4/4's
+ * invariant explicit: every selected measure contains exactly 16 units.
+ */
+function validateMeasures(
+  meter: MeterSpec,
+  templates: readonly RhythmValue[][],
+): readonly RhythmMeasure[] {
+  return templates.map((events, index) => {
+    const measure: RhythmMeasure = { index, capacityUnits: meter.capacityUnits, events }
+    const actualUnits = measureDurationUnits(measure)
+    if (actualUnits !== meter.capacityUnits) {
+      throw new Error(
+        `Invalid ${meter.label} measure ${index}: expected ${meter.capacityUnits} units, got ${actualUnits}`,
+      )
+    }
+    return measure
+  })
+}
+
+const MEASURES_BY_METER: Record<StaffJumperMeter, readonly RhythmMeasure[]> = {
+  simple: validateMeasures(METERS.simple, SIMPLE_BARS),
+  compound: validateMeasures(METERS.compound, COMPOUND_BARS),
 }
 
 /**
@@ -133,20 +188,22 @@ const BARS_BY_METER: Record<StaffJumperMeter, readonly RhythmValue[][]> = {
  * exponent compresses the range the way engraved music looks, and as a side
  * effect eighth notes pack tightly enough to fit more of the line on screen.
  */
-export function spacingUnitsForBeats(beats: number): number {
-  return Math.pow(Math.max(beats, 0.0625), 0.62)
+export function spacingUnitsForDuration(durationUnits: number): number {
+  return Math.pow(Math.max(durationUnits / DURATION_UNITS.quarter, 0.0625), 0.62)
 }
 
 export interface RhythmSlot {
   index: number
   value: NoteValue
   dotted: boolean
-  beats: number
-  /** Cumulative quarter-note beats from the start of the run. */
-  beatPosition: number
-  barIndex: number
-  beatInBar: number
-  startsBar: boolean
+  durationUnits: number
+  /** Cumulative sixteenth-note units from the start of the run. */
+  unitPosition: number
+  measureIndex: number
+  unitsIntoMeasure: number
+  startsMeasure: boolean
+  /** Model-owned spacing coordinate for a completed measure boundary. */
+  barlineBeforeSpacingPosition: number | null
   /** Cumulative spacing units from the start of the run. */
   spacingPosition: number
   /** Notes beamed together share an id; null when the note stands alone. */
@@ -157,14 +214,19 @@ export interface RhythmSlot {
 
 interface RhythmTimeline {
   slots: RhythmSlot[]
-  barCount: number
-  beatCursor: number
+  measureCount: number
+  unitCursor: number
   spacingCursor: number
   beamCursor: number
 }
 
-/** Extra breathing room at a barline, in spacing units. */
-export const BARLINE_SPACING_UNITS = 0.55
+/**
+ * Extra breathing room before the first note of a bar, in spacing units.
+ *
+ * Has to cover the barline itself plus clearance on both sides — at the old
+ * value the rule was drawn straight through the notehead it preceded.
+ */
+export const BARLINE_SPACING_UNITS = 0.9
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0
@@ -195,8 +257,7 @@ function assignBeams(
   timeline: RhythmTimeline,
   meter: MeterSpec,
 ): void {
-  const pulseOf = (beatPosition: number) =>
-    Math.floor(beatPosition / meter.pulseBeats + 1e-6)
+  const pulseOf = (unitPosition: number) => Math.floor(unitPosition / meter.pulseUnits)
 
   let runStart = fromIndex
   while (runStart < slots.length) {
@@ -206,12 +267,12 @@ function assignBeams(
       continue
     }
 
-    const pulse = pulseOf(slot.beatPosition)
+    const pulse = pulseOf(slot.unitPosition)
     let runEnd = runStart
     while (
       runEnd + 1 < slots.length &&
       isBeamable(slots[runEnd + 1]!.value) &&
-      pulseOf(slots[runEnd + 1]!.beatPosition) === pulse
+      pulseOf(slots[runEnd + 1]!.unitPosition) === pulse
     ) {
       runEnd += 1
     }
@@ -231,33 +292,45 @@ function assignBeams(
   }
 }
 
-function appendBar(timeline: RhythmTimeline, meter: MeterSpec, seed: number): void {
-  const bars = BARS_BY_METER[meter.id]
-  const rng = mulberry32(seed + timeline.barCount * 2654435761)
-  const bar = bars[Math.floor(rng() * bars.length)]!
+function appendMeasure(timeline: RhythmTimeline, meter: MeterSpec, seed: number): void {
+  const measures = MEASURES_BY_METER[meter.id]
+  const rng = mulberry32(seed + timeline.measureCount * 2654435761)
+  const measure = measures[Math.floor(rng() * measures.length)]!
   const firstNewIndex = timeline.slots.length
+  const measureStartUnits = timeline.measureCount * meter.capacityUnits
+  timeline.unitCursor = measureStartUnits
 
-  bar.forEach((rhythmValue, indexInBar) => {
+  measure.events.forEach((rhythmValue, indexInMeasure) => {
+    const startsMeasure = indexInMeasure === 0
+    const barlineBeforeSpacingPosition =
+      startsMeasure && timeline.measureCount > 0
+        ? timeline.spacingCursor + BARLINE_SPACING_UNITS / 2
+        : null
     timeline.slots.push({
       index: timeline.slots.length,
       value: rhythmValue.value,
       dotted: rhythmValue.dotted,
-      beats: rhythmValue.beats,
-      beatPosition: timeline.beatCursor,
-      barIndex: timeline.barCount,
-      beatInBar: timeline.beatCursor - timeline.barCount * meter.barBeats,
-      startsBar: indexInBar === 0,
-      spacingPosition: timeline.spacingCursor + (indexInBar === 0 ? BARLINE_SPACING_UNITS : 0),
+      durationUnits: rhythmValue.durationUnits,
+      unitPosition: timeline.unitCursor,
+      measureIndex: timeline.measureCount,
+      unitsIntoMeasure: timeline.unitCursor - measureStartUnits,
+      startsMeasure,
+      barlineBeforeSpacingPosition,
+      spacingPosition: timeline.spacingCursor + (startsMeasure ? BARLINE_SPACING_UNITS : 0),
       beamGroupId: null,
       beamIndexInGroup: 0,
       beamGroupSize: 1,
     })
-    timeline.beatCursor += rhythmValue.beats
+    timeline.unitCursor += rhythmValue.durationUnits
     timeline.spacingCursor +=
-      spacingUnitsForBeats(rhythmValue.beats) + (indexInBar === 0 ? BARLINE_SPACING_UNITS : 0)
+      spacingUnitsForDuration(rhythmValue.durationUnits) +
+      (startsMeasure ? BARLINE_SPACING_UNITS : 0)
   })
 
-  timeline.barCount += 1
+  if (timeline.unitCursor - measureStartUnits !== measure.capacityUnits) {
+    throw new Error(`Generated ${meter.label} measure did not reach exact capacity`)
+  }
+  timeline.measureCount += 1
   assignBeams(timeline.slots, firstNewIndex, timeline, meter)
 }
 
@@ -275,10 +348,10 @@ export function getRhythmSlot(
 ): RhythmSlot {
   let timeline = timelineCache.get(configKey)
   if (!timeline) {
-    timeline = { slots: [], barCount: 0, beatCursor: 0, spacingCursor: 0, beamCursor: 0 }
+    timeline = { slots: [], measureCount: 0, unitCursor: 0, spacingCursor: 0, beamCursor: 0 }
     timelineCache.set(configKey, timeline)
   }
-  while (index >= timeline.slots.length) appendBar(timeline, METERS[meter], seed)
+  while (index >= timeline.slots.length) appendMeasure(timeline, METERS[meter], seed)
   return timeline.slots[index]!
 }
 

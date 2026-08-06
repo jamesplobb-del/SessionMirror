@@ -7,12 +7,7 @@
  * all cut to meet one sloping line, so they cannot be drawn note by note.
  */
 import type { PlatformSlot } from './staffJumperMusicLogic'
-import {
-  beamCountForValue,
-  BARLINE_SPACING_UNITS,
-  hasStem,
-  isBeamable,
-} from './staffJumperRhythm'
+import { beamCountForValue, hasStem, isBeamable } from './staffJumperRhythm'
 import {
   BEAM_MAX_SLANT,
   BEAM_SPACING,
@@ -57,9 +52,18 @@ export interface RhythmLayout {
   barlineXs: number[]
 }
 
-/** X of the barline that opens a bar — centred in the gap before the note. */
-function barlineXForSpacingPosition(spacingPosition: number): number {
-  return STAFF_FIRST_NOTE_X + (spacingPosition - BARLINE_SPACING_UNITS * 0.5) * NOTE_SPACING_PX
+/**
+ * X of the barline that closes a completed measure.
+ *
+ * The rhythm model emits the boundary's spacing coordinate only after the
+ * preceding measure reaches exact capacity. The renderer merely converts that
+ * model coordinate to pixels and preserves any display-only score offset.
+ */
+export function barlineXForSlot(slot: PlatformSlot): number | null {
+  const boundary = slot.note.rhythm.barlineBeforeSpacingPosition
+  if (boundary == null) return null
+  const displayOffset = slot.xPx - slot.note.xPx
+  return STAFF_FIRST_NOTE_X + boundary * NOTE_SPACING_PX + displayOffset
 }
 
 export function layoutRhythm(slots: PlatformSlot[]): RhythmLayout {
@@ -69,9 +73,8 @@ export function layoutRhythm(slots: PlatformSlot[]): RhythmLayout {
   const barlineXs: number[] = []
 
   for (const slot of slots) {
-    if (slot.note.rhythm.startsBar && slot.note.rhythm.barIndex > 0) {
-      barlineXs.push(barlineXForSpacingPosition(slot.note.rhythm.spacingPosition))
-    }
+    const barlineX = barlineXForSlot(slot)
+    if (barlineX != null) barlineXs.push(barlineX)
   }
 
   let index = 0

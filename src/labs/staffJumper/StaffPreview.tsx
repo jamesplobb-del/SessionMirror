@@ -34,14 +34,13 @@ import {
 } from './staffNotationMap'
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
-import { layoutRhythm } from './staffJumperNotationLayout'
+import { barlineXForSlot, layoutRhythm } from './staffJumperNotationLayout'
 import { isHollowNotehead, METERS } from './staffJumperRhythm'
 
 interface StaffPreviewProps {
   config: StaffJumperConfig
   /** Bars to show before the preview runs out of room. */
   bars?: number
-  maxNotes?: number
 }
 
 /**
@@ -52,7 +51,7 @@ interface StaffPreviewProps {
  * constants — so the notes on the setup screen are literally the notes the run
  * will put on the staff, in the same hand. No separate music logic to drift.
  */
-export default function StaffPreview({ config, bars = 2, maxNotes = 12 }: StaffPreviewProps) {
+export default function StaffPreview({ config, bars = 1 }: StaffPreviewProps) {
   const glyphMetrics = useMusicGlyphMetrics()
   const hostRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ width: 320, height: 150 })
@@ -96,15 +95,31 @@ export default function StaffPreview({ config, bars = 2, maxNotes = 12 }: StaffP
     }
   }, [config.clef, glyphMetrics, keySignature])
 
-  const slots = useMemo<PlatformSlot[]>(() => {
+  const { slots, closingBarlineX } = useMemo<{
+    slots: PlatformSlot[]
+    closingBarlineX: number | null
+  }>(() => {
     const collected: PlatformSlot[] = []
-    for (let step = 0; step < maxNotes; step += 1) {
+    // Stop on a bar boundary, never on an arbitrary note count. Dense eighth-
+    // note cells can contain more notes than the old 12-note preview cap and
+    // were therefore displayed as incomplete 4/4 measures.
+    const safetyLimit = Math.max(32, bars * 16)
+    for (let step = 0; step < safetyLimit; step += 1) {
       const note = getTargetNoteAtStep(config, step)
-      if (note.rhythm.barIndex >= bars) break
+      if (note.rhythm.measureIndex >= bars) {
+        const boundarySlot: PlatformSlot = {
+          step,
+          note,
+          role: 'future',
+          opacity: 1,
+          xPx: note.xPx,
+        }
+        return { slots: collected, closingBarlineX: barlineXForSlot(boundarySlot) }
+      }
       collected.push({ step, note, role: 'future', opacity: 1, xPx: note.xPx })
     }
-    return collected
-  }, [bars, config, maxNotes])
+    return { slots: collected, closingBarlineX: null }
+  }, [bars, config])
 
   const rhythm = useMemo(() => layoutRhythm(slots), [slots])
   const meterSpec = METERS[config.meter]
@@ -117,7 +132,11 @@ export default function StaffPreview({ config, bars = 2, maxNotes = 12 }: StaffP
     const lastNote = slots.at(-1)
     // Notes are generated from a fixed origin; slide them up behind the head.
     const noteOffsetX = head.width - STAFF_FIRST_NOTE_X
-    const worldWidth = (lastNote ? lastNote.xPx + noteOffsetX : head.width) + NOTEHEAD_W
+    const contentRight = Math.max(
+      lastNote ? lastNote.xPx + NOTEHEAD_W : head.width,
+      closingBarlineX ?? 0,
+    )
+    const worldWidth = contentRight + noteOffsetX + BARLINE_THICKNESS
 
     const ys = slots.flatMap((slot) => [slot.note.yPx, ...slot.note.ledgerLineYPx])
     const top = Math.min(STAFF_TOP_Y, ...ys) - STEM_LENGTH - STAFF_SPACE_PX * 0.5
@@ -129,7 +148,7 @@ export default function StaffPreview({ config, bars = 2, maxNotes = 12 }: StaffP
     // scale — five rules stopping short of the edge reads as a broken image.
     const lineWidth = Math.max(worldWidth, box.width / scale)
     return { noteOffsetX, worldWidth, top, worldHeight, scale, lineWidth }
-  }, [box.height, box.width, head.width, slots])
+  }, [box.height, box.width, closingBarlineX, head.width, slots])
 
   return (
     <div className="sj-preview" ref={hostRef}>
@@ -225,6 +244,15 @@ export default function StaffPreview({ config, bars = 2, maxNotes = 12 }: StaffP
                 height={STAFF_BOTTOM_Y - STAFF_TOP_Y}
               />
             ))}
+            {closingBarlineX != null && (
+              <rect
+                className="sj-barline"
+                x={closingBarlineX - BARLINE_THICKNESS / 2}
+                y={STAFF_TOP_Y}
+                width={BARLINE_THICKNESS}
+                height={STAFF_BOTTOM_Y - STAFF_TOP_Y}
+              />
+            )}
             {rhythm.stems.map((stem) => (
               <rect
                 key={stem.key}

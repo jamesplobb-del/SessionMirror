@@ -14,7 +14,6 @@ import {
   type StaffJumperState,
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
-import type { StaffJumperMeter } from './staffJumperRhythm'
 import { judgeTiming, METERS, secondsPerPulse } from './staffJumperRhythm'
 import {
   startClickTrack,
@@ -40,14 +39,12 @@ const DIFFICULTY_TIMING = {
 const REPEATED_NOTE_HOLD_MS = 170
 
 /**
- * Bars of clicks before the first note.
+ * One bar of clicks before the first note.
  *
- * 6/8 only has two pulses to a bar, so a single bar would be a two-click
- * count-in — not enough to feel the tempo. Compound meters get two bars.
+ * A bar is enough in either meter now that the click ticks the subdivision
+ * grid: four in 4/4, six in 6/8.
  */
-function countInBarsFor(meter: StaffJumperMeter): number {
-  return METERS[meter].pulsesPerBar >= 4 ? 1 : 2
-}
+const COUNT_IN_BARS = 1
 
 /** Headroom for the audio context to resume before the count-in is timed out. */
 const AUDIO_START_GRACE_MS = 700
@@ -293,14 +290,14 @@ export function useStaffJumperGame(
     const generation = audioGenerationRef.current
     const spec = METERS[config.meter]
     const countInMs =
-      countInBarsFor(config.meter) * spec.pulsesPerBar * secondsPerPulse(config.tempoBpm) * 1000
+      COUNT_IN_BARS * spec.pulsesPerMeasure * secondsPerPulse(config.tempoBpm) * 1000
     countInUntilMsRef.current = performance.now() + countInMs + AUDIO_START_GRACE_MS
 
     void startClickTrack({
       bpm: config.tempoBpm,
       soundId: 'classic',
       audible: config.metronome,
-      countInBars: countInBarsFor(config.meter),
+      countInBars: COUNT_IN_BARS,
       meter: config.meter,
     })
       .then((handle) => {
@@ -537,10 +534,10 @@ export function useStaffJumperGame(
         let placement: StaffJumperTiming = null
         let errorMs = 0
         if (clickRef.current?.isRunning()) {
-          // Rhythm slots are in quarter-note units; the clock counts pulses.
-          const pulseBeats = METERS[current.config!.meter].pulseBeats
+          // Both duration and pulse length are exact sixteenth-note units.
+          const pulseUnits = METERS[current.config!.meter].pulseUnits
           const heldPulses =
-            getRhythmForStep(current.config!, current.sequenceStep).beats / pulseBeats
+            getRhythmForStep(current.config!, current.sequenceStep).durationUnits / pulseUnits
           const verdict = judgeTiming(
             clickRef.current.pulsesElapsed(),
             expectedPulseRef.current,

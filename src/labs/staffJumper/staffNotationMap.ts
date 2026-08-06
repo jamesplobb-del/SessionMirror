@@ -131,7 +131,7 @@ export const DOT_GAP = STAFF_SPACE_PX * 0.42
 export const BARLINE_THICKNESS = Math.max(2.6, STAFF_SPACE_PX * 0.11)
 
 /** Time signature numerals, sized to span two staff spaces each. */
-export const TIME_SIGNATURE_FONT_SIZE = STAFF_SPACE_PX * 2.35
+export const TIME_SIGNATURE_FONT_SIZE = STAFF_SPACE_PX * 2.05
 
 /**
  * Where each numeral sits: the upper number is centred on the second space
@@ -184,16 +184,16 @@ export const STAFF_CANVAS_HEIGHT = STAFF_BOTTOM_Y + STAFF_LINE_GAP * 3
 export const STAFF_FIRST_NOTE_X = 250
 
 /** Width reserved for the time signature in the pinned staff head. */
-export const TIME_SIGNATURE_WIDTH = Math.round(STAFF_SPACE_PX * 1.35)
+export const TIME_SIGNATURE_WIDTH = Math.round(STAFF_SPACE_PX * 1.12)
 
 /** Clef left edge in the pinned head of the staff. */
-export const STAFF_CLEF_X = 14
+export const STAFF_CLEF_X = 10
 
 /** Gap between the clef and the first key-signature accidental. */
-export const CLEF_TO_SIGNATURE_GAP = Math.round(STAFF_SPACE_PX * 0.55)
+export const CLEF_TO_SIGNATURE_GAP = Math.round(STAFF_SPACE_PX * 0.34)
 
 /** Gap between the pinned staff head and the first scrolling notehead. */
-export const SIGNATURE_TO_NOTE_GAP = Math.round(STAFF_SPACE_PX * 0.9)
+export const SIGNATURE_TO_NOTE_GAP = Math.round(STAFF_SPACE_PX * 0.62)
 
 /**
  * Staff position each clef names, used to anchor its glyph.
