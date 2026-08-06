@@ -2820,170 +2820,11 @@
   background: #fff;
 }
 
-/* Recording HUD — Camera Mode identity.
-   This only reskins the in-grid recorder; it does not alter recording flow,
-   monitoring, count-in, playback, or tile behavior. */
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__header {
-  width: min(20rem, calc(100vw - 1rem));
-  margin: calc(env(safe-area-inset-top, 0px) + 0.5rem) auto 0;
-  padding: 0.38rem 0.45rem;
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
-    rgba(8, 12, 18, 0.68);
-  box-shadow:
-    0 0.5rem 1.3rem rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.11);
-  -webkit-backdrop-filter: blur(20px) saturate(1.14);
-  backdrop-filter: blur(20px) saturate(1.14);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__header > button {
-  display: grid;
-  width: 2.1rem;
-  height: 2.1rem;
-  flex-shrink: 0;
-  place-items: center;
-  border: 0.5px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.075);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__title,
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__rec {
-  color: rgba(255, 255, 255, 0.94);
-  font-size: 0.82rem;
-  font-weight: 650;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__rec-dot {
-  width: 0.48rem;
-  height: 0.48rem;
-  background: #f04454;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-monitor-row {
-  width: fit-content;
-  max-width: calc(100vw - 1rem);
-  margin: 0.42rem auto 0;
-  padding: 0.34rem 0.46rem;
-  border: 0.5px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)),
-    rgba(8, 12, 18, 0.58);
-  box-shadow:
-    0 0.4rem 1.1rem rgba(0, 0, 0, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  -webkit-backdrop-filter: blur(18px) saturate(1.12);
-  backdrop-filter: blur(18px) saturate(1.12);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-monitor-row__label {
-  color: rgba(255, 255, 255, 0.52);
-  font-size: 0.58rem;
-  letter-spacing: 0.08em;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-monitor-chip {
-  height: 1.65rem;
-  border: 0.5px solid rgba(97, 189, 255, 0.2);
-  background: rgba(25, 152, 255, 0.09);
-  color: rgba(224, 245, 255, 0.92);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-monitor-chip--muted {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.035);
-  color: rgba(255, 255, 255, 0.38);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-headphone-chip--on {
-  background: rgba(25, 152, 255, 0.12);
-  color: #7acbff;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-headphone-chip--warn {
-  background: rgba(247, 174, 28, 0.12);
-  color: #f7bd45;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__widgets {
-  right: 0.72rem;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 6.2rem);
-  gap: 0.42rem;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__widgets button {
-  width: 2.45rem;
-  height: 2.45rem;
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
-    rgba(8, 12, 18, 0.54);
-  color: #61bdff;
-  box-shadow:
-    0 0.35rem 0.9rem rgba(0, 0, 0, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__widgets button:first-child {
-  color: #f7ae1c;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__widgets button.is-active {
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.9);
-  color: #1598ff;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__widgets button:first-child.is-active {
-  color: #e39300;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__controls {
-  left: 50%;
-  right: auto;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 0.45rem);
-  width: min(20.5rem, calc(100vw - 1rem));
-  padding: 0.46rem 0.6rem;
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 1.45rem;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
-    rgba(7, 11, 18, 0.7);
-  box-shadow:
-    0 0.7rem 1.8rem rgba(0, 0, 0, 0.23),
-    inset 0 1px 0 rgba(255, 255, 255, 0.11);
-  transform: translateX(-50%);
-  -webkit-backdrop-filter: blur(22px) saturate(1.16);
-  backdrop-filter: blur(22px) saturate(1.16);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__actions--live {
-  gap: 1.3rem;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__side-btn {
-  width: 3.75rem;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 0.62rem;
-  font-weight: 520;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__side-btn:first-child svg {
-  color: #f7ae1c;
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__side-btn:last-child svg {
-  color: #61bdff;
-}
-
+/* Preserve the original Multitrack recorder layout. Only the record control
+   and icon accents inherit the current Camera Mode identity. */
 .multitrack-recording-stage--in-grid .multitrack-recording-stage__record-big {
-  width: 3.75rem;
-  height: 3.75rem;
+  width: 4.5rem;
+  height: 4.5rem;
   border: 0.5px solid rgba(255, 255, 255, 0.3);
   background: linear-gradient(145deg, #ff5e66 0%, #ed334b 56%, #cf1f3d 100%);
   box-shadow:
@@ -2992,8 +2833,8 @@
 }
 
 .multitrack-recording-stage--in-grid .multitrack-recording-stage__record-glyph {
-  width: 0.78rem;
-  height: 0.78rem;
+  width: 0.86rem;
+  height: 0.86rem;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 0.1rem 0.18rem rgba(103, 8, 28, 0.24);
 }
@@ -3002,32 +2843,28 @@
   background: linear-gradient(145deg, #ec3b50 0%, #cf1f3d 58%, #a81231 100%);
 }
 
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__record-big.is-recording .multitrack-recording-stage__record-glyph {
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 0.24rem;
+.multitrack-recording-stage--in-grid
+  .multitrack-recording-stage__record-big.is-recording
+  .multitrack-recording-stage__record-glyph {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.3rem;
 }
 
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__actions--review {
-  gap: 0.42rem;
+.multitrack-recording-stage--in-grid
+  .multitrack-recording-stage__widgets
+  button:first-child,
+.multitrack-recording-stage--in-grid
+  .multitrack-recording-stage__side-btn:first-child
+  svg {
+  color: #f7ae1c;
 }
 
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__retry,
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__preview-btn {
-  height: 2.55rem;
-  border: 0.5px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.075);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__confirm {
-  height: 2.55rem;
-  background: linear-gradient(145deg, #ffbd38, #f7a600);
-  color: #fff;
-  box-shadow: 0 0.35rem 0.9rem rgba(247, 166, 0, 0.24);
-}
-
-.multitrack-recording-stage--in-grid .multitrack-recording-stage__hint {
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 0.66rem;
+.multitrack-recording-stage--in-grid
+  .multitrack-recording-stage__widgets
+  button:last-child,
+.multitrack-recording-stage--in-grid
+  .multitrack-recording-stage__side-btn:last-child
+  svg {
+  color: #61bdff;
 }
