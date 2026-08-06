@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
+  getConcertTonicPitchClass,
   getDetectedPitchClass,
+  getRhythmForStep,
   getTargetNoteAtStep,
   DIFFICULTY_TIMEOUT_SECONDS,
   isReadoutCorrectPitch,
@@ -10,7 +12,15 @@ import {
   saveBestScore,
   type StaffJumperConfig,
   type StaffJumperState,
+  type StaffJumperTiming,
 } from './staffJumperMusicLogic'
+import { BEATS_PER_BAR, judgeTiming, secondsPerBeat } from './staffJumperRhythm'
+import {
+  startClickTrack,
+  startDrone,
+  type ClickTrackHandle,
+  type DroneHandle,
+} from './staffJumperAudio'
 import { triggerSuccessHaptic, triggerWarningHaptic } from '../../utils/haptics'
 
 const DIFFICULTY_TIMING = {
@@ -19,17 +29,33 @@ const DIFFICULTY_TIMING = {
   hard: { correctMs: 26, wrongMs: 300, cooldownMs: 12 },
 } as const
 
+/**
+ * How long the same pitch must keep sounding to count as a deliberately
+ * repeated note rather than the decay of the one before it.
+ *
+ * Only relevant when a pattern happens to land on the same pitch class twice in
+ * a row; every other case clears the release gate as soon as the pitch moves.
+ */
+const REPEATED_NOTE_HOLD_MS = 170
+
+/** One bar of clicks before the first note. */
+const COUNT_IN_BARS = 1
+
+/** Headroom for the audio context to resume before the count-in is timed out. */
+const AUDIO_START_GRACE_MS = 700
+
 const INITIAL_HEARTS = 3
 
 type Action =
   | { type: 'START'; config: StaffJumperConfig }
-  | { type: 'SUCCESS'; quality: 'perfect' | 'good' }
+  | { type: 'SUCCESS'; quality: 'perfect' | 'good'; timing: StaffJumperTiming; timingErrorMs: number }
   | { type: 'MISS'; reason: 'wrong' | 'timeout' }
   | { type: 'FALL_COMPLETE' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'RESTART' }
   | { type: 'BACK_TO_SETUP' }
+  | { type: 'COUNT_IN_COMPLETE' }
 
 function createInitialState(): StaffJumperState {
   return {
@@ -53,6 +79,10 @@ function createInitialState(): StaffJumperState {
     endedAtMs: null,
     pausedAtMs: null,
     pausedDurationMs: 0,
+    timing: null,
+    timingErrorMs: 0,
+    onTimeCount: 0,
+    isCountingIn: false,
   }
 }
 
@@ -68,22 +98,32 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         targetPitchClass: target.pitchClass,
         bestScore: loadBestScore(),
         startedAtMs: Date.now(),
+        isCountingIn: true,
       }
     }
+
+    case 'COUNT_IN_COMPLETE':
+      return state.isCountingIn ? { ...state, isCountingIn: false } : state
 
     case 'SUCCESS': {
       if (state.phase !== 'playing' || !state.config) return state
       const nextStep = state.sequenceStep + 1
       const target = getTargetNoteAtStep(state.config, nextStep)
       const streak = state.streak + 1
+      // Landing on the beat is worth an extra point — timing is a bonus, never
+      // a penalty, so a late note still advances and still scores.
+      const onTime = action.timing === 'on'
       return {
         ...state,
         sequenceStep: nextStep,
         targetPitchClass: target.pitchClass,
-        score: state.score + 1,
+        score: state.score + (onTime ? 2 : 1),
         streak,
         bestStreak: Math.max(state.bestStreak, streak),
         correctCount: state.correctCount + 1,
+        onTimeCount: state.onTimeCount + (onTime ? 1 : 0),
+        timing: action.timing,
+        timingErrorMs: action.timingErrorMs,
         advanceToken: state.advanceToken + 1,
         feedback: action.quality,
         feedbackToken: state.feedbackToken + 1,
@@ -138,6 +178,9 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         ...state,
         phase: 'playing',
         pausedAtMs: null,
+        // Resuming replays the count-in, so pitch is ignored until it lands.
+        isCountingIn: true,
+        timing: null,
         pausedDurationMs:
           state.pausedDurationMs +
           (state.pausedAtMs == null ? 0 : Math.max(0, resumedAt - state.pausedAtMs)),
@@ -181,8 +224,101 @@ export function useStaffJumperGame(
 
   const actionLockUntilRef = useRef(0)
   const wrongPitchClassRef = useRef<number | null>(null)
+  /**
+   * Pitch class the player is still releasing.
+   *
+   * Detection is deliberately fast, so the moment a note is accepted the game
+   * moves to the next target while the previous note is still ringing. Without
+   * this gate that decay reads as a wrong answer against the new target — the
+   * player had to clip every note short to avoid losing hearts. It also stops a
+   * single held wrong note from burning all three hearts in a row.
+   */
+  const releasingPitchClassRef = useRef<number | null>(null)
   const noteDeadlineAtRef = useRef<number | null>(null)
   const noteRemainingMsRef = useRef(DIFFICULTY_TIMEOUT_SECONDS.medium * 1000)
+
+  const clickRef = useRef<ClickTrackHandle | null>(null)
+  const droneRef = useRef<DroneHandle | null>(null)
+  /**
+   * Beat position the next note is *expected* on.
+   *
+   * Re-anchored after every landing to "where you actually were, plus the note
+   * you just held". Judging against a fixed grid instead would mean one slow
+   * note marked everything after it late for the rest of the run, and it would
+   * also bake in the detector's own latency; measuring note-to-note cancels
+   * that constant offset out.
+   */
+  const expectedBeatRef = useRef(0)
+  /**
+   * Wall-clock backstop for the count-in.
+   *
+   * The click handle only exists once the audio context has resumed, and on a
+   * blocked or suspended context it never will — its clock simply stops. Without
+   * this the game would sit in the count-in forever waiting for a beat that is
+   * never going to arrive.
+   */
+  const countInUntilMsRef = useRef(0)
+  /**
+   * Bumped by every start and stop.
+   *
+   * Audio starts asynchronously, so a handle can arrive after the run it
+   * belongs to has already been stopped, restarted or paused. Comparing against
+   * game state here would be wrong — a `start()` dispatch has not been committed
+   * by React yet when the audio promise resolves — so the token is the only
+   * reliable way to know whether a late handle is still wanted.
+   */
+  const audioGenerationRef = useRef(0)
+
+  const stopAudio = useCallback(() => {
+    audioGenerationRef.current += 1
+    clickRef.current?.stop()
+    clickRef.current = null
+    const drone = droneRef.current
+    droneRef.current = null
+    if (drone) void drone.stop()
+  }, [])
+
+  const startAudio = useCallback((config: StaffJumperConfig) => {
+    stopAudio()
+    expectedBeatRef.current = 0
+
+    const generation = audioGenerationRef.current
+    const countInMs = COUNT_IN_BARS * BEATS_PER_BAR * secondsPerBeat(config.tempoBpm) * 1000
+    countInUntilMsRef.current = performance.now() + countInMs + AUDIO_START_GRACE_MS
+
+    void startClickTrack({
+      bpm: config.tempoBpm,
+      soundId: 'classic',
+      audible: config.metronome,
+      countInBars: COUNT_IN_BARS,
+    })
+      .then((handle) => {
+        if (audioGenerationRef.current !== generation) handle.stop()
+        else clickRef.current = handle
+      })
+      .catch(() => {
+        /* audio is optional — the game stays playable without a click */
+      })
+
+    if (config.drone) {
+      void startDrone(getConcertTonicPitchClass(config))
+        .then((handle) => {
+          if (audioGenerationRef.current !== generation) void handle.stop()
+          else droneRef.current = handle
+        })
+        .catch(() => {
+          /* drone is optional */
+        })
+    }
+  }, [stopAudio])
+
+  useEffect(() => stopAudio, [stopAudio])
+
+  // The run is over the moment the player starts falling — cut the click and
+  // drone then rather than waiting for the game-over screen to mount.
+  useEffect(() => {
+    if (state.isFalling) stopAudio()
+  }, [state.isFalling, stopAudio])
 
   const resetNoteClock = useCallback((timeoutMs: number) => {
     noteDeadlineAtRef.current = null
@@ -200,13 +336,17 @@ export function useStaffJumperGame(
   const start = useCallback((config: StaffJumperConfig) => {
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
+    releasingPitchClassRef.current = null
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000)
-    dispatch({ type: 'START', config: { ...config, sessionSeed: config.sessionSeed ?? Date.now() } })
-  }, [resetNoteClock])
+    const seeded = { ...config, sessionSeed: config.sessionSeed ?? Date.now() }
+    dispatch({ type: 'START', config: seeded })
+    startAudio(seeded)
+  }, [resetNoteClock, startAudio])
 
   const restart = useCallback(() => {
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
+    releasingPitchClassRef.current = null
     const config = stateRef.current.config
     resetNoteClock(
       config
@@ -214,14 +354,17 @@ export function useStaffJumperGame(
         : DIFFICULTY_TIMEOUT_SECONDS.medium * 1000,
     )
     dispatch({ type: 'RESTART' })
-  }, [resetNoteClock])
+    if (config) startAudio({ ...config, sessionSeed: Date.now() })
+  }, [resetNoteClock, startAudio])
 
   const backToSetup = useCallback(() => {
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
+    releasingPitchClassRef.current = null
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS.medium * 1000)
+    stopAudio()
     dispatch({ type: 'BACK_TO_SETUP' })
-  }, [resetNoteClock])
+  }, [resetNoteClock, stopAudio])
 
   const completeFall = useCallback(() => {
     dispatch({ type: 'FALL_COMPLETE' })
@@ -231,14 +374,20 @@ export function useStaffJumperGame(
     const current = stateRef.current
     if (current.phase !== 'playing' || current.isFalling) return
     captureNoteClock()
+    stopAudio()
     dispatch({ type: 'PAUSE' })
-  }, [captureNoteClock])
+  }, [captureNoteClock, stopAudio])
 
   const resume = useCallback(() => {
     actionLockUntilRef.current = performance.now() + 650
     wrongPitchClassRef.current = null
+    releasingPitchClassRef.current = null
+    const config = stateRef.current.config
     dispatch({ type: 'RESUME' })
-  }, [])
+    // A fresh count-in re-establishes the tempo, and restarting the transport
+    // re-anchors the beat clock so the first note back is judged from zero.
+    if (config) startAudio(config)
+  }, [startAudio])
 
   useEffect(() => {
     const pauseForVisibilityLoss = () => {
@@ -315,9 +464,38 @@ export function useStaffJumperGame(
       const dt = Math.min(now - lastTs, 50)
       lastTs = now
 
+      // Hold everything — pitch, the note clock, the lot — until the count-in
+      // has played, so warm-up notes over the click cannot score or cost a life.
+      const click = clickRef.current
+      if (current.isCountingIn) {
+        // Whichever clock says "done" first wins: the audio clock is the
+        // accurate one, the wall clock is the escape hatch when audio is
+        // blocked or still starting up.
+        const audioRemainingMs =
+          click && click.isRunning() ? click.countInRemainingSec() * 1000 : Number.POSITIVE_INFINITY
+        const wallRemainingMs = countInUntilMsRef.current - now
+        if (Math.min(audioRemainingMs, wallRemainingMs) > 0) {
+          resetTargetDeadline(now)
+          rafId = requestAnimationFrame(tick)
+          return
+        }
+        expectedBeatRef.current = click?.isRunning() ? click.beatsElapsed() : 0
+        resetTargetDeadline(now)
+        dispatch({ type: 'COUNT_IN_COMPLETE' })
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+
       if (now < actionLockUntilRef.current) {
         if (now >= targetDeadlineAt) {
           resetTargetDeadline(now)
+          correctStableMs = 0
+          wrongStableMs = 0
+          wrongPitchClassRef.current = null
+          releasingPitchClassRef.current = getDetectedPitchClass(
+            readoutRef.current,
+            current.config,
+          )
           dispatch({ type: 'MISS', reason: 'timeout' })
         }
         rafId = requestAnimationFrame(tick)
@@ -327,21 +505,62 @@ export function useStaffJumperGame(
       const readoutNow = readoutRef.current
       const target = current.targetPitchClass
       const timing = DIFFICULTY_TIMING[current.config.difficulty]
+      const detectedPc = getDetectedPitchClass(readoutNow, current.config)
+
+      // The previous note has stopped ringing once the pitch moves or drops out.
+      if (releasingPitchClassRef.current !== detectedPc) {
+        releasingPitchClassRef.current = null
+      }
+      const isReleasingPreviousNote = releasingPitchClassRef.current != null
+
+      const startNextNote = (quality: 'perfect' | 'good') => {
+        correctStableMs = 0
+        wrongStableMs = 0
+        resetTargetDeadline(now)
+        actionLockUntilRef.current = now + timing.cooldownMs
+        wrongPitchClassRef.current = null
+        releasingPitchClassRef.current = detectedPc
+
+        // Score the landing against the beat it was written on, then re-anchor
+        // the expectation to where the player actually is.
+        let placement: StaffJumperTiming = null
+        let errorMs = 0
+        if (clickRef.current?.isRunning()) {
+          const verdict = judgeTiming(
+            clickRef.current.beatsElapsed(),
+            expectedBeatRef.current,
+            getRhythmForStep(current.config!, current.sequenceStep).beats,
+            current.config!.tempoBpm,
+          )
+          placement = verdict.placement
+          errorMs = verdict.errorMs
+          expectedBeatRef.current = verdict.nextExpectedBeat
+        }
+
+        dispatch({
+          type: 'SUCCESS',
+          quality,
+          timing: placement,
+          timingErrorMs: Math.round(errorMs),
+        })
+      }
 
       if (isReadoutCorrectPitch(readoutNow, target, current.config)) {
         wrongStableMs = 0
         wrongPitchClassRef.current = null
         correctStableMs += dt
-        if (correctStableMs >= timing.correctMs) {
-          correctStableMs = 0
-          resetTargetDeadline(now)
-          actionLockUntilRef.current = now + timing.cooldownMs
-          wrongPitchClassRef.current = null
-          dispatch({ type: 'SUCCESS', quality: Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good' })
+        // A still-ringing note that matches the new target is a repeat, and
+        // needs a longer hold before it counts — there was no fresh attack.
+        const requiredMs = isReleasingPreviousNote ? REPEATED_NOTE_HOLD_MS : timing.correctMs
+        if (correctStableMs >= requiredMs) {
+          startNextNote(Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good')
         }
-      } else if (isReadoutWrongPitch(readoutNow, target, current.config)) {
+      } else if (
+        !isReleasingPreviousNote &&
+        isReadoutWrongPitch(readoutNow, target, current.config)
+      ) {
         correctStableMs = 0
-        const wrongPc = getDetectedPitchClass(readoutNow, current.config)!
+        const wrongPc = detectedPc!
         if (wrongPitchClassRef.current !== wrongPc) {
           wrongPitchClassRef.current = wrongPc
           wrongStableMs = 0
@@ -352,6 +571,9 @@ export function useStaffJumperGame(
           resetTargetDeadline(now)
           actionLockUntilRef.current = now + timing.cooldownMs
           wrongPitchClassRef.current = null
+          // Hold the gate on the offending note so one sustained wrong pitch
+          // costs a single heart instead of the whole run.
+          releasingPitchClassRef.current = wrongPc
           dispatch({ type: 'MISS', reason: 'wrong' })
         }
       } else {
@@ -366,6 +588,9 @@ export function useStaffJumperGame(
         wrongStableMs = 0
         actionLockUntilRef.current = now + timing.cooldownMs
         wrongPitchClassRef.current = null
+        // Whatever is sounding as the clock runs out belongs to the note that
+        // just expired, not to the next one.
+        releasingPitchClassRef.current = detectedPc
         dispatch({ type: 'MISS', reason: 'timeout' })
       }
 

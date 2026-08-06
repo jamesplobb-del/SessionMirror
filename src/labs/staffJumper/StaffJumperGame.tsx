@@ -15,23 +15,40 @@ import {
   type StaffJumperState,
 } from './staffJumperMusicLogic'
 import {
+  BARLINE_THICKNESS,
+  BEAM_THICKNESS,
+  CLEF_ANCHOR_YPX,
+  CLEF_TO_SIGNATURE_GAP,
+  DOT_GAP,
+  DOT_RADIUS,
+  dotYForNote,
+  LEDGER_LINE_THICKNESS,
   LEDGER_LINE_W,
-  BASS_CLEF_FONT_SIZE,
   noteheadHalfHeight,
+  NOTEHEAD_RING_THICKNESS,
   NOTEHEAD_W,
   NOTEHEAD_H,
   PLAYER_ANCHOR_X_PX,
+  SIGNATURE_TO_NOTE_GAP,
   STAFF_BOTTOM_Y,
   STAFF_CANVAS_HEIGHT,
   STAFF_CLEF_X,
-  STAFF_FIRST_NOTE_X,
-  STAFF_LINE_GAP,
+  STAFF_LINE_THICKNESS,
   STAFF_LINE_Y_LIST,
   STAFF_MIDDLE_Y,
+  STAFF_SPACE_PX,
   STAFF_TOP_Y,
+  STEM_THICKNESS,
+  TIME_SIGNATURE_FONT_SIZE,
+  TIME_SIGNATURE_X,
+  TIME_SIGNATURE_YPX,
   NOTE_SPACING_PX,
-  TREBLE_CLEF_FONT_SIZE,
+  type StemDirection,
 } from './staffNotationMap'
+import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
+import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
+import { layoutRhythm } from './staffJumperNotationLayout'
+import { isHollowNotehead, TIME_SIGNATURE } from './staffJumperRhythm'
 import Pressable from '../../components/ui/Pressable'
 
 interface StaffJumperGameProps {
@@ -46,10 +63,48 @@ interface StaffJumperGameProps {
 
 /** Visible feet sit above the transparent bottom padding in the source PNG. */
 const PLAYER_FEET_OFFSET_PX = 45
-const VISIBLE_NOTE_COUNT = 7
+/**
+ * Notes kept in the DOM ahead of the player. Eighth notes are narrow, so a
+ * screen's worth of them needs more slots than a screen of quarters.
+ */
+const VISIBLE_NOTE_COUNT = 10
 
-function accidentalGlyph(accidental: '#' | 'b'): string {
-  return accidental === '#' ? '♯' : '♭'
+/**
+ * How much of the staff to keep readable ahead of the player, measured in
+ * quarter-note widths. The staff shrinks to honour this when the pinned clef
+ * and key signature are wide (six flats eat real estate on a phone).
+ *
+ * Sight reading falls apart if you can only see the note you are playing, so
+ * this buys roughly a bar of lookahead — and because spacing now follows
+ * duration, a bar of eighths fits in well under a bar's worth of width.
+ */
+const MIN_LOOKAHEAD_NOTES = 4.6
+
+/** Fraction of the playfield height the five-line staff should occupy. */
+const STAFF_HEIGHT_FRACTION = 0.22
+
+function glyphNameForAccidental(accidental: '#' | 'b') {
+  return accidental === '#' ? ('sharp' as const) : ('flat' as const)
+}
+
+/**
+ * The hooked flag on an unbeamed eighth note.
+ *
+ * Drawn rather than set from a font: the SMuFL flag glyphs are absent from the
+ * system music fonts this game falls back to, and a flag has to start exactly
+ * at the stem tip to look attached.
+ */
+function flagPath(x: number, y: number, direction: StemDirection): string {
+  const sign = direction === 'up' ? 1 : -1
+  const width = STAFF_SPACE_PX * 1.15
+  const drop = STAFF_SPACE_PX * 2.1 * sign
+  const belly = STAFF_SPACE_PX * 0.75 * sign
+  return [
+    `M ${x} ${y}`,
+    `C ${x + width * 0.95} ${y + belly * 0.55} ${x + width} ${y + drop * 0.5} ${x + width * 0.42} ${y + drop}`,
+    `C ${x + width * 1.05} ${y + drop * 0.52} ${x + width * 0.55} ${y + belly * 0.7} ${x} ${y + belly * 1.5}`,
+    'Z',
+  ].join(' ')
 }
 
 function Hearts({ count, max = 3 }: { count: number; max?: number }) {
@@ -110,17 +165,13 @@ export default function StaffJumperGame({
    *
    * layout.baseY: screen Y of world Y=0 after aligning the staff midpoint.
    */
-  const [layout, setLayout] = useState({ scale: 1.1, baseY: 40, viewportWidth: 390 })
+  const [viewport, setViewport] = useState({ width: 390, height: 700 })
 
   useLayoutEffect(() => {
     const measure = () => {
       const el = playfieldRef.current
       if (!el) return
-      const staffHeight = STAFF_BOTTOM_Y - STAFF_TOP_Y
-      const scale = Math.max(0.62, Math.min(1.05, (el.clientHeight * 0.19) / staffHeight))
-      const staffCenterScreenY = el.clientHeight * 0.47
-      const baseY = staffCenterScreenY - STAFF_MIDDLE_Y * scale
-      setLayout({ scale, baseY, viewportWidth: el.clientWidth })
+      setViewport({ width: el.clientWidth, height: el.clientHeight })
     }
     measure()
     window.addEventListener('resize', measure)
@@ -137,14 +188,78 @@ export default function StaffJumperGame({
     [config.clef, config.difficulty, config.key, config.scaleMode],
   )
 
+  const rhythmLayout = useMemo(() => layoutRhythm(platforms), [platforms])
+
+  const glyphMetrics = useMusicGlyphMetrics()
+
+  /**
+   * The clef and key signature are pinned to the left edge, so their world
+   * width is fixed overhead that the scrolling notes never reclaim.
+   */
+  const staffHead = useMemo(() => {
+    const clefName = config.clef === 'treble' ? ('trebleClef' as const) : ('bassClef' as const)
+    const clefWidth = layoutMusicGlyph(clefName, STAFF_SPACE_PX, glyphMetrics).width
+    let width = STAFF_CLEF_X + clefWidth
+
+    const signatureX = width + CLEF_TO_SIGNATURE_GAP
+    let signatureWidth = 0
+    if (keySignature.length > 0) {
+      const symbol = keySignature[0]!.symbol
+      const glyph = layoutMusicGlyph(glyphNameForAccidental(symbol), STAFF_SPACE_PX, glyphMetrics)
+      signatureWidth =
+        (keySignature.length - 1) * keySignatureStepPx(symbol, STAFF_SPACE_PX) + glyph.width
+      width = signatureX + signatureWidth
+    }
+
+    return {
+      clefName,
+      clefWidth,
+      signatureX,
+      signatureWidth,
+      width: width + SIGNATURE_TO_NOTE_GAP,
+    }
+  }, [config.clef, glyphMetrics, keySignature])
+
+  /**
+   * Scale so the staff reads well vertically, but never so large that the
+   * pinned head crowds out the notes the player still has to read.
+   */
+  const staffHeight = STAFF_BOTTOM_Y - STAFF_TOP_Y
+  const heightScale = (viewport.height * STAFF_HEIGHT_FRACTION) / staffHeight
+  const widthScale =
+    viewport.width / (staffHead.width + NOTE_SPACING_PX * MIN_LOOKAHEAD_NOTES + NOTEHEAD_W)
+  const scale = Math.max(0.46, Math.min(1.05, Math.min(heightScale, widthScale)))
+  const baseY = viewport.height * 0.47 - STAFF_MIDDLE_Y * scale
+
+  /** Player sits just clear of the pinned head, and no further left than that. */
+  const playerAnchorX = Math.max(
+    PLAYER_ANCHOR_X_PX,
+    (staffHead.width + NOTEHEAD_W * 0.6) * scale,
+  )
+
   // Follow every accepted pitch immediately so fast passages never queue visual movement.
-  const focusWorldX = STAFF_FIRST_NOTE_X + state.sequenceStep * NOTE_SPACING_PX
-  const scrollX = PLAYER_ANCHOR_X_PX - focusWorldX * layout.scale
-  const visibleWorldWidth = layout.viewportWidth / Math.max(layout.scale, 0.1)
+  const focusWorldX = target.xPx
+  const scrollX = playerAnchorX - focusWorldX * scale
+
+  /**
+   * Fade the scrolling notes out where the pinned clef begins, rather than
+   * painting an opaque panel over them — the playfield behind is a gradient,
+   * so any solid backing would show a seam.
+   *
+   * The mask lives in the world's own coordinate space, which the transform
+   * then scales and shifts, hence undoing both here.
+   */
+  const maskEndWorldX = staffHead.width - scrollX / Math.max(scale, 0.1)
+  // Fade over several noteheads' width. A short ramp slices a head clean in
+  // half at the boundary, which reads as a rendering glitch rather than a fade.
+  const maskStartWorldX = maskEndWorldX - STAFF_SPACE_PX * 3.4
+  const notesMask = `linear-gradient(to right, transparent ${maskStartWorldX}px, #000 ${maskEndWorldX}px)`
+  const visibleWorldWidth = viewport.width / Math.max(scale, 0.1)
+  const lastVisibleX = platforms.length > 0 ? platforms[platforms.length - 1]!.xPx : focusWorldX
   const staffWorldWidth = Math.max(
     1200,
     focusWorldX + visibleWorldWidth + NOTE_SPACING_PX * 3,
-    STAFF_FIRST_NOTE_X + (state.sequenceStep + VISIBLE_NOTE_COUNT + 3) * NOTE_SPACING_PX,
+    lastVisibleX + NOTE_SPACING_PX * 3,
   )
 
   const feedbackAnnouncement =
@@ -163,14 +278,23 @@ export default function StaffJumperGame({
       : `Read the next note for jump ${state.sequenceStep + 1}.`
   const turnFraction = Math.max(0, Math.min(1, turnRemainingMs / Math.max(1, turnDurationMs)))
 
+  const timingLabel =
+    state.timing === 'on'
+      ? 'On the beat'
+      : state.timing === 'early'
+        ? `Early ${Math.abs(state.timingErrorMs)}ms`
+        : state.timing === 'late'
+          ? `Late ${Math.abs(state.timingErrorMs)}ms`
+          : null
+
   // Player position — visible feet meet the top edge of the current target notehead.
   const targetPlatform = platforms.find((p) => p.role === 'target')
   const standNote = targetPlatform?.note ?? target
-  const targetWorldX = targetPlatform?.xPx ?? STAFF_FIRST_NOTE_X + state.sequenceStep * NOTE_SPACING_PX
+  const targetWorldX = targetPlatform?.xPx ?? target.xPx
   const headTopWorld = standNote.yPx - noteheadHalfHeight()
-  const playerFeetScreen = layout.baseY + headTopWorld * layout.scale
+  const playerFeetScreen = baseY + headTopWorld * scale
   const playerScreenY = playerFeetScreen - PLAYER_FEET_OFFSET_PX
-  const playerScreenX = targetWorldX * layout.scale + scrollX
+  const playerScreenX = targetWorldX * scale + scrollX
   const playerModel = getScaleRushPlayerModel(config.playerModel)
 
   const prevAdvanceRef = useRef(state.advanceToken)
@@ -190,8 +314,45 @@ export default function StaffJumperGame({
   return (
     <div className="sj-screen sj-screen--playing">
       <div className="sj-playfield" ref={playfieldRef}>
-        {/* ── Scrolling staff world ── */}
+        {/* ── Staff ── */}
         <div className="sj-staff-viewport">
+          {/*
+            The five lines never scroll: they are horizontally uniform, so
+            pinning them keeps the staff continuous under the clef instead of
+            starting at the world's left edge.
+          */}
+          <div
+            className="sj-staff-backdrop"
+            style={{
+              transform: `translateY(${baseY}px) scale(${scale})`,
+              transformOrigin: '0 0',
+              width: `${visibleWorldWidth}px`,
+              height: `${STAFF_CANVAS_HEIGHT}px`,
+            }}
+          >
+            <div
+              className="sj-staff-band"
+              style={{
+                top: `${STAFF_TOP_Y}px`,
+                height: `${staffHeight}px`,
+                width: `${visibleWorldWidth}px`,
+              }}
+            />
+            <div className="sj-staff-lines">
+              {STAFF_LINE_Y_LIST.map((yPx) => (
+                <div
+                  key={yPx}
+                  className="sj-staff-line"
+                  style={{
+                    top: `${yPx}px`,
+                    width: `${visibleWorldWidth}px`,
+                    height: `${STAFF_LINE_THICKNESS}px`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
           <div
             className="sj-staff-world"
             style={{
@@ -204,63 +365,105 @@ export default function StaffJumperGame({
                * Result: screen_x = world_x * scale + scrollX
                *         screen_y = world_y * scale + baseY
                */
-              transform: `translateX(${scrollX}px) translateY(${layout.baseY}px) scale(${layout.scale})`,
+              transform: `translateX(${scrollX}px) translateY(${baseY}px) scale(${scale})`,
               transformOrigin: '0 0',
               height: `${STAFF_CANVAS_HEIGHT}px`,
               width: `${staffWorldWidth}px`,
+              maskImage: notesMask,
+              WebkitMaskImage: notesMask,
             }}
           >
-            {/* Light band behind the staff */}
-            <div
-              className="sj-staff-band"
-              style={{
-                top: `${STAFF_TOP_Y}px`,
-                height: `${STAFF_BOTTOM_Y - STAFF_TOP_Y}px`,
-                width: `${staffWorldWidth}px`,
-              }}
-            />
-
-            {/* 5 staff lines */}
-            <div className="sj-staff-lines">
-              {STAFF_LINE_Y_LIST.map((yPx) => (
-                <div
-                  key={yPx}
-                  className="sj-staff-line"
-                  style={{ top: `${yPx}px`, width: `${staffWorldWidth}px` }}
+            {/*
+              Barlines, stems, beams and flags share one SVG in world
+              coordinates. Beamed stems all have to meet the same sloping line,
+              so they cannot be drawn inside each note's own anchor.
+            */}
+            <svg
+              className="sj-rhythm-layer"
+              width={staffWorldWidth}
+              height={STAFF_CANVAS_HEIGHT}
+              viewBox={`0 0 ${staffWorldWidth} ${STAFF_CANVAS_HEIGHT}`}
+              aria-hidden
+              focusable="false"
+            >
+              {rhythmLayout.barlineXs.map((x) => (
+                <rect
+                  key={`bar-${x}`}
+                  className="sj-barline"
+                  x={x - BARLINE_THICKNESS / 2}
+                  y={STAFF_TOP_Y}
+                  width={BARLINE_THICKNESS}
+                  height={staffHeight}
                 />
               ))}
-            </div>
 
-            {/* Clef uses the engraved music glyph and its clef-specific staff anchor. */}
-            <span
-              className="sj-clef"
-              data-clef={config.clef}
-              style={{
-                top: `${config.clef === 'treble' ? STAFF_TOP_Y - STAFF_LINE_GAP * 1.55 : STAFF_TOP_Y - STAFF_LINE_GAP * 0.35}px`,
-                left: `${STAFF_CLEF_X}px`,
-                fontSize: `${config.clef === 'treble' ? TREBLE_CLEF_FONT_SIZE : BASS_CLEF_FONT_SIZE}px`,
-              }}
-              role="img"
-              aria-label={`${config.clef} clef`}
+              {rhythmLayout.stems.map((stem) => (
+                <rect
+                  key={stem.key}
+                  className="sj-stem"
+                  x={stem.x - STEM_THICKNESS / 2}
+                  y={Math.min(stem.yStart, stem.yEnd)}
+                  width={STEM_THICKNESS}
+                  height={Math.abs(stem.yEnd - stem.yStart)}
+                  opacity={stem.opacity}
+                />
+              ))}
+
+              {rhythmLayout.beams.map((beam) => (
+                <line
+                  key={beam.key}
+                  className="sj-beam"
+                  x1={beam.x1}
+                  y1={beam.y1}
+                  x2={beam.x2}
+                  y2={beam.y2}
+                  strokeWidth={BEAM_THICKNESS}
+                  strokeLinecap="butt"
+                  opacity={beam.opacity}
+                />
+              ))}
+
+              {rhythmLayout.flags.map((flag) => (
+                <path
+                  key={flag.key}
+                  className="sj-flag"
+                  d={flagPath(flag.x, flag.y, flag.direction)}
+                  opacity={flag.opacity}
+                />
+              ))}
+            </svg>
+
+            {/* Time signature scrolls with the music: like a real score it is
+                stated once at the start rather than pinned forever, which buys
+                back a chunk of the lookahead budget. */}
+            <svg
+              className="sj-time-signature"
+              style={{ left: `${TIME_SIGNATURE_X}px`, top: 0 }}
+              width={STAFF_SPACE_PX * 1.35}
+              height={STAFF_CANVAS_HEIGHT}
+              viewBox={`0 0 ${STAFF_SPACE_PX * 1.35} ${STAFF_CANVAS_HEIGHT}`}
+              aria-hidden
+              focusable="false"
             >
-              {config.clef === 'treble' ? '𝄞' : '𝄢'}
-            </span>
-
-            {/* Key signature (hard mode only) */}
-            {keySignature.length > 0 && (
-              <div className="sj-key-signature" style={{ left: `${STAFF_CLEF_X + 125}px` }}>
-                {keySignature.map((marker, index) => (
-                  <span
-                    key={`${marker.symbol}-${marker.yPx}-${index}`}
-                    className="sj-key-signature__symbol"
-                    data-accidental={marker.symbol}
-                    style={{ top: `${marker.yPx}px`, left: `${index * 14}px` }}
-                  >
-                    {accidentalGlyph(marker.symbol)}
-                  </span>
-                ))}
-              </div>
-            )}
+              <text
+                x={STAFF_SPACE_PX * 0.675}
+                y={TIME_SIGNATURE_YPX[config.clef].top}
+                fontSize={TIME_SIGNATURE_FONT_SIZE}
+                textAnchor="middle"
+                dominantBaseline="central"
+              >
+                {TIME_SIGNATURE.beats}
+              </text>
+              <text
+                x={STAFF_SPACE_PX * 0.675}
+                y={TIME_SIGNATURE_YPX[config.clef].bottom}
+                fontSize={TIME_SIGNATURE_FONT_SIZE}
+                textAnchor="middle"
+                dominantBaseline="central"
+              >
+                {TIME_SIGNATURE.beatValue}
+              </text>
+            </svg>
 
             {/* Noteheads */}
             <div className="sj-noteheads">
@@ -296,28 +499,54 @@ export default function StaffJumperGame({
                         style={{
                           top: `${ledgerY - slot.note.yPx}px`,
                           width: `${LEDGER_LINE_W}px`,
+                          height: `${LEDGER_LINE_THICKNESS}px`,
                         }}
                         aria-hidden
                       />
                     ))}
 
-                    {/* Accidental to the left */}
+                    {/* Accidental, right-aligned so it never crowds the head. */}
                     {slot.note.accidental && (
-                      <span
+                      <StaffGlyph
+                        name={glyphNameForAccidental(slot.note.accidental)}
+                        spacePx={STAFF_SPACE_PX}
+                        staffY={0}
+                        x={-(NOTEHEAD_W / 2 + STAFF_SPACE_PX * 0.32)}
+                        align="right"
+                        metrics={glyphMetrics}
                         className="sj-note__accidental"
-                        data-accidental={slot.note.accidental}
-                        aria-hidden
-                      >
-                        {accidentalGlyph(slot.note.accidental)}
-                      </span>
+                      />
                     )}
 
-                    {/* Notehead oval — centered at (0, 0) = note center */}
+                    {/* Notehead oval — centered at (0, 0) = note center.
+                        Half and whole notes are rings rather than filled. */}
                     <span
-                      className="sj-note__head"
-                      style={{ width: `${NOTEHEAD_W}px`, height: `${NOTEHEAD_H}px`, opacity: slot.opacity }}
+                      className={`sj-note__head ${
+                        isHollowNotehead(slot.note.rhythm.value) ? 'sj-note__head--hollow' : ''
+                      }`}
+                      style={{
+                        width: `${NOTEHEAD_W}px`,
+                        height: `${NOTEHEAD_H}px`,
+                        opacity: slot.opacity,
+                        borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
+                      }}
                       aria-hidden
                     />
+
+                    {/* Augmentation dot, always in a space. */}
+                    {slot.note.rhythm.dotted && (
+                      <span
+                        className="sj-note__dot"
+                        style={{
+                          left: `${NOTEHEAD_W / 2 + DOT_GAP}px`,
+                          top: `${dotYForNote(slot.note.yPx, slot.note.kind) - slot.note.yPx}px`,
+                          width: `${DOT_RADIUS * 2}px`,
+                          height: `${DOT_RADIUS * 2}px`,
+                          opacity: slot.opacity,
+                        }}
+                        aria-hidden
+                      />
+                    )}
 
                     {/* Note name label (easy mode) */}
                     {slot.note.showLabel && (
@@ -329,6 +558,43 @@ export default function StaffJumperGame({
                 )
               })}
             </div>
+          </div>
+
+          {/*
+            Clef and key signature stay pinned at the left edge. They used to
+            live in the scrolling world and disappeared after a few notes, which
+            left hard mode with no key signature to read.
+          */}
+          <div
+            className="sj-staff-head"
+            style={{
+              transform: `translateY(${baseY}px) scale(${scale})`,
+              transformOrigin: '0 0',
+              width: `${staffHead.width}px`,
+              height: `${STAFF_CANVAS_HEIGHT}px`,
+            }}
+          >
+            <StaffGlyph
+              name={staffHead.clefName}
+              spacePx={STAFF_SPACE_PX}
+              staffY={CLEF_ANCHOR_YPX[config.clef]}
+              x={STAFF_CLEF_X}
+              metrics={glyphMetrics}
+              className="sj-clef"
+            />
+
+            {keySignature.map((marker, index) => (
+              <StaffGlyph
+                key={`${marker.symbol}-${marker.yPx}-${index}`}
+                name={glyphNameForAccidental(marker.symbol)}
+                spacePx={STAFF_SPACE_PX}
+                staffY={marker.yPx}
+                x={staffHead.signatureX + index * keySignatureStepPx(marker.symbol, STAFF_SPACE_PX)}
+                metrics={glyphMetrics}
+                className="sj-key-signature__symbol"
+              />
+            ))}
+
           </div>
         </div>
 
@@ -387,6 +653,13 @@ export default function StaffJumperGame({
             </div>
           )}
 
+          {state.isCountingIn && (
+            <div className="sj-count-in" role="status">
+              <strong>Listen for the count-in</strong>
+              <small>{config.tempoBpm} BPM · {TIME_SIGNATURE.beats}/{TIME_SIGNATURE.beatValue}</small>
+            </div>
+          )}
+
           <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
             {feedbackAnnouncement} {targetAnnouncement}
           </p>
@@ -404,13 +677,14 @@ export default function StaffJumperGame({
                   : state.feedback === 'timeout'
                     ? 'Time’s up'
                     : 'Wrong note'}
+              {timingLabel && <em className={`sj-feedback-toast__timing sj-timing--${state.timing}`}>{timingLabel}</em>}
             </div>
           )}
 
           {!state.isFalling && (
             <div className="sj-target-dock">
               <div className="sj-target-dock__meta">
-                <span>Note {state.sequenceStep + 1}</span>
+                <span>{target.patternName}</span>
                 <span>{DIFFICULTY_LABELS[config.difficulty]}</span>
               </div>
               <div className="sj-target-dock__notes">

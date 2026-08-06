@@ -86,12 +86,93 @@ export const TREBLE_NOTE_YPX: Record<string, number> = {
   C4: STAFF_TOP_Y + STAFF_LINE_GAP * 5,         // ledger below staff
 }
 
-/** Notehead dimensions in world pixels. */
-export const NOTEHEAD_W = 50
-export const NOTEHEAD_H = 38
+/**
+ * One staff space — the white gap between two lines. Every engraved dimension
+ * in this game is expressed as a multiple of it, which is how real notation
+ * stays in proportion at any size.
+ */
+export const STAFF_SPACE_PX = STAFF_LINE_GAP
 
-/** Ledger line extends beyond each side of the notehead. */
-export const LEDGER_LINE_W = NOTEHEAD_W + 14
+/**
+ * Notehead dimensions in world pixels.
+ * An engraved notehead fills one staff space vertically and is a little wider
+ * than it is tall.
+ */
+export const NOTEHEAD_H = Math.round(STAFF_SPACE_PX * 0.96)
+export const NOTEHEAD_W = Math.round(NOTEHEAD_H * 1.28)
+
+/** Ledger line extends about a third of a space past each side of the head. */
+export const LEDGER_LINE_W = Math.round(NOTEHEAD_W + STAFF_SPACE_PX * 0.66)
+
+/** Rule thickness. Ledger lines are drawn a touch heavier than staff lines. */
+export const STAFF_LINE_THICKNESS = 3.4
+export const LEDGER_LINE_THICKNESS = 4.2
+
+/* ── Rhythm notation, all in engraved staff-space proportions ────────────── */
+
+/** Stem reaches an octave — 3.5 spaces — from the notehead centre. */
+export const STEM_LENGTH = STAFF_SPACE_PX * 3.5
+export const STEM_THICKNESS = Math.max(2.6, STAFF_SPACE_PX * 0.12)
+
+/** Beams are half a space thick, spaced three quarters of a space apart. */
+export const BEAM_THICKNESS = STAFF_SPACE_PX * 0.5
+export const BEAM_SPACING = STAFF_SPACE_PX * 0.75
+
+/** A beam never slants more than this, however far the pitches jump. */
+export const BEAM_MAX_SLANT = STAFF_SPACE_PX * 1.5
+
+/** Hollow (half and whole) noteheads are drawn as rings of this weight. */
+export const NOTEHEAD_RING_THICKNESS = Math.max(3, STAFF_SPACE_PX * 0.17)
+
+/** Augmentation dot. */
+export const DOT_RADIUS = STAFF_SPACE_PX * 0.17
+export const DOT_GAP = STAFF_SPACE_PX * 0.42
+
+export const BARLINE_THICKNESS = Math.max(2.6, STAFF_SPACE_PX * 0.11)
+
+/** Time signature numerals, sized to span two staff spaces each. */
+export const TIME_SIGNATURE_FONT_SIZE = STAFF_SPACE_PX * 2.35
+
+/**
+ * Where each numeral sits: the upper number is centred on the second space
+ * from the top, the lower on the second space from the bottom.
+ */
+export const TIME_SIGNATURE_YPX: Record<StaffJumperClef, { top: number; bottom: number }> = {
+  treble: { top: STAFF_TOP_Y + STAFF_LINE_GAP, bottom: STAFF_TOP_Y + STAFF_LINE_GAP * 3 },
+  bass: { top: STAFF_TOP_Y + STAFF_LINE_GAP, bottom: STAFF_TOP_Y + STAFF_LINE_GAP * 3 },
+}
+
+export type StemDirection = 'up' | 'down'
+
+/**
+ * Stems point away from the middle line, so notes high on the staff hang their
+ * stem down and low notes push it up — the rule that keeps a line of music
+ * inside its own staff.
+ */
+export function stemDirectionForY(yPx: number): StemDirection {
+  return yPx > STAFF_MIDDLE_Y ? 'up' : 'down'
+}
+
+/** X of the stem's centre line, on whichever side of the head it belongs. */
+export function stemXForNote(noteXPx: number, direction: StemDirection): number {
+  const offset = NOTEHEAD_W / 2 - STEM_THICKNESS / 2
+  return direction === 'up' ? noteXPx + offset : noteXPx - offset
+}
+
+/** Y of the stem tip when the note is not part of a beam group. */
+export function stemTipY(noteYPx: number, direction: StemDirection): number {
+  return direction === 'up' ? noteYPx - STEM_LENGTH : noteYPx + STEM_LENGTH
+}
+
+/**
+ * Y of an augmentation dot.
+ *
+ * A dot always sits in a space, so a note sitting on a line pushes its dot up
+ * into the space above rather than colliding with the rule.
+ */
+export function dotYForNote(noteYPx: number, kind: 'ledger' | 'space' | 'line'): number {
+  return kind === 'space' ? noteYPx : noteYPx - STAFF_HALF_STEP
+}
 
 /**
  * Vertical world span includes all generated targets and their ledger rules.
@@ -102,23 +183,43 @@ export const STAFF_CANVAS_HEIGHT = STAFF_BOTTOM_Y + STAFF_LINE_GAP * 3
 /** First notehead X in the scrolling world. */
 export const STAFF_FIRST_NOTE_X = 250
 
-/** Clef left edge in the scrolling world. */
-export const STAFF_CLEF_X = 12
+/**
+ * Time signature X in the scrolling world, sitting just before the first note.
+ * It scrolls out of view with the music, the way a printed score states the
+ * meter once and moves on.
+ */
+export const TIME_SIGNATURE_X = STAFF_FIRST_NOTE_X - Math.round(STAFF_SPACE_PX * 2.6)
+
+/** Clef left edge in the pinned head of the staff. */
+export const STAFF_CLEF_X = 14
+
+/** Gap between the clef and the first key-signature accidental. */
+export const CLEF_TO_SIGNATURE_GAP = Math.round(STAFF_SPACE_PX * 0.55)
+
+/** Gap between the pinned staff head and the first scrolling notehead. */
+export const SIGNATURE_TO_NOTE_GAP = Math.round(STAFF_SPACE_PX * 0.9)
 
 /**
- * Treble clef glyph size in world px.
- * Spans roughly one staff height plus ledger curl — matches engraved proportions.
+ * Staff position each clef names, used to anchor its glyph.
+ * The G clef spirals around the second line from the bottom; the F clef's dot
+ * sits on the fourth line.
  */
-export const TREBLE_CLEF_FONT_SIZE = STAFF_LINE_GAP * 8.2
-
-/** Bass clefs occupy less vertical space than a G clef. */
-export const BASS_CLEF_FONT_SIZE = STAFF_LINE_GAP * 3.8
+export const CLEF_ANCHOR_YPX: Record<StaffJumperClef, number> = {
+  treble: STAFF_TOP_Y + STAFF_LINE_GAP * 3,
+  bass: STAFF_TOP_Y + STAFF_LINE_GAP * 1,
+}
 
 /** Horizontal spacing between noteheads (world px). */
-export const NOTE_SPACING_PX = 100
+export const NOTE_SPACING_PX = 96
 
-/** Player anchor leaves the clef visible and the next target clear on phones. */
-export const PLAYER_ANCHOR_X_PX = 206
+/**
+ * Minimum screen X for the player. The real anchor also clears the pinned
+ * clef and key signature, which get wider with six sharps or flats.
+ *
+ * Every pixel here is a pixel of lookahead lost, so it sits just far enough in
+ * to keep the landed note visible behind the player.
+ */
+export const PLAYER_ANCHOR_X_PX = 124
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const
 export const STAFF_NOTE_LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const

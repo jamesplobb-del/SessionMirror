@@ -21,145 +21,424 @@
   max-height: 100%;
 }
 
-.sj-setup-header {
+/* Written-pitch chips — the instrument choice reads better as cards than as a
+   dropdown of key names. Scrolls horizontally on narrow phones. */
+/* ─────────────────────────────────────────────
+   Setup screen
+
+   Deliberately flat: ink on paper, hairline rules, and the selected option is
+   just the word in black with a rule under it. No pill trays, no tinted
+   capsules, no gradients — those are what made this read as a generic form.
+───────────────────────────────────────────── */
+.sj-screen--setup {
+  --sj-ink: #16181d;
+  --sj-muted: #767d89;
+  --sj-hair: rgba(22, 24, 29, 0.09);
+  --sj-paper: #ffffff;
+  background: #f2f1ee;
+  gap: 0.85rem;
+}
+
+/* ── Header ── */
+.sj-head {
   display: grid;
-  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1.15rem;
+  gap: 0.7rem;
 }
 
-.sj-setup-header__title {
-  min-width: 0;
-}
-
-.sj-setup-header__title h1,
-.sj-setup-header__title p,
-.sj-setup-best,
-.sj-setup-intro h2,
-.sj-setup-intro p,
-.sj-mic-status p {
-  margin: 0;
-}
-
-.sj-setup-header__title h1 {
-  color: #172033;
-  font-size: 1.15rem;
-  font-weight: 760;
-  letter-spacing: -0.025em;
-}
-
-.sj-setup-header__title p {
-  margin-top: 0.08rem;
-  color: #7a8495;
-  font-size: 0.68rem;
-  font-weight: 650;
-}
-
-.sj-setup-best {
+.sj-head__back {
   display: grid;
-  min-width: 3.55rem;
-  padding: 0.42rem 0.62rem;
-  border: 1px solid rgba(24, 32, 51, 0.07);
-  border-radius: 0.85rem;
-  text-align: right;
-  background: rgba(255, 255, 255, 0.76);
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  color: var(--sj-ink);
+  background: transparent;
 }
 
-.sj-setup-best span {
-  color: #8a94a6;
-  font-size: 0.52rem;
+.sj-head__back svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke-width: 2;
+}
+
+.sj-head__title h1,
+.sj-head__title p,
+.sj-head__best small,
+.sj-head__best strong {
+  margin: 0;
+  display: block;
+}
+
+.sj-head__title h1 {
+  color: var(--sj-ink);
+  font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: -0.02em;
+}
+
+.sj-head__title p {
+  color: var(--sj-muted);
+  font-size: 0.68rem;
+}
+
+.sj-head__best {
+  text-align: right;
+}
+
+.sj-head__best small {
+  color: var(--sj-muted);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.sj-setup-best strong {
-  margin-top: 0.05rem;
-  color: #172033;
-  font-size: 0.85rem;
+.sj-head__best strong {
+  color: var(--sj-ink);
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
 }
 
-.sj-setup-intro {
-  padding: 0.15rem 0.2rem 0.55rem;
+/* ── The brief: what this run actually is ── */
+.sj-brief {
+  padding: 1.1rem 1.15rem 0.9rem;
+  border-radius: 0.9rem;
+  background: var(--sj-paper);
+  box-shadow: 0 1px 0 var(--sj-hair);
 }
 
-.sj-setup-intro h2 {
-  color: #172033;
-  font-size: clamp(1.38rem, 5.8vw, 1.85rem);
-  font-weight: 750;
-  letter-spacing: -0.045em;
+.sj-brief p,
+.sj-brief h2 {
+  margin: 0;
 }
 
-.sj-setup-intro p {
-  max-width: 31rem;
-  margin-top: 0.42rem;
-  color: #667085;
-  font-size: 0.78rem;
+.sj-brief__kicker {
+  color: var(--sj-muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sj-brief__scale {
+  margin-top: 0.3rem;
+  color: var(--sj-ink);
+  font-size: clamp(1.5rem, 6.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.sj-brief__range {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
+.sj-brief__range strong {
+  color: var(--sj-ink);
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+.sj-brief__range span {
+  color: var(--sj-muted);
+  font-size: 0.72rem;
+}
+
+.sj-brief__meta {
+  margin-top: 0.3rem;
+  color: var(--sj-muted);
+  font-size: 0.7rem;
   line-height: 1.45;
 }
 
-.sj-mic-status {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+/* ── Mic strip ── */
+.sj-mic {
+  display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.72rem 0.78rem;
-  border: 1px solid rgba(24, 32, 51, 0.07);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.76);
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sj-hair);
+  color: var(--sj-muted);
+  font-size: 0.72rem;
 }
 
-.sj-mic-status__dot {
-  width: 0.55rem;
-  height: 0.55rem;
+.sj-mic svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.sj-mic span {
+  flex: 1 1 auto;
+}
+
+.sj-mic small {
+  font-size: 0.62rem;
+}
+
+.sj-mic--live {
+  color: #17694a;
+}
+
+/* ── Settings sheets ── */
+.sj-sheet {
+  padding: 0 1.15rem;
+  border-radius: 0.9rem;
+  background: var(--sj-paper);
+  box-shadow: 0 1px 0 var(--sj-hair);
+}
+
+.sj-field {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.15rem;
+  padding: 0.55rem 0;
+  border: 0;
+  border-top: 1px solid var(--sj-hair);
+  text-align: left;
+  background: transparent;
+}
+
+.sj-sheet > .sj-field:first-child {
+  border-top: 0;
+}
+
+/* Controls that need the full width sit under their label instead of beside it. */
+.sj-field--stack {
+  display: block;
+  padding: 0.85rem 0;
+}
+
+.sj-field--switch {
+  cursor: pointer;
+}
+
+.sj-field__label {
+  margin: 0;
+  color: var(--sj-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* The trailing hint on a label — plain grey, not a badge. */
+.sj-field__label span {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--sj-muted);
+  font-size: 0.68rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.sj-field--stack .sj-field__label {
+  margin-bottom: 0.6rem;
+}
+
+.sj-field__note {
+  margin: 0.55rem 0 0;
+  color: var(--sj-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* ── Inline options ── */
+.sj-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+}
+
+.sj-field:not(.sj-field--stack) .sj-options {
+  justify-content: flex-end;
+}
+
+.sj-option {
+  padding: 0.3rem 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--sj-muted);
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.sj-option--on {
+  border-bottom-color: var(--sj-ink);
+  color: var(--sj-ink);
+  font-weight: 680;
+}
+
+/* ── Key grid ── */
+.sj-keys {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--sj-hair);
+  border-radius: 0.5rem;
+  background: var(--sj-hair);
+}
+
+.sj-key {
+  min-height: 2.5rem;
+  border: 0;
+  border-radius: 0;
+  color: var(--sj-muted);
+  background: var(--sj-paper);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sj-key--on {
+  color: #fff;
+  background: var(--sj-ink);
+}
+
+/* ── Tempo ── */
+.sj-tempo {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.sj-tempo__step {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border: 1px solid var(--sj-hair);
+  border-radius: 0.5rem;
+  color: var(--sj-ink);
+  background: transparent;
+}
+
+.sj-tempo__step svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  stroke-width: 2.5;
+}
+
+.sj-tempo__value {
+  min-width: 2.9rem;
+  color: var(--sj-ink);
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.sj-slider {
+  width: 100%;
+  accent-color: var(--sj-ink);
+}
+
+/* ── Switch ── */
+.sj-switch {
+  position: relative;
+  width: 2.55rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #d9d7d2;
+  transition: background-color 160ms ease;
+}
+
+.sj-switch::after {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.2rem;
+  height: 1.2rem;
   border-radius: 50%;
-  background: #aeb6c2;
-  box-shadow: 0 0 0 0.25rem rgba(174, 182, 194, 0.12);
+  background: #fff;
+  content: '';
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.25);
+  transition: transform 160ms ease;
 }
 
-.sj-mic-status--live .sj-mic-status__dot {
-  background: #16a36e;
-  box-shadow: 0 0 0 0.25rem rgba(22, 163, 110, 0.12);
+.sj-switch--on {
+  background: var(--sj-ink);
 }
 
-.sj-mic-status > div,
-.sj-mic-status > p {
+.sj-switch--on::after {
+  transform: translateX(1.05rem);
+}
+
+/* ── Character picker ── */
+.sj-characters__grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.sj-character {
   display: grid;
   min-width: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 0.2rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  background: #f6f5f2;
 }
 
-.sj-mic-status > p {
-  min-width: 3.5rem;
-  text-align: right;
+.sj-character img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
-.sj-mic-status strong {
-  overflow: hidden;
-  color: #344054;
-  font-size: 0.7rem;
-  font-weight: 730;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.sj-character--on {
+  border-color: var(--sj-ink);
+  background: #fff;
 }
 
-.sj-mic-status > p strong {
-  color: #172033;
-  font-size: 0.95rem;
+/* ── Start ── */
+.sj-start {
+  position: sticky;
+  z-index: 8;
+  bottom: -0.75rem;
+  padding: 0.7rem 0 0.8rem;
+  background: linear-gradient(180deg, rgba(242, 241, 238, 0), #f2f1ee 26%);
 }
 
-.sj-mic-status--live > p strong {
-  color: #087f5b;
+.sj-start__button {
+  display: flex;
+  width: 100%;
+  min-height: 3.3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.8rem;
+  color: #fff;
+  background: var(--sj-ink);
+  font-size: 0.92rem;
+  font-weight: 650;
 }
 
-.sj-mic-status small {
-  margin-top: 0.08rem;
-  overflow: hidden;
-  color: #8a94a6;
-  font-size: 0.58rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.sj-start__button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: currentColor;
+}
+
+.sj-start p {
+  margin: 0.5rem 0 0;
+  color: var(--sj-muted);
+  font-size: 0.66rem;
+  text-align: center;
 }
 
 .sj-state-screen {
@@ -292,6 +571,24 @@
   will-change: transform;
 }
 
+/* Five lines and their band never scroll — they are the same at every X. */
+.sj-staff-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Pinned clef + key signature, drawn over the scrolling noteheads. */
+.sj-staff-head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: #1c1917;
+  pointer-events: none;
+}
+
+
 /* Soft white band behind the 5 lines */
 .sj-staff-band {
   position: absolute;
@@ -312,54 +609,20 @@
 .sj-staff-line {
   position: absolute;
   left: 0;
-  height: 2px;
   background: #1c1917;
 }
 
 /* ─────────────────────────────────────────────
-   Clefs
+   Clef and key signature
+
+   Both are <StaffGlyph> SVGs sized from the staff, so all that is left here
+   is ink color and stacking.
 ───────────────────────────────────────────── */
-.sj-clef {
-  position: absolute;
-  font-family: 'Apple Symbols', 'Noto Music', 'Noto Sans Symbols 2', serif;
-  line-height: 1;
+.sj-clef,
+.sj-key-signature__symbol {
   color: #1c1917;
   pointer-events: none;
   user-select: none;
-  white-space: nowrap;
-}
-
-.sj-clef[data-clef='treble'] {
-  width: 6.5rem;
-  transform: translateX(-7%);
-}
-
-.sj-clef[data-clef='bass'] {
-  width: 5.4rem;
-  transform: translateX(-3%);
-}
-
-/* ─────────────────────────────────────────────
-   Key signature
-───────────────────────────────────────────── */
-.sj-key-signature {
-  position: absolute;
-  top: 0;
-  pointer-events: none;
-}
-
-.sj-key-signature__symbol {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  font-family: 'Apple Symbols', 'Noto Music', 'Noto Sans Symbols 2', serif;
-  font-size: 52px;
-  font-weight: 500;
-  color: #1c1917;
-  line-height: 1;
-}
-
-.sj-key-signature__symbol[data-accidental='b'] {
-  transform: translate(-50%, -63%);
 }
 
 /* ─────────────────────────────────────────────
@@ -405,6 +668,110 @@
   box-shadow: 0 1px 2px rgba(23, 26, 34, 0.10);
 }
 
+/* Half and whole notes are rings. Border width comes from world-px constants. */
+.sj-note__head--hollow {
+  background: transparent;
+  border-style: solid;
+  border-color: #1c1917;
+  box-shadow: none;
+}
+
+/* ── Augmentation dot ───────────────────────*/
+.sj-note__dot {
+  position: absolute;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: #1c1917;
+  z-index: 3;
+}
+
+/* ── Stems, beams, flags, barlines ──────────
+   One SVG in world coordinates, beneath the noteheads so a stem tucks under
+   the head it belongs to.
+*/
+.sj-rhythm-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.sj-stem,
+.sj-flag {
+  fill: #1c1917;
+}
+
+.sj-beam {
+  stroke: #1c1917;
+}
+
+.sj-barline {
+  fill: #1c1917;
+  opacity: 0.55;
+}
+
+/* ── Count-in + timing feedback ─────────────*/
+.sj-count-in {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 0.7rem 1.1rem;
+  border-radius: 1rem;
+  color: #fff;
+  background: rgba(23, 32, 51, 0.86);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.24);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: sj-count-in-pulse 1.1s ease-in-out infinite;
+}
+
+.sj-count-in strong {
+  font-size: 0.82rem;
+  font-weight: 760;
+}
+
+.sj-count-in small {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+@keyframes sj-count-in-pulse {
+  50% { transform: translate(-50%, -50%) scale(1.035); }
+}
+
+.sj-feedback-toast__timing {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.sj-timing--on { color: #0b7a53; }
+.sj-timing--early,
+.sj-timing--late { color: #a8620a; }
+
+/* ── Time signature ─────────────────────────*/
+.sj-time-signature {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.sj-time-signature text {
+  fill: #1c1917;
+  font-family: 'Palatino', 'Times New Roman', Georgia, serif;
+  font-weight: 700;
+}
+
 /* ── Ledger line ────────────────────────────
    MUST pass through the notehead center.
    translate(-50%, -50%) centers the 2px rule on (0,0).
@@ -412,7 +779,6 @@
 */
 .sj-note__ledger {
   position: absolute;
-  height: 2px;
   background: #1c1917;
   transform: translate(-50%, -50%);
   top: 0;
@@ -420,31 +786,25 @@
   z-index: 1;
 }
 
-/* ── Accidental ─────────────────────────────*/
+/* ── Accidental ─────────────────────────────
+   Position and size come from <StaffGlyph>; only ink color lives here.
+*/
 .sj-note__accidental {
-  position: absolute;
-  left: -45px;
-  transform: translateY(-50%);
-  font-family: 'Apple Symbols', 'Noto Music', 'Noto Sans Symbols 2', serif;
-  font-size: 52px;
-  font-weight: 500;
   color: #1c1917;
-  line-height: 1;
   z-index: 3;
 }
 
-.sj-note__accidental[data-accidental='b'] {
-  transform: translateY(-63%);
-}
-
-/* ── Note name label ─────────────────────── */
+/* ── Note name label ───────────────────────
+   Sized in world px, not rem: this lives inside the scaled staff world, so a
+   rem-based size shrinks twice and ends up unreadable on a phone.
+*/
 .sj-note__label {
   position: absolute;
-  top: 28px;        /* just below the notehead bottom edge: NOTEHEAD_H/2 + gap */
+  top: 34px;        /* just below the notehead bottom edge: NOTEHEAD_H/2 + gap */
   transform: translateX(-50%);
-  font-size: 0.62rem;
+  font-size: 26px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: #57534e;
   white-space: nowrap;
   z-index: 3;

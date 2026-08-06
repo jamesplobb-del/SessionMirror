@@ -13,6 +13,14 @@ import {
   type StaffJumperClef,
   type StaffNoteLetter,
 } from './staffNotationMap'
+import { getWrittenRange, STAFF_CENTER_MIDI } from './staffJumperInstrumentRanges'
+import {
+  getRhythmSlot,
+  resolveRhythm,
+  type RhythmSlot,
+  type StaffJumperRhythm,
+} from './staffJumperRhythm'
+import { buildExerciseBlock, type PatternStep } from './staffJumperPatterns'
 
 export const STAFF_JUMPER_MAJOR_KEYS = [
   'C',
@@ -75,9 +83,9 @@ export const DIFFICULTY_LABELS: Record<StaffJumperDifficulty, string> = {
 }
 
 export const DIFFICULTY_DESCRIPTIONS: Record<StaffJumperDifficulty, string> = {
-  easy: 'Note names are shown and the scale repeats.',
-  medium: 'Starts with the scale, then moves through interval patterns.',
-  hard: 'Starts with the scale, then adds leaps, arpeggios, and key signatures.',
+  easy: 'Note names shown. Stepwise runs and neighbour tones.',
+  medium: 'Adds triads, broken thirds and turns.',
+  hard: 'Adds seventh chords, wide intervals and key signatures.',
 }
 
 export const DIFFICULTY_TIMEOUT_SECONDS: Record<StaffJumperDifficulty, number> = {
@@ -125,8 +133,15 @@ export interface StaffJumperConfig {
   tunerInstrument: TunerInstrument
   transposition: ScaleRushTransposition
   playerModel: ScaleRushPlayerModelId
+  rhythm: StaffJumperRhythm
+  tempoBpm: number
+  metronome: boolean
+  drone: boolean
   sessionSeed?: number
 }
+
+/** How a landed note sat against the beat it was written on. */
+export type StaffJumperTiming = 'early' | 'on' | 'late' | null
 
 export interface StaffJumperState {
   phase: StaffJumperPhase
@@ -149,6 +164,12 @@ export interface StaffJumperState {
   endedAtMs: number | null
   pausedAtMs: number | null
   pausedDurationMs: number
+  /** Timing of the most recent landing, and how far off it was in ms. */
+  timing: StaffJumperTiming
+  timingErrorMs: number
+  onTimeCount: number
+  /** True while the count-in is still running and pitch is ignored. */
+  isCountingIn: boolean
 }
 
 export interface TargetNote {
@@ -163,6 +184,12 @@ export interface TargetNote {
   writtenOctave: number
   accidental: '#' | 'b' | null
   showLabel: boolean
+  /** Rhythm — how the note is written and where it falls in the bar. */
+  rhythm: RhythmSlot
+  /** World X of the notehead, spaced by duration rather than by index. */
+  xPx: number
+  /** Exercise shape this note belongs to, e.g. "Triad", "Broken thirds". */
+  patternName: string
 }
 
 export interface KeySignatureMarker {
@@ -207,9 +234,9 @@ const MAJOR_FLAT_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {
   Gb: 6,
 }
 
-/** Resulting pitch classes after each signature accidental is applied. */
-const SHARP_PCS = [6, 1, 8, 3, 10, 5, 0] as const
-const FLAT_PCS = [10, 3, 8, 1, 6, 11, 4] as const
+/** The order accidentals are added to a key signature. */
+const SHARP_LETTER_ORDER: readonly StaffNoteLetter[] = ['F', 'C', 'G', 'D', 'A', 'E', 'B']
+const FLAT_LETTER_ORDER: readonly StaffNoteLetter[] = ['B', 'E', 'A', 'D', 'G', 'C', 'F']
 
 function signatureMajorKey(key: StaffJumperKey, scaleMode: StaffJumperScaleMode): StaffJumperMajorKey {
   if (scaleMode === 'major') return key as StaffJumperMajorKey
@@ -232,21 +259,29 @@ function signatureMajorKey(key: StaffJumperKey, scaleMode: StaffJumperScaleMode)
   return majorByPc[majorPc] ?? 'C'
 }
 
-function keySignaturePitchClasses(key: StaffJumperKey, scaleMode: StaffJumperScaleMode): Set<number> {
+/**
+ * Which letters the key signature already alters, and how.
+ *
+ * Keyed by letter rather than pitch class: a signature sharpens the letter F,
+ * not "everything that sounds like F♯". Matching on pitch class would wrongly
+ * swallow an enharmonic spelling such as a written G♭ in a key that only
+ * signs F♯.
+ */
+function keySignatureAccidentals(
+  key: StaffJumperKey,
+  scaleMode: StaffJumperScaleMode,
+): Map<StaffNoteLetter, '#' | 'b'> {
   const majorKey = signatureMajorKey(key, scaleMode)
   const sharpCount = MAJOR_SHARP_COUNT[majorKey] ?? 0
   const flatCount = MAJOR_FLAT_COUNT[majorKey] ?? 0
-  const pcs = new Set<number>()
-  if (sharpCount > 0) {
-    for (let index = 0; index < sharpCount; index += 1) {
-      pcs.add(SHARP_PCS[index]!)
-    }
-  } else if (flatCount > 0) {
-    for (let index = 0; index < flatCount; index += 1) {
-      pcs.add(FLAT_PCS[index]!)
-    }
+  const accidentals = new Map<StaffNoteLetter, '#' | 'b'>()
+  for (let index = 0; index < sharpCount; index += 1) {
+    accidentals.set(SHARP_LETTER_ORDER[index]!, '#')
   }
-  return pcs
+  for (let index = 0; index < flatCount; index += 1) {
+    accidentals.set(FLAT_LETTER_ORDER[index]!, 'b')
+  }
+  return accidentals
 }
 
 export function getKeySignatureMarkers(
@@ -273,15 +308,15 @@ export function getKeySignatureMarkers(
 }
 
 function accidentalForNote(
-  pitchClass: number,
+  letter: StaffNoteLetter,
   writtenAccidental: '#' | 'b' | null,
   key: StaffJumperKey,
   scaleMode: StaffJumperScaleMode,
   difficulty: StaffJumperDifficulty,
 ): '#' | 'b' | null {
   if (writtenAccidental == null) return null
-  const normalized = ((pitchClass % 12) + 12) % 12
-  if (difficulty === 'hard' && keySignaturePitchClasses(key, scaleMode).has(normalized)) {
+  // Hard mode prints the key signature, so signed letters carry no accidental.
+  if (difficulty === 'hard' && keySignatureAccidentals(key, scaleMode).get(letter) === writtenAccidental) {
     return null
   }
   return writtenAccidental
@@ -361,35 +396,71 @@ export function pitchClassLabel(pitchClass: number, key: StaffJumperKey): string
 }
 
 function midiForScaleDegree(
-  key: StaffJumperKey,
   scaleMode: StaffJumperScaleMode,
   degreeIndex: number,
-  baseOctave: number,
+  rootMidi: number,
 ): number {
   const pattern = scalePattern(scaleMode)
-  const rootPc = keyPitchClass(key)
   const octaveOffset = Math.floor(degreeIndex / 7)
   const degreeInOctave = degreeIndex % 7
   const semitoneFromRoot = pattern[degreeInOctave]! + octaveOffset * 12
-  const rootMidi = (baseOctave + 1) * 12 + rootPc
   return rootMidi + semitoneFromRoot
+}
+
+/**
+ * Choose the octave the scale is written in.
+ *
+ * Two competing goals: the whole scale must sit inside what the instrument can
+ * actually play, and it should sit as close to the middle of the staff as
+ * possible so it stays readable. Fit wins — the weight makes one semitone of
+ * range overflow cost more than any amount of off-center placement — and
+ * centering only breaks ties between octaves that both fit.
+ *
+ * This is what keeps a 2-octave Bb trumpet scale on Bb3–Bb5 instead of running
+ * up to Bb6 on four ledger lines.
+ */
+const RANGE_OVERFLOW_WEIGHT = 100
+
+export function resolveScaleRootMidi(
+  config: Pick<StaffJumperConfig, 'key' | 'range' | 'clef' | 'transposition' | 'tunerInstrument'>,
+): number {
+  const rootPitchClass = keyPitchClass(config.key)
+  const spanSemitones = (config.range === '1-octave' ? 1 : 2) * 12
+  const { minMidi, maxMidi } = getWrittenRange(
+    config.transposition,
+    config.clef,
+    config.tunerInstrument,
+  )
+  const staffCenter = STAFF_CENTER_MIDI[config.clef]
+
+  let bestRoot = minMidi
+  let bestScore = Number.POSITIVE_INFINITY
+
+  // Every octave of the root that could plausibly land on a five-line staff.
+  for (let candidate = rootPitchClass + 12; candidate <= 108; candidate += 12) {
+    const overflow =
+      Math.max(0, minMidi - candidate) + Math.max(0, candidate + spanSemitones - maxMidi)
+    const centerError = Math.abs(candidate + spanSemitones / 2 - staffCenter)
+    const score = overflow * RANGE_OVERFLOW_WEIGHT + centerError
+    if (score < bestScore) {
+      bestScore = score
+      bestRoot = candidate
+    }
+  }
+
+  return bestRoot
 }
 
 function topDegreeForRange(range: StaffJumperRange): number {
   return range === '1-octave' ? 7 : 14
 }
 
-/** A repeating up-and-down scale with no duplicated turn-around notes. */
-export function buildRepeatingScaleDegreePath(
-  config: Pick<StaffJumperConfig, 'range'>,
-): number[] {
-  const topDegree = topDegreeForRange(config.range)
-  const ascending = Array.from({ length: topDegree + 1 }, (_, degree) => degree)
-  const descending = Array.from({ length: Math.max(0, topDegree - 1) }, (_, index) => topDegree - 1 - index)
-  return [...ascending, ...descending]
-}
-
-/** A complete scale statement used before medium and hard pattern work. */
+/**
+ * A complete scale statement, up and down, that opens every run.
+ *
+ * It orients the player in the key before the patterns start, and it is the one
+ * part of the exercise that is the same every time.
+ */
 export function buildScaleIntroDegreePath(
   config: Pick<StaffJumperConfig, 'range'>,
 ): number[] {
@@ -400,12 +471,12 @@ export function buildScaleIntroDegreePath(
   ]
 }
 
-interface DegreePatternCache {
-  notes: number[]
+interface ExerciseCache {
+  steps: PatternStep[]
   blockCount: number
 }
 
-const degreePatternCache = new WeakMap<StaffJumperConfig, DegreePatternCache>()
+const exerciseCache = new WeakMap<StaffJumperConfig, ExerciseCache>()
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0
@@ -418,71 +489,93 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-function appendDifficultyPattern(config: StaffJumperConfig, cache: DegreePatternCache): void {
-  const topDegree = topDegreeForRange(config.range)
-  const rng = mulberry32((config.sessionSeed ?? 1) + cache.blockCount * 7919)
-  let block: number[]
-
-  if (config.difficulty === 'medium') {
-    const start = Math.floor(rng() * Math.max(1, topDegree - 3))
-    const templates = [
-      [start, start + 2, start + 1, start + 3],
-      [start, start + 1, start + 2, start + 1],
-      [start + 3, start + 1, start + 2, start],
-    ]
-    block = [...templates[Math.floor(rng() * templates.length)]!]
-  } else {
-    const start = Math.floor(rng() * Math.max(1, topDegree - 4))
-    const templates = [
-      [start, start + 2, start + 4, start + 2],
-      [start, start + 3, start + 1, start + 4],
-      [start + 4, start + 1, start + 3, start],
-    ]
-    block = [...templates[Math.floor(rng() * templates.length)]!]
-    if (rng() > 0.55) {
-      block.push(Math.floor(rng() * (topDegree + 1)))
-    }
-  }
-
-  block = block.map((degree) => Math.max(0, Math.min(topDegree, degree)))
-  const previousDegree = cache.notes.at(-1) ?? 0
-  while (block.length > 0 && block[0] === previousDegree) block.shift()
-  cache.notes.push(...block)
+function appendExerciseBlock(config: StaffJumperConfig, cache: ExerciseCache): void {
+  const previous = cache.steps.at(-1)
+  // The very first block follows the opening scale, which always lands on the
+  // tonic — so that is what it has to avoid restating.
+  const previousDegree = previous?.degree ?? buildScaleIntroDegreePath(config).at(-1) ?? 0
+  const block = buildExerciseBlock({
+    difficulty: config.difficulty,
+    topDegree: topDegreeForRange(config.range),
+    rng: mulberry32((config.sessionSeed ?? 1) + cache.blockCount * 7919),
+    previousDegree,
+    previousPatternId: previous?.patternId ?? null,
+  })
   cache.blockCount += 1
+
+  // Never restate the note the player is already standing on.
+  while (block.length > 0 && block[0]!.degree === previousDegree) block.shift()
+  cache.steps.push(...block)
 }
 
-function patternDegreeAt(config: StaffJumperConfig, patternIndex: number): number {
-  let cache = degreePatternCache.get(config)
+/**
+ * Pattern work for one step past the opening scale, generated lazily.
+ *
+ * Memoized against the config object, which carries the run's `sessionSeed` —
+ * a new run means a new object and therefore a new exercise.
+ */
+function exerciseStepAt(config: StaffJumperConfig, patternIndex: number): PatternStep {
+  let cache = exerciseCache.get(config)
   if (!cache) {
-    cache = { notes: [], blockCount: 0 }
-    degreePatternCache.set(config, cache)
+    cache = { steps: [], blockCount: 0 }
+    exerciseCache.set(config, cache)
   }
-  while (patternIndex >= cache.notes.length) appendDifficultyPattern(config, cache)
-  return cache.notes[patternIndex]!
+  // Blocks can come back empty if a pattern does not fit the range; the counter
+  // still advances, so the seed moves on and this cannot spin forever.
+  let guard = 0
+  while (patternIndex >= cache.steps.length && guard < 64) {
+    appendExerciseBlock(config, cache)
+    guard += 1
+  }
+  return cache.steps[patternIndex] ?? { degree: 0, patternId: 'tonic', patternName: 'Tonic' }
+}
+
+/** Degree and pattern for a step — the intro scale, then randomized patterns. */
+export function exerciseStepForSequenceStep(
+  config: StaffJumperConfig,
+  sequenceStep: number,
+): PatternStep {
+  const intro = buildScaleIntroDegreePath(config)
+  if (sequenceStep < intro.length) {
+    return { degree: intro[sequenceStep]!, patternId: 'scale', patternName: 'Scale' }
+  }
+  return exerciseStepAt(config, sequenceStep - intro.length)
 }
 
 export function degreeForSequenceStep(config: StaffJumperConfig, sequenceStep: number): number {
-  if (config.difficulty === 'easy') {
-    const path = buildRepeatingScaleDegreePath(config)
-    return path[sequenceStep % path.length]!
-  }
-
-  const intro = buildScaleIntroDegreePath(config)
-  if (sequenceStep < intro.length) return intro[sequenceStep]!
-  return patternDegreeAt(config, sequenceStep - intro.length)
+  return exerciseStepForSequenceStep(config, sequenceStep).degree
 }
 
 /**
  * Single source of truth for the note sequence.
  * HUD target, platform label, staff Y, and pitch check all derive from here.
  */
+/** Rhythm for one step, keyed off the config object so the stream is stable. */
+export function getRhythmForStep(config: StaffJumperConfig, sequenceStep: number): RhythmSlot {
+  return getRhythmSlot(
+    config,
+    resolveRhythm(config.rhythm, config.difficulty),
+    config.sessionSeed ?? 1,
+    sequenceStep,
+  )
+}
+
+/** World X of a notehead, from accumulated duration-based spacing. */
+export function noteXForStep(config: StaffJumperConfig, sequenceStep: number): number {
+  return STAFF_FIRST_NOTE_X + getRhythmForStep(config, sequenceStep).spacingPosition * NOTE_SPACING_PX
+}
+
 export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: number): TargetNote {
-  const degreeIndex = degreeForSequenceStep(config, sequenceStep)
-  const baseOctave = config.clef === 'bass' ? 2 : 4
-  const midi = midiForScaleDegree(config.key, config.scaleMode, degreeIndex, baseOctave)
+  const exerciseStep = exerciseStepForSequenceStep(config, sequenceStep)
+  const degreeIndex = exerciseStep.degree
+  const rootMidi = resolveScaleRootMidi(config)
+  const midi = midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
   const pitchClass = ((midi % 12) + 12) % 12
-  const written = writtenScaleNote(config.key, pitchClass, degreeIndex, baseOctave)
+  // The root's letter octave — writtenScaleNote walks letters up from here.
+  const rootOctave = Math.floor(rootMidi / 12) - 1
+  const written = writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
   const staff = getStaffPositionForNote(written.letter, written.octave, config.clef)
+  const rhythm = getRhythmForStep(config, sequenceStep)
   return {
     sequenceIndex: sequenceStep,
     midi,
@@ -494,13 +587,71 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
     writtenLetter: written.letter,
     writtenOctave: written.octave,
     accidental: accidentalForNote(
-      pitchClass,
+      written.letter,
       written.accidental,
       config.key,
       config.scaleMode,
       config.difficulty,
     ),
     showLabel: showNoteLabels(config.difficulty),
+    rhythm,
+    xPx: STAFF_FIRST_NOTE_X + rhythm.spacingPosition * NOTE_SPACING_PX,
+    patternName: exerciseStep.patternName,
+  }
+}
+
+/** Concert pitch class of the tonic — what the drone should actually sound. */
+export function getConcertTonicPitchClass(config: StaffJumperConfig): number {
+  const written = keyPitchClass(config.key)
+  return ((written - transpositionSemitones(config.transposition)) % 12 + 12) % 12
+}
+
+export interface ScaleRangePreview {
+  /** Written lowest and highest note, e.g. "B♭3" and "B♭5". */
+  lowLabel: string
+  highLabel: string
+  /** Notes in one full up-and-down lap of the scale. */
+  noteCount: number
+  /** "2 flats", "no sharps or flats", etc. */
+  signatureLabel: string
+}
+
+const ACCIDENTAL_GLYPHS: Record<string, string> = { '#': '♯', b: '♭' }
+
+function prettyNoteLabel(letter: StaffNoteLetter, accidental: '#' | 'b' | null, octave: number): string {
+  return `${letter}${accidental ? ACCIDENTAL_GLYPHS[accidental] : ''}${octave}`
+}
+
+/**
+ * What the player is about to read, resolved through the same range logic the
+ * game itself uses. Surfacing it on the setup screen makes the octave choice
+ * checkable at a glance instead of a surprise on the first note.
+ */
+export function getScaleRangePreview(config: StaffJumperConfig): ScaleRangePreview {
+  const topDegree = topDegreeForRange(config.range)
+  const rootMidi = resolveScaleRootMidi(config)
+  const rootOctave = Math.floor(rootMidi / 12) - 1
+
+  const noteAt = (degreeIndex: number) => {
+    const midi = midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
+    const pitchClass = ((midi % 12) + 12) % 12
+    const written = writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
+    return prettyNoteLabel(written.letter, written.accidental, written.octave)
+  }
+
+  const accidentals = keySignatureAccidentals(config.key, config.scaleMode)
+  const count = accidentals.size
+  const symbol = accidentals.values().next().value
+  const signatureLabel =
+    count === 0
+      ? 'no sharps or flats'
+      : `${count} ${symbol === '#' ? 'sharp' : 'flat'}${count === 1 ? '' : 's'}`
+
+  return {
+    lowLabel: noteAt(0),
+    highLabel: noteAt(topDegree),
+    noteCount: buildScaleIntroDegreePath(config).length,
+    signatureLabel,
   }
 }
 
@@ -537,10 +688,9 @@ export function getVisiblePlatforms(
     }
 
     const distance = role === 'target' || role === 'landed' ? 0 : index - (hasLanded ? 1 : 0)
-    const opacity = role === 'target' ? 1 : role === 'landed' ? 1 : Math.max(0.4, 1 - distance * 0.15)
-    const xPx = STAFF_FIRST_NOTE_X + step * NOTE_SPACING_PX
+    const opacity = role === 'target' ? 1 : role === 'landed' ? 1 : Math.max(0.4, 1 - distance * 0.11)
 
-    slots.push({ step, note, role, opacity, xPx })
+    slots.push({ step, note, role, opacity, xPx: note.xPx })
   }
 
   return slots
@@ -550,8 +700,13 @@ export function pitchClassesMatch(detected: number, target: number): boolean {
   return ((detected % 12) + 12) % 12 === ((target % 12) + 12) % 12
 }
 
-const MIN_GAMEPLAY_HZ = 70
-const MAX_GAMEPLAY_HZ = 1400
+/**
+ * Widest band any supported profile can report — tuba/bass low E1 up through
+ * a flute's top register. Narrower gates here silently dropped notes that the
+ * tuner itself was tracking fine.
+ */
+const MIN_GAMEPLAY_HZ = 55
+const MAX_GAMEPLAY_HZ = 1760
 
 export function readoutToConcertPitchClass(readout: PitchReadout): number | null {
   if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < MIN_GAMEPLAY_HZ) return null
