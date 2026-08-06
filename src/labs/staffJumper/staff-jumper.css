@@ -878,9 +878,19 @@
   background: #a8a29e;
 }
 
+.sj-note--future .sj-note__head--hollow {
+  background: transparent;
+  border-color: #a8a29e;
+}
+
 /* Landed note: same dark as target */
 .sj-note--landed .sj-note__head {
   background: #1c1917;
+}
+
+.sj-note--landed .sj-note__head--hollow {
+  background: transparent;
+  border-color: #1c1917;
 }
 
 /* Target: golden glow */

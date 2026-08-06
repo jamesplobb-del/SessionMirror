@@ -51,6 +51,17 @@ const AUDIO_START_GRACE_MS = 700
 
 const INITIAL_HEARTS = 3
 
+let runSeedCounter = 0
+
+/** A fresh, non-preview seed for every Start and Retry action. */
+function createRunSeed(): number {
+  runSeedCounter = (runSeedCounter + 1) >>> 0
+  const entropy = new Uint32Array(1)
+  globalThis.crypto?.getRandomValues?.(entropy)
+  const randomPart = entropy[0] ?? Math.floor(Math.random() * 0x1_0000_0000)
+  return (randomPart ^ (Date.now() >>> 0) ^ Math.imul(runSeedCounter, 0x9e3779b9)) >>> 0
+}
+
 type Action =
   | { type: 'START'; config: StaffJumperConfig }
   | { type: 'SUCCESS'; quality: 'perfect' | 'good'; timing: StaffJumperTiming; timingErrorMs: number }
@@ -58,7 +69,7 @@ type Action =
   | { type: 'FALL_COMPLETE' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
-  | { type: 'RESTART' }
+  | { type: 'RESTART'; config: StaffJumperConfig }
   | { type: 'BACK_TO_SETUP' }
   | { type: 'COUNT_IN_COMPLETE' }
 
@@ -193,15 +204,10 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
     }
 
     case 'RESTART':
-      return state.config
-        ? reducer(
-            { ...createInitialState(), config: state.config },
-            {
-              type: 'START',
-              config: { ...state.config, sessionSeed: Date.now() },
-            },
-          )
-        : createInitialState()
+      return reducer(
+        { ...createInitialState(), config: action.config },
+        { type: 'START', config: action.config },
+      )
 
     case 'BACK_TO_SETUP':
       return { ...createInitialState(), bestScore: loadBestScore() }
@@ -346,7 +352,8 @@ export function useStaffJumperGame(
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000)
-    const seeded = { ...config, sessionSeed: config.sessionSeed ?? Date.now() }
+    // Never inherit the setup preview's seed or a previous run's seed.
+    const seeded = { ...config, sessionSeed: createRunSeed() }
     dispatch({ type: 'START', config: seeded })
     startAudio(seeded)
   }, [resetNoteClock, startAudio])
@@ -361,8 +368,11 @@ export function useStaffJumperGame(
         ? DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000
         : DIFFICULTY_TIMEOUT_SECONDS.medium * 1000,
     )
-    dispatch({ type: 'RESTART' })
-    if (config) startAudio({ ...config, sessionSeed: Date.now() })
+    if (config) {
+      const seeded = { ...config, sessionSeed: createRunSeed() }
+      dispatch({ type: 'RESTART', config: seeded })
+      startAudio(seeded)
+    }
   }, [resetNoteClock, startAudio])
 
   const backToSetup = useCallback(() => {
