@@ -3,36 +3,59 @@
  *
  * The pitch stream and the rhythm stream are generated independently and zipped
  * together by note index: note N takes the Nth pitch and the Nth duration. That
- * keeps the existing scale/interval logic untouched and lets the rhythm be
- * changed without disturbing which notes come out.
+ * keeps the scale and pattern logic untouched and lets the meter change without
+ * disturbing which notes come out.
  *
- * Everything is measured in beats where a quarter note is 1.
+ * Two units are in play and it matters which is which:
+ *   • **beats** — quarter-note units. Every duration and bar length is measured
+ *     in these, because a quarter note is a quarter note in any meter.
+ *   • **pulses** — what the metronome clicks and what the tempo dial means. In
+ *     4/4 a pulse is a quarter; in 6/8 it is a dotted quarter.
  */
 
-export const STAFF_JUMPER_RHYTHMS = ['auto', 'straight', 'mixed', 'dotted'] as const
-export type StaffJumperRhythm = (typeof STAFF_JUMPER_RHYTHMS)[number]
+export const STAFF_JUMPER_METERS = ['simple', 'compound'] as const
+export type StaffJumperMeter = (typeof STAFF_JUMPER_METERS)[number]
 
-/** A concrete rhythm style, once `auto` has been resolved against difficulty. */
-export type ResolvedRhythm = Exclude<StaffJumperRhythm, 'auto'>
-
-export const RHYTHM_LABELS: Record<StaffJumperRhythm, string> = {
-  auto: 'Auto',
-  straight: 'Straight',
-  mixed: 'Mixed',
-  dotted: 'Dotted',
+export interface MeterSpec {
+  id: StaffJumperMeter
+  /** Printed time signature. */
+  numerator: number
+  denominator: number
+  label: string
+  name: string
+  description: string
+  /** Bar length in quarter-note units. */
+  barBeats: number
+  /** Quarter-note units in one pulse — what the tempo dial counts. */
+  pulseBeats: number
+  pulsesPerBar: number
 }
 
-export const RHYTHM_DESCRIPTIONS: Record<StaffJumperRhythm, string> = {
-  auto: 'Follows the difficulty you picked.',
-  straight: 'Quarter notes only — one note per beat.',
-  mixed: 'Quarters, halves and eighth-note pairs.',
-  dotted: 'Adds dotted rhythms and longer held notes.',
+export const METERS: Record<StaffJumperMeter, MeterSpec> = {
+  simple: {
+    id: 'simple',
+    numerator: 4,
+    denominator: 4,
+    label: '4/4',
+    name: 'Simple',
+    description: 'Four quarter-note beats in a bar.',
+    barBeats: 4,
+    pulseBeats: 1,
+    pulsesPerBar: 4,
+  },
+  compound: {
+    id: 'compound',
+    numerator: 6,
+    denominator: 8,
+    label: '6/8',
+    name: 'Compound',
+    description: 'Two dotted-quarter beats, each split into three.',
+    // Six eighths = three quarter-note units.
+    barBeats: 3,
+    pulseBeats: 1.5,
+    pulsesPerBar: 2,
+  },
 }
-
-/** Beats in one bar. Staff Jumper writes everything in 4/4. */
-export const BEATS_PER_BAR = 4
-
-export const TIME_SIGNATURE = { beats: 4, beatValue: 4 } as const
 
 export type NoteValue = 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'
 
@@ -52,8 +75,7 @@ const UNDOTTED_BEATS: Record<NoteValue, number> = {
 }
 
 function make(value: NoteValue, dotted = false): RhythmValue {
-  const beats = UNDOTTED_BEATS[value] * (dotted ? 1.5 : 1)
-  return { value, dotted, beats }
+  return { value, dotted, beats: UNDOTTED_BEATS[value] * (dotted ? 1.5 : 1) }
 }
 
 const WHOLE = make('whole')
@@ -64,12 +86,10 @@ const QUARTER = make('quarter')
 const EIGHTH = make('eighth')
 
 /**
- * Bar-length rhythm cells. Every entry sums to exactly {@link BEATS_PER_BAR},
+ * Bar-length rhythm cells. Every entry sums to exactly the meter's `barBeats`,
  * so bars always line up and barlines land where they should.
  */
-const STRAIGHT_BARS: readonly RhythmValue[][] = [[QUARTER, QUARTER, QUARTER, QUARTER]]
-
-const MIXED_BARS: readonly RhythmValue[][] = [
+const SIMPLE_BARS: readonly RhythmValue[][] = [
   [QUARTER, QUARTER, QUARTER, QUARTER],
   [HALF, QUARTER, QUARTER],
   [QUARTER, QUARTER, HALF],
@@ -78,36 +98,31 @@ const MIXED_BARS: readonly RhythmValue[][] = [
   [HALF, HALF],
   [QUARTER, QUARTER, EIGHTH, EIGHTH, QUARTER],
   [EIGHTH, EIGHTH, EIGHTH, EIGHTH, HALF],
-]
-
-const DOTTED_BARS: readonly RhythmValue[][] = [
-  ...MIXED_BARS,
   [DOTTED_QUARTER, EIGHTH, QUARTER, QUARTER],
   [QUARTER, QUARTER, DOTTED_QUARTER, EIGHTH],
   [DOTTED_HALF, QUARTER],
   [QUARTER, DOTTED_HALF],
-  [DOTTED_QUARTER, EIGHTH, HALF],
   [WHOLE],
 ]
 
-const BARS_BY_RHYTHM: Record<ResolvedRhythm, readonly RhythmValue[][]> = {
-  straight: STRAIGHT_BARS,
-  mixed: MIXED_BARS,
-  dotted: DOTTED_BARS,
-}
+/** 6/8 cells. Each dotted-quarter pulse is filled in one of the usual ways. */
+const COMPOUND_BARS: readonly RhythmValue[][] = [
+  [DOTTED_QUARTER, DOTTED_QUARTER],
+  [EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH],
+  [DOTTED_QUARTER, EIGHTH, EIGHTH, EIGHTH],
+  [EIGHTH, EIGHTH, EIGHTH, DOTTED_QUARTER],
+  // The 6/8 lilt: long-short, long-short.
+  [QUARTER, EIGHTH, QUARTER, EIGHTH],
+  [QUARTER, EIGHTH, DOTTED_QUARTER],
+  [DOTTED_QUARTER, QUARTER, EIGHTH],
+  [EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH],
+  [QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH],
+  [DOTTED_HALF],
+]
 
-/**
- * `auto` maps difficulty onto a rhythm so the setting can be left alone, while
- * an explicit choice always wins.
- */
-export function resolveRhythm(
-  rhythm: StaffJumperRhythm,
-  difficulty: 'easy' | 'medium' | 'hard',
-): ResolvedRhythm {
-  if (rhythm !== 'auto') return rhythm
-  if (difficulty === 'easy') return 'straight'
-  if (difficulty === 'medium') return 'mixed'
-  return 'dotted'
+const BARS_BY_METER: Record<StaffJumperMeter, readonly RhythmValue[][]> = {
+  simple: SIMPLE_BARS,
+  compound: COMPOUND_BARS,
 }
 
 /**
@@ -127,7 +142,7 @@ export interface RhythmSlot {
   value: NoteValue
   dotted: boolean
   beats: number
-  /** Cumulative beats from the start of the run. */
+  /** Cumulative quarter-note beats from the start of the run. */
   beatPosition: number
   barIndex: number
   beatInBar: number
@@ -162,27 +177,41 @@ function mulberry32(seed: number): () => number {
   }
 }
 
+/** True for note values that need a flag or beam. */
+export function isBeamable(value: NoteValue): boolean {
+  return value === 'eighth' || value === 'sixteenth'
+}
+
 /**
- * Beam runs of short notes that sit inside the same beat.
+ * Beam runs of short notes that share a pulse.
  *
- * Standard practice in 4/4: eighths beam in pairs per quarter-note beat rather
- * than across the whole bar, which keeps the beat visible when reading.
+ * Grouping by pulse rather than by bar is what makes the beat readable, and it
+ * is why 6/8 beams its eighths in threes while 4/4 beams them in twos — the
+ * rule is the same, only the pulse length differs.
  */
-function assignBeams(slots: RhythmSlot[], fromIndex: number, timeline: RhythmTimeline): void {
+function assignBeams(
+  slots: RhythmSlot[],
+  fromIndex: number,
+  timeline: RhythmTimeline,
+  meter: MeterSpec,
+): void {
+  const pulseOf = (beatPosition: number) =>
+    Math.floor(beatPosition / meter.pulseBeats + 1e-6)
+
   let runStart = fromIndex
   while (runStart < slots.length) {
     const slot = slots[runStart]!
-    if (slot.beats >= 1) {
+    if (!isBeamable(slot.value)) {
       runStart += 1
       continue
     }
 
-    const beatOfRun = Math.floor(slot.beatPosition)
+    const pulse = pulseOf(slot.beatPosition)
     let runEnd = runStart
     while (
       runEnd + 1 < slots.length &&
-      slots[runEnd + 1]!.beats < 1 &&
-      Math.floor(slots[runEnd + 1]!.beatPosition) === beatOfRun
+      isBeamable(slots[runEnd + 1]!.value) &&
+      pulseOf(slots[runEnd + 1]!.beatPosition) === pulse
     ) {
       runEnd += 1
     }
@@ -202,14 +231,13 @@ function assignBeams(slots: RhythmSlot[], fromIndex: number, timeline: RhythmTim
   }
 }
 
-function appendBar(timeline: RhythmTimeline, rhythm: ResolvedRhythm, seed: number): void {
-  const bars = BARS_BY_RHYTHM[rhythm]
+function appendBar(timeline: RhythmTimeline, meter: MeterSpec, seed: number): void {
+  const bars = BARS_BY_METER[meter.id]
   const rng = mulberry32(seed + timeline.barCount * 2654435761)
   const bar = bars[Math.floor(rng() * bars.length)]!
   const firstNewIndex = timeline.slots.length
 
   bar.forEach((rhythmValue, indexInBar) => {
-    const beatInBar = timeline.beatCursor % BEATS_PER_BAR
     timeline.slots.push({
       index: timeline.slots.length,
       value: rhythmValue.value,
@@ -217,7 +245,7 @@ function appendBar(timeline: RhythmTimeline, rhythm: ResolvedRhythm, seed: numbe
       beats: rhythmValue.beats,
       beatPosition: timeline.beatCursor,
       barIndex: timeline.barCount,
-      beatInBar,
+      beatInBar: timeline.beatCursor - timeline.barCount * meter.barBeats,
       startsBar: indexInBar === 0,
       spacingPosition: timeline.spacingCursor + (indexInBar === 0 ? BARLINE_SPACING_UNITS : 0),
       beamGroupId: null,
@@ -230,7 +258,7 @@ function appendBar(timeline: RhythmTimeline, rhythm: ResolvedRhythm, seed: numbe
   })
 
   timeline.barCount += 1
-  assignBeams(timeline.slots, firstNewIndex, timeline)
+  assignBeams(timeline.slots, firstNewIndex, timeline, meter)
 }
 
 const timelineCache = new WeakMap<object, RhythmTimeline>()
@@ -241,7 +269,7 @@ const timelineCache = new WeakMap<object, RhythmTimeline>()
  */
 export function getRhythmSlot(
   configKey: object,
-  rhythm: ResolvedRhythm,
+  meter: StaffJumperMeter,
   seed: number,
   index: number,
 ): RhythmSlot {
@@ -250,13 +278,8 @@ export function getRhythmSlot(
     timeline = { slots: [], barCount: 0, beatCursor: 0, spacingCursor: 0, beamCursor: 0 }
     timelineCache.set(configKey, timeline)
   }
-  while (index >= timeline.slots.length) appendBar(timeline, rhythm, seed)
+  while (index >= timeline.slots.length) appendBar(timeline, METERS[meter], seed)
   return timeline.slots[index]!
-}
-
-/** True for note values that need a flag or beam. */
-export function isBeamable(value: NoteValue): boolean {
-  return value === 'eighth' || value === 'sixteenth'
 }
 
 /** Half and whole notes are drawn as rings rather than filled ovals. */
@@ -274,7 +297,8 @@ export function beamCountForValue(value: NoteValue): number {
   return 0
 }
 
-export function secondsPerBeat(bpm: number): number {
+/** Seconds for one pulse — the unit the tempo dial counts. */
+export function secondsPerPulse(bpm: number): number {
   return 60 / Math.max(1, bpm)
 }
 
@@ -283,18 +307,18 @@ export const STAFF_JUMPER_TEMPO_MAX = 200
 export const STAFF_JUMPER_TEMPO_DEFAULT = 80
 
 /**
- * Half-width of the "on the beat" window as a fraction of a beat, clamped so it
- * stays humane at fast tempos and does not become a free pass at slow ones.
+ * Half-width of the "on the beat" window as a fraction of a pulse, clamped so
+ * it stays humane at fast tempos and does not become a free pass at slow ones.
  */
 const ON_BEAT_WINDOW_FRACTION = 0.18
 const ON_BEAT_WINDOW_MIN_MS = 90
 const ON_BEAT_WINDOW_MAX_MS = 220
 
 export function onBeatWindowMs(bpm: number): number {
-  const beatMs = secondsPerBeat(bpm) * 1000
+  const pulseMs = secondsPerPulse(bpm) * 1000
   return Math.max(
     ON_BEAT_WINDOW_MIN_MS,
-    Math.min(ON_BEAT_WINDOW_MAX_MS, beatMs * ON_BEAT_WINDOW_FRACTION),
+    Math.min(ON_BEAT_WINDOW_MAX_MS, pulseMs * ON_BEAT_WINDOW_FRACTION),
   )
 }
 
@@ -303,30 +327,30 @@ export type NotePlacement = 'early' | 'on' | 'late'
 export interface TimingVerdict {
   placement: NotePlacement
   errorMs: number
-  /** Beat position the *next* note is expected on. */
-  nextExpectedBeat: number
+  /** Pulse position the *next* note is expected on. */
+  nextExpectedPulse: number
 }
 
 /**
- * Judge one landing against the beat it was written on.
+ * Judge one landing against the pulse it was written on.
  *
- * `nextExpectedBeat` is re-anchored to where the player actually landed plus
+ * `nextExpectedPulse` is re-anchored to where the player actually landed plus
  * the note they just held, rather than to a fixed grid. Two reasons: one slow
  * note would otherwise mark every note after it late for the rest of the run,
  * and pitch detection adds a roughly constant lag that cancels out when
  * successive notes are compared to each other.
  */
 export function judgeTiming(
-  actualBeat: number,
-  expectedBeat: number,
-  heldNoteBeats: number,
+  actualPulse: number,
+  expectedPulse: number,
+  heldNotePulses: number,
   bpm: number,
 ): TimingVerdict {
-  const errorMs = (actualBeat - expectedBeat) * secondsPerBeat(bpm) * 1000
+  const errorMs = (actualPulse - expectedPulse) * secondsPerPulse(bpm) * 1000
   const window = onBeatWindowMs(bpm)
   return {
     placement: Math.abs(errorMs) <= window ? 'on' : errorMs < 0 ? 'early' : 'late',
     errorMs,
-    nextExpectedBeat: actualBeat + heldNoteBeats,
+    nextExpectedPulse: actualPulse + heldNotePulses,
   }
 }

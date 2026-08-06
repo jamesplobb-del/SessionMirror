@@ -530,6 +530,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     },
     [audioPracticeTab, setAudioPracticeTab]
   )
+  /** Practice has no tab of its own — the metronome's Program button opens it. */
+  const handleOpenProgram = useCallback(() => {
+    handleAudioPracticeTabChange('practice')
+  }, [handleAudioPracticeTabChange])
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
   const audioEnhancerEnabledRef = useRef(settings.audioEnhancerEnabled)
@@ -4388,7 +4392,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         className="audio-practice-metronome-layer flex min-h-0 flex-1 flex-col"
                         dataTutorial="audio-metronome-tab"
                       >
-                        <AudioMetronomeTab key="audio-metronome-tab" />
+                        <AudioMetronomeTab
+                          key="audio-metronome-tab"
+                          onOpenProgram={handleOpenProgram}
+                        />
                       </AnimatedTabPanel>
 
                       <AnimatedTabPanel

@@ -183,12 +183,8 @@ export const STAFF_CANVAS_HEIGHT = STAFF_BOTTOM_Y + STAFF_LINE_GAP * 3
 /** First notehead X in the scrolling world. */
 export const STAFF_FIRST_NOTE_X = 250
 
-/**
- * Time signature X in the scrolling world, sitting just before the first note.
- * It scrolls out of view with the music, the way a printed score states the
- * meter once and moves on.
- */
-export const TIME_SIGNATURE_X = STAFF_FIRST_NOTE_X - Math.round(STAFF_SPACE_PX * 2.6)
+/** Width reserved for the time signature in the pinned staff head. */
+export const TIME_SIGNATURE_WIDTH = Math.round(STAFF_SPACE_PX * 1.35)
 
 /** Clef left edge in the pinned head of the staff. */
 export const STAFF_CLEF_X = 14

@@ -40,7 +40,7 @@ import {
   STAFF_TOP_Y,
   STEM_THICKNESS,
   TIME_SIGNATURE_FONT_SIZE,
-  TIME_SIGNATURE_X,
+  TIME_SIGNATURE_WIDTH,
   TIME_SIGNATURE_YPX,
   NOTE_SPACING_PX,
   type StemDirection,
@@ -48,7 +48,7 @@ import {
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
 import { layoutRhythm } from './staffJumperNotationLayout'
-import { isHollowNotehead, TIME_SIGNATURE } from './staffJumperRhythm'
+import { isHollowNotehead, METERS } from './staffJumperRhythm'
 import Pressable from '../../components/ui/Pressable'
 
 interface StaffJumperGameProps {
@@ -184,10 +184,11 @@ export default function StaffJumperGame({
   )
 
   const keySignature = useMemo(
-    () => (showKeySignature(config.difficulty) ? getKeySignatureMarkers(config.key, config.scaleMode, config.clef) : []),
+    () => (showKeySignature() ? getKeySignatureMarkers(config.key, config.scaleMode, config.clef) : []),
     [config.clef, config.difficulty, config.key, config.scaleMode],
   )
 
+  const meterSpec = METERS[config.meter]
   const rhythmLayout = useMemo(() => layoutRhythm(platforms), [platforms])
 
   const glyphMetrics = useMusicGlyphMetrics()
@@ -211,11 +212,15 @@ export default function StaffJumperGame({
       width = signatureX + signatureWidth
     }
 
+    const timeSignatureX = width + CLEF_TO_SIGNATURE_GAP
+    width = timeSignatureX + TIME_SIGNATURE_WIDTH
+
     return {
       clefName,
       clefWidth,
       signatureX,
       signatureWidth,
+      timeSignatureX,
       width: width + SIGNATURE_TO_NOTE_GAP,
     }
   }, [config.clef, glyphMetrics, keySignature])
@@ -433,38 +438,6 @@ export default function StaffJumperGame({
               ))}
             </svg>
 
-            {/* Time signature scrolls with the music: like a real score it is
-                stated once at the start rather than pinned forever, which buys
-                back a chunk of the lookahead budget. */}
-            <svg
-              className="sj-time-signature"
-              style={{ left: `${TIME_SIGNATURE_X}px`, top: 0 }}
-              width={STAFF_SPACE_PX * 1.35}
-              height={STAFF_CANVAS_HEIGHT}
-              viewBox={`0 0 ${STAFF_SPACE_PX * 1.35} ${STAFF_CANVAS_HEIGHT}`}
-              aria-hidden
-              focusable="false"
-            >
-              <text
-                x={STAFF_SPACE_PX * 0.675}
-                y={TIME_SIGNATURE_YPX[config.clef].top}
-                fontSize={TIME_SIGNATURE_FONT_SIZE}
-                textAnchor="middle"
-                dominantBaseline="central"
-              >
-                {TIME_SIGNATURE.beats}
-              </text>
-              <text
-                x={STAFF_SPACE_PX * 0.675}
-                y={TIME_SIGNATURE_YPX[config.clef].bottom}
-                fontSize={TIME_SIGNATURE_FONT_SIZE}
-                textAnchor="middle"
-                dominantBaseline="central"
-              >
-                {TIME_SIGNATURE.beatValue}
-              </text>
-            </svg>
-
             {/* Noteheads */}
             <div className="sj-noteheads">
               {platforms.map((slot) => {
@@ -505,18 +478,6 @@ export default function StaffJumperGame({
                       />
                     ))}
 
-                    {/* Accidental, right-aligned so it never crowds the head. */}
-                    {slot.note.accidental && (
-                      <StaffGlyph
-                        name={glyphNameForAccidental(slot.note.accidental)}
-                        spacePx={STAFF_SPACE_PX}
-                        staffY={0}
-                        x={-(NOTEHEAD_W / 2 + STAFF_SPACE_PX * 0.32)}
-                        align="right"
-                        metrics={glyphMetrics}
-                        className="sj-note__accidental"
-                      />
-                    )}
 
                     {/* Notehead oval — centered at (0, 0) = note center.
                         Half and whole notes are rings rather than filled. */}
@@ -595,6 +556,39 @@ export default function StaffJumperGame({
               />
             ))}
 
+            {/* Pinned beside the key signature. It was briefly parked at a fixed
+                world X so it would scroll away, but the pinned head is wider
+                than that on most keys, so it drew straight through the clef. */}
+            <svg
+              className="sj-time-signature"
+              style={{ left: `${staffHead.timeSignatureX}px`, top: 0 }}
+              width={TIME_SIGNATURE_WIDTH}
+              height={STAFF_CANVAS_HEIGHT}
+              viewBox={`0 0 ${TIME_SIGNATURE_WIDTH} ${STAFF_CANVAS_HEIGHT}`}
+              aria-hidden
+              focusable="false"
+            >
+              <text
+                x={TIME_SIGNATURE_WIDTH / 2}
+                y={TIME_SIGNATURE_YPX[config.clef].top}
+                fontSize={TIME_SIGNATURE_FONT_SIZE}
+                textAnchor="middle"
+                dominantBaseline="central"
+              >
+                {meterSpec.numerator}
+              </text>
+              <text
+                x={TIME_SIGNATURE_WIDTH / 2}
+                y={TIME_SIGNATURE_YPX[config.clef].bottom}
+                fontSize={TIME_SIGNATURE_FONT_SIZE}
+                textAnchor="middle"
+                dominantBaseline="central"
+              >
+                {meterSpec.denominator}
+              </text>
+            </svg>
+
+
           </div>
         </div>
 
@@ -656,7 +650,7 @@ export default function StaffJumperGame({
           {state.isCountingIn && (
             <div className="sj-count-in" role="status">
               <strong>Listen for the count-in</strong>
-              <small>{config.tempoBpm} BPM · {TIME_SIGNATURE.beats}/{TIME_SIGNATURE.beatValue}</small>
+              <small>{config.tempoBpm} BPM · {meterSpec.label}</small>
             </div>
           )}
 

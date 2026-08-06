@@ -16,9 +16,8 @@ import {
 import { getWrittenRange, STAFF_CENTER_MIDI } from './staffJumperInstrumentRanges'
 import {
   getRhythmSlot,
-  resolveRhythm,
   type RhythmSlot,
-  type StaffJumperRhythm,
+  type StaffJumperMeter,
 } from './staffJumperRhythm'
 import { buildExerciseBlock, type PatternStep } from './staffJumperPatterns'
 
@@ -133,7 +132,7 @@ export interface StaffJumperConfig {
   tunerInstrument: TunerInstrument
   transposition: ScaleRushTransposition
   playerModel: ScaleRushPlayerModelId
-  rhythm: StaffJumperRhythm
+  meter: StaffJumperMeter
   tempoBpm: number
   metronome: boolean
   drone: boolean
@@ -182,7 +181,6 @@ export interface TargetNote {
   ledgerLineYPx: number[]
   writtenLetter: StaffNoteLetter
   writtenOctave: number
-  accidental: '#' | 'b' | null
   showLabel: boolean
   /** Rhythm — how the note is written and where it falls in the bar. */
   rhythm: RhythmSlot
@@ -307,27 +305,19 @@ export function getKeySignatureMarkers(
   return []
 }
 
-function accidentalForNote(
-  letter: StaffNoteLetter,
-  writtenAccidental: '#' | 'b' | null,
-  key: StaffJumperKey,
-  scaleMode: StaffJumperScaleMode,
-  difficulty: StaffJumperDifficulty,
-): '#' | 'b' | null {
-  if (writtenAccidental == null) return null
-  // Hard mode prints the key signature, so signed letters carry no accidental.
-  if (difficulty === 'hard' && keySignatureAccidentals(key, scaleMode).get(letter) === writtenAccidental) {
-    return null
-  }
-  return writtenAccidental
-}
-
 export function showNoteLabels(difficulty: StaffJumperDifficulty): boolean {
   return difficulty === 'easy'
 }
 
-export function showKeySignature(difficulty: StaffJumperDifficulty): boolean {
-  return difficulty === 'hard'
+/**
+ * The key signature is always printed.
+ *
+ * Every note the game generates is a degree of the chosen scale, so the
+ * signature accounts for all of them — which means no note ever needs its own
+ * accidental, and the staff stays clean.
+ */
+export function showKeySignature(): boolean {
+  return true
 }
 
 export function keysForScaleMode(scaleMode: StaffJumperScaleMode): readonly StaffJumperKey[] {
@@ -552,12 +542,7 @@ export function degreeForSequenceStep(config: StaffJumperConfig, sequenceStep: n
  */
 /** Rhythm for one step, keyed off the config object so the stream is stable. */
 export function getRhythmForStep(config: StaffJumperConfig, sequenceStep: number): RhythmSlot {
-  return getRhythmSlot(
-    config,
-    resolveRhythm(config.rhythm, config.difficulty),
-    config.sessionSeed ?? 1,
-    sequenceStep,
-  )
+  return getRhythmSlot(config, config.meter, config.sessionSeed ?? 1, sequenceStep)
 }
 
 /** World X of a notehead, from accumulated duration-based spacing. */
@@ -586,13 +571,6 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
     ledgerLineYPx: staff.ledgerLineYPx,
     writtenLetter: written.letter,
     writtenOctave: written.octave,
-    accidental: accidentalForNote(
-      written.letter,
-      written.accidental,
-      config.key,
-      config.scaleMode,
-      config.difficulty,
-    ),
     showLabel: showNoteLabels(config.difficulty),
     rhythm,
     xPx: STAFF_FIRST_NOTE_X + rhythm.spacingPosition * NOTE_SPACING_PX,

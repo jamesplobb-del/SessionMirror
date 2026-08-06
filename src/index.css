@@ -5122,6 +5122,22 @@ html.physical-landscape-right .control-deck__vault-btn {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+/*
+ * Program sits opposite Tap Tempo so the play button stays centred, and both
+ * flanks share a width — an off-centre transport reads as a mistake.
+ */
+.metronome-audio-stage__program-btn {
+  display: inline-flex;
+  min-width: 3.25rem;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.metronome-audio-stage__program-btn svg {
+  flex: 0 0 auto;
+}
 
 .metronome-audio-stage__play-btn {
   display: inline-flex;

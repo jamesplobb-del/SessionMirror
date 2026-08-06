@@ -100,121 +100,162 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── The brief: what this run actually is ── */
-.sj-brief {
-  padding: 1.1rem 1.15rem 0.9rem;
+/* ── Hero: the exercise, drawn ── */
+.sj-hero {
+  padding: 0.95rem 1rem 0.8rem;
   border-radius: 0.9rem;
   background: var(--sj-paper);
   box-shadow: 0 1px 0 var(--sj-hair);
 }
 
-.sj-brief p,
-.sj-brief h2 {
+.sj-hero__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sj-hero__top h2,
+.sj-hero__top p {
   margin: 0;
 }
 
-.sj-brief__kicker {
-  color: var(--sj-muted);
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.sj-brief__scale {
-  margin-top: 0.3rem;
+.sj-hero__top h2 {
   color: var(--sj-ink);
-  font-size: clamp(1.5rem, 6.5vw, 2rem);
+  font-size: clamp(1.25rem, 5.5vw, 1.6rem);
   font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
-.sj-brief__range {
-  display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  margin-top: 0.35rem;
-}
-
-.sj-brief__range strong {
-  color: var(--sj-ink);
-  font-size: 1.15rem;
-  font-weight: 650;
-}
-
-.sj-brief__range span {
-  color: var(--sj-muted);
-  font-size: 0.72rem;
-}
-
-.sj-brief__meta {
-  margin-top: 0.3rem;
+.sj-hero__top p {
+  margin-top: 0.2rem;
   color: var(--sj-muted);
   font-size: 0.7rem;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
-/* ── Mic strip ── */
-.sj-mic {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.85rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--sj-hair);
-  color: var(--sj-muted);
-  font-size: 0.72rem;
-}
-
-.sj-mic svg {
-  width: 0.95rem;
-  height: 0.95rem;
+.sj-hero__shuffle {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
   flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--sj-hair);
+  border-radius: 0.6rem;
+  color: var(--sj-ink);
+  background: transparent;
 }
 
-.sj-mic span {
-  flex: 1 1 auto;
+.sj-hero__shuffle svg {
+  width: 1rem;
+  height: 1rem;
 }
 
-.sj-mic small {
+.sj-hero__note {
+  margin: 0.5rem 0 0;
+  color: var(--sj-muted);
   font-size: 0.62rem;
+  text-align: center;
 }
 
-.sj-mic--live {
-  color: #17694a;
+/* ── The staff preview itself ── */
+.sj-preview {
+  position: relative;
+  height: clamp(7rem, 22vh, 10rem);
+  margin-top: 0.7rem;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  background: #fff;
 }
 
-/* ── Settings sheets ── */
-.sj-sheet {
-  padding: 0 1.15rem;
+.sj-preview__world,
+.sj-preview__notes {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* ── Collapsible settings groups ── */
+.sj-group {
   border-radius: 0.9rem;
   background: var(--sj-paper);
   box-shadow: 0 1px 0 var(--sj-hair);
 }
 
+.sj-group__head {
+  display: flex;
+  width: 100%;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.05rem;
+  border: 0;
+  border-radius: 0.9rem;
+  text-align: left;
+  background: transparent;
+}
+
+.sj-group__title {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.sj-group__title strong {
+  color: var(--sj-ink);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.sj-group__title small {
+  overflow: hidden;
+  color: var(--sj-muted);
+  font-size: 0.68rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sj-group__chevron {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  color: var(--sj-muted);
+  transition: transform 180ms ease;
+}
+
+.sj-group--open .sj-group__chevron {
+  transform: rotate(180deg);
+}
+
+.sj-group__body {
+  padding: 0 1.05rem 0.4rem;
+}
+
+/* ── Setting rows ── */
 .sj-field {
   display: flex;
   width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 3.15rem;
-  padding: 0.55rem 0;
+  min-height: 3.05rem;
+  padding: 0.5rem 0;
   border: 0;
   border-top: 1px solid var(--sj-hair);
   text-align: left;
   background: transparent;
 }
 
-.sj-sheet > .sj-field:first-child {
+.sj-group__body > .sj-field:first-child {
   border-top: 0;
 }
 
-/* Controls that need the full width sit under their label instead of beside it. */
+/* Controls that need the full width sit under their label, not beside it. */
 .sj-field--stack {
   display: block;
-  padding: 0.85rem 0;
+  padding: 0.8rem 0;
 }
 
 .sj-field--switch {
@@ -239,11 +280,11 @@
 }
 
 .sj-field--stack .sj-field__label {
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.55rem;
 }
 
 .sj-field__note {
-  margin: 0.55rem 0 0;
+  margin: 0.5rem 0 0;
   color: var(--sj-muted);
   font-size: 0.7rem;
   line-height: 1.4;
@@ -434,11 +475,24 @@
   fill: currentColor;
 }
 
-.sj-start p {
+/* Mic state sits with Start — it is the last thing you check before playing. */
+.sj-start__mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   margin: 0.5rem 0 0;
   color: var(--sj-muted);
   font-size: 0.66rem;
-  text-align: center;
+}
+
+.sj-start__mic svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.sj-start__mic--live {
+  color: #17694a;
 }
 
 .sj-state-screen {

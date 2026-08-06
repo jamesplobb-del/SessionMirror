@@ -14,7 +14,8 @@ import {
   type StaffJumperState,
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
-import { BEATS_PER_BAR, judgeTiming, secondsPerBeat } from './staffJumperRhythm'
+import type { StaffJumperMeter } from './staffJumperRhythm'
+import { judgeTiming, METERS, secondsPerPulse } from './staffJumperRhythm'
 import {
   startClickTrack,
   startDrone,
@@ -38,8 +39,15 @@ const DIFFICULTY_TIMING = {
  */
 const REPEATED_NOTE_HOLD_MS = 170
 
-/** One bar of clicks before the first note. */
-const COUNT_IN_BARS = 1
+/**
+ * Bars of clicks before the first note.
+ *
+ * 6/8 only has two pulses to a bar, so a single bar would be a two-click
+ * count-in — not enough to feel the tempo. Compound meters get two bars.
+ */
+function countInBarsFor(meter: StaffJumperMeter): number {
+  return METERS[meter].pulsesPerBar >= 4 ? 1 : 2
+}
 
 /** Headroom for the audio context to resume before the count-in is timed out. */
 const AUDIO_START_GRACE_MS = 700
@@ -240,7 +248,7 @@ export function useStaffJumperGame(
   const clickRef = useRef<ClickTrackHandle | null>(null)
   const droneRef = useRef<DroneHandle | null>(null)
   /**
-   * Beat position the next note is *expected* on.
+   * Pulse position the next note is *expected* on.
    *
    * Re-anchored after every landing to "where you actually were, plus the note
    * you just held". Judging against a fixed grid instead would mean one slow
@@ -248,7 +256,7 @@ export function useStaffJumperGame(
    * also bake in the detector's own latency; measuring note-to-note cancels
    * that constant offset out.
    */
-  const expectedBeatRef = useRef(0)
+  const expectedPulseRef = useRef(0)
   /**
    * Wall-clock backstop for the count-in.
    *
@@ -280,17 +288,20 @@ export function useStaffJumperGame(
 
   const startAudio = useCallback((config: StaffJumperConfig) => {
     stopAudio()
-    expectedBeatRef.current = 0
+    expectedPulseRef.current = 0
 
     const generation = audioGenerationRef.current
-    const countInMs = COUNT_IN_BARS * BEATS_PER_BAR * secondsPerBeat(config.tempoBpm) * 1000
+    const spec = METERS[config.meter]
+    const countInMs =
+      countInBarsFor(config.meter) * spec.pulsesPerBar * secondsPerPulse(config.tempoBpm) * 1000
     countInUntilMsRef.current = performance.now() + countInMs + AUDIO_START_GRACE_MS
 
     void startClickTrack({
       bpm: config.tempoBpm,
       soundId: 'classic',
       audible: config.metronome,
-      countInBars: COUNT_IN_BARS,
+      countInBars: countInBarsFor(config.meter),
+      meter: config.meter,
     })
       .then((handle) => {
         if (audioGenerationRef.current !== generation) handle.stop()
@@ -479,7 +490,7 @@ export function useStaffJumperGame(
           rafId = requestAnimationFrame(tick)
           return
         }
-        expectedBeatRef.current = click?.isRunning() ? click.beatsElapsed() : 0
+        expectedPulseRef.current = click?.isRunning() ? click.pulsesElapsed() : 0
         resetTargetDeadline(now)
         dispatch({ type: 'COUNT_IN_COMPLETE' })
         rafId = requestAnimationFrame(tick)
@@ -526,15 +537,19 @@ export function useStaffJumperGame(
         let placement: StaffJumperTiming = null
         let errorMs = 0
         if (clickRef.current?.isRunning()) {
+          // Rhythm slots are in quarter-note units; the clock counts pulses.
+          const pulseBeats = METERS[current.config!.meter].pulseBeats
+          const heldPulses =
+            getRhythmForStep(current.config!, current.sequenceStep).beats / pulseBeats
           const verdict = judgeTiming(
-            clickRef.current.beatsElapsed(),
-            expectedBeatRef.current,
-            getRhythmForStep(current.config!, current.sequenceStep).beats,
+            clickRef.current.pulsesElapsed(),
+            expectedPulseRef.current,
+            heldPulses,
             current.config!.tempoBpm,
           )
           placement = verdict.placement
           errorMs = verdict.errorMs
-          expectedBeatRef.current = verdict.nextExpectedBeat
+          expectedPulseRef.current = verdict.nextExpectedPulse
         }
 
         dispatch({

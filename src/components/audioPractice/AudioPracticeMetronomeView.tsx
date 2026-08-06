@@ -1,4 +1,4 @@
-import { ChevronsUpDown, Minus, Pause, Play, Plus } from 'lucide-react'
+import { ChevronsUpDown, ListMusic, Minus, Pause, Play, Plus } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useMetronome } from '../../hooks/useMetronome'
 import { useTapTempo } from '../../hooks/useTapTempo'
@@ -64,7 +64,14 @@ function PracticeControlButton({
   )
 }
 
-export default function AudioPracticeMetronomeView() {
+interface AudioPracticeMetronomeViewProps {
+  /** Opens the practice program. Omitted when there is nowhere to go. */
+  onOpenProgram?: () => void
+}
+
+export default function AudioPracticeMetronomeView({
+  onOpenProgram,
+}: AudioPracticeMetronomeViewProps = {}) {
   const notifyTutorial = useTutorialAction()
   const bpmInputId = useId()
   const didNormalizeBpmRef = useRef(false)
@@ -440,6 +447,17 @@ export default function AudioPracticeMetronomeView() {
           role="group"
           aria-label="Metronome transport"
         >
+          {onOpenProgram ? (
+            <PracticeControlButton
+              label="Open practice program"
+              onPress={onOpenProgram}
+              dataTutorial="metronome-program"
+              className="metronome-audio-stage__program-btn audio-practice-metronome__program-btn"
+            >
+              <ListMusic className="h-5 w-5" strokeWidth={2.2} aria-hidden />
+              <span>Program</span>
+            </PracticeControlButton>
+          ) : null}
           <PracticeControlButton
             label={playing ? 'Stop metronome' : 'Start metronome'}
             haptic={false}

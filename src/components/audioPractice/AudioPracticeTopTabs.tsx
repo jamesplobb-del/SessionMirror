@@ -3,11 +3,15 @@ import type { AudioPracticeTab } from '../../types/audioPractice'
 import Pressable from '../ui/Pressable'
 import { requestInteractiveMediaRecovery } from '../../utils/appForeground'
 
+/**
+ * Practice deliberately has no tab. It is reached from the Program button in
+ * the metronome transport — five tabs across the top of a phone was too many,
+ * and Practice is where you go *from* a tempo, not a peer of it.
+ */
 const TABS: { id: AudioPracticeTab; label: string }[] = [
   { id: 'audio', label: 'Audio' },
   { id: 'metronome', label: 'Metronome' },
   { id: 'tuner', label: 'Tuner' },
-  { id: 'practice', label: 'Practice' },
   { id: 'games', label: 'Games' },
 ]
 

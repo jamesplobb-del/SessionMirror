@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { ArrowLeft, Mic, Minus, Play, Plus } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Mic, Minus, Play, Plus, Shuffle } from 'lucide-react'
 import './staff-jumper.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import {
@@ -22,14 +22,12 @@ import {
 } from './staffJumperMusicLogic'
 import { type ScaleRushTransposition } from '../scaleRush/scaleRushMusicLogic'
 import {
-  resolveRhythm,
-  RHYTHM_DESCRIPTIONS,
-  RHYTHM_LABELS,
-  STAFF_JUMPER_RHYTHMS,
+  METERS,
+  STAFF_JUMPER_METERS,
   STAFF_JUMPER_TEMPO_DEFAULT,
   STAFF_JUMPER_TEMPO_MAX,
   STAFF_JUMPER_TEMPO_MIN,
-  type StaffJumperRhythm,
+  type StaffJumperMeter,
 } from './staffJumperRhythm'
 import {
   loadScaleRushPlayerModel,
@@ -43,9 +41,10 @@ import {
   type StaffJumperClef,
 } from './staffNotationMap'
 import { useStaffJumperGame } from './useStaffJumperGame'
-import { getTunerProfile, type TunerInstrument } from '../../utils/pitchConfig'
+import type { TunerInstrument } from '../../utils/pitchConfig'
 import Pressable from '../../components/ui/Pressable'
 import StaffJumperGame from './StaffJumperGame'
+import StaffPreview from './StaffPreview'
 
 interface StaffJumperScreenProps {
   streamRef: RefObject<MediaStream | null>
@@ -74,6 +73,9 @@ const WRITTEN_PITCH_CHOICES: {
   { id: 'g', name: 'G', instruments: 'Alto flute' },
 ]
 
+/** Only one settings group is open at a time, so the screen stays scannable. */
+type SetupSection = 'exercise' | 'instrument' | 'tempo'
+
 function formatRunTime(seconds: number): string {
   const rounded = Math.max(0, Math.round(seconds))
   const minutes = Math.floor(rounded / 60)
@@ -99,10 +101,16 @@ export default function StaffJumperScreen({
   const [draftPlayerModel, setDraftPlayerModel] = useState<ScaleRushPlayerModelId>(
     loadScaleRushPlayerModel,
   )
-  const [draftRhythm, setDraftRhythm] = useState<StaffJumperRhythm>('auto')
+  const [draftMeter, setDraftMeter] = useState<StaffJumperMeter>('simple')
   const [draftTempo, setDraftTempo] = useState(STAFF_JUMPER_TEMPO_DEFAULT)
   const [draftMetronome, setDraftMetronome] = useState(true)
   const [draftDrone, setDraftDrone] = useState(false)
+  const [openSection, setOpenSection] = useState<SetupSection | null>(null)
+  /**
+   * The preview shows one sample of a randomized exercise, so it needs its own
+   * seed — otherwise it would redraw different notes on every keystroke.
+   */
+  const [previewSeed, setPreviewSeed] = useState(() => Date.now())
 
   const availableKeys = keysForScaleMode(draftScaleMode)
 
@@ -155,7 +163,7 @@ export default function StaffJumperScreen({
       tunerInstrument,
       transposition: draftTransposition,
       playerModel: draftPlayerModel,
-      rhythm: draftRhythm,
+      meter: draftMeter,
       tempoBpm: draftTempo,
       metronome: draftMetronome,
       drone: draftDrone,
@@ -168,7 +176,7 @@ export default function StaffJumperScreen({
       draftMetronome,
       draftPlayerModel,
       draftRange,
-      draftRhythm,
+      draftMeter,
       draftScaleMode,
       draftTempo,
       draftTransposition,
@@ -176,13 +184,13 @@ export default function StaffJumperScreen({
     ],
   )
   const rangePreview = useMemo(() => getScaleRangePreview(draftConfig), [draftConfig])
-  const rhythmHint =
-    draftRhythm === 'auto'
-      ? `${RHYTHM_LABELS[resolveRhythm(draftRhythm, draftDifficulty)]} — from ${DIFFICULTY_LABELS[draftDifficulty]}`
-      : RHYTHM_DESCRIPTIONS[draftRhythm]
+  const previewConfig = useMemo(
+    () => ({ ...draftConfig, sessionSeed: previewSeed }),
+    [draftConfig, previewSeed],
+  )
+  const meterSpec = METERS[draftMeter]
   const droneNoteLabel = pitchClassLabel(getConcertTonicPitchClass(draftConfig), draftKey)
 
-  const instrumentProfile = getTunerProfile(tunerInstrument)
   const hasPitchSignal =
     Number.isFinite(readout.frequencyHz) &&
     readout.frequencyHz > 0 &&
@@ -193,7 +201,7 @@ export default function StaffJumperScreen({
       WRITTEN_PITCH_CHOICES.find((item) => item.id === draftTransposition) ??
       WRITTEN_PITCH_CHOICES[0]!
 
-    /** Inline text options — no pills, no trays; the choice is just the word. */
+    /** Inline text options — the choice is just the word, underlined when on. */
     const Options = <T extends string>({
       value,
       options,
@@ -222,6 +230,42 @@ export default function StaffJumperScreen({
       </div>
     )
 
+    const Section = ({
+      id,
+      title,
+      summary,
+      children,
+    }: {
+      id: SetupSection
+      title: string
+      summary: string
+      children: React.ReactNode
+    }) => {
+      const open = openSection === id
+      return (
+        <section className={`sj-group ${open ? 'sj-group--open' : ''}`}>
+          <Pressable
+            type="button"
+            intensity="soft"
+            hapticFeedback={hapticFeedback}
+            onClick={() => setOpenSection(open ? null : id)}
+            className="sj-group__head"
+            aria-expanded={open}
+          >
+            <span className="sj-group__title">
+              <strong>{title}</strong>
+              {/* The summary means you can read every setting without opening
+                  anything — the screen was hard to follow when the only way to
+                  see a value was to go looking for it. */}
+              <small>{summary}</small>
+            </span>
+            <ChevronDown className="sj-group__chevron" aria-hidden />
+          </Pressable>
+          {open && <div className="sj-group__body">{children}</div>}
+        </section>
+      )
+    }
+
     return (
       <div className="sj-screen sj-screen--setup">
         <header className="sj-head">
@@ -245,54 +289,57 @@ export default function StaffJumperScreen({
           </p>
         </header>
 
-        {/* The brief: exactly what this run will put in front of you. */}
-        <section className="sj-brief">
-          <p className="sj-brief__kicker">You&rsquo;ll be reading</p>
-          <h2 className="sj-brief__scale">{scaleDisplayName(draftKey, draftScaleMode)}</h2>
-          <p className="sj-brief__range">
-            <strong>{rangePreview.lowLabel}</strong>
-            <span aria-hidden>to</span>
-            <strong>{rangePreview.highLabel}</strong>
-          </p>
-          <p className="sj-brief__meta">
-            {CLEF_LABELS[draftClef]} clef · {rangePreview.signatureLabel} · {rangePreview.noteCount}{' '}
-            notes per lap · {draftTempo} BPM
-          </p>
-
-          <div className={`sj-mic ${hasPitchSignal ? 'sj-mic--live' : ''}`}>
-            <Mic aria-hidden />
-            <span>
-              {hasPitchSignal
-                ? `Hearing ${readout.noteName}`
-                : 'Play a note to check your mic'}
-            </span>
-            <small>{instrumentProfile.label}</small>
+        {/* The hero is the music itself. Every control below redraws it. */}
+        <section className="sj-hero">
+          <div className="sj-hero__top">
+            <div>
+              <h2>{scaleDisplayName(draftKey, draftScaleMode)}</h2>
+              <p>
+                {rangePreview.lowLabel} to {rangePreview.highLabel} · {CLEF_LABELS[draftClef]} ·{' '}
+                {meterSpec.label} · {draftTempo} BPM
+              </p>
+            </div>
+            <Pressable
+              type="button"
+              intensity="soft"
+              hapticFeedback={hapticFeedback}
+              onClick={() => setPreviewSeed(Date.now())}
+              className="sj-hero__shuffle"
+              aria-label="Shuffle the example exercise"
+            >
+              <Shuffle aria-hidden />
+            </Pressable>
           </div>
+
+          <StaffPreview config={previewConfig} />
+
+          <p className="sj-hero__note">
+            Every run is a different exercise — this is one example.
+          </p>
         </section>
 
-        <section className="sj-sheet">
-          <div className="sj-field sj-field--stack">
-            <p className="sj-field__label">
-              Instrument <span>{selectedInstrument.instruments}</span>
-            </p>
-            <Options
-              label="Instrument"
-              value={draftTransposition}
-              onChange={setDraftTransposition}
-              options={WRITTEN_PITCH_CHOICES.map((item) => ({ id: item.id, label: item.name }))}
-            />
-          </div>
+        <div className="sj-start">
+          <Pressable
+            type="button"
+            haptic="medium"
+            hapticFeedback={hapticFeedback}
+            onClick={() => start(draftConfig)}
+            className="sj-start__button"
+          >
+            <Play aria-hidden />
+            Start
+          </Pressable>
+          <p className={`sj-start__mic ${hasPitchSignal ? 'sj-start__mic--live' : ''}`}>
+            <Mic aria-hidden />
+            {hasPitchSignal ? `Hearing ${readout.noteName}` : 'Play a note to check your mic'}
+          </p>
+        </div>
 
-          <div className="sj-field">
-            <p className="sj-field__label">Clef</p>
-            <Options
-              label="Clef"
-              value={draftClef}
-              onChange={setDraftClef}
-              options={STAFF_JUMPER_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
-            />
-          </div>
-
+        <Section
+          id="exercise"
+          title="Exercise"
+          summary={`${scaleDisplayName(draftKey, draftScaleMode)} · ${RANGE_LABELS[draftRange]} · ${DIFFICULTY_LABELS[draftDifficulty]}`}
+        >
           <div className="sj-field">
             <p className="sj-field__label">Scale</p>
             <Options
@@ -334,9 +381,83 @@ export default function StaffJumperScreen({
               options={STAFF_JUMPER_RANGES.map((range) => ({ id: range, label: RANGE_LABELS[range] }))}
             />
           </div>
-        </section>
 
-        <section className="sj-sheet">
+          <div className="sj-field sj-field--stack">
+            <p className="sj-field__label">
+              Difficulty <span>{DIFFICULTY_TIMEOUT_SECONDS[draftDifficulty]}s per note</span>
+            </p>
+            <Options
+              label="Difficulty"
+              value={draftDifficulty}
+              onChange={setDraftDifficulty}
+              options={STAFF_JUMPER_DIFFICULTIES.map((level) => ({
+                id: level,
+                label: DIFFICULTY_LABELS[level],
+              }))}
+            />
+            <p className="sj-field__note">{DIFFICULTY_DESCRIPTIONS[draftDifficulty]}</p>
+          </div>
+        </Section>
+
+        <Section
+          id="instrument"
+          title="Instrument"
+          summary={`${selectedInstrument.name} · ${CLEF_LABELS[draftClef]} clef`}
+        >
+          <div className="sj-field sj-field--stack">
+            <p className="sj-field__label">
+              Written pitch <span>{selectedInstrument.instruments}</span>
+            </p>
+            <Options
+              label="Written pitch"
+              value={draftTransposition}
+              onChange={setDraftTransposition}
+              options={WRITTEN_PITCH_CHOICES.map((item) => ({ id: item.id, label: item.name }))}
+            />
+          </div>
+
+          <div className="sj-field">
+            <p className="sj-field__label">Clef</p>
+            <Options
+              label="Clef"
+              value={draftClef}
+              onChange={setDraftClef}
+              options={STAFF_JUMPER_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
+            />
+          </div>
+
+          <div className="sj-field sj-field--stack" role="group" aria-label="Character">
+            <p className="sj-field__label">Character</p>
+            <div className="sj-characters__grid">
+              {SCALE_RUSH_PLAYER_MODELS.map((model) => (
+                <Pressable
+                  key={model.id}
+                  type="button"
+                  intensity="soft"
+                  hapticFeedback={hapticFeedback}
+                  onClick={() => {
+                    setDraftPlayerModel(model.id)
+                    saveScaleRushPlayerModel(model.id)
+                  }}
+                  className={`sj-character ${draftPlayerModel === model.id ? 'sj-character--on' : ''}`}
+                  aria-pressed={draftPlayerModel === model.id}
+                  aria-label={`Choose ${model.name}`}
+                >
+                  <img src={model.asset} alt="" draggable={false} />
+                </Pressable>
+              ))}
+            </div>
+          </div>
+        </Section>
+
+        <Section
+          id="tempo"
+          title="Tempo & sound"
+          summary={`${meterSpec.label} · ${draftTempo} BPM · ${
+            [draftMetronome ? 'click' : null, draftDrone ? 'drone' : null].filter(Boolean).join(' + ') ||
+            'silent'
+          }`}
+        >
           <div className="sj-field">
             <p className="sj-field__label">Tempo</p>
             <div className="sj-tempo" role="group" aria-label="Tempo">
@@ -379,15 +500,15 @@ export default function StaffJumperScreen({
 
           <div className="sj-field sj-field--stack">
             <p className="sj-field__label">
-              Rhythm <span>{rhythmHint}</span>
+              Time signature <span>{meterSpec.description}</span>
             </p>
             <Options
-              label="Rhythm"
-              value={draftRhythm}
-              onChange={setDraftRhythm}
-              options={STAFF_JUMPER_RHYTHMS.map((rhythm) => ({
-                id: rhythm,
-                label: RHYTHM_LABELS[rhythm],
+              label="Time signature"
+              value={draftMeter}
+              onChange={setDraftMeter}
+              options={STAFF_JUMPER_METERS.map((meter) => ({
+                id: meter,
+                label: `${METERS[meter].label}  ${METERS[meter].name}`,
               }))}
             />
           </div>
@@ -401,7 +522,7 @@ export default function StaffJumperScreen({
             aria-pressed={draftMetronome}
           >
             <span className="sj-field__label">
-              Metronome <span>One bar of count-in, then the pulse</span>
+              Metronome <span>Counts you in, then keeps the pulse</span>
             </span>
             <span className={`sj-switch ${draftMetronome ? 'sj-switch--on' : ''}`} aria-hidden />
           </Pressable>
@@ -419,66 +540,10 @@ export default function StaffJumperScreen({
             </span>
             <span className={`sj-switch ${draftDrone ? 'sj-switch--on' : ''}`} aria-hidden />
           </Pressable>
-        </section>
-
-        <section className="sj-sheet">
-          <div className="sj-field sj-field--stack">
-            <p className="sj-field__label">
-              Difficulty <span>{DIFFICULTY_TIMEOUT_SECONDS[draftDifficulty]}s per note</span>
-            </p>
-            <Options
-              label="Difficulty"
-              value={draftDifficulty}
-              onChange={setDraftDifficulty}
-              options={STAFF_JUMPER_DIFFICULTIES.map((level) => ({
-                id: level,
-                label: DIFFICULTY_LABELS[level],
-              }))}
-            />
-            <p className="sj-field__note">{DIFFICULTY_DESCRIPTIONS[draftDifficulty]}</p>
-          </div>
-
-          <div className="sj-field sj-field--stack" role="group" aria-label="Character">
-            <p className="sj-field__label">Character</p>
-            <div className="sj-characters__grid">
-              {SCALE_RUSH_PLAYER_MODELS.map((model) => (
-                <Pressable
-                  key={model.id}
-                  type="button"
-                  intensity="soft"
-                  hapticFeedback={hapticFeedback}
-                  onClick={() => {
-                    setDraftPlayerModel(model.id)
-                    saveScaleRushPlayerModel(model.id)
-                  }}
-                  className={`sj-character ${draftPlayerModel === model.id ? 'sj-character--on' : ''}`}
-                  aria-pressed={draftPlayerModel === model.id}
-                  aria-label={`Choose ${model.name}`}
-                >
-                  <img src={model.asset} alt="" draggable={false} />
-                </Pressable>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <div className="sj-start">
-          <Pressable
-            type="button"
-            haptic="medium"
-            hapticFeedback={hapticFeedback}
-            onClick={() => start(draftConfig)}
-            className="sj-start__button"
-          >
-            <Play aria-hidden />
-            Start
-          </Pressable>
-          <p>3 lives · every run is a new exercise</p>
-        </div>
+        </Section>
       </div>
     )
   }
-
 
   if (state.phase === 'paused') {
     return (
