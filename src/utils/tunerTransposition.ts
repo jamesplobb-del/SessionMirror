@@ -197,6 +197,22 @@ export function getTunerTransposition(
   )
 }
 
+/** Convert a written MIDI target into the sounding concert MIDI note. */
+export function writtenMidiToConcertMidi(
+  writtenMidi: number,
+  transposition: TunerTranspositionId,
+): number {
+  return Math.round(writtenMidi) - getTunerTransposition(transposition).writtenOffsetSemitones
+}
+
+/** Convert a sounding concert MIDI note into its written MIDI equivalent. */
+export function concertMidiToWrittenMidi(
+  concertMidi: number,
+  transposition: TunerTranspositionId,
+): number {
+  return Math.round(concertMidi) + getTunerTransposition(transposition).writtenOffsetSemitones
+}
+
 const WRITTEN_PITCH_CLASS_LABELS = [
   'C',
   'C♯',

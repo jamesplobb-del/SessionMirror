@@ -3305,6 +3305,7 @@ export function useCameraSession({
     reacquireStreamForAudioRoute,
     retuneCaptureAudio,
     reacquireCaptureStream,
+    releaseLiveStream,
     suspendCameraForBackground,
     suspendMicForPlayback,
     suspendAudioCaptureForPlayback,

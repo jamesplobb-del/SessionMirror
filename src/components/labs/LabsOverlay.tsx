@@ -1,14 +1,18 @@
+import { lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, type RefObject } from 'react'
 import type { TunerInstrument } from '../../utils/pitchConfig'
+import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import '../../styles/labs-arcade.css'
 import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
 import LabsMenu from './LabsMenu'
 import ScaleRushScreen from './ScaleRushScreen'
 
-export type LabsRoute = 'menu' | 'scale-rush' | 'staff-jumper'
+const BalanceScreen = lazy(() => import('../../labs/balance/BalanceScreen'))
+
+export type LabsRoute = 'menu' | 'scale-rush' | 'staff-jumper' | 'balance'
 
 interface LabsOverlayProps {
   isOpen: boolean
@@ -16,10 +20,17 @@ interface LabsOverlayProps {
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   tunerInstrument: TunerInstrument
+  tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
+  micPermissionBlocked: boolean
+  micPermissionPending: boolean
   onClose: () => void
   onNavigate: (route: LabsRoute) => void
   onRequestMicStream: () => void
+  onTunerSettingsChange: (settings: {
+    tunerInstrument: TunerInstrument
+    tunerTransposition: TunerTranspositionId
+  }) => void
 }
 
 export default function LabsOverlay({
@@ -28,10 +39,14 @@ export default function LabsOverlay({
   streamRef,
   streamGeneration,
   tunerInstrument,
+  tunerTransposition,
   hapticFeedback,
+  micPermissionBlocked,
+  micPermissionPending,
   onClose,
   onNavigate,
   onRequestMicStream,
+  onTunerSettingsChange,
 }: LabsOverlayProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const routeRef = useRef(route)
@@ -157,6 +172,7 @@ export default function LabsOverlay({
               hapticFeedback={hapticFeedback}
               onOpenScaleRush={() => onNavigate('scale-rush')}
               onOpenStaffJumper={() => onNavigate('staff-jumper')}
+              onOpenBalance={() => onNavigate('balance')}
               onBack={onClose}
             />
           ) : route === 'scale-rush' ? (
@@ -168,7 +184,7 @@ export default function LabsOverlay({
               onRequestMicStream={onRequestMicStream}
               onBack={() => onNavigate('menu')}
             />
-          ) : (
+          ) : route === 'staff-jumper' ? (
             <StaffJumperScreen
               streamRef={streamRef}
               streamGeneration={streamGeneration}
@@ -177,6 +193,21 @@ export default function LabsOverlay({
               onRequestMicStream={onRequestMicStream}
               onBack={() => onNavigate('menu')}
             />
+          ) : (
+            <Suspense fallback={<div className="balance-route-loading" role="status">Opening Balance…</div>}>
+              <BalanceScreen
+                streamRef={streamRef}
+                streamGeneration={streamGeneration}
+                tunerInstrument={tunerInstrument}
+                tunerTransposition={tunerTransposition}
+                hapticFeedback={hapticFeedback}
+                micPermissionBlocked={micPermissionBlocked}
+                micPermissionPending={micPermissionPending}
+                onRequestMicStream={onRequestMicStream}
+                onTunerSettingsChange={onTunerSettingsChange}
+                onBack={() => onNavigate('menu')}
+              />
+            </Suspense>
           )}
         </motion.div>
       )}

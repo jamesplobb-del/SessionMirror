@@ -1762,6 +1762,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     refreshCameraSession,
     requestCameraPreviewResume,
     reacquireStreamForAudioRoute,
+    releaseLiveStream,
     suspendCameraForBackground,
     suspendMicForPlayback,
     suspendAudioCaptureForPlayback,
@@ -1788,6 +1789,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const liveStreamGenerationRef = useRef(streamGeneration)
   const tunerMicBackgroundGenerationRef = useRef<number | null>(null)
   liveStreamGenerationRef.current = streamGeneration
+
+  const previousLabsRouteRef = useRef<LabsRoute | null>(labsRoute)
+  useEffect(() => {
+    const previous = previousLabsRouteRef.current
+    previousLabsRouteRef.current = labsRoute
+    if (previous === 'balance' && labsRoute !== 'balance') {
+      releaseLiveStream()
+    }
+  }, [labsRoute, releaseLiveStream])
 
   useEffect(() => {
     const markTunerMicForForegroundRecovery = () => {
@@ -4841,10 +4851,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     streamRef={streamRef}
                     streamGeneration={streamGeneration}
                     tunerInstrument={settings.tunerInstrument}
+                    tunerTransposition={settings.tunerTransposition}
                     hapticFeedback={settings.hapticFeedback}
+                    micPermissionBlocked={cameraPermissionBlocked}
+                    micPermissionPending={cameraPermissionRequestInFlight}
                     onClose={handleCloseLabs}
                     onNavigate={handleLabsNavigate}
                     onRequestMicStream={handleRequestLabsMicStream}
+                    onTunerSettingsChange={(next) => updateSettings(next)}
                   />
 
                   <MultitrackOverlay

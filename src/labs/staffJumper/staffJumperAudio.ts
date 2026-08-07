@@ -165,14 +165,19 @@ export interface DroneHandle {
 const WEB_DRONE_PEAK = 0.34
 
 /** Web fallback: a soft two-oscillator drone in the shared playback context. */
-async function startWebDrone(pitchClass: number, octave: number): Promise<DroneHandle> {
+async function startWebDrone(
+  pitchClass: number,
+  octave: number,
+  volume = DRONE_VOLUME,
+): Promise<DroneHandle> {
   const ctx = await getPlaybackAudioContext()
   const midi = (octave + 1) * 12 + pitchClass
   const hz = 440 * Math.pow(2, (midi - 69) / 12)
 
   const master = ctx.createGain()
   master.gain.setValueAtTime(0.0001, ctx.currentTime)
-  master.gain.exponentialRampToValueAtTime(WEB_DRONE_PEAK, ctx.currentTime + 0.6)
+  const peak = Math.max(0.0001, WEB_DRONE_PEAK * Math.max(0, Math.min(1, volume)) / DRONE_VOLUME)
+  master.gain.exponentialRampToValueAtTime(peak, ctx.currentTime + 0.6)
   master.connect(ctx.destination)
 
   // Root plus a quiet octave above — enough body to tune against without
@@ -232,18 +237,22 @@ const DRONE_VOLUME = 0.85
  * A phone speaker rolls off badly in the bass, so a drone an octave lower
  * measures the same but sounds far quieter than the tuner tab's.
  */
-export async function startDrone(concertPitchClass: number, octave = 4): Promise<DroneHandle> {
-  if (!isDroneNativeAvailable()) return startWebDrone(concertPitchClass, octave)
+export async function startDrone(
+  concertPitchClass: number,
+  octave = 4,
+  volume = DRONE_VOLUME,
+): Promise<DroneHandle> {
+  if (!isDroneNativeAvailable()) return startWebDrone(concertPitchClass, octave, volume)
 
   let previous: DroneState | null = null
   try {
     previous = await droneGetState()
     await droneSetOctave(octave)
-    await droneSetVolume(DRONE_VOLUME)
+    await droneSetVolume(Math.max(0, Math.min(1, volume)))
     await droneSoloNote(concertPitchClass, octave)
     await droneStart()
   } catch {
-    return startWebDrone(concertPitchClass, octave)
+    return startWebDrone(concertPitchClass, octave, volume)
   }
 
   return {
