@@ -1,4 +1,5 @@
 import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
+import { isBalanceCharacterId } from './balanceCharacters'
 import type {
   BalanceCustomRoutine,
   BalanceNoteResult,
@@ -17,6 +18,7 @@ export function createDefaultBalanceSettings(instrumentId: string): BalanceSetti
   return {
     routineType: 'single',
     instrumentId: instrument.id,
+    characterId: 'balancer',
     single: { writtenMidi: defaultMidi, repetitions: 3 },
     scale: {
       rootWrittenMidi: defaultMidi,
@@ -87,6 +89,7 @@ function normalizeSettings(value: unknown, instrumentId: string): BalanceSetting
         ? source.routineType
         : 'single',
     instrumentId: instrument.id,
+    characterId: isBalanceCharacterId(source.characterId) ? source.characterId : defaults.characterId,
     single: {
       writtenMidi: clampWrittenMidi(finiteNumber(single.writtenMidi, defaults.single.writtenMidi), instrument),
       repetitions: Math.max(1, Math.min(12, Math.round(finiteNumber(single.repetitions, 3)))),

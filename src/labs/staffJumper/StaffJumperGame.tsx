@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Pause } from 'lucide-react'
 import type { PitchReadout } from '../../utils/pitchUtils'
-import { getScaleRushPlayerModel } from '../scaleRush/scaleRushPlayerModels'
+import { getPracticeGameCharacter } from '../practiceGameCharacters'
 import {
   computeAccuracy,
   DIFFICULTY_LABELS,
@@ -310,7 +310,7 @@ export default function StaffJumperGame({
   const playerFeetScreen = baseY + headTopWorld * scale
   const playerScreenY = playerFeetScreen - PLAYER_FEET_OFFSET_PX
   const playerScreenX = targetWorldX * scale + scrollX
-  const playerModel = getScaleRushPlayerModel(config.playerModel)
+  const playerModel = getPracticeGameCharacter(config.playerModel)
 
   const prevAdvanceRef = useRef(state.advanceToken)
   const prevMissRef = useRef(state.missToken)

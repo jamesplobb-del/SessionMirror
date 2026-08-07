@@ -11,9 +11,14 @@
  * to pick the octave a scale is written in, so overshooting here is what puts
  * a 2-octave trumpet Bb scale on double high Bb instead of the normal Bb5.
  */
-import type { ScaleRushTransposition } from '../scaleRush/scaleRushMusicLogic'
 import type { TunerInstrument } from '../../utils/pitchConfig'
+import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import type { StaffJumperClef } from './staffNotationMap'
+
+export type StaffJumperTransposition = Extract<
+  TunerTranspositionId,
+  'concert' | 'bb' | 'eb' | 'f' | 'g' | 'a'
+>
 
 export interface WrittenRange {
   /** Lowest comfortably written note (MIDI). */
@@ -37,7 +42,7 @@ const N = {
  * Treble-clef ranges by written-pitch transposition.
  * `concert` is refined further by tuner instrument (voice vs strings vs winds).
  */
-const TREBLE_RANGES: Record<ScaleRushTransposition, WrittenRange> = {
+const TREBLE_RANGES: Record<StaffJumperTransposition, WrittenRange> = {
   concert: { minMidi: N.G3, maxMidi: N.G6, label: 'G3–G6' },
   /** Trumpet, Bb clarinet, tenor sax — low F#3, top around written D6. */
   bb: { minMidi: N.Fs3, maxMidi: N.D6, label: 'F♯3–D6' },
@@ -72,7 +77,7 @@ const BASS_RANGE_BY_INSTRUMENT: Record<TunerInstrument, WrittenRange> = {
 }
 
 export function getWrittenRange(
-  transposition: ScaleRushTransposition,
+  transposition: StaffJumperTransposition,
   clef: StaffJumperClef,
   tunerInstrument: TunerInstrument,
 ): WrittenRange {

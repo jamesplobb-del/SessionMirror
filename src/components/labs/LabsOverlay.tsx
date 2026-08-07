@@ -8,11 +8,10 @@ import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import '../../styles/labs-arcade.css'
 import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
 import LabsMenu from './LabsMenu'
-import ScaleRushScreen from './ScaleRushScreen'
 
 const BalanceScreen = lazy(() => import('../../labs/balance/BalanceScreen'))
 
-export type LabsRoute = 'menu' | 'scale-rush' | 'staff-jumper' | 'balance'
+export type LabsRoute = 'menu' | 'staff-jumper' | 'balance'
 
 interface LabsOverlayProps {
   isOpen: boolean
@@ -170,19 +169,9 @@ export default function LabsOverlay({
           {route === 'menu' ? (
             <LabsMenu
               hapticFeedback={hapticFeedback}
-              onOpenScaleRush={() => onNavigate('scale-rush')}
               onOpenStaffJumper={() => onNavigate('staff-jumper')}
               onOpenBalance={() => onNavigate('balance')}
               onBack={onClose}
-            />
-          ) : route === 'scale-rush' ? (
-            <ScaleRushScreen
-              streamRef={streamRef}
-              streamGeneration={streamGeneration}
-              tunerInstrument={tunerInstrument}
-              hapticFeedback={hapticFeedback}
-              onRequestMicStream={onRequestMicStream}
-              onBack={() => onNavigate('menu')}
             />
           ) : route === 'staff-jumper' ? (
             <StaffJumperScreen

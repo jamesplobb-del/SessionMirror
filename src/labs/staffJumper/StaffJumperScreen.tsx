@@ -20,7 +20,7 @@ import {
   type StaffJumperRange,
   type StaffJumperScaleMode,
 } from './staffJumperMusicLogic'
-import { type ScaleRushTransposition } from '../scaleRush/scaleRushMusicLogic'
+import type { StaffJumperTransposition } from './staffJumperInstrumentRanges'
 import {
   METERS,
   STAFF_JUMPER_METERS,
@@ -30,11 +30,11 @@ import {
   type StaffJumperMeter,
 } from './staffJumperRhythm'
 import {
-  loadScaleRushPlayerModel,
-  saveScaleRushPlayerModel,
-  SCALE_RUSH_PLAYER_MODELS,
-} from '../scaleRush/scaleRushPlayerModels'
-import type { ScaleRushPlayerModelId } from '../scaleRush/scaleRushTypes'
+  loadPracticeGameCharacter,
+  PRACTICE_GAME_CHARACTERS,
+  savePracticeGameCharacter,
+  type PracticeGameCharacterId,
+} from '../practiceGameCharacters'
 import {
   CLEF_LABELS,
   STAFF_JUMPER_CLEFS,
@@ -61,7 +61,7 @@ interface StaffJumperScreenProps {
  * key names made everyone guess.
  */
 const WRITTEN_PITCH_CHOICES: {
-  id: ScaleRushTransposition
+  id: StaffJumperTransposition
   name: string
   instruments: string
 }[] = [
@@ -97,9 +97,9 @@ export default function StaffJumperScreen({
   const [draftRange, setDraftRange] = useState<StaffJumperRange>('1-octave')
   const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>('easy')
   const [draftClef, setDraftClef] = useState<StaffJumperClef>('treble')
-  const [draftTransposition, setDraftTransposition] = useState<ScaleRushTransposition>('concert')
-  const [draftPlayerModel, setDraftPlayerModel] = useState<ScaleRushPlayerModelId>(
-    loadScaleRushPlayerModel,
+  const [draftTransposition, setDraftTransposition] = useState<StaffJumperTransposition>('concert')
+  const [draftPlayerModel, setDraftPlayerModel] = useState<PracticeGameCharacterId>(
+    loadPracticeGameCharacter,
   )
   const [draftMeter, setDraftMeter] = useState<StaffJumperMeter>('simple')
   const [draftTempo, setDraftTempo] = useState(STAFF_JUMPER_TEMPO_DEFAULT)
@@ -429,7 +429,7 @@ export default function StaffJumperScreen({
           <div className="sj-field sj-field--stack" role="group" aria-label="Character">
             <p className="sj-field__label">Character</p>
             <div className="sj-characters__grid">
-              {SCALE_RUSH_PLAYER_MODELS.map((model) => (
+              {PRACTICE_GAME_CHARACTERS.map((model) => (
                 <Pressable
                   key={model.id}
                   type="button"
@@ -437,7 +437,7 @@ export default function StaffJumperScreen({
                   hapticFeedback={hapticFeedback}
                   onClick={() => {
                     setDraftPlayerModel(model.id)
-                    saveScaleRushPlayerModel(model.id)
+                    savePracticeGameCharacter(model.id)
                   }}
                   className={`sj-character ${draftPlayerModel === model.id ? 'sj-character--on' : ''}`}
                   aria-pressed={draftPlayerModel === model.id}

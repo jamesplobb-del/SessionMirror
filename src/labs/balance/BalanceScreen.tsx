@@ -212,7 +212,12 @@ export default function BalanceScreen({
     const nextTarget = game.state.targets[game.state.targetIndex + 1] ?? null
     return (
       <div className="balance-play-screen balance-play-screen--rest">
-        <BalanceScene phase="resting" target={nextTarget} visualRef={game.visualRef} />
+        <BalanceScene
+          phase="resting"
+          target={nextTarget}
+          visualRef={game.visualRef}
+          characterId={game.state.settings.characterId}
+        />
         <section className="balance-rest-card">
           <p className="balance-eyebrow">Rest</p>
           <strong>{remaining === null ? 'Take your time' : `${Math.ceil(remaining / 1000)}s`}</strong>
@@ -262,7 +267,12 @@ export default function BalanceScreen({
         ><Pause /></Pressable>
       </header>
 
-      <BalanceScene phase={game.state.phase} target={target} visualRef={game.visualRef} />
+      <BalanceScene
+        phase={game.state.phase}
+        target={target}
+        visualRef={game.visualRef}
+        characterId={game.state.settings.characterId}
+      />
 
       <section className="balance-game-hud" aria-label="Live balance status">
         <p className="balance-hud__time">Balanced <strong>{formatBalanceDuration(game.hud.balancedMs)}</strong></p>

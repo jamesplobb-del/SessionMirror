@@ -1,10 +1,7 @@
 import type { PitchReadout } from '../../utils/pitchUtils'
 import type { TunerInstrument } from '../../utils/pitchConfig'
-import {
-  transpositionSemitones,
-  type ScaleRushTransposition,
-} from '../scaleRush/scaleRushMusicLogic'
-import type { ScaleRushPlayerModelId } from '../scaleRush/scaleRushTypes'
+import { getTunerTransposition } from '../../utils/tunerTransposition'
+import type { PracticeGameCharacterId } from '../practiceGameCharacters'
 import {
   getStaffPositionForNote,
   NOTE_SPACING_PX,
@@ -13,7 +10,11 @@ import {
   type StaffJumperClef,
   type StaffNoteLetter,
 } from './staffNotationMap'
-import { getWrittenRange, STAFF_CENTER_MIDI } from './staffJumperInstrumentRanges'
+import {
+  getWrittenRange,
+  STAFF_CENTER_MIDI,
+  type StaffJumperTransposition,
+} from './staffJumperInstrumentRanges'
 import {
   getRhythmSlot,
   type RhythmSlot,
@@ -130,8 +131,8 @@ export interface StaffJumperConfig {
   difficulty: StaffJumperDifficulty
   clef: StaffJumperClef
   tunerInstrument: TunerInstrument
-  transposition: ScaleRushTransposition
-  playerModel: ScaleRushPlayerModelId
+  transposition: StaffJumperTransposition
+  playerModel: PracticeGameCharacterId
   meter: StaffJumperMeter
   tempoBpm: number
   metronome: boolean
@@ -581,7 +582,7 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
 /** Concert pitch class of the tonic — what the drone should actually sound. */
 export function getConcertTonicPitchClass(config: StaffJumperConfig): number {
   const written = keyPitchClass(config.key)
-  return ((written - transpositionSemitones(config.transposition)) % 12 + 12) % 12
+  return ((written - getTunerTransposition(config.transposition).writtenOffsetSemitones) % 12 + 12) % 12
 }
 
 export interface ScaleRangePreview {
@@ -699,7 +700,9 @@ export function getDetectedPitchClass(
 ): number | null {
   const concertPitchClass = readoutToConcertPitchClass(readout)
   if (concertPitchClass == null) return null
-  const writtenOffset = config ? transpositionSemitones(config.transposition) : 0
+  const writtenOffset = config
+    ? getTunerTransposition(config.transposition).writtenOffsetSemitones
+    : 0
   return ((concertPitchClass + writtenOffset) % 12 + 12) % 12
 }
 

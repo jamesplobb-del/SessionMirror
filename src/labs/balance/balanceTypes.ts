@@ -1,5 +1,6 @@
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
+import type { BalanceCharacterId } from './balanceCharacters'
 
 export type BalancePhase =
   | 'setup'
@@ -75,6 +76,7 @@ export interface BalanceSoundRestSettings {
 export interface BalanceSettings {
   routineType: BalanceRoutineType
   instrumentId: string
+  characterId: BalanceCharacterId
   single: BalanceSingleRoutineSettings
   scale: BalanceScaleRoutineSettings
   selectedCustomRoutineId: string | null

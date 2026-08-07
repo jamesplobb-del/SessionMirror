@@ -797,7 +797,7 @@ export default function SettingsDrawer({
                   <div>
                     <p className="text-sm font-semibold text-stone-900">Labs</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                      Prototype games like Scale Rush. Does not affect recording or playback.
+                      Pitch-controlled practice games. Does not affect recording or playback.
                     </p>
                   </div>
                 </Pressable>

@@ -1,24 +1,20 @@
 import { Gamepad2, Music4, Play, Trophy, X } from 'lucide-react'
-import { loadBestScore as loadScaleRushBestScore } from '../../labs/scaleRush/scaleRushMusicLogic'
 import { loadBestScore as loadStaffJumperBestScore } from '../../labs/staffJumper/staffJumperMusicLogic'
 import { formatBalanceDuration, loadBalanceBestMs } from '../../labs/balance/balanceStorage'
 import Pressable from '../ui/Pressable'
 
 interface LabsMenuProps {
   hapticFeedback: boolean
-  onOpenScaleRush: () => void
   onOpenStaffJumper: () => void
   onOpenBalance: () => void
   onBack: () => void
 }
 export default function LabsMenu({
   hapticFeedback,
-  onOpenScaleRush,
   onOpenStaffJumper,
   onOpenBalance,
   onBack,
 }: LabsMenuProps) {
-  const scaleRushBest = loadScaleRushBestScore()
   const staffJumperBest = loadStaffJumperBestScore()
   const balanceBest = loadBalanceBestMs()
 
@@ -54,44 +50,10 @@ export default function LabsMenu({
 
       <div className="arcade-menu__section-head">
         <h2>Games</h2>
-        <span>3 available</span>
+        <span>2 available</span>
       </div>
 
       <ul className="arcade-game-list">
-        <li>
-          <Pressable
-            type="button"
-            intensity="normal"
-            hapticFeedback={hapticFeedback}
-            onClick={onOpenScaleRush}
-            className="arcade-game-card arcade-game-card--rush"
-            aria-label={`Play Scale Rush. Personal best ${scaleRushBest}`}
-          >
-            <span className="arcade-game-card__copy">
-              <span className="arcade-game-card__badge">
-                <Music4 aria-hidden /> Scales
-              </span>
-              <h3>Scale Rush</h3>
-              <p>Cross the lanes by playing each scale degree in time.</p>
-              <span className="arcade-game-card__meta">
-                <span>
-                  <Trophy aria-hidden /> Best {scaleRushBest || '—'}
-                </span>
-              </span>
-            </span>
-            <span className="arcade-game-card__art arcade-game-card__art--rush" aria-hidden>
-              <span className="arcade-game-card__lane" />
-              <span className="arcade-game-card__lane" />
-              <span className="arcade-game-card__lane" />
-              <span className="arcade-game-card__lane" />
-              <span className="arcade-game-card__note">♪</span>
-              <span className="arcade-game-card__runner">🎺</span>
-              <span className="arcade-game-card__go">
-                <Play aria-hidden />
-              </span>
-            </span>
-          </Pressable>
-        </li>
         <li>
           <Pressable
             type="button"

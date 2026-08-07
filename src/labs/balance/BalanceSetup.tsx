@@ -14,6 +14,7 @@ import {
   routineSummary,
 } from './balanceMusic'
 import { formatBalanceDuration, toleranceCentsForSettings } from './balanceStorage'
+import { BALANCE_CHARACTERS, getBalanceCharacter } from './balanceCharacters'
 import type {
   BalanceCustomRoutine,
   BalanceScaleDirection,
@@ -119,6 +120,7 @@ export default function BalanceSetup({
 }: BalanceSetupProps) {
   const [openSection, setOpenSection] = useState<SetupSection | null>(null)
   const instrument = getBalanceInstrument(settings.instrumentId)
+  const selectedCharacter = getBalanceCharacter(settings.characterId)
   const hasPitch = readout.noteName !== '—' && readout.frequencyHz > 0
   const selectedCustom = customRoutines.find((routine) => routine.id === settings.selectedCustomRoutineId)
   const restLabel =
@@ -159,7 +161,17 @@ export default function BalanceSetup({
           <span className="balance-preview-cloud" />
           <span className="balance-preview-platform" />
           <span className="balance-preview-rope" />
-          <span className="balance-preview-person"><i /><b /></span>
+          {selectedCharacter.asset ? (
+            <img
+              className="balance-preview-character"
+              src={selectedCharacter.asset}
+              alt=""
+              draggable={false}
+              style={{ transform: `translateX(-50%) scale(${selectedCharacter.scale})` }}
+            />
+          ) : (
+            <span className="balance-preview-person"><i /><b /></span>
+          )}
           <span className="balance-preview-note">{previewTarget?.writtenLabel ?? 'C5'}</span>
         </div>
         <h2>Stay centered to keep moving.</h2>
@@ -303,6 +315,38 @@ export default function BalanceSetup({
           <span>Transposition<strong>{instrument.transposition === 'concert' ? 'Concert C' : instrument.transposition.replace('_', ' · ')}</strong></span>
           <span>Written range<strong>{midiToBalanceNoteName(instrument.minWrittenMidi)}–{midiToBalanceNoteName(instrument.maxWrittenMidi)}</strong></span>
           <span>Current target<strong>{previewTarget ? `Written ${previewTarget.writtenLabel} · Concert ${previewTarget.concertLabel}` : '—'}</strong></span>
+        </div>
+        <div className="balance-character-picker" role="radiogroup" aria-label="Character">
+          <p>Character</p>
+          <div className="balance-character-picker__grid">
+            {BALANCE_CHARACTERS.map((character) => (
+              <Pressable
+                key={character.id}
+                type="button"
+                intensity="soft"
+                hapticFeedback={hapticFeedback}
+                className={`balance-character-option ${settings.characterId === character.id ? 'is-selected' : ''}`}
+                role="radio"
+                aria-checked={settings.characterId === character.id}
+                aria-label={`Choose ${character.name}`}
+                onClick={() => onUpdate({ characterId: character.id })}
+              >
+                <span className="balance-character-option__preview" aria-hidden>
+                  {character.asset ? (
+                    <img
+                      src={character.asset}
+                      alt=""
+                      draggable={false}
+                      style={{ transform: `scale(${character.scale})` }}
+                    />
+                  ) : (
+                    <span className="balance-character-option__balancer"><i /><b /></span>
+                  )}
+                </span>
+                <span>{character.name}</span>
+              </Pressable>
+            ))}
+          </div>
         </div>
       </SetupGroup>
 

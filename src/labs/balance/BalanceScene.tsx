@@ -1,18 +1,21 @@
 import { useEffect, useRef, type MutableRefObject } from 'react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import type { BalancePhase, BalanceTarget, BalanceVisualSnapshot } from './balanceTypes'
+import type { BalanceCharacterId } from './balanceCharacters'
 import BalanceCharacter from './BalanceCharacter'
 
 interface BalanceSceneProps {
   phase: BalancePhase
   target: BalanceTarget | null
   visualRef: MutableRefObject<BalanceVisualSnapshot>
+  characterId: BalanceCharacterId
 }
 
 export default function BalanceScene({
   phase,
   target,
   visualRef,
+  characterId,
 }: BalanceSceneProps) {
   const sceneRef = useRef<HTMLDivElement>(null)
   const characterRef = useRef<HTMLDivElement>(null)
@@ -72,7 +75,16 @@ export default function BalanceScene({
       const ropeY = cubic(0, 30, 67, 100, ropeT)
       const characterX = sceneWidth * (0.3 + (ropeX / 100) * 0.4)
       const characterY = sceneHeight * (0.368 + (ropeY / 100) * 0.44)
-      const characterScale = 1 - visualProgress * 0.48
+      // Once the player moves out from the foreground platform, keep them in
+      // a stable lower-middle follow zone. The world moves around that anchor,
+      // which makes the next island visibly approach instead of shrinking the
+      // character into the distance.
+      const cameraAnchorX = sceneWidth * 0.48
+      const cameraAnchorY = sceneHeight * 0.62
+      const followEase = visualProgress * visualProgress * (3 - 2 * visualProgress)
+      const cameraX = (cameraAnchorX - characterX) * followEase
+      const cameraY = Math.max(0, cameraAnchorY - characterY)
+      const characterScale = 1 - visualProgress * 0.16
       const lean = Math.max(-11, Math.min(11, visualCents * 0.5))
       const stepDuration = 1200 - Math.max(0, Math.min(1, snapshot.speed)) * 400
 
@@ -95,13 +107,15 @@ export default function BalanceScene({
         (completing || resting) && visualProgress >= 0.96,
       )
       scene.style.setProperty('--balance-progress', String(visualProgress))
-      scene.style.setProperty('--balance-destination-scale', String(0.88 + visualProgress * 0.17))
+      scene.style.setProperty('--balance-camera-x', `${cameraX}px`)
+      scene.style.setProperty('--balance-camera-y', `${cameraY}px`)
+      scene.style.setProperty('--balance-destination-scale', String(0.88 + visualProgress * 0.38))
       scene.style.setProperty('--balance-drift-left', `${(travel % 96) * -0.018}px`)
       scene.style.setProperty('--balance-drift-right', `${(travel % 96) * 0.025}px`)
       scene.style.setProperty('--balance-parallax-far', `${visualProgress * sceneHeight * 0.012 + (travel % 96) * 0.018}px`)
       scene.style.setProperty('--balance-parallax-mid', `${visualProgress * sceneHeight * 0.03 + (travel % 96) * 0.035}px`)
       scene.style.setProperty('--balance-parallax-near', `${visualProgress * sceneHeight * 0.06 + (travel % 96) * 0.055}px`)
-      scene.style.setProperty('--balance-start-shift', `${visualProgress * sceneHeight * 0.18}px`)
+      scene.style.setProperty('--balance-start-shift', `${visualProgress * sceneHeight * 0.11}px`)
       scene.style.setProperty('--balance-rope-shift', `${(travel % 96) * -0.2}px`)
       scene.style.setProperty('--balance-speed', String(snapshot.speed))
       frame = window.requestAnimationFrame(tick)
@@ -176,7 +190,7 @@ export default function BalanceScene({
           <span className="balance-anchor-post" />
         </div>
 
-        <BalanceCharacter ref={characterRef} active={active} />
+        <BalanceCharacter ref={characterRef} active={active} characterId={characterId} />
       </div>
     </div>
   )
