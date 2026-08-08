@@ -320,6 +320,9 @@ function ControlDeck({
         showTakeCards={showTakeCards}
         showMetronome={showMetronome}
         audioEnhancerEnabled={audioEnhancerEnabled}
+        handsFreeEnabled={autoSoundRecording}
+        handsFreeToggleVisible={Boolean(onAutoSoundRecordingChange) && !isRecording}
+        onHandsFreeChange={onAutoSoundRecordingChange}
         layoutMode={settingsLayoutMode}
         tunerTakePillsVisible={tunerTakePillsVisible}
         tunerTakePillsToggleVisible={tunerTakePillsToggleVisible}
@@ -398,11 +401,11 @@ function ControlDeck({
                 triggerModeSwitchHaptic(hapticFeedback)
                 onRecordingModeChange('audio')
               }}
-              aria-label="Open Practice"
+              aria-label="Open Tools"
             >
               <span className="ui-orient-spin camera-pill-action__content">
                 <PracticeWaveformIcon />
-                <span>Practice</span>
+                <span>Tools</span>
               </span>
             </Pressable>
 

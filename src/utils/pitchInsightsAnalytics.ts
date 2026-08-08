@@ -273,6 +273,69 @@ export function aggregatePitchInsights(
     .sort((left, right) => left.midiNote - right.midiNote)
 }
 
+/**
+ * Top notes to review, ranked by how far off center they are — scaled down
+ * for notes with few observations so a wildly-off note seen 4 times can't
+ * outrank a moderately-off note seen 40 times. Notes still in the
+ * 'collecting' confidence band are excluded entirely: there isn't enough
+ * data yet to call them a habit worth fixing.
+ */
+export function rankNotesWorthReviewing(
+  insights: NotePitchInsight[],
+  limit = 3,
+): NotePitchInsight[] {
+  return insights
+    .filter((insight) => insight.confidence !== 'collecting')
+    .map((insight) => ({
+      insight,
+      score:
+        Math.abs(insight.typicalCents) *
+        Math.min(
+          1,
+          insight.observationCount / PITCH_INSIGHTS_THRESHOLDS.establishedTendencyObservations,
+        ),
+    }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit)
+    .map(({ insight }) => insight)
+}
+
+export interface OverallPitchTrend {
+  overallCents: number
+  /** Positive means recent playing sits closer to center than before; null
+   * when there isn't enough data on both sides of the window to compare. */
+  deltaCents: number | null
+}
+
+/**
+ * Same recent-vs-historical comparison as aggregatePitchInsights, pooled
+ * across every note instead of grouped by one — the headline "how am I
+ * doing overall" number for the Pitch Insights hero.
+ */
+export function summarizeOverallPitchTrend(
+  observations: PitchObservation[],
+  now = Date.now(),
+): OverallPitchTrend {
+  const recentBoundary =
+    now - PITCH_INSIGHTS_THRESHOLDS.recentWindowDays * 24 * 60 * 60 * 1000
+  const overallCents = median(observations.map((observation) => observation.centsOffset))
+
+  const recent = observations.filter((observation) => observation.observedAt >= recentBoundary)
+  const historical = observations.filter((observation) => observation.observedAt < recentBoundary)
+  const canCompare =
+    recent.length >= PITCH_INSIGHTS_THRESHOLDS.minimumTrendGroupObservations &&
+    historical.length >= PITCH_INSIGHTS_THRESHOLDS.minimumTrendGroupObservations
+  if (!canCompare) return { overallCents, deltaCents: null }
+
+  const recentCents = median(recent.map((observation) => observation.centsOffset))
+  const historicalCents = median(historical.map((observation) => observation.centsOffset))
+  const rawDelta = Math.abs(historicalCents) - Math.abs(recentCents)
+  const deltaCents =
+    Math.abs(rawDelta) >= PITCH_INSIGHTS_THRESHOLDS.meaningfulImprovementCents ? rawDelta : null
+
+  return { overallCents, deltaCents }
+}
+
 export function describePitchInsight(insight: NotePitchInsight): string {
   const cents = Math.round(Math.abs(insight.typicalCents))
   if (insight.confidence === 'collecting') {

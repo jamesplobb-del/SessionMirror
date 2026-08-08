@@ -27,9 +27,8 @@ function TunerTranspositionMenu({
     <section className="tuner-transposition-menu" aria-label="Tuner transposition">
       <header className="tuner-transposition-menu__header">
         <div>
-          <p>Written pitch</p>
-          <h2>Transposition</h2>
-          <span>Notes match your part. Frequency and cents stay at concert pitch.</span>
+          <h2>Written pitch</h2>
+          <span>Note names follow your part. Frequency and cents stay at concert pitch.</span>
         </div>
         <button type="button" onClick={onClose} aria-label="Close transposition menu">
           <X aria-hidden />

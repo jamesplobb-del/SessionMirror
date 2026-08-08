@@ -357,6 +357,39 @@
   background: rgba(255, 90, 90, 0.06) !important;
 }
 
+/*
+ * Video take backing stays black in camera mode — these boxes float over a
+ * live camera feed, so letterbox bars need to read as part of the viewfinder,
+ * not as light cards. Audio Mode keeps the light default from index.css.
+ */
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .take-media-surface {
+  background: #000000;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .take-media-controls-bar {
+  background: rgba(0, 0, 0, 0.7);
+  border-top: 0;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .take-media-controls-bar
+  .mini-pip-controls__btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .take-media-controls-bar
+  .mini-pip-controls__icon {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .take-media-controls-bar
+  .mini-pip-controls__slider {
+  accent-color: #ffffff;
+}
+
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-video-container:has(.take-audio-surface) .hud-glass-badge,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .pip-window--fill:has(.take-audio-surface) .hud-glass-badge,
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel:has(.take-audio-surface) .hud-glass-badge {
@@ -782,14 +815,21 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
   min-height: 0;
 }
 
+/*
+ * White card, same as every other elevated-light surface in the app — this
+ * is the rule that actually wins the cascade (later + equal specificity to
+ * the two earlier attempts above), and it was still painting the panel
+ * near-black (#080b10) with a white inner ring meant for a dark card. That's
+ * the "black undertone" that didn't fit the rest of the app.
+ */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel {
   border: 0 !important;
   border-radius: var(--split-panel-radius);
-  background: #080b10 !important;
+  background: var(--audio-surface, #ffffff) !important;
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.08),
-    0 8px 22px rgba(15, 23, 42, 0.1),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.34) !important;
+    0 1px 2px rgba(23, 26, 34, 0.06),
+    0 8px 22px rgba(23, 26, 34, 0.08),
+    inset 0 0 0 1px rgba(23, 26, 34, 0.07) !important;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -801,9 +841,9 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel--current {
   border: 0 !important;
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.08),
-    0 8px 22px rgba(15, 23, 42, 0.1),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.34) !important;
+    0 1px 2px rgba(23, 26, 34, 0.06),
+    0 8px 22px rgba(23, 26, 34, 0.08),
+    inset 0 0 0 1px rgba(23, 26, 34, 0.07) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel__label {
@@ -813,18 +853,16 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
   align-items: center;
   gap: 0.38rem;
   padding: 0.3rem 0.58rem 0.28rem 0.48rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(23, 26, 34, 0.08);
   border-radius: 999px;
-  background: rgba(10, 16, 26, 0.58);
-  color: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--audio-text-primary, #171a22);
   font-size: 0.55rem;
   font-weight: 680;
   letter-spacing: 0.11em;
-  box-shadow:
-    0 5px 16px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.12);
-  backdrop-filter: blur(14px) saturate(1.12);
+  box-shadow: 0 4px 12px rgba(23, 26, 34, 0.1);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-panel__label::before {
@@ -854,20 +892,18 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compa
   > .relative
   > .relative {
   border-radius: calc(var(--split-panel-radius) - 1px) !important;
-  background: #080b10 !important;
+  background: var(--audio-surface, #ffffff) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .split-compare-layout
   .pip-chrome-btn--expand.hud-glass-badge--ghost {
-  border: 0 !important;
-  background: rgba(10, 16, 26, 0.58) !important;
-  color: rgba(255, 255, 255, 0.96) !important;
-  box-shadow:
-    0 5px 16px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.12);
-  backdrop-filter: blur(14px) saturate(1.12);
+  border: 1px solid rgba(23, 26, 34, 0.08) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: var(--audio-text-primary, #171a22) !important;
+  box-shadow: 0 4px 12px rgba(23, 26, 34, 0.1) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .split-compare-layout .split-ratio-handle {

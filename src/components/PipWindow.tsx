@@ -77,7 +77,9 @@ function PipMediaPoster({
 }) {
   return (
     <div
-      className={`absolute inset-0 h-full w-full ${isAudio ? 'take-audio-surface' : 'bg-black'}`}
+      className={`absolute inset-0 h-full w-full ${
+        isAudio ? 'take-audio-surface' : 'take-media-surface'
+      }`}
       aria-hidden
     >
       {posterUrl ? (
@@ -142,7 +144,7 @@ function PipWindow({
     Boolean(filePath) &&
     !isAudioMimeType(mimeType)
   const isAudioMedia = isAudioMimeType(mimeType)
-  const mediaSurfaceClass = isAudioMedia ? 'take-audio-surface' : 'bg-black/95'
+  const mediaSurfaceClass = isAudioMedia ? 'take-audio-surface' : 'take-media-surface'
   const showUploadBadge =
     !compact && variant === 'benchmark' && Boolean(onUpload) && hasMedia
   const isFill = layout === 'fill'
@@ -580,7 +582,9 @@ function PipWindow({
                   videoRef={videoRef}
                   videoSourceKey={videoSourceKey}
                   className="absolute inset-0 h-full w-full pointer-events-none"
-                  loadingClassName={`absolute inset-0 h-full w-full ${isAudioMedia ? 'take-audio-surface' : 'bg-black'}`}
+                  loadingClassName={`absolute inset-0 h-full w-full ${
+                    isAudioMedia ? 'take-audio-surface' : 'take-media-surface'
+                  }`}
                   mirror={mirror}
                   recordingOrientation={recordingOrientation}
                   fit={playbackFit}
@@ -642,7 +646,7 @@ function PipWindow({
             {!compact && !suspendPlayback && (
             <div
               className={`absolute inset-x-0 bottom-0 z-20 translate-y-full px-2 py-1 transition-transform duration-200 group-hover:translate-y-0 ${
-                isAudioMedia ? 'take-audio-controls-bar' : 'bg-black/70'
+                isAudioMedia ? 'take-audio-controls-bar' : 'take-media-controls-bar'
               }`}
               onClick={(e) => e.stopPropagation()}
               {...touchBubbleBlockProps()}

@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Filter,
   Minus,
   RotateCcw,
   Sparkles,
@@ -27,10 +26,14 @@ import {
   describePitchInsight,
   localPracticeDayBounds,
   PITCH_INSIGHTS_THRESHOLDS,
+  rankNotesWorthReviewing,
+  summarizeOverallPitchTrend,
   summarizePitchPracticeDays,
+  tendencyForCents,
   type NotePitchInsight,
   type PitchPracticeDaySummary,
   type PitchPracticeSessionSummary,
+  type PitchTendency,
 } from '../../utils/pitchInsightsAnalytics'
 import { triggerLightHaptic } from '../../utils/haptics'
 import { iosSpringSnappy } from '../../utils/motionPresets'
@@ -61,8 +64,8 @@ interface CentsGraphPoint {
 
 const DAY_PREVIEW_COUNT = 6
 const GRAPH_POINT_LIMIT = 160
-
-const CHROMATIC_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+/** Half-range of the rail widget in cents — the visual scale a dot moves across. */
+const PITCH_RAIL_RANGE_CENTS = 30
 
 const fullDateFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: 'long',
@@ -95,6 +98,13 @@ function formatCents(value: number | null): string {
   const rounded = Math.round(value)
   if (rounded === 0) return '0¢'
   return `${rounded > 0 ? '+' : ''}${rounded}¢`
+}
+
+/** Same ±3¢ boundary already used throughout this screen for note-tile and
+ * graph-dot coloring — kept in one place so the rail agrees with them. */
+function zoneForCents(cents: number): 'good' | 'flat' | 'sharp' {
+  if (Math.abs(cents) <= PITCH_INSIGHTS_THRESHOLDS.centeredCents) return 'good'
+  return cents < 0 ? 'flat' : 'sharp'
 }
 
 function formatDayHeading(day: PitchPracticeDaySummary): string {
@@ -183,55 +193,118 @@ function tendencyLabel(insight: NotePitchInsight): string {
     : `${insight.tendency} · variable`
 }
 
-function AccuracyHeader({ observations }: { observations: PitchObservation[] }) {
-  const total = observations.length
-  if (total === 0) return null
-
-  let inTune = 0
-  let flat = 0
-  let sharp = 0
-  for (const obs of observations) {
-    if (Math.abs(obs.centsOffset) <= 3) inTune++
-    else if (obs.centsOffset < -3) flat++
-    else sharp++
+/** Plain-language row verdict for the compact note rows — same underlying
+ * consistency/tendency fields as tendencyLabel, said the way you'd say it
+ * to a student rather than as a statistics label. */
+function rowVerdict(insight: NotePitchInsight): string {
+  if (insight.confidence === 'collecting') return 'Still learning this note'
+  const varies = insight.consistency === 'Variable'
+  switch (insight.tendency) {
+    case 'Centered':
+      return varies ? 'Wanders around center' : 'Centered and steady'
+    case 'Slightly Flat':
+      return varies ? 'Mostly flat, and varies' : 'Steady, slightly flat'
+    case 'Tends Flat':
+      return varies ? 'Runs flat, and varies' : 'Steady, but flat'
+    case 'Slightly Sharp':
+      return varies ? 'Mostly sharp, and varies' : 'Steady, slightly sharp'
+    case 'Tends Sharp':
+      return varies ? 'Runs sharp, and varies' : 'Steady, but sharp'
   }
+}
 
-  const inTunePct = Math.round((inTune / total) * 100)
-  const flatPct = Math.round((flat / total) * 100)
-  const sharpPct = Math.max(0, 100 - inTunePct - flatPct)
+/**
+ * The position-on-a-strip widget from the live tuner (CentsNeedle /
+ * pitch-needle-rail), reused here instead of a chart: one visual idea for
+ * the hero, every note row, and — via PitchNoteList — the note detail and
+ * day detail screens too. Purely decorative; the surrounding text already
+ * carries the reading, so it's hidden from assistive tech.
+ */
+function PitchRail({ cents, size = 'hero' }: { cents: number; size?: 'hero' | 'mini' }) {
+  const clamped = Math.max(-PITCH_RAIL_RANGE_CENTS, Math.min(PITCH_RAIL_RANGE_CENTS, cents))
+  const position = 50 + (clamped / PITCH_RAIL_RANGE_CENTS) * 50
+  const zone = zoneForCents(cents)
+  const goodHalf = (PITCH_INSIGHTS_THRESHOLDS.centeredCents / PITCH_RAIL_RANGE_CENTS) * 50
+  const closeHalf = (PITCH_INSIGHTS_THRESHOLDS.slightTendencyCents / PITCH_RAIL_RANGE_CENTS) * 50
 
   return (
-    <section className="pitch-insights-accuracy">
-      <div className="pitch-insights-accuracy__score">
-        <div>
-          <span className="pitch-insights-accuracy__kicker">Intonation Accuracy</span>
-          <h2 className="pitch-insights-accuracy__value">
-            {inTunePct}% <small>In-Tune Rate</small>
-          </h2>
-        </div>
-        <div className="pitch-insights-accuracy__counts">
-          <span className="is-in-tune">{inTune} centered</span>
-          <span className="is-flat">{flat} flat</span>
-          <span className="is-sharp">{sharp} sharp</span>
-        </div>
+    <div className={`pitch-insights-rail pitch-insights-rail--${size}`} aria-hidden="true">
+      <div className="pitch-insights-rail__track" />
+      <div
+        className="pitch-insights-rail__zone pitch-insights-rail__zone--close"
+        style={{ left: `${50 - closeHalf}%`, width: `${closeHalf * 2}%` }}
+      />
+      <div
+        className="pitch-insights-rail__zone pitch-insights-rail__zone--good"
+        style={{ left: `${50 - goodHalf}%`, width: `${goodHalf * 2}%` }}
+      />
+      {size === 'hero' ? <div className="pitch-insights-rail__zero" /> : null}
+      <div
+        className={`pitch-insights-rail__dot pitch-insights-rail__dot--${zone}`}
+        style={{ left: `${position}%` }}
+      />
+    </div>
+  )
+}
+
+function heroStatusWord(tendency: PitchTendency): string {
+  switch (tendency) {
+    case 'Centered':
+      return 'Centered'
+    case 'Slightly Flat':
+      return 'Slightly flat'
+    case 'Slightly Sharp':
+      return 'Slightly sharp'
+    case 'Tends Flat':
+      return 'Runs flat'
+    case 'Tends Sharp':
+      return 'Runs sharp'
+  }
+}
+
+function PitchInsightsHero({
+  observations,
+  registerNote,
+}: {
+  observations: PitchObservation[]
+  registerNote: string | null
+}) {
+  const trend = useMemo(() => summarizeOverallPitchTrend(observations), [observations])
+  if (observations.length === 0) return null
+
+  const tendency = tendencyForCents(trend.overallCents)
+  const zone = zoneForCents(trend.overallCents)
+  const improving = trend.deltaCents != null && trend.deltaCents > 0
+
+  return (
+    <section
+      className={`pitch-insights-hero pitch-insights-hero--${zone}`}
+      aria-label={`Overall intonation: ${heroStatusWord(tendency)}, ${formatCents(trend.overallCents)} median`}
+    >
+      <span className="pitch-insights-hero__eyebrow">Your center · all notes</span>
+      <strong className="pitch-insights-hero__status">{heroStatusWord(tendency)}</strong>
+      <PitchRail cents={trend.overallCents} size="hero" />
+      <div className="pitch-insights-hero__ticks" aria-hidden="true">
+        <span>flat</span>
+        <span>centered</span>
+        <span>sharp</span>
       </div>
-      <div className="pitch-insights-accuracy__bar" aria-hidden>
-        <div
-          className="pitch-insights-accuracy__seg is-in-tune"
-          style={{ width: `${inTunePct}%` }}
-          title={`${inTunePct}% In-Tune`}
-        />
-        <div
-          className="pitch-insights-accuracy__seg is-flat"
-          style={{ width: `${flatPct}%` }}
-          title={`${flatPct}% Flat`}
-        />
-        <div
-          className="pitch-insights-accuracy__seg is-sharp"
-          style={{ width: `${sharpPct}%` }}
-          title={`${sharpPct}% Sharp`}
-        />
-      </div>
+      <p className="pitch-insights-hero__sub">
+        {trend.deltaCents != null ? (
+          <>
+            <strong className={improving ? 'is-improving' : ''}>
+              {improving ? 'Getting closer' : 'Recent shift'}
+            </strong>
+            {' — '}
+            {Math.round(Math.abs(trend.deltaCents))}
+            ¢ {improving ? 'nearer center' : 'from center'} than{' '}
+            {PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days ago
+          </>
+        ) : (
+          `${formatCents(trend.overallCents)} median across ${plural(observations.length, 'stable note')}`
+        )}
+      </p>
+      {registerNote ? <p className="pitch-insights-hero__register">{registerNote}</p> : null}
     </section>
   )
 }
@@ -276,138 +349,6 @@ function describeRegisterPattern(insights: NotePitchInsight[]): string | null {
     return 'Top register runs flat, low register runs sharp — the reverse of the usual pattern.'
   }
   return null
-}
-
-function ChromaticPitchMatrix({
-  insights,
-  selectedPitchClass,
-  onSelectPitchClass,
-  onSelectMidiNote,
-  hapticFeedback,
-}: {
-  insights: NotePitchInsight[]
-  selectedPitchClass: number | null
-  onSelectPitchClass: (pitchClass: number | null) => void
-  onSelectMidiNote: (midiNote: number) => void
-  hapticFeedback: boolean
-}) {
-  const cellByKey = useMemo(() => {
-    const map = new Map<string, NotePitchInsight>()
-    for (const insight of insights) {
-      if (insight.observationCount === 0) continue
-      map.set(`${octaveForMidi(insight.midiNote)}:${insight.midiNote % 12}`, insight)
-    }
-    return map
-  }, [insights])
-
-  const octaves = useMemo(() => {
-    const present = [
-      ...new Set(
-        insights
-          .filter((insight) => insight.observationCount > 0)
-          .map((insight) => octaveForMidi(insight.midiNote)),
-      ),
-    ]
-    if (present.length === 0) return [4]
-    return present.sort((left, right) => right - left)
-  }, [insights])
-
-  const registerNote = useMemo(() => describeRegisterPattern(insights), [insights])
-
-  return (
-    <section className="pitch-insights-chromatic">
-      <header className="pitch-insights-chromatic__header">
-        <div>
-          <span>Register Map</span>
-          <strong>By octave</strong>
-        </div>
-        {selectedPitchClass !== null ? (
-          <button
-            type="button"
-            className="pitch-insights-chromatic__clear"
-            onClick={() => {
-              triggerLightHaptic(hapticFeedback)
-              onSelectPitchClass(null)
-            }}
-          >
-            <Filter aria-hidden /> Reset filter ({CHROMATIC_NOTE_NAMES[selectedPitchClass]})
-          </button>
-        ) : (
-          <small>Letter filters, cell opens the note</small>
-        )}
-      </header>
-
-      <div className="pitch-insights-chromatic__body">
-        <div className="pitch-insights-chromatic__octaves" aria-hidden>
-          {octaves.map((octave) => (
-            <span key={octave}>{octave}</span>
-          ))}
-        </div>
-        <div className="pitch-insights-chromatic__rows">
-          {octaves.map((octave) => (
-            <div className="pitch-insights-chromatic__row" key={octave}>
-              {CHROMATIC_NOTE_NAMES.map((name, pitchClass) => {
-                const insight = cellByKey.get(`${octave}:${pitchClass}`)
-                const hasData = Boolean(insight)
-                const cents = insight?.typicalCents ?? 0
-                const isDimmed = selectedPitchClass !== null && selectedPitchClass !== pitchClass
-                const statusClass = !hasData
-                  ? 'is-unplayed'
-                  : Math.abs(cents) <= 3
-                    ? 'is-centered'
-                    : cents < -3
-                      ? 'is-flat'
-                      : 'is-sharp'
-
-                const label = hasData
-                  ? `${name}${octave}: ${formatCents(cents)} (${plural(insight!.observationCount, 'note')})`
-                  : `${name}${octave}: No data`
-
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    className={`pitch-insights-chromatic__cell ${statusClass} ${
-                      selectedPitchClass === pitchClass ? 'is-selected' : ''
-                    }`}
-                    style={isDimmed ? { opacity: 0.35 } : undefined}
-                    disabled={!hasData}
-                    onClick={() => {
-                      if (!insight) return
-                      triggerLightHaptic(hapticFeedback)
-                      onSelectMidiNote(insight.midiNote)
-                    }}
-                    title={label}
-                    aria-label={label}
-                  />
-                )
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="pitch-insights-chromatic__pc-labels">
-        {CHROMATIC_NOTE_NAMES.map((name, index) => (
-          <button
-            key={name}
-            type="button"
-            className={`pitch-insights-chromatic__pc-label ${
-              selectedPitchClass === index ? 'is-active' : ''
-            }`}
-            onClick={() => {
-              triggerLightHaptic(hapticFeedback)
-              onSelectPitchClass(selectedPitchClass === index ? null : index)
-            }}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-
-      {registerNote ? <p className="pitch-insights-chromatic__callout">{registerNote}</p> : null}
-    </section>
-  )
 }
 
 function reduceGraphPoints(points: CentsGraphPoint[]): CentsGraphPoint[] {
@@ -579,6 +520,49 @@ function TrendSparkline({ observations }: { observations: PitchObservation[] }) 
   )
 }
 
+/** One row, reused by "Worth a look", "All notes", and the note list inside
+ * a day's detail view: note tile, plain-language verdict, and the same rail
+ * widget shown big in the hero — no separate chart per list. */
+function PitchInsightsNoteRow({
+  insight,
+  formatNoteName,
+  onSelect,
+}: {
+  insight: NotePitchInsight
+  formatNoteName: (midiNote: number, fallback: string) => string
+  onSelect: (midiNote: number) => void
+}) {
+  const displayName = formatNoteName(insight.midiNote, insight.noteName)
+  const collecting = insight.confidence === 'collecting'
+  const statusClass = collecting
+    ? ''
+    : zoneForCents(insight.typicalCents) === 'good'
+      ? 'is-centered'
+      : zoneForCents(insight.typicalCents) === 'flat'
+        ? 'is-flat'
+        : 'is-sharp'
+
+  return (
+    <button
+      type="button"
+      className={`pitch-insights-row ${statusClass}`}
+      onClick={() => onSelect(insight.midiNote)}
+    >
+      <strong className="pitch-insights-row__note">{displayName}</strong>
+      <div className="pitch-insights-row__copy">
+        <strong>{rowVerdict(insight)}</strong>
+        <span>{plural(insight.observationCount, 'stable note')}</span>
+      </div>
+      {collecting ? (
+        <span className="pitch-insights-row__collecting">Collecting</span>
+      ) : (
+        <PitchRail cents={insight.typicalCents} size="mini" />
+      )}
+      <ChevronRight aria-hidden />
+    </button>
+  )
+}
+
 function PitchNoteList({
   insights,
   formatNoteName,
@@ -591,49 +575,23 @@ function PitchNoteList({
   onSelect: (midiNote: number) => void
 }) {
   return (
-    <section className="pitch-insights-list" aria-label="Pitch tendencies">
+    <section className="pitch-insights-list" aria-label="All notes">
       <header>
         <div>
-          <span>Pitch Register Breakdown</span>
+          <span>All Notes</span>
           <strong>{plural(insights.length, 'pitch', 'pitches')}</strong>
         </div>
         <small>{labelSummary}</small>
       </header>
       <div className="pitch-insights-list__rows">
-        {insights.map((insight) => {
-          const displayName = formatNoteName(insight.midiNote, insight.noteName)
-          const cents = insight.typicalCents
-          const statusClass =
-            insight.confidence === 'collecting'
-              ? 'is-collecting'
-              : Math.abs(cents) <= 3
-                ? 'is-centered'
-                : cents < -3
-                  ? 'is-flat'
-                  : 'is-sharp'
-
-          return (
-            <button
-              key={insight.midiNote}
-              type="button"
-              className={`pitch-insights-row ${statusClass}`}
-              onClick={() => onSelect(insight.midiNote)}
-            >
-              <strong className="pitch-insights-row__note">{displayName}</strong>
-              <div className="pitch-insights-row__copy">
-                <strong>{tendencyLabel(insight)}</strong>
-                <span>
-                  {plural(insight.observationCount, 'observation')}
-                  {' · '}{marginLabel(insight)}
-                </span>
-              </div>
-              <span className="pitch-insights-row__cents">
-                {insight.confidence === 'collecting' ? '—' : formatCents(insight.typicalCents)}
-              </span>
-              <ChevronRight aria-hidden />
-            </button>
-          )
-        })}
+        {insights.map((insight) => (
+          <PitchInsightsNoteRow
+            key={insight.midiNote}
+            insight={insight}
+            formatNoteName={formatNoteName}
+            onSelect={onSelect}
+          />
+        ))}
       </div>
     </section>
   )
@@ -870,6 +828,172 @@ function PracticeDayDetail({
   )
 }
 
+/** Destination of the "All notes" row in the overview's More list. */
+function AllNotesScreen({
+  insights,
+  formatNoteName,
+  labelSummary,
+  onBack,
+  onSelectNote,
+}: {
+  insights: NotePitchInsight[]
+  formatNoteName: (midiNote: number, fallback: string) => string
+  labelSummary: string
+  onBack: () => void
+  onSelectNote: (midiNote: number) => void
+}) {
+  return (
+    <motion.div
+      className="pitch-insights-detail"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={iosSpringSnappy}
+    >
+      <button type="button" className="pitch-insights-back" onClick={onBack}>
+        <ChevronLeft aria-hidden />
+        Overview
+      </button>
+      <PitchNoteList
+        insights={insights}
+        formatNoteName={formatNoteName}
+        labelSummary={labelSummary}
+        onSelect={onSelectNote}
+      />
+    </motion.div>
+  )
+}
+
+/** Destination of the "Practice days" row in the overview's More list —
+ * the all-time trend graph plus the day-by-day list, moved out of the
+ * overview scroll so it no longer duplicates the hero as a second summary. */
+function PracticeDaysScreen({
+  days,
+  visibleDays,
+  showAllDays,
+  overallMedian,
+  allTimePoints,
+  resettingKey,
+  hapticFeedback,
+  onBack,
+  onToggleShowAllDays,
+  onOpenDay,
+  onResetDay,
+  onResetAll,
+}: {
+  days: PitchPracticeDaySummary[]
+  visibleDays: PitchPracticeDaySummary[]
+  showAllDays: boolean
+  overallMedian: number
+  allTimePoints: CentsGraphPoint[]
+  resettingKey: string | null
+  hapticFeedback: boolean
+  onBack: () => void
+  onToggleShowAllDays: () => void
+  onOpenDay: (dayKey: string) => void
+  onResetDay: (day: PitchPracticeDaySummary) => void
+  onResetAll: () => void
+}) {
+  return (
+    <motion.div
+      className="pitch-insights-detail"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={iosSpringSnappy}
+    >
+      <button type="button" className="pitch-insights-back" onClick={onBack}>
+        <ChevronLeft aria-hidden />
+        Overview
+      </button>
+
+      <section className="pitch-insights-all-time pitch-insights-history-card">
+        <header>
+          <div>
+            <span>All-Time Cent Trend</span>
+            <strong>Daily median intonation</strong>
+          </div>
+          <button
+            type="button"
+            className="pitch-insights-all-time__reset"
+            disabled={resettingKey === 'all'}
+            onClick={onResetAll}
+          >
+            <RotateCcw aria-hidden />
+            {resettingKey === 'all' ? 'Resetting…' : 'Reset all'}
+          </button>
+        </header>
+        <CentsHistoryGraph
+          points={allTimePoints}
+          ariaLabel={`All-time daily pitch tendency across ${plural(days.length, 'practice day')}`}
+          xAxis="sequence"
+        />
+        {days.length > 0 ? (
+          <footer>
+            <span>{shortDateFormatter.format(days[days.length - 1]!.startAt)}</span>
+            <strong>{formatCents(overallMedian)} overall median</strong>
+            <span>{shortDateFormatter.format(days[0]!.startAt)}</span>
+          </footer>
+        ) : null}
+      </section>
+
+      <section className="pitch-insights-days" aria-label="Practice days">
+        <header>
+          <div>
+            <span>Practice Days</span>
+            <strong>{plural(days.length, 'day')}</strong>
+          </div>
+          <small>Open a day to inspect sessions</small>
+        </header>
+        <div className="pitch-insights-days__rows">
+          {visibleDays.map((day) => (
+            <article className="pitch-insights-day-row" key={day.key}>
+              <button
+                type="button"
+                className="pitch-insights-day-row__open"
+                onClick={() => onOpenDay(day.key)}
+              >
+                <span className="pitch-insights-day-row__date" aria-hidden>
+                  <small>{monthFormatter.format(day.startAt)}</small>
+                  <strong>{dayNumberFormatter.format(day.startAt)}</strong>
+                </span>
+                <span className="pitch-insights-day-row__copy">
+                  <strong>{formatDayHeading(day)}</strong>
+                  <small>
+                    {plural(day.sessionCount, 'session')}
+                    {' · '}{plural(day.observationCount, 'stable note')}
+                  </small>
+                </span>
+                <span className="pitch-insights-day-row__cents">
+                  {formatCents(day.typicalCents)}
+                </span>
+                <ChevronRight aria-hidden />
+              </button>
+              <Pressable
+                type="button"
+                intensity="icon"
+                haptic="light"
+                hapticFeedback={hapticFeedback}
+                className="pitch-insights-day-row__reset"
+                aria-label={`Reset Pitch Insights for ${fullDateFormatter.format(day.startAt)}`}
+                disabled={resettingKey === day.key}
+                onClick={() => onResetDay(day)}
+              >
+                <RotateCcw aria-hidden />
+              </Pressable>
+            </article>
+          ))}
+        </div>
+        {days.length > DAY_PREVIEW_COUNT ? (
+          <button type="button" className="pitch-insights-days__more" onClick={onToggleShowAllDays}>
+            {showAllDays ? 'Show recent days' : `Show all ${days.length} days`}
+          </button>
+        ) : null}
+      </section>
+    </motion.div>
+  )
+}
+
 export default function PitchInsightsScreen({
   isOpen,
   onClose,
@@ -884,7 +1008,7 @@ export default function PitchInsightsScreen({
   const [loadError, setLoadError] = useState(false)
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null)
   const [selectedMidi, setSelectedMidi] = useState<number | null>(null)
-  const [selectedPitchClass, setSelectedPitchClass] = useState<number | null>(null)
+  const [overviewRoute, setOverviewRoute] = useState<'notes' | 'days' | null>(null)
   const [showAllDays, setShowAllDays] = useState(false)
   const [resettingKey, setResettingKey] = useState<string | null>(null)
   const [selectedInstrument, setSelectedInstrument] = useState<TunerInstrument | 'all'>(
@@ -1007,7 +1131,7 @@ export default function PitchInsightsScreen({
     if (!isOpen) {
       setSelectedMidi(null)
       setSelectedDayKey(null)
-      setSelectedPitchClass(null)
+      setOverviewRoute(null)
       setShowAllDays(false)
       setResettingKey(null)
       setSelectedInstrument(tunerInstrument ?? 'all')
@@ -1047,17 +1171,11 @@ export default function PitchInsightsScreen({
     [scopedObservations],
   )
 
-  const filteredInsights = useMemo(() => {
-    if (selectedPitchClass === null) return allInsights
-    return allInsights.filter((insight) => insight.midiNote % 12 === selectedPitchClass)
-  }, [allInsights, selectedPitchClass])
+  const worthReviewing = useMemo(() => rankNotesWorthReviewing(allInsights), [allInsights])
+  const registerNote = useMemo(() => describeRegisterPattern(allInsights), [allInsights])
 
   const selected = allInsights.find((insight) => insight.midiNote === selectedMidi) ?? null
   const displayProfile = getTunerTransposition(transpositionId)
-  const sessionCount = useMemo(
-    () => days.reduce((sum, day) => sum + day.sessionCount, 0),
-    [days],
-  )
   const overallMedian = useMemo(
     () => median(visibleObservations.map((observation) => observation.centsOffset)),
     [visibleObservations],
@@ -1109,6 +1227,16 @@ export default function PitchInsightsScreen({
     },
     [selectedDayKey, showAlert, showConfirm],
   )
+
+  // A reset (this day, or all) can empty the practice-days or all-notes
+  // sub-screen out from under the user while they're standing on it —
+  // observations update asynchronously, so this can't be handled inline in
+  // resetDay/resetAll. Bounce back to the overview, which already has its
+  // own empty state built in.
+  useEffect(() => {
+    if (overviewRoute === 'days' && days.length === 0) setOverviewRoute(null)
+    if (overviewRoute === 'notes' && allInsights.length === 0) setOverviewRoute(null)
+  }, [overviewRoute, days.length, allInsights.length])
 
   const resetAll = useCallback(async () => {
     // Always clears every instrument's history, regardless of the filter
@@ -1188,7 +1316,7 @@ export default function PitchInsightsScreen({
               <PracticeDayDetail
                 key={`day-${selectedDay.key}`}
                 day={selectedDay}
-                insights={filteredInsights}
+                insights={allInsights}
                 formatNoteName={formatNoteName}
                 displayLabel={displayProfile.shortLabel}
                 resetting={resettingKey === selectedDay.key}
@@ -1196,6 +1324,34 @@ export default function PitchInsightsScreen({
                 onBack={() => setSelectedDayKey(null)}
                 onSelectNote={selectNote}
                 onReset={() => void resetDay(selectedDay)}
+              />
+            ) : overviewRoute === 'notes' ? (
+              <AllNotesScreen
+                key="all-notes"
+                insights={allInsights}
+                formatNoteName={formatNoteName}
+                labelSummary={`${displayProfile.shortLabel} labels`}
+                onBack={() => setOverviewRoute(null)}
+                onSelectNote={selectNote}
+              />
+            ) : overviewRoute === 'days' ? (
+              <PracticeDaysScreen
+                key="practice-days"
+                days={days}
+                visibleDays={visibleDays}
+                showAllDays={showAllDays}
+                overallMedian={overallMedian}
+                allTimePoints={allTimePoints}
+                resettingKey={resettingKey}
+                hapticFeedback={hapticFeedback}
+                onBack={() => setOverviewRoute(null)}
+                onToggleShowAllDays={() => setShowAllDays((current) => !current)}
+                onOpenDay={(dayKey) => {
+                  triggerLightHaptic(hapticFeedback)
+                  setSelectedDayKey(dayKey)
+                }}
+                onResetDay={(day) => void resetDay(day)}
+                onResetAll={() => void resetAll()}
               />
             ) : (
               <motion.div
@@ -1206,77 +1362,6 @@ export default function PitchInsightsScreen({
                 exit={{ opacity: 0, x: -14 }}
                 transition={iosSpringSnappy}
               >
-                <AccuracyHeader observations={scopedObservations} />
-
-                <section className="pitch-insights-intro">
-                  <span>Intonation Profile · {displayProfile.shortLabel} labels</span>
-                  <h1>Intonation History</h1>
-                  <p>
-                    Automatic stable-note analytics captured from your live tuner practice.
-                  </p>
-                  {visibleObservations.length > 0 ? (
-                    <div className="pitch-insights-intro__stats">
-                      <span>
-                        <strong>{days.length}</strong> practice days
-                      </span>
-                      <span>
-                        <strong>{sessionCount}</strong> sessions
-                      </span>
-                      <span>
-                        <strong>{visibleObservations.length}</strong> stable notes
-                      </span>
-                    </div>
-                  ) : null}
-                </section>
-
-                {showInstrumentFilter ? (
-                  <div
-                    className="pitch-insights-instrument-filter"
-                    role="tablist"
-                    aria-label="Filter Pitch Insights by instrument"
-                  >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={selectedInstrument === 'all'}
-                      className={`pitch-insights-instrument-filter__pill ${
-                        selectedInstrument === 'all' ? 'is-active' : ''
-                      }`}
-                      onClick={() => {
-                        triggerLightHaptic(hapticFeedback)
-                        setSelectedInstrument('all')
-                      }}
-                    >
-                      All instruments
-                    </button>
-                    {instrumentsPresent.map((instrument) => (
-                      <button
-                        key={instrument}
-                        type="button"
-                        role="tab"
-                        aria-selected={selectedInstrument === instrument}
-                        className={`pitch-insights-instrument-filter__pill ${
-                          selectedInstrument === instrument ? 'is-active' : ''
-                        }`}
-                        onClick={() => {
-                          triggerLightHaptic(hapticFeedback)
-                          setSelectedInstrument(instrument)
-                        }}
-                      >
-                        {getTunerProfile(instrument).label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                <ChromaticPitchMatrix
-                  insights={allInsights}
-                  selectedPitchClass={selectedPitchClass}
-                  onSelectPitchClass={setSelectedPitchClass}
-                  onSelectMidiNote={selectNote}
-                  hapticFeedback={hapticFeedback}
-                />
-
                 {loading ? (
                   <div className="pitch-insights-state" role="status">
                     <span className="pitch-insights-state__spinner" />
@@ -1301,105 +1386,113 @@ export default function PitchInsightsScreen({
                   </div>
                 ) : (
                   <>
-                    <section className="pitch-insights-days" aria-label="Practice days">
-                      <header>
-                        <div>
-                          <span>Practice Days</span>
-                          <strong>{plural(days.length, 'day')}</strong>
-                        </div>
-                        <small>Open a day to inspect sessions</small>
-                      </header>
-                      <div className="pitch-insights-days__rows">
-                        {visibleDays.map((day) => (
-                          <article className="pitch-insights-day-row" key={day.key}>
-                            <button
-                              type="button"
-                              className="pitch-insights-day-row__open"
-                              onClick={() => {
-                                triggerLightHaptic(hapticFeedback)
-                                setSelectedDayKey(day.key)
-                              }}
-                            >
-                              <span className="pitch-insights-day-row__date" aria-hidden>
-                                <small>{monthFormatter.format(day.startAt)}</small>
-                                <strong>{dayNumberFormatter.format(day.startAt)}</strong>
-                              </span>
-                              <span className="pitch-insights-day-row__copy">
-                                <strong>{formatDayHeading(day)}</strong>
-                                <small>
-                                  {plural(day.sessionCount, 'session')}
-                                  {' · '}{plural(day.observationCount, 'stable note')}
-                                </small>
-                              </span>
-                              <span className="pitch-insights-day-row__cents">
-                                {formatCents(day.typicalCents)}
-                              </span>
-                              <ChevronRight aria-hidden />
-                            </button>
-                            <Pressable
-                              type="button"
-                              intensity="icon"
-                              haptic="light"
-                              hapticFeedback={hapticFeedback}
-                              className="pitch-insights-day-row__reset"
-                              aria-label={`Reset Pitch Insights for ${fullDateFormatter.format(day.startAt)}`}
-                              disabled={resettingKey === day.key}
-                              onClick={() => void resetDay(day)}
-                            >
-                              <RotateCcw aria-hidden />
-                            </Pressable>
-                          </article>
+                    <PitchInsightsHero observations={scopedObservations} registerNote={registerNote} />
+
+                    {showInstrumentFilter ? (
+                      <div
+                        className="pitch-insights-instrument-filter"
+                        role="tablist"
+                        aria-label="Filter Pitch Insights by instrument"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={selectedInstrument === 'all'}
+                          className={`pitch-insights-instrument-filter__pill ${
+                            selectedInstrument === 'all' ? 'is-active' : ''
+                          }`}
+                          onClick={() => {
+                            triggerLightHaptic(hapticFeedback)
+                            setSelectedInstrument('all')
+                          }}
+                        >
+                          All instruments
+                        </button>
+                        {instrumentsPresent.map((instrument) => (
+                          <button
+                            key={instrument}
+                            type="button"
+                            role="tab"
+                            aria-selected={selectedInstrument === instrument}
+                            className={`pitch-insights-instrument-filter__pill ${
+                              selectedInstrument === instrument ? 'is-active' : ''
+                            }`}
+                            onClick={() => {
+                              triggerLightHaptic(hapticFeedback)
+                              setSelectedInstrument(instrument)
+                            }}
+                          >
+                            {getTunerProfile(instrument).label}
+                          </button>
                         ))}
                       </div>
-                      {days.length > DAY_PREVIEW_COUNT ? (
-                        <button
-                          type="button"
-                          className="pitch-insights-days__more"
-                          onClick={() => setShowAllDays((current) => !current)}
-                        >
-                          {showAllDays ? 'Show recent days' : `Show all ${days.length} days`}
-                        </button>
-                      ) : null}
-                    </section>
+                    ) : null}
 
-                    <section className="pitch-insights-all-time pitch-insights-history-card">
+                    {worthReviewing.length > 0 ? (
+                      <section className="pitch-insights-list" aria-label="Notes worth reviewing">
+                        <header>
+                          <div>
+                            <span>Worth a look</span>
+                            <strong>{plural(worthReviewing.length, 'note')}</strong>
+                          </div>
+                          <small>of {plural(allInsights.length, 'note')} total</small>
+                        </header>
+                        <div className="pitch-insights-list__rows">
+                          {worthReviewing.map((insight) => (
+                            <PitchInsightsNoteRow
+                              key={insight.midiNote}
+                              insight={insight}
+                              formatNoteName={formatNoteName}
+                              onSelect={selectNote}
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    <section className="pitch-insights-list" aria-label="More">
                       <header>
                         <div>
-                          <span>All-Time Cent Trend</span>
-                          <strong>Daily median intonation</strong>
+                          <span>More</span>
                         </div>
+                      </header>
+                      <div className="pitch-insights-list__rows">
                         <button
                           type="button"
-                          className="pitch-insights-all-time__reset"
-                          disabled={resettingKey === 'all'}
-                          onClick={() => void resetAll()}
+                          className="pitch-insights-link-row"
+                          onClick={() => {
+                            triggerLightHaptic(hapticFeedback)
+                            setOverviewRoute('notes')
+                          }}
                         >
-                          <RotateCcw aria-hidden />
-                          {resettingKey === 'all' ? 'Resetting…' : 'Reset all'}
+                          <div className="pitch-insights-link-row__copy">
+                            <strong>All notes</strong>
+                            <span>Every pitch you’ve held, {displayProfile.shortLabel} labels</span>
+                          </div>
+                          <span className="pitch-insights-link-row__count">
+                            {plural(allInsights.length, 'note')}
+                          </span>
+                          <ChevronRight aria-hidden />
                         </button>
-                      </header>
-                      <CentsHistoryGraph
-                        points={allTimePoints}
-                        ariaLabel={`All-time daily pitch tendency across ${plural(days.length, 'practice day')}`}
-                        xAxis="sequence"
-                      />
-                      <footer>
-                        <span>{shortDateFormatter.format(days[days.length - 1]!.startAt)}</span>
-                        <strong>{formatCents(overallMedian)} overall median</strong>
-                        <span>{shortDateFormatter.format(days[0]!.startAt)}</span>
-                      </footer>
+                        <button
+                          type="button"
+                          className="pitch-insights-link-row"
+                          onClick={() => {
+                            triggerLightHaptic(hapticFeedback)
+                            setOverviewRoute('days')
+                          }}
+                        >
+                          <div className="pitch-insights-link-row__copy">
+                            <strong>Practice days</strong>
+                            <span>Sessions grouped by date</span>
+                          </div>
+                          <span className="pitch-insights-link-row__count">
+                            {plural(days.length, 'day')}
+                          </span>
+                          <ChevronRight aria-hidden />
+                        </button>
+                      </div>
                     </section>
-
-                    <PitchNoteList
-                      insights={filteredInsights}
-                      formatNoteName={formatNoteName}
-                      labelSummary={`${displayProfile.shortLabel} labels · ${
-                        selectedPitchClass !== null
-                          ? `${CHROMATIC_NOTE_NAMES[selectedPitchClass]} notes`
-                          : 'all time'
-                      }`}
-                      onSelect={selectNote}
-                    />
                   </>
                 )}
               </motion.div>

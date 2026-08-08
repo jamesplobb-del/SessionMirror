@@ -10,6 +10,12 @@ interface MiniPipControlsProps {
   onVolumeChange: (value: number) => void
 }
 
+/**
+ * Styled through CSS classes rather than fixed white-on-dark utilities: this
+ * bar sits on the light elevated surface in Audio Mode and on a dark bar over
+ * the live camera, so the colors have to follow the theme (see
+ * .mini-pip-controls in index.css / camera-mode-glass.css).
+ */
 export default function MiniPipControls({
   isPlaying,
   volume,
@@ -17,7 +23,7 @@ export default function MiniPipControls({
   onVolumeChange,
 }: MiniPipControlsProps) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="mini-pip-controls flex items-center gap-1.5">
       <Pressable
         type="button"
         intensity="icon"
@@ -26,16 +32,16 @@ export default function MiniPipControls({
         onTouchStart={stopEventBubble}
         onTouchEnd={stopEventBubble}
         onClick={onPlayPauseClick}
-        className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white"
+        className="mini-pip-controls__btn flex h-5 w-5 items-center justify-center rounded-full"
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >
         {isPlaying ? (
           <Pause className="h-2.5 w-2.5" />
         ) : (
-          <Play className="h-2.5 w-2.5 fill-white" />
+          <Play className="mini-pip-controls__play-glyph h-2.5 w-2.5" />
         )}
       </Pressable>
-      <Volume2 className="h-2.5 w-2.5 text-white/60" />
+      <Volume2 className="mini-pip-controls__icon h-2.5 w-2.5" />
       <input
         type="range"
         min={0}
@@ -43,7 +49,7 @@ export default function MiniPipControls({
         step={0.05}
         value={volume}
         onChange={(e) => onVolumeChange(Number(e.target.value))}
-        className="h-1 flex-1 accent-white"
+        className="mini-pip-controls__slider h-1 flex-1"
         aria-label="Volume"
       />
     </div>

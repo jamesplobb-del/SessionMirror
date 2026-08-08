@@ -1,12 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { AudioLines, LayoutGrid, Sparkles } from 'lucide-react'
+import { AudioLines, LayoutGrid, MicVocal, Sparkles } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useTutorialAction } from '../context/TutorialContext'
 import MetronomeIcon from './icons/MetronomeIcon'
 import {
-  BRANCH_ITEM_WIDTH,
-  layoutBranchItems,
+  CAMERA_BRANCH_ITEM_WIDTH,
+  computeBranchLayout,
+  diceCenterSlot,
+  TOOLS_BRANCH_ITEM_WIDTH,
   type SettingsBranchLayoutMode,
 } from '../utils/settingsBranchLayout'
 import { motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
@@ -22,6 +24,9 @@ interface SettingsBranchWheelProps {
   showTakeCards: boolean
   showMetronome: boolean
   audioEnhancerEnabled: boolean
+  handsFreeEnabled?: boolean
+  /** Hidden while a video take is rolling — hands-free turns itself off there. */
+  handsFreeToggleVisible?: boolean
   layoutMode?: SettingsBranchLayoutMode
   tunerTakePillsVisible?: boolean
   tunerTakePillsToggleVisible?: boolean
@@ -32,12 +37,13 @@ interface SettingsBranchWheelProps {
   onShowMetronomeChange: (show: boolean) => void
   onAudioEnhancerChange: (enabled: boolean) => void
   onTunerTakePillsChange?: (show: boolean) => void
+  onHandsFreeChange?: (enabled: boolean) => void
 }
 
 interface BranchItem {
   id: string
   label: string
-  icon: 'pitch' | 'take-cards' | 'tuner-takes' | 'metronome' | 'enhancer'
+  icon: 'pitch' | 'take-cards' | 'tuner-takes' | 'metronome' | 'enhancer' | 'hands-free'
   active: boolean
   onSelect: () => void
 }
@@ -53,6 +59,8 @@ export default function SettingsBranchWheel({
   showTakeCards,
   showMetronome,
   audioEnhancerEnabled,
+  handsFreeEnabled = false,
+  handsFreeToggleVisible = false,
   layoutMode = 'camera',
   tunerTakePillsVisible = false,
   tunerTakePillsToggleVisible = false,
@@ -63,6 +71,7 @@ export default function SettingsBranchWheel({
   onShowMetronomeChange,
   onAudioEnhancerChange,
   onTunerTakePillsChange,
+  onHandsFreeChange,
 }: SettingsBranchWheelProps) {
   const notifyTutorial = useTutorialAction()
   const [anchor, setAnchor] = useState<{ x: number; y: number; rect: DOMRect } | null>(
@@ -184,10 +193,33 @@ export default function SettingsBranchWheel({
       },
     )
 
+    // Hands-free was long-press-only on the record button, which nothing
+    // advertised. Surfacing it here — dropped into the die face's centre pip
+    // rather than tacked on the end — makes it findable without removing the
+    // gesture for anyone who already knows it.
+    if (handsFreeToggleVisible && onHandsFreeChange) {
+      const handsFreeItem: BranchItem = {
+        id: 'hands-free',
+        label: 'Hands-Free',
+        icon: 'hands-free',
+        active: handsFreeEnabled,
+        onSelect: () => onHandsFreeChange(!handsFreeEnabled),
+      }
+      const centerSlot = diceCenterSlot(items.length + 1)
+      if (centerSlot !== null) {
+        items.splice(centerSlot, 0, handsFreeItem)
+      } else {
+        items.push(handsFreeItem)
+      }
+    }
+
     return items
   }, [
     audioEnhancerEnabled,
+    handsFreeEnabled,
+    handsFreeToggleVisible,
     onAudioEnhancerChange,
+    onHandsFreeChange,
     onPitchTrackerChange,
     onShowMetronomeChange,
     onShowTakeCardsChange,
@@ -201,9 +233,11 @@ export default function SettingsBranchWheel({
     tunerTakePillsVisible,
   ])
 
-  const positions = anchor
-    ? layoutBranchItems(branchItems.length, anchor.rect, 'camera')
-    : []
+  const layout = anchor
+    ? computeBranchLayout(branchItems.length, anchor.rect, layoutMode)
+    : null
+  const positions = layout?.positions ?? []
+  const itemWidth = layoutMode === 'camera' ? CAMERA_BRANCH_ITEM_WIDTH : TOOLS_BRANCH_ITEM_WIDTH
 
   if (typeof document === 'undefined') return null
 
@@ -243,6 +277,20 @@ export default function SettingsBranchWheel({
               transition={BRANCH_MOTION}
               style={motionGpuLayer}
             >
+              {layout && layout.boxWidth > 0 ? (
+                <div
+                  className="settings-branch-wheel__box"
+                  aria-hidden="true"
+                  style={{
+                    left: layout.boxCenter.x,
+                    top: layout.boxCenter.y,
+                    width: layout.boxWidth,
+                    height: layout.boxHeight,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+              ) : null}
+
               {branchItems.map((item, index) => {
                 const { x, y } = positions[index] ?? { x: 0, y: -88 }
 
@@ -260,7 +308,7 @@ export default function SettingsBranchWheel({
                     style={{
                       left: x,
                       top: y,
-                      width: BRANCH_ITEM_WIDTH,
+                      width: itemWidth,
                       transform: 'translate(-50%, -50%)',
                     }}
                   >
@@ -292,6 +340,8 @@ export default function SettingsBranchWheel({
                             <LayoutGrid className="h-5 w-5" strokeWidth={2.1} />
                           ) : item.icon === 'enhancer' ? (
                             <Sparkles className="h-5 w-5" strokeWidth={2.1} />
+                          ) : item.icon === 'hands-free' ? (
+                            <MicVocal className="h-5 w-5" strokeWidth={2.1} />
                           ) : (
                             <MetronomeIcon className="h-5 w-5" />
                           )}

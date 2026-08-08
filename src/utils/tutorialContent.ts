@@ -114,7 +114,7 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
     id: 'welcome',
     title: 'Welcome to BestTake',
-    body: 'This short guided tour will walk you through Camera, comparison, Practice, Take Vault, and the iPhone quick tools.',
+    body: 'This short guided tour will walk you through Camera, comparison, Tools, Take Vault, and the iPhone quick tools.',
     highlights: ['Use each control to continue', 'Skip the tour at any time'],
   },
 ]
@@ -212,12 +212,12 @@ export const COACH_MARKS: CoachMarkContent[] = [
   },
   {
     id: 'switch-to-practice',
-    title: 'Open Practice',
-    body: 'Tap Practice to open Audio, Metronome, Tuner, and Practice routines.',
+    title: 'Open Tools',
+    body: 'Tap Tools to open Audio, Metronome, Tuner, and Practice routines.',
     selector: '[data-tutorial="practice-button"]',
     placement: 'top',
     advance: 'audio-mode',
-    continueHint: 'Tap Practice.',
+    continueHint: 'Tap Tools.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'video',
     requiresVault: 'closed',
@@ -324,20 +324,20 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Camera Mode',
     body: 'Camera Mode keeps visual technique, quick comparison, and the controls you use most in one view.',
     bullets: [
-      'Bottom pill: Take Vault, Overlays, Record, Practice, Settings',
+      'Bottom pill: Take Vault, Overlays, Record, Tools, Settings',
       'Tap the full red Record button to start or stop a video take',
       'Drag a take label directly to swap Best and Current; hold a card to move its layout',
       'Use Expand View directly above Record for a larger comparison',
-      'Tap Practice to move to the Audio workspace',
+      'Tap Tools to move to the Audio workspace',
     ],
   },
   {
     id: 'audio-mode',
     title: 'Audio Mode',
-    body: 'Audio Mode is the fast-listening home inside Practice, with a calm idle waveform and immediate playback after each take.',
+    body: 'Audio Mode is the fast-listening home inside Tools, with a calm idle waveform and immediate playback after each take.',
     bullets: [
       'Bottom pill: Take Vault, Overlays, Record, Camera, Settings',
-      'Use Audio, Metronome, Tuner, and Practice from the top tabs',
+      'Use Audio, Metronome, Tuner, and Games from the top tabs',
       'Tap Camera to return to video recording',
       'Best Take and Current Take stay ready for quick comparison',
     ],
@@ -501,7 +501,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'Replay the updated introduction and contextual coach marks whenever you want a fresh walkthrough.',
     bullets: [
       'Restarts the onboarding cards',
-      'Restarts the guided Camera and Practice tour',
+      'Restarts the guided Camera and Tools tour',
       'Does not change recordings, routines, or app settings',
     ],
   },

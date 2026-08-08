@@ -733,22 +733,37 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   display: flex;
   max-height: min(72%, 540px);
   overflow: hidden;
-  border: 1px solid rgba(21, 152, 255, 0.18);
+  /* Neutral hairline + white card, matching the app's other elevated-light
+     surfaces. The old accent-tinted border and blue glow made this one panel
+     look unrelated to everything around it. */
+  border: 1px solid rgba(23, 26, 34, 0.08);
   border-radius: 18px;
-  background: rgba(250, 252, 255, 0.97);
+  background: var(--audio-surface, #ffffff);
   box-shadow:
-    0 22px 54px rgba(18, 33, 52, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(28px) saturate(1.14);
-  -webkit-backdrop-filter: blur(28px) saturate(1.14);
+    0 18px 44px rgba(23, 26, 34, 0.16),
+    0 2px 8px rgba(23, 26, 34, 0.06);
 }
 
+/* ─────────────────────────────────────────────
+   Written-pitch picker
+
+   Follows the flat idiom already set by the Staff Jumper setup screen: ink on
+   paper, hairline rules, and the key name carrying the type. The previous
+   version signalled selection three times over (tinted row gradient + solid
+   blue chip with a glow + a check), which is what made a simple radio list
+   read as a generic generated form. One signal now: the row goes to ink and
+   keeps the check.
+───────────────────────────────────────────── */
 .tuner-transposition-menu {
+  --tt-ink: #171a22;
+  --tt-muted: #6c7077;
+  --tt-faint: rgba(23, 26, 34, 0.42);
+  --tt-hair: rgba(23, 26, 34, 0.09);
   display: flex;
   width: 100%;
   min-height: 0;
   flex-direction: column;
-  color: #17304a;
+  color: var(--tt-ink);
 }
 
 .tuner-transposition-menu__header {
@@ -757,25 +772,15 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 16px 13px;
-  border-bottom: 1px solid rgba(21, 152, 255, 0.1);
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.tuner-transposition-menu__header p {
-  margin: 0 0 2px;
-  color: #1598ff;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  padding: 15px 16px 12px;
+  border-bottom: 1px solid var(--tt-hair);
 }
 
 .tuner-transposition-menu__header h2 {
   margin: 0;
-  color: #17304a;
-  font-size: 18px;
-  font-weight: 790;
+  color: var(--tt-ink);
+  font-size: 17px;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
@@ -783,37 +788,37 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   display: block;
   max-width: 330px;
   margin-top: 3px;
-  color: rgba(23, 48, 74, 0.58);
-  font-size: 10px;
-  line-height: 1.35;
+  color: var(--tt-muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .tuner-transposition-menu__header button {
   display: grid;
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
   padding: 0;
-  border: 1px solid rgba(21, 152, 255, 0.12);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.84);
-  color: #55718a;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tt-muted);
   place-items: center;
 }
 
 .tuner-transposition-menu__header button:active {
-  transform: scale(0.96);
+  background: rgba(23, 26, 34, 0.06);
 }
 
 .tuner-transposition-menu__header button svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
 }
 
 .tuner-transposition-menu__list {
   min-height: 0;
   flex: 1 1 auto;
-  padding: 4px 8px max(10px, env(safe-area-inset-bottom));
+  padding: 0 16px max(12px, env(safe-area-inset-bottom));
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -822,68 +827,47 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 
 .tuner-transposition-menu__group > p {
   margin: 0;
-  padding: 11px 8px 5px;
-  color: rgba(23, 48, 74, 0.46);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  padding: 16px 0 6px;
+  color: var(--tt-faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
+/* No card, no fill — the group is defined by a rule above its first row. */
 .tuner-transposition-menu__group > div {
-  overflow: hidden;
-  border: 1px solid rgba(21, 152, 255, 0.09);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.62);
+  border-top: 1px solid var(--tt-hair);
 }
 
 .tuner-transposition-menu__group button {
   display: grid;
   width: 100%;
-  min-height: 58px;
-  grid-template-columns: 56px minmax(0, 1fr) 24px;
+  min-height: 54px;
+  /* Key name is the anchor: fixed column, right-aligned against the label. */
+  grid-template-columns: 4.25rem minmax(0, 1fr) 18px;
   align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
+  gap: 12px;
+  padding: 9px 0;
   border: 0;
-  border-bottom: 1px solid rgba(21, 152, 255, 0.07);
+  border-bottom: 1px solid var(--tt-hair);
   background: transparent;
-  color: #17304a;
+  color: var(--tt-ink);
   text-align: left;
 }
 
-.tuner-transposition-menu__group button:last-child {
-  border-bottom: 0;
-}
-
 .tuner-transposition-menu__group button:active {
-  background: rgba(21, 152, 255, 0.07);
-}
-
-.tuner-transposition-menu__group button.tuner-transposition-menu__option--selected {
-  background: linear-gradient(90deg, rgba(21, 152, 255, 0.11), rgba(21, 152, 255, 0.035));
+  background: rgba(23, 26, 34, 0.04);
 }
 
 .tuner-transposition-menu__key {
-  display: grid;
-  min-height: 36px;
-  padding-inline: 4px;
-  border: 1px solid rgba(21, 152, 255, 0.14);
-  border-radius: 10px;
-  background: rgba(239, 248, 255, 0.86);
-  color: #0878c8;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.05;
-  text-align: center;
-  place-items: center;
-}
-
-.tuner-transposition-menu__option--selected .tuner-transposition-menu__key {
-  border-color: rgba(21, 152, 255, 0.32);
-  background: #1598ff;
-  color: white;
-  box-shadow: 0 5px 13px rgba(21, 152, 255, 0.2);
+  color: var(--tt-muted);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  text-align: right;
 }
 
 .tuner-transposition-menu__copy {
@@ -896,30 +880,39 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 }
 
 .tuner-transposition-menu__copy strong {
-  font-size: 12px;
-  font-weight: 750;
+  color: var(--tt-ink);
+  font-size: 13px;
+  font-weight: 550;
 }
 
 .tuner-transposition-menu__copy small {
   margin-top: 2px;
-  color: rgba(23, 48, 74, 0.52);
-  font-size: 9px;
-  line-height: 1.3;
+  color: var(--tt-faint);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+/* Selected: the key name and label go to full ink and weight, plus the check.
+   Deliberately no tint, gradient, or glow. */
+.tuner-transposition-menu__option--selected .tuner-transposition-menu__key {
+  color: var(--tt-ink);
+  font-weight: 750;
+}
+
+.tuner-transposition-menu__option--selected .tuner-transposition-menu__copy strong {
+  font-weight: 750;
 }
 
 .tuner-transposition-menu__check {
   display: grid;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  color: #1598ff;
+  color: var(--tt-ink);
   place-items: center;
 }
 
 .tuner-transposition-menu__check svg {
   width: 16px;
   height: 16px;
-  stroke-width: 2.5;
+  stroke-width: 2.4;
 }
 
 .pitch-living-drone-panel .harmonic-ribbon {
@@ -1584,55 +1577,21 @@ html.app-dark-mode .pitch-living-drone-panel {
 }
 
 html.app-dark-mode .pitch-living-transposition-panel {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(15, 24, 36, 0.97);
+  border-color: rgba(238, 244, 250, 0.1);
+  background: #1a1e26;
 }
 
+/* Dark mode swaps the four tokens; the flat structure needs nothing else. */
 html.app-dark-mode .tuner-transposition-menu {
-  color: #eef4fa;
+  --tt-ink: #eef4fa;
+  --tt-muted: #9eabbc;
+  --tt-faint: rgba(238, 244, 250, 0.44);
+  --tt-hair: rgba(238, 244, 250, 0.12);
 }
 
-html.app-dark-mode .tuner-transposition-menu__header {
-  border-bottom-color: rgba(91, 174, 238, 0.12);
-  background: rgba(17, 29, 44, 0.7);
-}
-
-html.app-dark-mode .tuner-transposition-menu__header h2,
-html.app-dark-mode .tuner-transposition-menu__group button {
-  color: #eef4fa;
-}
-
-html.app-dark-mode .tuner-transposition-menu__header span,
-html.app-dark-mode .tuner-transposition-menu__copy small {
-  color: #9eabbc;
-}
-
-html.app-dark-mode .tuner-transposition-menu__header button,
-html.app-dark-mode .tuner-transposition-menu__group > div {
-  border-color: rgba(91, 174, 238, 0.14);
-  background: rgba(17, 29, 44, 0.82);
-  color: #b9d8f0;
-}
-
-html.app-dark-mode .tuner-transposition-menu__group > p {
-  color: #8595a8;
-}
-
-html.app-dark-mode .tuner-transposition-menu__group button {
-  border-bottom-color: rgba(91, 174, 238, 0.1);
-}
-
-html.app-dark-mode .tuner-transposition-menu__group button:active,
-html.app-dark-mode
-  .tuner-transposition-menu__group
-  button.tuner-transposition-menu__option--selected {
-  background: rgba(91, 174, 238, 0.12);
-}
-
-html.app-dark-mode .tuner-transposition-menu__key {
-  border-color: rgba(91, 174, 238, 0.16);
-  background: rgba(30, 48, 68, 0.8);
-  color: #8dcbf8;
+html.app-dark-mode .tuner-transposition-menu__header button:active,
+html.app-dark-mode .tuner-transposition-menu__group button:active {
+  background: rgba(238, 244, 250, 0.07);
 }
 
 html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon {
