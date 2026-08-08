@@ -83,7 +83,8 @@ export function getPracticeRhythmOptions(
   return getAvailableSubdivisions(meter, pulseModeId).map((value) => {
     const mode = getPulseModeById(meter, pulseModeId)
     const meta = RHYTHM_LABELS[value]
-    const name = value === 'off' ? mode.pulseName : getSubdivisionLabel(meter, value)
+    const name =
+      value === 'off' ? mode.pulseName : getSubdivisionLabel(meter, value, mode.pulseCount)
     return {
       id: meta.id,
       value,

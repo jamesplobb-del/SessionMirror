@@ -26,6 +26,12 @@ import {
 import MetronomeAudioSelect from './MetronomeAudioSelect'
 import MetronomeBeatDisplay from './MetronomeBeatDisplay'
 import { useTutorialAction } from '../../context/TutorialContext'
+import {
+  METRONOME_VISUAL_STYLES,
+  setMetronomeVisualStyle,
+  useMetronomeVisualStyle,
+  type MetronomeVisualStyle,
+} from '../../utils/metronomeVisualStyle'
 
 const TEMPO_PIXELS_PER_BPM = 5
 
@@ -86,6 +92,7 @@ export default function AudioPracticeMetronomeView({
   const [editingBpm, setEditingBpm] = useState(false)
   const [bpmDraft, setBpmDraft] = useState('')
   const [tempoScrubbing, setTempoScrubbing] = useState(false)
+  const visualStyle = useMetronomeVisualStyle()
 
   const {
     bpm,
@@ -127,7 +134,9 @@ export default function AudioPracticeMetronomeView({
     : []
   const showBeatGrouping =
     feelOptions.length > 1 && (meter.endsWith('/8') || meter.endsWith('/16'))
-  const selectorCount = 3 + (pulseModeOptions.length > 0 ? 1 : 0) + (showBeatGrouping ? 1 : 0)
+  // Time + Rhythm + Sound + View, plus the two conditional selectors.
+  const selectorCount =
+    4 + (pulseModeOptions.length > 0 ? 1 : 0) + (showBeatGrouping ? 1 : 0)
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -433,6 +442,16 @@ export default function AudioPracticeMetronomeView({
                 label,
               }))}
               onChange={handleSoundChange}
+            />
+            <MetronomeAudioSelect<MetronomeVisualStyle>
+              label="View"
+              ariaLabel="Visual metronome style"
+              value={visualStyle}
+              options={METRONOME_VISUAL_STYLES.map(({ id, label }) => ({
+                value: id,
+                label,
+              }))}
+              onChange={setMetronomeVisualStyle}
             />
             </div>
           </section>

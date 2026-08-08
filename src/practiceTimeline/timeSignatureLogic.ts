@@ -104,7 +104,7 @@ export function sectionTimingSummary(section: TimelineSection, measure = 1): str
   const rhythm =
     timing.subdivision === 'off'
       ? timing.pulseName
-      : getSubdivisionLabel(section.meter, timing.subdivision)
+      : getSubdivisionLabel(section.meter, timing.subdivision, timing.pulseCount)
   const ramp = tempoRampLabel(section)
   const bpmLabel = formatBpmLabel(section.bpm, timing)
   const parts: string[] = [section.meter, bpmLabel]
@@ -149,7 +149,7 @@ export function subdivisionLabel(section: TimelineSection): string {
   if (section.subdivision === 'auto') return 'Auto'
   const resolved = resolveSectionTiming(section)
   if (resolved.subdivision === 'off') return resolved.pulseName
-  return getSubdivisionLabel(section.meter, resolved.subdivision)
+  return getSubdivisionLabel(section.meter, resolved.subdivision, resolved.pulseCount)
 }
 
 export function subdivisionOptionsForSection(section: TimelineSection): MetronomeSubdivision[] {

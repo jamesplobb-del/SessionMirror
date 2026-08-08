@@ -162,7 +162,9 @@ export function accentLevelToClickTier(
   level: MetronomeAccentLevel,
 ): MetronomeClickTier | null {
   if (level === 'silent') return null
-  if (level === 'weak') return 'subdivision'
+  // A weak MAIN beat gets its own tier — quieter than an accent, but still
+  // clearly a beat rather than an offbeat tick.
+  if (level === 'weak') return 'beat'
   if (level === 'strong' && beatIndex === 0) return 'downbeat'
   return 'macro'
 }
@@ -268,27 +270,57 @@ export function getPulseLabel(meter: MetronomeMeter): string {
   return getTimeSignatureDefinition(meter).pulseName
 }
 
+/** Note value of one tick, keyed by its length in sixteenth-note units. */
+const TICK_NOTE_NAMES: Record<string, string> = {
+  '16': 'Whole notes',
+  '8': 'Half notes',
+  '6': 'Dotted quarters',
+  '4': 'Quarters',
+  '3': 'Dotted eighths',
+  '2': 'Eighths',
+  '1': 'Sixteenths',
+  '0.5': 'Thirty-seconds',
+  '0.25': 'Sixty-fourths',
+}
+
+/**
+ * Name the subdivision by the note value it actually produces.
+ *
+ * The tick count for a subdivision is relative to the conducting pulse, so a
+ * fixed name per subdivision id is only right when that pulse is a quarter
+ * note. Under an eighth-note pulse (7/8, 5/8 …) "8ths" divides the eighth and
+ * therefore plays SIXTEENTHS; under a dotted-quarter pulse (6/8) it plays the
+ * three natural eighths; under a sixteenth pulse (7/16) it plays 32nds.
+ *
+ * `pulseCount` must come from the active pulse mode — several meters offer
+ * more than one, and they divide differently.
+ */
 export function getSubdivisionLabel(
   meter: MetronomeMeter,
   subdivision: MetronomeSubdivision,
+  pulseCount?: number,
 ): string {
+  const count = pulseCount ?? getTimeSignatureDefinition(meter).pulseCount
   if (subdivision === 'off') {
     return getTimeSignatureDefinition(meter).pulseName
   }
+
+  const ticks = ticksPerPulse(meter, subdivision, count)
+  const tickUnits = smallestNoteUnitsPerPulse(meter, count) / ticks
+  const noteName = TICK_NOTE_NAMES[String(Number(tickUnits.toFixed(4)))]
+  if (noteName) return noteName
+
+  // Divisions that do not land on a plain note value are named as tuplets.
   switch (subdivision) {
-    case '8ths':
-      return 'Eighths'
     case 'triplets':
       return 'Triplets'
-    case '16ths':
-      return 'Sixteenths'
-    case 'dotted':
-      return 'Dotted'
     case 'quints':
       return 'Quintuplets'
     case 'septuplets':
       return 'Septuplets'
+    case 'dotted':
+      return 'Dotted'
     default:
-      return subdivision
+      return `${ticks} per beat`
   }
 }

@@ -19,14 +19,32 @@ export interface PulseModeDefinition {
 
 const Q_SUB = ['off', '8ths', 'triplets', '16ths'] as MetronomeSubdivision[]
 const H_SUB = ['off', '8ths', 'triplets', '16ths'] as MetronomeSubdivision[]
-const C_SUB = ['off', '8ths', 'triplets', '16ths'] as MetronomeSubdivision[]
 const E_SUB = ['off', '8ths', 'triplets', '16ths'] as MetronomeSubdivision[]
 const S_SUB = ['off', '8ths', 'triplets', '16ths'] as MetronomeSubdivision[]
+
+/**
+ * Dotted-quarter (compound) pulses divide into 3 by nature, so "triplets" and
+ * "8ths" both resolve to 3 ticks per pulse — the same rhythm under two names.
+ * Compound modes therefore offer only the divisions that differ: the natural
+ * 3 eighths, and 6 sixteenths.
+ */
+const C_SUB = ['off', '8ths', '16ths'] as MetronomeSubdivision[]
 
 function feel(id: string, label: string, grouping: number[]): BeatFeelOption {
   return { id, label, grouping }
 }
 
+/**
+ * Accents for one conducting beat per group head.
+ *
+ * NOTE: the returned array is one entry per unit of `grouping`, so it is only
+ * valid as a mode's `defaultAccentLevels` when sum(grouping) === pulseCount —
+ * i.e. when the grouping counts conducting pulses, not subdivisions. Compound
+ * modes group eighths under a dotted-quarter pulse (6/8 = 3+3 eighths but 2
+ * pulses), so they must state their accents explicitly instead; feeding a
+ * subdivision-level grouping through here produces an over-long array that
+ * resolvePulseTiming then truncates, silently shifting the accents.
+ */
 function accentsFromGrouping(grouping: number[]): MetronomeAccentLevel[] {
   const levels: MetronomeAccentLevel[] = []
   for (let groupIndex = 0; groupIndex < grouping.length; groupIndex += 1) {
@@ -79,7 +97,8 @@ export const METER_PULSE_MODES: Record<MetronomeMeter, PulseModeDefinition[]> = 
     {
       id: 'dotted-half', label: 'Dotted half', bpmSymbol: '𝅗𝅥·', pulseCount: 2, pulseUnit: 'dotted-half',
       pulseName: 'Dotted Half', compound: true, defaultSubdivision: '8ths', availableSubdivisions: Q_SUB,
-      defaultAccentLevels: ['strong', 'medium'],
+      // Compound duple accents like 2/4.
+      defaultAccentLevels: ['strong', 'weak'],
     },
   ],
   '7/4': [{
@@ -149,10 +168,13 @@ export const METER_PULSE_MODES: Record<MetronomeMeter, PulseModeDefinition[]> = 
   }],
   '6/8': [
     {
+      // Compound duple: 2 dotted-quarter beats. The 3+3 eighth grouping is
+      // fixed by the meter, so it is not a "feel" choice — and expressing it
+      // as one would mis-length the accent array (see accentsFromGrouping).
       id: 'default', label: 'Dotted quarter', bpmSymbol: '♩·', pulseCount: 2, pulseUnit: 'dotted-quarter',
       pulseName: 'Dotted Quarter', compound: true, defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
-      feelOptions: [feel('3+3', '3+3', [3, 3])],
-      defaultFeelId: '3+3', defaultAccentLevels: accentsFromGrouping([3, 3]),
+      // Compound duple accents like 2/4.
+      defaultAccentLevels: ['strong', 'weak'],
     },
     {
       id: 'simple-eighth', label: 'Simple eighth', bpmSymbol: '♪', pulseCount: 6, pulseUnit: 'eighth',
@@ -184,10 +206,11 @@ export const METER_PULSE_MODES: Record<MetronomeMeter, PulseModeDefinition[]> = 
   }],
   '9/8': [
     {
+      // Compound triple: 3 dotted-quarter beats (3+3+3 eighths is fixed).
       id: 'default', label: 'Dotted quarter', bpmSymbol: '♩·', pulseCount: 3, pulseUnit: 'dotted-quarter',
       pulseName: 'Dotted Quarter', compound: true, defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
-      feelOptions: [feel('3+3+3', '3+3+3', [3, 3, 3])],
-      defaultFeelId: '3+3+3', defaultAccentLevels: accentsFromGrouping([3, 3, 3]),
+      // Compound triple accents like 3/4.
+      defaultAccentLevels: ['strong', 'weak', 'weak'],
     },
     {
       id: 'grouped-eighth', label: 'Grouped eighth', bpmSymbol: '♪', pulseCount: 9, pulseUnit: 'eighth',
@@ -226,33 +249,38 @@ export const METER_PULSE_MODES: Record<MetronomeMeter, PulseModeDefinition[]> = 
   }],
   '12/8': [
     {
+      // Compound quadruple: 4 dotted-quarter beats (3+3+3+3 eighths is fixed).
       id: 'default', label: 'Dotted quarter', bpmSymbol: '♩·', pulseCount: 4, pulseUnit: 'dotted-quarter',
       pulseName: 'Dotted Quarter', compound: true, defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
-      feelOptions: [feel('3+3+3+3', '3+3+3+3', [3, 3, 3, 3])],
-      defaultFeelId: '3+3+3+3', defaultAccentLevels: accentsFromGrouping([3, 3, 3, 3]),
+      // Compound quadruple accents like 4/4 — secondary accent on beat 3.
+      defaultAccentLevels: ['strong', 'weak', 'medium', 'weak'],
     },
     {
-      id: 'six-groups', label: 'Six groups (2+2…)', bpmSymbol: '♪', pulseCount: 6, pulseUnit: 'eighth',
-      pulseName: 'Grouped Eighth', compound: false, defaultSubdivision: 'off', availableSubdivisions: E_SUB,
-      feelOptions: [feel('2+2+2+2+2+2', '2+2+2+2+2+2', [2, 2, 2, 2, 2, 2])],
-      defaultFeelId: '2+2+2+2+2+2', defaultAccentLevels: accentsFromGrouping([2, 2, 2, 2, 2, 2]),
+      // 6 groups of 2 eighths — each group is a QUARTER note, so that is the
+      // pulse BPM refers to, not an eighth. Behaves as 6/4.
+      id: 'six-groups', label: 'Six groups (2+2…)', bpmSymbol: '♩', pulseCount: 6, pulseUnit: 'quarter',
+      pulseName: 'Quarter', compound: false, defaultSubdivision: 'off', availableSubdivisions: Q_SUB,
+      defaultAccentLevels: ['strong', 'weak', 'weak', 'medium', 'weak', 'weak'],
     },
     {
-      id: 'four-threes', label: 'Three groups (4+4+4)', bpmSymbol: '♩·', pulseCount: 3, pulseUnit: 'dotted-quarter',
-      pulseName: 'Dotted Quarter', compound: true, defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
-      feelOptions: [feel('4+4+4', '4+4+4', [4, 4, 4])],
-      defaultFeelId: '4+4+4', defaultAccentLevels: accentsFromGrouping([4, 4, 4]),
+      // 3 groups of 4 eighths — each group is a HALF note, and groups of 4 are
+      // not compound. Behaves as 3/2 across the bar.
+      id: 'three-fours', label: 'Three groups (4+4+4)', bpmSymbol: '𝅗𝅥', pulseCount: 3, pulseUnit: 'half',
+      pulseName: 'Half', compound: false, defaultSubdivision: 'off', availableSubdivisions: H_SUB,
+      defaultAccentLevels: ['strong', 'weak', 'weak'],
     },
   ],
   '13/8': [{
     id: 'default', label: 'Grouped eighth', bpmSymbol: '♪', pulseCount: 13, pulseUnit: 'eighth', pulseName: 'Eighth',
     compound: false, defaultSubdivision: 'off', availableSubdivisions: E_SUB,
     feelOptions: [
-      feel('3+3+3+2', '3+3+3+2', [3, 3, 3, 2]),
+      // 3+3+3+2 only accounts for 11 of the bar's 13 eighths — corrected.
+      feel('3+3+3+2+2', '3+3+3+2+2', [3, 3, 3, 2, 2]),
       feel('3+3+2+2+3', '3+3+2+2+3', [3, 3, 2, 2, 3]),
       feel('2+2+3+3+3', '2+2+3+3+3', [2, 2, 3, 3, 3]),
+      feel('3+2+2+3+3', '3+2+2+3+3', [3, 2, 2, 3, 3]),
     ],
-    defaultFeelId: '3+3+3+2', defaultAccentLevels: accentsFromGrouping([3, 3, 3, 2]),
+    defaultFeelId: '3+3+3+2+2', defaultAccentLevels: accentsFromGrouping([3, 3, 3, 2, 2]),
   }],
   '15/8': [
     {
@@ -267,21 +295,24 @@ export const METER_PULSE_MODES: Record<MetronomeMeter, PulseModeDefinition[]> = 
     {
       id: 'compound', label: 'Dotted quarter', bpmSymbol: '♩·', pulseCount: 5, pulseUnit: 'dotted-quarter',
       pulseName: 'Dotted Quarter', compound: true, defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
-      defaultAccentLevels: ['strong', 'medium', 'medium', 'medium', 'medium'],
+      // Five compound beats accent like 5/4's default 3+2.
+      defaultAccentLevels: accentsFromGrouping([3, 2]),
     },
   ],
   '16/8': [
     {
-      id: 'default', label: 'Traditional (2+2…)', bpmSymbol: '♪', pulseCount: 8, pulseUnit: 'eighth',
-      pulseName: 'Grouped Eighth', compound: false, defaultSubdivision: 'off', availableSubdivisions: E_SUB,
-      feelOptions: [feel('2+2+2+2+2+2+2+2', '2+2+2+2+2+2+2+2', [2, 2, 2, 2, 2, 2, 2, 2])],
-      defaultFeelId: '2+2+2+2+2+2+2+2', defaultAccentLevels: accentsFromGrouping([2, 2, 2, 2, 2, 2, 2, 2]),
+      // 8 groups of 2 eighths — each group is a QUARTER note. Behaves as 4/4
+      // twice over, so the halfway point takes the secondary accent.
+      id: 'default', label: 'Traditional (2+2…)', bpmSymbol: '♩', pulseCount: 8, pulseUnit: 'quarter',
+      pulseName: 'Quarter', compound: false, defaultSubdivision: 'off', availableSubdivisions: Q_SUB,
+      defaultAccentLevels: accentsFromGrouping([4, 4]),
     },
     {
-      id: 'compound', label: 'Compound (4+4+4+4)', bpmSymbol: '♩·', pulseCount: 4, pulseUnit: 'dotted-quarter',
-      pulseName: 'Dotted Quarter', compound: true, defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
-      feelOptions: [feel('4+4+4+4', '4+4+4+4', [4, 4, 4, 4])],
-      defaultFeelId: '4+4+4+4', defaultAccentLevels: accentsFromGrouping([4, 4, 4, 4]),
+      // 4 groups of 4 eighths — each group is a HALF note. Groups of 4 are not
+      // compound (compound means groups of 3). Behaves as 4/2.
+      id: 'four-halves', label: 'Four groups (4+4+4+4)', bpmSymbol: '𝅗𝅥', pulseCount: 4, pulseUnit: 'half',
+      pulseName: 'Half', compound: false, defaultSubdivision: 'off', availableSubdivisions: H_SUB,
+      defaultAccentLevels: ['strong', 'weak', 'medium', 'weak'],
     },
   ],
   '3/16': [{

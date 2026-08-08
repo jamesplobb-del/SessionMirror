@@ -1,9 +1,16 @@
 import AVFoundation
 import Foundation
 
+/// Click prominence, loudest first. Raw values must match
+/// MetronomeClickTier in src/metronome/metronomeTypes.ts — the tier pattern
+/// arrives from JS as these strings, and an unknown one parses to nil (silent).
+///
+/// `beat` keeps an unaccented MAIN beat audible as a beat; without it weak
+/// beats shared the `subdivision` click and vanished among the offbeats.
 enum MetronomeClickTier: String {
     case downbeat
     case macro
+    case beat
     case subdivision
 }
 
@@ -426,31 +433,43 @@ final class MetronomeEngine {
         var wave: MetronomeWaveform
     }
 
+    /// Keep in sync with src/utils/metronomeClickSounds.ts — the same four
+    /// voices are synthesized on the web path, and a mismatch means the
+    /// metronome changes character between the native and web engines.
+    ///
+    /// All four sit at 1.2–2.4 kHz, where the ear is most sensitive and a loud
+    /// instrument masks least, with short decays so each click reads as a
+    /// transient rather than a tone. Waveform separates them now that they
+    /// share a register: sine = pure, triangle = bright, square = cutting.
     private func profile(for tier: MetronomeClickTier, sound: MetronomeSoundId) -> MetronomeClickProfile {
         switch sound {
         case .woodblock:
             switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 320, peak: 0.95, decaySec: 0.032, wave: .triangle)
-            case .macro: return MetronomeClickProfile(hz: 260, peak: 0.55, decaySec: 0.028, wave: .triangle)
-            case .subdivision: return MetronomeClickProfile(hz: 220, peak: 0.18, decaySec: 0.022, wave: .triangle)
+            case .downbeat: return MetronomeClickProfile(hz: 1950, peak: 1.0, decaySec: 0.022, wave: .square)
+            case .macro: return MetronomeClickProfile(hz: 1620, peak: 0.7, decaySec: 0.02, wave: .square)
+            case .beat: return MetronomeClickProfile(hz: 1480, peak: 0.5, decaySec: 0.017, wave: .square)
+            case .subdivision: return MetronomeClickProfile(hz: 1350, peak: 0.32, decaySec: 0.015, wave: .square)
             }
         case .soft:
             switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 660, peak: 0.34, decaySec: 0.085, wave: .sine)
-            case .macro: return MetronomeClickProfile(hz: 540, peak: 0.22, decaySec: 0.072, wave: .sine)
-            case .subdivision: return MetronomeClickProfile(hz: 440, peak: 0.08, decaySec: 0.052, wave: .sine)
+            case .downbeat: return MetronomeClickProfile(hz: 1700, peak: 0.6, decaySec: 0.045, wave: .sine)
+            case .macro: return MetronomeClickProfile(hz: 1450, peak: 0.42, decaySec: 0.04, wave: .sine)
+            case .beat: return MetronomeClickProfile(hz: 1320, peak: 0.3, decaySec: 0.034, wave: .sine)
+            case .subdivision: return MetronomeClickProfile(hz: 1200, peak: 0.19, decaySec: 0.028, wave: .sine)
             }
         case .electronic:
             switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 1800, peak: 0.9, decaySec: 0.03, wave: .square)
-            case .macro: return MetronomeClickProfile(hz: 1500, peak: 0.5, decaySec: 0.026, wave: .square)
-            case .subdivision: return MetronomeClickProfile(hz: 1300, peak: 0.22, decaySec: 0.02, wave: .square)
+            case .downbeat: return MetronomeClickProfile(hz: 2400, peak: 0.95, decaySec: 0.026, wave: .square)
+            case .macro: return MetronomeClickProfile(hz: 1950, peak: 0.6, decaySec: 0.022, wave: .square)
+            case .beat: return MetronomeClickProfile(hz: 1770, peak: 0.43, decaySec: 0.02, wave: .square)
+            case .subdivision: return MetronomeClickProfile(hz: 1600, peak: 0.28, decaySec: 0.017, wave: .square)
             }
         case .classic:
             switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 1000, peak: 1.0, decaySec: 0.045, wave: .sine)
-            case .macro: return MetronomeClickProfile(hz: 800, peak: 0.75, decaySec: 0.045, wave: .sine)
-            case .subdivision: return MetronomeClickProfile(hz: 600, peak: 0.35, decaySec: 0.028, wave: .sine)
+            case .downbeat: return MetronomeClickProfile(hz: 2150, peak: 1.0, decaySec: 0.03, wave: .triangle)
+            case .macro: return MetronomeClickProfile(hz: 1800, peak: 0.72, decaySec: 0.027, wave: .triangle)
+            case .beat: return MetronomeClickProfile(hz: 1650, peak: 0.52, decaySec: 0.023, wave: .triangle)
+            case .subdivision: return MetronomeClickProfile(hz: 1500, peak: 0.34, decaySec: 0.019, wave: .triangle)
             }
         }
     }
