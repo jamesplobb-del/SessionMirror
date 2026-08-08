@@ -12,3 +12,12 @@ ios/**/DerivedData/
 
 # Local Netlify folder
 .netlify
+
+# Xcode build cache / DerivedData redirected to project root
+/build/
+
+# Stray duplicate Cordova config files (created by repeated cap sync runs)
+ios/App/App/config*.xml
+
+# Unused local asset experiments
+/kenney_isometricBlocks/

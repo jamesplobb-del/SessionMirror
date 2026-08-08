@@ -10,11 +10,18 @@
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 }
 
+/*
+ * The menu is a full-screen sheet on a phone, so it is sized to fit rather
+ * than to scroll: the vertical rhythm is vh-based and the safe areas are part
+ * of the padding, not something the topbar disappears under.
+ */
 .arcade-menu {
   width: 100%;
   max-width: 36rem;
   margin: 0 auto;
-  padding: clamp(1rem, 3vh, 1.75rem) clamp(0.9rem, 4vw, 1.5rem) 2rem;
+  padding: calc(clamp(0.75rem, 2.2vh, 1.35rem) + env(safe-area-inset-top, 0px))
+    clamp(0.9rem, 4vw, 1.5rem)
+    calc(clamp(0.75rem, 2vh, 1.35rem) + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -94,7 +101,7 @@
 }
 
 .arcade-menu__hero {
-  margin: clamp(1.75rem, 5vh, 2.75rem) 0 1rem;
+  margin: clamp(0.9rem, 3.4vh, 2.4rem) 0 clamp(0.7rem, 1.8vh, 1rem);
 }
 
 .arcade-kicker,
@@ -111,7 +118,7 @@
   max-width: 35rem;
   margin: 0;
   color: var(--arcade-ink);
-  font-size: clamp(1.7rem, 7vw, 2.35rem);
+  font-size: clamp(1.5rem, 6.4vw, 2.35rem);
   font-weight: 740;
   letter-spacing: -0.045em;
   line-height: 1.04;
@@ -119,10 +126,10 @@
 
 .arcade-menu__hero p:last-child {
   max-width: 32rem;
-  margin: 0.9rem 0 0;
+  margin: clamp(0.45rem, 1.3vh, 0.9rem) 0 0;
   color: var(--arcade-muted);
-  font-size: 0.93rem;
-  line-height: 1.55;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .arcade-menu__section-head {
@@ -148,7 +155,7 @@
 
 .arcade-game-list {
   display: grid;
-  gap: 0.85rem;
+  gap: clamp(0.6rem, 1.6vh, 0.85rem);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -158,12 +165,13 @@
   position: relative;
   display: grid;
   width: 100%;
-  min-height: 5.8rem;
+  min-height: clamp(5rem, 13vh, 5.8rem);
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 1rem;
+  gap: clamp(0.7rem, 3vw, 1rem);
   overflow: hidden;
-  padding: 1rem 1rem 1rem 1.15rem;
+  padding: clamp(0.75rem, 1.8vh, 1rem) clamp(0.75rem, 3vw, 1rem)
+    clamp(0.75rem, 1.8vh, 1rem) clamp(0.85rem, 3.4vw, 1.15rem);
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 1.35rem;
   text-align: left;
@@ -287,8 +295,8 @@
 .arcade-game-card__art {
   position: relative;
   align-self: stretch;
-  width: clamp(6.5rem, 30vw, 8.5rem);
-  min-height: 8.6rem;
+  width: clamp(5.75rem, 28vw, 8.5rem);
+  min-height: clamp(6.4rem, 17vh, 8.6rem);
   overflow: hidden;
   border-radius: 1.2rem;
 }
@@ -372,7 +380,7 @@
 .arcade-game-card__balance-rope {
   position: absolute;
   width: 0.18rem;
-  height: 6.4rem;
+  height: min(6.4rem, 74%);
   left: 50%;
   bottom: 1.1rem;
   background: #785534;
@@ -422,7 +430,7 @@
 }
 
 .arcade-menu__footer-note {
-  margin: 1rem 0 0;
+  margin: clamp(0.7rem, 1.8vh, 1rem) 0 0;
   padding: 0 0.4rem;
   color: #7a8495;
   font-size: 0.7rem;
@@ -1214,6 +1222,26 @@
 }
 
 @media (max-height: 720px) {
+  .arcade-menu__hero h1 {
+    font-size: clamp(1.4rem, 5.8vw, 1.8rem);
+  }
+
+  .arcade-menu__hero p:last-child {
+    font-size: 0.82rem;
+  }
+
+  .arcade-game-card__art {
+    min-height: 6rem;
+  }
+
+  .arcade-game-card__copy > p {
+    font-size: 0.74rem;
+  }
+
+  .arcade-menu__footer-note {
+    font-size: 0.66rem;
+  }
+
   .arcade-setup-hero {
     padding: 0.9rem;
   }

@@ -19,13 +19,6 @@ export interface AudioEnhancerSettings {
   reverb: number
 }
 
-export const DEFAULT_AUDIO_ENHANCER_SETTINGS: AudioEnhancerSettings = {
-  preset: 'Voice',
-  eq: { low: 0, mid: 0, high: 0 },
-  compression: 0,
-  reverb: 0,
-}
-
 export const AUDIO_ENHANCER_PRESETS: Record<
   Exclude<AudioEnhancerPreset, 'Custom'>,
   AudioEnhancerSettings
@@ -36,6 +29,33 @@ export const AUDIO_ENHANCER_PRESETS: Record<
   Voice: { preset: 'Voice', eq: { low: -3, mid: 2, high: 4 }, compression: 48, reverb: 16 },
   Percussion: { preset: 'Percussion', eq: { low: 3, mid: -3, high: 3 }, compression: 68, reverb: 6 },
 }
+
+/**
+ * Deep copy. Preset entries are module constants and their `eq` object would
+ * otherwise be shared by every settings object spread from them — one stray
+ * mutation would rewrite the preset table for the rest of the session.
+ */
+export function cloneAudioEnhancerSettings(
+  settings: AudioEnhancerSettings,
+): AudioEnhancerSettings {
+  return {
+    preset: settings.preset,
+    eq: { ...settings.eq },
+    compression: settings.compression,
+    reverb: settings.reverb,
+  }
+}
+
+export const DEFAULT_AUDIO_ENHANCER_PRESET: Exclude<AudioEnhancerPreset, 'Custom'> = 'Voice'
+
+/**
+ * The enhancer ships in the state its chip claims: the values ARE the Voice
+ * preset. A flat/zero default under a preset name means turning the enhancer
+ * on does almost nothing while the UI insists a mode is active.
+ */
+export const DEFAULT_AUDIO_ENHANCER_SETTINGS: AudioEnhancerSettings = cloneAudioEnhancerSettings(
+  AUDIO_ENHANCER_PRESETS[DEFAULT_AUDIO_ENHANCER_PRESET],
+)
 
 type EnhancerProfileTuning = {
   lowHz: number
@@ -65,7 +85,26 @@ const PROFILE_TUNING: Record<AudioEnhancerPreset, EnhancerProfileTuning> = {
 export function settingsFromPreset(
   preset: Exclude<AudioEnhancerPreset, 'Custom'>,
 ): AudioEnhancerSettings {
-  return { ...AUDIO_ENHANCER_PRESETS[preset] }
+  return cloneAudioEnhancerSettings(AUDIO_ENHANCER_PRESETS[preset])
+}
+
+/**
+ * True when the sliders still hold the named preset's values. Editing a slider
+ * deliberately keeps the preset selected — the preset also picks the filter
+ * frequencies, so switching to "Custom" mid-edit would jump the EQ centres and
+ * change the tone from an unrelated control. The UI labels the difference
+ * instead.
+ */
+export function matchesPresetDefaults(settings: AudioEnhancerSettings): boolean {
+  if (settings.preset === 'Custom') return false
+  const preset = AUDIO_ENHANCER_PRESETS[settings.preset]
+  return (
+    settings.eq.low === preset.eq.low &&
+    settings.eq.mid === preset.eq.mid &&
+    settings.eq.high === preset.eq.high &&
+    settings.compression === preset.compression &&
+    settings.reverb === preset.reverb
+  )
 }
 
 export interface AudioEnhancerNodes {
@@ -83,17 +122,70 @@ export interface AudioEnhancerNodes {
   convolver: ConvolverNode
 }
 
-function makeImpulseResponse(ctx: AudioContext, seconds: number, decay: number): AudioBuffer {
-  const length = Math.max(1, Math.floor(ctx.sampleRate * seconds))
-  const impulse = ctx.createBuffer(2, length, ctx.sampleRate)
+const IMPULSE_SECONDS = 1.4
+const PRE_DELAY_SECONDS = 0.018
+
+/**
+ * Discrete early reflections (seconds after the pre-delay, gain). They give the
+ * tail a room signature; without them a convolved noise burst reads as a hiss
+ * cloud rather than a space.
+ */
+const EARLY_REFLECTIONS: ReadonlyArray<readonly [number, number]> = [
+  [0.0113, 0.72],
+  [0.0197, -0.55],
+  [0.0281, 0.46],
+  [0.0353, -0.34],
+  [0.0461, 0.27],
+  [0.0592, -0.19],
+]
+
+/**
+ * One impulse response per AudioContext. Generating it costs ~130k random
+ * samples per channel, and every routed media element used to build its own.
+ */
+const impulseCache = new WeakMap<BaseAudioContext, AudioBuffer>()
+
+/**
+ * A small room: pre-delay so note attacks stay clear, early reflections, then a
+ * diffuse tail that decays exponentially and loses its highs as it goes (real
+ * rooms absorb treble fastest). ConvolverNode.normalize keeps the wet level
+ * independent of the shape, so tuning this does not change how loud reverb is.
+ */
+function makeImpulseResponse(ctx: BaseAudioContext): AudioBuffer {
+  const cached = impulseCache.get(ctx)
+  if (cached) return cached
+
+  const sampleRate = ctx.sampleRate
+  const length = Math.max(2, Math.floor(sampleRate * IMPULSE_SECONDS))
+  const preDelay = Math.min(length - 1, Math.floor(sampleRate * PRE_DELAY_SECONDS))
+  const tailLength = Math.max(1, length - preDelay)
+  // Reach −60 dB exactly at the buffer end so the tail fades out, not cuts off.
+  const decayPerSample = Math.log(0.001) / tailLength
+
+  const impulse = ctx.createBuffer(2, length, sampleRate)
 
   for (let channel = 0; channel < 2; channel++) {
     const data = impulse.getChannelData(channel)
-    for (let i = 0; i < length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay)
+    // Skewing one channel decorrelates the two tails, which is what makes the
+    // reverb sound wide instead of centred.
+    const skew = channel === 0 ? 1 : 1.037
+    let lowpassState = 0
+
+    for (let i = preDelay; i < length; i++) {
+      const envelope = Math.exp(decayPerSample * (i - preDelay) * skew)
+      // One-pole lowpass that closes as the tail decays: bright early, dark late.
+      const cutoff = 0.3 + 0.55 * envelope
+      lowpassState += cutoff * (Math.random() * 2 - 1 - lowpassState)
+      data[i] = lowpassState * envelope
+    }
+
+    for (const [seconds, gain] of EARLY_REFLECTIONS) {
+      const index = preDelay + Math.floor(seconds * sampleRate * skew)
+      if (index < length) data[index] += gain * (channel === 0 ? 1 : -0.92)
     }
   }
 
+  impulseCache.set(ctx, impulse)
   return impulse
 }
 
@@ -109,28 +201,59 @@ function dbToLinear(db: number): number {
   return Math.pow(10, db / 20)
 }
 
+/** Time constant for live parameter moves — long enough to hide zipper noise. */
+const PARAM_GLIDE_SECONDS = 0.02
+
+/**
+ * Assigning `param.value` mid-playback steps the coefficient in one block,
+ * which clicks audibly while a slider is being dragged. Glide instead, except
+ * when the chain is still being built and nothing is listening yet.
+ */
+function setParam(
+  param: AudioParam,
+  value: number,
+  ctx: BaseAudioContext,
+  immediate: boolean,
+): void {
+  if (!Number.isFinite(value)) return
+  if (immediate) {
+    param.value = value
+    return
+  }
+  try {
+    param.setTargetAtTime(value, ctx.currentTime, PARAM_GLIDE_SECONDS)
+  } catch {
+    param.value = value
+  }
+}
+
 export function applyAudioEnhancerSettings(
   nodes: AudioEnhancerNodes,
   settings: AudioEnhancerSettings,
+  immediate = false,
 ): void {
+  const ctx = nodes.input.context
   const eq = settings.eq
   const tuning = PROFILE_TUNING[settings.preset] ?? DEFAULT_PROFILE_TUNING
-  nodes.lowShelf.frequency.value = tuning.lowHz
-  nodes.midPeaking.frequency.value = tuning.midHz
-  nodes.midPeaking.Q.value = tuning.midQ
-  nodes.highShelf.frequency.value = tuning.highHz
 
-  nodes.lowShelf.gain.value = clampDb(eq.low)
-  nodes.midPeaking.gain.value = clampDb(eq.mid)
-  nodes.highShelf.gain.value = clampDb(eq.high)
+  setParam(nodes.lowShelf.frequency, tuning.lowHz, ctx, immediate)
+  setParam(nodes.midPeaking.frequency, tuning.midHz, ctx, immediate)
+  setParam(nodes.midPeaking.Q, tuning.midQ, ctx, immediate)
+  setParam(nodes.highShelf.frequency, tuning.highHz, ctx, immediate)
+
+  setParam(nodes.lowShelf.gain, clampDb(eq.low), ctx, immediate)
+  setParam(nodes.midPeaking.gain, clampDb(eq.mid), ctx, immediate)
+  setParam(nodes.highShelf.gain, clampDb(eq.high), ctx, immediate)
 
   const comp = clampPercent(settings.compression) / 100
-  nodes.compressor.threshold.value = -12 - comp * 24
-  nodes.compressor.ratio.value = 1.5 + comp * 6.5
-  nodes.compressor.attack.value = 0.004 + (1 - comp) * 0.014
-  nodes.compressor.release.value = 0.09 + comp * 0.2
-  nodes.compressor.knee.value = 20
-  nodes.makeup.gain.value = dbToLinear(tuning.makeupDb + comp * 2.4)
+  setParam(nodes.compressor.threshold, -12 - comp * 24, ctx, immediate)
+  setParam(nodes.compressor.ratio, 1.5 + comp * 6.5, ctx, immediate)
+  setParam(nodes.compressor.attack, 0.004 + (1 - comp) * 0.014, ctx, immediate)
+  setParam(nodes.compressor.release, 0.09 + comp * 0.2, ctx, immediate)
+  setParam(nodes.compressor.knee, 20, ctx, immediate)
+  setParam(nodes.makeup.gain, dbToLinear(tuning.makeupDb + comp * 2.4), ctx, immediate)
+
+  // Fixed brickwall; never glided, it is the safety net for everything above.
   nodes.limiter.threshold.value = -1
   nodes.limiter.knee.value = 0
   nodes.limiter.ratio.value = 20
@@ -138,9 +261,9 @@ export function applyAudioEnhancerSettings(
   nodes.limiter.release.value = 0.075
 
   const reverbMix = clampPercent(settings.reverb) / 100
-  nodes.reverbSend.gain.value = reverbMix * 0.55
-  nodes.dryGain.gain.value = 1
-  nodes.wetGain.gain.value = 0.22 + reverbMix * 0.42
+  setParam(nodes.reverbSend.gain, reverbMix * 0.55, ctx, immediate)
+  setParam(nodes.dryGain.gain, 1, ctx, immediate)
+  setParam(nodes.wetGain.gain, 0.22 + reverbMix * 0.42, ctx, immediate)
 }
 
 export function createAudioEnhancerChain(
@@ -152,16 +275,12 @@ export function createAudioEnhancerChain(
 
   const lowShelf = ctx.createBiquadFilter()
   lowShelf.type = 'lowshelf'
-  lowShelf.frequency.value = 180
 
   const midPeaking = ctx.createBiquadFilter()
   midPeaking.type = 'peaking'
-  midPeaking.frequency.value = 1200
-  midPeaking.Q.value = 0.9
 
   const highShelf = ctx.createBiquadFilter()
   highShelf.type = 'highshelf'
-  highShelf.frequency.value = 4200
 
   const compressor = ctx.createDynamicsCompressor()
   const makeup = ctx.createGain()
@@ -171,8 +290,8 @@ export function createAudioEnhancerChain(
   const wetGain = ctx.createGain()
   const reverbSend = ctx.createGain()
   const convolver = ctx.createConvolver()
-  convolver.buffer = makeImpulseResponse(ctx, 1.6, 2.4)
   convolver.normalize = true
+  convolver.buffer = makeImpulseResponse(ctx)
 
   input.connect(lowShelf)
   lowShelf.connect(midPeaking)
@@ -204,7 +323,7 @@ export function createAudioEnhancerChain(
     convolver,
   }
 
-  applyAudioEnhancerSettings(nodes, settings)
+  applyAudioEnhancerSettings(nodes, settings, true)
   return nodes
 }
 
@@ -273,20 +392,27 @@ export function buildNativeEnhancerParams(
 
 export function parseAudioEnhancerSettings(value: unknown): AudioEnhancerSettings {
   if (!value || typeof value !== 'object') {
-    return { ...DEFAULT_AUDIO_ENHANCER_SETTINGS }
+    return cloneAudioEnhancerSettings(DEFAULT_AUDIO_ENHANCER_SETTINGS)
   }
 
   const parsed = value as Partial<AudioEnhancerSettings>
+  const preset = parsePreset(parsed.preset)
   const eq = parsed.eq
+
+  // A stored preset with no slider payload is a preset selection, not a flat
+  // EQ — fall back to that preset's own values rather than to zeros.
+  const fallback =
+    preset === 'Custom' ? DEFAULT_AUDIO_ENHANCER_SETTINGS : AUDIO_ENHANCER_PRESETS[preset]
+
   return {
-    preset: parsePreset(parsed.preset),
+    preset,
     eq: {
-      low: clampEqBand(eq?.low),
-      mid: clampEqBand(eq?.mid),
-      high: clampEqBand(eq?.high),
+      low: clampEqBand(eq?.low, fallback.eq.low),
+      mid: clampEqBand(eq?.mid, fallback.eq.mid),
+      high: clampEqBand(eq?.high, fallback.eq.high),
     },
-    compression: clampPercent(Number(parsed.compression) || 0),
-    reverb: clampPercent(Number(parsed.reverb) || 0),
+    compression: clampStoredPercent(parsed.compression, fallback.compression),
+    reverb: clampStoredPercent(parsed.reverb, fallback.reverb),
   }
 }
 
@@ -304,8 +430,16 @@ function parsePreset(value: unknown): AudioEnhancerPreset {
     : DEFAULT_AUDIO_ENHANCER_SETTINGS.preset
 }
 
-function clampEqBand(value: unknown): number {
+function clampEqBand(value: unknown, fallback: number): number {
+  if (value === undefined || value === null) return fallback
   const n = Number(value)
-  if (!Number.isFinite(n)) return 0
+  if (!Number.isFinite(n)) return fallback
   return Math.min(12, Math.max(-12, Math.round(n)))
+}
+
+function clampStoredPercent(value: unknown, fallback: number): number {
+  if (value === undefined || value === null) return fallback
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return clampPercent(n)
 }

@@ -347,9 +347,19 @@ final class AudioEnhancerRenderer {
             let status = try engine.renderOffline(framesToRender, to: buffer)
             switch status {
             case .success:
-                try outputFile.write(from: buffer)
-                renderedFrames += AVAudioFramePosition(buffer.frameLength)
-                stallGuard = 0
+                // A zero-frame success advances nothing; without this the loop
+                // would spin forever because only the other cases are guarded.
+                if buffer.frameLength == 0 {
+                    stallGuard += 1
+                    if stallGuard > 1000 {
+                        engine.stop()
+                        throw AudioEnhancerRendererError.renderFailed("Render stalled")
+                    }
+                } else {
+                    try outputFile.write(from: buffer)
+                    renderedFrames += AVAudioFramePosition(buffer.frameLength)
+                    stallGuard = 0
+                }
             case .insufficientDataFromInputNode, .cannotDoInCurrentContext:
                 stallGuard += 1
                 if stallGuard > 1000 {

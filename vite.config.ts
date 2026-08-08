@@ -3,11 +3,14 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss(), basicSsl()],
   server: {
     host: true,
   },
+  // Strip console.* and debugger statements from the production/App Store
+  // build only — the dev server (`vite`/`npm run dev`) is untouched.
+  esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : {},
   build: {
     rollupOptions: {
       output: {
@@ -23,4 +26,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

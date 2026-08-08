@@ -6,6 +6,7 @@ import {
 } from './tunerTransposition'
 import type { DroneWaveform } from './droneEngine'
 import {
+  cloneAudioEnhancerSettings,
   DEFAULT_AUDIO_ENHANCER_SETTINGS,
   parseAudioEnhancerSettings,
   type AudioEnhancerSettings,
@@ -83,7 +84,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   takeCardScale: 105,
   audioEnhancerEnabled: false,
   nativeExperimentalAudioEnabled: true,
-  audioEnhancerSettings: { ...DEFAULT_AUDIO_ENHANCER_SETTINGS },
+  audioEnhancerSettings: cloneAudioEnhancerSettings(DEFAULT_AUDIO_ENHANCER_SETTINGS),
   speakerLoudnessPreset: 'phone',
   excludeYoutubeFromRecording: false,
   micInputPreference: 'iphone',

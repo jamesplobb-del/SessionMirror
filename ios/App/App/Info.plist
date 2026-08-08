@@ -80,5 +80,7 @@
 	<string>BestTake needs the microphone to record audio with your takes.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>BestTake needs permission to save your takes to Photos.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

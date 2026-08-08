@@ -1335,15 +1335,35 @@ body.settings-branch-open * {
   margin-inline: auto;
 }
 
+/*
+ * Three symmetric columns keep the play button on the row's centre line — it
+ * has to sit directly above the mic button in the control deck below, so the
+ * flanks share a column width instead of sizing to their own text.
+ */
 .audio-practice-metronome__transport-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
   gap: clamp(0.55rem, 2.5vw, 0.75rem);
   width: 100%;
   max-width: 22rem;
   margin-inline: auto;
   padding: clamp(0.1rem, 0.5vh, 0.25rem) 0.45rem max(0.2rem, env(safe-area-inset-bottom, 0px));
+}
+
+.audio-practice-metronome__transport-row .audio-practice-metronome__program-btn {
+  grid-column: 1;
+  justify-self: end;
+}
+
+.audio-practice-metronome__transport-row .audio-practice-metronome__play-btn {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.audio-practice-metronome__transport-row .audio-practice-metronome__tap-btn {
+  grid-column: 3;
+  justify-self: start;
 }
 
 .audio-practice-metronome__step-btn {
@@ -1367,8 +1387,11 @@ body.settings-branch-open * {
   margin-top: clamp(0.25rem, 0.9vh, 0.45rem);
 }
 
-.audio-practice-metronome .audio-practice-metronome__tap-btn {
-  min-width: min(9rem, 50vw);
+.audio-practice-metronome .audio-practice-metronome__tap-btn,
+.audio-practice-metronome .audio-practice-metronome__program-btn {
+  width: 100%;
+  min-width: 0;
+  max-width: min(9rem, 50vw);
   min-height: 2.25rem;
   border-radius: 999px;
   font-size: 0.92rem;
@@ -5130,7 +5153,8 @@ html.physical-landscape-right .control-deck__vault-btn {
   display: inline-flex;
   min-width: 3.25rem;
   align-items: center;
-  gap: 0.3rem;
+  justify-content: center;
+  gap: 0.35rem;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -7279,7 +7303,10 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 
 .app-ui-overlay--audio-mode
   .audio-practice-metronome__transport-row
-  .audio-practice-metronome__tap-btn {
+  .audio-practice-metronome__tap-btn,
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__transport-row
+  .audio-practice-metronome__program-btn {
   max-width: 13.5rem;
   min-height: 3.45rem;
   font-size: 0.98rem;

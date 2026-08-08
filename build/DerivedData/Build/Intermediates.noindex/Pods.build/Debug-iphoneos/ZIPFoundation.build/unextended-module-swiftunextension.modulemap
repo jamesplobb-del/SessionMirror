@@ -1,4 +1,0 @@
-
-module ZIPFoundation.__Swift {
-  exclude header "ZIPFoundation-Swift.h"
-}

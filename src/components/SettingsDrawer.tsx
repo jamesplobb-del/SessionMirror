@@ -758,7 +758,6 @@ export default function SettingsDrawer({
             <AnimatedExpand open={hudQuickSettings.audioEnhancerEnabled}>
               <div className="pt-3">
                 <AudioEnhancer
-                  variant="inline"
                   settings={settings.audioEnhancerSettings}
                   onChange={(audioEnhancerSettings) => onUpdate({ audioEnhancerSettings })}
                 />
