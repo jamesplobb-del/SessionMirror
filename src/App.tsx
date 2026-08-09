@@ -280,9 +280,7 @@ const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
 const CoachMark = lazy(() => import('./components/CoachMark'))
-const CreatorStudio = lazy(() => import('./components/creatorStudio/CreatorStudio'))
 const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
-const CreatorStudioTakePicker = lazy(() => import('./components/labs/CreatorStudioTakePicker'))
 const MultitrackOverlay = lazy(() => import('./multitrack/components/MultitrackOverlay'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
@@ -465,7 +463,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
-  const [creatorStudioTake, setCreatorStudioTake] = useState<Take | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [labsRoute, setLabsRoute] = useState<LabsRoute | null>(null)
@@ -474,7 +471,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     string | null
   >(null)
   const multitrackRecordingActiveRef = useRef(false)
-  const [isCreatorStudioPickerOpen, setIsCreatorStudioPickerOpen] = useState(false)
   const [pipDragState, setPipDragState] = useState<PipDragUiState>({
     isDragging: false,
     isArming: false,
@@ -587,8 +583,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const isReviewOpen = reviewSlot !== null
   const isLabsOpen = labsRoute !== null
-  const isExperimentalOpen =
-    isLabsOpen || isCreatorStudioPickerOpen || creatorStudioTake !== null || multitrackOpen
+  const isExperimentalOpen = isLabsOpen || multitrackOpen
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
     ? 'review'
     : isVaultOpen || isSettingsOpen || isExperimentalOpen
@@ -2601,26 +2596,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [markOverlayClosed, settings.hapticFeedback])
 
-  const handleOpenCreatorStudioPicker = useCallback(() => {
-    triggerLightHaptic(settings.hapticFeedback)
-    markOverlayClosed()
-    setIsSettingsOpen(false)
-    setIsVaultOpen(false)
-    setLabsRoute(null)
-    setMultitrackOpen(false)
-    setShowPitch(false)
-    pauseYoutubeReference()
-    pausePipVideos()
-    setIsCreatorStudioPickerOpen(true)
-    deferHudMediaPause()
-  }, [
-    deferHudMediaPause,
-    markOverlayClosed,
-    pausePipVideos,
-    pauseYoutubeReference,
-    settings.hapticFeedback,
-  ])
-
   const handleOpenQuickTunerFromSettings = useCallback(() => {
     setIsSettingsOpen(false)
     requestQuickFunctionFromApp('tuner', 'inAppSettings')
@@ -2637,8 +2612,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsSettingsOpen(false)
     setIsVaultOpen(false)
     setLabsRoute(null)
-    setIsCreatorStudioPickerOpen(false)
-    setCreatorStudioTake(null)
     setShowPitch(false)
     setMultitrackOpen(true)
     // While multitrack owns the camera, a failed take must never tear down
@@ -2767,12 +2740,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     settings.hapticFeedback,
     stopRecording,
   ])
-
-  const handleCloseCreatorStudioPicker = useCallback(() => {
-    triggerLightHaptic(settings.hapticFeedback)
-    setIsCreatorStudioPickerOpen(false)
-    recoverCameraAfterSurfaceDismiss('creator-studio-picker-close')
-  }, [recoverCameraAfterSurfaceDismiss, settings.hapticFeedback])
 
   const handleCloseLabs = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
@@ -3528,25 +3495,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     },
     [deferHudMediaPause, markOverlayClosed, sortedTakes]
   )
-
-  const handleOpenCreatorStudio = useCallback(
-    (take: Take) => {
-      pauseYoutubeReference()
-      pausePipVideos()
-      setIsVaultOpen(false)
-      setIsSettingsOpen(false)
-      setIsCreatorStudioPickerOpen(false)
-      setLabsRoute(null)
-      setCreatorStudioTake(take)
-    },
-    [pausePipVideos, pauseYoutubeReference]
-  )
-
-  const handleCloseCreatorStudio = useCallback(() => {
-    pauseYoutubeReference()
-    setCreatorStudioTake(null)
-    recoverCameraAfterSurfaceDismiss('creator-studio-close')
-  }, [pauseYoutubeReference, recoverCameraAfterSurfaceDismiss])
 
   const handleOpenCompareReview = useCallback(
     (slot: ReviewSlot) => {
@@ -4815,20 +4763,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onEnterComplete={handleVaultEnterComplete}
                   />
 
-                  <CreatorStudioTakePicker
-                    isOpen={isCreatorStudioPickerOpen}
-                    takes={sortedTakes}
-                    onClose={handleCloseCreatorStudioPicker}
-                    onSelectTake={handleOpenCreatorStudio}
-                  />
-
-                  <CreatorStudio
-                    isOpen={creatorStudioTake !== null}
-                    take={creatorStudioTake}
-                    projectName={activeProject?.name ?? null}
-                    onClose={handleCloseCreatorStudio}
-                  />
-
                   <SettingsDrawer
                     isOpen={isSettingsOpen}
                     onClose={handleCloseSettings}
@@ -4838,8 +4772,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                     onReset={handleResetSettings}
                     onReplayTutorial={handleReplayOnboardingTutorial}
-                    onOpenCreatorStudio={handleOpenCreatorStudioPicker}
-                    onOpenMultitrack={handleOpenMultitrack}
                     onOpenQuickTuner={handleOpenQuickTunerFromSettings}
                     onOpenQuickMetronome={handleOpenQuickMetronomeFromSettings}
                     recordingMode={recordingMode}

@@ -34,8 +34,6 @@ interface SettingsDrawerProps {
   onReset: () => void
   onReplayTutorial?: () => void
   onOpenLabs?: () => void
-  onOpenCreatorStudio?: () => void
-  onOpenMultitrack?: () => void
   onOpenQuickTuner?: () => void
   onOpenQuickMetronome?: () => void
   recordingMode: 'video' | 'audio'
@@ -368,8 +366,6 @@ export default function SettingsDrawer({
   onReset,
   onReplayTutorial,
   onOpenLabs,
-  onOpenCreatorStudio,
-  onOpenMultitrack,
   onOpenQuickTuner,
   onOpenQuickMetronome,
   recordingMode,
@@ -780,60 +776,25 @@ export default function SettingsDrawer({
           </section>
 
           <div id="settings-section-more" className="space-y-5">
-          {(onOpenLabs || onOpenCreatorStudio || onOpenMultitrack) && (
+          {onOpenLabs && (
             <section className="settings-group space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                In Development
+                Practice
               </h3>
 
-              {onOpenLabs && (
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={onOpenLabs}
-                  className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-stone-900">Labs</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                      Pitch-controlled practice games. Does not affect recording or playback.
-                    </p>
-                  </div>
-                </Pressable>
-              )}
-
-              {onOpenCreatorStudio && (
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={onOpenCreatorStudio}
-                  className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-stone-900">Creator Studio</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                      Trim, crop, and export a video take.
-                    </p>
-                  </div>
-                </Pressable>
-              )}
-
-              {onOpenMultitrack && (
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={onOpenMultitrack}
-                  className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-stone-900">Multitrack</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                      Record up to six synced camera boxes with optional music on screen.
-                    </p>
-                  </div>
-                </Pressable>
-              )}
-
+              <Pressable
+                type="button"
+                intensity="soft"
+                onClick={onOpenLabs}
+                className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-stone-900">Practice Games</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
+                    Pitch-controlled practice games. Does not affect recording or playback.
+                  </p>
+                </div>
+              </Pressable>
             </section>
           )}
 
