@@ -28,13 +28,23 @@ export type SettingsBranchLayoutMode = 'camera' | 'audio' | 'tuner'
 // one fixed box that's either too tight or mostly empty.
 // ─────────────────────────────────────────────────────────────────────────
 
-const CAMERA_ITEM_WIDTH = 88
-const CAMERA_ITEM_HEIGHT = 84
+const CAMERA_ITEM_WIDTH = 80
+const CAMERA_ITEM_HEIGHT = 92
 
-/** Px per dice-grid unit. Chosen so the 5-face's tightest pair (center vs. a
- * corner, which are 1 unit apart vertically) still clears with a visible
- * gap: UNIT − CAMERA_ITEM_HEIGHT = 98 − 84 = 14px. */
-const DICE_UNIT = 98
+/**
+ * Px per dice-grid unit, per axis.
+ *
+ * These were a single 98px unit against an 88x84 item, which left far more air
+ * between the 44px icons than between the slots — the cluster read as small
+ * dots scattered across a large empty card. The axes are split so each one is
+ * just the item's own size plus a fixed gap, which tightens the grid around
+ * larger icons without ever letting neighbours touch.
+ *
+ * Both must stay >= their item dimension + DICE_GAP or items will overlap.
+ */
+const DICE_GAP = 12
+const DICE_UNIT_X = CAMERA_ITEM_WIDTH + DICE_GAP
+const DICE_UNIT_Y = CAMERA_ITEM_HEIGHT + DICE_GAP
 
 /**
  * Dice-face arrangements, in grid units from the centre. A palette of 5 reads
@@ -104,7 +114,7 @@ function boxFromPositions(
 function layoutCameraGrid(count: number): BranchLayout {
   const face = DICE_FACES[count]
   const positions = face
-    ? face.map(({ x, y }) => ({ x: x * DICE_UNIT, y: y * DICE_UNIT }))
+    ? face.map(({ x, y }) => ({ x: x * DICE_UNIT_X, y: y * DICE_UNIT_Y }))
     : layoutFallbackGrid(count, CAMERA_ITEM_WIDTH, CAMERA_ITEM_HEIGHT)
 
   const { boxWidth, boxHeight } = boxFromPositions(

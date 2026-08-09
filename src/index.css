@@ -188,6 +188,19 @@ video.media-display-enhance:not(.camera-preview) {
   padding-bottom: 0.25rem;
 }
 
+/*
+ * iPad. This HUD is laid out for a phone: `space-between` on a 768px row gives
+ * each take card a ~356px slot to hold a ~68px thumbnail, so the cards read as
+ * stretched and mostly empty. Clamping to a phone-ish width and centring keeps
+ * the intended proportions on a large screen instead of letting the row grow.
+ */
+@media (min-width: 600px) {
+  .app-pip-row {
+    max-width: 34rem;
+    margin-inline: auto;
+  }
+}
+
 .pip-video-container {
   overflow: visible;
   width: calc(9.5rem * var(--pip-scale, 1));
@@ -5760,22 +5773,36 @@ html.app-dark-mode .pitch-spectrogram--glass {
  * Camera's dice cluster — item box matches CAMERA_ITEM_WIDTH/HEIGHT in
  * settingsBranchLayout.ts, which the palette card is sized to wrap.
  */
+/* Heights track CAMERA_ITEM_HEIGHT (92px) so the palette card wraps the
+ * cluster exactly and neighbours keep their DICE_GAP. */
 .settings-branch-wheel--camera .settings-branch-wheel__slot {
-  min-height: 5.25rem;
+  min-height: 5.75rem;
 }
 
 .settings-branch-wheel--camera .settings-branch-wheel__item {
-  min-height: 5.25rem;
+  min-height: 5.75rem;
   padding: 0;
 }
 
 .settings-branch-wheel--camera .settings-branch-wheel__item > .ui-orient-spin {
-  gap: 0.3rem;
+  gap: 0.34rem;
+}
+
+/* Camera was the only mode still on the 44px base icon while audio and tuner
+ * had already moved to 50px, which is why the cluster read as small. */
+.settings-branch-wheel--camera .settings-branch-wheel__icon {
+  width: 3.625rem;
+  height: 3.625rem;
+}
+
+.settings-branch-wheel--camera .settings-branch-wheel__icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .settings-branch-wheel--camera .settings-branch-wheel__label {
   max-width: 100%;
-  font-size: 0.64rem;
+  font-size: 0.69rem;
   font-weight: 650;
   line-height: 1.2;
 }
