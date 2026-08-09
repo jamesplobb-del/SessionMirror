@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { reportError } from '../../utils/crashReporting'
 
 interface AppErrorBoundaryProps {
   children: ReactNode
@@ -20,6 +21,7 @@ export default class AppErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[AppErrorBoundary] Unhandled render failure', error, info)
+    reportError(error, { componentStack: info.componentStack })
   }
 
   private reload = () => {

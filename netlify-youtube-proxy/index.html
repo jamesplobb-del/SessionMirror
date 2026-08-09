@@ -143,39 +143,86 @@
         }
       }
 
-      function applyVolume() {
-        if (!ytPlayer || typeof ytPlayer.unMute !== 'function') return
-        const cap = volumeProfile === 'headphones'
+      /**
+       * Volume maintenance.
+       *
+       * iOS resets/ducks the embedded player's volume when the native audio
+       * session changes (route switches, recording start/stop). Rather than
+       * hammering setVolume on a tight interval, we read the player's actual
+       * volume first and only write when it has actually drifted from target.
+       *
+       * Speaker profile: pinned to max so the reference track is audible over
+       * the instrument. Headphones profile: follows requestedVolume and is NOT
+       * maintained on an interval, so the user can still adjust volume using
+       * the player's own controls without us fighting them.
+       */
+      const VOLUME_CHECK_INTERVAL_MS = 1000
+      const VOLUME_SETTLE_DELAYS_MS = [60, 160, 400, 900]
+      const VOLUME_EPSILON = 1
+
+      let volumeSettleTimers = []
+
+      function targetVolume() {
+        return volumeProfile === 'headphones'
           ? Math.min(100, Math.max(0, requestedVolume))
           : 100
-        const repeats = volumeProfile === 'headphones' ? 1 : 14
-        for (let i = 0; i < repeats; i++) {
-          ytPlayer.unMute()
-          ytPlayer.setVolume(cap)
+      }
+
+      function volumeNeedsCorrection() {
+        if (!ytPlayer || typeof ytPlayer.getVolume !== 'function') return true
+        try {
+          if (typeof ytPlayer.isMuted === 'function' && ytPlayer.isMuted()) return true
+          const current = ytPlayer.getVolume()
+          if (typeof current !== 'number') return true
+          return Math.abs(current - targetVolume()) > VOLUME_EPSILON
+        } catch {
+          return true
         }
       }
 
-      function burstMaxVolume() {
-        if (volumeProfile === 'headphones') {
-          applyVolume()
-          return
+      /** Write volume only when it has drifted, unless `force` is set. */
+      function applyVolume(force) {
+        if (!ytPlayer || typeof ytPlayer.setVolume !== 'function') return
+        if (!force && !volumeNeedsCorrection()) return
+        try {
+          if (typeof ytPlayer.unMute === 'function') ytPlayer.unMute()
+          ytPlayer.setVolume(targetVolume())
+        } catch {
+          // player not ready yet — the maintenance loop will retry
         }
-        applyVolume()
-        window.setTimeout(applyVolume, 40)
-        window.setTimeout(applyVolume, 100)
-        window.setTimeout(applyVolume, 180)
-        window.setTimeout(applyVolume, 320)
-        window.setTimeout(applyVolume, 520)
+      }
+
+      function clearVolumeSettleTimers() {
+        for (const timer of volumeSettleTimers) window.clearTimeout(timer)
+        volumeSettleTimers = []
+      }
+
+      /**
+       * Apply immediately, then re-check a few times over the next ~1s. State
+       * transitions are exactly when iOS clobbers volume, and the player often
+       * ignores writes issued in the same tick as the transition.
+       */
+      function burstMaxVolume() {
+        clearVolumeSettleTimers()
+        applyVolume(true)
+        for (const delay of VOLUME_SETTLE_DELAYS_MS) {
+          volumeSettleTimers.push(window.setTimeout(() => applyVolume(false), delay))
+        }
       }
 
       function startVolumeBoostLoop() {
         stopVolumeBoostLoop()
         burstMaxVolume()
+        // Headphones follows the user's own volume changes — no interval.
         if (volumeProfile === 'headphones') return
-        volumeBoostTimer = window.setInterval(burstMaxVolume, 90)
+        volumeBoostTimer = window.setInterval(
+          () => applyVolume(false),
+          VOLUME_CHECK_INTERVAL_MS,
+        )
       }
 
       function stopVolumeBoostLoop() {
+        clearVolumeSettleTimers()
         if (volumeBoostTimer !== null) {
           window.clearInterval(volumeBoostTimer)
           volumeBoostTimer = null
@@ -206,6 +253,13 @@
       }
 
       window.addEventListener('message', (event) => {
+        // Only accept commands from the embedding app (the parent frame).
+        // Without this, the nested YouTube player iframe — or anything else
+        // able to post into this window — could drive playback. Checked by
+        // frame identity rather than origin string, because the Capacitor host
+        // reports a non-standard (capacitor://) origin on iOS.
+        if (event.source !== window.parent) return
+
         let data = event.data
         if (typeof data === 'string') {
           try {

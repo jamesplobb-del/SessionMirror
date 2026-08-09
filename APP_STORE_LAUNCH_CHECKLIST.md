@@ -58,6 +58,52 @@ git commit -m "Clean up repo: drop build cache, duplicate config files, unused a
 6. Open the project in Xcode, confirm **Deployment Target** reads 15.0 under both the Project and the App target's Build Settings (should already reflect the pbxproj edit, but worth a visual check before you archive).
 7. Build and run on a simulator/device, then do a full Archive to make sure everything still compiles clean under Capacitor 8 before submitting.
 
-## 4. Still open — not something I can fix for you
+## 4. Crash reporting (Sentry) — finish the install
 
-- **Netlify dependency** for the YouTube play-along proxy — separate conversation, flagged for follow-up.
+The integration code is written and wired in. It's inert until you install the packages and provide a DSN.
+
+```bash
+cd ~/Documents/SessionMirror
+npm install @sentry/capacitor @sentry/react
+npm run cap:sync          # pulls the native iOS SDK via CocoaPods
+```
+
+Then create your Sentry project (free tier, choose **React** as the platform), copy the DSN, and:
+
+```bash
+cp .env.example .env
+# edit .env, paste the DSN into VITE_SENTRY_DSN=
+```
+
+`.env` is gitignored — the DSN never gets committed.
+
+**Verify it works end to end** before you trust it. Temporarily call `sendTestCrash()` from somewhere reachable (a settings screen button, or just at the end of `bootstrap()` in `main.tsx`), run a build on device, confirm the event shows up in Sentry, then remove the call.
+
+### What was wired up
+
+- `src/utils/crashReporting.ts` — init, error reporting, test helper
+- `src/main.tsx` — initializes first thing in `bootstrap()`, so boot-time failures are captured
+- `src/components/ui/AppErrorBoundary.tsx` — React render failures now report with the component stack
+- `vite.config.ts` — injects `__APP_VERSION__` as the Sentry release tag
+
+### Decisions baked in
+
+- **Native crashes are captured**, not just JS — that's the point, since your Swift camera/audio/SQLite plugins are where the hard-to-reproduce failures live.
+- **Session Replay is hard off.** It records the screen, which in your app means the live camera preview. Not sampled at zero — disabled.
+- **Performance tracing off** (`tracesSampleRate: 0`) to protect the free-tier quota. Errors only.
+- **Absolute file paths are scrubbed** from events and breadcrumbs, since take/project titles can appear in sandbox paths.
+- **`console.*` is no longer stripped from production builds.** I removed the earlier `drop: ['console']` — Sentry converts console calls into breadcrumbs that only transmit when an error occurs, so your existing diagnostic logging becomes the trail leading up to a crash. Stripping it would leave you with stack traces and no context.
+
+### One follow-up worth doing
+
+Your play-along diagnostics log a large object every 2 seconds during recording (`[YouTubePlaybackProgress]`, `[YouTubePlayAlongDiag]`). Sentry keeps the last ~100 breadcrumbs, so a long recording session will flush out everything useful before a crash lands. Consider throttling those two to every 10s, or routing them through `Sentry.addBreadcrumb` at a lower level.
+
+### App Store Connect
+
+Adding crash reporting changes your privacy answers. In the App Privacy section you'll now need to declare **Diagnostics → Crash Data**, collected, **not** linked to the user's identity, used for App Functionality. Sentry's iOS SDK ships its own privacy manifest, so no change needed to yours.
+
+## 5. Still open — not something I can fix for you
+
+- **Netlify redeploy** — `netlify-youtube-proxy/index.html` has fixes (volume loop efficiency, postMessage origin guard) that only take effect once the Netlify site is redeployed. The app talks to the deployed copy, not the one in this repo.
+- **App Store Connect listing** — privacy policy URL, screenshots, description, keywords, age rating.
+- **Build number** — bump `CURRENT_PROJECT_VERSION` (currently `3`) if you've already uploaded a build with that number.
