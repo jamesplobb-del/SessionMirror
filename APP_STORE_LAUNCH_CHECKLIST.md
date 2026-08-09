@@ -24,7 +24,7 @@ Add these values to the existing gitignored `.env` file:
 ```dotenv
 SENTRY_AUTH_TOKEN=your_token_here
 SENTRY_ORG=your-org-slug
-SENTRY_PROJECT=besttake
+SENTRY_PROJECT=capacitor
 ```
 
 The same file now drives both Vite source-map upload and the Xcode dSYM upload phase. The archive phase intentionally fails if any of the three values are missing, so an App Store archive cannot silently ship without native symbols.

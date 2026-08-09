@@ -7417,7 +7417,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
   width: min(100%, 30rem);
   margin-inline: auto;
-  padding: clamp(0.5rem, 1.2dvh, 0.72rem) clamp(0.7rem, 3vw, 1rem) 0.5rem;
+  padding: clamp(0.5rem, 1.2dvh, 0.72rem) clamp(0.7rem, 3vw, 1rem) 0.12rem;
   border: 1px solid rgba(23, 26, 34, 0.055);
   border-radius: clamp(1.35rem, 5vw, 1.8rem);
   background: radial-gradient(circle at 50% 0%, rgba(247, 166, 0, 0.055), transparent 42%),
@@ -7520,7 +7520,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   gap: 0;
   width: 100%;
   overflow: visible;
-  border: 1px solid rgba(23, 26, 34, 0.055);
+  border: 1px solid rgba(23, 26, 34, 0.14);
   border-radius: 0.95rem;
   background: color-mix(in srgb, var(--audio-bg-base) 76%, var(--audio-surface));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 0.5rem 1.3rem rgba(23, 26, 34, 0.045);
@@ -7703,6 +7703,13 @@ html.app-dark-mode
 html.app-dark-mode
   .app-ui-overlay--audio-mode
   .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__select-row--primary {
+  border-color: rgba(226, 232, 240, 0.16);
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
   .metronome-audio-select
   + .metronome-audio-select {
   border-left-color: rgba(226, 232, 240, 0.085);
@@ -7711,7 +7718,7 @@ html.app-dark-mode
 @media (max-height: 740px) {
   .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
     padding-top: 0.45rem;
-    padding-bottom: 0.55rem;
+    padding-bottom: 0.12rem;
   }
 
   .app-ui-overlay--audio-mode

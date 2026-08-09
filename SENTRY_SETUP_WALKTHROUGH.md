@@ -18,7 +18,7 @@ Create a Sentry organization token with permission to upload release artifacts a
 VITE_SENTRY_DSN=https://your-public-dsn
 SENTRY_AUTH_TOKEN=your-secret-build-token
 SENTRY_ORG=your-org-slug
-SENTRY_PROJECT=besttake
+SENTRY_PROJECT=capacitor
 ```
 
 Only `VITE_SENTRY_DSN` is compiled into the app. The unprefixed `SENTRY_*` values are build-only credentials and must never be committed.
