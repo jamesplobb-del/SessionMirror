@@ -7417,7 +7417,10 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
   width: min(100%, 30rem);
   margin-inline: auto;
-  padding: clamp(0.5rem, 1.2dvh, 0.72rem) clamp(0.7rem, 3vw, 1rem) 0.65rem;
+  /* Bottom padding runs a little wider than the sides so the selector row sits
+     inside the white rather than hugging the card's bottom edge. */
+  padding: clamp(0.5rem, 1.2dvh, 0.72rem) clamp(0.7rem, 3vw, 1rem)
+    clamp(0.9rem, 3.2vw, 1.2rem);
   border: 1px solid rgba(23, 26, 34, 0.055);
   border-radius: clamp(1.35rem, 5vw, 1.8rem);
   background: radial-gradient(circle at 50% 0%, rgba(247, 166, 0, 0.055), transparent 42%),
@@ -7522,7 +7525,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   overflow: visible;
   border: 1px solid rgba(23, 26, 34, 0.14);
   border-radius: 0.82rem;
-  background: color-mix(in srgb, var(--audio-bg-base) 76%, var(--audio-surface));
+  background: var(--audio-surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
@@ -7593,8 +7596,8 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__control {
   align-items: flex-start;
   justify-content: center;
-  min-height: 2.28rem;
-  padding: 1.08rem 1.05rem 0.16rem 0.35rem;
+  min-height: 2.55rem;
+  padding: 1.08rem 1.05rem 0.4rem 0.35rem;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -7718,7 +7721,9 @@ html.app-dark-mode
 @media (max-height: 740px) {
   .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
     padding-top: 0.45rem;
-    padding-bottom: 0.5rem;
+    /* Still clears the selector row on short screens — the row should never
+       sit flush against the card's bottom edge. */
+    padding-bottom: 0.8rem;
   }
 
   .app-ui-overlay--audio-mode
