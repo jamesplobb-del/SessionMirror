@@ -45,7 +45,7 @@ import { waitForMediaElement, waitForMediaReadyWithRetry } from '../utils/mediaP
 import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import { useTutorialAction } from '../context/TutorialContext'
 import { triggerLightHaptic } from '../utils/haptics'
-import { parseYoutubeVideoId } from '../utils/youtubeEmbed'
+import { parseYoutubeVideoId, YOUTUBE_PROXY_ORIGIN } from '../utils/youtubeEmbed'
 import type { Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
@@ -245,6 +245,9 @@ function BestTakeBox({
     }
 
     const onMessage = (event: MessageEvent) => {
+      // Same guard as utils/playalong/youtubeBridge.ts — only the proxy frame
+      // may drive this indicator.
+      if (event.origin !== YOUTUBE_PROXY_ORIGIN) return
       if (typeof event.data !== 'string') return
       let payload: { event?: string; state?: string }
       try {
