@@ -7593,8 +7593,8 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__control {
   align-items: flex-start;
   justify-content: center;
-  min-height: 2.95rem;
-  padding: 1.08rem 1.05rem 0.38rem 0.35rem;
+  min-height: 2.28rem;
+  padding: 1.08rem 1.05rem 0.16rem 0.35rem;
   border: 0;
   border-radius: 0;
   background: transparent;
