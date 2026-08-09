@@ -60,6 +60,7 @@ import { acquireNativeAudioTap } from '../utils/nativeAudioPitchTap'
 import { setNativeAudioCaptureActive, syncNativeCameraSessionState } from '../utils/cameraSessionState'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isAppInForeground } from '../utils/appForeground'
+import { reportError } from '../utils/crashReporting'
 import type { MicInputPreference } from '../utils/appSettings'
 
 interface UseCameraSessionOptions {
@@ -1430,7 +1431,13 @@ export function useCameraSession({
         })
       }
 
-      recorder.onerror = () => {
+      recorder.onerror = (event) => {
+        // The in-progress take is discarded below — always worth a report.
+        const cause = (event as unknown as { error?: unknown }).error
+        reportError(cause ?? new Error('MediaRecorder failed mid-take'), {
+          phase: 'webkit.recorderError',
+          engine: 'mediaRecorder',
+        })
         chunksRef.current = []
         void abortActiveWriter().catch(() => {})
         releaseRecorderStream(recordStreamRef.current, streamRef.current)
@@ -1754,6 +1761,7 @@ export function useCameraSession({
 
     const settledSafe = settle.catch((error) => {
       console.warn('[NativeExperimentalAudio] native recording start failed', error)
+      reportError(error, { phase: 'video.start', engine: 'nativeExperimentalAudio' })
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
       isRecordingRef.current = false
@@ -1828,6 +1836,7 @@ export function useCameraSession({
 
     const settledSafe = settle.catch((error) => {
       console.warn('[NativeVideoRecording] native hands-free pre-roll start failed', error)
+      reportError(error, { phase: 'video.preRollStart', engine: 'nativeVideoRecording' })
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
       autoPreRollActiveRef.current = false
@@ -1975,7 +1984,10 @@ export function useCameraSession({
       autoPerformanceStartedAtRef.current = 0
       setIsStopping(false)
     })().catch((error) => {
+      // Stop failures are the worst case: the take the user just performed may
+      // not have been finalized to disk.
       console.warn('[NativeExperimentalAudio] native recording stop failed', error)
+      reportError(error, { phase: 'video.stop', engine: 'nativeExperimentalAudio' })
       isRecordingRef.current = false
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
@@ -2086,6 +2098,7 @@ export function useCameraSession({
 
     const settledSafe = settle.catch((error) => {
       console.warn('[NativeAudioRecording] native pre-roll start failed', error)
+      reportError(error, { phase: 'audio.preRollStart', engine: 'nativeAudioRecording' })
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
       autoPreRollActiveRef.current = false
@@ -2148,6 +2161,7 @@ export function useCameraSession({
 
     const settledSafe = settle.catch((error) => {
       console.warn('[NativeAudioRecording] native recording start failed', error)
+      reportError(error, { phase: 'audio.start', engine: 'nativeAudioRecording' })
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false
       isRecordingRef.current = false
@@ -2286,7 +2300,10 @@ export function useCameraSession({
       setIsStopping(false)
       recoverAfterNativeAudioRecording()
     })().catch((error) => {
+      // Stop failures are the worst case: the take the user just performed may
+      // not have been finalized to disk.
       console.warn('[NativeAudioRecording] native recording stop failed', error)
+      reportError(error, { phase: 'audio.stop', engine: 'nativeAudioRecording' })
       isRecordingRef.current = false
       activeTakeIdRef.current = null
       nativeExperimentalRecordingRef.current = false

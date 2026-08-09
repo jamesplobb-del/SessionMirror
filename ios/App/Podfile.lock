@@ -1,35 +1,41 @@
 PODS:
-  - Capacitor (7.6.7):
+  - Capacitor (8.5.0):
     - CapacitorCordova
-  - CapacitorApp (7.1.2):
+  - CapacitorApp (8.1.1):
     - Capacitor
-  - CapacitorCommunityKeepAwake (7.1.0):
+  - CapacitorCommunityKeepAwake (8.0.1):
     - Capacitor
   - CapacitorCommunityMedia (8.0.1):
     - Capacitor
     - SDWebImage
-  - CapacitorCommunitySqlite (7.0.3):
+  - CapacitorCommunitySqlite (8.1.1):
     - Capacitor
     - SQLCipher
     - ZIPFoundation
-  - CapacitorCordova (7.6.7)
-  - CapacitorFilesystem (7.1.8):
+  - CapacitorCordova (8.5.0)
+  - CapacitorFilesystem (8.1.2):
     - Capacitor
     - IONFilesystemLib (~> 1.1.1)
-  - CapacitorHaptics (7.0.5):
+  - CapacitorHaptics (8.0.2):
     - Capacitor
-  - CapacitorScreenOrientation (7.0.4):
+  - CapacitorScreenOrientation (8.0.1):
     - Capacitor
-  - CapacitorShare (7.0.4):
+  - CapacitorShare (8.0.1):
     - Capacitor
-  - CapacitorSplashScreen (7.0.5):
+  - CapacitorSplashScreen (8.0.2):
     - Capacitor
-  - CapacitorStatusBar (7.0.6):
+  - CapacitorStatusBar (8.0.3):
     - Capacitor
   - IONFilesystemLib (1.1.2)
   - SDWebImage (5.21.7):
     - SDWebImage/Core (= 5.21.7)
   - SDWebImage/Core (5.21.7)
+  - Sentry (9.16.1):
+    - Sentry/Core (= 9.16.1)
+  - Sentry/Core (9.16.1)
+  - SentryCapacitor (4.2.0):
+    - Capacitor
+    - Sentry (= 9.16.1)
   - SQLCipher (4.10.0):
     - SQLCipher/standard (= 4.10.0)
   - SQLCipher/common (4.10.0)
@@ -50,11 +56,13 @@ DEPENDENCIES:
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
+  - "SentryCapacitor (from `../../node_modules/@sentry/capacitor`)"
 
 SPEC REPOS:
   trunk:
     - IONFilesystemLib
     - SDWebImage
+    - Sentry
     - SQLCipher
     - ZIPFoundation
 
@@ -83,25 +91,29 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/splash-screen"
   CapacitorStatusBar:
     :path: "../../node_modules/@capacitor/status-bar"
+  SentryCapacitor:
+    :path: "../../node_modules/@sentry/capacitor"
 
 SPEC CHECKSUMS:
-  Capacitor: 8ef25ba872436d2c5ac2a4791f7255529bdcd93b
-  CapacitorApp: f01a913211780e0718dae9750442c3e23f96e106
-  CapacitorCommunityKeepAwake: 05c75aab989f60e621870cf03b24a144a5544c30
+  Capacitor: 00b87168591cc006ea6f5c0de681ec5c39a2c8eb
+  CapacitorApp: 305bd13c44f6f9d164e2ee66a4faa956ed8c0e06
+  CapacitorCommunityKeepAwake: d41922812644562e94a79acaf7f41e6d9413af8c
   CapacitorCommunityMedia: d1538b56a3303298e7cf45a18b11e624fbcbdc8e
-  CapacitorCommunitySqlite: 4813d82ad33001e612a39d313cb5d28066cbafda
-  CapacitorCordova: 139e2ed3d91c54b5aeae7941135c9f9aefc6da1d
-  CapacitorFilesystem: c63fc54df41e5a6761785a7f3c49dc696c22e296
-  CapacitorHaptics: 1b145fa83c622e5383a3bac04ea81e2514f0b0f5
-  CapacitorScreenOrientation: a128ea5394d31a12d77f7f6bcb497010945ecda8
-  CapacitorShare: 25f7fc5dd0e4edbde5d6801c6de5d14a8b450a41
-  CapacitorSplashScreen: 409eeaaeac603d264f209c0fcb718aa22fe1f7bb
-  CapacitorStatusBar: 416e9e53fd6397e668d4a181cd2131617d949bd6
+  CapacitorCommunitySqlite: 785553c54e52da62d058238d4571db5692c022c4
+  CapacitorCordova: 9d3acbb574048e7167d2af127a0af2123e619f2f
+  CapacitorFilesystem: 2db285a1ac6e475cc27cae2e1bea999000f9e2be
+  CapacitorHaptics: 296f771ecd89c7a1bd92a7b6826a7d268e2e70f5
+  CapacitorScreenOrientation: 6c3c84223ea1dd44aaa7184e2b416dd1192270d0
+  CapacitorShare: 0c58305114538568059bfc07111f22dcb9cb2a82
+  CapacitorSplashScreen: 7bf61c2001557ff9e195e601c6b87344480d3c65
+  CapacitorStatusBar: eca7bc2b58d9f886f1ef9edb66e57a9b29c121af
   IONFilesystemLib: 21a63377696b2d8fab5632ecfb7d2ac67bddb68a
   SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
+  Sentry: e5d82a3c1f2d951f75c04c57215a0abb1facbd51
+  SentryCapacitor: 865c2ef0d0d010cb50509b0846dd0a9848006b05
   SQLCipher: eb79c64049cb002b4e9fcb30edb7979bf4706dfc
   ZIPFoundation: dfd3d681c4053ff7e2f7350bc4e53b5dba3f5351
 
-PODFILE CHECKSUM: e6ab20baec7885b177fff9afb70bc4002a595cec
+PODFILE CHECKSUM: e1337a138ad1d00d8e6523e3f62b52e42ea85177
 
 COCOAPODS: 1.16.2

@@ -3,13 +3,39 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import basicSsl from '@vitejs/plugin-basic-ssl'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 const pkg = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
 ) as { version: string }
 
+// Source map upload. Without this, a production JS crash in Sentry is an
+// unreadable minified frame (`App-CaDl.js:1:84210`) instead of a file and line.
+// Inert unless SENTRY_AUTH_TOKEN is exported, so ordinary builds are unaffected.
+// The release name MUST stay in sync with `release` in src/utils/crashReporting.ts.
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN
+
 export default defineConfig(({ command }) => ({
-  plugins: [react(), tailwindcss(), basicSsl()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    basicSsl(),
+    ...(command === 'build' && sentryAuthToken
+      ? [
+          sentryVitePlugin({
+            authToken: sentryAuthToken,
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT ?? 'besttake',
+            release: { name: `besttake@${pkg.version}` },
+            sourcemaps: {
+              // Upload, then delete — shipping maps inside the app bundle would
+              // hand the full unminified source to anyone who unzips the .ipa.
+              filesToDeleteAfterUpload: ['dist/**/*.map'],
+            },
+          }),
+        ]
+      : []),
+  ],
   server: {
     host: true,
   },
@@ -25,6 +51,9 @@ export default defineConfig(({ command }) => ({
   // you with a stack trace and no context.
   esbuild: command === 'build' ? { drop: ['debugger'] } : {},
   build: {
+    // Only generated when we're actually uploading them; the plugin deletes
+    // them from dist afterwards so they never reach the App Store binary.
+    sourcemap: command === 'build' && Boolean(sentryAuthToken),
     rollupOptions: {
       output: {
         manualChunks(id) {
