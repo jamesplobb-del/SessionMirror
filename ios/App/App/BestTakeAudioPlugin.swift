@@ -58,6 +58,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "hapticNotification", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareHaptics", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openAppSettings", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setTakesBackupExcluded", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioHardwareRtl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioOutputLatencyMs", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "computeTakeAlignment", returnType: CAPPluginReturnPromise),
@@ -173,6 +174,53 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async { [weak self] in
             self?.warmHaptics()
             call.resolve()
+        }
+    }
+
+    /**
+     * Include or exclude recorded takes from iCloud/iTunes backup.
+     *
+     * Takes live in Documents, which iOS backs up by default. Video adds up
+     * fast, and a heavy user can silently fill a 5GB free iCloud tier — what
+     * they see is their phone complaining that backup failed, with no obvious
+     * link to this app. Excluding is the opposite trade: nothing to restore if
+     * the device is lost, so this is the user's choice, not a default.
+     *
+     * The flag is set on the directory, which covers files created inside it
+     * later, so this does not need re-running per take.
+     */
+    @objc func setTakesBackupExcluded(_ call: CAPPluginCall) {
+        let excluded = call.getBool("excluded") ?? false
+
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first else {
+            call.reject("Could not locate the Documents directory")
+            return
+        }
+
+        var takesURL = documents.appendingPathComponent("takes", isDirectory: true)
+
+        if !FileManager.default.fileExists(atPath: takesURL.path) {
+            do {
+                try FileManager.default.createDirectory(
+                    at: takesURL,
+                    withIntermediateDirectories: true
+                )
+            } catch {
+                call.reject("Could not create the takes directory: \(error.localizedDescription)")
+                return
+            }
+        }
+
+        do {
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = excluded
+            try takesURL.setResourceValues(values)
+            call.resolve(["excluded": excluded])
+        } catch {
+            call.reject("Could not update the backup flag: \(error.localizedDescription)")
         }
     }
 

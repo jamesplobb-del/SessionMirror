@@ -64,6 +64,14 @@ export interface AppSettings {
   micInputPreference: MicInputPreference
   /** Mic capture profile — Natural preserves prior behavior; Loud Camera-like enables AGC. */
   captureProfile: CaptureProfile
+  /**
+   * Include recorded takes in the device's iCloud backup.
+   *
+   * On by default: takes are irreplaceable, and silently not backing up
+   * someone's recordings is the worse failure. Users with a full iCloud tier
+   * can turn it off — video adds up faster than the free 5GB allows.
+   */
+  backUpTakesToIcloud: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -89,6 +97,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   excludeYoutubeFromRecording: false,
   micInputPreference: 'iphone',
   captureProfile: 'natural',
+  backUpTakesToIcloud: true,
 }
 
 /** Transient recording controls and floating widgets — forced off on each cold app start. */
@@ -215,6 +224,10 @@ export function loadAppSettings(): AppSettings {
       captureProfile: parseCaptureProfile(
         parsed.captureProfile ?? DEFAULT_APP_SETTINGS.captureProfile,
       ),
+      backUpTakesToIcloud:
+        parsed.backUpTakesToIcloud !== undefined
+          ? Boolean(parsed.backUpTakesToIcloud)
+          : DEFAULT_APP_SETTINGS.backUpTakesToIcloud,
     }
   } catch {
     return { ...DEFAULT_APP_SETTINGS }

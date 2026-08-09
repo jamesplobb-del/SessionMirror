@@ -154,7 +154,10 @@ import {
 } from './utils/libraryStorage'
 import type { BenchmarkBinding } from './types/library'
 import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
-import BestTakeAudioPlugin, { applyNativeExperimentalAudioMode } from './utils/audioSessionRoute'
+import BestTakeAudioPlugin, {
+  applyNativeExperimentalAudioMode,
+  applyTakesBackupPreference,
+} from './utils/audioSessionRoute'
 import { buildNativeEnhancerParams } from './utils/audioEnhancer'
 import { isPlaybackRouteHoldActive } from './utils/playbackRouteCoordinator'
 import { setActiveCaptureProfile } from './utils/audioCapture'
@@ -3193,6 +3196,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     keepAwake: isRecording || isReviewOpen || takePlaybackActive,
     hudSurface: hudModalState,
   })
+
+  useEffect(() => {
+    // Re-applied on launch as well as on change, so a takes directory recreated
+    // by a restore picks the preference back up.
+    void applyTakesBackupPreference(settings.backUpTakesToIcloud)
+  }, [settings.backUpTakesToIcloud])
 
   useEffect(() => {
     // A take whose file already has the enhancement baked in (native offline

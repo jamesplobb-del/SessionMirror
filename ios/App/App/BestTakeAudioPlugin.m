@@ -53,4 +53,5 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(getAudioOutputLatencyMs, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(computeTakeAlignment, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(extractWaveformPeaks, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setTakesBackupExcluded, CAPPluginReturnPromise);
 )

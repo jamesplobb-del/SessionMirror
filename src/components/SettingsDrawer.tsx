@@ -776,6 +776,19 @@ export default function SettingsDrawer({
           </section>
 
           <div id="settings-section-more" className="space-y-5">
+          <section className="settings-group space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Storage
+            </h3>
+
+            <SettingToggle
+              label="Back Up Takes to iCloud"
+              description="Includes your recordings in the device's iCloud backup, so they survive a lost or replaced phone. Video adds up quickly — turn this off if iCloud storage is tight. Takes stay on this device either way."
+              checked={settings.backUpTakesToIcloud}
+              onChange={(checked) => onUpdate({ backUpTakesToIcloud: checked })}
+            />
+          </section>
+
           {onOpenLabs && (
             <section className="settings-group space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">

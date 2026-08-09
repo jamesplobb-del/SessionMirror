@@ -254,6 +254,13 @@ export interface BestTakeAudioPluginType {
     endTime: number
     mediaType: 'video' | 'audio'
   }): Promise<{ duration: number }>
+  /**
+   * Include or exclude the takes directory from iCloud/iTunes backup.
+   * Set on the directory, so files created later inherit it.
+   */
+  setTakesBackupExcluded(options: {
+    excluded: boolean
+  }): Promise<{ excluded: boolean }>
   /** Composites N synced videos into one grid + optional sheet-music overlay + mixed audio. */
   renderMultitrackVideo(options: {
     aspectRatio: string
@@ -491,6 +498,23 @@ export async function applyNativeExperimentalAudioMode(options: {
   })()
   inFlightNativeExperimentalAudioModePromise = applyPromise
   await applyPromise
+}
+
+/**
+ * Push the user's iCloud-backup choice down to the takes directory.
+ *
+ * Safe to call on every launch — setting the flag to its current value is a
+ * no-op, and re-applying covers a directory recreated after a restore.
+ */
+export async function applyTakesBackupPreference(backUp: boolean): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return
+
+  try {
+    await BestTakeAudioPlugin.setTakesBackupExcluded({ excluded: !backUp })
+  } catch (error) {
+    // Not worth interrupting the user — the takes themselves are unaffected.
+    console.warn('[TakesBackup] could not apply backup preference', error)
+  }
 }
 
 export default BestTakeAudioPlugin
