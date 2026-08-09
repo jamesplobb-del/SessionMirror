@@ -1,12 +1,14 @@
 import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
 import { isBalanceCharacterId } from './balanceCharacters'
+import { awardBalanceTrophies, isBalanceTrophyId } from './balanceTrophies'
 import type {
   BalanceCustomRoutine,
   BalanceNoteResult,
   BalanceRoutineResult,
   BalanceSettings,
-  BalanceStoredDataV1,
+  BalanceStoredDataV2,
   BalanceStoredPersonalBest,
+  BalanceStoredTrophy,
 } from './balanceTypes'
 
 export const BALANCE_STORAGE_KEY = 'besttake:balance'
@@ -43,13 +45,15 @@ export function createDefaultBalanceSettings(instrumentId: string): BalanceSetti
   }
 }
 
-function createEmptyData(instrumentId: string): BalanceStoredDataV1 {
+function createEmptyData(instrumentId: string): BalanceStoredDataV2 {
   return {
-    version: 1,
+    version: 2,
     settings: createDefaultBalanceSettings(instrumentId),
     customRoutines: [],
     personalBests: {},
     routineSummaries: [],
+    trophies: {},
+    unlockedCharacterIds: ['balancer', 'trumpeter'],
   }
 }
 
@@ -179,34 +183,66 @@ function normalizePersonalBests(value: unknown): Record<string, BalanceStoredPer
   }, {})
 }
 
-export function loadBalanceData(instrumentId: string): BalanceStoredDataV1 {
+function normalizeTrophies(value: unknown): BalanceStoredDataV2['trophies'] {
+  if (!value || typeof value !== 'object') return {}
+  return Object.entries(value).reduce<BalanceStoredDataV2['trophies']>((result, [key, item]) => {
+    if (!isBalanceTrophyId(key) || !item || typeof item !== 'object') return result
+    const source = item as Partial<BalanceStoredTrophy>
+    result[key] = { id: key, unlockedAt: finiteNumber(source.unlockedAt, Date.now()) }
+    return result
+  }, {})
+}
+
+export function loadBalanceData(instrumentId: string): BalanceStoredDataV2 {
   const fallback = createEmptyData(instrumentId)
   if (typeof localStorage === 'undefined') return fallback
   try {
     const raw = localStorage.getItem(BALANCE_STORAGE_KEY)
     if (!raw) return fallback
-    const parsed = JSON.parse(raw) as Partial<BalanceStoredDataV1>
-    if (parsed.version !== 1) return fallback
-    return {
-      version: 1,
-      settings: normalizeSettings(parsed.settings, instrumentId),
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (parsed.version !== 1 && parsed.version !== 2) return fallback
+    const settings = normalizeSettings(parsed.settings, instrumentId)
+    const summaries: BalanceRoutineResult[] = Array.isArray(parsed.routineSummaries)
+      ? (parsed.routineSummaries as BalanceRoutineResult[]).slice(0, MAX_ROUTINE_SUMMARIES).map((summary): BalanceRoutineResult => ({
+          ...summary,
+          routineType:
+            summary.routineType === 'scale' || summary.routineType === 'custom'
+              ? summary.routineType
+              : 'single',
+        }))
+      : []
+    const persistedUnlocked = Array.isArray(parsed.unlockedCharacterIds)
+      ? parsed.unlockedCharacterIds.filter(isBalanceCharacterId)
+      : []
+    // Version 1 exposed every character. Preserve the player's current choice
+    // when migrating so adding rewards never takes a cosmetic away.
+    const unlockedCharacterIds = new Set([
+      'balancer' as const,
+      'trumpeter' as const,
+      ...persistedUnlocked,
+      ...(parsed.version === 1 ? [settings.characterId] : []),
+    ])
+    const base: BalanceStoredDataV2 = {
+      version: 2,
+      settings,
       customRoutines: Array.isArray(parsed.customRoutines)
         ? parsed.customRoutines.map(normalizeCustomRoutine).filter((item): item is BalanceCustomRoutine => item !== null)
         : [],
       personalBests: normalizePersonalBests(parsed.personalBests),
-      routineSummaries: Array.isArray(parsed.routineSummaries)
-        ? parsed.routineSummaries.slice(0, MAX_ROUTINE_SUMMARIES)
-        : [],
+      routineSummaries: summaries,
+      trophies: normalizeTrophies(parsed.trophies),
+      unlockedCharacterIds: [...unlockedCharacterIds],
     }
+    return awardBalanceTrophies(base).data
   } catch {
     return fallback
   }
 }
 
-export function saveBalanceData(data: BalanceStoredDataV1): void {
+export function saveBalanceData(data: BalanceStoredDataV2): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(BALANCE_STORAGE_KEY, JSON.stringify({ ...data, version: 1 }))
+    localStorage.setItem(BALANCE_STORAGE_KEY, JSON.stringify({ ...data, version: 2 }))
   } catch {
     /* Private browsing and quota errors must never block play. */
   }
@@ -224,9 +260,9 @@ export function personalBestKey(result: Pick<BalanceNoteResult, 'target' | 'tole
 }
 
 export function recordBalanceResult(
-  data: BalanceStoredDataV1,
+  data: BalanceStoredDataV2,
   result: BalanceRoutineResult,
-): BalanceStoredDataV1 {
+): BalanceStoredDataV2 {
   const personalBests = { ...data.personalBests }
   for (const noteResult of result.noteResults) {
     if (noteResult.balancedMs <= 0) continue
@@ -236,14 +272,15 @@ export function recordBalanceResult(
       personalBests[key] = { key, balancedMs: noteResult.balancedMs, updatedAt: Date.now() }
     }
   }
-  return {
+  const next: BalanceStoredDataV2 = {
     ...data,
     personalBests,
     routineSummaries: [result, ...data.routineSummaries].slice(0, MAX_ROUTINE_SUMMARIES),
   }
+  return awardBalanceTrophies(next).data
 }
 
-export function getBalanceBestMs(data: BalanceStoredDataV1): number {
+export function getBalanceBestMs(data: BalanceStoredDataV2): number {
   return Math.max(0, ...Object.values(data.personalBests).map((best) => best.balancedMs))
 }
 

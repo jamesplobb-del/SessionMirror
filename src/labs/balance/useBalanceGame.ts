@@ -34,7 +34,8 @@ import type {
   BalanceCustomRoutine,
   BalanceRoutineResult,
   BalanceSettings,
-  BalanceStoredDataV1,
+  BalanceStoredDataV2,
+  BalanceTrophyId,
   BalanceVisualSnapshot,
 } from './balanceTypes'
 
@@ -65,6 +66,7 @@ function createRoutineResult(
   const totalConfidentMs = state.noteResults.reduce((sum, result) => sum + result.totalConfidentMs, 0)
   return {
     id: `${state.startedAt ?? Date.now()}-${state.targets.length}`,
+    routineType: state.settings.routineType,
     routineName: routineSummary(state.settings, customRoutines),
     startedAt: state.startedAt ?? Date.now(),
     completedAt: Date.now(),
@@ -87,7 +89,8 @@ interface UseBalanceGameOptions {
 
 export interface UseBalanceGameResult {
   state: ReturnType<typeof createBalanceState>
-  data: BalanceStoredDataV1
+  data: BalanceStoredDataV2
+  newTrophyIds: BalanceTrophyId[]
   customRoutines: BalanceCustomRoutine[]
   visualRef: MutableRefObject<BalanceVisualSnapshot>
   hud: BalanceVisualSnapshot
@@ -126,6 +129,7 @@ export function useBalanceGame({
   stateRef.current = state
   const visualRef = useRef<BalanceVisualSnapshot>({ ...EMPTY_VISUAL })
   const [hud, setHud] = useState<BalanceVisualSnapshot>({ ...EMPTY_VISUAL })
+  const [newTrophyIds, setNewTrophyIds] = useState<BalanceTrophyId[]>([])
   const suppressUntilRef = useRef(0)
   const accumulatorRef = useRef<BalanceScoreAccumulator | null>(null)
   const lockStartedAtRef = useRef<number | null>(null)
@@ -351,7 +355,11 @@ export function useBalanceGame({
     const result = createRoutineResult(state, dataRef.current.customRoutines)
     if (resultPersistedRef.current === result.id) return
     resultPersistedRef.current = result.id
+    const previousTrophies = dataRef.current.trophies
     const next = recordBalanceResult(dataRef.current, result)
+    setNewTrophyIds(
+      (Object.keys(next.trophies) as BalanceTrophyId[]).filter((id) => !previousTrophies[id]),
+    )
     dataRef.current = next
     setData(next)
     saveBalanceData(next)
@@ -393,6 +401,7 @@ export function useBalanceGame({
 
   const start = useCallback(() => {
     clearAttempt()
+    setNewTrophyIds([])
     resultPersistedRef.current = null
     const targets = buildBalanceTargets(stateRef.current.settings, dataRef.current.customRoutines)
     dispatch({ type: 'START', targets, bestBalancedMs: getBalanceBestMs(dataRef.current) })
@@ -457,6 +466,7 @@ export function useBalanceGame({
   return {
     state,
     data,
+    newTrophyIds,
     customRoutines: data.customRoutines,
     visualRef,
     hud,

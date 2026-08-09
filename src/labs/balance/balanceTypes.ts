@@ -122,6 +122,7 @@ export interface BalanceNoteResult {
 
 export interface BalanceRoutineResult {
   id: string
+  routineType: BalanceRoutineType
   routineName: string
   startedAt: number
   completedAt: number
@@ -162,10 +163,26 @@ export interface BalanceStoredPersonalBest {
   updatedAt: number
 }
 
-export interface BalanceStoredDataV1 {
-  version: 1
+export type BalanceTrophyId =
+  | 'first-crossing'
+  | 'long-haul'
+  | 'rope-time'
+  | 'scale-walker'
+  | 'center-stage'
+  | 'precision-pilot'
+  | 'made-to-measure'
+
+export interface BalanceStoredTrophy {
+  id: BalanceTrophyId
+  unlockedAt: number
+}
+
+export interface BalanceStoredDataV2 {
+  version: 2
   settings: BalanceSettings
   customRoutines: BalanceCustomRoutine[]
   personalBests: Record<string, BalanceStoredPersonalBest>
   routineSummaries: BalanceRoutineResult[]
+  trophies: Partial<Record<BalanceTrophyId, BalanceStoredTrophy>>
+  unlockedCharacterIds: BalanceCharacterId[]
 }

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { ArrowLeft, ChevronDown, Mic, Play } from 'lucide-react'
+import { ArrowLeft, ChevronDown, LockKeyhole, Mic, Play } from 'lucide-react'
 import type { PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import IOSSwitch from '../../components/ui/IOSSwitch'
@@ -15,21 +15,29 @@ import {
 } from './balanceMusic'
 import { formatBalanceDuration, toleranceCentsForSettings } from './balanceStorage'
 import { BALANCE_CHARACTERS, getBalanceCharacter } from './balanceCharacters'
+import {
+  BALANCE_TROPHIES,
+  isBalanceCharacterUnlocked,
+  trophyForCharacter,
+} from './balanceTrophies'
 import type {
   BalanceCustomRoutine,
   BalanceScaleDirection,
   BalanceScaleType,
   BalanceSettings,
+  BalanceStoredDataV2,
   BalanceTarget,
   BalanceTolerancePreset,
 } from './balanceTypes'
 import BalanceRoutineEditor from './BalanceRoutineEditor'
+import BalanceTrophyCase from './BalanceTrophyCase'
 
-type SetupSection = 'routine' | 'instrument' | 'goal' | 'sound'
+type SetupSection = 'routine' | 'instrument' | 'goal' | 'sound' | 'rewards'
 
 interface BalanceSetupProps {
   settings: BalanceSettings
   customRoutines: BalanceCustomRoutine[]
+  progression: Pick<BalanceStoredDataV2, 'trophies' | 'unlockedCharacterIds'>
   previewTarget: BalanceTarget | null
   bestBalancedMs: number
   readout: PitchReadout
@@ -104,6 +112,7 @@ function NoteSelect({
 export default function BalanceSetup({
   settings,
   customRoutines,
+  progression,
   previewTarget,
   bestBalancedMs,
   readout,
@@ -121,6 +130,7 @@ export default function BalanceSetup({
   const [openSection, setOpenSection] = useState<SetupSection | null>(null)
   const instrument = getBalanceInstrument(settings.instrumentId)
   const selectedCharacter = getBalanceCharacter(settings.characterId)
+  const earnedTrophyCount = Object.keys(progression.trophies).length
   const hasPitch = readout.noteName !== '—' && readout.frequencyHz > 0
   const selectedCustom = customRoutines.find((routine) => routine.id === settings.selectedCustomRoutineId)
   const restLabel =
@@ -200,6 +210,17 @@ export default function BalanceSetup({
           <strong>{hasPitch ? `${readout.noteName} ${Math.round(readout.cents) >= 0 ? '+' : ''}${Math.round(readout.cents)}¢` : '—'}</strong>
         </Pressable>
       </div>
+
+      <SetupGroup
+        id="rewards"
+        open={openSection === 'rewards'}
+        title="Trophies & Characters"
+        summary={`${earnedTrophyCount}/${BALANCE_TROPHIES.length} trophies earned`}
+        hapticFeedback={hapticFeedback}
+        onToggle={(id) => setOpenSection(openSection === id ? null : id)}
+      >
+        <BalanceTrophyCase trophies={progression.trophies} />
+      </SetupGroup>
 
       <SetupGroup
         id="routine"
@@ -319,33 +340,47 @@ export default function BalanceSetup({
         <div className="balance-character-picker" role="radiogroup" aria-label="Character">
           <p>Character</p>
           <div className="balance-character-picker__grid">
-            {BALANCE_CHARACTERS.map((character) => (
-              <Pressable
-                key={character.id}
-                type="button"
-                intensity="soft"
-                hapticFeedback={hapticFeedback}
-                className={`balance-character-option ${settings.characterId === character.id ? 'is-selected' : ''}`}
-                role="radio"
-                aria-checked={settings.characterId === character.id}
-                aria-label={`Choose ${character.name}`}
-                onClick={() => onUpdate({ characterId: character.id })}
-              >
-                <span className="balance-character-option__preview" aria-hidden>
-                  {character.asset ? (
-                    <img
-                      src={character.asset}
-                      alt=""
-                      draggable={false}
-                      style={{ transform: `scale(${character.scale})` }}
-                    />
-                  ) : (
-                    <span className="balance-character-option__balancer"><i /><b /></span>
-                  )}
-                </span>
-                <span>{character.name}</span>
-              </Pressable>
-            ))}
+            {BALANCE_CHARACTERS.map((character) => {
+              const unlocked = isBalanceCharacterUnlocked(
+                character.id,
+                progression.unlockedCharacterIds,
+              )
+              const requiredTrophy = trophyForCharacter(character.id)
+              return (
+                <Pressable
+                  key={character.id}
+                  type="button"
+                  intensity="soft"
+                  hapticFeedback={hapticFeedback}
+                  className={`balance-character-option ${settings.characterId === character.id ? 'is-selected' : ''} ${unlocked ? '' : 'is-locked'}`}
+                  role="radio"
+                  aria-checked={settings.characterId === character.id}
+                  aria-label={
+                    unlocked
+                      ? `Choose ${character.name}`
+                      : `${character.name} locked. Earn ${requiredTrophy?.title ?? 'a trophy'} to unlock.`
+                  }
+                  disabled={!unlocked}
+                  onClick={() => onUpdate({ characterId: character.id })}
+                >
+                  <span className="balance-character-option__preview" aria-hidden>
+                    {character.asset ? (
+                      <img
+                        src={character.asset}
+                        alt=""
+                        draggable={false}
+                        style={{ transform: `scale(${character.scale})` }}
+                      />
+                    ) : (
+                      <span className="balance-character-option__balancer"><i /><b /></span>
+                    )}
+                    {!unlocked && <LockKeyhole className="balance-character-option__lock" />}
+                  </span>
+                  <span>{character.name}</span>
+                  {!unlocked && <small>{requiredTrophy?.title}</small>}
+                </Pressable>
+              )
+            })}
           </div>
         </div>
       </SetupGroup>

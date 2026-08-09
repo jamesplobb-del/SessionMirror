@@ -233,6 +233,7 @@
 				504EC3021FED79650016851F /* Resources */,
 				64C0F87B8B65D522B63873FD /* [CP] Embed Pods Frameworks */,
 				74A30BF081C84B3BA5F7922D /* Embed App Extensions */,
+				A7D51C4E3B9F42F5A8C6D102 /* Upload dSYMs to Sentry */,
 			);
 			buildRules = (
 			);
@@ -378,6 +379,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "cd \"${SRCROOT}/../..\" && node scripts/patch-ios-audio-plugin.mjs\ntouch \"${DERIVED_FILE_DIR}/capacitor-local-plugins.stamp\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A7D51C4E3B9F42F5A8C6D102 /* Upload dSYMs to Sentry */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${SRCROOT}/../../scripts/upload-sentry-dsyms.sh",
+			);
+			name = "Upload dSYMs to Sentry";
+			outputPaths = (
+				"${DERIVED_FILE_DIR}/sentry-dsyms-uploaded.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/../../scripts/upload-sentry-dsyms.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

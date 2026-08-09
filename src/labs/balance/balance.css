@@ -142,11 +142,26 @@
 .balance-character-picker__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; }
 .balance-character-option { display: grid; min-width: 0; min-height: 5rem; place-items: center; align-content: center; gap: 0.2rem; padding: 0.35rem 0.2rem 0.45rem; border: 1px solid rgba(23,35,58,0.08); border-radius: 0.72rem; color: #667085; background: #f5f7f8; font-size: 0.58rem; font-weight: 700; }
 .balance-character-option.is-selected { border-color: rgba(44,154,113,0.55); color: #166b51; background: #eaf8f1; box-shadow: inset 0 0 0 1px rgba(44,154,113,0.12); }
+.balance-character-option.is-locked { cursor: default; opacity: 0.62; filter: saturate(0.45); }
+.balance-character-option.is-locked:disabled { opacity: 0.62; }
 .balance-character-option__preview { position: relative; display: grid; width: 2.65rem; height: 2.95rem; place-items: end center; }
 .balance-character-option__preview img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; transform-origin: center bottom; user-select: none; -webkit-user-drag: none; }
 .balance-character-option__balancer { position: relative; display: block; width: 1.5rem; height: 2.75rem; }
 .balance-character-option__balancer i { position: absolute; z-index: 2; top: 0; left: 50%; width: 0.92rem; height: 0.92rem; border-radius: 50%; background: #f2a03b; transform: translateX(-50%); }
 .balance-character-option__balancer b { position: absolute; top: 0.72rem; left: 50%; width: 1.25rem; height: 1.85rem; border-radius: 42% 42% 26% 26%; background: #173f67; transform: translateX(-50%); }
+.balance-character-option__lock { position: absolute; z-index: 3; right: -0.15rem; bottom: -0.05rem; width: 1.1rem; height: 1.1rem; padding: 0.2rem; border-radius: 50%; color: #fff; background: #344054; box-shadow: 0 0.15rem 0.35rem rgba(23,35,58,0.22); }
+.balance-character-option > small { display: block; max-width: 100%; overflow: hidden; color: #7a8493; font-size: 0.49rem; line-height: 1.1; white-space: nowrap; text-overflow: ellipsis; }
+
+.balance-trophy-case { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; padding-top: 0.2rem; }
+.balance-trophy { display: grid; min-width: 0; grid-template-columns: 2.1rem minmax(0, 1fr); align-items: start; gap: 0.5rem; padding: 0.65rem; border: 1px solid rgba(23,35,58,0.07); border-radius: 0.72rem; background: #f5f7f8; }
+.balance-trophy__medal { display: grid; width: 2.1rem; height: 2.1rem; place-items: center; border-radius: 50%; color: #98a2b3; background: #e6e9ed; }
+.balance-trophy__medal svg { width: 1rem; }
+.balance-trophy > span:last-child { display: grid; min-width: 0; gap: 0.14rem; }
+.balance-trophy strong { color: #344054; font-size: 0.68rem; }
+.balance-trophy small { color: #778193; font-size: 0.54rem; line-height: 1.3; }
+.balance-trophy em { color: #8b5d12; font-size: 0.52rem; font-style: normal; font-weight: 720; }
+.balance-trophy.is-earned { border-color: rgba(236,166,55,0.25); background: #fff8e9; }
+.balance-trophy.is-earned .balance-trophy__medal { color: #fff; background: linear-gradient(145deg, #f4bd52, #e58b22); box-shadow: 0 0.3rem 0.65rem rgba(198,116,25,0.2); }
 
 .balance-routine-editor__saved { display: flex; gap: 0.35rem; overflow-x: auto; padding: 0.2rem 0 0.45rem; }
 .balance-routine-editor__saved button { flex: 0 0 auto; }
@@ -391,6 +406,14 @@
 .balance-score-hero span { color: #4a635a; font-size: 0.65rem; font-weight: 750; text-transform: uppercase; }
 .balance-score-hero strong { margin-top: 0.12rem; font-size: 2.1rem; font-variant-numeric: tabular-nums; }
 .balance-score-hero small { color: #7a8493; font-size: 0.6rem; }
+.balance-new-trophies { display: grid; gap: 0.4rem; margin-top: 0.75rem; padding: 0.8rem; border: 1px solid rgba(224,148,36,0.2); border-radius: 0.82rem; background: linear-gradient(145deg, #fff7e4, #fffdf8); }
+.balance-new-trophies > header { display: flex; align-items: center; gap: 0.4rem; color: #a96108; font-size: 0.72rem; }
+.balance-new-trophies > header svg { width: 1rem; }
+.balance-new-trophies > div { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding-top: 0.35rem; border-top: 1px solid rgba(146,93,20,0.1); }
+.balance-new-trophies > div > span { display: grid; gap: 0.08rem; }
+.balance-new-trophies > div strong { font-size: 0.7rem; }
+.balance-new-trophies > div small { color: #778193; font-size: 0.56rem; }
+.balance-new-trophies em { flex: 0 0 auto; padding: 0.22rem 0.38rem; border-radius: 999px; color: #7b4b08; background: #ffe8b1; font-size: 0.52rem; font-style: normal; font-weight: 750; }
 .balance-results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0.7rem 0 0; }
 .balance-results-grid div { padding: 0.65rem; border-radius: 0.65rem; background: #f5f7f8; }
 .balance-results-grid dt { color: var(--balance-muted); font-size: 0.57rem; }
@@ -414,6 +437,10 @@
   .balance-game-hud { width: min(84vw, 46rem); }
   .balance-destination-island { width: min(44vw, 29rem); }
   .balance-start-island { width: min(112vw, 72rem); }
+}
+
+@media (max-width: 390px) {
+  .balance-trophy-case { grid-template-columns: 1fr; }
 }
 
 @media (max-height: 690px) {

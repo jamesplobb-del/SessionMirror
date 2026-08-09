@@ -7,7 +7,7 @@ redirects = []
 [functions."*"]
 
 [build]
-publish = "C:\\Users\\james\\Projects\\SessionMirror\\dist"
+publish = "/Users/jameslobb/Documents/SessionMirror/dist"
 publishOrigin = "ui"
 commandOrigin = "ui"
 command = "npm run build"

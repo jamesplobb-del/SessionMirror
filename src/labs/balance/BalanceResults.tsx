@@ -1,10 +1,13 @@
-import { ArrowLeft, RotateCcw, Settings2 } from 'lucide-react'
+import { ArrowLeft, RotateCcw, Settings2, Trophy } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import { formatBalanceDuration } from './balanceStorage'
-import type { BalanceRoutineResult } from './balanceTypes'
+import { getBalanceTrophy } from './balanceTrophies'
+import { getBalanceCharacter } from './balanceCharacters'
+import type { BalanceRoutineResult, BalanceTrophyId } from './balanceTypes'
 
 interface BalanceResultsProps {
   result: BalanceRoutineResult
+  newTrophyIds: BalanceTrophyId[]
   bestBalancedMs: number
   hapticFeedback: boolean
   onReplay: () => void
@@ -24,6 +27,7 @@ function roundedWhole(value: number): string {
 
 export default function BalanceResults({
   result,
+  newTrophyIds,
   bestBalancedMs,
   hapticFeedback,
   onReplay,
@@ -45,6 +49,24 @@ export default function BalanceResults({
           <strong>{formatBalanceDuration(result.totalBalancedMs)}</strong>
           <small>Best single note {bestBalancedMs > 0 ? formatBalanceDuration(bestBalancedMs) : '—'}</small>
         </div>
+
+        {newTrophyIds.length > 0 && (
+          <section className="balance-new-trophies" aria-live="polite">
+            <header><Trophy aria-hidden /><strong>{newTrophyIds.length === 1 ? 'New trophy earned' : 'New trophies earned'}</strong></header>
+            {newTrophyIds.map((id) => {
+              const trophy = getBalanceTrophy(id)
+              const reward = trophy.characterReward
+                ? getBalanceCharacter(trophy.characterReward).name
+                : null
+              return (
+                <div key={id}>
+                  <span><strong>{trophy.title}</strong><small>{trophy.description}</small></span>
+                  {reward && <em>{reward} unlocked</em>}
+                </div>
+              )
+            })}
+          </section>
+        )}
 
         <dl className="balance-results-grid">
           <div><dt>Notes completed</dt><dd>{result.notesCompleted}/{result.noteResults.length}</dd></div>

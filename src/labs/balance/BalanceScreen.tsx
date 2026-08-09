@@ -100,6 +100,7 @@ export default function BalanceScreen({
       <BalanceSetup
         settings={game.state.settings}
         customRoutines={game.customRoutines}
+        progression={game.data}
         previewTarget={previewTargets[0] ?? null}
         bestBalancedMs={game.state.bestBalancedMs}
         readout={readout}
@@ -121,6 +122,7 @@ export default function BalanceScreen({
     return (
       <BalanceResults
         result={game.routineResult}
+        newTrophyIds={game.newTrophyIds}
         bestBalancedMs={Math.max(game.state.bestBalancedMs, game.data.routineSummaries[0]?.noteResults.reduce((best, note) => Math.max(best, note.balancedMs), 0) ?? 0)}
         hapticFeedback={hapticFeedback}
         onReplay={game.start}
