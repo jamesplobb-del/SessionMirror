@@ -61,6 +61,7 @@ import { setNativeAudioCaptureActive, syncNativeCameraSessionState } from '../ut
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isAppInForeground } from '../utils/appForeground'
 import { reportError } from '../utils/crashReporting'
+import { showAlertOutsideTree } from '../context/ActionSheetContext'
 import type { MicInputPreference } from '../utils/appSettings'
 
 interface UseCameraSessionOptions {
@@ -1408,6 +1409,16 @@ export function useCameraSession({
                 })
               } else {
                 console.error('[useCameraSession] save aborted due to missing/empty file')
+                reportError(
+                  new Error('Take file missing or empty after write'),
+                  { phase: 'take.verify', mediaType: completedMode },
+                )
+                showAlertOutsideTree({
+                  title: "That take didn't save",
+                  message:
+                    'The recording finished but the file came back empty, so it was discarded. If your storage is nearly full, freeing some space should fix it.',
+                  tone: 'error',
+                })
               }
             }
           } catch (error) {
@@ -1422,6 +1433,16 @@ export function useCameraSession({
             if (activeWriter) {
               await activeWriter.abort().catch(() => {})
             }
+            // The performance is gone either way — say so immediately, while
+            // the player is still set up to run it again.
+            showAlertOutsideTree({
+              title: "That take didn't save",
+              message:
+                completedMode === 'audio'
+                  ? 'Something went wrong writing the recording to this device, so the take was discarded. If your storage is nearly full, freeing some space should fix it.'
+                  : 'Something went wrong writing the video to this device, so the take was discarded. If your storage is nearly full, freeing some space should fix it.',
+              tone: 'error',
+            })
           } finally {
             releaseRecorderStream(recordStreamRef.current, streamRef.current)
             recordStreamRef.current = null

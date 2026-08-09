@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -56,6 +57,28 @@ interface ActionSheetContextValue {
 }
 
 const ActionSheetContext = createContext<ActionSheetContextValue | null>(null)
+
+/**
+ * Live provider's showAlert, for callers that cannot use the hook.
+ *
+ * The provider is mounted *inside* App's render tree, so App itself and the
+ * hooks it calls (useCameraSession) are above it and cannot read the context —
+ * but they are exactly where recording failures surface. Only one provider is
+ * live at a time (RootRouter's for quick tools, App's otherwise).
+ */
+let liveShowAlert: ActionSheetContextValue['showAlert'] | null = null
+
+/**
+ * Show an alert from outside the React tree. No-ops if no provider is mounted,
+ * so it is safe during boot and teardown.
+ */
+export function showAlertOutsideTree(options: AlertOptions | string): void {
+  if (!liveShowAlert) {
+    console.warn('[ActionSheet] no provider mounted; alert dropped', options)
+    return
+  }
+  void liveShowAlert(options)
+}
 
 function playToneHaptic(tone: ActionSheetTone): void {
   if (tone === 'success') {
@@ -161,6 +184,13 @@ export function ActionSheetProvider({ children }: { children: ReactNode }) {
     () => ({ showAlert, showConfirm }),
     [showAlert, showConfirm],
   )
+
+  useEffect(() => {
+    liveShowAlert = showAlert
+    return () => {
+      if (liveShowAlert === showAlert) liveShowAlert = null
+    }
+  }, [showAlert])
 
   return (
     <ActionSheetContext.Provider value={value}>
