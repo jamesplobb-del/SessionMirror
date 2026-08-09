@@ -3,6 +3,7 @@ import { Directory, Filesystem } from '@capacitor/filesystem'
 import { initAppFilesystem, isFilesystemMissingError, nativeDataFileExists, TAKES_DIR } from './filesystemInit'
 import type { CaptureProfile } from './audioCapture'
 import type { RecordingCaptureDiagnostics, RecordingTrackSnapshot } from './recordingDiagnostics'
+import { reportError } from './crashReporting'
 
 export const NATIVE_VIDEO_MIME = 'video/mp4'
 export const NATIVE_AUDIO_MIME = 'audio/mp4'
@@ -315,6 +316,48 @@ export async function resolveNativeFileUri(filePath: string): Promise<string> {
   }
 }
 
+/**
+ * Slice size for incremental writes.
+ *
+ * Base64-encoding a whole recording produces a single JS string roughly 1.37x
+ * the file size, on top of the blob itself — a long take is enough to get the
+ * app jetsammed by iOS mid-save. Filesystem decodes each call's payload
+ * independently and appends the resulting bytes, so writing in slices is
+ * byte-for-byte identical to one large write with bounded peak memory.
+ */
+const WRITE_SLICE_BYTES = 3 * 1024 * 1024
+
+/** Write a blob to the takes directory without ever holding it all as base64. */
+async function writeBlobToDataFile(blob: Blob, filePath: string): Promise<void> {
+  if (blob.size <= WRITE_SLICE_BYTES) {
+    await Filesystem.writeFile({
+      path: filePath,
+      data: await blobToBase64(blob),
+      directory: Directory.Data,
+    })
+    return
+  }
+
+  for (let offset = 0; offset < blob.size; offset += WRITE_SLICE_BYTES) {
+    const slice = blob.slice(offset, Math.min(offset + WRITE_SLICE_BYTES, blob.size))
+    const base64 = await blobToBase64(slice)
+
+    if (offset === 0) {
+      await Filesystem.writeFile({
+        path: filePath,
+        data: base64,
+        directory: Directory.Data,
+      })
+    } else {
+      await Filesystem.appendFile({
+        path: filePath,
+        data: base64,
+        directory: Directory.Data,
+      })
+    }
+  }
+}
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -347,6 +390,12 @@ export class StreamingTakeWriter {
   private closed = false
   private aborted = false
   private fileMaterialized = false
+  /**
+   * First error from any chunk append. A dropped interior chunk leaves a hole
+   * in the container, so the file is unplayable even though later chunks land —
+   * `finalize()` must refuse it rather than present a corrupt take as good.
+   */
+  private writeError: unknown = null
   private readonly bufferChunks: Blob[] = []
   private readonly useBufferedWrite: boolean
 
@@ -398,8 +447,13 @@ export class StreamingTakeWriter {
     }
 
     const task = this.writeChain.then(() => this.writeChunk(chunk))
-    this.writeChain = task.catch(() => {
-      /* keep chain alive after a failed append */
+    this.writeChain = task.catch((error: unknown) => {
+      // Keep the chain alive so later chunks still drain, but remember that
+      // this take now has a gap in it.
+      if (this.writeError === null) {
+        this.writeError = error
+        console.error('[TakeStorage] chunk append failed — take is incomplete', error)
+      }
     })
     return task
   }
@@ -435,6 +489,20 @@ export class StreamingTakeWriter {
     this.closed = true
     await this.writeChain
 
+    if (this.writeError !== null) {
+      const cause = this.writeError
+      reportError(cause, {
+        phase: 'takeStorage.finalize',
+        reason: 'chunkAppendFailed',
+        takeId: this.takeId,
+        chunksWritten: this.chunkCount,
+      })
+      await deleteTakeFile(this.filePath)
+      throw new Error(
+        `Recording is incomplete — a chunk failed to write: ${String(cause)}`,
+      )
+    }
+
     if (this.chunkCount === 0) {
       await deleteTakeFile(this.filePath)
       throw new Error('Recording contained no data')
@@ -449,12 +517,7 @@ export class StreamingTakeWriter {
         throw new Error('Recording contained no data')
       }
 
-      const base64 = await blobToBase64(blob)
-      await Filesystem.writeFile({
-        path: this.filePath,
-        data: base64,
-        directory: Directory.Data,
-      })
+      await writeBlobToDataFile(blob, this.filePath)
 
       const { uri } = await Filesystem.getUri({
         path: this.filePath,
@@ -536,12 +599,7 @@ export async function persistUploadedVideo(
 
   await deleteTakeFile(filePath)
 
-  const base64 = await blobToBase64(normalized)
-  await Filesystem.writeFile({
-    path: filePath,
-    data: base64,
-    directory: Directory.Data,
-  })
+  await writeBlobToDataFile(normalized, filePath)
 
   const { uri } = await Filesystem.getUri({
     path: filePath,

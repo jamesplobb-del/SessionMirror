@@ -1410,7 +1410,15 @@ export function useCameraSession({
                 console.error('[useCameraSession] save aborted due to missing/empty file')
               }
             }
-          } catch {
+          } catch (error) {
+            // This is the "the take the user just performed did not save" path.
+            // It was previously swallowed silently.
+            console.error('[useCameraSession] failed to persist take', error)
+            reportError(error, {
+              phase: 'take.persist',
+              mediaType: completedMode,
+              streamed: Boolean(activeWriter),
+            })
             if (activeWriter) {
               await activeWriter.abort().catch(() => {})
             }
