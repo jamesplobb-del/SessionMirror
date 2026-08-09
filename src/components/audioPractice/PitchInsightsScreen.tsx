@@ -6,7 +6,6 @@ import {
   Clock3,
   Minus,
   RotateCcw,
-  Sparkles,
   TrendingDown,
   TrendingUp,
   X,
@@ -173,9 +172,9 @@ function marginOfErrorCents(insight: NotePitchInsight): number | null {
 function confidenceLabel(insight: NotePitchInsight): string {
   const margin = marginOfErrorCents(insight)
   if (margin == null) {
-    return `${plural(insight.observationCount, 'observation')} — too early to tell`
+    return `${plural(insight.observationCount, 'note held', 'notes held')} — too early to tell`
   }
-  return `±${Math.round(margin)}¢ margin · ${plural(insight.observationCount, 'observation')}`
+  return `${plural(insight.observationCount, 'note held', 'notes held')} · ±${Math.round(margin)}¢ margin`
 }
 
 /** Same statistic as confidenceLabel without repeating the observation
@@ -281,7 +280,7 @@ function PitchInsightsHero({
       className={`pitch-insights-hero pitch-insights-hero--${zone}`}
       aria-label={`Overall intonation: ${heroStatusWord(tendency)}, ${formatCents(trend.overallCents)} median`}
     >
-      <span className="pitch-insights-hero__eyebrow">Your center · all notes</span>
+      <span className="pitch-insights-hero__eyebrow">Across every note you play</span>
       <strong className="pitch-insights-hero__status">{heroStatusWord(tendency)}</strong>
       <PitchRail cents={trend.overallCents} size="hero" />
       <div className="pitch-insights-hero__ticks" aria-hidden="true">
@@ -301,7 +300,7 @@ function PitchInsightsHero({
             {PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days ago
           </>
         ) : (
-          `${formatCents(trend.overallCents)} median across ${plural(observations.length, 'stable note')}`
+          `${formatCents(trend.overallCents)} median across ${plural(observations.length, 'note held', 'notes held')}`
         )}
       </p>
       {registerNote ? <p className="pitch-insights-hero__register">{registerNote}</p> : null}
@@ -376,7 +375,7 @@ function reduceGraphPoints(points: CentsGraphPoint[]): CentsGraphPoint[] {
 function CentsHistoryGraph({
   points,
   ariaLabel,
-  emptyMessage = 'More observations will reveal a pattern.',
+  emptyMessage = 'Keep playing to see a pattern.',
   xAxis = 'time',
 }: {
   points: CentsGraphPoint[]
@@ -428,7 +427,7 @@ function CentsHistoryGraph({
 
   return (
     <div className="pitch-insights-graph-wrap">
-      <span className="pitch-insights-graph-label pitch-insights-graph-label--sharp">+30¢ Sharp</span>
+      <span className="pitch-insights-graph-label pitch-insights-graph-label--sharp">+30¢</span>
       <svg
         className="pitch-insights-trend"
         viewBox={`0 0 ${width} ${height}`}
@@ -496,8 +495,8 @@ function CentsHistoryGraph({
           )
         })}
       </svg>
-      <span className="pitch-insights-graph-label pitch-insights-graph-label--target">Target Zone ±3¢</span>
-      <span className="pitch-insights-graph-label pitch-insights-graph-label--flat">-30¢ Flat</span>
+      <span className="pitch-insights-graph-label pitch-insights-graph-label--target">±3¢</span>
+      <span className="pitch-insights-graph-label pitch-insights-graph-label--flat">−30¢</span>
     </div>
   )
 }
@@ -515,7 +514,7 @@ function TrendSparkline({ observations }: { observations: PitchObservation[] }) 
     <CentsHistoryGraph
       points={recent}
       ariaLabel="Recent pitch tendency in cents"
-      emptyMessage="More observations will reveal a trend."
+      emptyMessage="Keep playing to see a trend."
     />
   )
 }
@@ -551,7 +550,7 @@ function PitchInsightsNoteRow({
       <strong className="pitch-insights-row__note">{displayName}</strong>
       <div className="pitch-insights-row__copy">
         <strong>{rowVerdict(insight)}</strong>
-        <span>{plural(insight.observationCount, 'stable note')}</span>
+        <span>{plural(insight.observationCount, 'note held', 'notes held')}</span>
       </div>
       {collecting ? (
         <span className="pitch-insights-row__collecting">Collecting</span>
@@ -636,12 +635,12 @@ function InsightDetail({
 
       <div className="pitch-insights-detail__metrics">
         <article>
-          <span>Typical tendency</span>
+          <span>Tendency</span>
           <strong>{hasTendency ? formatCents(insight.typicalCents) : '—'}</strong>
           <small>{tendencyLabel(insight)}</small>
         </article>
         <article>
-          <span>Observations</span>
+          <span>Notes held</span>
           <strong>{insight.observationCount}</strong>
           <small>{marginLabel(insight)}</small>
         </article>
@@ -651,7 +650,7 @@ function InsightDetail({
           <small>
             {hasTendency
               ? `Spread ±${Math.round(insight.typicalVariability)}¢`
-              : 'More stable notes needed'}
+              : 'Not enough yet'}
           </small>
         </article>
       </div>
@@ -659,8 +658,8 @@ function InsightDetail({
       <section className="pitch-insights-detail__trend-card">
         <header>
           <div>
-            <span>Intonation Trend</span>
-            <strong>Last {Math.min(24, insight.observationCount)} observations</strong>
+            <span>Recent trend</span>
+            <strong>Last {Math.min(24, insight.observationCount)} held</strong>
           </div>
           {improvement != null ? (
             <div className={`pitch-insights-trend-label ${improving ? 'is-improving' : ''}`}>
@@ -675,14 +674,14 @@ function InsightDetail({
         </header>
         <p className="pitch-insights-detail__trend-basis">
           {improvement != null
-            ? `Comparing the last ${PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days to what came before, ${PITCH_INSIGHTS_THRESHOLDS.minimumTrendGroupObservations}+ observations each side.`
-            : `Needs ${PITCH_INSIGHTS_THRESHOLDS.minimumTrendGroupObservations}+ observations in the last ${PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days and ${PITCH_INSIGHTS_THRESHOLDS.minimumTrendGroupObservations}+ from before that to compare.`}
+            ? `Last ${PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days vs. everything before.`
+            : 'Keep playing — a trend needs a couple more weeks of history.'}
         </p>
         {hasTendency ? (
           <TrendSparkline observations={insight.observations} />
         ) : (
           <div className="pitch-insights-trend__empty">
-            More observations will reveal a trend.
+            Keep playing to see a trend.
           </div>
         )}
         <div className="pitch-insights-detail__comparison">
@@ -766,7 +765,7 @@ function PracticeDayDetail({
         <header>
           <div>
             <span>Daily graph</span>
-            <strong>Every stable note from this day</strong>
+            <strong>Every note held on this day</strong>
           </div>
         </header>
         <CentsHistoryGraph points={points} ariaLabel={`Pitch tendency for ${fullDateFormatter.format(day.startAt)}`} />
@@ -785,7 +784,7 @@ function PracticeDayDetail({
                 <div>
                   <strong>{sessionTimeRange(session.startedAt, session.endedAt)}</strong>
                   <span>
-                    {plural(session.observationCount, 'stable note')}
+                    {plural(session.observationCount, 'note held', 'notes held')}
                     {' · '}{plural(session.pitchCount, 'pitch', 'pitches')}
                   </span>
                   {warmUpNote ? (
@@ -910,8 +909,8 @@ function PracticeDaysScreen({
       <section className="pitch-insights-all-time pitch-insights-history-card">
         <header>
           <div>
-            <span>All-Time Cent Trend</span>
-            <strong>Daily median intonation</strong>
+            <span>Daily trend</span>
+            <strong>Median for each practice day</strong>
           </div>
           <button
             type="button"
@@ -961,7 +960,7 @@ function PracticeDaysScreen({
                   <strong>{formatDayHeading(day)}</strong>
                   <small>
                     {plural(day.sessionCount, 'session')}
-                    {' · '}{plural(day.observationCount, 'stable note')}
+                    {' · '}{plural(day.observationCount, 'note held', 'notes held')}
                   </small>
                 </span>
                 <span className="pitch-insights-day-row__cents">
@@ -1203,7 +1202,7 @@ export default function PitchInsightsScreen({
     async (day: PitchPracticeDaySummary) => {
       const confirmed = await showConfirm({
         title: `Reset ${formatDayHeading(day)}?`,
-        message: `${plural(day.observationCount, 'stable note')} from ${plural(day.sessionCount, 'session')} will be removed from Pitch Insights. Other days will stay intact.`,
+        message: `${plural(day.observationCount, 'note held', 'notes held')} from ${plural(day.sessionCount, 'session')} will be removed from Pitch Insights. Other days will stay intact.`,
         confirmLabel: 'Reset Day',
         destructive: true,
       })
@@ -1244,7 +1243,7 @@ export default function PitchInsightsScreen({
     // never understates what "Reset all" is about to delete.
     const confirmed = await showConfirm({
       title: 'Reset all Pitch Insights?',
-      message: `${plural(observations.length, 'stable note')} across ${plural(allObservationsDayCount, 'practice day')}${
+      message: `${plural(observations.length, 'note held', 'notes held')} across ${plural(allObservationsDayCount, 'practice day')}${
         showInstrumentFilter ? ', across every instrument,' : ''
       } will be permanently removed from this device.`,
       confirmLabel: 'Reset All',
@@ -1283,10 +1282,6 @@ export default function PitchInsightsScreen({
       <div className="pitch-insights-screen">
         <header className="pitch-insights-screen__topbar">
           <div className="pitch-insights-screen__title-wrap">
-            <div className="pitch-insights-screen__badge">
-              <Sparkles className="pitch-insights-screen__sparkle" aria-hidden />
-              <span>PRO ANALYTICS</span>
-            </div>
             <h2>Pitch Insights</h2>
           </div>
           <Pressable
@@ -1380,8 +1375,8 @@ export default function PitchInsightsScreen({
                     <BarChart3 aria-hidden />
                     <strong>Practice with the live tuner to build your profile.</strong>
                     <p>
-                      Pitch Insights will record your stable note holds and calculate your pitch
-                      tendencies per note.
+                      Every note you hold steady gets logged here, so you can see which
+                      pitches drift and which sit true.
                     </p>
                   </div>
                 ) : (
@@ -1433,9 +1428,8 @@ export default function PitchInsightsScreen({
                         <header>
                           <div>
                             <span>Worth a look</span>
-                            <strong>{plural(worthReviewing.length, 'note')}</strong>
+                            <strong>Your least centered pitches</strong>
                           </div>
-                          <small>of {plural(allInsights.length, 'note')} total</small>
                         </header>
                         <div className="pitch-insights-list__rows">
                           {worthReviewing.map((insight) => (
@@ -1467,7 +1461,7 @@ export default function PitchInsightsScreen({
                         >
                           <div className="pitch-insights-link-row__copy">
                             <strong>All notes</strong>
-                            <span>Every pitch you’ve held, {displayProfile.shortLabel} labels</span>
+                            <span>Every pitch you’ve held</span>
                           </div>
                           <span className="pitch-insights-link-row__count">
                             {plural(allInsights.length, 'note')}

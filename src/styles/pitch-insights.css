@@ -91,23 +91,6 @@ html.app-dark-mode .pitch-insights-screen {
   gap: 0.15rem;
 }
 
-.pitch-insights-screen__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--pi-gold);
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.pitch-insights-screen__sparkle {
-  width: 0.75rem;
-  height: 0.75rem;
-  color: var(--pi-gold);
-}
-
 .pitch-insights-screen__title-wrap h2 {
   margin: 0;
   color: var(--pi-text-primary);
@@ -188,10 +171,10 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-hero__eyebrow {
   color: var(--pi-text-tertiary);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 0.76rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .pitch-insights-hero__status {
@@ -353,23 +336,42 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-list > header {
   display: flex;
-  align-items: flex-end;
+  align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
   padding: 0 0.35rem 0.5rem;
 }
 
-.pitch-insights-list > header span {
-  color: var(--pi-accent);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+/*
+ * Section headers stack a label over a value. Both were inline with no
+ * separator between them in the markup, so they rendered glued together
+ * ("WORTH A LOOK1 note"). Stacking them is the intended reading and makes the
+ * collision structurally impossible.
+ */
+.pitch-insights-list > header > div,
+.pitch-insights-days > header > div,
+.pitch-insights-sessions > header > div,
+.pitch-insights-all-time > header > div,
+.pitch-insights-detail__trend-card > header > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
-.pitch-insights-list > header strong {
+.pitch-insights-list > header span {
   color: var(--pi-text-primary);
   font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+/* Sits under the section label as a quiet count, not a second heading. */
+.pitch-insights-list > header strong {
+  color: var(--pi-text-tertiary);
+  font-size: 0.76rem;
+  font-weight: 500;
 }
 
 .pitch-insights-list > header small {
@@ -547,19 +549,19 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-all-time > header span,
 .pitch-insights-detail__trend-card header span {
-  color: var(--pi-accent);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  color: var(--pi-text-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
 }
 
 .pitch-insights-all-time > header strong,
 .pitch-insights-detail__trend-card header strong {
   display: block;
-  margin-top: 0.1rem;
-  color: var(--pi-text-primary);
-  font-size: 0.92rem;
+  color: var(--pi-text-tertiary);
+  font-size: 0.76rem;
+  font-weight: 500;
 }
 
 .pitch-insights-detail__trend-basis {
@@ -569,10 +571,13 @@ html.app-dark-mode .pitch-insights-screen {
   line-height: 1.4;
 }
 
+/* The axis labels sit in the left gutter. It has to be wide enough to hold
+   them, or they print straight over the plotted line. */
 .pitch-insights-graph-wrap {
   position: relative;
   margin-top: 0.85rem;
-  padding-inline: 1.5rem;
+  padding-left: 2.5rem;
+  padding-right: 0.5rem;
 }
 
 .pitch-insights-graph-wrap .pitch-insights-trend {
@@ -584,10 +589,14 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-graph-label {
   position: absolute;
-  left: 0.2rem;
+  left: 0;
+  width: 2.2rem;
   color: var(--pi-text-tertiary);
   font-size: 0.58rem;
-  font-weight: 700;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .pitch-insights-graph-label--sharp {
@@ -668,17 +677,18 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-days > header span,
 .pitch-insights-sessions > header span {
-  color: var(--pi-accent);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  color: var(--pi-text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
 }
 
 .pitch-insights-days > header strong,
 .pitch-insights-sessions > header strong {
-  color: var(--pi-text-primary);
-  font-size: 1rem;
+  color: var(--pi-text-tertiary);
+  font-size: 0.76rem;
+  font-weight: 500;
 }
 
 .pitch-insights-days > header small {
@@ -898,11 +908,11 @@ html.app-dark-mode .pitch-insights-screen {
 }
 
 .pitch-insights-detail__hero span {
-  color: var(--pi-accent);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  color: var(--pi-text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .pitch-insights-detail__hero h2 {
@@ -949,11 +959,11 @@ html.app-dark-mode .pitch-insights-screen {
 }
 
 .pitch-insights-detail__metrics article > span {
-  color: var(--pi-accent);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  color: var(--pi-text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .pitch-insights-detail__metrics article > strong {
