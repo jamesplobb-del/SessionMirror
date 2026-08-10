@@ -164,6 +164,16 @@
   text-align: center;
 }
 
+.sj-hero__measurement-note {
+  margin: 0.45rem 0 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--sj-hair);
+  color: var(--sj-muted);
+  font-size: 0.62rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 /* ── The staff preview itself ── */
 .sj-preview {
   position: relative;

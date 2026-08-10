@@ -316,6 +316,10 @@ export default function StaffJumperScreen({
           <p className="sj-hero__note">
             Every run is a different exercise — this is one example.
           </p>
+          <p className="sj-hero__measurement-note">
+            Staff Jumper checks pitch and estimates note timing. Note duration and full rhythm
+            accuracy are not assessed.
+          </p>
         </section>
 
         <div className="sj-start">
