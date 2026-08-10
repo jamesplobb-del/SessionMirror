@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { Grid2X2, Layers3 } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { useTutorial } from '../context/TutorialContext'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
@@ -69,6 +70,12 @@ export default function CoachMark() {
   const advancesOnScreenTap = coachMark.advance === 'tap-screen'
   const initialOffset = sidePlacement === 'left' ? 8 : sidePlacement === 'right' ? -8 : 0
   const initialYOffset = sidePlacement ? 0 : shouldShowBelow ? -8 : 8
+  const featureIcon =
+    coachMark.icon === 'overlays' ? (
+      <Layers3 aria-hidden />
+    ) : coachMark.icon === 'multitrack' ? (
+      <Grid2X2 aria-hidden />
+    ) : null
 
   return createPortal(
     <div
@@ -116,8 +123,23 @@ export default function CoachMark() {
           {tutorial.activeStepNumber} of {tutorial.totalSteps}
         </span>
         <div className="coach-mark-card__copy">
-          <h2>{coachMark.title}</h2>
+          <div className="coach-mark-card__heading">
+            {featureIcon ? (
+              <span className="coach-mark-card__feature-icon">{featureIcon}</span>
+            ) : null}
+            <h2>{coachMark.title}</h2>
+          </div>
           <p>{coachMark.body}</p>
+          {coachMark.instructions ? (
+            <ol className="coach-mark-card__instructions">
+              {coachMark.instructions.map((instruction, index) => (
+                <li key={instruction}>
+                  <span aria-hidden>{index + 1}</span>
+                  <strong>{instruction}</strong>
+                </li>
+              ))}
+            </ol>
+          ) : null}
           <p className="coach-mark-card__continue">{coachMark.continueHint}</p>
         </div>
         <Pressable

@@ -6,13 +6,16 @@ export type CoachMarkId =
   | 'record-comparison-take'
   | 'swap-take-cards'
   | 'move-take-cards'
+  | 'open-overlays'
+  | 'close-overlays'
+  | 'discover-multitrack'
   | 'open-expand-view'
   | 'resize-expand-view'
   | 'close-expand-view'
   | 'switch-to-practice'
   | 'visit-metronome'
   | 'visit-tuner'
-  | 'visit-practice'
+  | 'visit-games'
   | 'return-to-audio'
   | 'open-take-vault'
   | 'close-take-vault'
@@ -65,6 +68,8 @@ export type HelpTopicId =
   | 'audio-mode'
   | 'hands-free-recording'
   | 'overlays'
+  | 'multitrack'
+  | 'practice-games'
   | 'practice-sessions'
   | 'metronome'
   | 'tuner-drones'
@@ -95,9 +100,11 @@ export interface CoachMarkContent {
   placement?: 'top' | 'bottom' | 'left' | 'right'
   advance: CoachMarkAdvance
   continueHint: string
+  icon?: 'overlays' | 'multitrack'
+  instructions?: string[]
   requiresSplitView?: 'open' | 'closed'
   requiresRecordingMode?: 'video' | 'audio'
-  requiresAudioPracticeTab?: 'audio' | 'metronome' | 'tuner' | 'practice'
+  requiresAudioPracticeTab?: 'audio' | 'metronome' | 'tuner' | 'practice' | 'games'
   requiresVault?: 'open' | 'closed'
   requiresSettings?: 'open' | 'closed'
   requiresCurrentTake?: boolean
@@ -113,9 +120,10 @@ export interface HelpTopic {
 export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
     id: 'welcome',
-    title: 'Welcome to BestTake',
-    body: 'This short guided tour will walk you through Camera, comparison, Tools, Take Vault, and the iPhone quick tools.',
-    highlights: ['Use each control to continue', 'Skip the tour at any time'],
+    kicker: 'A quick look around',
+    title: 'Make a take. Hear the difference.',
+    body: 'Record two short takes, compare them, and keep the one you want. We’ll point out the other controls as we go.',
+    highlights: ['About two minutes', 'Uses the real controls'],
   },
 ]
 
@@ -168,12 +176,54 @@ export const COACH_MARKS: CoachMarkContent[] = [
   },
   {
     id: 'move-take-cards',
-    title: 'Arrange the Take Cards',
-    body: 'This is a different gesture: press and hold a card until it wiggles, then reposition it. Tap an empty area when done.',
+    title: 'Move a Take Card',
+    body: 'Use the picture area of the card for this gesture. The text label is for swapping takes.',
     selector: '[data-movable-take-card="true"]',
     placement: 'top',
     advance: 'take-card-layout-finished',
-    continueHint: 'Hold for the haptic, move, then tap outside.',
+    continueHint: 'Keep your finger down through steps 1–3.',
+    instructions: [
+      'Press and hold the picture without moving.',
+      'Wait for the vibration and wiggle.',
+      'Keep holding, then drag the card to a new spot.',
+      'Lift your finger and tap outside the cards.',
+    ],
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'open-overlays',
+    title: 'Open Overlays',
+    body: 'The stacked-layers icon opens the controls you can place over Camera mode, including take cards, pitch, metronome, audio enhancement, and Hands-free.',
+    selector: '[data-tutorial="overlays-button"]',
+    placement: 'top',
+    advance: 'overlays-opened',
+    continueHint: 'Tap Overlays.',
+    icon: 'overlays',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'close-overlays',
+    title: 'Close Overlays',
+    body: 'Tap the same stacked-layers icon again to close the overlay controls.',
+    selector: '[data-tutorial="overlays-button"]',
+    placement: 'top',
+    advance: 'overlays-closed',
+    continueHint: 'Tap Overlays again.',
+    icon: 'overlays',
+    requiresSplitView: 'closed',
+    requiresRecordingMode: 'video',
+  },
+  {
+    id: 'discover-multitrack',
+    title: 'Build a Multitrack',
+    body: 'The four-panel icon opens Multitrack, where you can layer separate performances into one project. You can come back to it after the tour.',
+    selector: '[data-tutorial="multitrack-button"]',
+    placement: 'top',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to continue.',
+    icon: 'multitrack',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'video',
   },
@@ -247,13 +297,13 @@ export const COACH_MARKS: CoachMarkContent[] = [
     requiresAudioPracticeTab: 'metronome',
   },
   {
-    id: 'visit-practice',
-    title: 'See Practice Routines',
-    body: 'Tap Practice to build reusable routines from timed sections.',
-    selector: '[data-tutorial="audio-tab-practice"]',
+    id: 'visit-games',
+    title: 'Practice Games',
+    body: 'Games opens Staff Jumper and Balance for pitch-driven sight-reading and long-tone practice.',
+    selector: '[data-tutorial="audio-tab-games"]',
     placement: 'bottom',
-    advance: 'audio-tab-practice',
-    continueHint: 'Tap Practice.',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to continue.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'audio',
     requiresAudioPracticeTab: 'tuner',
@@ -268,7 +318,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
     continueHint: 'Tap Audio.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'audio',
-    requiresAudioPracticeTab: 'practice',
+    requiresAudioPracticeTab: 'tuner',
   },
   {
     id: 'open-take-vault',
@@ -326,8 +376,8 @@ export const HELP_TOPICS: HelpTopic[] = [
     bullets: [
       'Bottom pill: Take Vault, Overlays, Record, Tools, Settings',
       'Tap the full red Record button to start or stop a video take',
-      'Drag a take label directly to swap Best and Current; hold a card to move its layout',
-      'Use Expand View directly above Record for a larger comparison',
+      'Drag a take label directly to swap Best and Current; hold the picture area to move the card',
+      'Use Expand for a larger comparison or Multitrack to layer performances',
       'Tap Tools to move to the Audio workspace',
     ],
   },
@@ -338,6 +388,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     bullets: [
       'Bottom pill: Take Vault, Overlays, Record, Camera, Settings',
       'Use Audio, Metronome, Tuner, and Games from the top tabs',
+      'Open Program from Metronome to build a timed practice routine',
       'Tap Camera to return to video recording',
       'Best Take and Current Take stay ready for quick comparison',
     ],
@@ -356,18 +407,40 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'overlays',
     title: 'Overlays',
-    body: 'Tap Overlays beside Record in Camera or Audio Mode to open the centered on-screen tools menu.',
+    body: 'Tap the stacked-layers icon beside Record in Camera or Audio Mode to open the on-screen controls menu.',
     bullets: [
-      'Camera: Pitch Analysis, Take Cards, Metronome, and Audio Enhancer',
+      'Camera: Pitch Analysis, Take Cards, Metronome, Audio Enhancer, and Hands-free',
       'Audio and tool tabs show the overlays that fit the current workspace',
       'Tap an overlay to show or hide it without opening Settings',
       'Use the cog at the right end of the pill for full settings',
     ],
   },
   {
+    id: 'multitrack',
+    title: 'Multitrack',
+    body: 'Tap the four-panel Multitrack control above Record in Camera Mode to layer separate performances in one project.',
+    bullets: [
+      'Record or assign a take to each performance panel',
+      'Add a backing track, click, pitch guide, or sheet music when needed',
+      'Balance the parts and align their starts before exporting',
+      'Your original Take Vault recordings remain separate',
+    ],
+  },
+  {
+    id: 'practice-games',
+    title: 'Practice Games',
+    body: 'The Games tab uses live pitch to make focused fundamentals more visual. Microphone input is processed live and is not saved.',
+    bullets: [
+      'Staff Jumper responds to detected notes for sight-reading practice',
+      'Staff Jumper does not grade full rhythm accuracy or note duration',
+      'Balance measures centered pitch time during long tones',
+      'Game results report measurable pitch data, not tone or technique',
+    ],
+  },
+  {
     id: 'practice-sessions',
     title: 'Practice Routines',
-    body: 'The Practice tab turns a difficult passage or full program into a reusable sequence of timed sections.',
+    body: 'Open Program from the Metronome tab to turn a difficult passage or full program into a reusable sequence of timed sections.',
     bullets: [
       'Add sections with bars, tempo, time signature, feel, and repeats',
       'Drag section cards to reorder the routine',
@@ -437,7 +510,8 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'Best Take and Current Take support two distinct gestures: a direct take swap and a held layout move.',
     bullets: [
       'To swap takes, drag immediately from one card’s text label onto the other card',
-      'To change the layout, hold a card until the haptic and wiggle begin, then move it',
+      'To change the layout, press the picture area and hold still until the haptic and wiggle begin',
+      'Keep your finger down after the wiggle, then drag the card to its new position',
       'In layout mode, drag either card anywhere within the screen and tap outside when finished',
       'Positions persist after closing the app; Reset restores the original layout',
     ],
@@ -508,5 +582,5 @@ export const HELP_TOPICS: HelpTopic[] = [
 ]
 
 // Versioned so users who completed the older interface tutorial see this revised walkthrough.
-export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v5'
-export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v6'
+export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v6'
+export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v7'

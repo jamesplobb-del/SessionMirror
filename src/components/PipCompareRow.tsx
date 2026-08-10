@@ -635,6 +635,7 @@ function CompactMultitrackButton({
       squish={false}
       haptic="light"
       hapticFeedback={hapticFeedback}
+      data-tutorial="multitrack-button"
       className="camera-compare-toggle camera-multitrack-toggle pointer-events-auto"
       onClick={onOpen}
       aria-label="Open Multitrack view"

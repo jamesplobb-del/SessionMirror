@@ -162,11 +162,13 @@ const LEARN_APP_SECTIONS: {
       { id: 'audio-mode', label: 'Audio Mode' },
       { id: 'hands-free-recording', label: 'Hands-Free Recording' },
       { id: 'overlays', label: 'Overlays' },
+      { id: 'multitrack', label: 'Multitrack' },
     ],
   },
   {
     title: 'Practice Tools',
     topics: [
+      { id: 'practice-games', label: 'Practice Games' },
       { id: 'practice-sessions', label: 'Practice Routines' },
       { id: 'metronome', label: 'Metronome' },
       { id: 'tuner-drones', label: 'Tuner & Drones' },

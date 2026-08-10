@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { Check, MousePointer2 } from 'lucide-react'
+import { ArrowRight, Check, Grid2X2, Layers3 } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
@@ -85,9 +85,15 @@ export default function OnboardingTutorial({
         transition={iosSpringSnappy}
         style={motionGpuLayer}
       >
-        <header className="onboarding-lite__top onboarding-lite__top--single">
-          <div className="onboarding-lite__glyph" aria-hidden>
-            <img src="/icons/icon.png" alt="" draggable={false} />
+        <header className="onboarding-lite__top">
+          <div className="onboarding-lite__brand">
+            <div className="onboarding-lite__glyph" aria-hidden>
+              <img src="/icons/icon.png" alt="" draggable={false} />
+            </div>
+            <span>
+              <strong>BestTake</strong>
+              <small>Quick tour</small>
+            </span>
           </div>
         </header>
 
@@ -105,6 +111,18 @@ export default function OnboardingTutorial({
             ) : null}
             <h1>{card.title}</h1>
             <p>{card.body}</p>
+            <div className="onboarding-lite__feature-row" aria-label="Camera tools">
+              <span>
+                <Layers3 aria-hidden />
+                <strong>Overlays</strong>
+                <small>Controls on screen</small>
+              </span>
+              <span>
+                <Grid2X2 aria-hidden />
+                <strong>Multitrack</strong>
+                <small>Layer performances</small>
+              </span>
+            </div>
             <div className="onboarding-lite__highlights" aria-label="Highlights">
               {card.highlights.map((highlight) => (
                 <span key={highlight}>
@@ -131,8 +149,8 @@ export default function OnboardingTutorial({
             Skip Tour
           </Pressable>
           <div className="onboarding-lite__tap-hint" aria-hidden>
-            <MousePointer2 className="h-4 w-4" />
-            Start guided tour
+            Begin tour
+            <ArrowRight className="h-4 w-4" />
           </div>
         </footer>
       </motion.div>
