@@ -24,6 +24,25 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// in the movie file despite the connection reporting active the whole
     /// time and zero interruption/route-change events).
     private let audioTapEncodeQueue = DispatchQueue(label: "SessionMirror.NativeAudioTapEncode", qos: .utility)
+
+    /// Backpressure for audioTapEncodeQueue.
+    ///
+    /// The tap produces a chunk every ~43ms in real time, and the dispatch to
+    /// the encode queue is `async` — unbounded. Base64 encoding plus the
+    /// Capacitor bridge notify is not guaranteed to keep up: with the
+    /// metronome engine, the pitch DSP and the UI all competing for CPU the
+    /// consumer falls behind and the queue grows monotonically. Each pending
+    /// block retains an 8KB sample array and produces an ~11KB String, so a
+    /// couple of minutes of drift is enough growth for iOS to jetsam the app
+    /// — which presents to the user as the app restarting on its own.
+    ///
+    /// Dropping a pitch frame under overload is harmless: the next one is
+    /// 43ms behind it and detection re-locks immediately. This cap only
+    /// engages once the encoder is already behind, so the steady-state frame
+    /// rate — and the pitch graph — is untouched.
+    private let audioTapBacklogLock = NSLock()
+    private var audioTapBacklog = 0
+    private static let audioTapMaxBacklog = 3
     private var isAudioTapEnabled = false
     private var tapAccumulator: [Float] = []
     private var didLogFirstTapSample = false
@@ -2573,6 +2592,9 @@ extension NativeCameraRecordingEngine {
             self.didLogFirstTapSample = false
             if !enabled {
                 self.tapAccumulator.removeAll()
+                self.audioTapBacklogLock.lock()
+                self.audioTapBacklog = 0
+                self.audioTapBacklogLock.unlock()
             }
         }
     }
@@ -2645,11 +2667,22 @@ extension NativeCameraRecordingEngine {
         while tapAccumulator.count >= chunkSize {
             let chunk = Array(tapAccumulator.prefix(chunkSize))
             tapAccumulator.removeFirst(chunkSize)
+            audioTapBacklogLock.lock()
+            let saturated = audioTapBacklog >= Self.audioTapMaxBacklog
+            if !saturated { audioTapBacklog += 1 }
+            audioTapBacklogLock.unlock()
+            // Encoder is behind — drop this frame rather than queue it forever.
+            if saturated { continue }
+
             // Encode + bridge notify happen off audioTapQueue — see comment on
             // audioTapEncodeQueue's declaration.
             audioTapEncodeQueue.async { [weak self] in
+                guard let self = self else { return }
                 let payload = chunk.withUnsafeBufferPointer { Data(buffer: $0) }
-                self?.onAudioTapChunk?(payload.base64EncodedString(), sampleRate, chunkSize)
+                self.onAudioTapChunk?(payload.base64EncodedString(), sampleRate, chunkSize)
+                self.audioTapBacklogLock.lock()
+                self.audioTapBacklog -= 1
+                self.audioTapBacklogLock.unlock()
             }
         }
     }

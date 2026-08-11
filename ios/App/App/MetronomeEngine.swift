@@ -100,15 +100,29 @@ final class MetronomeEngine {
     private let speakerBusGain: Float = 48
 
     private var configurationObserver: NSObjectProtocol?
-    private var lastConfigurationRecoveryAt: TimeInterval = 0
+
+    /// Serial lane for configuration recovery. Keeps blocking AVAudioSession /
+    /// AVAudioEngine calls off the UI thread and off the render path.
+    private let recoveryQueue = DispatchQueue(
+        label: "MetronomeEngine.configRecovery",
+        qos: .userInitiated
+    )
+    /// Long enough for a Bluetooth route switch to settle, short enough that a
+    /// dropped metronome comes back before the player notices.
+    private static let configurationRecoveryDebounce: TimeInterval = 0.18
+    /// Guarded by stateLock; only the newest scheduled recovery runs.
+    private var configurationRecoveryGeneration: UInt64 = 0
 
     private init() {
+        // Deliberately NOT queue: .main. Recovery does blocking AVAudioSession
+        // and AVAudioEngine work, which must never run on the UI thread — see
+        // scheduleConfigurationRecovery.
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: engine,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
-            self?.handleEngineConfigurationChange()
+            self?.scheduleConfigurationRecovery()
         }
 
         engine.attach(outputMixer)
@@ -265,12 +279,43 @@ final class MetronomeEngine {
 
     // MARK: - Audio graph
 
-    private func handleEngineConfigurationChange() {
+    /**
+     * Coalesce a burst of configuration changes into one recovery, off the UI
+     * thread.
+     *
+     * This used to run inline on the main queue: it took `controlLock` (which
+     * `start`/`stop` also hold from other threads) and then made blocking
+     * AVAudioSession `setCategory`/`setActive` and `AVAudioEngine.start()`
+     * calls. Each of those can take hundreds of milliseconds, and Bluetooth
+     * route switches — connecting AirPods, or opening the tuner's mic while
+     * the metronome plays — emit several notifications in quick succession.
+     * The result was seconds of blocked UI and a metronome that could die
+     * mid-recovery.
+     *
+     * The debounce also has to outlast a route switch settling, so the engine
+     * is reconfigured once against the final route rather than once per
+     * intermediate one.
+     */
+    private func scheduleConfigurationRecovery() {
+        stateLock.lock()
+        configurationRecoveryGeneration &+= 1
+        let generation = configurationRecoveryGeneration
+        stateLock.unlock()
+
+        recoveryQueue.asyncAfter(deadline: .now() + Self.configurationRecoveryDebounce) { [weak self] in
+            guard let self = self else { return }
+            self.stateLock.lock()
+            let isLatest = generation == self.configurationRecoveryGeneration
+            self.stateLock.unlock()
+            // A newer notification landed while this one waited; let that one win.
+            guard isLatest else { return }
+            self.performConfigurationRecovery()
+        }
+    }
+
+    private func performConfigurationRecovery() {
         controlLock.lock()
         defer { controlLock.unlock() }
-        let now = ProcessInfo.processInfo.systemUptime
-        guard now - lastConfigurationRecoveryAt >= 0.08 else { return }
-        lastConfigurationRecoveryAt = now
         guard !outputPausedForCaptureHandoff else { return }
         guard schedulerTimer != nil else { return }
         do {

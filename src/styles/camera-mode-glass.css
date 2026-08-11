@@ -1596,10 +1596,12 @@ button.compact-take-caption:active {
     inset 0 1px 0 rgba(95, 190, 255, 0.12);
 }
 
+/* Offset must clear the control deck, whose height is form-factor dependent —
+   iPad overrides --take-card-top-control-lift in tablet.css. */
 .take-card-top-control {
   position: fixed;
   top: auto;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.45rem);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--take-card-top-control-lift, 4.45rem));
   left: 50%;
   z-index: 58;
   width: max-content;
@@ -2326,9 +2328,9 @@ button.compact-take-caption:active {
     height: 3.95rem;
   }
 
-  .take-card-top-control {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.65rem);
-  }
+  /* Lift is set once via --take-card-top-control-lift (tablet.css); a second
+     hard-coded bottom here silently beat it and left the Expand / Multitrack
+     row sitting on top of the deck. */
 }
 
 @media (orientation: landscape) {

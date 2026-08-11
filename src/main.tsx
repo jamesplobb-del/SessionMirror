@@ -6,6 +6,9 @@ import './styles/drone-sound-wheel.css'
 import './styles/practice-system.css'
 import './styles/quick-tuner.css'
 import './styles/pitch-insights.css'
+// Keep adaptive iPad overrides last so feature-specific styles cannot restore
+// phone-sized width caps after the tablet layout has been applied.
+import './styles/tablet.css'
 import RootRouter from './RootRouter.tsx'
 import AppErrorBoundary from './components/ui/AppErrorBoundary.tsx'
 import { primeWebStatusBarChrome } from './utils/nativeStatusBar'

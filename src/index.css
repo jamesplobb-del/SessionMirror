@@ -6555,7 +6555,6 @@ html.dark .help-sheet__bullet {
 @import './styles/audio-mode-sheets.css';
 @import './styles/camera-mode-glass.css';
 @import './styles/vault-ui.css';
-@import './styles/tablet.css';
 
 /* Premium Recording Border */
 .camera-recording-border {

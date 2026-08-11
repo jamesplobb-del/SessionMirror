@@ -96,7 +96,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        return .portrait
+        // iPad is a two-handed, stand-and-music-desk device — landscape is the
+        // orientation people actually prop it in. iPhone stays portrait-locked:
+        // the camera framing and control deck are built around it.
+        return isPad ? .all : .portrait
+    }
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
@@ -150,6 +157,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     private func lockInterfaceToPortrait() {
+        // On iPad the user picks the orientation; forcing portrait on every
+        // resume would snap them out of landscape.
+        guard !isPad else { return }
         if #available(iOS 16.0, *) {
             guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
                 return

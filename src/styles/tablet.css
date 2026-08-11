@@ -12,6 +12,9 @@
     --pitch-tuner-edge-gap: 32px;
     --pitch-pip-row-block: calc(var(--ipad-pip-width) * 9 / 16 + 1.25rem);
     --pitch-control-deck-block: calc(var(--ipad-record-size) + 2.5rem);
+    /* The iPad control deck is taller than the phone's, so the Expand /
+       Multitrack row needs more lift or it lands on top of the deck. */
+    --take-card-top-control-lift: 8.25rem;
   }
 
   .hud-header {
@@ -78,7 +81,7 @@
   }
 
   /* Vault left corner · record center · settings right corner */
-  .control-deck.pointer-events-auto {
+  .control-deck--camera.pointer-events-auto {
     display: grid;
     width: 100%;
     grid-template-columns: 1fr auto 1fr;
@@ -88,11 +91,11 @@
       max(1.25rem, env(safe-area-inset-right, 0px));
   }
 
-  .control-deck__main-row {
+  .control-deck--camera .control-deck__main-row {
     display: contents;
   }
 
-  .control-deck__vault-btn {
+  .control-deck--camera .control-deck__vault-btn {
     position: static;
     grid-column: 1;
     grid-row: 1;
@@ -103,18 +106,18 @@
     margin-bottom: 0.125rem;
   }
 
-  .control-deck__vault-btn svg {
+  .control-deck--camera .control-deck__vault-btn svg {
     height: 1.625rem;
     width: 1.625rem;
   }
 
-  .control-deck__vault-btn span.absolute {
+  .control-deck--camera .control-deck__vault-btn span.absolute {
     height: 1.25rem;
     min-width: 1.25rem;
     font-size: 0.625rem;
   }
 
-  .control-deck__settings-btn {
+  .control-deck--camera .control-deck__settings-btn {
     position: static;
     grid-column: 3;
     grid-row: 1;
@@ -125,12 +128,12 @@
     margin-bottom: 0.125rem;
   }
 
-  .control-deck__settings-btn svg {
+  .control-deck--camera .control-deck__settings-btn svg {
     height: 1.625rem;
     width: 1.625rem;
   }
 
-  .control-deck__main-row > .ui-orient-spin {
+  .control-deck--camera .control-deck__main-row > .ui-orient-spin {
     grid-column: 2;
     grid-row: 1;
     justify-self: center;
@@ -170,7 +173,7 @@
     font-size: 0.8125rem;
   }
 
-  .control-deck__main-row .text-xs {
+  .control-deck--camera .control-deck__main-row .text-xs {
     font-size: 0.875rem;
   }
 
@@ -810,5 +813,1219 @@
   .audio-practice-tuner-shell {
     width: 100%;
     max-width: none;
+  }
+}
+
+/*
+ * Edge-aware iPad chrome.
+ *
+ * The current camera/audio decks use five controls inside a phone-width
+ * capsule. On iPad, keep the record action centered while returning the
+ * outer actions to the leading and trailing edges of the canvas.
+ */
+@media (min-width: 744px) {
+  :root {
+    --ipad-edge-gap: clamp(1.5rem, 3vw, 3rem);
+    --ipad-chrome-size: clamp(4.25rem, 5.4vw, 4.9rem);
+    --ipad-center-action-size: clamp(5.25rem, 7.2vw, 6.25rem);
+  }
+
+  /* Best Take and Current Take read as two iPad regions, not a stretched
+     phone row floating in the middle of the preview. */
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .app-pip-row-wrap--camera.app-pip-row-wrap--compact {
+    top: max(calc(env(safe-area-inset-top, 0px) + 1.25rem), 4.25rem);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact {
+    display: grid;
+    width: min(calc(100% - var(--ipad-edge-gap) - var(--ipad-edge-gap)), 70rem);
+    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 26rem));
+    justify-content: space-between;
+    gap: clamp(1.5rem, 4vw, 4rem);
+    padding-inline: 0;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .app-pip-row--compact
+    > .compact-take-slot {
+    --camera-take-card-height: clamp(5.5rem, 7.2vw, 6.35rem);
+    --camera-take-thumb-size: clamp(4.5rem, 6vw, 5.3rem);
+    width: 100% !important;
+    min-width: 0;
+    flex: none !important;
+    gap: clamp(0.7rem, 1.25vw, 1rem);
+    padding: 0.5rem 0.7rem;
+  }
+
+  .compact-take-caption__label {
+    font-size: clamp(0.68rem, 1vw, 0.8rem);
+  }
+
+  .compact-take-caption__name {
+    font-size: clamp(0.84rem, 1.2vw, 1rem);
+  }
+
+  .compact-take-caption__detail {
+    font-size: clamp(0.66rem, 0.95vw, 0.78rem);
+  }
+
+  /* Camera: Vault at the leading edge, Settings at the trailing edge, with
+     Overlays / Record / Tools forming a balanced center group. */
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .control-deck.control-deck--camera {
+    padding-inline: max(var(--ipad-edge-gap), env(safe-area-inset-left, 0px))
+      max(var(--ipad-edge-gap), env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: max(1.1rem, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-deck__main-row {
+    min-height: var(--ipad-center-action-size);
+    transform: none;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill {
+    width: 100%;
+    height: var(--ipad-center-action-size);
+    grid-template-columns:
+      var(--ipad-chrome-size) minmax(6.5rem, 1fr) var(--ipad-center-action-size)
+      minmax(6.5rem, 1fr) var(--ipad-chrome-size);
+    column-gap: clamp(0.75rem, 1.8vw, 1.5rem);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill::before,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill::after {
+    display: none;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-vault-button,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-control-deck__settings-btn {
+    width: var(--ipad-chrome-size) !important;
+    height: var(--ipad-chrome-size) !important;
+    min-width: var(--ipad-chrome-size) !important;
+    min-height: var(--ipad-chrome-size) !important;
+    align-self: center !important;
+    justify-self: center !important;
+    border: 0.75px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 999px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.03)),
+      rgba(8, 12, 18, 0.2) !important;
+    box-shadow:
+      0 0.65rem 1.7rem rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-vault-button::before,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-control-deck__settings-btn::before {
+    display: none;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    .camera-pill-action {
+    width: min(9rem, 100%) !important;
+    height: var(--ipad-chrome-size) !important;
+    min-height: var(--ipad-chrome-size) !important;
+    justify-self: end;
+    border: 0.75px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 999px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
+      rgba(8, 12, 18, 0.18) !important;
+    box-shadow:
+      0 0.55rem 1.45rem rgba(0, 0, 0, 0.17),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+    backdrop-filter: blur(18px) saturate(1.18);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    .camera-practice-button {
+    justify-self: start;
+  }
+
+  .camera-pill-action__content {
+    gap: 0.2rem;
+    font-size: clamp(0.72rem, 1vw, 0.86rem);
+  }
+
+  .camera-overlays-button__icon,
+  .camera-practice-button__waveform {
+    width: clamp(1.55rem, 2.4vw, 2rem);
+    height: clamp(1.45rem, 2vw, 1.75rem);
+  }
+
+  .camera-control-deck__record-stack {
+    width: var(--ipad-center-action-size);
+    height: var(--ipad-center-action-size);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-deck__record-stack
+    .record-delete-drop--camera,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-deck__record-stack
+    .record-carousel-viewport--camera,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-deck__record-stack
+    .record-carousel-viewport {
+    --record-carousel-viewport-width: var(--ipad-center-action-size);
+    --record-slot-active-size: calc(var(--ipad-center-action-size) - 0.35rem);
+    width: var(--ipad-center-action-size) !important;
+    height: var(--ipad-center-action-size) !important;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    .record-carousel-slot--camera {
+    width: calc(var(--ipad-center-action-size) - 0.35rem) !important;
+    height: calc(var(--ipad-center-action-size) - 0.35rem) !important;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    .record-orbit-icon {
+    width: calc(var(--ipad-center-action-size) - 0.85rem);
+    height: calc(var(--ipad-center-action-size) - 0.85rem);
+  }
+
+  /* Audio mode uses the same edge map, with opaque iPadOS-style controls. */
+  .app-ui-overlay--audio-mode .control-deck:not(.control-deck--camera) {
+    padding-inline: max(var(--ipad-edge-gap), env(safe-area-inset-left, 0px))
+      max(var(--ipad-edge-gap), env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: max(1.1rem, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-deck__main-row {
+    min-height: var(--ipad-center-action-size);
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill {
+    width: 100%;
+    height: var(--ipad-center-action-size);
+    grid-template-columns:
+      var(--ipad-chrome-size) minmax(6.5rem, 1fr) var(--ipad-center-action-size)
+      minmax(6.5rem, 1fr) var(--ipad-chrome-size);
+    column-gap: clamp(0.75rem, 1.8vw, 1.5rem);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill::before,
+  .app-ui-overlay--audio-mode .audio-control-pill::after {
+    display: none;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,
+  .app-ui-overlay--audio-mode
+    .audio-control-pill
+    > .control-deck__settings-btn.audio-control-deck__settings-btn {
+    width: var(--ipad-chrome-size) !important;
+    height: var(--ipad-chrome-size) !important;
+    min-width: var(--ipad-chrome-size) !important;
+    min-height: var(--ipad-chrome-size) !important;
+    align-self: center !important;
+    justify-self: center !important;
+    border: 1px solid var(--audio-divider) !important;
+    border-radius: 999px;
+    background: var(--audio-surface) !important;
+    box-shadow: var(--audio-shadow-fab) !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill > .audio-vault-button::before {
+    display: none;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill .audio-camera-button,
+  .app-ui-overlay--audio-mode .audio-control-pill .audio-pill-action {
+    width: min(9rem, 100%) !important;
+    height: var(--ipad-chrome-size) !important;
+    min-height: var(--ipad-chrome-size) !important;
+    justify-self: end;
+    border: 1px solid var(--audio-divider) !important;
+    border-radius: 999px;
+    background: var(--audio-surface) !important;
+    box-shadow: var(--audio-shadow-fab) !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill .audio-camera-button {
+    justify-self: start;
+  }
+
+  .app-ui-overlay--audio-mode .audio-pill-action__content,
+  .app-ui-overlay--audio-mode .audio-camera-button__content {
+    gap: 0.2rem;
+    font-size: clamp(0.72rem, 1vw, 0.86rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-deck__record-stack {
+    width: var(--ipad-center-action-size);
+    height: var(--ipad-center-action-size);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-control-deck__record-stack
+    .record-delete-drop,
+  .app-ui-overlay--audio-mode
+    .audio-control-deck__record-stack
+    .record-carousel-viewport,
+  .app-ui-overlay--audio-mode
+    .audio-control-deck__record-stack
+    .record-carousel-viewport--audio-compact {
+    --record-carousel-viewport-width: var(--ipad-center-action-size);
+    --record-slot-active-size: calc(var(--ipad-center-action-size) - 0.7rem);
+    width: var(--ipad-center-action-size) !important;
+    height: var(--ipad-center-action-size) !important;
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-control-pill
+    .record-carousel-slot--center {
+    width: calc(var(--ipad-center-action-size) - 0.7rem) !important;
+    height: calc(var(--ipad-center-action-size) - 0.7rem) !important;
+  }
+
+  /* The full-screen analytics and multitrack surfaces should consume a useful
+     iPad reading width while retaining comfortable margins. */
+  .pitch-insights-overview,
+  .pitch-insights-detail {
+    width: min(100%, 64rem);
+  }
+
+  .pitch-insights-screen__scroll {
+    padding-inline: max(2rem, env(safe-area-inset-left, 0px))
+      max(2rem, env(safe-area-inset-right, 0px));
+  }
+
+  .multitrack-overlay--camera-mode .multitrack-overlay__body {
+    padding-inline: max(1.5rem, env(safe-area-inset-left, 0px))
+      max(1.5rem, env(safe-area-inset-right, 0px));
+  }
+
+  .labs-overlay .arcade-menu {
+    width: 100%;
+    max-width: 48rem;
+    padding-inline: clamp(1.5rem, 3vw, 2.5rem);
+  }
+
+  .labs-overlay .arcade-game-list {
+    gap: clamp(1rem, 2vw, 1.5rem);
+  }
+
+  .labs-overlay .arcade-game-card {
+    min-height: clamp(13rem, 24vh, 17rem);
+  }
+}
+
+/* Regular-width iPads have enough horizontal room for the tool surfaces to
+   become true two-pane workspaces even while the device is held in portrait. */
+@media (min-width: 900px) and (min-height: 800px) {
+  .app-ui-overlay--audio-mode .audio-mode-home-layer {
+    width: min(64rem, calc(100% - 4rem));
+    margin-inline: auto;
+    padding-inline: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-home {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(18rem, 0.82fr) minmax(24rem, 1.18fr);
+    align-items: center;
+    gap: clamp(2rem, 4vw, 3.5rem);
+    overflow: visible;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-hero {
+    min-height: 0;
+    justify-content: center;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-stack {
+    min-height: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-card {
+    min-height: clamp(9rem, 12vh, 10.5rem) !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__body {
+    display: grid;
+    width: min(64rem, calc(100% - 4rem));
+    grid-template-columns: minmax(19rem, 0.88fr) minmax(23rem, 1.12fr);
+    align-items: center;
+    gap: clamp(2rem, 4vw, 3.5rem);
+    margin-inline: auto;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__bpm-row {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    max-width: none;
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished {
+    display: grid;
+    width: min(64rem, calc(100% - 4rem));
+    grid-template-columns: minmax(18rem, 0.8fr) minmax(24rem, 1.2fr);
+    align-items: center;
+    gap: clamp(1.75rem, 3.5vw, 3rem);
+    margin-inline: auto;
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__hero {
+    grid-column: 1;
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-chart-card,
+  .app-ui-overlay--audio-mode
+    .pitch-audio-stage--polished
+    .pitch-audio-idle-pane--polished {
+    grid-column: 2;
+    min-height: clamp(22rem, 38vh, 30rem);
+  }
+
+  .app-ui-overlay--audio-mode .pitch-audio-stage--polished .pitch-audio-stage__chart {
+    min-height: clamp(22rem, 38vh, 30rem);
+  }
+}
+
+@media (min-width: 744px) and (orientation: landscape) {
+  :root {
+    --ipad-edge-gap: clamp(2rem, 3vw, 3.5rem);
+    --ipad-chrome-size: clamp(3.8rem, 7vh, 4.45rem);
+    --ipad-center-action-size: clamp(4.5rem, 8.5vh, 5.25rem);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .app-pip-row-wrap--camera.app-pip-row-wrap--compact {
+    top: max(calc(env(safe-area-inset-top, 0px) + 0.75rem), 1.5rem);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact {
+    width: min(calc(100% - var(--ipad-edge-gap) - var(--ipad-edge-gap)), 74rem);
+    grid-template-columns: repeat(2, minmax(0, 24rem));
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .app-pip-row--compact
+    > .compact-take-slot {
+    --camera-take-card-height: 5rem;
+    --camera-take-thumb-size: 4rem;
+  }
+}
+
+/* Audio keeps the phone's connected, vertical composition on iPad. The wider
+   canvas is used for breathing room and larger controls, not extra columns. */
+@media (min-width: 744px) {
+  .app-ui-overlay--audio-mode .audio-mode-home-layer {
+    width: min(46rem, calc(100% - 3rem));
+    max-width: 46rem;
+    margin-inline: auto;
+    padding-inline: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-home-layer > * {
+    width: 100%;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-home {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    grid-template-columns: none;
+    align-items: stretch;
+    gap: clamp(0.85rem, 1.4vh, 1.2rem);
+    padding-bottom: clamp(0.45rem, 1vh, 0.8rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-hero {
+    min-height: clamp(14rem, 28vh, 22rem);
+    justify-content: flex-start;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-stack {
+    width: 100%;
+    min-height: 0;
+    gap: clamp(0.85rem, 1.3vh, 1.1rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-card {
+    min-height: clamp(8.5rem, 12vh, 10.25rem) !important;
+  }
+
+  .audio-practice-metronome-shell {
+    width: min(48rem, calc(100% - 3rem));
+    max-width: 48rem;
+    margin-inline: auto;
+    padding-inline: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__body {
+    display: flex;
+    width: 100%;
+    max-width: 46rem;
+    flex-direction: column;
+    grid-template-columns: none;
+    align-items: stretch;
+    gap: clamp(0.4rem, 0.9vh, 0.7rem);
+    margin-inline: auto;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__bpm-row,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__center-stack,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    width: min(100%, 36rem);
+    max-width: 36rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
+    width: 100%;
+    min-height: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual {
+    min-height: clamp(16rem, 34vh, 24rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-dial {
+    width: clamp(16rem, 30vh, 22rem);
+    height: clamp(16rem, 30vh, 22rem);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__pulse {
+    width: clamp(13rem, 25vh, 18rem);
+    height: clamp(13rem, 25vh, 18rem);
+  }
+
+  /* Keep Audio's five actions in one centered capsule. Camera deliberately
+     retains the separate edge-aware control layout above. */
+  .app-ui-overlay--audio-mode .control-deck:not(.control-deck--camera) {
+    padding-inline: max(1.5rem, env(safe-area-inset-left, 0px))
+      max(1.5rem, env(safe-area-inset-right, 0px)) !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-deck__main-row {
+    min-height: 4.75rem;
+    justify-content: center;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill {
+    width: min(calc(100vw - 3rem), 34rem);
+    height: 4.75rem;
+    grid-template-columns: 3.5rem minmax(0, 1fr) 4.25rem minmax(0, 1fr) 3.5rem;
+    column-gap: 0;
+    padding-inline: 0.3rem;
+    border: 0.75px solid rgba(255, 255, 255, 0.82);
+    border-radius: 999px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.14)),
+      rgba(222, 234, 244, 0.16);
+    box-shadow:
+      0 0.65rem 1.7rem rgba(29, 61, 84, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(22px) saturate(1.18);
+    backdrop-filter: blur(22px) saturate(1.18);
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill::before,
+  .app-ui-overlay--audio-mode .audio-control-pill::after {
+    display: block;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,
+  .app-ui-overlay--audio-mode .audio-control-pill .audio-camera-button,
+  .app-ui-overlay--audio-mode .audio-control-pill .audio-pill-action,
+  .app-ui-overlay--audio-mode
+    .audio-control-pill
+    > .control-deck__settings-btn.audio-control-deck__settings-btn {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 3.5rem !important;
+    align-self: stretch !important;
+    justify-self: stretch !important;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-deck__record-stack,
+  .app-ui-overlay--audio-mode
+    .audio-control-deck__record-stack
+    .record-delete-drop,
+  .app-ui-overlay--audio-mode
+    .audio-control-deck__record-stack
+    .record-carousel-viewport,
+  .app-ui-overlay--audio-mode
+    .audio-control-deck__record-stack
+    .record-carousel-viewport--audio-compact {
+    --record-carousel-viewport-width: 4.25rem;
+    --record-slot-active-size: 3.75rem;
+    width: 4.25rem !important;
+    height: 4.25rem !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-control-pill .record-carousel-slot--center {
+    width: 3.75rem !important;
+    height: 3.75rem !important;
+  }
+}
+
+@media (min-width: 744px) and (orientation: landscape) {
+  .app-ui-overlay--audio-mode .audio-mode-home-layer,
+  .audio-practice-metronome-shell {
+    width: min(42rem, calc(100% - 3rem));
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-hero {
+    min-height: clamp(10rem, 22vh, 13rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-hero-mic__dial {
+    width: clamp(10rem, 21vh, 13rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-card {
+    min-height: clamp(7.25rem, 15vh, 8.75rem) !important;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual {
+    min-height: clamp(14rem, 30vh, 19rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-dial {
+    width: clamp(14rem, 27vh, 18rem);
+    height: clamp(14rem, 27vh, 18rem);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__pulse {
+    width: clamp(11.5rem, 22vh, 15rem);
+    height: clamp(11.5rem, 22vh, 15rem);
+  }
+}
+
+/* Final iPad composition pass. These rules intentionally live last: the
+   tablet experience keeps the phone's vertical hierarchy while using an
+   iPad-sized content column, connected control capsules, and larger practice
+   surfaces. Nothing below 744px is affected. */
+@media (min-width: 744px) {
+  /* Camera now shares Audio's connected five-action bottom capsule. */
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .control-deck.control-deck--camera {
+    padding-inline: max(1.5rem, env(safe-area-inset-left, 0px))
+      max(1.5rem, env(safe-area-inset-right, 0px)) !important;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-deck__main-row {
+    min-height: 4.75rem;
+    justify-content: center;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill {
+    width: min(calc(100vw - 3rem), 34rem);
+    height: 4.75rem;
+    grid-template-columns: 3.5rem minmax(0, 1fr) 4.25rem minmax(0, 1fr) 3.5rem;
+    column-gap: 0;
+    padding-inline: 0.3rem;
+    overflow: visible;
+    border: 0.75px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.035)),
+      rgba(8, 12, 18, 0.18);
+    box-shadow:
+      0 0.65rem 1.7rem rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.22);
+    backdrop-filter: blur(22px) saturate(1.22);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill::before,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill::after {
+    display: block;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-vault-button,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-control-deck__settings-btn,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    .camera-pill-action {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 3.5rem !important;
+    align-self: stretch !important;
+    justify-self: stretch !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-vault-button::before,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    > .camera-control-deck__settings-btn::before {
+    display: block;
+  }
+
+  .camera-control-deck__record-stack,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-deck__record-stack
+    .record-delete-drop--camera,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-deck__record-stack
+    .record-carousel-viewport--camera,
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-deck__record-stack
+    .record-carousel-viewport {
+    --record-carousel-viewport-width: 4.25rem;
+    --record-slot-active-size: 3.75rem;
+    width: 4.25rem !important;
+    height: 4.25rem !important;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    .record-carousel-slot--camera {
+    width: 3.75rem !important;
+    height: 3.75rem !important;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .camera-control-pill
+    .record-orbit-icon {
+    width: 3.35rem;
+    height: 3.35rem;
+  }
+
+  /* Metronome: keep the phone's vertical order, but make each tier feel
+     deliberate at tablet scale instead of floating inside a phone column. */
+  .audio-practice-metronome-shell {
+    width: min(58rem, calc(100% - 3rem));
+    max-width: 58rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__body {
+    max-width: 56rem;
+    gap: clamp(0.7rem, 1.25vh, 1rem);
+    padding-top: clamp(0.35rem, 0.8vh, 0.65rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    width: min(100%, 42rem);
+    max-width: 42rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip {
+    min-height: 9rem;
+    padding: 0.75rem 1rem;
+    border-radius: 1.15rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-scrubber {
+    flex-basis: 14rem;
+    min-width: 12rem;
+    min-height: 7.25rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__tempo-scrubber
+    .metronome-audio-stage__bpm-value {
+    font-size: clamp(5rem, 9vw, 6.4rem);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__tempo-scrubber
+    .audio-practice-metronome__tempo-label,
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__tempo-scrubber
+    .metronome-audio-stage__bpm-label {
+    font-size: 0.8rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__tempo-strip
+    .audio-practice-metronome__step-btn {
+    width: 4.25rem;
+    height: 4.25rem;
+    font-size: 1rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    min-height: 4rem;
+    padding: 0.65rem 0.7rem;
+    border-radius: 1.15rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__center-stack {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual {
+    --runway-node-width: clamp(6.75rem, 11vw, 8rem);
+    --runway-node-height: clamp(21rem, 29vh, 25rem);
+    width: min(100%, 56rem);
+    max-width: none;
+    min-height: clamp(30rem, 39vh, 34rem);
+    margin-top: 0;
+    padding-inline: clamp(1rem, 2vw, 1.75rem);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__beat-row {
+    --runway-node-width: clamp(6.75rem, 11vw, 8rem);
+    --runway-node-height: clamp(21rem, 29vh, 25rem);
+    max-width: 54rem;
+    gap: clamp(0.8rem, 1.5vw, 1.25rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__transport-row {
+    max-width: 32rem;
+    min-height: 5.25rem;
+    gap: 1rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__transport-row
+    .audio-practice-metronome__play-btn {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__transport-row
+    :is(.audio-practice-metronome__tap-btn, .audio-practice-metronome__program-btn) {
+    min-height: 3.25rem;
+    font-size: 1rem;
+  }
+
+  /* Tuner: align the navigation and lower tool rail to Audio's 46rem/34rem
+     tablet rhythm and enlarge the live pitch readout. */
+  .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
+    width: min(calc(100% - 3rem), 46rem);
+    max-width: 46rem;
+    min-height: 3.6rem;
+    padding: 0.32rem;
+    gap: 0.2rem;
+  }
+
+  .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn {
+    min-height: 2.9rem;
+    font-size: 0.9rem;
+  }
+
+  .pitch-living-readout {
+    top: clamp(2.5rem, 5.5vh, 5rem);
+    width: min(82%, 36rem);
+  }
+
+  .pitch-living-readout__status {
+    min-height: 2rem;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+  }
+
+  .pitch-living-readout__note {
+    min-height: 8rem;
+    margin-top: 0.85rem;
+    font-size: clamp(7rem, 13vw, 8.75rem);
+  }
+
+  .pitch-living-readout__detail {
+    min-height: 2rem;
+    margin-top: 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  .pitch-living-readout__detail strong {
+    font-size: 1.2rem;
+  }
+
+  .pitch-living-tool-rail {
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    width: min(calc(100% - 3rem), 34rem);
+    height: 4.75rem;
+    grid-template-columns: minmax(0, 1fr) 4.25rem minmax(0, 1fr);
+    grid-auto-rows: 4.25rem;
+    gap: 0;
+    padding: 0.25rem 0.3rem;
+    overflow: hidden;
+    border: 0.75px solid rgba(255, 255, 255, 0.88);
+    border-radius: 999px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.16)),
+      rgba(222, 234, 244, 0.18);
+    box-shadow:
+      0 0.65rem 1.7rem rgba(29, 61, 84, 0.13),
+      inset 0 1px 0 rgba(255, 255, 255, 0.88);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    backdrop-filter: blur(24px) saturate(1.2);
+  }
+
+  .pitch-living-tool-rail > .pitch-living-drone-trigger,
+  .pitch-living-tool-rail .pitch-living-insights-trigger {
+    width: 100%;
+    height: 4.25rem;
+    min-height: 4.25rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-drone-trigger {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    gap: 0 0.55rem;
+    padding: 0.55rem 1rem;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-drone-trigger svg {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-drone-trigger span {
+    font-size: 0.8rem;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-drone-trigger small {
+    font-size: 0.68rem;
+  }
+
+  .pitch-living-tool-rail .pitch-living-insights-trigger {
+    width: 4.25rem;
+    justify-self: center;
+  }
+
+  .pitch-living-tool-rail .pitch-living-insights-trigger svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  /* Games retain their vertical, lightweight composition but occupy a true
+     tablet content width with larger cards and setup previews. */
+  .labs-overlay .arcade-menu {
+    width: min(calc(100% - 3rem), 58rem);
+    max-width: 58rem;
+    padding-inline: 0;
+  }
+
+  .labs-overlay .arcade-menu__hero {
+    margin-top: clamp(3rem, 7vh, 6rem);
+    margin-bottom: clamp(1.25rem, 2vh, 2rem);
+  }
+
+  .labs-overlay .arcade-menu__hero h1 {
+    font-size: clamp(2.35rem, 4.5vw, 3.4rem);
+  }
+
+  .labs-overlay .arcade-menu__hero p:last-child {
+    max-width: 42rem;
+    font-size: 1rem;
+  }
+
+  .labs-overlay .arcade-game-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .labs-overlay .arcade-game-card {
+    min-height: clamp(19rem, 25vh, 22rem);
+    padding: clamp(1.25rem, 2.5vw, 2rem);
+    border-radius: 1.75rem;
+  }
+
+  .labs-overlay :is(.sj-screen, .balance-screen--setup) {
+    width: min(calc(100% - 3rem), 60rem);
+    max-width: 60rem;
+    padding-inline: clamp(1.5rem, 3vw, 2.5rem);
+  }
+
+  .labs-overlay .sj-screen--setup {
+    max-height: 100%;
+  }
+}
+
+@media (min-width: 744px) and (orientation: landscape) {
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill {
+    width: min(calc(100vw - 4rem), 37.5rem);
+    grid-template-columns: 3.75rem minmax(0, 1fr) 4.5rem minmax(0, 1fr) 3.75rem;
+  }
+
+  .audio-practice-metronome-shell {
+    width: min(62rem, calc(100% - 4rem));
+    max-width: 62rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__body {
+    max-width: 60rem;
+    gap: clamp(0.45rem, 0.8vh, 0.7rem);
+    padding-top: 0.2rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip {
+    min-height: 7.75rem;
+    padding-block: 0.55rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-scrubber {
+    min-height: 6.25rem;
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__tempo-scrubber
+    .metronome-audio-stage__bpm-value {
+    font-size: clamp(4.5rem, 7vw, 5.7rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    min-height: 3.5rem;
+    padding-block: 0.48rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual--large,
+  .app-ui-overlay--audio-mode .audio-practice-metronome__visual {
+    --runway-node-width: clamp(6.5rem, 8vw, 7.75rem);
+    --runway-node-height: clamp(19rem, 34vh, 22rem);
+    width: min(100%, 58rem);
+    min-height: clamp(25rem, 43vh, 28rem);
+  }
+
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__beat-row {
+    --runway-node-width: clamp(6.5rem, 8vw, 7.75rem);
+    --runway-node-height: clamp(19rem, 34vh, 22rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-metronome__transport-row {
+    min-height: 4.75rem;
+  }
+
+  .pitch-living-readout {
+    top: clamp(2rem, 4vh, 3rem);
+  }
+
+  .labs-overlay .arcade-menu {
+    width: min(calc(100% - 4rem), 64rem);
+    max-width: 64rem;
+  }
+
+  .labs-overlay .arcade-menu__hero {
+    margin-top: clamp(2rem, 4vh, 3rem);
+  }
+
+  .labs-overlay .arcade-game-card {
+    min-height: clamp(17rem, 29vh, 20rem);
+  }
+
+  .labs-overlay :is(.sj-screen, .balance-screen--setup) {
+    width: min(calc(100% - 4rem), 62rem);
+    max-width: 62rem;
+  }
+
+  /* Settings becomes an iPad two-pane sheet: persistent section rail on the
+     left, content on the right, with one shared vertical scroll surface. */
+  .animated-bottom-sheet:has(.settings-drawer-scroll),
+  .native-bottom-sheet:has(.settings-drawer-scroll) {
+    width: min(70rem, calc(100% - 4rem));
+    max-height: min(88vh, 50rem);
+  }
+
+  .settings-drawer-scroll > .space-y-5 {
+    display: grid;
+    grid-template-columns: 13.5rem minmax(0, 1fr);
+    column-gap: 1.5rem;
+    row-gap: 1.1rem;
+    align-items: start;
+  }
+
+  .settings-drawer-scroll > .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0 !important;
+  }
+
+  .settings-drawer-scroll .settings-category-nav {
+    position: sticky;
+    top: 0;
+    grid-column: 1;
+    grid-row: 1 / span 20;
+    align-self: start;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .settings-drawer-scroll .settings-category-nav::after {
+    content: none;
+  }
+
+  .settings-drawer-scroll .settings-category-nav__track {
+    flex-direction: column;
+    gap: 0.3rem;
+    overflow: visible;
+    padding: 0.4rem;
+  }
+
+  .settings-drawer-scroll .settings-category-nav__button {
+    width: 100%;
+    min-height: 2.75rem;
+    text-align: left;
+  }
+
+  .settings-drawer-scroll .settings-group {
+    grid-column: 2;
+  }
+
+  .settings-group[id^='settings-section-'],
+  #settings-section-more {
+    scroll-margin-top: 1rem;
+  }
+}
+
+/* iPad Audio spacing corrections. Keep the waveform, hint, and take cards as
+   one centered vertical composition instead of allowing the hero to absorb
+   every unused point between the waveform and cards. */
+@media (min-width: 744px) {
+  .app-ui-overlay--audio-mode .audio-mode-home {
+    justify-content: center;
+    gap: clamp(1.5rem, 2.4vh, 2.1rem);
+    padding-block: clamp(1rem, 2vh, 1.75rem);
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-hero {
+    flex: 0 0 auto;
+    min-height: 0;
+    gap: clamp(0.7rem, 1.2vh, 1rem);
+    padding-top: 0;
+  }
+
+  .app-ui-overlay--audio-mode .audio-mode-take-stack {
+    margin-bottom: 0;
+  }
+
+  /* A tablet bar is wider than the phone-sized grid track it replaced. Size
+     the single-line runway from its column count so each bar owns a full cell
+     and keeps a visible gap from its neighbours. */
+  .app-ui-overlay--audio-mode
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__beat-row--single-line {
+    width: min(100%, calc(var(--beat-columns) * 9rem));
+    justify-items: center;
+  }
+
+  /* Tuner tools are three explicit segments. The shared trigger class uses a
+     two-column label layout, so Pitch Insights must reset that grid instead
+     of inheriting the Drone / Transpose padding and squeezing its icon. */
+  .pitch-living-tool-rail {
+    width: min(calc(100% - 3rem), 38rem);
+    grid-template-columns: minmax(0, 1fr) 4.75rem minmax(0, 1fr);
+    column-gap: 0.375rem;
+    padding-inline: 0.45rem;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-drone-trigger {
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-drone-trigger:first-child {
+    grid-column: 1;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-insights-trigger {
+    width: 4.75rem;
+    grid-column: 2;
+    grid-row: 1;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    place-items: center;
+    padding: 0;
+    overflow: visible;
+    border-inline: 1px solid rgba(21, 152, 255, 0.13);
+  }
+
+  .pitch-living-tool-rail > .pitch-living-insights-trigger svg {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .pitch-living-tool-rail > .pitch-living-transposition-trigger {
+    grid-column: 3;
+  }
+
+  .pitch-living-tool-rail
+    > .pitch-living-drone-trigger:not(.pitch-living-insights-trigger) {
+    padding-inline: 0.85rem;
   }
 }

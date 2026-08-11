@@ -201,14 +201,65 @@ function layoutToolsList(count: number, anchorRect: DOMRect): BranchLayout {
   }
 }
 
-/** Camera uses a centered dice cluster; audio and tuner use an anchored vertical list. */
+/**
+ * iPad has enough horizontal room for Tools to read as one compact popover
+ * above the control deck. Keeping the phone's vertical list here made the
+ * palette look like a narrow, detached strip in the middle of the display.
+ */
+function layoutToolsRow(count: number, anchorRect: DOMRect): BranchLayout {
+  const itemStep = TOOLS_ITEM_WIDTH + TOOLS_ITEM_GAP
+  const positions = Array.from({ length: count }, (_, index) => ({
+    x: (index - (count - 1) / 2) * itemStep,
+    y: 0,
+  }))
+
+  const boxWidth = count * TOOLS_ITEM_WIDTH + Math.max(0, count - 1) * TOOLS_ITEM_GAP + 2 * BOX_PADDING
+  const boxHeight = TOOLS_ITEM_HEIGHT + 2 * BOX_PADDING
+  const visualViewport = window.visualViewport
+  const viewportLeft = visualViewport?.offsetLeft ?? 0
+  const viewportTop = visualViewport?.offsetTop ?? 0
+  const viewportWidth = visualViewport?.width ?? window.innerWidth
+  const viewportHeight = visualViewport?.height ?? window.innerHeight
+  const wheelOriginX = viewportLeft + viewportWidth / 2
+  const wheelOriginY = viewportTop + viewportHeight / 2
+
+  const desiredBoxBottom = anchorRect.top - TOOLS_DECK_CLEARANCE
+  const desiredBoxCenterY = desiredBoxBottom - boxHeight / 2
+  const minBoxCenterY = viewportTop + VIEWPORT_MARGIN + boxHeight / 2
+  const boxCenterYAbsolute = Math.max(minBoxCenterY, desiredBoxCenterY)
+  const boxCenterY = boxCenterYAbsolute - wheelOriginY
+
+  const halfBoxWidth = boxWidth / 2
+  const minCenterXAbsolute = viewportLeft + VIEWPORT_MARGIN + halfBoxWidth
+  const maxCenterXAbsolute = viewportLeft + viewportWidth - VIEWPORT_MARGIN - halfBoxWidth
+  const boxCenterXAbsolute = Math.min(
+    maxCenterXAbsolute,
+    Math.max(minCenterXAbsolute, wheelOriginX),
+  )
+  const boxCenterX = boxCenterXAbsolute - wheelOriginX
+
+  return {
+    positions: positions.map((point) => ({ x: point.x + boxCenterX, y: point.y + boxCenterY })),
+    boxWidth,
+    boxHeight,
+    boxCenter: { x: boxCenterX, y: boxCenterY },
+  }
+}
+
+/** Camera uses a centered dice cluster; audio and tuner anchor near the control deck. */
 export function computeBranchLayout(
   count: number,
   anchorRect: DOMRect,
   mode: SettingsBranchLayoutMode = 'camera',
 ): BranchLayout {
   if (count === 0) return { positions: [], boxWidth: 0, boxHeight: 0, boxCenter: { x: 0, y: 0 } }
-  return mode === 'camera' ? layoutCameraGrid(count) : layoutToolsList(count, anchorRect)
+  if (mode === 'camera') return layoutCameraGrid(count)
+
+  const visualViewport = window.visualViewport
+  const viewportWidth = visualViewport?.width ?? window.innerWidth
+  return viewportWidth >= 744
+    ? layoutToolsRow(count, anchorRect)
+    : layoutToolsList(count, anchorRect)
 }
 
 export const CAMERA_BRANCH_ITEM_WIDTH = CAMERA_ITEM_WIDTH
