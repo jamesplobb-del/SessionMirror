@@ -1,4 +1,4 @@
-export type OnboardingCardId = 'welcome'
+export type OnboardingCardId = 'welcome' | 'instrument'
 
 export type CoachMarkId =
   | 'record-camera-take'
@@ -89,7 +89,7 @@ export interface OnboardingCard {
   kicker?: string
   title: string
   body: string
-  highlights: string[]
+  highlights?: string[]
 }
 
 export interface CoachMarkContent {
@@ -120,10 +120,13 @@ export interface HelpTopic {
 export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
     id: 'welcome',
-    kicker: 'A quick look around',
-    title: 'Make a take. Hear the difference.',
-    body: 'Record two short takes, compare them, and keep the one you want. We’ll point out the other controls as we go.',
-    highlights: ['About two minutes', 'Uses the real controls'],
+    title: 'Welcome to BestTake',
+    body: 'Take a tour.',
+  },
+  {
+    id: 'instrument',
+    title: 'What do you play?',
+    body: 'Sets the tuner to read your written notes and listen for your instrument. Change it any time in Settings.',
   },
 ]
 

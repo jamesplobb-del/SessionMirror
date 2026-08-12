@@ -1,27 +1,39 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Check, Grid2X2, Layers3 } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
+import {
+  INSTRUMENT_FAMILIES,
+  getInstrumentProfile,
+  getInstrumentProfilesByFamily,
+} from '../utils/instrumentProfiles'
+import { getTunerProfile } from '../utils/pitchConfig'
+import { getTunerTransposition } from '../utils/tunerTransposition'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { triggerLightHaptic } from '../utils/haptics'
 
 interface OnboardingTutorialProps {
   onComplete: () => void
   onSkip: () => void
+  /** Applies the tuner and hands-free settings implied by the chosen instrument. */
+  onSelectInstrument: (instrumentId: string) => void
   hapticFeedback?: boolean
 }
 
 export default function OnboardingTutorial({
   onComplete,
   onSkip,
+  onSelectInstrument,
   hapticFeedback = true,
 }: OnboardingTutorialProps) {
   const [index, setIndex] = useState(0)
+  const [selectedInstrument, setSelectedInstrument] = useState<string | null>(null)
   const card = ONBOARDING_CARDS[index] ?? ONBOARDING_CARDS[0]
   const isLast = index >= ONBOARDING_CARDS.length - 1
+  const isInstrumentStep = card.id === 'instrument'
 
   useEffect(() => {
     document.body.classList.add('tutorial-active')
@@ -49,16 +61,40 @@ export default function OnboardingTutorial({
     setIndex((value) => Math.min(ONBOARDING_CARDS.length - 1, value + 1))
   }, [finish, hapticFeedback, isLast])
 
+  /** The card body advances on tap, but only where there is nothing to choose. */
+  const handleCardTap = useCallback(() => {
+    if (isInstrumentStep) return
+    handleNext()
+  }, [handleNext, isInstrumentStep])
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (isInstrumentStep) return
       if (event.key !== 'Enter' && event.key !== ' ') return
       event.preventDefault()
       handleNext()
     },
-    [handleNext],
+    [handleNext, isInstrumentStep],
+  )
+
+  const handleSelectInstrument = useCallback(
+    (instrumentId: string) => {
+      if (!instrumentId) return
+      void triggerLightHaptic(hapticFeedback)
+      setSelectedInstrument(instrumentId)
+      onSelectInstrument(instrumentId)
+    },
+    [hapticFeedback, onSelectInstrument],
   )
 
   if (typeof document === 'undefined') return null
+
+  const selectedProfile = selectedInstrument ? getInstrumentProfile(selectedInstrument) : undefined
+  const selectionSummary = selectedProfile
+    ? `${getTunerProfile(selectedProfile.tunerInstrument).label} · Written pitch: ${
+        getTunerTransposition(selectedProfile.tunerTransposition).shortLabel
+      }`
+    : null
 
   return createPortal(
     <div
@@ -67,7 +103,7 @@ export default function OnboardingTutorial({
       aria-modal="true"
       aria-label="BestTake onboarding"
       tabIndex={0}
-      onClick={handleNext}
+      onClick={handleCardTap}
       onKeyDown={handleKeyDown}
     >
       <motion.div
@@ -111,26 +147,57 @@ export default function OnboardingTutorial({
             ) : null}
             <h1>{card.title}</h1>
             <p>{card.body}</p>
-            <div className="onboarding-lite__feature-row" aria-label="Camera tools">
-              <span>
-                <Layers3 aria-hidden />
-                <strong>Overlays</strong>
-                <small>Controls on screen</small>
-              </span>
-              <span>
-                <Grid2X2 aria-hidden />
-                <strong>Multitrack</strong>
-                <small>Layer performances</small>
-              </span>
-            </div>
-            <div className="onboarding-lite__highlights" aria-label="Highlights">
-              {card.highlights.map((highlight) => (
-                <span key={highlight}>
-                  <Check aria-hidden />
-                  {highlight}
-                </span>
-              ))}
-            </div>
+
+            {isInstrumentStep ? (
+              <div className="onboarding-lite__instrument-field">
+                {/*
+                 * A plain <select> on purpose: iOS renders it as the system
+                 * wheel picker, so the instrument list scrolls the way every
+                 * other picker on the device does and needs no scroll
+                 * container of our own.
+                 */}
+                <select
+                  className="onboarding-lite__instrument-select"
+                  aria-label="Instrument"
+                  data-placeholder={selectedInstrument === null}
+                  value={selectedInstrument ?? ''}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => handleSelectInstrument(event.target.value)}
+                >
+                  <option value="" disabled>
+                    Choose your instrument
+                  </option>
+                  {INSTRUMENT_FAMILIES.map((family) => (
+                    <optgroup key={family} label={family}>
+                      {getInstrumentProfilesByFamily(family).map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <ChevronDown className="onboarding-lite__instrument-chevron" aria-hidden />
+              </div>
+            ) : null}
+
+            {selectionSummary ? (
+              <p className="onboarding-lite__instrument-summary" aria-live="polite">
+                <Check aria-hidden />
+                {selectionSummary}
+              </p>
+            ) : null}
+
+            {card.highlights?.length ? (
+              <div className="onboarding-lite__highlights" aria-label="Highlights">
+                {card.highlights.map((highlight) => (
+                  <span key={highlight}>
+                    <Check aria-hidden />
+                    {highlight}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </motion.section>
         </AnimatePresence>
 
@@ -148,10 +215,27 @@ export default function OnboardingTutorial({
           >
             Skip Tour
           </Pressable>
-          <div className="onboarding-lite__tap-hint" aria-hidden>
-            Begin tour
-            <ArrowRight className="h-4 w-4" />
-          </div>
+          {isInstrumentStep ? (
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              onClick={(event) => {
+                event.stopPropagation()
+                finish()
+              }}
+              className="onboarding-lite__tap-hint"
+            >
+              Start Tour
+              <ArrowRight className="h-4 w-4" />
+            </Pressable>
+          ) : (
+            <div className="onboarding-lite__tap-hint" aria-hidden>
+              Begin tour
+              <ArrowRight className="h-4 w-4" />
+            </div>
+          )}
         </footer>
       </motion.div>
     </div>,

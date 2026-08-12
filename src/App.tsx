@@ -104,6 +104,7 @@ import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosFade, iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
+import { getInstrumentSettings } from './utils/instrumentProfiles'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
@@ -626,6 +627,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setShowOnboardingTutorial(false)
     setTutorialTourEnabled(false)
   }, [])
+
+  /** Onboarding instrument pick — sets the tuner profile, written pitch, and auto-record gate. */
+  const handleSelectOnboardingInstrument = useCallback(
+    (instrumentId: string) => {
+      const instrumentSettings = getInstrumentSettings(instrumentId)
+      if (!instrumentSettings) return
+      updateSettings(instrumentSettings)
+    },
+    [updateSettings],
+  )
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -4833,6 +4844,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         key="onboarding-tutorial"
                         onComplete={handleCompleteOnboardingTutorial}
                         onSkip={handleSkipOnboardingTutorial}
+                        onSelectInstrument={handleSelectOnboardingInstrument}
                         hapticFeedback={settings.hapticFeedback}
                       />
                     )}
