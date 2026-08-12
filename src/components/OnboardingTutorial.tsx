@@ -181,7 +181,7 @@ export default function OnboardingTutorial({
               </div>
             ) : null}
 
-            {selectionSummary ? (
+            {isInstrumentStep && selectionSummary ? (
               <p className="onboarding-lite__instrument-summary" aria-live="polite">
                 <Check aria-hidden />
                 {selectionSummary}
@@ -223,16 +223,16 @@ export default function OnboardingTutorial({
               hapticFeedback={hapticFeedback}
               onClick={(event) => {
                 event.stopPropagation()
-                finish()
+                handleNext()
               }}
               className="onboarding-lite__tap-hint"
             >
-              Start Tour
+              {card.cta}
               <ArrowRight className="h-4 w-4" />
             </Pressable>
           ) : (
             <div className="onboarding-lite__tap-hint" aria-hidden>
-              Begin tour
+              {card.cta}
               <ArrowRight className="h-4 w-4" />
             </div>
           )}

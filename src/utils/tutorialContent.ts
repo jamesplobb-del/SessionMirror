@@ -1,4 +1,4 @@
-export type OnboardingCardId = 'welcome' | 'instrument'
+export type OnboardingCardId = 'welcome' | 'instrument' | 'closing'
 
 export type CoachMarkId =
   | 'record-camera-take'
@@ -89,6 +89,8 @@ export interface OnboardingCard {
   kicker?: string
   title: string
   body: string
+  /** Label on the card's forward control. */
+  cta: string
   highlights?: string[]
 }
 
@@ -122,11 +124,19 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
     id: 'welcome',
     title: 'Welcome to BestTake',
     body: 'Take a tour.',
+    cta: 'Begin tour',
   },
   {
     id: 'instrument',
     title: 'What do you play?',
     body: 'Sets the tuner to read your written notes and listen for your instrument. Change it any time in Settings.',
+    cta: 'Continue',
+  },
+  {
+    id: 'closing',
+    title: 'Record your best take',
+    body: 'Then beat it.',
+    cta: 'Start Tour',
   },
 ]
 

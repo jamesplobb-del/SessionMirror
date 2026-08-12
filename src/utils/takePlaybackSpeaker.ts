@@ -112,6 +112,13 @@ function shouldUseSpeakerMastering(nodes?: TakeSpeakerNodes): boolean {
   return !isHeadphoneOutputActive() && speakerLoudnessPreset !== 'off'
 }
 
+/**
+ * Loudness analysis decodes the whole file. Past this length that costs more
+ * memory than the WebView has, so a long take would take the app down rather
+ * than play. Losing normalization on a marathon take is the acceptable trade.
+ */
+const MAX_LOUDNESS_ANALYSIS_SECONDS = 8 * 60
+
 function shouldAnalyzePlaybackLoudness(el: HTMLMediaElement): boolean {
   if (
     Capacitor.isNativePlatform() &&
@@ -119,6 +126,12 @@ function shouldAnalyzePlaybackLoudness(el: HTMLMediaElement): boolean {
     !isTabletViewport() &&
     el instanceof HTMLVideoElement
   ) {
+    return false
+  }
+  if (Number.isFinite(el.duration) && el.duration > MAX_LOUDNESS_ANALYSIS_SECONDS) {
+    console.info('[Loudness] skipping analysis — take too long to decode safely', {
+      duration: el.duration,
+    })
     return false
   }
   return true

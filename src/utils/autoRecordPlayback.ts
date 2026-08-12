@@ -1,3 +1,5 @@
+import { getPlaybackAudioContext } from './playbackAudioContext'
+
 /** Hands-free capture: keep this much audio before the performance gate. */
 export const AUTO_RECORD_PREROLL_MS = 1000
 
@@ -18,9 +20,29 @@ const PEAK_HEADROOM_DB = 24
 const RMS_CONTENT_DROP_DB = 10
 const PEAK_CONTENT_DROP_DB = 12
 const CONSECUTIVE_RMS_WINDOWS = 3
+/** Longest take whose onset we will scan by decoding the whole file. */
+const MAX_ONSET_SCAN_SECONDS = 8 * 60
 
 function linearToDb(value: number): number {
   return 20 * Math.log10(Math.max(value, 1e-8))
+}
+
+/**
+ * Onset offsets keyed by media URL.
+ *
+ * Hands-free replays the same take repeatedly, and the scan below decodes the
+ * whole file. Without this, every single replay re-fetched and re-decoded it.
+ */
+const onsetCache = new Map<string, number>()
+const ONSET_CACHE_LIMIT = 24
+
+function rememberOnset(key: string, value: number): number {
+  if (onsetCache.size >= ONSET_CACHE_LIMIT) {
+    const oldest = onsetCache.keys().next().value
+    if (oldest !== undefined) onsetCache.delete(oldest)
+  }
+  onsetCache.set(key, value)
+  return value
 }
 
 function percentile(sorted: number[], ratio: number): number {
@@ -40,9 +62,24 @@ export async function findAutoPlaybackLeadInStartSeconds(
   const src = media.currentSrc || media.src
   if (!src) return 0
 
-  let ctx: AudioContext | null = null
+  // Same trap as the waveform and loudness paths: this decodes the entire file.
+  // A long take would cost more memory than the WebView has, and the lead-in is
+  // only a nicety — starting at 0 is a fine outcome.
+  if (Number.isFinite(media.duration) && media.duration > MAX_ONSET_SCAN_SECONDS) {
+    return 0
+  }
+
+  const cacheKey = `${src}|${leadInSeconds}`
+  const cached = onsetCache.get(cacheKey)
+  if (cached !== undefined) return cached
+
   try {
-    ctx = new AudioContext()
+    // Decode on the shared playback context. This used to mint (and close) a
+    // fresh AudioContext per replay: WKWebView caps how many can exist, close()
+    // does not reclaim the hardware object promptly, and an extended hands-free
+    // session eventually exhausted them — at which point playback stopped
+    // working app-wide, not just here.
+    const ctx = await getPlaybackAudioContext()
     const response = await fetch(src)
     if (!response.ok) return 0
     const arrayBuffer = await response.arrayBuffer()
@@ -79,7 +116,7 @@ export async function findAutoPlaybackLeadInStartSeconds(
     }
 
     if (windows.length === 0) {
-      return 0
+      return rememberOnset(cacheKey, 0)
     }
 
     const baselineWindowCount = Math.max(
@@ -120,17 +157,15 @@ export async function findAutoPlaybackLeadInStartSeconds(
           ? Math.max(0, window.offset - (CONSECUTIVE_RMS_WINDOWS - 1) * windowSamples)
           : window.offset
         const onsetSeconds = correctedOffset / sampleRate
-        return Math.max(0, onsetSeconds - leadInSeconds)
+        return rememberOnset(cacheKey, Math.max(0, onsetSeconds - leadInSeconds))
       }
     }
 
-    return 0
+    return rememberOnset(cacheKey, 0)
   } catch {
+    // Not cached: a transient fetch/decode failure should not pin 0 for the
+    // rest of the session.
     return 0
-  } finally {
-    if (ctx && ctx.state !== 'closed') {
-      await ctx.close().catch(() => {})
-    }
   }
 }
 

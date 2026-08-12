@@ -966,9 +966,19 @@ export function useAutoSoundRecording({
     setHandsFreeRecording(false)
   }, [isRecording])
 
-  const restartHandsFreeMonitor = useCallback(() => {
+  const restartHandsFreeMonitor = useCallback((options?: { force?: boolean }) => {
     if (!isAppInForeground()) return
-    if (nativeTapReadyRef.current && isNativeAudioCaptureActiveRef.current?.() === true) {
+    // `isNativeAudioCaptureActive()` reads a JS mirror of the last state we
+    // pushed to native, not the live hardware. After an interruption (alarm,
+    // call, Siri) it can still report an active capture that iOS has already
+    // torn down — and this guard then skipped the very restart that would have
+    // rebuilt it, leaving hands-free permanently deaf. Callers recovering from
+    // a lifecycle event must be able to insist.
+    if (
+      !options?.force &&
+      nativeTapReadyRef.current &&
+      isNativeAudioCaptureActiveRef.current?.() === true
+    ) {
       return
     }
     setMonitorEpoch((epoch) => epoch + 1)

@@ -22,6 +22,8 @@ import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
+import HandsFreeStage from './components/HandsFreeStage'
+import { resolveHandsFreePhase } from './utils/handsFreePhase'
 import type { LabsRoute } from './components/labs/LabsOverlay'
 import { useCameraSession } from './hooks/useCameraSession'
 import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
@@ -2265,7 +2267,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             : Promise.resolve(refreshCameraSessionRef.current())
         void refresh.finally(() => {
           if (autoSoundRecordingEnabledRef.current) {
-            restartHandsFreeMonitorRef.current()
+            // Force past the "native capture already active" guard: coming back
+            // from another app is exactly the case where that flag is stale.
+            restartHandsFreeMonitorRef.current({ force: true })
           }
         })
       }, 400)
@@ -3138,6 +3142,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     (recordingMode === 'video' || (recordingMode === 'audio' && audioPracticeTab !== 'metronome'))
 
   const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended
+
+  // Full-screen hands-free presence layer. Uses the same resolver as the control
+  // deck carousel so the stage and the record button can never disagree, and
+  // stands down whenever a sheet, review or the tutorial owns the screen.
+  const handsFreeStagePhase = resolveHandsFreePhase({
+    autoSoundRecording: settings.autoSoundRecording,
+    isRecording,
+    handsFreePlaybackPending: handsFreePlaybackPending || autoPlaybackPlaying,
+    handsFreeListeningReady,
+    dragDeleteActive: pipDragState.isDragging && !isRecording,
+    finishingTake: isStopping && recordingMode === 'video',
+  })
+  const handsFreeStageVisiblePhase =
+    hudModalState === 'idle' && !showOnboardingTutorial ? handsFreeStagePhase : null
 
   const takePlaybackActive =
     autoPlaybackPlaying ||
@@ -4261,6 +4279,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   </Suspense>
                 )}
               </div>
+
+              {/* Sibling of the rotator, not a child: `.app-ui-rotator` is a
+                  positioned z-10 element, so anything nested inside it is
+                  clamped to that plane and the z-36 metronome layer would paint
+                  over the hands-free overlay. */}
+              <HandsFreeStage
+                phase={handsFreeStageVisiblePhase}
+                elapsed={elapsed}
+                onLightBackground={recordingMode === 'audio'}
+              />
 
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
                 {showMainPitchWidget && mainVideoPitchSource && (

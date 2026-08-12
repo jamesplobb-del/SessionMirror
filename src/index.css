@@ -3110,6 +3110,208 @@ video.camera-preview.camera-preview--hidden {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Hands-free stage — full-screen presence layer.
+ *
+ * Rendered as a sibling of `.app-ui-rotator` (a positioned z-10 element, and
+ * therefore a stacking context that would otherwise clamp this). Sits above
+ * every in-app layer including the floating metronome/pitch widgets at z-36,
+ * so hands-free reads over whatever the user has up — camera included. Never
+ * takes a pointer event and never fully hides anything: the app behind it must
+ * stay both visible and usable while hands-free listens.
+ * ------------------------------------------------------------------------- */
+.hands-free-stage {
+  --hands-free-accent: 99, 188, 255;
+  position: fixed;
+  z-index: 37;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Biases the copy to ~60% of the height instead of dead centre. The tuner
+   * puts its note, cents readout and gauge in the exact middle of the screen —
+   * centring here landed the status text straight on top of the numbers the
+   * user is watching. This still reads as "middle of the screen" while leaving
+   * the tuner's own data completely clear. */
+  padding-top: 20vh;
+  opacity: 0;
+  transition: opacity 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  pointer-events: none;
+}
+
+.hands-free-stage * {
+  pointer-events: none;
+}
+
+.hands-free-stage:not([aria-hidden='true']) {
+  opacity: 1;
+}
+
+.hands-free-stage[aria-hidden='true'] {
+  visibility: hidden;
+}
+
+.hands-free-stage--recording {
+  --hands-free-accent: 251, 113, 133;
+}
+
+.hands-free-stage--preparing {
+  --hands-free-accent: 148, 163, 184;
+}
+
+.hands-free-stage--playback {
+  --hands-free-accent: 52, 211, 153;
+}
+
+/* Barely-there tint so the camera / tuner underneath stays legible. */
+.hands-free-stage__wash {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      118% 78% at 50% 50%,
+      rgba(var(--hands-free-accent), 0.05) 0%,
+      rgba(var(--hands-free-accent), 0.02) 46%,
+      transparent 78%
+    );
+  transition: background 320ms ease;
+}
+
+/* The "screen reacts" cue: a phase-coloured edge glow that breathes. */
+.hands-free-stage__rim {
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(var(--hands-free-accent), 0.26),
+    inset 0 0 4.5rem rgba(var(--hands-free-accent), 0.16);
+  animation: hands-free-stage-rim 3.6s ease-in-out infinite;
+  transition: box-shadow 320ms ease;
+}
+
+.hands-free-stage--recording .hands-free-stage__rim {
+  box-shadow:
+    inset 0 0 0 2px rgba(var(--hands-free-accent), 0.42),
+    inset 0 0 6rem rgba(var(--hands-free-accent), 0.24);
+  animation-duration: 1.5s;
+}
+
+.hands-free-stage--preparing .hands-free-stage__rim {
+  animation-duration: 2.2s;
+}
+
+.hands-free-stage__center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 1.5rem 2.2rem;
+  text-align: center;
+}
+
+/* Soft halo behind the copy only — keeps the words readable over a busy tuner
+ * without putting a panel between the user and what they are watching. */
+.hands-free-stage__pulse {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: 19rem;
+  height: 19rem;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    rgba(8, 14, 22, 0.52) 0%,
+    rgba(8, 14, 22, 0.26) 44%,
+    transparent 74%
+  );
+  transform: translate(-50%, -50%);
+  animation: hands-free-stage-breathe 3.6s ease-in-out infinite;
+}
+
+.hands-free-stage--recording .hands-free-stage__pulse {
+  animation-duration: 1.5s;
+}
+
+.hands-free-stage__title {
+  color: rgb(var(--hands-free-accent));
+  font-size: 2rem;
+  font-weight: 780;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  transition: color 260ms ease;
+}
+
+.hands-free-stage__detail {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.9rem;
+  font-weight: 560;
+  line-height: 1.2;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+
+.hands-free-stage__elapsed {
+  margin-top: 0.35rem;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1.05rem;
+  font-weight: 640;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* Audio mode paints a light background — flip the neutral copy to dark ink and
+ * lighten the halo so it reads as a glow rather than a smudge. */
+html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__detail,
+html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__elapsed {
+  color: rgba(30, 43, 58, 0.78);
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.65);
+}
+
+html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__title {
+  text-shadow: 0 2px 14px rgba(255, 255, 255, 0.7);
+}
+
+html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__pulse {
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.24) 42%,
+    transparent 72%
+  );
+}
+
+@keyframes hands-free-stage-rim {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes hands-free-stage-breathe {
+  0%,
+  100% {
+    opacity: 0.78;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hands-free-stage__rim,
+  .hands-free-stage__pulse {
+    animation: none;
+  }
+}
+
 @keyframes auto-sound-hint-in {
   from {
     opacity: 0;

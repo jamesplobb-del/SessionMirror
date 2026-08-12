@@ -13,6 +13,7 @@ import {
   releaseNativeTunerMonitor,
 } from '../../utils/nativeAudioPitchTap'
 import { isNativeCaptureSessionActive } from '../../utils/cameraSessionState'
+import { ensureNativeCameraSessionHealthy } from '../../utils/nativeCameraTest'
 import {
   APP_FOREGROUND_RECOVERY_EVENT,
   APP_INTERACTIVE_MEDIA_RECOVERY_EVENT,
@@ -143,6 +144,13 @@ export default function AudioTunerTab({
   const recoverNativeSource = useCallback(async (): Promise<boolean> => {
     if (!active || !isAppInForeground()) return false
     if (handsFreeEnabled) {
+      // `isNativeCaptureSessionActive()` is only a mirror of what JS last TOLD
+      // native — an alarm or call can leave it reporting a session that no
+      // longer exists. Returning that mirror unchanged meant hands-free had no
+      // recovery path at all (the WebKit fallbacks below are gated behind
+      // `!handsFreeEnabled`), so the tuner sat on "connecting" until the app
+      // was restarted. Make native re-verify and self-heal first.
+      await ensureNativeCameraSessionHealthy()
       return isNativeCaptureSessionActive()
     }
     return recoverNativeTunerMonitor(micInputPreference)

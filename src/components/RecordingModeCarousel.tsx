@@ -8,6 +8,7 @@ import {
   triggerRecordStopHaptic,
 } from '../utils/haptics'
 import type { RecordingMode } from '../types'
+import type { HandsFreePhase } from '../utils/handsFreePhase'
 import { useLongPress } from '../hooks/useLongPress'
 import { useTutorialAction } from '../context/TutorialContext'
 
@@ -28,7 +29,7 @@ interface RecordingModeCarouselProps {
 }
 
 type SlotPosition = 'center' | 'left' | 'right'
-export type HandsFreePhase = 'preparing' | 'listening' | 'recording' | 'playback'
+export type { HandsFreePhase }
 
 function slotPosition(mode: RecordingMode, active: RecordingMode): SlotPosition {
   if (mode === active) return 'center'

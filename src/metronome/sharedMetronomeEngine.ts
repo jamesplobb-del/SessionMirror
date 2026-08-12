@@ -137,6 +137,8 @@ class SharedMetronomeEngine {
   private isBackgrounded = false
   private foregroundTimer: number | null = null
   private recoveringForeground = false
+  /** Bumped per mode-switch recovery pass so overlapping passes cannot fight. */
+  private modeSwitchRecoveryGeneration = 0
   private startInFlight = false
   private controlGeneration = 0
   private nativeControlQueue: Promise<void> = Promise.resolve()
@@ -1129,6 +1131,16 @@ class SharedMetronomeEngine {
   private async recoverAfterModeSwitch(targetMode: 'video' | 'audio'): Promise<void> {
     if (!this.snapshot.playing) return
 
+    // A single mode switch fires this from the React effect AND from three
+    // settle timers. Without a generation guard those passes interleave:
+    // `start()` short-circuits on `startInFlight`, the losing pass reads that
+    // as a failed attempt and calls `clearSchedulerTimer()` on the scheduler
+    // the winning pass just built, and whichever pass exhausts its retries
+    // last flips `playing:false` — the metronome switching itself off on the
+    // way back into Tools. Only the newest pass may act.
+    const generation = ++this.modeSwitchRecoveryGeneration
+    const superseded = () => generation !== this.modeSwitchRecoveryGeneration
+
     const enteringCamera = targetMode === 'video'
 
     if (enteringCamera) {
@@ -1136,9 +1148,10 @@ class SharedMetronomeEngine {
       // kills the capture session (black preview). Wait for live preview, then
       // only refresh the native metronome engine — no route release cycle.
       for (let attempt = 0; attempt < 12; attempt++) {
-        if (!this.snapshot.playing) return
+        if (!this.snapshot.playing || superseded()) return
         if (attempt > 0) {
           await new Promise((resolve) => window.setTimeout(resolve, 150 * attempt))
+          if (superseded()) return
         }
         try {
           const snapshot = await BestTakeAudioPlugin.getCameraSessionState()
@@ -1161,6 +1174,7 @@ class SharedMetronomeEngine {
     }
 
     await this.reassertNativeSpeakerRoute()
+    if (superseded()) return
 
     if (Capacitor.isNativePlatform()) {
       try {
@@ -1169,6 +1183,7 @@ class SharedMetronomeEngine {
       } catch {
         /* route may be blocked briefly while camera hands off */
       }
+      if (superseded()) return
     }
 
     if (this.isSchedulerHealthy()) {
@@ -1180,10 +1195,11 @@ class SharedMetronomeEngine {
     this.clearSchedulerTimer()
 
     for (let attempt = 0; attempt < 8; attempt++) {
-      if (!this.snapshot.playing) return
+      if (!this.snapshot.playing || superseded()) return
 
       if (attempt > 0) {
         await new Promise((resolve) => window.setTimeout(resolve, 120 * attempt))
+        if (superseded()) return
         await resumePlaybackAudioContext()
         if (Capacitor.isNativePlatform()) {
           try {
@@ -1193,9 +1209,11 @@ class SharedMetronomeEngine {
             /* retry */
           }
         }
+        if (superseded()) return
       }
 
       const started = await this.start({ recovered: true, fromStale: true })
+      if (superseded()) return
       if (started && this.isSchedulerHealthy()) {
         this.applyMasterGain()
         return
@@ -1203,8 +1221,14 @@ class SharedMetronomeEngine {
       this.clearSchedulerTimer()
     }
 
+    if (superseded()) return
     this.debugLog('mode-switch recovery failed')
-    this.patchState({ playing: false })
+    // The metronome stays on. The user turned it on; a route handoff between
+    // camera and Tools is not their instruction to turn it off. Web Audio gets
+    // one more recovery pass here; on the native engine `playing` simply stays
+    // set, so the next reconcile — or a tap on the button, which sanity-resets
+    // an unhealthy scheduler and restarts — brings the click back.
+    this.reconcileAfterInterrupt()
   }
 
   /**

@@ -386,7 +386,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
 
-            if CameraSessionGuard.recordingMode == "audio" && !self.isTunerMonitorActive {
+            // Hands-free in Tools owns the audio-only capture session without a
+            // tuner monitor, so `isTunerMonitorActive` alone left that path with
+            // NO self-heal at all: after an alarm or call interrupted the
+            // session, nothing here would run and the tuner/hands-free mic
+            // stayed dead until the app was restarted.
+            if CameraSessionGuard.recordingMode == "audio"
+                && !self.isTunerMonitorActive
+                && !self.isAudioOnlyRecording {
                 return
             }
 
@@ -394,6 +401,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 self.isPreviewActive ||
                 self.isBridgePreviewActive ||
                 self.isRecording ||
+                self.isAudioOnlyRecording ||
                 self.isTunerMonitorActive
             guard shouldBeActive else { return }
 
@@ -407,11 +415,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 return
             }
 
-            if self.isRecording || self.isStarting {
+            if self.isRecording || self.isStarting || self.isAudioOnlyRecording {
                 // Never tear down capture inputs/outputs mid-recording, but DO
                 // recover the movie audio connection and reactivate AVAudioSession
                 // input-only — interruptions/route changes can leave video writing
-                // while the audio connection is silently disabled.
+                // while the audio connection is silently disabled. The hands-free
+                // pre-roll is a live audio-only capture and gets the same
+                // non-destructive treatment: rebuilding under it would drop the
+                // file the next take is about to be promoted from.
                 self.recoverMovieAudioDuringRecording(reason: reason)
                 return
             }

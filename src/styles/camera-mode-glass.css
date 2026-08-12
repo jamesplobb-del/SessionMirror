@@ -2209,6 +2209,33 @@ button.compact-take-caption:active {
   justify-content: center;
 }
 
+/* The elapsed readout used to float ABOVE the record button, which put it
+ * straight underneath the pip row's split-view and multitrack buttons — the
+ * clock was unreadable for the whole take. It now hangs below the button, and
+ * `--timer-below` reserves the space for it so it never runs off the bottom
+ * edge on a phone with no home indicator. */
+.camera-control-deck__record-stack > .recording-elapsed {
+  top: calc(100% + 0.34rem);
+  bottom: auto;
+  min-height: 1.4rem;
+  padding: 0.26rem 0.6rem;
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
+  transition: padding-bottom 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .control-deck.control-deck--camera.control-deck--timer-below {
+  padding-bottom: calc(clamp(0.78rem, 2.2vh, 1.1rem) + 2rem) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
+    transition: none;
+  }
+}
+
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-deck__settings-btn
   > .ui-orient-spin,
@@ -2294,6 +2321,12 @@ button.compact-take-caption:active {
 
   .app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
     padding-bottom: 0.48rem !important;
+  }
+
+  /* Short screens keep their tighter base padding; just add the timer strip. */
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .control-deck.control-deck--camera.control-deck--timer-below {
+    padding-bottom: calc(0.48rem + 2rem) !important;
   }
 }
 

@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useCapacitorVideoSrc } from './useCapacitorVideoSrc'
+import { extractNativeWaveformPeaks } from '../utils/nativeWaveform'
 
 interface UseMediaWaveformOptions {
   filePath: string
   mediaUrl: string
   barCount?: number
 }
+
+/**
+ * Ceiling for the JavaScript decode fallback.
+ *
+ * That path costs roughly 2x the file size (fetch + the `.slice(0)` copy the
+ * decoder needs) PLUS the decoded stereo Float32 PCM — for a 20 minute 1080p
+ * take that is several gigabytes inside the WebView, which iOS answers by
+ * killing the app. Anything above this is left on the placeholder waveform
+ * rather than risking the process. Native takes never reach it.
+ */
+const MAX_JS_DECODE_BYTES = 48 * 1024 * 1024
 
 function fallbackPeaks(barCount: number): number[] {
   return Array.from({ length: barCount }, (_, index) => {
@@ -42,6 +54,19 @@ function buildPeaks(buffer: AudioBuffer, barCount: number): number[] {
   return peaks.map((peak) => Math.max(0.08, Math.min(1, Math.pow(peak / max, 0.72))))
 }
 
+/** Best-effort size probe so the decode below can refuse oversized media. */
+async function probeByteLength(src: string): Promise<number | null> {
+  try {
+    const response = await fetch(src, { method: 'HEAD' })
+    const length = response.headers.get('content-length')
+    if (!length) return null
+    const parsed = Number.parseInt(length, 10)
+    return Number.isFinite(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 export function useMediaWaveform({
   filePath,
   mediaUrl,
@@ -60,9 +85,41 @@ export function useMediaWaveform({
     let audioContext: AudioContext | null = null
 
     void (async () => {
+      // Native reads the audio track alone, streamed and off the main thread,
+      // instead of pulling the whole container through the WebView.
+      try {
+        const nativePeaks = await extractNativeWaveformPeaks({ filePath, videoUrl: mediaUrl }, barCount)
+        if (cancelled) return
+        if (nativePeaks) {
+          setPeaks(nativePeaks)
+          return
+        }
+      } catch (error) {
+        console.warn('[Waveform] native extract failed, trying decode', error)
+        if (cancelled) return
+      }
+
+      const byteLength = await probeByteLength(resolvedSrc)
+      if (cancelled) return
+      if (byteLength !== null && byteLength > MAX_JS_DECODE_BYTES) {
+        console.info('[Waveform] skipping decode — media too large for the WebView', {
+          byteLength,
+        })
+        setPeaks(fallbackPeaks(barCount))
+        return
+      }
+
       try {
         const response = await fetch(resolvedSrc)
         const arrayBuffer = await response.arrayBuffer()
+        if (cancelled) return
+        if (arrayBuffer.byteLength > MAX_JS_DECODE_BYTES) {
+          console.info('[Waveform] skipping decode — media too large for the WebView', {
+            byteLength: arrayBuffer.byteLength,
+          })
+          setPeaks(fallbackPeaks(barCount))
+          return
+        }
         const AudioContextCtor =
           window.AudioContext ??
           (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -85,7 +142,7 @@ export function useMediaWaveform({
     return () => {
       cancelled = true
     }
-  }, [barCount, resolvedSrc])
+  }, [barCount, filePath, mediaUrl, resolvedSrc])
 
   return peaks
 }

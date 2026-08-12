@@ -9,9 +9,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
-import RecordingModeCarousel, { type HandsFreePhase } from './RecordingModeCarousel'
+import RecordingModeCarousel from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
 import type { RecordingMode } from '../types'
+import { resolveHandsFreePhase } from '../utils/handsFreePhase'
 import { triggerModeSwitchHaptic } from '../utils/haptics'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
@@ -121,16 +122,14 @@ function ControlDeck({
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
   const showFinishingTake = isStopping && recordingMode === 'video' && !showDeleteDrop
-  const handsFreePhase: HandsFreePhase | null =
-    autoSoundRecording && !showDeleteDrop && !showFinishingTake
-      ? handsFreePlaybackPending && !isRecording
-        ? 'playback'
-        : isRecording
-        ? 'recording'
-        : handsFreeListeningReady
-        ? 'listening'
-        : 'preparing'
-      : null
+  const handsFreePhase = resolveHandsFreePhase({
+    autoSoundRecording,
+    isRecording,
+    handsFreePlaybackPending,
+    handsFreeListeningReady,
+    dragDeleteActive: showDeleteDrop,
+    finishingTake: showFinishingTake,
+  })
   const overlaysButtonRef = useRef<HTMLButtonElement>(null)
   const notifyTutorial = useTutorialAction()
   const [branchOpen, setBranchOpen] = useState(false)
@@ -262,37 +261,8 @@ function ControlDeck({
         </p>
       )}
 
-      <div
-        className={`hands-free-status ${
-          handsFreePhase ? `hands-free-status--${handsFreePhase}` : ''
-        }`}
-        role="status"
-        aria-live="polite"
-        aria-atomic
-        aria-hidden={!handsFreePhase}
-      >
-        <span className="hands-free-status__dot" aria-hidden />
-        <span className="hands-free-status__copy">
-          <strong>
-            {handsFreePhase === 'recording'
-              ? 'Recording'
-              : handsFreePhase === 'playback'
-              ? 'Playing back'
-              : handsFreePhase === 'preparing'
-              ? 'Getting ready'
-              : 'Listening'}
-          </strong>
-          <small>
-            {handsFreePhase === 'recording'
-              ? 'Take in progress'
-              : handsFreePhase === 'playback'
-              ? 'Listen, then play again'
-              : handsFreePhase === 'preparing'
-              ? 'Connecting microphone'
-              : 'Play when you’re ready'}
-          </small>
-        </span>
-      </div>
+      {/* Status copy now lives in the full-screen HandsFreeStage overlay, so the
+          deck keeps only the record control itself. */}
 
       {isRecording && !handsFreeRecording && (
         <span
@@ -309,7 +279,11 @@ function ControlDeck({
     <div
       className={`control-deck pointer-events-auto flex w-full flex-col items-center px-4 ${
         collapsible ? 'control-deck--collapsible' : ''
-      } ${isCameraPresentation ? 'control-deck--camera' : ''}`}
+      } ${isCameraPresentation ? 'control-deck--camera' : ''} ${
+        // Reserves the strip the elapsed timer now sits in, below the record
+        // button. Only while recording, so the deck is not permanently short.
+        isRecording && !handsFreeRecording ? 'control-deck--timer-below' : ''
+      }`}
     >
       <SettingsBranchWheel
         open={branchOpen}

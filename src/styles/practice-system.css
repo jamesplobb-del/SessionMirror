@@ -423,7 +423,9 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   .control-deck__collapse-trigger {
   position: absolute;
   z-index: 4;
-  top: -1.05rem;
+  /* Sits in the strip the collapsible row reserves above the pill — a negative
+   * offset here put it straight on top of the record button. */
+  top: 0.05rem;
   left: 50%;
   display: grid;
   width: 2rem;
@@ -2085,11 +2087,17 @@ html.app-dark-mode
   stroke-width: 1.85;
 }
 
+/* The row reserves its own strip above the pill so the chevron never sits on
+ * top of the raised record button in the middle of the deck. */
+.app-ui-overlay--audio-mode .audio-control-deck__main-row--collapsible {
+  padding-top: 1.65rem;
+}
+
 .app-ui-overlay--audio-mode
   .audio-control-deck__main-row
   .control-deck__collapse-trigger {
   position: absolute;
-  top: -0.92rem;
+  top: 0.1rem;
   left: 50%;
   z-index: 10;
   display: grid;
