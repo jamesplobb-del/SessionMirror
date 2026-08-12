@@ -1,4 +1,6 @@
 import { Gamepad2, Music4, Play, Trophy, X } from 'lucide-react'
+import balanceShot from '../../assets/games/balance.jpg'
+import staffJumperShot from '../../assets/games/staff-jumper.jpg'
 import { loadBestScore as loadStaffJumperBestScore } from '../../labs/staffJumper/staffJumperMusicLogic'
 import { formatBalanceDuration, loadBalanceBestMs } from '../../labs/balance/balanceStorage'
 import Pressable from '../ui/Pressable'
@@ -26,7 +28,9 @@ export default function LabsMenu({
             <Gamepad2 />
           </span>
           <span>
-            <strong>Practice Games</strong>
+            <strong>
+              Practice Games <span className="arcade-wordmark__beta">(Beta)</span>
+            </strong>
             <span>BestTake</span>
           </span>
         </div>
@@ -76,10 +80,7 @@ export default function LabsMenu({
               </span>
             </span>
             <span className="arcade-game-card__art arcade-game-card__art--staff" aria-hidden>
-              <span className="arcade-game-card__staff-lines" />
-              <span className="arcade-game-card__staff-note" />
-              <span className="arcade-game-card__staff-note" />
-              <span className="arcade-game-card__staff-note" />
+              <img className="arcade-game-card__shot" src={staffJumperShot} alt="" decoding="async" />
               <span className="arcade-game-card__go">
                 <Play aria-hidden />
               </span>
@@ -104,10 +105,7 @@ export default function LabsMenu({
               </span>
             </span>
             <span className="arcade-game-card__art arcade-game-card__art--balance" aria-hidden>
-              <span className="arcade-game-card__balance-cloud" />
-              <span className="arcade-game-card__balance-platform" />
-              <span className="arcade-game-card__balance-rope" />
-              <span className="arcade-game-card__balance-runner"><i /><b /></span>
+              <img className="arcade-game-card__shot" src={balanceShot} alt="" decoding="async" />
               <span className="arcade-game-card__go"><Play aria-hidden /></span>
             </span>
           </Pressable>

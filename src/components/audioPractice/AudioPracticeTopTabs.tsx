@@ -8,11 +8,11 @@ import { requestInteractiveMediaRecovery } from '../../utils/appForeground'
  * the metronome transport — five tabs across the top of a phone was too many,
  * and Practice is where you go *from* a tempo, not a peer of it.
  */
-const TABS: { id: AudioPracticeTab; label: string }[] = [
+const TABS: { id: AudioPracticeTab; label: string; beta?: boolean }[] = [
   { id: 'audio', label: 'Audio' },
   { id: 'metronome', label: 'Metronome' },
   { id: 'tuner', label: 'Tuner' },
-  { id: 'games', label: 'Games' },
+  { id: 'games', label: 'Games', beta: true },
 ]
 
 interface AudioPracticeTopTabsProps {
@@ -48,6 +48,9 @@ export default function AudioPracticeTopTabs({
               aria-current={isActive ? 'page' : undefined}
             >
               {tab.label}
+              {tab.beta ? (
+                <span className="audio-practice-top-tabs__beta"> (Beta)</span>
+              ) : null}
             </Pressable>
           </Fragment>
         )

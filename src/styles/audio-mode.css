@@ -78,6 +78,16 @@ html.app-audio-mode #root {
     background 0.15s ease;
 }
 
+/* Tabs are flex:1 1 0 inside an overflow:hidden bar, so the suffix has to stay
+   small enough that "Games (Beta)" still fits the share a 4-up row leaves at
+   375pt. Sized in em so it tracks the tab's own clamped font-size. */
+.audio-practice-top-tabs__beta {
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0;
+  opacity: 0.72;
+}
+
 .audio-practice-top-tabs__btn:active {
   transform: scale(0.985);
 }
