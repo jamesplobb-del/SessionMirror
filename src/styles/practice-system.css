@@ -1,41 +1,60 @@
 /* BestTake tuner presentation. Pitch analysis and native drone audio are unchanged. */
 
+/* Every one of these drives a WHOLE-SCREEN layer. Anything that tints only a
+ * sub-region shows its boundary as a seam the moment the colour comes up, which
+ * is what the stage's inset vignette used to do. `rim`/`spread` feed the
+ * full-viewport bloom on the overlay, so in-tune can be dramatic without any
+ * layer having an edge inside the screen. */
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) {
   --tuner-ui-hue: #1598ff;
   --tuner-ui-strength: 0%;
   --tuner-ui-feather-strength: 0%;
   --tuner-ui-dark-strength: 22%;
   --tuner-center-strength: 0%;
+  --tuner-rim-strength: 28%;
+  --tuner-rim-glow-strength: 18%;
+  --tuner-rim-spread: 34px;
 }
 
+/* In tune — the payoff state, so it goes furthest: strongest wash, the biggest
+ * central bloom and a wide edge glow. */
 html.app-audio-mode:has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--green
 ) {
-  --tuner-ui-hue: #08a957;
-  --tuner-ui-strength: 18%;
+  --tuner-ui-hue: #00b85c;
+  --tuner-ui-strength: 32%;
   --tuner-ui-feather-strength: 11%;
-  --tuner-ui-dark-strength: 38%;
-  --tuner-center-strength: 46%;
+  --tuner-ui-dark-strength: 52%;
+  --tuner-center-strength: 66%;
+  --tuner-rim-strength: 52%;
+  --tuner-rim-glow-strength: 34%;
+  --tuner-rim-spread: 82px;
 }
 
 html.app-audio-mode:has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--yellow
 ) {
-  --tuner-ui-hue: #e79b00;
-  --tuner-ui-strength: 16%;
+  --tuner-ui-hue: #f0a000;
+  --tuner-ui-strength: 24%;
   --tuner-ui-feather-strength: 10%;
-  --tuner-ui-dark-strength: 36%;
-  --tuner-center-strength: 42%;
+  --tuner-ui-dark-strength: 44%;
+  --tuner-center-strength: 52%;
+  --tuner-rim-strength: 36%;
+  --tuner-rim-glow-strength: 23%;
+  --tuner-rim-spread: 48px;
 }
 
 html.app-audio-mode:has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--red
 ) {
-  --tuner-ui-hue: #e33a4e;
-  --tuner-ui-strength: 17%;
+  --tuner-ui-hue: #f03348;
+  --tuner-ui-strength: 26%;
   --tuner-ui-feather-strength: 10%;
-  --tuner-ui-dark-strength: 36%;
-  --tuner-center-strength: 42%;
+  --tuner-ui-dark-strength: 46%;
+  --tuner-center-strength: 54%;
+  --tuner-rim-strength: 38%;
+  --tuner-rim-glow-strength: 25%;
+  --tuner-rim-spread: 54px;
 }
 
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner),
@@ -64,10 +83,12 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   background-image: none !important;
 }
 
+/* The one glow allowed to have an edge, because its edge IS the screen edge. */
 .app-ui-overlay--audio-practice-tuner {
   box-shadow:
-    inset 0 0 0 2px color-mix(in srgb, var(--tuner-ui-hue) 28%, transparent),
-    inset 0 0 34px color-mix(in srgb, var(--tuner-ui-hue) 18%, transparent);
+    inset 0 0 0 2px color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-strength), transparent),
+    inset 0 0 var(--tuner-rim-spread)
+      color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-glow-strength), transparent);
   transition:
     background-color 680ms cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 680ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -151,6 +172,19 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 
 .app-ui-overlay--audio-practice-tuner .pitch-living-canvas::after {
   content: none;
+}
+
+/* THE seam. `.pitch-audio-stage--besttake` carries an `inset 0 0 150px` zone
+ * vignette, and the stage box starts immediately under the tab bar — so the
+ * shadow sat at full strength along that top edge and faded inward, drawing a
+ * hard coloured line across the screen that got louder the more in tune you
+ * were. The whole-screen wash and the rim above already carry the zone colour,
+ * so inside this tab the stage contributes no tint of its own. */
+.app-ui-overlay--audio-practice-tuner .pitch-audio-stage--besttake,
+html.app-dark-mode
+  .app-ui-overlay--audio-practice-tuner
+  .pitch-audio-stage--besttake {
+  box-shadow: none;
 }
 
 .app-ui-overlay--audio-practice-tuner .app-hud-bottom {
