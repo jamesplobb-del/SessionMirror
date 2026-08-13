@@ -1578,8 +1578,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             fallbackUrl: playbackUrl,
           })
 
-          const readiness = await prepareAudioTakePlayback(takeId)
+          let readiness = await prepareAudioTakePlayback(takeId)
           if (shouldAutoPlay) {
+            // A cold start can fail this preflight once for reasons that clear
+            // on their own a moment later — the just-written file not yet
+            // visible to the filesystem bridge, the playback URL not resolvable
+            // yet, or the metadata probe timing out on a WebView media stack
+            // that has not warmed up. Hands-free used to take that single
+            // failure as final and skip the replay entirely, which is why the
+            // first take after opening the app played back silently and every
+            // take after it was fine.
+            for (let attempt = 0; !readiness && attempt < 3; attempt++) {
+              await waitMs(220 * (attempt + 1))
+              if (recordingModeRef.current !== 'audio') break
+              console.info('[TakeReadiness] hands-free retry', { takeId, attempt: attempt + 1 })
+              readiness = await prepareAudioTakePlayback(takeId)
+            }
+
             if (readiness) {
               pendingAutoPlaybackRef.current = false
               playAutoTakeAudioRef.current(
@@ -1590,6 +1605,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 playbackGainDb
               )
             } else {
+              console.warn('[TakeReadiness] hands-free playback skipped — take never became ready', {
+                takeId,
+              })
               pendingAutoPlaybackRef.current = false
               setHandsFreePlaybackPending(false)
               releaseAutoRecordSuppress(0)
@@ -3156,6 +3174,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   })
   const handsFreeStageVisiblePhase =
     hudModalState === 'idle' && !showOnboardingTutorial ? handsFreeStagePhase : null
+  // Camera and the tuner leave the middle of the screen open, so they get the
+  // large free-floating copy. Every other Tools tab packs controls from top to
+  // bottom and needs the compact backed pill instead.
+  const handsFreeStagePlacement =
+    recordingMode === 'audio' && audioPracticeTab !== 'tuner' ? 'chip' : 'center'
 
   const takePlaybackActive =
     autoPlaybackPlaying ||
@@ -4288,6 +4311,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 phase={handsFreeStageVisiblePhase}
                 elapsed={elapsed}
                 onLightBackground={recordingMode === 'audio'}
+                placement={handsFreeStagePlacement}
               />
 
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">

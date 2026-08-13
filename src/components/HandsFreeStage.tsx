@@ -1,6 +1,15 @@
 import { memo } from 'react'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 
+/**
+ * `center` is the large free-floating treatment — right when the screen behind
+ * is mostly open (camera preview, tuner). `chip` is for the dense Tools tabs
+ * (metronome, home) whose controls run edge to edge with no clear band to sit
+ * in: there the copy takes a compact translucent backing so it stays readable
+ * on top of a white tempo dial or a take card.
+ */
+export type HandsFreeStagePlacement = 'center' | 'chip'
+
 interface HandsFreeStageProps {
   /** Null whenever hands-free is off or another surface owns the screen. */
   phase: HandsFreePhase | null
@@ -8,6 +17,7 @@ interface HandsFreeStageProps {
   elapsed: number
   /** Audio mode paints a light backdrop; camera mode is dark behind the copy. */
   onLightBackground?: boolean
+  placement?: HandsFreeStagePlacement
 }
 
 const PHASE_COPY: Record<HandsFreePhase, { title: string; detail: string }> = {
@@ -31,13 +41,22 @@ function formatElapsed(seconds: number): string {
  * hands-free is running. Everything here is decoration plus a live status
  * reading — never a control.
  */
-function HandsFreeStage({ phase, elapsed, onLightBackground = false }: HandsFreeStageProps) {
+function HandsFreeStage({
+  phase,
+  elapsed,
+  onLightBackground = false,
+  placement = 'center',
+}: HandsFreeStageProps) {
   const copy = phase ? PHASE_COPY[phase] : null
 
   return (
     <div
-      className={`hands-free-stage ${phase ? `hands-free-stage--${phase}` : ''} ${
-        onLightBackground ? 'hands-free-stage--on-light' : ''
+      className={`hands-free-stage hands-free-stage--${placement} ${
+        phase ? `hands-free-stage--${phase}` : ''
+      } ${
+        // The chip carries its own dark backing, so the light-backdrop palette
+        // would only fight it.
+        onLightBackground && placement === 'center' ? 'hands-free-stage--on-light' : ''
       }`}
       role="status"
       aria-live="polite"

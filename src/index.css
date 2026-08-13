@@ -3122,6 +3122,12 @@ video.camera-preview.camera-preview--hidden {
  * ------------------------------------------------------------------------- */
 .hands-free-stage {
   --hands-free-accent: 99, 188, 255;
+  /* Colour that outlines the glyphs. A contour is what makes the copy hold up
+   * over a live camera frame or a light Tools background — unlike a panel it
+   * separates the text without covering a single pixel of the app. Flipped to
+   * white by `--on-light`. */
+  --hands-free-contour: 4, 8, 14;
+  --hands-free-ink: 255, 255, 255;
   position: fixed;
   z-index: 37;
   inset: 0;
@@ -3216,14 +3222,17 @@ video.camera-preview.camera-preview--hidden {
   z-index: -1;
   top: 50%;
   left: 50%;
-  width: 19rem;
-  height: 19rem;
+  width: 15rem;
+  height: 15rem;
   border-radius: 999px;
+  /* Kept deliberately faint. The glyph contour carries legibility now, so this
+   * is only a soft lift plus the breathing motion cue — at the weight it needed
+   * before the contour it read as a dark cloud parked over the app. */
   background: radial-gradient(
     circle,
-    rgba(8, 14, 22, 0.52) 0%,
-    rgba(8, 14, 22, 0.26) 44%,
-    transparent 74%
+    rgba(var(--hands-free-contour), 0.26) 0%,
+    rgba(var(--hands-free-contour), 0.11) 46%,
+    transparent 72%
   );
   transform: translate(-50%, -50%);
   animation: hands-free-stage-breathe 3.6s ease-in-out infinite;
@@ -3235,50 +3244,122 @@ video.camera-preview.camera-preview--hidden {
 
 .hands-free-stage__title {
   color: rgb(var(--hands-free-accent));
-  font-size: 2rem;
-  font-weight: 780;
+  /* Scales down rather than breaking "Playing back" / "Getting ready" across
+   * two lines on a narrow phone; capped so it does not balloon on iPad. */
+  font-size: clamp(1.55rem, 7.5vw, 2.15rem);
+  font-weight: 800;
   letter-spacing: -0.015em;
   line-height: 1.05;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  /* `paint-order` puts the stroke BEHIND the fill, so the contour thickens the
+   * letters outward instead of eating into them. WebKit has supported this on
+   * HTML text for years, and iOS is WebKit — but the text-shadow below still
+   * carries the copy on its own if it is ever ignored. */
+  -webkit-text-stroke: 0.055em rgba(var(--hands-free-contour), 0.82);
+  paint-order: stroke fill;
+  text-shadow:
+    0 1px 2px rgba(var(--hands-free-contour), 0.9),
+    0 2px 16px rgba(var(--hands-free-contour), 0.75);
   transition: color 260ms ease;
 }
 
+.hands-free-stage__detail,
+.hands-free-stage__elapsed {
+  color: rgb(var(--hands-free-ink));
+  -webkit-text-stroke: 0.04em rgba(var(--hands-free-contour), 0.62);
+  paint-order: stroke fill;
+  text-shadow:
+    0 1px 2px rgba(var(--hands-free-contour), 0.85),
+    0 1px 12px rgba(var(--hands-free-contour), 0.7);
+}
+
 .hands-free-stage__detail {
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.9rem;
-  font-weight: 560;
+  font-size: 0.95rem;
+  font-weight: 640;
   line-height: 1.2;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
 }
 
 .hands-free-stage__elapsed {
   margin-top: 0.35rem;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 1.05rem;
-  font-weight: 640;
+  font-size: 1.1rem;
+  font-weight: 680;
   letter-spacing: 0.02em;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
 }
 
-/* Audio mode paints a light background — flip the neutral copy to dark ink and
- * lighten the halo so it reads as a glow rather than a smudge. */
-html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__detail,
-html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__elapsed {
-  color: rgba(30, 43, 58, 0.78);
-  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.65);
+/* Tools paints a light background: invert the contour to white, ink the
+ * neutral copy dark, and drop each accent to a shade that actually has
+ * contrast against near-white. */
+html:not(.app-dark-mode) .hands-free-stage--on-light {
+  --hands-free-contour: 255, 255, 255;
+  --hands-free-ink: 28, 41, 56;
+  --hands-free-accent: 10, 104, 184;
 }
 
-html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__title {
-  text-shadow: 0 2px 14px rgba(255, 255, 255, 0.7);
+html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--recording {
+  --hands-free-accent: 194, 24, 58;
 }
 
-html:not(.app-dark-mode) .hands-free-stage--on-light .hands-free-stage__pulse {
-  background: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.5) 0%,
-    rgba(255, 255, 255, 0.24) 42%,
-    transparent 72%
-  );
+html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--playback {
+  --hands-free-accent: 4, 124, 87;
+}
+
+html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--preparing {
+  --hands-free-accent: 71, 85, 105;
+}
+
+/* ---- Chip placement (dense Tools tabs) ---------------------------------- *
+ * The metronome and audio-home tabs stack controls from the top of the screen
+ * to the bottom — there is no clear band to drop free-floating copy into, so it
+ * landed on the tempo dial and the take cards. Here the copy takes a compact
+ * translucent backing instead: it can sit over anything and stay readable, and
+ * being one small pill it hides far less of the tab than dimming would. The
+ * backing is dark in both themes so it never depends on guessing the backdrop.
+ */
+.hands-free-stage--chip .hands-free-stage__center {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.45rem;
+  max-width: calc(100vw - 2.5rem);
+  padding: 0.5rem 0.95rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(10, 15, 23, 0.74);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.28);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+}
+
+/* The pill does the separating — a contour on top of it only muddies the
+ * smaller type, and the halo would darken the tab for no benefit. */
+.hands-free-stage--chip .hands-free-stage__pulse {
+  display: none;
+}
+
+.hands-free-stage--chip .hands-free-stage__title,
+.hands-free-stage--chip .hands-free-stage__detail,
+.hands-free-stage--chip .hands-free-stage__elapsed {
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+.hands-free-stage--chip .hands-free-stage__title {
+  font-size: 1.1rem;
+  font-weight: 760;
+}
+
+.hands-free-stage--chip .hands-free-stage__detail {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hands-free-stage--chip .hands-free-stage__elapsed {
+  margin-top: 0;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 0.88rem;
 }
 
 @keyframes hands-free-stage-rim {

@@ -85,6 +85,10 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   background: transparent;
 }
 
+/* The tab bar sits directly on the tinted page rather than on a white pill of
+ * its own — a solid bar here was the top half of the two-tone split under the
+ * tabs. The active segment keeps its highlight, which is all that is needed to
+ * tell the tabs apart. */
 .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
   display: grid;
   width: min(calc(100% - 1.35rem), 28rem);
@@ -92,15 +96,12 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   gap: 0.12rem;
   padding: 0.24rem;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid transparent;
   border-radius: var(--audio-radius-segment, 1.35rem);
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow:
-    0 14px 36px rgba(29, 61, 84, 0.08),
-    0 2px 8px rgba(29, 61, 84, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(26px) saturate(1.18);
-  -webkit-backdrop-filter: blur(26px) saturate(1.18);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn {
@@ -130,6 +131,26 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   box-shadow:
     0 5px 14px rgba(247, 166, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+/* One tint, whole screen.
+ *
+ * The living canvas painted its own white wash (0.34 white at its top edge)
+ * over the page tint, then tried to blend back into that tint with a fixed
+ * `clamp(82px, 13vh, 132px)` feather strip at the top. Wherever that strip ran
+ * out you got a hard horizontal seam under the tab bar, and the pitch colour
+ * reaction was landing on two differently-shaded regions. Inside this tab the
+ * canvas is fully transparent so the tinted page shows through everywhere and
+ * green/yellow/red sweeps the entire screen evenly.
+ *
+ * Scoped to the tab on purpose: Quick Tuner draws the same canvas inside a
+ * white card, where the wash and the feather are correct. */
+.app-ui-overlay--audio-practice-tuner .pitch-living-canvas {
+  background: transparent;
+}
+
+.app-ui-overlay--audio-practice-tuner .pitch-living-canvas::after {
+  content: none;
 }
 
 .app-ui-overlay--audio-practice-tuner .app-hud-bottom {
