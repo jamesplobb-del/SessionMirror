@@ -2325,6 +2325,8 @@
   overflow: auto;
   padding-bottom: 0.5rem;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
 }
 
 .multitrack-align-stage__timeline {
@@ -2468,12 +2470,16 @@
   background: #44403c;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   overflow: hidden;
-  touch-action: none;
-  cursor: grab;
+  /* An unselected clip must not swallow a scroll: the browser owns the gesture
+     until the clip is selected, and even then it keeps vertical panning. */
+  touch-action: pan-x pan-y;
+  cursor: pointer;
 }
 
 .multitrack-align-stage__clip[data-selected='true'] {
   box-shadow: 0 0 0 2px #dc2626, 0 3px 8px rgba(0, 0, 0, 0.2);
+  touch-action: pan-y;
+  cursor: grab;
 }
 
 .multitrack-align-stage__clip-waveform {
@@ -2529,13 +2535,15 @@
   border: 1px solid #e7e5e4;
   background: #fff;
   overflow: hidden;
-  touch-action: none;
-  cursor: grab;
+  touch-action: pan-x pan-y;
+  cursor: pointer;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .multitrack-align-stage__image-cue[data-selected='true'] {
   box-shadow: 0 0 0 2px #dc2626;
+  touch-action: pan-y;
+  cursor: grab;
 }
 
 .multitrack-align-stage__image-cue[data-pinned='true'] {

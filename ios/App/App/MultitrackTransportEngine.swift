@@ -76,8 +76,12 @@ final class MultitrackTransportEngine {
             }
 
             engine.attach(clickNode)
-            let sessionRate = AVAudioSession.sharedInstance().sampleRate
-            let renderRate = sessionRate > 0 ? sessionRate : 48_000
+            // The graph's own mixer format is authoritative. Reading the session
+            // sample rate instead can hand back a rate the hardware has already
+            // moved off (leaving and re-entering multitrack reconfigures the
+            // session), and connecting a node at a stale rate makes engine.start()
+            // fail with a bare CoreAudio -50.
+            let renderRate = currentRenderSampleRate()
             let clickFormat = AVAudioFormat(
                 standardFormatWithSampleRate: renderRate,
                 channels: 2
@@ -117,7 +121,7 @@ final class MultitrackTransportEngine {
 
             preparedSources = nextSources
             engine.prepare()
-            try engine.start()
+            try startEngineRecoveringFromStaleFormat()
             isPrepared = true
             isRolling = false
 
@@ -164,7 +168,7 @@ final class MultitrackTransportEngine {
 
             if !engine.isRunning {
                 engine.prepare()
-                try engine.start()
+                try startEngineRecoveringFromStaleFormat()
             }
 
             stopScheduledNodesLocked()
@@ -180,10 +184,16 @@ final class MultitrackTransportEngine {
             let countInDurationSec = Double(countInBeats) * beatDurationSec
             let performanceHostTime = firstClickHostTime + AVAudioTime.hostTime(forSeconds: countInDurationSec)
             let firstClickTime = AVAudioTime(hostTime: firstClickHostTime)
-            let clickFormat = engine.outputNode.outputFormat(forBus: 0)
+            // Must be the click node's OWN output format: scheduling a buffer
+            // whose format differs from the node's connection is a parameter
+            // error, and the output node can differ from it after a route change.
+            let clickFormat = clickNode.outputFormat(forBus: 0)
+            let fallbackFormat = engine.outputNode.outputFormat(forBus: 0)
             let usableClickFormat = clickFormat.sampleRate > 0 && clickFormat.channelCount > 0
                 ? clickFormat
-                : AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+                : (fallbackFormat.sampleRate > 0 && fallbackFormat.channelCount > 0
+                    ? fallbackFormat
+                    : AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!)
             let bar = makeClickBar(
                 format: usableClickFormat,
                 bpm: clampedBpm,
@@ -298,6 +308,51 @@ final class MultitrackTransportEngine {
         }
         clickBuffer = nil
         isRolling = false
+    }
+
+    /// Sample rate the engine will actually render at, preferring the graph's
+    /// own mixer format over the session's advertised rate.
+    private func currentRenderSampleRate() -> Double {
+        let mixerRate = engine.mainMixerNode.outputFormat(forBus: 0).sampleRate
+        if mixerRate > 0 { return mixerRate }
+        let sessionRate = AVAudioSession.sharedInstance().sampleRate
+        return sessionRate > 0 ? sessionRate : 48_000
+    }
+
+    /// Starts the engine, and if it refuses because a node is still connected at
+    /// a sample rate the hardware has moved off, rebuilds every connection at the
+    /// current rate and tries once more. A raw CoreAudio -50 is never actionable
+    /// for the player, so a second failure carries a message they can act on.
+    private func startEngineRecoveringFromStaleFormat() throws {
+        do {
+            try engine.start()
+            return
+        } catch {
+            print("[MultitrackTransport] engine.start failed (\(error.localizedDescription)) - rebuilding graph at current rate")
+        }
+
+        let renderRate = currentRenderSampleRate()
+        if engine.attachedNodes.contains(clickNode),
+           let clickFormat = AVAudioFormat(standardFormatWithSampleRate: renderRate, channels: 2) {
+            engine.connect(clickNode, to: engine.mainMixerNode, format: clickFormat)
+        }
+        for prepared in preparedSources where engine.attachedNodes.contains(prepared.node) {
+            engine.connect(prepared.node, to: engine.mainMixerNode, format: prepared.file.processingFormat)
+        }
+
+        engine.prepare()
+        do {
+            try engine.start()
+        } catch {
+            throw NSError(
+                domain: "BestTake.MultitrackTransport",
+                code: 5,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "The audio engine could not start. Close and re-open Multitrack, or unplug and replug your headphones, then try again. (\(error.localizedDescription))"
+                ]
+            )
+        }
     }
 
     private func stopLocked(resetPreparedSources: Bool) {

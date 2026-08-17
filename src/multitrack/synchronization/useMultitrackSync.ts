@@ -55,6 +55,13 @@ export function useMultitrackSync() {
   const visualStartTimersRef = useRef<number[]>([])
   const visualPlaybackGenerationRef = useRef(0)
   const visualOnlyModeRef = useRef(false)
+  /**
+   * performance.now() until which playback is in its lead-in: the mix is already
+   * sounding a little before the downbeat so the first note's attack is audible,
+   * while the timeline is still held at zero. Element slaving stands down until
+   * then — the loop would otherwise "correct" the lead-in straight back out.
+   */
+  const prerollUntilRef = useRef(0)
   /** Timeline position playback was prepared/started at (used to anchor the transport). */
   const preparedStartRef = useRef(0)
   /**
@@ -531,15 +538,20 @@ export function useMultitrackSync() {
    * Native Play All owns audible audio. The DOM videos are a muted visual
    * slave and begin near the native transport's returned wall-clock anchor.
    */
-  const startVisualPlaybackAtEpoch = useCallback(async (epochMs: number) => {
+  const startVisualPlaybackAtEpoch = useCallback(async (
+    epochMs: number,
+    /** Negative to begin this many seconds of lead-in before the downbeat. */
+    startTime = 0,
+  ) => {
     const generation = ++visualPlaybackGenerationRef.current
     visualOnlyModeRef.current = true
     chaseModeRef.current = false
     transportLockedRef.current = true
     pendingStartRef.current.clear()
     preparedStartRef.current = 0
+    prerollUntilRef.current = 0
     multitrackTransport.arm(0)
-    prepareVisualAtStart()
+    prepareVisualAtStart(startTime)
     setCurrentTime(0)
 
     const delayMs = Math.max(0, epochMs - Date.now())
@@ -551,7 +563,7 @@ export function useMultitrackSync() {
     const entries = getEntries()
     const playNow: Array<[string, HTMLMediaElement]> = []
     for (const [panelId, element] of entries) {
-      const entryDelayMs = Math.max(0, -offsetFor(panelId) * 1000)
+      const entryDelayMs = Math.max(0, (-offsetFor(panelId) - startTime) * 1000)
       if (entryDelayMs > 5) {
         pendingStartRef.current.add(panelId)
       } else {
@@ -572,7 +584,19 @@ export function useMultitrackSync() {
       results.some((result) => result.status === 'fulfilled') ||
       pendingStartRef.current.size > 0
     if (started) {
-      multitrackTransport.start(0)
+      const prerollMs = Math.max(0, -startTime * 1000)
+      if (prerollMs > 5) {
+        // The mix is already sounding. Timeline zero belongs on the downbeat, so
+        // the transport only starts once the lead-in has played out.
+        prerollUntilRef.current = performance.now() + prerollMs
+        window.setTimeout(() => {
+          if (generation !== visualPlaybackGenerationRef.current) return
+          prerollUntilRef.current = 0
+          multitrackTransport.start(0)
+        }, prerollMs)
+      } else {
+        multitrackTransport.start(0)
+      }
     } else {
       visualOnlyModeRef.current = false
     }
@@ -729,6 +753,7 @@ export function useMultitrackSync() {
     chaseModeRef.current = false
     visualOnlyModeRef.current = false
     visualPlaybackGenerationRef.current += 1
+    prerollUntilRef.current = 0
     pendingStartRef.current.clear()
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
@@ -873,7 +898,11 @@ export function useMultitrackSync() {
           return
         }
 
+        const inPreroll = tickNow < prerollUntilRef.current
         for (const [panelId, el] of entries) {
+          // During the lead-in the timeline reads zero while the media are
+          // deliberately ahead of it. Leave every element alone until it ends.
+          if (inPreroll) break
           try {
             const win = clipWindowFor(panelId, el)
 

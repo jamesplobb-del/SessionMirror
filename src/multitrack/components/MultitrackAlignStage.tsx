@@ -17,6 +17,8 @@ const DEFAULT_ZOOM_INDEX = 1
 /** Left padding so a clip can be dragged to start before timeline zero (negative offset). */
 const TIMELINE_ORIGIN_PX = 96
 const MIN_CLIP_SEC = 0.2
+/** Movement before a touch on a selected clip counts as a drag and not a scroll. */
+const DRAG_INTENT_PX = 8
 
 export interface AlignClipState {
   panelId: string
@@ -146,6 +148,9 @@ function ClipTrack({
   const dragRef = useRef<{
     mode: 'move' | 'trim-start' | 'trim-end'
     startX: number
+    startY: number
+    /** False until the gesture has proved itself a horizontal drag. */
+    committed: boolean
     startOffsetMs: number
     startTrimStart: number
     startTrimEnd: number
@@ -158,13 +163,25 @@ function ClipTrack({
   const leftPx = TIMELINE_ORIGIN_PX + clipStartSec * pxPerSec
   const widthPx = Math.max(24, clipDurationSec * pxPerSec)
 
+  /**
+   * A clip only moves once it is selected, and only after the finger has
+   * committed to a horizontal gesture. Grabbing the timeline anywhere else
+   * scrolls it — dragging a clip by accident while trying to scroll was the
+   * single easiest way to knock a part out of alignment.
+   */
   const beginDrag = (mode: 'move' | 'trim-start' | 'trim-end') => (event: ReactPointerEvent) => {
+    if (!selected) {
+      // First touch selects; it never moves anything. The gesture is left
+      // uncaptured so this same swipe can still scroll the timeline.
+      onSelect()
+      return
+    }
     event.stopPropagation()
-    onSelect()
-    ;(event.target as Element).setPointerCapture(event.pointerId)
     dragRef.current = {
       mode,
       startX: event.clientX,
+      startY: event.clientY,
+      committed: false,
       startOffsetMs: clip.offsetMs,
       startTrimStart: clip.trimStart,
       startTrimEnd: trimEndValue,
@@ -174,6 +191,24 @@ function ClipTrack({
   const onPointerMove = (event: ReactPointerEvent) => {
     const drag = dragRef.current
     if (!drag) return
+
+    if (!drag.committed) {
+      const dx = event.clientX - drag.startX
+      const dy = event.clientY - drag.startY
+      // Mostly-vertical movement is a scroll: let go entirely.
+      if (Math.abs(dy) > DRAG_INTENT_PX && Math.abs(dy) > Math.abs(dx)) {
+        dragRef.current = null
+        return
+      }
+      if (Math.abs(dx) < DRAG_INTENT_PX) return
+      drag.committed = true
+      try {
+        ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+      } catch {
+        /* capture is best-effort */
+      }
+    }
+
     const deltaSec = (event.clientX - drag.startX) / pxPerSec
 
     if (drag.mode === 'move') {
@@ -202,7 +237,7 @@ function ClipTrack({
     if (!dragRef.current) return
     dragRef.current = null
     try {
-      ;(event.target as Element).releasePointerCapture(event.pointerId)
+      ;(event.currentTarget as Element).releasePointerCapture(event.pointerId)
     } catch {
       /* ignore */
     }
@@ -227,20 +262,26 @@ function ClipTrack({
         widthPx={widthPx}
       />
       <span className="multitrack-align-stage__clip-name">{clip.label}</span>
-      <div
-        className="multitrack-align-stage__handle multitrack-align-stage__handle--left"
-        onPointerDown={beginDrag('trim-start')}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      />
-      <div
-        className="multitrack-align-stage__handle multitrack-align-stage__handle--right"
-        onPointerDown={beginDrag('trim-end')}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      />
+      {/* Trim handles belong to the selected clip only — otherwise every lane
+          carries two thin targets that swallow a scroll. */}
+      {selected ? (
+        <>
+          <div
+            className="multitrack-align-stage__handle multitrack-align-stage__handle--left"
+            onPointerDown={beginDrag('trim-start')}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          />
+          <div
+            className="multitrack-align-stage__handle multitrack-align-stage__handle--right"
+            onPointerDown={beginDrag('trim-end')}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          />
+        </>
+      ) : null}
     </div>
   )
 }
@@ -327,18 +368,30 @@ export default function MultitrackAlignStage({
         continue
       }
       if (next[panel.id]?.takeId === panel.take.id) continue
-      next[panel.id] = {
+      const offsetMs = timelineOffsetMsForTake(panel.take, bpm)
+      const trimStart = panel.trimStartSec ?? 0
+      // The overlay stands its reconcile effect down while this editor is open,
+      // so a clip that arrives now has to seed the transport itself — otherwise
+      // Preview would play it at offset zero, ahead of its own count-in.
+      sync.setPanelOffset(panel.id, offsetMs)
+      sync.setPanelTrim(panel.id, trimStart, panel.trimEndSec ?? null)
+      const arrived: AlignClipState = {
         panelId: panel.id,
         takeId: panel.take.id,
         label: panel.take.name || 'Performance',
         filePath: panel.take.filePath,
         videoUrl: panel.take.videoUrl,
         duration: sync.getPanelMediaDuration(panel.id) || panel.take.duration || 0,
-        offsetMs: timelineOffsetMsForTake(panel.take, bpm),
-        trimStart: panel.trimStartSec ?? 0,
+        offsetMs,
+        trimStart,
         trimEnd: panel.trimEndSec,
         windowed: hasSectionWindow(panel),
       }
+      next[panel.id] = arrived
+      // Where it landed is where it was recorded, so that becomes the spot
+      // Reset returns it to — a part overdubbed into the bridge has no earlier
+      // state in this session to fall back on.
+      initialClipsRef.current = { ...initialClipsRef.current, [panel.id]: arrived }
       changed = true
     }
     if (changed) commitClips(next)
@@ -406,11 +459,35 @@ export default function MultitrackAlignStage({
     [clipTimelineWindow, commitClips, onSectionChange],
   )
 
+  /**
+   * Puts a clip back where it started — its own recorded spot on the timeline,
+   * not timeline zero. A part overdubbed into the last chorus belongs in the
+   * last chorus; dragging it to the top would be a different edit, not a reset.
+   */
   const handleReset = useCallback(
     (panelId: string) => {
-      updateClip(panelId, { offsetMs: 0, trimStart: 0, trimEnd: undefined })
+      const original = initialClipsRef.current[panelId]
+      const current = clipsRef.current[panelId]
+      if (!original || !current) return
+      dirtyRef.current.add(panelId)
+      const restored: AlignClipState = {
+        ...current,
+        offsetMs: original.offsetMs,
+        trimStart: original.trimStart,
+        trimEnd: original.trimEnd,
+        windowed: original.windowed,
+      }
+      sync.setPanelOffset(panelId, restored.offsetMs)
+      sync.setPanelTrim(panelId, restored.trimStart, restored.trimEnd ?? null)
+      commitClips({ ...clipsRef.current, [panelId]: restored })
+      if (restored.windowed) {
+        const window = clipTimelineWindow(restored)
+        onSectionChange(panelId, Math.max(0, window.start), window.end)
+      } else {
+        onSectionChange(panelId, undefined, undefined)
+      }
     },
-    [updateClip],
+    [clipTimelineWindow, commitClips, onSectionChange, sync],
   )
 
   const handleCancel = () => {
@@ -492,18 +569,49 @@ export default function MultitrackAlignStage({
 
   // ── Image cue dragging ───────────────────────────────────────────────────
   const [imageDrag, setImageDrag] = useState<{ cueId: string; startSec: number } | null>(null)
-  const imageDragRef = useRef<{ cueId: string; startX: number; startSec: number } | null>(null)
+  const imageDragRef = useRef<{
+    cueId: string
+    startX: number
+    startY: number
+    committed: boolean
+    startSec: number
+  } | null>(null)
 
+  /** Same rule as clips: tap selects, and only a committed sideways drag retimes. */
   const beginImageDrag = (cueId: string, startSec: number) => (event: ReactPointerEvent) => {
+    const alreadySelected = selection?.kind === 'image' && selection.id === cueId
+    if (!alreadySelected) {
+      setSelection({ kind: 'image', id: cueId })
+      return
+    }
     event.stopPropagation()
-    setSelection({ kind: 'image', id: cueId })
-    ;(event.target as Element).setPointerCapture(event.pointerId)
-    imageDragRef.current = { cueId, startX: event.clientX, startSec }
+    imageDragRef.current = {
+      cueId,
+      startX: event.clientX,
+      startY: event.clientY,
+      committed: false,
+      startSec,
+    }
   }
 
   const onImageDragMove = (event: ReactPointerEvent) => {
     const drag = imageDragRef.current
     if (!drag) return
+    if (!drag.committed) {
+      const dx = event.clientX - drag.startX
+      const dy = event.clientY - drag.startY
+      if (Math.abs(dy) > DRAG_INTENT_PX && Math.abs(dy) > Math.abs(dx)) {
+        imageDragRef.current = null
+        return
+      }
+      if (Math.abs(dx) < DRAG_INTENT_PX) return
+      drag.committed = true
+      try {
+        ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+      } catch {
+        /* capture is best-effort */
+      }
+    }
     const deltaSec = (event.clientX - drag.startX) / pxPerSec
     setImageDrag({ cueId: drag.cueId, startSec: Math.max(0, drag.startSec + deltaSec) })
   }
@@ -514,11 +622,11 @@ export default function MultitrackAlignStage({
     imageDragRef.current = null
     const dropped = imageDrag
     setImageDrag(null)
-    if (dropped && dropped.cueId === drag.cueId) {
+    if (drag.committed && dropped && dropped.cueId === drag.cueId) {
       onMoveImage(drag.cueId, Math.round(dropped.startSec * 10) / 10)
     }
     try {
-      ;(event.target as Element).releasePointerCapture(event.pointerId)
+      ;(event.currentTarget as Element).releasePointerCapture(event.pointerId)
     } catch {
       /* ignore */
     }
@@ -535,24 +643,24 @@ export default function MultitrackAlignStage({
   const playheadSec = Math.max(0, sync.state.currentTime)
 
   return (
-    <section className="multitrack-align-stage" aria-label="Timeline editor">
+    <section className="multitrack-align-stage" aria-label="Editor">
       <header className="multitrack-align-stage__header">
         <Pressable
           type="button"
           intensity="icon"
           className="multitrack-align-stage__close"
           onClick={handleCancel}
-          aria-label="Discard timeline changes"
+          aria-label="Discard editor changes"
         >
           <X className="h-5 w-5" />
         </Pressable>
         <div className="multitrack-align-stage__titles">
-          <p className="multitrack-align-stage__title">Timeline</p>
+          <p className="multitrack-align-stage__title">Editor</p>
           <span className="multitrack-align-stage__clock">
             {formatClock(playheadSec)} / {formatClock(maxDurationSec)}
           </span>
         </div>
-        <div className="multitrack-align-stage__zoom" aria-label="Timeline zoom">
+        <div className="multitrack-align-stage__zoom" aria-label="Zoom">
           <Pressable
             type="button"
             intensity="icon"
@@ -626,10 +734,14 @@ export default function MultitrackAlignStage({
               {selectedClip.windowed ? 'box appears only here' : 'box shows all song'}
             </span>
           </div>
-          <div className="multitrack-align-stage__nudge" aria-label="Fine alignment controls">
-            <Pressable type="button" intensity="soft" onClick={() => updateClip(selectedClip.panelId, { offsetMs: selectedClip.offsetMs + 10 })}>−10ms</Pressable>
-            <Pressable type="button" intensity="soft" onClick={() => updateClip(selectedClip.panelId, { offsetMs: selectedClip.offsetMs - 10 })}>+10ms</Pressable>
-            <Pressable type="button" intensity="soft" onClick={() => handleReset(selectedClip.panelId)}>
+          <div className="multitrack-align-stage__nudge">
+            <Pressable
+              type="button"
+              intensity="soft"
+              onClick={() => handleReset(selectedClip.panelId)}
+              aria-label="Put this clip back where it was recorded"
+              title="Back to its recorded spot"
+            >
               <RotateCcw className="h-3.5 w-3.5" />
             </Pressable>
           </div>
@@ -801,8 +913,8 @@ export default function MultitrackAlignStage({
           Reset all
         </Pressable>
         <p className="multitrack-align-stage__hint">
-          Drag clips to move them, edges to trim. “Add box here” records a new part over the mix
-          from the playhead.
+          Drag clips to move them, edges to trim. Reset puts a clip back on its own recorded spot,
+          wherever that is in the song.
         </p>
       </footer>
     </section>

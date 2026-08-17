@@ -61,6 +61,14 @@ import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOver
 /** Sheets portal to document.body; the overlay itself sits at z-135. */
 const MULTITRACK_SHEET_Z = { backdrop: 'z-[140]', sheet: 'z-[145]' }
 const MULTITRACK_MONITOR_CACHE_DIR = 'multitrack-monitor-assets'
+/**
+ * Lead-in before the downbeat on Play All. Starting exactly on the first note
+ * clips its attack and gives the ear nothing to place it against; half a second
+ * of the room before the entry is what makes an articulation audible.
+ * Takes play their own pre-downbeat material here — anything with nothing to
+ * play (a backing track, a part overdubbed later) simply waits out the gap.
+ */
+const PLAY_ALL_PREROLL_SEC = 0.5
 
 const SHEET_FRAME_OPTIONS = [
   { value: 'top', label: 'Above', detail: 'Full-width row above the videos' },
@@ -514,8 +522,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       const offsetSec = timeline.offsetMs / 1000
       // Timeline t plays media time `t + trimStart + offset`; the clip enters at
       // `-offset`. Starting at `startSec` therefore either seeks into the clip or,
-      // if it has not entered yet, waits out the remaining gap.
-      const entersAtSec = Math.max(0, -offsetSec)
+      // if it has not entered yet, waits out the remaining gap. The entry point
+      // is NOT clamped to zero: a take carries material before the downbeat (its
+      // count-in), and the Play All lead-in starts at a negative `startSec` to
+      // reach exactly that.
+      const entersAtSec = -offsetSec
       const startsInsideClip = startSec >= entersAtSec
       const sourceInSec = startsInsideClip
         ? startSec + timeline.trimStartSec + offsetSec
@@ -555,11 +566,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           )
           nativeBackingCacheRef.current = { src: session.backing.src, path }
         }
+        // The backing's own zero IS timeline zero, so it has nothing to play
+        // during a lead-in — it waits out the gap instead of starting early.
+        const backingStartsInside = startSec >= 0
         sources.push({
           id: 'backing',
           label: session.backing.fileName || 'Backing track',
           path,
-          sourceInSec: startSec,
+          sourceInSec: backingStartsInside ? startSec : 0,
+          ...(backingStartsInside ? null : { timelineDelaySec: -startSec }),
           volume: session.backing.volume,
         })
       } catch (error) {
@@ -592,7 +607,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       // iOS Play All uses one native AVAudioEngine graph for every take (and
       // uploaded backing audio). This avoids WebKit's multiple-media-element
       // limit and gives every source the same sample clock.
-      const sources = await buildNativeMonitorSources(null, false)
+      const sources = await buildNativeMonitorSources(null, false, -PLAY_ALL_PREROLL_SEC)
       if (generation !== nativeGridPlaybackGenerationRef.current) return false
 
       const prepared = await prepareNativeMultitrackMonitor(sources)
@@ -619,11 +634,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       }
 
       nativeGridPlaybackActiveRef.current = true
+      // Sources begin at performanceEpochMs, which is now the head of the
+      // lead-in — timeline zero (the downbeat) lands a lead-in later, and
+      // anything joining the mix has to aim there, not at the audio's start.
+      const downbeatEpochMs = transport.performanceEpochMs + PLAY_ALL_PREROLL_SEC * 1000
       if (session.backing.kind === 'youtube') {
-        await scheduleYoutubeBackingStart(transport.performanceEpochMs)
+        await scheduleYoutubeBackingStart(downbeatEpochMs)
       }
       const visualsStarted = await sync.startVisualPlaybackAtEpoch(
         transport.performanceEpochMs,
+        -PLAY_ALL_PREROLL_SEC,
       )
       if (!visualsStarted || generation !== nativeGridPlaybackGenerationRef.current) {
         await stopNativeGridPlayback()
@@ -1103,9 +1123,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   )
   const tileSheetTake = tileSheetPanel?.kind === 'performance' ? tileSheetPanel.take : null
 
+  /**
+   * `startSec` is the timeline position the monitor mix will roll from — always
+   * passed explicitly so a mid-song overdub can never leak into the next plain
+   * recording, which would start the references mid-track while the count-in
+   * counted from the top.
+   */
   const openRecordingForPanel = useCallback(
-    (panelId: string) => {
+    (panelId: string, startSec = 0) => {
       triggerLightHaptic(hapticFeedback)
+      recordStartSecRef.current = Math.max(0, startSec)
       setTileSheetPanelId(null)
       onOpenRecordingStage?.()
       setActivePanelId(panelId)
@@ -1121,6 +1148,29 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     [hapticFeedback, onOpenRecordingStage, session.panels, sync],
   )
 
+  /** Tempo the count-in and the recorded take are anchored to. */
+  const resolveRecordingGrid = useCallback(() => {
+    const snapshot = sharedMetronomeEngine.getSnapshot()
+    const bpm = session.practice.showMetronome ? snapshot.bpm : session.practice.bpm
+    const beatsPerBar = Math.max(1, Number.parseInt(snapshot.meter.split('/')[0] ?? '4', 10) || 4)
+    const safeBpm = Math.max(40, Math.min(300, Math.round(bpm) || 120))
+    return { bpm: safeBpm, beatsPerBar, barSec: (60 / safeBpm) * beatsPerBar }
+  }, [session.practice.bpm, session.practice.showMetronome])
+
+  /**
+   * Overdubs drop in on a downbeat. Starting at an arbitrary second would put
+   * the count-in click a fraction of a beat out of phase with everything already
+   * recorded, so the click would fight the track instead of leading into it.
+   */
+  const snapToDownbeat = useCallback(
+    (atSec: number) => {
+      const { barSec } = resolveRecordingGrid()
+      if (!Number.isFinite(barSec) || barSec <= 0) return Math.max(0, atSec)
+      return Math.max(0, Math.round(Math.max(0, atSec) / barSec) * barSec)
+    },
+    [resolveRecordingGrid],
+  )
+
   /**
    * Timeline "+": claim a box and overdub into it from the playhead.
    *
@@ -1134,23 +1184,27 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       const panelId = addPerformanceBox()
       if (!panelId) {
         void showAlert({
-          message: 'Six boxes is the most one canvas holds. Free one up to add another part.',
+          message: 'Nine boxes is the most one canvas holds. Free one up to add another part.',
         })
         return
       }
-      recordStartSecRef.current = Math.max(0, atSec)
-      openRecordingForPanel(panelId)
+      const startSec = snapToDownbeat(atSec)
+      // Park the playhead on the bar we snapped to so the timeline shows exactly
+      // where the new part will come in.
+      if (startSec !== atSec) sync.seek(startSec)
+      openRecordingForPanel(panelId, startSec)
     },
-    [addPerformanceBox, openRecordingForPanel, showAlert],
+    [addPerformanceBox, openRecordingForPanel, showAlert, snapToDownbeat, sync],
   )
 
   /** Timeline lane "Record here": overdub into an existing empty box. */
   const handleRecordBoxAt = useCallback(
     (panelId: string, atSec: number) => {
-      recordStartSecRef.current = Math.max(0, atSec)
-      openRecordingForPanel(panelId)
+      const startSec = snapToDownbeat(atSec)
+      if (startSec !== atSec) sync.seek(startSec)
+      openRecordingForPanel(panelId, startSec)
     },
-    [openRecordingForPanel],
+    [openRecordingForPanel, snapToDownbeat, sync],
   )
 
   /** Timeline "+ image": pick a screenshot that cuts in at the playhead. */
@@ -1460,12 +1514,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 ) {
                   prepareBackingForRecord()
                 }
-                const recordingBpm = session.practice.showMetronome
-                  ? sharedMetronomeEngine.getSnapshot().bpm
-                  : session.practice.bpm
+                // Same tempo source the overdub start point was snapped to — if
+                // these two disagreed the click would land off the bar grid.
                 recording.beginCountIn(activePanel.id, {
                   ...session.practice,
-                  bpm: recordingBpm,
+                  bpm: resolveRecordingGrid().bpm,
                   clickEnabled:
                     session.practice.clickEnabled && !monitorMutesRef.current.has('click'),
                 })
@@ -1825,7 +1878,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 }}
               >
                 <SlidersHorizontal className="h-4 w-4" />
-                Timeline
+                Editor
               </Pressable>
               <Pressable
                 type="button"
@@ -1867,8 +1920,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           {tileSheetPanel?.kind === 'performance' && tileSheetTake ? (
             <p className="multitrack-sheet__footnote">
               {hasSectionWindow(tileSheetPanel)
-                ? 'This box only appears for part of the song. Open Timeline to move or widen that window.'
-                : 'Open Timeline to trim this part, slide it in time, or make the box appear for only part of the song.'}
+                ? 'This box only appears for part of the song. Open Editor to move or widen that window.'
+                : 'Open Editor to trim this part, slide it in time, or make the box appear for only part of the song.'}
             </p>
           ) : null}
         </div>

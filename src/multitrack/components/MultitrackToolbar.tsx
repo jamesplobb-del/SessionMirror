@@ -93,9 +93,9 @@ export default function MultitrackToolbar(props: {
           ))}
         </div>
         {onOpenAlign && (
-          <Pressable type="button" intensity="soft" onClick={onOpenAlign} className="multitrack-toolbar__chip" aria-label="Align">
+          <Pressable type="button" intensity="soft" onClick={onOpenAlign} className="multitrack-toolbar__chip" aria-label="Editor">
             <SlidersHorizontal className="h-4 w-4" />
-            Align
+            Editor
           </Pressable>
         )}
         <Pressable type="button" intensity="soft" onClick={onOpenMixer} className="multitrack-toolbar__chip" aria-label="Mixer">
