@@ -6,10 +6,15 @@
  * keeps the scale and pattern logic untouched and lets the meter change without
  * disturbing which notes come out.
  *
+ * Rests occupy a slot in the rhythm stream but consume no pitch — every slot
+ * carries the `noteIndex` it zips to, so inserting silence shifts nothing in the
+ * exercise the player is reading.
+ *
  * Rhythm arithmetic uses integer sixteenth-note units exclusively. A quarter
  * is 4 units, 4/4 is 16 units, and 6/8 is 12 units. Pulses are the metronome
  * unit: 4 units in 4/4 and 6 units (a dotted quarter) in 6/8.
  */
+import type { StaffJumperDifficulty } from './staffJumperMusicLogic'
 
 export const STAFF_JUMPER_METERS = ['simple', 'compound'] as const
 export type StaffJumperMeter = (typeof STAFF_JUMPER_METERS)[number]
@@ -77,6 +82,8 @@ export type NoteValue = 'whole' | 'half' | 'quarter' | 'eighth' | 'sixteenth'
 export interface RhythmValue {
   value: NoteValue
   dotted: boolean
+  /** Silence of this length rather than a sounded note. */
+  isRest: boolean
   /** Exact duration in sixteenth-note units, dot included. */
   durationUnits: number
 }
@@ -89,13 +96,21 @@ export const DURATION_UNITS: Record<NoteValue, number> = {
   sixteenth: 1,
 }
 
-function make(value: NoteValue, dotted = false): RhythmValue {
+function build(value: NoteValue, dotted: boolean, isRest: boolean): RhythmValue {
   const undottedUnits = DURATION_UNITS[value]
   const durationUnits = dotted ? (undottedUnits * 3) / 2 : undottedUnits
   if (!Number.isInteger(durationUnits)) {
     throw new Error(`${value} cannot be dotted on the sixteenth-note unit grid`)
   }
-  return { value, dotted, durationUnits }
+  return { value, dotted, isRest, durationUnits }
+}
+
+function make(value: NoteValue, dotted = false): RhythmValue {
+  return build(value, dotted, false)
+}
+
+function rest(value: NoteValue, dotted = false): RhythmValue {
+  return build(value, dotted, true)
 }
 
 const WHOLE = make('whole')
@@ -107,42 +122,114 @@ const DOTTED_EIGHTH = make('eighth', true)
 const EIGHTH = make('eighth')
 const SIXTEENTH = make('sixteenth')
 
+const HALF_REST = rest('half')
+const QUARTER_REST = rest('quarter')
+const EIGHTH_REST = rest('eighth')
+const SIXTEENTH_REST = rest('sixteenth')
+
 /**
- * Measure-length rhythm cells. Every entry sums to the meter's exact integer
- * capacity, so barlines can only occur after a complete measure.
+ * A measure-length rhythm cell and the lowest difficulty it may appear at.
+ *
+ * Harder settings inherit every easier cell, so raising the difficulty widens
+ * the vocabulary rather than replacing it — and because the rest cells are
+ * tiered on top of a fixed set of note-only cells, silence gets steadily more
+ * frequent and more syncopated as the player moves up.
  */
-const SIMPLE_BARS: readonly RhythmValue[][] = [
-  [QUARTER, QUARTER, QUARTER, QUARTER],
-  [HALF, QUARTER, QUARTER],
-  [QUARTER, QUARTER, HALF],
-  [EIGHTH, EIGHTH, QUARTER, QUARTER, QUARTER],
-  [QUARTER, EIGHTH, EIGHTH, HALF],
-  [HALF, HALF],
-  [QUARTER, QUARTER, EIGHTH, EIGHTH, QUARTER],
-  [EIGHTH, EIGHTH, EIGHTH, EIGHTH, HALF],
-  [WHOLE],
+interface BarTemplate {
+  events: readonly RhythmValue[]
+  tier: StaffJumperDifficulty
+}
+
+const bar = (tier: StaffJumperDifficulty, ...events: RhythmValue[]): BarTemplate => ({ events, tier })
+
+/**
+ * 4/4 cells. Every entry sums to the meter's exact integer capacity, so
+ * barlines can only occur after a complete measure.
+ *
+ * Rests are placed the way they are engraved: a half rest only ever covers
+ * beats 1–2 or 3–4, a quarter rest takes a whole beat, and an eighth rest sits
+ * on either half of one.
+ */
+const SIMPLE_BARS: readonly BarTemplate[] = [
+  bar('easy', QUARTER, QUARTER, QUARTER, QUARTER),
+  bar('easy', HALF, QUARTER, QUARTER),
+  bar('easy', QUARTER, QUARTER, HALF),
+  bar('easy', EIGHTH, EIGHTH, QUARTER, QUARTER, QUARTER),
+  bar('easy', QUARTER, EIGHTH, EIGHTH, HALF),
+  bar('easy', HALF, HALF),
+  bar('easy', QUARTER, QUARTER, EIGHTH, EIGHTH, QUARTER),
+  bar('easy', EIGHTH, EIGHTH, EIGHTH, EIGHTH, HALF),
+  bar('easy', WHOLE),
+
+  // ── Rests on the beat ──
+  bar('easy', QUARTER, QUARTER, QUARTER, QUARTER_REST),
+  bar('easy', QUARTER, QUARTER, HALF_REST),
+  bar('easy', HALF, QUARTER, QUARTER_REST),
+  bar('easy', QUARTER, QUARTER_REST, QUARTER, QUARTER),
+
+  // ── Rests that start a bar or split a beat ──
+  bar('medium', QUARTER_REST, QUARTER, QUARTER, QUARTER),
+  bar('medium', HALF_REST, QUARTER, QUARTER),
+  bar('medium', HALF, QUARTER_REST, QUARTER),
+  bar('medium', EIGHTH, EIGHTH, QUARTER, QUARTER_REST, QUARTER),
+  bar('medium', QUARTER, EIGHTH_REST, EIGHTH, QUARTER, QUARTER),
+  bar('medium', QUARTER, QUARTER, EIGHTH_REST, EIGHTH, QUARTER),
+
+  // ── Off-beat entries and sixteenth rests ──
+  bar('hard', EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, EIGHTH_REST, EIGHTH, EIGHTH_REST, EIGHTH, QUARTER),
+  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH_REST, EIGHTH, HALF),
+  bar('hard', QUARTER, QUARTER, EIGHTH, EIGHTH_REST, QUARTER),
+  bar('hard', SIXTEENTH_REST, SIXTEENTH, SIXTEENTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
 ]
 
-/** 6/8 cells. Each dotted-quarter pulse is filled in one of the usual ways. */
-const COMPOUND_BARS: readonly RhythmValue[][] = [
-  [DOTTED_QUARTER, DOTTED_QUARTER],
-  [EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH],
-  [DOTTED_QUARTER, EIGHTH, EIGHTH, EIGHTH],
-  [EIGHTH, EIGHTH, EIGHTH, DOTTED_QUARTER],
+/**
+ * 6/8 cells. Each dotted-quarter pulse is filled in one of the usual ways.
+ *
+ * Rests stay inside their own pulse: a silent compound beat is written as a
+ * quarter rest plus an eighth rest rather than a dotted rest, which is how the
+ * beat's three-part division stays visible on the page.
+ */
+const COMPOUND_BARS: readonly BarTemplate[] = [
+  bar('easy', DOTTED_QUARTER, DOTTED_QUARTER),
+  bar('easy', EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
+  bar('easy', DOTTED_QUARTER, EIGHTH, EIGHTH, EIGHTH),
+  bar('easy', EIGHTH, EIGHTH, EIGHTH, DOTTED_QUARTER),
   // The 6/8 lilt: long-short, long-short.
-  [QUARTER, EIGHTH, QUARTER, EIGHTH],
-  [QUARTER, EIGHTH, DOTTED_QUARTER],
-  [DOTTED_QUARTER, QUARTER, EIGHTH],
-  [EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH],
-  [QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH],
-  [DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER],
-  [DOTTED_HALF],
+  bar('easy', QUARTER, EIGHTH, QUARTER, EIGHTH),
+  bar('easy', QUARTER, EIGHTH, DOTTED_QUARTER),
+  bar('easy', DOTTED_QUARTER, QUARTER, EIGHTH),
+  bar('easy', EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH),
+  bar('easy', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
+  bar('easy', DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER),
+  bar('easy', DOTTED_HALF),
+
+  // ── The third eighth of a beat left silent ──
+  bar('easy', DOTTED_QUARTER, QUARTER, EIGHTH_REST),
+  bar('easy', QUARTER, EIGHTH, QUARTER, EIGHTH_REST),
+  bar('easy', QUARTER, EIGHTH, QUARTER_REST, EIGHTH_REST),
+  bar('easy', QUARTER, EIGHTH_REST, QUARTER, EIGHTH),
+
+  // ── Rests inside a running eighth-note beat ──
+  bar('medium', EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH_REST),
+  bar('medium', EIGHTH_REST, EIGHTH, EIGHTH, DOTTED_QUARTER),
+  bar('medium', QUARTER, EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH),
+  bar('medium', EIGHTH, EIGHTH, EIGHTH_REST, DOTTED_QUARTER),
+  bar('medium', DOTTED_QUARTER, EIGHTH, EIGHTH, EIGHTH_REST),
+
+  // ── Both beats entering off the downbeat ──
+  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH),
+  bar('hard', EIGHTH, EIGHTH_REST, EIGHTH, QUARTER, EIGHTH),
+  bar('hard', QUARTER_REST, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
+  bar('hard', QUARTER, EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH_REST, QUARTER, EIGHTH),
 ]
 
 export interface RhythmMeasure {
   index: number
   capacityUnits: number
   events: readonly RhythmValue[]
+  tier: StaffJumperDifficulty
 }
 
 export function measureDurationUnits(measure: Pick<RhythmMeasure, 'events'>): number {
@@ -152,19 +239,29 @@ export function measureDurationUnits(measure: Pick<RhythmMeasure, 'events'>): nu
 /**
  * Reject an invalid rhythm cell before it can reach either the preview or the
  * game. Integer sixteenth-note units avoid float comparisons and make 4/4's
- * invariant explicit: every selected measure contains exactly 16 units.
+ * invariant explicit: every selected measure contains exactly 16 units, rests
+ * included — silence is counted against the bar exactly like a sounded note.
  */
 function validateMeasures(
   meter: MeterSpec,
-  templates: readonly RhythmValue[][],
+  templates: readonly BarTemplate[],
 ): readonly RhythmMeasure[] {
-  return templates.map((events, index) => {
-    const measure: RhythmMeasure = { index, capacityUnits: meter.capacityUnits, events }
+  return templates.map((template, index) => {
+    const measure: RhythmMeasure = {
+      index,
+      capacityUnits: meter.capacityUnits,
+      events: template.events,
+      tier: template.tier,
+    }
     const actualUnits = measureDurationUnits(measure)
     if (actualUnits !== meter.capacityUnits) {
       throw new Error(
         `Invalid ${meter.label} measure ${index}: expected ${meter.capacityUnits} units, got ${actualUnits}`,
       )
+    }
+    // A bar of pure silence would leave the player nothing to read or play.
+    if (!measure.events.some((event) => !event.isRest)) {
+      throw new Error(`Invalid ${meter.label} measure ${index}: no sounded note`)
     }
     return measure
   })
@@ -173,6 +270,18 @@ function validateMeasures(
 const MEASURES_BY_METER: Record<StaffJumperMeter, readonly RhythmMeasure[]> = {
   simple: validateMeasures(METERS.simple, SIMPLE_BARS),
   compound: validateMeasures(METERS.compound, COMPOUND_BARS),
+}
+
+const TIER_ORDER: Record<StaffJumperDifficulty, number> = { easy: 0, medium: 1, hard: 2 }
+
+/** Cells a difficulty may draw from — its own tier plus everything below it. */
+function measuresFor(
+  meter: StaffJumperMeter,
+  difficulty: StaffJumperDifficulty,
+): readonly RhythmMeasure[] {
+  return MEASURES_BY_METER[meter].filter(
+    (measure) => TIER_ORDER[measure.tier] <= TIER_ORDER[difficulty],
+  )
 }
 
 /**
@@ -191,6 +300,14 @@ export interface RhythmSlot {
   index: number
   value: NoteValue
   dotted: boolean
+  isRest: boolean
+  /**
+   * Position in the pitch stream this slot zips to.
+   *
+   * Rests take no pitch, so they carry the index of the note that follows and
+   * leave the exercise sequence itself untouched.
+   */
+  noteIndex: number
   durationUnits: number
   /** Cumulative sixteenth-note units from the start of the run. */
   unitPosition: number
@@ -213,6 +330,8 @@ interface RhythmTimeline {
   unitCursor: number
   spacingCursor: number
   beamCursor: number
+  /** How many sounded notes the timeline has emitted so far. */
+  noteCursor: number
 }
 
 /**
@@ -239,12 +358,18 @@ export function isBeamable(value: NoteValue): boolean {
   return value === 'eighth' || value === 'sixteenth'
 }
 
+/** Rests carry no stem, so they never join the beam over them. */
+function joinsBeam(slot: RhythmSlot): boolean {
+  return !slot.isRest && isBeamable(slot.value)
+}
+
 /**
  * Beam runs of short notes that share a pulse.
  *
  * Grouping by pulse rather than by bar is what makes the beat readable, and it
  * is why 6/8 beams its eighths in threes while 4/4 beams them in twos — the
- * rule is the same, only the pulse length differs.
+ * rule is the same, only the pulse length differs. A rest breaks the run: the
+ * notes on either side of it are flagged or beamed separately.
  */
 function assignBeams(
   slots: RhythmSlot[],
@@ -257,7 +382,7 @@ function assignBeams(
   let runStart = fromIndex
   while (runStart < slots.length) {
     const slot = slots[runStart]!
-    if (!isBeamable(slot.value)) {
+    if (!joinsBeam(slot)) {
       runStart += 1
       continue
     }
@@ -266,7 +391,7 @@ function assignBeams(
     let runEnd = runStart
     while (
       runEnd + 1 < slots.length &&
-      isBeamable(slots[runEnd + 1]!.value) &&
+      joinsBeam(slots[runEnd + 1]!) &&
       pulseOf(slots[runEnd + 1]!.unitPosition) === pulse
     ) {
       runEnd += 1
@@ -287,8 +412,13 @@ function assignBeams(
   }
 }
 
-function appendMeasure(timeline: RhythmTimeline, meter: MeterSpec, seed: number): void {
-  const measures = MEASURES_BY_METER[meter.id]
+function appendMeasure(
+  timeline: RhythmTimeline,
+  meter: MeterSpec,
+  difficulty: StaffJumperDifficulty,
+  seed: number,
+): void {
+  const measures = measuresFor(meter.id, difficulty)
   const rng = mulberry32(seed + timeline.measureCount * 2654435761)
   const measure = measures[Math.floor(rng() * measures.length)]!
   const firstNewIndex = timeline.slots.length
@@ -305,6 +435,8 @@ function appendMeasure(timeline: RhythmTimeline, meter: MeterSpec, seed: number)
       index: timeline.slots.length,
       value: rhythmValue.value,
       dotted: rhythmValue.dotted,
+      isRest: rhythmValue.isRest,
+      noteIndex: timeline.noteCursor,
       durationUnits: rhythmValue.durationUnits,
       unitPosition: timeline.unitCursor,
       measureIndex: timeline.measureCount,
@@ -317,6 +449,7 @@ function appendMeasure(timeline: RhythmTimeline, meter: MeterSpec, seed: number)
       beamGroupSize: 1,
     })
     timeline.unitCursor += rhythmValue.durationUnits
+    if (!rhythmValue.isRest) timeline.noteCursor += 1
     timeline.spacingCursor +=
       spacingUnitsForDuration(rhythmValue.durationUnits) +
       (startsMeasure ? BARLINE_SPACING_UNITS : 0)
@@ -338,15 +471,25 @@ const timelineCache = new WeakMap<object, RhythmTimeline>()
 export function getRhythmSlot(
   configKey: object,
   meter: StaffJumperMeter,
+  difficulty: StaffJumperDifficulty,
   seed: number,
   index: number,
 ): RhythmSlot {
   let timeline = timelineCache.get(configKey)
   if (!timeline) {
-    timeline = { slots: [], measureCount: 0, unitCursor: 0, spacingCursor: 0, beamCursor: 0 }
+    timeline = {
+      slots: [],
+      measureCount: 0,
+      unitCursor: 0,
+      spacingCursor: 0,
+      beamCursor: 0,
+      noteCursor: 0,
+    }
     timelineCache.set(configKey, timeline)
   }
-  while (index >= timeline.slots.length) appendMeasure(timeline, METERS[meter], seed)
+  while (index >= timeline.slots.length) {
+    appendMeasure(timeline, METERS[meter], difficulty, seed)
+  }
   return timeline.slots[index]!
 }
 
@@ -368,6 +511,11 @@ export function beamCountForValue(value: NoteValue): number {
 /** Seconds for one pulse — the unit the tempo dial counts. */
 export function secondsPerPulse(bpm: number): number {
   return 60 / Math.max(1, bpm)
+}
+
+/** How long a written value lasts at a tempo — what a rest has to be held for. */
+export function durationMs(durationUnits: number, meter: MeterSpec, bpm: number): number {
+  return (durationUnits / meter.pulseUnits) * secondsPerPulse(bpm) * 1000
 }
 
 export const STAFF_JUMPER_TEMPO_MIN = 40

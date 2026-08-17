@@ -33,6 +33,7 @@ import {
   TIME_SIGNATURE_YPX,
 } from './staffNotationMap'
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
+import StaffRest from './StaffRest'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
 import { barlineXForSlot, layoutRhythm } from './staffJumperNotationLayout'
 import { isHollowNotehead, METERS } from './staffJumperRhythm'
@@ -41,6 +42,12 @@ interface StaffPreviewProps {
   config: StaffJumperConfig
   /** Bars to show before the preview runs out of room. */
   bars?: number
+  /**
+   * Makes the notation itself the control surface: the clef and the time
+   * signature become hit targets that open their own editor. Omit it and the
+   * preview stays a still frame.
+   */
+  onEdit?: (target: 'clef' | 'meter') => void
 }
 
 /**
@@ -51,7 +58,7 @@ interface StaffPreviewProps {
  * constants — so the notes on the setup screen are literally the notes the run
  * will put on the staff, in the same hand. No separate music logic to drift.
  */
-export default function StaffPreview({ config, bars = 1 }: StaffPreviewProps) {
+export default function StaffPreview({ config, bars = 1, onEdit }: StaffPreviewProps) {
   const glyphMetrics = useMusicGlyphMetrics()
   const hostRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ width: 320, height: 150 })
@@ -149,6 +156,42 @@ export default function StaffPreview({ config, bars = 1 }: StaffPreviewProps) {
     const lineWidth = Math.max(worldWidth, box.width / scale)
     return { noteOffsetX, worldWidth, top, worldHeight, scale, lineWidth }
   }, [box.height, box.width, closingBarlineX, head.width, slots])
+
+  const editOverlay = onEdit ? (
+    <div
+      className="sj-preview__edits"
+      style={{
+        transform: `translateY(${-view.top * view.scale}px) scale(${view.scale})`,
+        transformOrigin: '0 0',
+        width: `${view.lineWidth}px`,
+      }}
+    >
+      <button
+        type="button"
+        className="sj-preview__edit"
+        onClick={() => onEdit('clef')}
+        aria-label="Change clef"
+        style={{
+          left: `${STAFF_CLEF_X - STAFF_SPACE_PX * 0.5}px`,
+          top: `${STAFF_TOP_Y - STAFF_SPACE_PX * 1.5}px`,
+          width: `${Math.max(STAFF_SPACE_PX * 3, head.signatureX - STAFF_CLEF_X)}px`,
+          height: `${STAFF_BOTTOM_Y - STAFF_TOP_Y + STAFF_SPACE_PX * 3}px`,
+        }}
+      />
+      <button
+        type="button"
+        className="sj-preview__edit"
+        onClick={() => onEdit('meter')}
+        aria-label="Change time signature"
+        style={{
+          left: `${head.timeSignatureX - STAFF_SPACE_PX * 0.35}px`,
+          top: `${STAFF_TOP_Y - STAFF_SPACE_PX * 1.5}px`,
+          width: `${TIME_SIGNATURE_WIDTH + STAFF_SPACE_PX * 0.7}px`,
+          height: `${STAFF_BOTTOM_Y - STAFF_TOP_Y + STAFF_SPACE_PX * 3}px`,
+        }}
+      />
+    </div>
+  ) : null
 
   return (
     <div className="sj-preview" ref={hostRef}>
@@ -279,45 +322,54 @@ export default function StaffPreview({ config, bars = 1 }: StaffPreviewProps) {
           {slots.map((slot) => (
             <div
               key={slot.step}
-              className={`sj-note sj-note--${slot.note.kind}`}
+              className={`sj-note sj-note--${slot.note.kind} ${
+                slot.note.isRest ? 'sj-note--rest' : ''
+              }`}
               style={{ left: `${slot.xPx}px`, top: `${slot.note.yPx}px` }}
             >
-              {slot.note.ledgerLineYPx.map((ledgerY) => (
-                <span
-                  key={ledgerY}
-                  className="sj-note__ledger"
-                  style={{
-                    top: `${ledgerY - slot.note.yPx}px`,
-                    width: `${LEDGER_LINE_W}px`,
-                    height: `${LEDGER_LINE_THICKNESS}px`,
-                  }}
-                />
-              ))}
-              <span
-                className={`sj-note__head ${
-                  isHollowNotehead(slot.note.rhythm.value) ? 'sj-note__head--hollow' : ''
-                }`}
-                style={{
-                  width: `${NOTEHEAD_W}px`,
-                  height: `${NOTEHEAD_H}px`,
-                  borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
-                }}
-              />
-              {slot.note.rhythm.dotted && (
-                <span
-                  className="sj-note__dot"
-                  style={{
-                    left: `${NOTEHEAD_W / 2 + DOT_GAP}px`,
-                    top: `${dotYForNote(slot.note.yPx, slot.note.kind) - slot.note.yPx}px`,
-                    width: `${DOT_RADIUS * 2}px`,
-                    height: `${DOT_RADIUS * 2}px`,
-                  }}
-                />
+              {slot.note.isRest ? (
+                <StaffRest value={slot.note.rhythm.value} />
+              ) : (
+                <>
+                  {slot.note.ledgerLineYPx.map((ledgerY) => (
+                    <span
+                      key={ledgerY}
+                      className="sj-note__ledger"
+                      style={{
+                        top: `${ledgerY - slot.note.yPx}px`,
+                        width: `${LEDGER_LINE_W}px`,
+                        height: `${LEDGER_LINE_THICKNESS}px`,
+                      }}
+                    />
+                  ))}
+                  <span
+                    className={`sj-note__head ${
+                      isHollowNotehead(slot.note.rhythm.value) ? 'sj-note__head--hollow' : ''
+                    }`}
+                    style={{
+                      width: `${NOTEHEAD_W}px`,
+                      height: `${NOTEHEAD_H}px`,
+                      borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
+                    }}
+                  />
+                  {slot.note.rhythm.dotted && (
+                    <span
+                      className="sj-note__dot"
+                      style={{
+                        left: `${NOTEHEAD_W / 2 + DOT_GAP}px`,
+                        top: `${dotYForNote(slot.note.yPx, slot.note.kind) - slot.note.yPx}px`,
+                        width: `${DOT_RADIUS * 2}px`,
+                        height: `${DOT_RADIUS * 2}px`,
+                      }}
+                    />
+                  )}
+                </>
               )}
             </div>
           ))}
         </div>
       </div>
+      {editOverlay}
     </div>
   )
 }

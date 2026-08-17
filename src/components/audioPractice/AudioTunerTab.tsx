@@ -35,6 +35,7 @@ interface AudioTunerTabProps {
   tunerInstrument: TunerInstrument
   tunerTransposition: TunerTranspositionId
   onTunerTranspositionChange: (value: TunerTranspositionId) => void
+  onTunerInstrumentChange: (value: TunerInstrument) => void
   liveMicTunerEnabled: boolean
   droneVolume: number
   droneWaveform: DroneWaveform
@@ -71,6 +72,7 @@ export default function AudioTunerTab({
   tunerInstrument,
   tunerTransposition,
   onTunerTranspositionChange,
+  onTunerInstrumentChange,
   liveMicTunerEnabled: _liveMicTunerEnabled,
   droneVolume,
   droneWaveform,
@@ -399,6 +401,7 @@ export default function AudioTunerTab({
         tunerInstrument={tunerInstrument}
         tunerTransposition={tunerTransposition}
         onTunerTranspositionChange={onTunerTranspositionChange}
+        onTunerInstrumentChange={onTunerInstrumentChange}
         drone={droneKeyboard}
         onLiveSourceHealthChange={handleSourceHealthChange}
       />

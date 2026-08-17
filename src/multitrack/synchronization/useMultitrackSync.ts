@@ -491,8 +491,9 @@ export function useMultitrackSync() {
    * keep the corresponding videos moving in their layout tiles without routing
    * any WebKit audio or introducing a second audible clock.
    */
-  const prepareVisualAtStart = useCallback(() => {
+  const prepareVisualAtStart = useCallback((startTime = 0) => {
     visualOnlyModeRef.current = true
+    preparedStartRef.current = startTime
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
     for (const [panelId, element] of getEntries()) {
@@ -501,14 +502,17 @@ export function useMultitrackSync() {
       element.setAttribute('playsinline', 'true')
       try {
         const win = clipWindowFor(panelId, element)
-        element.currentTime = Math.max(win.trimStart, win.trimStart + win.offset)
+        // Overdubbing part-way into the song parks every reference at the media
+        // time that timeline `startTime` maps to; clips that have not entered
+        // yet stay parked at their own head until the rAF loop cues them.
+        element.currentTime = Math.max(win.trimStart, startTime + win.trimStart + win.offset)
       } catch {
         /* metadata may finish loading during the count-in */
       }
     }
   }, [applyMixState, clipWindowFor, getEntries])
 
-  const startVisualPrepared = useCallback(() => {
+  const startVisualPrepared = useCallback((startTime = 0) => {
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
     for (const [panelId, element] of getEntries()) {
@@ -517,7 +521,7 @@ export function useMultitrackSync() {
         element.volume = 0
         void element.play().catch(() => {})
       }
-      const entryDelayMs = Math.max(0, -offsetFor(panelId) * 1000)
+      const entryDelayMs = Math.max(0, (-offsetFor(panelId) - startTime) * 1000)
       if (entryDelayMs <= 5) startElement()
       else visualStartTimersRef.current.push(window.setTimeout(startElement, entryDelayMs))
     }

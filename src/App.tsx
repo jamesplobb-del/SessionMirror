@@ -2677,6 +2677,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     requestCameraAccess,
   ])
 
+  /** Tap-to-reactivate from multitrack: rebuild the capture session from scratch. */
+  const handleMultitrackWakeCamera = useCallback(async () => {
+    handleRecordingModeChange('video')
+    await refreshCameraSession()
+    if (isNativeCameraPlatform) {
+      await acquireNativeVideoBridge()
+      return
+    }
+    await requestCameraAccess('video')
+  }, [
+    acquireNativeVideoBridge,
+    handleRecordingModeChange,
+    isNativeCameraPlatform,
+    refreshCameraSession,
+    requestCameraAccess,
+  ])
+
   const handleMultitrackStartRecording = useCallback((): Promise<boolean> => {
     multitrackRecordingActiveRef.current = true
     if (settings.excludeYoutubeFromRecording) {
@@ -4092,7 +4109,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             <Headphones className="h-4 w-4" aria-hidden />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
+                            <p className="text-[11px] font-medium text-white/72">
                               YouTube Tip
                             </p>
                             <p className="mt-1 text-sm leading-snug text-white/92">
@@ -4128,7 +4145,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             <Maximize2 className="h-4 w-4" aria-hidden />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
+                            <p className="text-[11px] font-medium text-white/72">
                               YouTube Tip
                             </p>
                             <p className="mt-1 text-sm leading-snug text-white/92">
@@ -4461,6 +4478,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           onTunerTranspositionChange={(tunerTransposition) =>
                             updateSettings({ tunerTransposition })
                           }
+                          onTunerInstrumentChange={(tunerInstrument) =>
+                            updateSettings({ tunerInstrument })
+                          }
                           liveMicTunerEnabled={settings.liveMicTunerEnabled}
                           droneVolume={settings.droneVolume}
                           droneWaveform={settings.droneWaveform}
@@ -4690,6 +4710,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onPitchTrackerChange={handlePitchTrackerSettingChange}
                         onShowTakeCardsChange={handleShowTakeCardsSettingChange}
                         showMetronome={hudQuickSettings.showMetronome}
+                        metronomeToggleVisible={!isAudioPracticeMetronomeTab}
                         onShowMetronomeChange={handleShowMetronomeSettingChange}
                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
@@ -4885,6 +4906,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     pendingRecordingTakeId={multitrackPendingRecordingTakeId}
                     onClearPendingRecording={handleClearMultitrackPendingRecording}
                     onOpenRecordingStage={handleMultitrackOpenRecordingStage}
+                    onWakeCamera={handleMultitrackWakeCamera}
                     onSaveRenderedTakeToVault={handleSaveRenderedMultitrackToVault}
                   />
                 </Suspense>

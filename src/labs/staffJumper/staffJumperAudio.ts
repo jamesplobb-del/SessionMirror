@@ -153,6 +153,7 @@ export async function startClickTrack(options: ClickTrackOptions): Promise<Click
 }
 
 export interface DroneHandle {
+  setPitch(pitchClass: number, octave: number): Promise<void>
   stop(): Promise<void>
 }
 
@@ -171,8 +172,11 @@ async function startWebDrone(
   volume = DRONE_VOLUME,
 ): Promise<DroneHandle> {
   const ctx = await getPlaybackAudioContext()
-  const midi = (octave + 1) * 12 + pitchClass
-  const hz = 440 * Math.pow(2, (midi - 69) / 12)
+  const frequencyForPitch = (nextPitchClass: number, nextOctave: number) => {
+    const midi = (nextOctave + 1) * 12 + nextPitchClass
+    return 440 * Math.pow(2, (midi - 69) / 12)
+  }
+  const hz = frequencyForPitch(pitchClass, octave)
 
   const master = ctx.createGain()
   master.gain.setValueAtTime(0.0001, ctx.currentTime)
@@ -183,21 +187,30 @@ async function startWebDrone(
   // Root plus a quiet octave above — enough body to tune against without
   // masking the player's own sound in the microphone.
   const voices = [
-    { hz, gain: 1, type: 'sine' as OscillatorType },
-    { hz: hz * 2, gain: 0.28, type: 'sine' as OscillatorType },
-  ].map(({ hz: voiceHz, gain, type }) => {
+    { ratio: 1, gain: 1, type: 'sine' as OscillatorType },
+    { ratio: 2, gain: 0.28, type: 'sine' as OscillatorType },
+  ].map(({ ratio, gain, type }) => {
     const osc = ctx.createOscillator()
     const voiceGain = ctx.createGain()
     osc.type = type
-    osc.frequency.value = voiceHz
+    osc.frequency.value = hz * ratio
     voiceGain.gain.value = gain
     osc.connect(voiceGain)
     voiceGain.connect(master)
     osc.start()
-    return { osc, voiceGain }
+    return { osc, voiceGain, ratio }
   })
 
   return {
+    async setPitch(nextPitchClass: number, nextOctave: number) {
+      const nextHz = frequencyForPitch(nextPitchClass, nextOctave)
+      const now = ctx.currentTime
+      for (const { osc, ratio } of voices) {
+        osc.frequency.cancelScheduledValues(now)
+        osc.frequency.setValueAtTime(osc.frequency.value, now)
+        osc.frequency.linearRampToValueAtTime(nextHz * ratio, now + 0.045)
+      }
+    },
     async stop() {
       const now = ctx.currentTime
       master.gain.cancelScheduledValues(now)
@@ -256,19 +269,21 @@ export async function startDrone(
   }
 
   return {
+    async setPitch(nextPitchClass: number, nextOctave: number) {
+      const normalizedPitchClass = ((Math.round(nextPitchClass) % 12) + 12) % 12
+      const normalizedOctave = Math.max(0, Math.min(8, Math.round(nextOctave)))
+      await droneSoloNote(normalizedPitchClass, normalizedOctave)
+    },
     async stop() {
       try {
         await droneStop()
         if (previous) {
-          await droneSetVolume(previous.volume)
-          if (previous.activeNotes.length > 0) {
-            await droneRestoreState({
-              activeNotes: previous.activeNotes,
-              octave: previous.octave,
-              volume: previous.volume,
-              waveform: previous.waveform,
-            })
-          }
+          await droneRestoreState({
+            activeNotes: previous.activeNotes,
+            octave: previous.octave,
+            volume: previous.volume,
+            waveform: previous.waveform,
+          })
         }
       } catch {
         /* the tuner tab re-applies its own state when it next opens */

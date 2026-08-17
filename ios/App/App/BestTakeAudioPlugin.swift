@@ -1219,15 +1219,23 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             decorationLayer.addSublayer(borderLayer)
         }
 
-        if let sheetMusicDict = call.getObject("sheetMusic"),
-           let sheetPath = sheetMusicDict["path"] as? String,
-           let sheetRectDict = sheetMusicDict["rect"] as? [String: Any],
-           let image = imageForCreatorStudioAsset(
-                path: sheetPath,
-                fileType: sheetMusicDict["fileType"] as? String ?? "image"
-           ) {
-            let fileType = sheetMusicDict["fileType"] as? String ?? "image"
-            let requestedContentMode = sheetMusicDict["contentMode"] as? String
+        // Sheet cue windows are expressed against the finished composition, so
+        // the real composition length is what their key times are scaled by.
+        let sheetTimelineDuration = max(CMTimeGetSeconds(longestDuration), durationHint)
+
+        // One sheet layer builder, shared by the static image and by each timed
+        // screenshot cue. Cues carry a window; the static case has none and
+        // simply stays up for the whole render.
+        func addSheetLayer(_ dict: [String: Any], window: (start: Double, end: Double?)?) {
+            guard let sheetPath = dict["path"] as? String,
+                  let sheetRectDict = dict["rect"] as? [String: Any],
+                  let image = imageForCreatorStudioAsset(
+                      path: sheetPath,
+                      fileType: dict["fileType"] as? String ?? "image"
+                  ) else { return }
+
+            let fileType = dict["fileType"] as? String ?? "image"
+            let requestedContentMode = dict["contentMode"] as? String
             // Existing image sessions have no contentMode. Default those to
             // fill as well, while PDFs keep their full-page fit behavior.
             let fillsViewport = fileType != "pdf" && requestedContentMode != "fit"
@@ -1243,16 +1251,57 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             sheetLayer.frame = sheetViewport.bounds
             sheetLayer.contents = image.cgImage
             sheetLayer.contentsGravity = fillsViewport ? .resizeAspectFill : .resizeAspect
-            let x = min(1.25, max(-0.25, (sheetMusicDict["x"] as? NSNumber)?.doubleValue ?? 0.5))
-            let y = min(1.25, max(-0.25, (sheetMusicDict["y"] as? NSNumber)?.doubleValue ?? 0.5))
-            let scale = min(2.5, max(0.6, (sheetMusicDict["scale"] as? NSNumber)?.doubleValue ?? 1))
+            let x = min(1.25, max(-0.25, (dict["x"] as? NSNumber)?.doubleValue ?? 0.5))
+            let y = min(1.25, max(-0.25, (dict["y"] as? NSNumber)?.doubleValue ?? 0.5))
+            let scale = min(2.5, max(0.6, (dict["scale"] as? NSNumber)?.doubleValue ?? 1))
             sheetLayer.position = CGPoint(
                 x: sheetViewport.bounds.midX + (x - 0.5) * 0.7 * sheetViewport.bounds.width,
                 y: sheetViewport.bounds.midY + (y - 0.5) * 0.7 * sheetViewport.bounds.height
             )
             sheetLayer.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
             sheetViewport.addSublayer(sheetLayer)
+
+            if let window = window, sheetTimelineDuration > 0 {
+                // A hard opacity step (not a fade) reproduces the canvas cut.
+                // The animation is anchored at AVCoreAnimationBeginTimeAtZero and
+                // never removed, so it survives the whole offline render.
+                let startFraction = min(1, max(0, window.start / sheetTimelineDuration))
+                // Discrete keyframes take one MORE keyTime than value, starting
+                // at 0 and ending at 1 — each value holds until the next time.
+                var values: [NSNumber] = [0, 1]
+                var keyTimes: [NSNumber] = [0, NSNumber(value: startFraction)]
+                if let windowEnd = window.end, windowEnd < sheetTimelineDuration {
+                    let endFraction = min(1, max(startFraction, windowEnd / sheetTimelineDuration))
+                    values.append(0)
+                    keyTimes.append(NSNumber(value: endFraction))
+                }
+                keyTimes.append(1)
+
+                let animation = CAKeyframeAnimation(keyPath: "opacity")
+                animation.calculationMode = .discrete
+                animation.beginTime = AVCoreAnimationBeginTimeAtZero
+                animation.duration = sheetTimelineDuration
+                animation.isRemovedOnCompletion = false
+                animation.fillMode = .both
+                animation.values = values
+                animation.keyTimes = keyTimes
+                sheetViewport.opacity = startFraction <= 0 ? 1 : 0
+                sheetViewport.add(animation, forKey: "sheetCueVisibility")
+            }
+
             decorationLayer.addSublayer(sheetViewport)
+        }
+
+        let sheetMusicCues = call.getArray("sheetMusicCues", JSObject.self) ?? []
+        if sheetMusicCues.count > 1 {
+            for cueAny in sheetMusicCues {
+                let cue = cueAny as [String: Any]
+                let startSec = (cue["startSec"] as? NSNumber)?.doubleValue ?? 0
+                let endSec = (cue["endSec"] as? NSNumber)?.doubleValue
+                addSheetLayer(cue, window: (start: startSec, end: endSec))
+            }
+        } else if let sheetMusicDict = call.getObject("sheetMusic") {
+            addSheetLayer(sheetMusicDict, window: nil)
         }
 
         videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(

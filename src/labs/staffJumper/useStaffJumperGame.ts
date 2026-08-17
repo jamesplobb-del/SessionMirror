@@ -14,7 +14,7 @@ import {
   type StaffJumperState,
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
-import { judgeTiming, METERS, secondsPerPulse } from './staffJumperRhythm'
+import { durationMs, judgeTiming, METERS, secondsPerPulse } from './staffJumperRhythm'
 import {
   startClickTrack,
   startDrone,
@@ -65,6 +65,7 @@ function createRunSeed(): number {
 type Action =
   | { type: 'START'; config: StaffJumperConfig }
   | { type: 'SUCCESS'; quality: 'perfect' | 'good'; timing: StaffJumperTiming; timingErrorMs: number }
+  | { type: 'REST_COMPLETE' }
   | { type: 'MISS'; reason: 'wrong' | 'timeout' }
   | { type: 'FALL_COMPLETE' }
   | { type: 'PAUSE' }
@@ -143,6 +144,27 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         advanceToken: state.advanceToken + 1,
         feedback: action.quality,
         feedbackToken: state.feedbackToken + 1,
+      }
+    }
+
+    /**
+     * A rest has been held for its written length.
+     *
+     * Silence is not something the player can get right or wrong, so this
+     * advances the run without touching score, streak, hearts or accuracy — it
+     * only moves the player onto the next slot and hops them across.
+     */
+    case 'REST_COMPLETE': {
+      if (state.phase !== 'playing' || !state.config) return state
+      const nextStep = state.sequenceStep + 1
+      return {
+        ...state,
+        sequenceStep: nextStep,
+        targetPitchClass: getTargetNoteAtStep(state.config, nextStep).pitchClass,
+        advanceToken: state.advanceToken + 1,
+        timing: null,
+        timingErrorMs: 0,
+        feedback: null,
       }
     }
 
@@ -460,6 +482,21 @@ export function useStaffJumperGame(
     let correctStableMs = 0
     let wrongStableMs = 0
     const noteTimeoutMs = DIFFICULTY_TIMEOUT_SECONDS[state.config!.difficulty] * 1000
+
+    /**
+     * Rests are read, not played.
+     *
+     * When the step the player is on is silence, the run simply waits out the
+     * written length and moves on — no pitch is judged, the note clock cannot
+     * expire, and nothing is scored either way.
+     */
+    const stepRhythm = getRhythmForStep(state.config!, state.sequenceStep)
+    const stepMeter = METERS[state.config!.meter]
+    const restMs = durationMs(stepRhythm.durationUnits, stepMeter, state.config!.tempoBpm)
+    const restPulses = stepRhythm.durationUnits / stepMeter.pulseUnits
+    let restEndsAt: number | null = null
+    let restResolved = false
+
     const initialRemainingMs = Math.max(0, Math.min(noteTimeoutMs, noteRemainingMsRef.current))
     let targetDeadlineAt = performance.now() + initialRemainingMs
     noteDeadlineAtRef.current = targetDeadlineAt
@@ -500,6 +537,26 @@ export function useStaffJumperGame(
         expectedPulseRef.current = click?.isRunning() ? click.pulsesElapsed() : 0
         resetTargetDeadline(now)
         dispatch({ type: 'COUNT_IN_COMPLETE' })
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+
+      if (stepRhythm.isRest) {
+        // The clock is held full, exactly as during the count-in, so a rest can
+        // never expire into a missed note.
+        resetTargetDeadline(now)
+        if (restEndsAt == null) restEndsAt = now + restMs
+        if (!restResolved && now >= restEndsAt) {
+          restResolved = true
+          actionLockUntilRef.current =
+            now + DIFFICULTY_TIMING[current.config.difficulty].cooldownMs
+          // Silence guarantees the next note is a fresh attack, so nothing is
+          // left ringing for the release gate to hold back.
+          releasingPitchClassRef.current = null
+          wrongPitchClassRef.current = null
+          expectedPulseRef.current += restPulses
+          dispatch({ type: 'REST_COMPLETE' })
+        }
         rafId = requestAnimationFrame(tick)
         return
       }

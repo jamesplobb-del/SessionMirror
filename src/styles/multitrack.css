@@ -120,26 +120,26 @@
 
 .multitrack-backing-strip__identity p {
   max-width: min(52vw, 20rem);
-  font-size: 0.78rem;
-  font-weight: 750;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .multitrack-backing-strip__identity span {
   max-width: min(58vw, 22rem);
   color: #78716c;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 600;
 }
 
 .multitrack-backing-strip--stage .multitrack-backing-strip__identity p {
   max-width: min(48vw, 18rem);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .multitrack-backing-strip--stage .multitrack-backing-strip__identity span {
   max-width: min(52vw, 20rem);
   color: rgba(255, 255, 255, 0.62);
-  font-size: 0.6rem;
+  font-size: 0.62rem;
 }
 
 .multitrack-backing-strip__play,
@@ -183,8 +183,8 @@
   background: #f5f5f4;
   padding: 0.35rem 0.55rem;
   color: #44403c;
-  font-size: 0.72rem;
-  font-weight: 750;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .multitrack-backing-strip--stage .multitrack-backing-strip__chip {
@@ -200,8 +200,8 @@
   align-items: center;
   gap: 0.4rem;
   color: #78716c;
-  font-size: 0.66rem;
-  font-weight: 750;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .multitrack-backing-strip--stage .multitrack-backing-strip__volume {
@@ -229,7 +229,7 @@
 
 .multitrack-backing-strip__youtube-row {
   margin-top: 0.45rem;
-  border-radius: 0.65rem;
+  border-radius: 0.6rem;
   background: #fafaf9;
   padding: 0.35rem;
 }
@@ -243,7 +243,7 @@
   flex: 1;
   border: 0;
   background: transparent;
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   outline: none;
 }
 
@@ -256,12 +256,12 @@
 }
 
 .multitrack-backing-strip__youtube-row button {
-  border-radius: 0.55rem;
+  border-radius: 0.6rem;
   background: #1c1917;
   padding: 0.42rem 0.6rem;
   color: #fff;
-  font-size: 0.72rem;
-  font-weight: 750;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .multitrack-backing-strip--stage .multitrack-backing-strip__youtube-row button {
@@ -271,7 +271,7 @@
 
 .multitrack-backing-strip__youtube-row span {
   color: #dc2626;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -344,7 +344,7 @@
   justify-content: center;
   color: #fff;
   font-size: clamp(3rem, 16vw, 7rem);
-  font-weight: 850;
+  font-weight: 800;
   text-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
 }
 
@@ -362,7 +362,7 @@
   padding: 0.32rem 0.58rem;
   color: #fff;
   font-size: 0.7rem;
-  font-weight: 750;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   backdrop-filter: blur(14px);
 }
@@ -435,7 +435,7 @@
   border-radius: 9999px;
   background: rgba(0, 0, 0, 0.5);
   color: white;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 600;
   max-width: 70%;
 }
@@ -474,9 +474,8 @@
   border-radius: 0.25rem;
   background: #ef4444;
   color: white;
-  font-size: 0.625rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
 }
 
 .multitrack-panel--sheet {
@@ -544,7 +543,7 @@
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.62);
   color: #fff;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 700;
   backdrop-filter: blur(14px);
 }
@@ -565,7 +564,7 @@
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.58);
   color: #fff;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
   white-space: nowrap;
   pointer-events: none;
@@ -592,7 +591,7 @@
 .multitrack-visual-editor__heading p:last-child {
   margin: 0.2rem 0 0;
   color: #78716c;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   line-height: 1.35;
 }
 
@@ -603,7 +602,7 @@
   background: #1c1917;
   padding: 0 0.9rem;
   color: #fff;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
@@ -644,7 +643,7 @@
   align-items: center;
   gap: 0.55rem;
   border: 1px solid #e7e5e4;
-  border-radius: 0.8rem;
+  border-radius: 0.75rem;
   background: #fafaf9;
   padding: 0.55rem 0.65rem;
   color: #57534e;
@@ -656,7 +655,7 @@
   flex-shrink: 0;
   width: 2.85rem;
   height: 2.15rem;
-  border-radius: 0.4rem;
+  border-radius: 0.45rem;
   background: #e7e5e4;
   overflow: hidden;
 }
@@ -703,7 +702,7 @@
 
 .multitrack-visual-editor__placement strong {
   color: #292524;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
 }
 
 .multitrack-visual-editor__placement small {
@@ -735,7 +734,7 @@
   display: block;
   min-height: 3.25rem;
   border: 1px solid #e7e5e4;
-  border-radius: 0.8rem;
+  border-radius: 0.75rem;
   background: #fafaf9;
   padding: 0.55rem 0.65rem;
   color: #292524;
@@ -748,7 +747,7 @@
 }
 
 .multitrack-visual-editor__frame-choice strong {
-  font-size: 0.75rem;
+  font-size: 0.76rem;
 }
 
 .multitrack-visual-editor__frame-choice small {
@@ -787,18 +786,18 @@
 
 .multitrack-visual-editor__slider-row strong {
   color: #292524;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
 }
 
 .multitrack-visual-editor__slider-row small {
   margin-top: 0.08rem;
   color: #78716c;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
 }
 
 .multitrack-visual-editor__slider-row output {
   color: #57534e;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
@@ -871,13 +870,13 @@
   padding: 0 0.9rem;
   background: #1c1917;
   color: white;
-  font-size: 0.8125rem;
-  font-weight: 750;
+  font-size: 0.82rem;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .multitrack-toolbar__time {
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   color: #78716c;
 }
@@ -900,7 +899,7 @@
   padding: 0.375rem 0.625rem;
   border-radius: 9999px;
   background: #f5f5f4;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: #57534e;
 }
@@ -965,10 +964,8 @@
   background: rgba(239, 68, 68, 0.22);
   padding: 0.2rem 0.45rem;
   color: #fecaca;
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .multitrack-recording-stage--in-grid .multitrack-recording-stage__header {
@@ -1033,7 +1030,7 @@
   background: #050505;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease;
+  transition: opacity 180ms ease;
 }
 
 .multitrack-recording-stage__review-video.is-visible {
@@ -1060,7 +1057,7 @@
 
 .multitrack-recording-stage__kicker {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.62);
 }
@@ -1068,7 +1065,7 @@
 .multitrack-recording-stage__header h2 {
   margin: 0.1rem 0 0;
   font-size: 1.1rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .multitrack-recording-stage__count {
@@ -1079,7 +1076,7 @@
   align-items: center;
   justify-content: center;
   font-size: clamp(5rem, 28vw, 9rem);
-  font-weight: 850;
+  font-weight: 800;
   text-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
@@ -1138,7 +1135,7 @@
 
 .multitrack-recording-stage__settings label {
   min-width: 0;
-  border-radius: 0.8rem;
+  border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.14);
   padding: 0.45rem 0.5rem;
   backdrop-filter: blur(18px);
@@ -1147,7 +1144,7 @@
 .multitrack-recording-stage__settings span {
   display: block;
   margin-bottom: 0.2rem;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.68);
 }
@@ -1157,7 +1154,7 @@
   border: 0;
   background: transparent;
   color: #fff;
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 800;
 }
 
@@ -1217,7 +1214,7 @@
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.55);
   padding: 0.35rem 0.7rem;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
@@ -1248,7 +1245,7 @@
   align-items: center;
   min-width: 3.5rem;
   padding: 0.5rem 0.625rem;
-  border-radius: 0.625rem;
+  border-radius: 0.6rem;
   background: #fafaf9;
   border: 1px solid #e7e5e4;
 }
@@ -1260,12 +1257,12 @@
 }
 
 .multitrack-layout-picker__label {
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 600;
 }
 
 .multitrack-layout-picker__count {
-  font-size: 0.625rem;
+  font-size: 0.62rem;
   opacity: 0.7;
 }
 
@@ -1289,7 +1286,7 @@
   width: 100%;
   max-width: 28rem;
   padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
-  border-radius: 1.25rem 1.25rem 0 0;
+  border-radius: 1.15rem 1.25rem 0 0;
   background: white;
 }
 
@@ -1302,7 +1299,7 @@
   border-radius: 0.75rem;
   margin-bottom: 0.375rem;
   background: #fafaf9;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #1c1917;
 }
@@ -1332,7 +1329,7 @@
   border-radius: 9999px;
   background: rgba(0, 0, 0, 0.65);
   color: #fde68a;
-  font-size: 0.625rem;
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   pointer-events: none;
@@ -1365,7 +1362,7 @@
   border-radius: 9999px;
   background: #1c1917;
   color: #fff;
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -1375,6 +1372,11 @@
 }
 
 /* ── Mix strip (project audio sources) ── */
+/* `display: flex` would otherwise beat the hidden attribute's UA rule. */
+.multitrack-mix-strip[hidden] {
+  display: none;
+}
+
 .multitrack-mix-strip {
   flex-shrink: 0;
   display: flex;
@@ -1400,7 +1402,7 @@
   border: 1px solid #e7e5e4;
   background: #fff;
   color: #57534e;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1425,10 +1427,8 @@
 }
 
 .multitrack-source-chip__state {
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   color: #a8a29e;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .multitrack-source-chip--active .multitrack-source-chip__state {
@@ -1477,7 +1477,7 @@
 .multitrack-layout-strip__item {
   width: 2.6rem;
   height: 2.1rem;
-  border-radius: 0.55rem;
+  border-radius: 0.6rem;
   border: 1px solid #e7e5e4;
   background: #fafaf9;
   display: flex;
@@ -1519,7 +1519,7 @@
 }
 
 .multitrack-sheet__title {
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #1c1917;
 }
@@ -1529,9 +1529,18 @@
 }
 
 .multitrack-sheet__empty {
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   color: #a8a29e;
   padding: 0.5rem 0 1rem;
+}
+
+.multitrack-sheet__footnote {
+  margin-top: 0.15rem;
+  border-top: 1px solid #f5f5f4;
+  padding-top: 0.6rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #78716c;
 }
 
 .multitrack-sheet__primary-row {
@@ -1551,7 +1560,7 @@
   border: 1px solid #e7e5e4;
   background: #fafaf9;
   color: #1c1917;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-weight: 600;
 }
 
@@ -1577,7 +1586,7 @@
   border: 1px solid #e7e5e4;
   background: #fff;
   color: #57534e;
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
@@ -1619,7 +1628,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: #1c1917;
 }
@@ -1640,7 +1649,7 @@
 .multitrack-recording-stage__title {
   flex: 1;
   text-align: center;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #fff;
 }
@@ -1656,7 +1665,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #fff;
@@ -1687,10 +1696,8 @@
 }
 
 .multitrack-monitor-row__label {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
 }
 
@@ -1704,7 +1711,7 @@
   border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 600;
   max-width: 10rem;
   overflow: hidden;
@@ -1729,7 +1736,7 @@
   height: 1.75rem;
   padding: 0 0.6rem;
   border-radius: 9999px;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -1759,7 +1766,7 @@
   gap: 0.25rem;
   width: 4rem;
   color: rgba(255, 255, 255, 0.85);
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 600;
 }
 
@@ -1816,7 +1823,7 @@
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-weight: 600;
 }
 
@@ -1829,13 +1836,13 @@
   border-radius: 9999px;
   background: #22c55e;
   color: #052e16;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 700;
 }
 
 .multitrack-recording-stage__hint {
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   color: rgba(255, 255, 255, 0.6);
   padding-top: 0.4rem;
 }
@@ -1851,6 +1858,13 @@
   gap: 0.5rem;
 }
 
+.multitrack-countin-sheet__hint {
+  margin: -0.15rem 0.2rem 0;
+  color: #78716c;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .multitrack-countin-sheet__row {
   display: flex;
   align-items: center;
@@ -1861,7 +1875,7 @@
   border: 1px solid #e7e5e4;
   border-radius: 0.9rem;
   background: #fafaf9;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: #292524;
 }
@@ -1870,7 +1884,7 @@
   min-width: 1.5rem;
   text-align: center;
   color: #1c1917;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1891,89 +1905,9 @@
   background: #fff;
   color: #1c1917;
   text-align: center;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-/* ── Per-box song-section window (tile sheet) ── */
-.multitrack-section-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  border: 1px solid #e7e5e4;
-  border-radius: 0.9rem;
-  background: #fafaf9;
-  padding: 0.7rem 0.8rem 0.8rem;
-}
-
-.multitrack-section-editor__toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.multitrack-section-editor__toggle strong,
-.multitrack-section-editor__toggle small {
-  display: block;
-}
-
-.multitrack-section-editor__toggle strong {
-  color: #292524;
-  font-size: 0.82rem;
-}
-
-.multitrack-section-editor__toggle small {
-  margin-top: 0.12rem;
-  color: #78716c;
-  font-size: 0.7rem;
-}
-
-.multitrack-section-editor__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.2rem 0.75rem;
-}
-
-.multitrack-section-editor__row span {
-  color: #292524;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.multitrack-section-editor__row output {
-  color: #57534e;
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-
-.multitrack-section-editor__row input[type='range'] {
-  grid-column: 1 / -1;
-  width: 100%;
-  accent-color: #1c1917;
-}
-
-.multitrack-section-editor__actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.multitrack-section-editor__actions button {
-  display: inline-flex;
-  min-height: 2.6rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  border: 1px solid #e7e5e4;
-  border-radius: 0.75rem;
-  background: #fff;
-  color: #44403c;
-  font-size: 0.72rem;
-  font-weight: 700;
 }
 
 /* Shared-metronome controls embedded in the click / count-in sheet. */
@@ -2022,7 +1956,7 @@
 
 /* ── Trim sheet ── */
 .multitrack-sheet__hint {
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   color: #a8a29e;
   margin-top: -0.35rem;
 }
@@ -2036,7 +1970,7 @@
 }
 
 .multitrack-trim-row__label {
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #1c1917;
   width: 3rem;
@@ -2051,7 +1985,7 @@
 .multitrack-trim-row__controls strong {
   min-width: 3.6rem;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
   color: #1c1917;
 }
@@ -2059,11 +1993,11 @@
 .multitrack-trim-row__controls button {
   height: 2rem;
   padding: 0 0.55rem;
-  border-radius: 0.55rem;
+  border-radius: 0.6rem;
   border: 1px solid #e7e5e4;
   background: #fafaf9;
   color: #57534e;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
 }
 
@@ -2079,7 +2013,7 @@
   display: block;
   width: 100%;
   height: 56px;
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: #fafaf9;
   border: 1px solid #f5f5f4;
 }
@@ -2089,7 +2023,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem 0.85rem;
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: #fafaf9;
   border: 1px solid #f5f5f4;
 }
@@ -2102,20 +2036,20 @@
 }
 
 .multitrack-align-section__label {
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #1c1917;
 }
 
 .multitrack-align-section__value {
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
   color: #1c1917;
 }
 
 .multitrack-align-section__sub {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #78716c;
   line-height: 1.35;
 }
@@ -2131,11 +2065,11 @@
   min-width: 2.75rem;
   height: 2.1rem;
   padding: 0 0.4rem;
-  border-radius: 0.55rem;
+  border-radius: 0.6rem;
   border: 1px solid #e7e5e4;
   background: #fff;
   color: #57534e;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -2145,11 +2079,9 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #a8a29e;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 .multitrack-align-slider-row__input {
@@ -2163,11 +2095,11 @@
 
 .multitrack-align-full-length {
   align-self: flex-start;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: #57534e;
   padding: 0.35rem 0.55rem;
-  border-radius: 0.5rem;
+  border-radius: 0.45rem;
   border: 1px solid #e7e5e4;
   background: #fff;
 }
@@ -2189,7 +2121,7 @@
   border: 1px solid #e7e5e4;
   background: #fafaf9;
   color: #44403c;
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -2199,63 +2131,135 @@
   color: #fff;
 }
 
-/* ── Align stage (CapCut-style multi-track drag timeline) ── */
+/* ── Timeline editor (CapCut-style: live canvas above, tracks below) ──
+   Docked under the multitrack grid rather than covering it, so the boxes you
+   are retiming stay on screen and keep playing while you drag. */
 .multitrack-align-stage {
-  position: fixed;
-  inset: 0;
-  z-index: 150;
   display: flex;
   flex-direction: column;
-  background: #fafaf9;
-  color: #1c1917;
-  padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+  flex: 1 1 55%;
+  min-height: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(9, 13, 20, 0.94);
+  color: rgba(255, 255, 255, 0.94);
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .multitrack-align-stage__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e7e5e4;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.multitrack-align-stage__titles {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
 .multitrack-align-stage__title {
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  color: #1c1917;
+  color: #fff;
+}
+
+.multitrack-align-stage__clock {
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .multitrack-align-stage__close {
-  color: #57534e;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.multitrack-align-stage__zoom {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+}
+
+.multitrack-align-stage__zoom button {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.multitrack-align-stage__zoom button:disabled {
+  opacity: 0.35;
 }
 
 .multitrack-align-stage__done {
-  min-height: 2.25rem;
-  padding: 0 0.9rem;
-  border-radius: 0.65rem;
-  background: #1c1917;
-  color: #fff;
-  font-size: 0.8125rem;
-  font-weight: 700;
+  flex-shrink: 0;
+  min-height: 2.1rem;
+  padding: 0 0.85rem;
+  border-radius: 0.6rem;
+  background: #f7ae1c;
+  color: #1c1917;
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
-.multitrack-align-stage__hint {
-  padding: 0.5rem 1rem 0;
-  font-size: 0.75rem;
-  color: #78716c;
+.multitrack-align-stage__actions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.multitrack-align-stage__actions::-webkit-scrollbar {
+  display: none;
+}
+
+.multitrack-align-stage__action {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.2rem;
+  padding: 0 0.7rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.multitrack-align-stage__action:disabled {
+  opacity: 0.4;
+}
+
+.multitrack-align-stage__action--primary {
+  border-color: rgba(37, 164, 241, 0.5);
+  background: rgba(37, 164, 241, 0.22);
+  color: #fff;
+}
+
+.multitrack-align-stage__action--play {
+  margin-left: auto;
 }
 
 .multitrack-align-stage__inspector {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  margin: 0.55rem 1rem 0;
-  border: 1px solid #e7e5e4;
-  border-radius: 0.75rem;
-  background: #fff;
-  padding: 0.55rem 0.65rem;
+  gap: 0.6rem;
+  margin: 0 0.75rem 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.4rem 0.5rem;
 }
 
 .multitrack-align-stage__selection {
@@ -2271,38 +2275,48 @@
 }
 
 .multitrack-align-stage__selection strong {
-  font-size: 0.75rem;
-  color: #292524;
+  font-size: 0.74rem;
+  color: #fff;
 }
 
 .multitrack-align-stage__selection span {
-  margin-top: 0.1rem;
-  color: #78716c;
-  font-size: 0.65rem;
+  margin-top: 0.05rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
 }
 
 .multitrack-align-stage__nudge {
   display: flex;
   flex-shrink: 0;
-  gap: 0.3rem;
+  gap: 0.25rem;
 }
 
 .multitrack-align-stage__nudge button {
-  min-height: 2rem;
-  border-radius: 0.55rem;
-  background: #f5f5f4;
-  padding: 0 0.5rem;
-  color: #44403c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.9rem;
+  min-width: 2.1rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0 0.45rem;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 0.68rem;
   font-weight: 700;
+}
+
+.multitrack-align-stage__nudge-danger {
+  background: rgba(220, 38, 38, 0.25) !important;
+  color: #fecaca !important;
 }
 
 .multitrack-align-stage__scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0.75rem 0;
+  padding-bottom: 0.5rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .multitrack-align-stage__timeline {
@@ -2311,44 +2325,50 @@
 }
 
 .multitrack-align-stage__ruler {
-  position: relative;
-  height: 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 1.6rem;
+  background: rgba(9, 13, 20, 0.96);
+  touch-action: none;
 }
 
 .multitrack-align-stage__tick {
   position: absolute;
-  top: 0;
+  top: 0.55rem;
   bottom: 0;
   width: 1px;
-  background: #e7e5e4;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .multitrack-align-stage__tick span {
   position: absolute;
-  top: 0;
-  left: 0.3rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #a8a29e;
+  top: -0.5rem;
+  left: 0.25rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.45);
   white-space: nowrap;
 }
 
 .multitrack-align-stage__zero-line {
   position: absolute;
-  top: 1.5rem;
+  top: 1.6rem;
   bottom: 0;
   width: 2px;
-  background: #d6d3d1;
+  background: rgba(255, 255, 255, 0.18);
   z-index: 1;
 }
 
 .multitrack-align-stage__playhead {
   position: absolute;
-  top: 1.5rem;
+  top: 0;
   bottom: 0;
   width: 2px;
-  background: #dc2626;
-  z-index: 3;
+  background: #f7ae1c;
+  box-shadow: 0 0 6px rgba(247, 174, 28, 0.6);
+  z-index: 6;
   pointer-events: none;
 }
 
@@ -2357,57 +2377,96 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding-top: 0.5rem;
+  gap: 0.4rem;
+  padding-top: 0.45rem;
 }
 
 .multitrack-align-stage__track {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  min-height: 3.75rem;
-}
-
-.multitrack-align-stage__track.is-selected .multitrack-align-stage__track-label {
-  color: #1c1917;
-}
-
-.multitrack-align-stage__track.is-selected .multitrack-align-stage__clip {
-  box-shadow: 0 0 0 2px #dc2626, 0 3px 8px rgba(0, 0, 0, 0.18);
+  min-height: 3.1rem;
 }
 
 .multitrack-align-stage__track-label {
   position: sticky;
-  left: 0.5rem;
-  flex-shrink: 0;
-  width: 3.25rem;
-  font-size: 0.6875rem;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  flex: 0 0 5.25rem;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 5.25rem;
+  padding-left: 0.5rem;
+  background: linear-gradient(90deg, rgba(9, 13, 20, 0.98) 72%, rgba(9, 13, 20, 0));
+}
+
+.multitrack-align-stage__track-name {
+  font-size: 0.66rem;
   font-weight: 700;
-  color: #57534e;
+  color: rgba(255, 255, 255, 0.75);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  z-index: 4;
 }
 
+.multitrack-align-stage__track.is-selected .multitrack-align-stage__track-name {
+  color: #fff;
+}
+
+.multitrack-align-stage__window-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  align-self: flex-start;
+  min-height: 1.3rem;
+  padding: 0 0.35rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.multitrack-align-stage__window-chip.is-on {
+  border-color: rgba(247, 174, 28, 0.6);
+  background: rgba(247, 174, 28, 0.2);
+  color: #f7ae1c;
+}
+
+/* The lane spans the full timeline width and slides back under the sticky
+   label, so a clip at second N sits exactly under the ruler's N mark. The
+   label floats above it; TIMELINE_ORIGIN_PX keeps zero clear of it. */
 .multitrack-align-stage__track-lane {
   position: relative;
-  flex: 1;
-  height: 3.5rem;
-  border-radius: 0.6rem;
-  background: rgba(231, 229, 228, 0.5);
+  flex: 0 0 100%;
+  width: 100%;
+  margin-left: -5.25rem;
+  height: 3rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.multitrack-align-stage__track--images .multitrack-align-stage__track-lane {
+  height: 2.4rem;
 }
 
 .multitrack-align-stage__clip {
   position: absolute;
   top: 0;
-  height: 3.5rem;
-  border-radius: 0.6rem;
-  background: #44403c;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  height: 3rem;
+  border-radius: 0.5rem;
+  background: #2f4a63;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   overflow: hidden;
   touch-action: none;
   cursor: grab;
+}
+
+.multitrack-align-stage__clip[data-selected='true'] {
+  box-shadow: 0 0 0 2px #f7ae1c, 0 3px 8px rgba(0, 0, 0, 0.35);
 }
 
 .multitrack-align-stage__clip-waveform {
@@ -2416,66 +2475,146 @@
   height: 100%;
 }
 
+.multitrack-align-stage__clip-name {
+  position: absolute;
+  left: 1.15rem;
+  bottom: 0.15rem;
+  max-width: calc(100% - 2.3rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+
 .multitrack-align-stage__handle {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 14px;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.3);
   touch-action: none;
   cursor: ew-resize;
 }
 
 .multitrack-align-stage__handle--left {
   left: 0;
-  border-radius: 0.6rem 0 0 0.6rem;
+  border-radius: 0.5rem 0 0 0.5rem;
 }
 
 .multitrack-align-stage__handle--right {
   right: 0;
-  border-radius: 0 0.6rem 0.6rem 0;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+/* Timed sheet-music screenshots: one block per image, cutting line to line. */
+.multitrack-align-stage__image-cue {
+  position: absolute;
+  top: 0;
+  display: flex;
+  height: 2.4rem;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.35rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(247, 174, 28, 0.16);
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.multitrack-align-stage__image-cue[data-selected='true'] {
+  box-shadow: 0 0 0 2px #f7ae1c;
+}
+
+.multitrack-align-stage__image-cue[data-pinned='true'] {
+  cursor: default;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.multitrack-align-stage__image-thumb {
+  height: 1.7rem;
+  width: 1.7rem;
+  flex-shrink: 0;
+  border-radius: 0.25rem;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.multitrack-align-stage__image-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.multitrack-align-stage__empty-clip {
+  position: absolute;
+  top: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 2.2rem;
+  padding: 0 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px dashed rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .multitrack-align-stage__transport {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid #e7e5e4;
+  padding: 0.4rem 0.75rem 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .multitrack-align-stage__transport-btn {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  min-height: 2.75rem;
-  padding: 0 1.1rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e7e5e4;
-  background: #fff;
-  color: #44403c;
-  font-size: 0.8125rem;
+  gap: 0.3rem;
+  min-height: 2.1rem;
+  padding: 0 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
-.multitrack-align-stage__transport-btn--primary {
-  background: #1c1917;
-  border-color: #1c1917;
-  color: #fff;
-  min-width: 8rem;
+.multitrack-align-stage__hint {
+  font-size: 0.62rem;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.45);
 }
 
-@media (max-width: 560px) {
-  .multitrack-align-stage__inspector {
-    align-items: stretch;
-    flex-direction: column;
-  }
+/* While the timeline editor is docked the canvas gives up half the screen. */
+.multitrack-overlay__body--editing {
+  flex: 0 0 auto;
+  max-height: 42vh;
+}
 
-  .multitrack-align-stage__nudge button {
-    flex: 1;
-  }
+.multitrack-panel__sheet-cue-count {
+  margin-left: 0.3rem;
+  border-radius: 0.3rem;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0 0.25rem;
+  font-size: 0.58rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Camera Mode integration -------------------------------------------------
@@ -2527,11 +2666,9 @@
   align-items: center;
   gap: 0.25rem;
   color: rgba(97, 189, 255, 0.94);
-  font-size: 0.58rem;
-  font-weight: 760;
-  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  font-weight: 600;
   line-height: 1;
-  text-transform: uppercase;
 }
 
 .multitrack-overlay--camera-mode .multitrack-camera-title h1 {
@@ -2867,4 +3004,68 @@
   .multitrack-recording-stage__side-btn:last-child
   svg {
   color: #61bdff;
+}
+
+/* Tap-to-reactivate — sits above the recording stage (150) but below its
+   sheets (155/160) so a sheet opened before the sleep still wins. */
+.multitrack-wake-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 152;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  background: rgba(5, 5, 5, 0.74);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.multitrack-wake-veil__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 20rem;
+  padding: 1.6rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 1.35rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-align: center;
+}
+
+.multitrack-wake-veil__card strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.multitrack-wake-veil__card span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.multitrack-wake-veil__card:disabled {
+  opacity: 0.75;
+}
+
+.multitrack-wake-veil__dismiss {
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.multitrack-wake-veil__spin {
+  animation: multitrack-wake-spin 1.1s linear infinite;
+}
+
+@keyframes multitrack-wake-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

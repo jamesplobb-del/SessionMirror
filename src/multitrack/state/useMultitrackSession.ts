@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Take } from '../../types'
-import { createPanelsForLayout, getLayoutPreset } from '../layout/layoutPresets'
+import {
+  MULTITRACK_LAYOUT_PRESETS,
+  MULTITRACK_PANEL_SLOT_IDS,
+  createPanelsForLayout,
+  getLayoutPreset,
+  mergePanelsIntoLayout,
+} from '../layout/layoutPresets'
+import { createSheetCueId } from '../sheetMusic/sheetMusicTimeline'
 import {
   loadMultitrackSession,
   persistedSessionWantsTakes,
   saveMultitrackSession,
 } from './multitrackPersistence'
-import type { MultitrackBackingTrack, MultitrackPracticeSettings, MultitrackSession, SheetMusicAsset } from '../types'
+import type {
+  MultitrackBackingTrack,
+  MultitrackPracticeSettings,
+  MultitrackSession,
+  PerformancePanelState,
+  SheetMusicAsset,
+} from '../types'
 
 const DEFAULT_PRACTICE: MultitrackPracticeSettings = {
   showMetronome: false,
@@ -55,30 +68,54 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
 
   const setLayout = useCallback((layoutId: string) => {
     const preset = getLayoutPreset(layoutId)
-    setSession((prev) => {
-      const prevById = new Map(
-        prev.panels
-          .filter((panel) => panel.kind === 'performance')
-          .map((panel) => [panel.id, panel] as const),
+    setSession((prev) => ({
+      ...prev,
+      layoutId,
+      panels: mergePanelsIntoLayout(preset, prev.panels),
+    }))
+  }, [])
+
+  /**
+   * Claims a box for a part being added mid-song: reuses an empty one when there
+   * is one, otherwise grows the grid by one slot. Returns the box id so the
+   * caller can point the recorder at it, or null once the grid is full.
+   */
+  const addPerformanceBox = useCallback(
+    (section?: { startSec?: number; endSec?: number }): string | null => {
+      const performancePanels = session.panels.filter(
+        (panel): panel is PerformancePanelState => panel.kind === 'performance',
       )
-      const nextPanels = createPanelsForLayout(preset).map((panel) => {
-        if (panel.kind !== 'performance') return panel
-        const existing = prevById.get(panel.id)
-        if (!existing || existing.kind !== 'performance') return panel
+      const vacant = performancePanels.find((panel) => panel.take === null)
+      const grownPreset = vacant
+        ? null
+        : MULTITRACK_LAYOUT_PRESETS.find(
+            (preset) => preset.panelCount === performancePanels.length + 1,
+          )
+      const targetId = vacant?.id ?? MULTITRACK_PANEL_SLOT_IDS[performancePanels.length]
+      if (!vacant && (!grownPreset || !targetId)) return null
+
+      setSession((prev) => {
+        const panels = grownPreset
+          ? mergePanelsIntoLayout(grownPreset, prev.panels)
+          : prev.panels
         return {
-          ...panel,
-          take: existing.take,
-          volume: existing.volume,
-          muted: existing.muted,
-          trimStartSec: existing.trimStartSec,
-          trimEndSec: existing.trimEndSec,
-          sectionStartSec: existing.sectionStartSec,
-          sectionEndSec: existing.sectionEndSec,
+          ...prev,
+          ...(grownPreset ? { layoutId: grownPreset.id } : null),
+          panels: panels.map((panel) =>
+            panel.id === targetId && panel.kind === 'performance'
+              ? {
+                  ...panel,
+                  sectionStartSec: section?.startSec,
+                  sectionEndSec: section?.endSec,
+                }
+              : panel,
+          ),
         }
       })
-      return { ...prev, layoutId, panels: nextPanels }
-    })
-  }, [])
+      return targetId
+    },
+    [session.panels],
+  )
 
   const assignTakeToPanel = useCallback((panelId: string, take: Take | null) => {
     setSession((prev) => ({
@@ -141,6 +178,62 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     }))
   }, [])
 
+  /**
+   * Adds a screenshot to the music panel's timeline. The very first image always
+   * becomes the base (on screen from the downbeat); later ones cut in at the
+   * second they were dropped, so a player can walk the page line by line.
+   */
+  const addSheetCue = useCallback((asset: SheetMusicAsset, startSec: number) => {
+    setSession((prev) => {
+      const cues = prev.sheetMusic.cues ?? []
+      if (!prev.sheetMusic.asset && cues.length === 0) {
+        return { ...prev, sheetMusic: { ...prev.sheetMusic, asset } }
+      }
+      const cue = { id: createSheetCueId(), asset, startSec: Math.max(0, startSec) }
+      return {
+        ...prev,
+        sheetMusic: {
+          ...prev.sheetMusic,
+          cues: [...cues, cue].sort((a, b) => a.startSec - b.startSec),
+        },
+      }
+    })
+  }, [])
+
+  const moveSheetCue = useCallback((cueId: string, startSec: number) => {
+    setSession((prev) => ({
+      ...prev,
+      sheetMusic: {
+        ...prev.sheetMusic,
+        cues: (prev.sheetMusic.cues ?? [])
+          .map((cue) => (cue.id === cueId ? { ...cue, startSec: Math.max(0, startSec) } : cue))
+          .sort((a, b) => a.startSec - b.startSec),
+      },
+    }))
+  }, [])
+
+  const updateSheetCueAsset = useCallback((cueId: string, asset: SheetMusicAsset) => {
+    setSession((prev) => ({
+      ...prev,
+      sheetMusic: {
+        ...prev.sheetMusic,
+        cues: (prev.sheetMusic.cues ?? []).map((cue) =>
+          cue.id === cueId ? { ...cue, asset } : cue,
+        ),
+      },
+    }))
+  }, [])
+
+  const removeSheetCue = useCallback((cueId: string) => {
+    setSession((prev) => ({
+      ...prev,
+      sheetMusic: {
+        ...prev.sheetMusic,
+        cues: (prev.sheetMusic.cues ?? []).filter((cue) => cue.id !== cueId),
+      },
+    }))
+  }, [])
+
   const updatePractice = useCallback((patch: Partial<MultitrackPracticeSettings>) => {
     setSession((prev) => ({ ...prev, practice: { ...prev.practice, ...patch } }))
   }, [])
@@ -153,12 +246,17 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     session,
     layout,
     setLayout,
+    addPerformanceBox,
     assignTakeToPanel,
     setPanelVolume,
     setPanelMuted,
     setPanelTrim,
     setPanelSection,
     assignSheetMusic,
+    addSheetCue,
+    moveSheetCue,
+    updateSheetCueAsset,
+    removeSheetCue,
     updatePractice,
     updateBacking,
   }

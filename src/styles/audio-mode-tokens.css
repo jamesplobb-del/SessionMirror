@@ -22,6 +22,32 @@
 }
 
 /**
+ * Type scale — four sizes, three weights, and that is the whole set.
+ *
+ * The app had drifted to 70 distinct font-size values and 189 font-weight
+ * declarations off the real ladder (650, 720, 760, 790, 820, 850...). Those
+ * in-between weights either snap to the nearest shipped face or interpolate a
+ * hair off it, so a "hierarchy" written as 650 vs 700 renders as no hierarchy
+ * at all — which is why the denser surfaces read flat.
+ *
+ * --sm-text-body is 400 on purpose. Labels are not emphasis; when every line
+ * is semibold the eye has nowhere to land.
+ *
+ * Floor is 0.7rem (~11px): anything smaller is unreadable with the phone on a
+ * stand, which is where this app actually gets used.
+ */
+:root {
+  --sm-text-title: 0.95rem;
+  --sm-text-value: 0.82rem;
+  --sm-text-label: 0.76rem;
+  --sm-text-caption: 0.7rem;
+
+  --sm-weight-body: 400;
+  --sm-weight-medium: 600;
+  --sm-weight-strong: 700;
+}
+
+/**
  * Audio Mode design tokens — source of truth for the light Apple-style audio UI.
  * Scoped usage: prefer under `.app-ui-overlay--audio-mode` or `html.app-audio-mode`.
  */

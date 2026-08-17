@@ -5,6 +5,7 @@ import { resolveNativeFileUri } from '../../utils/shareTakeVideo'
 import { extensionForBlob, writeBlobToNativeCache } from '../../utils/nativeAssetCache'
 import { computeMultitrackLayoutRects, type LayoutRectPercent } from '../layout/layoutRects'
 import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
+import { sheetCueWindows, sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
 import type { MultitrackLayoutPreset, MultitrackSession, PerformancePanelState } from '../types'
 
 const MULTITRACK_EXPORT_DIR = 'multitrack-export-assets'
@@ -54,7 +55,10 @@ export async function exportMultitrackSession(
     return { ok: false, reason: 'missing_takes' }
   }
 
-  const { panelRects, musicRect } = computeMultitrackLayoutRects(layout, session.sheetMusic.asset)
+  const { panelRects, musicRect } = computeMultitrackLayoutRects(
+    layout,
+    sheetLayoutAsset(session.sheetMusic),
+  )
 
   const sources: Array<{
     id: string
@@ -88,7 +92,7 @@ export async function exportMultitrackSession(
   }
   if (sources.length === 0) return { ok: false, reason: 'missing_takes' }
 
-  let sheetMusic: {
+  interface ExportSheetLayer {
     path: string
     fileType: string
     rect: LayoutRectPercent
@@ -96,30 +100,53 @@ export async function exportMultitrackSession(
     y: number
     scale: number
     contentMode: 'fill' | 'fit'
-  } | null = null
+  }
+  let sheetMusic: ExportSheetLayer | null = null
+  let sheetMusicCues: Array<ExportSheetLayer & { startSec: number; endSec?: number }> | undefined
   let backingAudio: { path: string; gain: number } | null = null
   let backingSkipped: 'youtube' | undefined
 
   let renderedPath: string
   try {
-    const musicAsset = session.sheetMusic.asset
-    if (musicAsset && musicRect) {
-      const blob = await fetchBlob(musicAsset.src)
-      const extension = extensionForBlob(blob, musicAsset.fileName)
+    // Every screenshot on the music panel's timeline is written out with the
+    // window it owns, so the render cuts line to line exactly as the canvas did.
+    const cueWindows = musicRect ? sheetCueWindows(session.sheetMusic) : []
+    const layers: Array<ExportSheetLayer & { startSec: number; endSec?: number }> = []
+    for (const [index, window] of cueWindows.entries()) {
+      const asset = window.asset
+      const blob = await fetchBlob(asset.src)
+      const extension = extensionForBlob(blob, asset.fileName)
       const path = await writeBlobToNativeCache(
         MULTITRACK_EXPORT_DIR,
-        `sheet-${Date.now()}.${extension}`,
+        `sheet-${Date.now()}-${index}.${extension}`,
         blob,
       )
-      sheetMusic = {
+      const isPdf = asset.mimeType === 'application/pdf'
+      layers.push({
         path,
-        fileType: musicAsset.mimeType === 'application/pdf' ? 'pdf' : 'image',
-        rect: musicRect,
-        x: musicAsset.x ?? 0.5,
-        y: musicAsset.y ?? 0.5,
-        scale: musicAsset.scale ?? 1,
-        contentMode: musicAsset.mimeType === 'application/pdf' ? 'fit' : (musicAsset.contentMode ?? 'fill'),
+        fileType: isPdf ? 'pdf' : 'image',
+        rect: musicRect!,
+        x: asset.x ?? 0.5,
+        y: asset.y ?? 0.5,
+        scale: asset.scale ?? 1,
+        contentMode: isPdf ? 'fit' : (asset.contentMode ?? 'fill'),
+        startSec: window.startSec,
+        ...(window.endSec !== undefined ? { endSec: window.endSec } : null),
+      })
+    }
+    if (layers.length > 0) {
+      // The first layer doubles as the static payload older native builds read.
+      const [first] = layers
+      sheetMusic = {
+        path: first.path,
+        fileType: first.fileType,
+        rect: first.rect,
+        x: first.x,
+        y: first.y,
+        scale: first.scale,
+        contentMode: first.contentMode,
       }
+      if (layers.length > 1) sheetMusicCues = layers
     }
 
     if (session.backing.kind === 'audio') {
@@ -144,6 +171,7 @@ export async function exportMultitrackSession(
       sources,
       gridRects: Object.values(panelRects),
       sheetMusic,
+      ...(sheetMusicCues ? { sheetMusicCues } : null),
       backingAudio,
     })
     renderedPath = rendered.path

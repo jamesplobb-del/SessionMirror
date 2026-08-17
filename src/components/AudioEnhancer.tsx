@@ -86,7 +86,7 @@ export default function AudioEnhancer({ settings, onChange }: AudioEnhancerProps
   return (
     <div className="space-y-3">
       <div>
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+        <span className="text-[11px] font-medium text-stone-500">
           Mode
         </span>
         <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -113,7 +113,7 @@ export default function AudioEnhancer({ settings, onChange }: AudioEnhancerProps
 
       <div className="space-y-3 rounded-2xl border border-stone-200 bg-stone-50 p-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+          <p className="text-[11px] font-medium text-stone-500">
             {settings.preset} adjustments
           </p>
           {edited && (
@@ -151,7 +151,7 @@ export default function AudioEnhancer({ settings, onChange }: AudioEnhancerProps
           onChange={(high) => patchSettings({ eq: { ...settings.eq, high } })}
         />
 
-        <p className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+        <p className="pt-1 text-[11px] font-medium text-stone-500">
           Dynamics &amp; Space
         </p>
         <Fader

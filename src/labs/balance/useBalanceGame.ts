@@ -8,6 +8,7 @@ import {
   type MutableRefObject,
 } from 'react'
 import type { AcceptedPitchFrame } from '../../hooks/useLivePitchTracker'
+import { loadPracticeGameCharacter } from '../practiceGameCharacters'
 import { triggerSuccessHaptic } from '../../utils/haptics'
 import { startBalanceCountIn, startBalanceTone, type BalanceCountInHandle, type DroneHandle } from './balanceAudio'
 import { balanceReducer, createBalanceState } from './balanceEngine'
@@ -117,7 +118,16 @@ export function useBalanceGame({
   hapticFeedback,
   onInstrumentChange,
 }: UseBalanceGameOptions): UseBalanceGameResult {
-  const [data, setData] = useState(() => loadBalanceData(initialInstrumentId))
+  const [data, setData] = useState<BalanceStoredDataV2>(() => {
+    const stored = loadBalanceData(initialInstrumentId)
+    return {
+      ...stored,
+      settings: {
+        ...stored.settings,
+        characterId: loadPracticeGameCharacter(),
+      },
+    }
+  })
   const dataRef = useRef(data)
   dataRef.current = data
   const [state, dispatch] = useReducer(

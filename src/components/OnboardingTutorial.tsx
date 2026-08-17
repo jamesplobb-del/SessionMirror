@@ -213,7 +213,7 @@ export default function OnboardingTutorial({
             }}
             className="onboarding-lite__skip"
           >
-            Skip Tour
+            Skip tour
           </Pressable>
           {isInstrumentStep ? (
             <Pressable

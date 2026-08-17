@@ -37,7 +37,9 @@ export function createDefaultBalanceSettings(instrumentId: string): BalanceSetti
     soundRest: {
       referencePitch: true,
       continuousDrone: false,
-      volume: 0.6,
+      // No volume control in the UI any more — the reference tone is either on
+      // or it isn't, so it plays at full level.
+      volume: 1,
       countIn: false,
       restDuration: 'matchGoal',
       autoAdvance: true,
@@ -131,7 +133,8 @@ function normalizeSettings(value: unknown, instrumentId: string): BalanceSetting
     soundRest: {
       referencePitch: soundRest.referencePitch !== false,
       continuousDrone: soundRest.continuousDrone === true,
-      volume: Math.max(0.05, Math.min(1, finiteNumber(soundRest.volume, 0.6))),
+      // Ignore any stored value: the slider is gone, so migrate everyone to full.
+      volume: 1,
       countIn: soundRest.countIn === true,
       restDuration,
       autoAdvance: soundRest.autoAdvance !== false,

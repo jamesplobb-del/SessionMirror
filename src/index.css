@@ -152,7 +152,7 @@ select {
 .interactive-native {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  transition: all 200ms ease-out;
+  transition: all 180ms ease-out;
 }
 
 .interactive-native:active:not(:disabled) {
@@ -654,7 +654,7 @@ body.settings-branch-open * {
 }
 
 .metronome-widget__bpm-label {
-  font-size: 0.625rem;
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -663,7 +663,7 @@ body.settings-branch-open * {
 
 .metronome-widget__bpm-input {
   width: 4.5rem;
-  border-radius: 0.65rem;
+  border-radius: 0.6rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(0, 0, 0, 0.35);
   color: white;
@@ -730,7 +730,7 @@ body.settings-branch-open * {
 
 .review-timeline-waveform {
   overflow: hidden;
-  border-radius: 0.8rem;
+  border-radius: 0.75rem;
   opacity: 0.98;
 }
 
@@ -799,7 +799,7 @@ body.settings-branch-open * {
   min-width: clamp(3.05rem, 6.4vh, 3.75rem);
   border-radius: 999px;
   transform: translateY(-50%);
-  transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .audio-mode-take-card__play:active:not(:disabled) {
@@ -920,7 +920,7 @@ body.settings-branch-open * {
 .audio-practice-placeholder__body {
   margin: 0;
   max-width: 18rem;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   line-height: 1.45;
   color: rgba(203, 213, 225, 0.85);
 }
@@ -929,8 +929,6 @@ body.settings-branch-open * {
   margin: 0.25rem 0 0;
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: rgba(125, 211, 252, 0.65);
 }
 
@@ -1013,8 +1011,7 @@ body.settings-branch-open * {
 
 .pitch-audio-stage--polished .pitch-note-orbit__meta {
   margin-top: 0.5rem;
-  font-size: 0.875rem;
-  letter-spacing: 0.05em;
+  font-size: 0.88rem;
   color: rgba(226, 232, 240, 0.88);
 }
 
@@ -1067,7 +1064,6 @@ body.settings-branch-open * {
 
 .pitch-audio-idle-pane--polished .pitch-audio-idle-pane__title {
   color: var(--audio-text-secondary, #6c7077);
-  letter-spacing: 0.16em;
 }
 
 .pitch-audio-idle-pane--polished .pitch-audio-idle-pane__copy {
@@ -1177,7 +1173,7 @@ body.settings-branch-open * {
 }
 
 .app-ui-overlay--audio-practice-tuner .pitch-note-orbit--light-native .pitch-note-orbit__meta {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--audio-text-secondary, #6c7077);
@@ -1305,7 +1301,7 @@ body.settings-branch-open * {
   margin-inline: auto;
   padding: 0.5rem 0.45rem 0.42rem;
   border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 1.1rem;
+  border-radius: 1.15rem;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.42), rgba(3, 7, 18, 0.36)),
     rgba(2, 6, 23, 0.2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 36px rgba(0, 0, 0, 0.22);
@@ -1387,7 +1383,7 @@ body.settings-branch-open * {
   height: clamp(2.35rem, 10vw, 2.75rem);
   padding: 0;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(2, 6, 23, 0.76)),
     rgba(15, 23, 42, 0.48);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 12px 28px rgba(0, 0, 0, 0.25);
@@ -1407,7 +1403,7 @@ body.settings-branch-open * {
   max-width: min(9rem, 50vw);
   min-height: 2.25rem;
   border-radius: 999px;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   letter-spacing: 0;
   text-transform: none;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.74)),
@@ -1534,10 +1530,8 @@ body.settings-branch-open * {
 .audio-practice-metronome__tempo-label {
   display: block;
   margin-bottom: 0.12rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: rgba(203, 213, 225, 0.68);
 }
 
@@ -1560,7 +1554,6 @@ body.settings-branch-open * {
 .audio-practice-metronome .metronome-audio-stage__bpm-label {
   margin-top: 0.25rem;
   font-size: 0.82rem;
-  letter-spacing: 0.05em;
   color: rgba(226, 232, 240, 0.7);
 }
 
@@ -1769,7 +1762,7 @@ body.settings-branch-open * {
 }
 
 .audio-practice-metronome__beat-row--compact .audio-practice-metronome__beat-number {
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
 }
 
 .audio-practice-metronome__beat-row--compact {
@@ -1828,10 +1821,8 @@ body.settings-branch-open * {
   grid-template-columns: minmax(1rem, 1fr) auto minmax(1rem, 1fr);
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: rgba(203, 213, 225, 0.64);
   text-align: center;
   width: 100%;
@@ -1920,7 +1911,7 @@ body.settings-branch-open * {
 }
 
 .metronome-h-scroll__chip--rhythm {
-  font-size: 1.0625rem;
+  font-size: 1.1rem;
   line-height: 1;
 }
 
@@ -1961,7 +1952,7 @@ body.settings-branch-open * {
 .control-deck__settings-btn {
   min-width: 44px;
   min-height: 44px;
-  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1.18), background 180ms ease,
+  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1.18), background 180ms ease,
     box-shadow 180ms ease, color 180ms ease;
   will-change: transform;
 }
@@ -2005,10 +1996,8 @@ body.settings-branch-open * {
 }
 
 .vault-thumb-placeholder__label {
-  font-size: 0.625rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.35);
 }
 
@@ -2150,24 +2139,22 @@ html.physical-landscape-right .ui-orient-spin {
 }
 
 .native-sheet-title-block {
-  border-radius: 1.25rem;
+  border-radius: 1.15rem;
 }
 
 .native-sheet-kicker {
   display: block;
   margin-bottom: 0.125rem;
   color: rgba(120, 113, 108, 0.82);
-  font-size: 0.625rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  font-weight: 600;
   line-height: 1;
-  text-transform: uppercase;
 }
 
 .native-sheet-title {
   color: rgb(12, 10, 9);
   font-size: 1.35rem;
-  font-weight: 760;
+  font-weight: 700;
   letter-spacing: 0;
   line-height: 1.05;
 }
@@ -2177,7 +2164,7 @@ html.physical-landscape-right .ui-orient-spin {
   max-width: min(100%, 18rem);
   overflow: hidden;
   color: rgba(87, 83, 78, 0.78);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -2272,7 +2259,7 @@ html.physical-landscape-right .ui-orient-spin {
   transform: translateY(-50%);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity 200ms ease-out;
+  transition: opacity 180ms ease-out;
 }
 
 .record-carousel-auto-btn--active {
@@ -2457,7 +2444,7 @@ html.physical-landscape-right .ui-orient-spin {
   filter: drop-shadow(0 3px 7px rgba(190, 18, 60, 0.42));
   transform-box: fill-box;
   transform-origin: center;
-  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .record-orbit-icon__dot {
@@ -2603,16 +2590,16 @@ html.physical-landscape-right .ui-orient-spin {
   animation-delay: 70ms;
 }
 .vault-card-strip > *:nth-child(4) {
-  animation-delay: 105ms;
+  animation-delay: 120ms;
 }
 .vault-card-strip > *:nth-child(5) {
-  animation-delay: 140ms;
+  animation-delay: 180ms;
 }
 .vault-card-strip > *:nth-child(6) {
-  animation-delay: 175ms;
+  animation-delay: 180ms;
 }
 .vault-card-strip > *:nth-child(n + 7) {
-  animation-delay: 200ms;
+  animation-delay: 180ms;
 }
 
 @keyframes vault-card-in {
@@ -2643,8 +2630,8 @@ html.physical-landscape-right .ui-orient-spin {
 }
 
 .record-carousel-slot--hands-free {
-  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1), opacity 140ms ease,
-    background 160ms ease, box-shadow 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1), opacity 180ms ease,
+    background 180ms ease, box-shadow 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
 .record-carousel-slot--hands-free:not(.record-carousel-slot--recording)::before {
@@ -2656,7 +2643,7 @@ html.physical-landscape-right .ui-orient-spin {
   opacity: 0.52;
   pointer-events: none;
   transform: scale(1);
-  transition: border-color 160ms ease, opacity 160ms ease, transform 160ms ease;
+  transition: border-color 180ms ease, opacity 180ms ease, transform 180ms ease;
 }
 
 .record-carousel-slot--hands-free-playback:not(.record-carousel-slot--recording) {
@@ -3012,7 +2999,7 @@ video.camera-preview.camera-preview--hidden {
   opacity: 0;
   color: rgba(255, 255, 255, 0.94);
   pointer-events: none;
-  transition: opacity 120ms ease, color 160ms ease;
+  transition: opacity 120ms ease, color 180ms ease;
 }
 
 .hands-free-status:not([aria-hidden='true']) {
@@ -3049,7 +3036,7 @@ video.camera-preview.camera-preview--hidden {
   border-radius: 999px;
   background: rgb(var(--hands-free-accent));
   box-shadow: 0 0 0 0.22rem rgba(var(--hands-free-accent), 0.12);
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition: background 180ms ease, box-shadow 180ms ease;
 }
 
 .hands-free-status--recording .hands-free-status__dot {
@@ -3066,17 +3053,17 @@ video.camera-preview.camera-preview--hidden {
 
 .hands-free-status__copy strong {
   color: rgb(var(--hands-free-accent));
-  font-size: 0.68rem;
-  font-weight: 760;
+  font-size: 0.7rem;
+  font-weight: 700;
   line-height: 1;
-  transition: color 160ms ease;
+  transition: color 180ms ease;
 }
 
 .hands-free-status__copy small {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.64);
-  font-size: 0.61rem;
-  font-weight: 560;
+  font-size: 0.62rem;
+  font-weight: 600;
   line-height: 1;
   text-overflow: ellipsis;
 }
@@ -3275,14 +3262,14 @@ video.camera-preview.camera-preview--hidden {
 
 .hands-free-stage__detail {
   font-size: 0.95rem;
-  font-weight: 640;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .hands-free-stage__elapsed {
   margin-top: 0.35rem;
   font-size: 1.1rem;
-  font-weight: 680;
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 
@@ -3344,14 +3331,14 @@ html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--preparing
 
 .hands-free-stage--chip .hands-free-stage__title {
   font-size: 1.1rem;
-  font-weight: 760;
+  font-weight: 700;
 }
 
 .hands-free-stage--chip .hands-free-stage__detail {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 0.8rem;
-  font-weight: 560;
+  font-size: 0.82rem;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3471,7 +3458,7 @@ html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--preparing
 
 .camera-permission-gate__message {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.72);
 }
@@ -3481,7 +3468,7 @@ html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--preparing
   border-radius: 9999px;
   background: #fff;
   padding: 0.75rem 1.5rem;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: #000;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
@@ -3502,7 +3489,7 @@ html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--preparing
   border: none;
   background: transparent;
   padding: 0.625rem 1rem;
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.76);
   touch-action: manipulation;
@@ -3586,7 +3573,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   min-height: 0;
   padding: 0.3rem;
   padding-bottom: 0.55rem;
-  border-radius: 1.65rem;
+  border-radius: 1.75rem;
   overflow: visible;
   border: 1px solid rgba(23, 26, 34, 0.08);
   background: var(--audio-bg-base, #f7f8fa);
@@ -3675,10 +3662,8 @@ video.camera-preview--embedded.camera-preview--mirror {
     system-ui,
     sans-serif
   );
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: #ffffff;
   pointer-events: none;
 }
@@ -3950,7 +3935,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   );
   cursor: ns-resize;
   touch-action: none;
-  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .split-ratio-handle--arming {
@@ -3969,7 +3954,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   justify-content: center;
   color: var(--audio-text-secondary, #6c7077);
   pointer-events: none;
-  transition: color 150ms ease, transform 150ms ease;
+  transition: color 180ms ease, transform 180ms ease;
 }
 
 .split-ratio-handle--active .split-ratio-handle__grip,
@@ -4120,7 +4105,7 @@ video.camera-preview--embedded.camera-preview--mirror {
   font-size: 15px;
   font-weight: 500;
   text-align: left;
-  transition: background-color 150ms ease;
+  transition: background-color 180ms ease;
 }
 
 .review-menu-item:active:not(:disabled) {
@@ -4175,7 +4160,7 @@ video.camera-preview--embedded.camera-preview--mirror {
 
 .review-trim-action {
   border-radius: 8px;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 .review-trim-action--cancel {
@@ -4404,11 +4389,11 @@ html.app-dark-mode .review-menu-item:active:not(:disabled) {
   padding: 0.55rem 0.82rem;
   background: transparent;
   color: rgba(68, 64, 60, 0.72);
-  font-size: 0.77rem;
-  font-weight: 650;
+  font-size: 0.76rem;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.01em;
-  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
 .settings-category-nav__button[aria-current='page'] {
@@ -4863,9 +4848,8 @@ html.app-dark-mode .pitch-widget-close--elevated {
   align-items: center;
   justify-content: center;
   gap: 0.375rem;
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
   opacity: 0.92;
 }
 
@@ -4894,17 +4878,15 @@ html.app-dark-mode .pitch-widget-close--elevated {
 }
 
 .pitch-audio-idle-pane__title {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: var(--audio-text-secondary, #6c7077);
 }
 
 .pitch-audio-idle-pane__copy {
   margin-top: 0.875rem;
   max-width: 18rem;
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   line-height: 1.55;
   color: var(--audio-text-secondary, #6c7077);
 }
@@ -4927,9 +4909,8 @@ html.app-dark-mode .pitch-widget-close--elevated {
 }
 
 .pitch-audio-pane__eyebrow {
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
   text-transform: none;
   color: rgba(255, 255, 255, 0.72);
 }
@@ -4937,7 +4918,6 @@ html.app-dark-mode .pitch-widget-close--elevated {
 .pitch-audio-pane__eyebrow--live {
   color: rgba(255, 255, 255, 0.92);
   font-weight: 700;
-  letter-spacing: 0.1em;
   text-shadow: 0 0 18px rgba(255, 255, 255, 0.12);
 }
 
@@ -4947,7 +4927,7 @@ html.app-dark-mode .pitch-widget-close--elevated {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   color: rgba(255, 255, 255, 0.58);
@@ -4970,7 +4950,7 @@ html.app-dark-mode .pitch-widget-close--elevated {
 }
 
 .pitch-status-label {
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: none;
@@ -5002,7 +4982,6 @@ html.app-dark-mode .pitch-widget-close--elevated {
   font-size: clamp(3rem, 10vw, 4.25rem);
   font-weight: 800;
   line-height: 1;
-  letter-spacing: 0.06em;
 }
 
 .pitch-audio-pane__meta {
@@ -5014,15 +4993,13 @@ html.app-dark-mode .pitch-widget-close--elevated {
 }
 
 .pitch-audio-pane__meta-freq {
-  font-size: 0.9375rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
 }
 
 .pitch-audio-pane__cents {
   font-size: clamp(1.5rem, 4.5vw, 2rem);
   font-weight: 700;
-  letter-spacing: 0.08em;
 }
 
 .pitch-audio-pane__needle {
@@ -5050,7 +5027,7 @@ html.app-dark-mode .pitch-widget-close--elevated {
 
 .pitch-axis-label {
   font-family: ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.03em;
   color: rgba(255, 255, 255, 0.38);
@@ -5077,7 +5054,7 @@ html.app-dark-mode .pitch-widget-close--elevated {
 }
 
 .pitch-audio-pane__idle p {
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   line-height: 1.55;
   color: rgba(255, 255, 255, 0.48);
   font-weight: 500;
@@ -5117,7 +5094,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .pitch-widget-hint {
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   line-height: 1.15;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -5318,10 +5295,8 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .metronome-audio-stage__bpm-label {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.52);
 }
 
@@ -5446,7 +5421,7 @@ html.physical-landscape-right .control-deck__vault-btn {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.88);
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   font-weight: 600;
   line-height: 1.2;
   padding: 0.5rem 0.875rem;
@@ -5470,7 +5445,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .metronome-audio-stage__subdivision-btn {
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   padding: 0.4375rem 0.75rem;
 }
 
@@ -5521,7 +5496,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 .metronome-audio-stage__toggle-label {
-  font-size: 0.875rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.82);
 }
@@ -5537,7 +5512,7 @@ html.physical-landscape-right .control-deck__vault-btn {
   overflow-x: auto;
   overflow-y: hidden;
   border: 1px solid rgba(148, 163, 184, 0.13);
-  border-radius: 1.1rem;
+  border-radius: 1.15rem;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.42), rgba(3, 7, 18, 0.36)),
     rgba(2, 6, 23, 0.2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 36px rgba(0, 0, 0, 0.2);
@@ -5559,11 +5534,9 @@ html.physical-landscape-right .control-deck__vault-btn {
   gap: 0.5rem;
   width: calc(100% - 1.1rem);
   transform: translateX(-50%);
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-align: center;
-  text-transform: uppercase;
   color: rgba(203, 213, 225, 0.64);
   pointer-events: none;
 }
@@ -5586,7 +5559,7 @@ html.physical-landscape-right .control-deck__vault-btn {
   padding-inline: 0.78rem;
   border-color: rgba(148, 163, 184, 0.16);
   background: rgba(15, 23, 42, 0.45);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -5605,7 +5578,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 
   .audio-practice-top-tabs__btn {
     min-height: 2.32rem;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
   }
 
   .audio-practice-metronome {
@@ -5773,7 +5746,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 .pip-video-container .pip-empty-action {
   min-height: clamp(1.28rem, 3.9vw, 1.6rem);
-  border-radius: 0.46rem;
+  border-radius: 0.45rem;
   border-color: rgba(255, 255, 255, 0.26) !important;
   background: rgba(255, 255, 255, 0.035) !important;
   color: rgba(255, 255, 255, 0.9) !important;
@@ -5913,7 +5886,7 @@ html.physical-landscape-right .control-deck__vault-btn {
 
 .pitch-tuner--widget .pitch-note-orbit__meta {
   margin-top: 0.2rem;
-  font-size: 0.625rem;
+  font-size: 0.62rem;
   color: var(--audio-text-secondary, #6c7077);
 }
 
@@ -5969,174 +5942,194 @@ html.app-dark-mode .pitch-spectrogram--glass {
   cursor: grabbing;
 }
 
-.settings-branch-wheel__item {
-  color: rgba(255, 255, 255, 0.88);
+/* Anchored Overlays tray shared by Camera and Tools. The transparent backdrop
+ * preserves the live context while still making outside-tap dismissal easy. */
+.settings-branch-backdrop {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
-.settings-branch-wheel {
-  width: 1px;
-  height: 1px;
-}
-
-.settings-branch-wheel__slot {
-  min-height: 5.625rem;
-}
-
-.settings-branch-wheel__item {
-  min-height: 5.375rem;
-  justify-content: flex-start;
-  padding: 0.125rem 0.2rem;
-}
-
-.settings-branch-wheel__item > .ui-orient-spin {
-  min-width: 0;
-  gap: 0.38rem;
-}
-
-/*
- * Palette card — an explicit, absolutely-positioned element sized in JS
- * (computeBranchLayout) to wrap whatever's actually on screen, not a fixed
- * decorative backdrop. A count that needs more room gets a bigger card
- * instead of spilling past a constant-size one.
- */
-.settings-branch-wheel__box {
-  position: absolute;
-  z-index: 0;
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
+.settings-branch-tray {
+  --tray-surface: rgba(8, 13, 21, 0.9);
+  --tray-border: rgba(255, 255, 255, 0.2);
+  --tray-text: rgba(250, 252, 255, 0.96);
+  --tray-muted: rgba(235, 242, 250, 0.58);
+  --tray-tile: rgba(255, 255, 255, 0.055);
+  --tray-tile-border: rgba(255, 255, 255, 0.11);
+  --tray-icon: rgba(255, 255, 255, 0.075);
+  /* The app's own blue, not a near-miss of it. */
+  --tray-accent: var(--sm-blue);
+  --tray-active: var(--sm-blue-soft);
+  --tray-active-border: var(--sm-blue-border);
+  width: 100%;
+  padding: 0.72rem;
+  border: 0.75px solid var(--tray-border);
+  border-radius: 1.35rem;
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035)),
-    rgba(7, 11, 18, 0.68);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    var(--tray-surface);
+  color: var(--tray-text);
   box-shadow:
-    0 1.25rem 3.5rem rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    0 1rem 2.8rem rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11);
   -webkit-backdrop-filter: blur(24px) saturate(1.18);
   backdrop-filter: blur(24px) saturate(1.18);
+}
+
+.settings-branch-tray--audio,
+.settings-branch-tray--tuner {
+  --tray-surface: rgba(246, 250, 253, 0.92);
+  --tray-border: rgba(70, 94, 112, 0.18);
+  --tray-text: rgba(28, 54, 72, 0.96);
+  --tray-muted: rgba(52, 76, 93, 0.58);
+  --tray-tile: rgba(255, 255, 255, 0.58);
+  --tray-tile-border: rgba(70, 94, 112, 0.12);
+  --tray-icon: rgba(34, 75, 104, 0.07);
+  /* The app's own blue, not a near-miss of it. */
+  --tray-accent: var(--sm-blue);
+  --tray-active: var(--sm-blue-soft);
+  --tray-active-border: var(--sm-blue-border);
+  box-shadow:
+    0 1rem 2.8rem rgba(29, 61, 84, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+/* Title only. The "N of 6 on" counter and the Done pill both went: the tiles
+ * already show what is on, and the backdrop already closes the tray. */
+.settings-branch-tray__header {
+  display: flex;
+  align-items: center;
+  padding: 0 0.16rem 0.5rem 0.22rem;
+}
+
+.settings-branch-tray__title {
+  display: block;
+  color: var(--tray-text);
+  font-size: var(--sm-text-title);
+  font-weight: var(--sm-weight-medium);
+  line-height: 1.1;
+}
+
+.settings-branch-tray__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.44rem;
+}
+
+.settings-branch-tray__item {
+  display: block;
+  min-width: 0;
+  min-height: 3.25rem;
+  padding: 0.38rem 0.44rem;
+  border: 0.75px solid var(--tray-tile-border);
+  border-radius: 0.9rem;
+  background: var(--tray-tile);
+  color: var(--tray-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  text-align: left;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.settings-branch-tray__item:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.settings-branch-tray__item--active {
+  border-color: var(--tray-active-border);
+  background: var(--tray-active);
+}
+
+.settings-branch-tray__item-content {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.settings-branch-tray__icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  border: 0.75px solid var(--tray-tile-border);
+  border-radius: 0.75rem;
+  background: var(--tray-icon);
+  color: var(--tray-muted);
+  place-items: center;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
+}
+
+.settings-branch-tray__icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Solid fill, no bloom. The 1rem coloured glow that was here read as decoration
+ * rather than state; a filled chip is what you can actually parse at a glance
+ * in a dark room mid-practice. */
+.settings-branch-tray__item--active .settings-branch-tray__icon {
+  border-color: transparent;
+  background: var(--tray-accent);
+  color: #fff;
+}
+
+.settings-branch-tray__label {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--tray-text);
+  font-size: var(--sm-text-label);
+  font-weight: var(--sm-weight-body);
+  line-height: 1.15;
+}
+
+.settings-branch-tray__arrow {
+  position: absolute;
+  bottom: -0.38rem;
+  width: 0.78rem;
+  height: 0.78rem;
+  border-right: 0.75px solid var(--tray-border);
+  border-bottom: 0.75px solid var(--tray-border);
+  background: var(--tray-surface);
+  transform: translateX(-50%) rotate(45deg);
   pointer-events: none;
 }
 
-.settings-branch-wheel--camera .settings-branch-wheel__box {
-  border-radius: 2rem;
+html.app-dark-mode .settings-branch-tray--audio,
+html.app-dark-mode .settings-branch-tray--tuner {
+  --tray-surface: rgba(8, 13, 21, 0.92);
+  --tray-border: rgba(255, 255, 255, 0.18);
+  --tray-text: rgba(247, 250, 253, 0.94);
+  --tray-muted: rgba(232, 239, 246, 0.56);
+  --tray-tile: rgba(255, 255, 255, 0.05);
+  --tray-tile-border: rgba(255, 255, 255, 0.1);
+  --tray-icon: rgba(255, 255, 255, 0.065);
+  --tray-accent: var(--sm-blue);
+  --tray-active: var(--sm-blue-soft);
+  --tray-active-border: var(--sm-blue-border);
+  box-shadow:
+    0 1rem 2.8rem rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.settings-branch-wheel--audio .settings-branch-wheel__box,
-.settings-branch-wheel--tuner .settings-branch-wheel__box {
-  border-radius: 1.5rem;
-}
+@media (max-height: 620px) {
+  .settings-branch-tray {
+    padding: 0.6rem;
+  }
 
-.settings-branch-wheel__slot {
-  z-index: 1;
-}
+  .settings-branch-tray__header {
+    min-height: 2.05rem;
+    padding-bottom: 0.44rem;
+  }
 
-.settings-branch-wheel--audio .settings-branch-wheel__item > .ui-orient-spin,
-.settings-branch-wheel--tuner .settings-branch-wheel__item > .ui-orient-spin {
-  gap: 0.5rem;
-}
-
-.settings-branch-wheel--audio .settings-branch-wheel__icon,
-.settings-branch-wheel--tuner .settings-branch-wheel__icon {
-  width: 3.125rem;
-  height: 3.125rem;
-  background: rgba(12, 18, 28, 0.78);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.settings-branch-wheel--audio .settings-branch-wheel__icon svg,
-.settings-branch-wheel--tuner .settings-branch-wheel__icon svg {
-  width: 1.4rem;
-  height: 1.4rem;
-}
-
-.settings-branch-wheel--audio .settings-branch-wheel__label,
-.settings-branch-wheel--tuner .settings-branch-wheel__label {
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-
-/*
- * Camera's dice cluster — item box matches CAMERA_ITEM_WIDTH/HEIGHT in
- * settingsBranchLayout.ts, which the palette card is sized to wrap.
- */
-/* Heights track CAMERA_ITEM_HEIGHT (92px) so the palette card wraps the
- * cluster exactly and neighbours keep their DICE_GAP. */
-.settings-branch-wheel--camera .settings-branch-wheel__slot {
-  min-height: 5.75rem;
-}
-
-.settings-branch-wheel--camera .settings-branch-wheel__item {
-  min-height: 5.75rem;
-  padding: 0;
-}
-
-.settings-branch-wheel--camera .settings-branch-wheel__item > .ui-orient-spin {
-  gap: 0.34rem;
-}
-
-/* Camera was the only mode still on the 44px base icon while audio and tuner
- * had already moved to 50px, which is why the cluster read as small. */
-.settings-branch-wheel--camera .settings-branch-wheel__icon {
-  width: 3.625rem;
-  height: 3.625rem;
-}
-
-.settings-branch-wheel--camera .settings-branch-wheel__icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
-.settings-branch-wheel--camera .settings-branch-wheel__label {
-  max-width: 100%;
-  font-size: 0.69rem;
-  font-weight: 650;
-  line-height: 1.2;
-}
-
-.settings-branch-wheel__icon {
-  flex: 0 0 auto;
-  background: rgba(10, 15, 24, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-}
-
-.settings-branch-wheel__item--active .settings-branch-wheel__icon {
-  background: rgb(2, 132, 199);
-  border-color: rgba(186, 230, 253, 0.82);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.13), 0 12px 30px rgba(2, 132, 199, 0.34);
-}
-
-.settings-branch-wheel__item--active .settings-branch-wheel__label {
-  color: rgb(125, 211, 252);
-}
-
-.settings-branch-wheel__item:active .settings-branch-wheel__icon {
-  transform: scale(0.94);
-}
-
-.settings-branch-wheel__label {
-  display: flex;
-  min-height: 2.5em;
-  align-items: flex-start;
-  justify-content: center;
-  padding-inline: 0.1rem;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.67rem;
-  line-height: 1.22;
-  letter-spacing: 0;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
-  hyphens: none;
-  overflow-wrap: normal;
-  white-space: normal;
-}
-
-.settings-branch-wheel--audio .settings-branch-wheel__item,
-.settings-branch-wheel--tuner .settings-branch-wheel__item {
-  min-height: 5.375rem;
-}
-
-.settings-branch-wheel--audio .settings-branch-wheel__item > .ui-orient-spin,
-.settings-branch-wheel--tuner .settings-branch-wheel__item > .ui-orient-spin {
-  gap: 0.48rem;
+  .settings-branch-tray__item {
+    min-height: 2.85rem;
+  }
 }
 
 .pitch-tuner--widget {
@@ -6290,15 +6283,15 @@ html.native-dark-chrome body {
 
 .onboarding-lite__brand strong {
   color: #101828;
-  font-size: 0.94rem;
-  font-weight: 820;
+  font-size: 0.95rem;
+  font-weight: 800;
   letter-spacing: -0.015em;
 }
 
 .onboarding-lite__brand small {
   color: rgba(51, 65, 85, 0.6);
   font-size: 0.7rem;
-  font-weight: 680;
+  font-weight: 600;
 }
 
 .onboarding-lite__icon-btn {
@@ -6317,8 +6310,8 @@ html.native-dark-chrome body {
 .onboarding-lite__step {
   justify-self: end;
   color: rgba(15, 23, 42, 0.48);
-  font-size: 0.74rem;
-  font-weight: 760;
+  font-size: 0.76rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -6329,7 +6322,7 @@ html.native-dark-chrome body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 0.72rem;
+  border-radius: 0.75rem;
   background: var(--onboarding-accent-soft);
   color: var(--onboarding-accent);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.76);
@@ -6363,10 +6356,8 @@ html.native-dark-chrome body {
   margin-bottom: 0.45rem;
   color: var(--onboarding-accent);
   font-size: 0.7rem;
-  font-weight: 820;
-  letter-spacing: 0.105em;
+  font-weight: 600;
   line-height: 1.2;
-  text-transform: uppercase;
 }
 
 .onboarding-lite__copy h1 {
@@ -6381,8 +6372,8 @@ html.native-dark-chrome body {
   margin: 0.72rem 0 0;
   max-width: 19.5rem;
   color: rgba(51, 65, 85, 0.76);
-  font-size: 0.94rem;
-  font-weight: 560;
+  font-size: 0.95rem;
+  font-weight: 600;
   line-height: 1.43;
 }
 
@@ -6417,7 +6408,7 @@ html.native-dark-chrome body {
   overflow: hidden;
   color: #172033;
   font-size: 0.76rem;
-  font-weight: 790;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -6425,8 +6416,8 @@ html.native-dark-chrome body {
 .onboarding-lite__feature-row small {
   overflow: hidden;
   color: rgba(51, 65, 85, 0.58);
-  font-size: 0.63rem;
-  font-weight: 620;
+  font-size: 0.62rem;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -6442,12 +6433,12 @@ html.native-dark-chrome body {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 1.05rem;
+  border-radius: 1rem;
   background: white;
   padding: 0 2.6rem 0 1rem;
   color: #172033;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 700;
   /* iOS zooms the page when a focused control is under 16px. */
   line-height: 1.2;
@@ -6481,8 +6472,8 @@ html.native-dark-chrome body {
   gap: 0.35rem;
   margin-top: 0.8rem;
   color: #0e7490;
-  font-size: 0.78rem;
-  font-weight: 760;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .onboarding-lite__instrument-summary svg {
@@ -6508,8 +6499,8 @@ html.native-dark-chrome body {
   gap: 0.3rem;
   padding: 0.25rem 0;
   color: rgba(51, 65, 85, 0.72);
-  font-size: 0.72rem;
-  font-weight: 740;
+  font-size: 0.7rem;
+  font-weight: 700;
   line-height: 1.15;
 }
 
@@ -6555,11 +6546,11 @@ html.native-dark-chrome body {
   min-height: 3.2rem;
   align-items: center;
   justify-content: center;
-  border-radius: 1.05rem;
+  border-radius: 1rem;
   padding: 0 0.95rem;
   color: rgba(15, 23, 42, 0.58);
-  font-size: 0.92rem;
-  font-weight: 760;
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .onboarding-lite__tap-hint {
@@ -6569,17 +6560,17 @@ html.native-dark-chrome body {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border-radius: 1.05rem;
+  border-radius: 1rem;
   background: #172033;
   color: white;
-  font-size: 0.84rem;
-  font-weight: 760;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .coach-mark-target {
   position: absolute;
   border: 1px solid rgba(14, 165, 233, 0.62);
-  border-radius: 1.25rem;
+  border-radius: 1.15rem;
   box-shadow: 0 0 0 999px rgba(15, 23, 42, 0.28), 0 0 0 5px rgba(14, 165, 233, 0.1),
     0 12px 30px rgba(14, 165, 233, 0.18);
 }
@@ -6587,7 +6578,7 @@ html.native-dark-chrome body {
 .coach-mark-card {
   position: absolute;
   border: 1px solid rgba(255, 255, 255, 0.75);
-  border-radius: 1.25rem;
+  border-radius: 1.15rem;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 16px 42px rgba(15, 23, 42, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.86);
   -webkit-backdrop-filter: blur(22px) saturate(1.14);
@@ -6599,9 +6590,8 @@ html.native-dark-chrome body {
   left: 1rem;
   top: 0.72rem;
   color: rgba(14, 116, 144, 0.72);
-  font-size: 0.68rem;
-  font-weight: 820;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .coach-mark-card__arrow {
@@ -6643,8 +6633,8 @@ html.native-dark-chrome body {
 
 .coach-mark-card__copy h2 {
   color: #101828;
-  font-size: 0.94rem;
-  font-weight: 820;
+  font-size: 0.95rem;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
@@ -6661,7 +6651,7 @@ html.native-dark-chrome body {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 0.58rem;
+  border-radius: 0.6rem;
   background: rgba(14, 116, 144, 0.1);
   color: #0e7490;
 }
@@ -6676,15 +6666,15 @@ html.native-dark-chrome body {
   margin-top: 0.3rem;
   color: rgba(51, 65, 85, 0.78);
   font-size: 0.82rem;
-  font-weight: 560;
+  font-weight: 600;
   line-height: 1.35;
 }
 
 .coach-mark-card__copy .coach-mark-card__continue {
   margin-top: 0.55rem;
   color: rgba(15, 23, 42, 0.48);
-  font-size: 0.74rem;
-  font-weight: 720;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .coach-mark-card__instructions {
@@ -6699,7 +6689,7 @@ html.native-dark-chrome body {
   align-items: start;
   gap: 0.42rem;
   color: rgba(30, 41, 59, 0.78);
-  font-size: 0.73rem;
+  font-size: 0.76rem;
   line-height: 1.28;
 }
 
@@ -6712,12 +6702,12 @@ html.native-dark-chrome body {
   border-radius: 999px;
   background: rgba(14, 116, 144, 0.1);
   color: #0e7490;
-  font-size: 0.65rem;
-  font-weight: 820;
+  font-size: 0.62rem;
+  font-weight: 800;
 }
 
 .coach-mark-card__instructions strong {
-  font-weight: 660;
+  font-weight: 600;
 }
 
 .coach-mark-card__skip {
@@ -6731,8 +6721,8 @@ html.native-dark-chrome body {
   border-radius: 999px;
   padding: 0 0.65rem;
   color: rgba(15, 23, 42, 0.58);
-  font-size: 0.75rem;
-  font-weight: 760;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .settings-learn-sections {
@@ -6747,16 +6737,14 @@ html.native-dark-chrome body {
 .settings-learn-section__title {
   margin: 0 0 0.38rem 0.45rem;
   color: rgba(100, 116, 139, 0.72);
-  font-size: 0.66rem;
-  font-weight: 790;
-  letter-spacing: 0.075em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .settings-learn-list {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 1.25rem;
+  border-radius: 1.15rem;
   background: rgba(255, 255, 255, 0.68);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
@@ -6781,8 +6769,8 @@ html.native-dark-chrome body {
   border-bottom: 1px solid rgba(15, 23, 42, 0.07);
   padding: 0 1rem;
   color: #1f2937;
-  font-size: 0.93rem;
-  font-weight: 680;
+  font-size: 0.95rem;
+  font-weight: 600;
   text-align: left;
 }
 
@@ -6796,8 +6784,8 @@ html.native-dark-chrome body {
 
 .help-sheet__intro {
   color: rgba(51, 65, 85, 0.84);
-  font-size: 1rem;
-  font-weight: 560;
+  font-size: 1.02rem;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -6811,8 +6799,8 @@ html.native-dark-chrome body {
   background: rgba(255, 255, 255, 0.68);
   padding: 0.72rem 0.85rem;
   color: rgba(15, 23, 42, 0.76);
-  font-size: 0.9rem;
-  font-weight: 640;
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .help-sheet__bullet svg {
@@ -7184,7 +7172,7 @@ html.app-dark-mode
   padding: 0.36rem 0.5rem;
   gap: clamp(0.52rem, 2.2vw, 0.82rem);
   border: 1px solid rgba(21, 152, 255, 0.13);
-  border-radius: 0.72rem;
+  border-radius: 0.75rem;
   background: linear-gradient(
       90deg,
       rgba(247, 166, 0, 0.055),
@@ -7219,7 +7207,7 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__bpm-center {
   width: 100%;
-  transition: opacity 150ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-drag-cue {
@@ -7246,12 +7234,12 @@ html.app-dark-mode
   opacity: 0;
   pointer-events: none;
   transform: translateY(0.25rem);
-  transition: opacity 140ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-drag-scale span {
-  font-size: 0.72rem;
-  font-weight: 650;
+  font-size: 0.7rem;
+  font-weight: 600;
   opacity: 0.52;
 }
 
@@ -7298,10 +7286,9 @@ html.app-dark-mode
   .audio-practice-metronome__tempo-scrubber
   .audio-practice-metronome__tempo-label {
   margin-bottom: 0.08rem;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   color: var(--audio-gold);
   line-height: 1;
-  letter-spacing: 0.06em;
 }
 
 .app-ui-overlay--audio-mode
@@ -7317,11 +7304,10 @@ html.app-dark-mode
   .audio-practice-metronome__tempo-scrubber
   .metronome-audio-stage__bpm-label {
   margin-top: 0.28rem;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--audio-blue);
   line-height: 1;
-  letter-spacing: 0.06em;
 }
 
 .app-ui-overlay--audio-mode
@@ -7329,7 +7315,7 @@ html.app-dark-mode
   .metronome-audio-stage__bpm-input {
   width: 7rem;
   padding: 0.28rem 0.45rem;
-  border-radius: 0.5rem;
+  border-radius: 0.45rem;
   font-size: 2.25rem;
 }
 
@@ -7463,7 +7449,7 @@ html.app-dark-mode
   left: 50%;
   width: clamp(2.6rem, 11vw, 3.4rem);
   height: clamp(1.7rem, 7vw, 2.2rem);
-  border-radius: 0.42rem;
+  border-radius: 0.45rem;
   background: linear-gradient(160deg, var(--audio-blue, #1598ff), #0f6fbe);
   box-shadow: 0 0.55rem 1.4rem rgba(21, 152, 255, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.45);
   transform: translateX(-50%);
@@ -7529,10 +7515,10 @@ html.app-dark-mode
   background: var(--audio-surface, #fff);
   color: var(--audio-text-secondary, #6c7077);
   box-shadow: 0 0.35rem 0.9rem rgba(23, 26, 34, 0.07);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  transition: transform 140ms ease, background 120ms ease, color 120ms ease,
+  transition: transform 180ms ease, background 120ms ease, color 120ms ease,
     border-color 120ms ease;
 }
 
@@ -7602,7 +7588,7 @@ html.app-dark-mode
   border-radius: 50%;
   background: radial-gradient(circle at 50% 42%, rgba(21, 152, 255, 0.14), transparent 70%);
   transform: translate(-50%, -50%) scale(1);
-  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), background 150ms ease;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), background 180ms ease;
   pointer-events: none;
 }
 
@@ -7912,14 +7898,15 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
+  --metronome-tempo-card-padding-x: clamp(0.7rem, 3vw, 1rem);
+  --metronome-tempo-card-radius: clamp(1.35rem, 5vw, 1.8rem);
   width: min(100%, 30rem);
   margin-inline: auto;
-  /* Bottom padding runs a little wider than the sides so the selector row sits
-     inside the white rather than hugging the card's bottom edge. */
-  padding: clamp(0.5rem, 1.2dvh, 0.72rem) clamp(0.7rem, 3vw, 1rem)
-    clamp(0.9rem, 3.2vw, 1.2rem);
+  /* The setup selectors are the card footer, so the outer card supplies their
+     bottom edge instead of wrapping a second rounded rectangle around them. */
+  padding: clamp(0.5rem, 1.2dvh, 0.72rem) var(--metronome-tempo-card-padding-x) 0;
   border: 1px solid rgba(23, 26, 34, 0.055);
-  border-radius: clamp(1.35rem, 5vw, 1.8rem);
+  border-radius: var(--metronome-tempo-card-radius);
   background: radial-gradient(circle at 50% 0%, rgba(247, 166, 0, 0.055), transparent 42%),
     var(--audio-surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 1.15rem 2.8rem rgba(23, 26, 34, 0.075);
@@ -7961,7 +7948,6 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   .audio-practice-metronome__tempo-label {
   margin-bottom: 0.45rem;
   font-size: clamp(0.72rem, 2.7vw, 0.88rem);
-  letter-spacing: 0.07em;
 }
 
 .app-ui-overlay--audio-mode
@@ -7969,7 +7955,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   .audio-practice-metronome__tempo-scrubber
   .metronome-audio-stage__bpm-value {
   font-size: clamp(4.1rem, 19vw, 5.6rem);
-  font-weight: 820;
+  font-weight: 800;
   line-height: 0.82;
   letter-spacing: -0.055em;
   font-variant-numeric: tabular-nums;
@@ -8005,11 +7991,17 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
 .app-ui-overlay--audio-mode
   .audio-practice-metronome__tempo-card
   .audio-practice-metronome__selectors {
-  width: 100%;
+  width: calc(100% + (2 * var(--metronome-tempo-card-padding-x)));
   max-width: none;
-  margin: 0;
+  margin: 0 calc(-1 * var(--metronome-tempo-card-padding-x));
   padding: 0.35rem 0 0;
-  border-top: 1px solid rgba(23, 26, 34, 0.055);
+  border: 0;
+  border-top: 1px solid rgba(23, 26, 34, 0.07);
+  border-radius: 0 0 var(--metronome-tempo-card-radius) var(--metronome-tempo-card-radius);
+  background: rgba(23, 26, 34, 0.012);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .app-ui-overlay--audio-mode
@@ -8020,10 +8012,10 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   gap: 0;
   width: 100%;
   overflow: visible;
-  border: 1px solid rgba(23, 26, 34, 0.14);
-  border-radius: 0.82rem;
-  background: var(--audio-surface);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .app-ui-overlay--audio-mode
@@ -8094,29 +8086,48 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   align-items: flex-start;
   justify-content: center;
   min-height: 2.55rem;
-  padding: 1.08rem 1.05rem 0.4rem 0.35rem;
+  padding: 1.08rem 0.35rem 0.4rem;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
   font-size: clamp(0.62rem, 2.2vw, 0.78rem);
-  font-weight: 720;
+  font-weight: 700;
   text-align: center;
 }
 
+.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__selection {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .metronome-audio-select__selection::before {
+  width: 0.78rem;
+  flex: 0 0 0.78rem;
+  content: '';
+}
+
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__value {
-  width: 100%;
+  width: auto;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-select__chevron {
-  right: 0.28rem;
-  top: 1.06rem;
+  position: static;
+  right: auto;
+  top: auto;
   bottom: auto;
-  width: 0.68rem;
+  width: 0.78rem;
   height: 0.68rem;
+  flex: 0 0 0.78rem;
 }
 
 .app-ui-overlay--audio-mode
@@ -8179,7 +8190,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   .audio-practice-metronome__program-btn {
   max-width: 13.5rem;
   min-height: 3.45rem;
-  font-size: 0.98rem;
+  font-size: 0.95rem;
 }
 
 html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
@@ -8192,19 +8203,9 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-
 html.app-dark-mode
   .app-ui-overlay--audio-mode
   .audio-practice-metronome__tempo-card
-  .audio-practice-metronome__select-row--primary,
-html.app-dark-mode
-  .app-ui-overlay--audio-mode
-  .audio-practice-metronome__tempo-card
   .audio-practice-metronome__selectors {
-  border-color: rgba(226, 232, 240, 0.085);
-}
-
-html.app-dark-mode
-  .app-ui-overlay--audio-mode
-  .audio-practice-metronome__tempo-card
-  .audio-practice-metronome__select-row--primary {
-  border-color: rgba(226, 232, 240, 0.16);
+  border-top-color: rgba(226, 232, 240, 0.1);
+  background: rgba(226, 232, 240, 0.018);
 }
 
 html.app-dark-mode
@@ -8218,9 +8219,7 @@ html.app-dark-mode
 @media (max-height: 740px) {
   .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
     padding-top: 0.45rem;
-    /* Still clears the selector row on short screens — the row should never
-       sit flush against the card's bottom edge. */
-    padding-bottom: 0.8rem;
+    padding-bottom: 0;
   }
 
   .app-ui-overlay--audio-mode

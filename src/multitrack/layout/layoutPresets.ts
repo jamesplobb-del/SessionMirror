@@ -13,9 +13,41 @@ export function getLayoutPreset(id: string): MultitrackLayoutPreset {
   return MULTITRACK_LAYOUT_PRESETS.find((preset) => preset.id === id) ?? MULTITRACK_LAYOUT_PRESETS[0]
 }
 
+export const MULTITRACK_PANEL_SLOT_IDS = ['a', 'b', 'c', 'd', 'e', 'f'] as const
+
 export function createPanelsForLayout(preset: MultitrackLayoutPreset): MultitrackPanelState[] {
-  const slotIds = ['a', 'b', 'c', 'd', 'e', 'f']
-  return slotIds
+  return MULTITRACK_PANEL_SLOT_IDS
     .slice(0, preset.panelCount)
     .map((id) => ({ kind: 'performance', id, take: null }))
+}
+
+/**
+ * Panels for `preset`, carrying every existing box's contents across by slot id.
+ * Used when the layout changes and when a new box is added mid-session — a
+ * growing grid must never drop takes that are already on the canvas.
+ */
+export function mergePanelsIntoLayout(
+  preset: MultitrackLayoutPreset,
+  previousPanels: MultitrackPanelState[],
+): MultitrackPanelState[] {
+  const previousById = new Map(
+    previousPanels
+      .filter((panel) => panel.kind === 'performance')
+      .map((panel) => [panel.id, panel] as const),
+  )
+  return createPanelsForLayout(preset).map((panel) => {
+    if (panel.kind !== 'performance') return panel
+    const existing = previousById.get(panel.id)
+    if (!existing || existing.kind !== 'performance') return panel
+    return {
+      ...panel,
+      take: existing.take,
+      volume: existing.volume,
+      muted: existing.muted,
+      trimStartSec: existing.trimStartSec,
+      trimEndSec: existing.trimEndSec,
+      sectionStartSec: existing.sectionStartSec,
+      sectionEndSec: existing.sectionEndSec,
+    }
+  })
 }

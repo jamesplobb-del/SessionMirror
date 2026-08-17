@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
+import { AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -22,7 +22,11 @@ import AnimatedBottomSheet from '../../components/ui/AnimatedBottomSheet'
 import { ensureNativeCameraSessionHealthy } from '../../utils/nativeCameraTest'
 import { completePlaybackRouteRestore } from '../../utils/playbackRouteCoordinator'
 import { resumePlaybackAudioContext } from '../../utils/playbackAudioContext'
-import { APP_FOREGROUND_RECOVERY_EVENT } from '../../utils/appForeground'
+import {
+  APP_BACKGROUND_SUSPEND_EVENT,
+  APP_FOREGROUND_RECOVERY_EVENT,
+  requestInteractiveMediaRecovery,
+} from '../../utils/appForeground'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
 import { useActionSheet } from '../../context/ActionSheetContext'
 import { useMultitrackSession } from '../state/useMultitrackSession'
@@ -45,8 +49,8 @@ import { exportMultitrackSession, type MultitrackExportFailureReason } from '../
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
 import SheetPlacementDiagram from './SheetPlacementDiagram'
-import MultitrackSectionEditor from './MultitrackSectionEditor'
 import { hasSectionWindow } from '../layout/sectionVisibility'
+import { SHEET_BASE_CUE_ID, sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
 import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../backing/MultitrackBackingTrackPanel'
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
@@ -91,6 +95,8 @@ interface MultitrackOverlayProps {
   pendingRecordingTakeId: string | null
   onClearPendingRecording: () => void
   onOpenRecordingStage?: () => void
+  /** Re-acquires the camera/preview after an idle or interrupted session. */
+  onWakeCamera?: () => Promise<void> | void
   onSaveRenderedTakeToVault: (rendered: {
     path: string
     durationSeconds: number
@@ -133,6 +139,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     pendingRecordingTakeId,
     onClearPendingRecording,
     onOpenRecordingStage,
+    onWakeCamera,
     onSaveRenderedTakeToVault,
   } = props
   const shellRef = useRef<HTMLDivElement>(null)
@@ -155,17 +162,33 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'mixer' | 'export' | 'visual' | null>(null)
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
   const [alignStageOpen, setAlignStageOpen] = useState(false)
+  /** Last-resort recovery: the camera/audio never came back on its own. */
+  const [needsWake, setNeedsWake] = useState(false)
+  const [isWaking, setIsWaking] = useState(false)
+  const wakeDismissedRef = useRef(false)
   const sheetMusicInputRef = useRef<HTMLInputElement>(null)
+  /**
+   * Timeline second a picked image should cut in at. Null means "this is the
+   * panel's first image" — it takes over from the downbeat.
+   */
+  const pendingImageAtSecRef = useRef<number | null>(null)
+  /** Timeline second the next recording starts at (the align stage's "+" flow). */
+  const recordStartSecRef = useRef(0)
   const {
     session,
     layout,
     setLayout,
+    addPerformanceBox,
     assignTakeToPanel,
     setPanelVolume,
     setPanelMuted,
     setPanelTrim,
     setPanelSection,
     assignSheetMusic,
+    addSheetCue,
+    moveSheetCue,
+    updateSheetCueAsset,
+    removeSheetCue,
     updatePractice,
     updateBacking,
   } = useMultitrackSession({ takes, isOpen })
@@ -196,11 +219,23 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     updatePractice(patch)
   }, [session.practice.bpm, updatePractice])
 
+  /**
+   * The image that owns the music panel's placement — the base image, or the
+   * opening cue when the panel was built entirely from timeline screenshots.
+   * Panel placement is shared by every cue, so it always lives on this one.
+   */
+  const layoutSheetAsset = sheetLayoutAsset(session.sheetMusic)
+
   const updateSheetMusicAsset = useCallback((patch: Partial<NonNullable<typeof session.sheetMusic.asset>>) => {
-    const asset = session.sheetMusic.asset
-    if (!asset) return
-    assignSheetMusic(session.sheetMusic.id, { ...asset, ...patch })
-  }, [assignSheetMusic, session.sheetMusic])
+    const base = session.sheetMusic.asset
+    if (base) {
+      assignSheetMusic(session.sheetMusic.id, { ...base, ...patch })
+      return
+    }
+    const firstCue = [...(session.sheetMusic.cues ?? [])].sort((a, b) => a.startSec - b.startSec)[0]
+    if (!firstCue) return
+    updateSheetCueAsset(firstCue.id, { ...firstCue.asset, ...patch })
+  }, [assignSheetMusic, session.sheetMusic, updateSheetCueAsset])
 
   const handleSheetMusicAssetChange = useCallback((panelId: string, asset: typeof session.sheetMusic.asset) => {
     assignSheetMusic(panelId, asset)
@@ -249,7 +284,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
     pauseBacking()
     updateBacking(nextBacking)
-  }, [pauseBacking, session.backing, updateBacking])
+    // A song you play along to is almost never at the click's tempo, and a
+    // click fighting the track is worse than no click. Start it off whenever a
+    // backing is attached or swapped — the Click chip turns it back on.
+    if (nextBacking.kind !== 'none') updatePractice({ clickEnabled: false })
+  }, [pauseBacking, session.backing, updateBacking, updatePractice])
 
   useEffect(() => () => {
     for (const url of ownedBackingBlobUrlsRef.current) URL.revokeObjectURL(url)
@@ -444,8 +483,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const buildNativeMonitorSources = useCallback(async (
     targetPanelId: string | null,
     respectRecordingMonitorMutes = true,
+    /** Timeline second the mix starts from — non-zero when overdubbing a part
+        that only exists later in the song. */
+    startAtSec = 0,
   ): Promise<MultitrackMonitorSource[]> => {
     const sources: MultitrackMonitorSource[] = []
+    const startSec = Math.max(0, startAtSec)
 
     for (const [panelIndex, panel] of session.panels.entries()) {
       if (
@@ -465,13 +508,25 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       // edits as the video instead of rebuilding from stale session metadata.
       const timeline = sync.getPanelTimelineSettings(panel.id)
       const offsetSec = timeline.offsetMs / 1000
+      // Timeline t plays media time `t + trimStart + offset`; the clip enters at
+      // `-offset`. Starting at `startSec` therefore either seeks into the clip or,
+      // if it has not entered yet, waits out the remaining gap.
+      const entersAtSec = Math.max(0, -offsetSec)
+      const startsInsideClip = startSec >= entersAtSec
+      const sourceInSec = startsInsideClip
+        ? startSec + timeline.trimStartSec + offsetSec
+        : timeline.trimStartSec
+      const timelineDelaySec = startsInsideClip ? 0 : entersAtSec - startSec
+      // A clip that has already finished by `startSec` contributes nothing.
+      if (timeline.trimEndSec !== null && sourceInSec >= timeline.trimEndSec) continue
+
       sources.push({
         id: panel.id,
         label: panel.take.name || `Box ${panelIndex + 1}`,
         path,
-        sourceInSec: timeline.trimStartSec + Math.max(0, offsetSec),
+        sourceInSec,
         ...(timeline.trimEndSec !== null ? { sourceOutSec: timeline.trimEndSec } : null),
-        ...(offsetSec < 0 ? { timelineDelaySec: -offsetSec } : null),
+        ...(timelineDelaySec > 0 ? { timelineDelaySec } : null),
         volume: panel.volume ?? 1,
       })
     }
@@ -500,7 +555,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           id: 'backing',
           label: session.backing.fileName || 'Backing track',
           path,
-          sourceInSec: 0,
+          sourceInSec: startSec,
           volume: session.backing.volume,
         })
       } catch (error) {
@@ -634,17 +689,20 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       if (session.backing.kind === 'youtube') {
         await prepareBackingAtStart()
       }
-      const sources = await buildNativeMonitorSources(panelId)
+      // Adding a part that only exists at the bridge shouldn't mean sitting
+      // through the whole song: the monitor mix rolls from the playhead.
+      const startSec = recordStartSecRef.current
+      const sources = await buildNativeMonitorSources(panelId, true, startSec)
       nativeTransportActiveRef.current = await prepareNativeMultitrackMonitor(sources)
       if (nativeTransportActiveRef.current) {
-        sync.prepareVisualAtStart()
+        sync.prepareVisualAtStart(startSec)
         return true
       }
       if (isNativeMultitrackTransportAvailable()) return false
 
       // Browser development fallback. iOS production must use the native
       // transport; this path keeps the feature testable without AVFoundation.
-      await sync.prepareAtStart(0)
+      await sync.prepareAtStart(startSec)
       await prepareBackingAtStart()
       return true
     },
@@ -709,7 +767,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       if (!nativeTransportActiveRef.current) {
         await sync.startPrepared()
       } else {
-        sync.startVisualPrepared()
+        sync.startVisualPrepared(recordStartSecRef.current)
       }
       if (
         session.backing.kind === 'youtube' &&
@@ -764,29 +822,141 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     if (session.backing.kind === 'none') pauseBacking()
   }, [pauseBacking, session.backing.kind])
 
-  // After background / lock screen / app switch: clear a stuck arming count-in and
-  // heal the metronome audio graph so the next Record tap can start clicks.
+  // ── Idle / background recovery ───────────────────────────────────────────
+  // Everything the lifecycle listeners touch is read through refs: the objects
+  // below are rebuilt on every render, and depending on them directly would
+  // re-subscribe these listeners on each one.
+  const recordingRef = useRef(recording)
+  recordingRef.current = recording
+  const activePanelIdRef = useRef(activePanelId)
+  activePanelIdRef.current = activePanelId
+  const pauseAllPlaybackRef = useRef(pauseAllPlayback)
+  pauseAllPlaybackRef.current = pauseAllPlayback
+  const onWakeCameraRef = useRef(onWakeCamera)
+  onWakeCameraRef.current = onWakeCamera
+  /** The capture surface is genuinely delivering pictures right now. */
+  const cameraLive = nativeLivePreviewActive === true || streamRef.current !== null
+  const cameraLiveRef = useRef(cameraLive)
+  cameraLiveRef.current = cameraLive
+
+  // After background / lock screen / app switch: iOS has already torn down the
+  // capture session, the AVAudioEngine monitor graph, and the audio route. Stop
+  // pretending any of them are still rolling, then heal them on return.
   useEffect(() => {
     if (!isOpen) return
 
-    const healMultitrackAudio = () => {
-      recording.recover()
+    const wakeTimers: number[] = []
+    const clearWakeTimers = () => {
+      for (const id of wakeTimers.splice(0)) window.clearTimeout(id)
+    }
+
+    const onBackground = () => {
+      clearWakeTimers()
+      pauseAllPlaybackRef.current()
+      const phase = recordingRef.current.phase
+      if (phase === 'arming' || phase === 'count-in') {
+        // Nothing musical was captured yet. cancel() aborts capture and flags the
+        // fragment for deletion itself when the recorder had already started.
+        recordingRef.current.cancel()
+      } else if (phase === 'recording') {
+        // Native capture was already stopped for us and the partial take is on
+        // its way to the vault; land it in review so it can be kept or retried
+        // instead of leaving the stage stuck on a recording that ended.
+        recordingRef.current.enterReview()
+      }
+    }
+
+    const onForeground = () => {
+      clearWakeTimers()
+      wakeDismissedRef.current = false
+      recordingRef.current.recover()
       void resumePlaybackAudioContext()
       void sharedMetronomeEngine.prepareForCountIn()
       void ensureNativeCameraSessionHealthy()
+
+      // Give the app's own camera restart a moment. If the stage still has no
+      // picture, re-acquire it once ourselves, and only ask the user to tap
+      // when even that didn't bring it back.
+      wakeTimers.push(window.setTimeout(() => {
+        if (!activePanelIdRef.current || cameraLiveRef.current) {
+          setNeedsWake(false)
+          return
+        }
+        void onWakeCameraRef.current?.()
+        wakeTimers.push(window.setTimeout(() => {
+          if (!activePanelIdRef.current || cameraLiveRef.current) return
+          setNeedsWake(true)
+        }, 2200))
+      }, 1500))
     }
 
-    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, healMultitrackAudio)
+    window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, onBackground)
+    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, onForeground)
     const onVisible = () => {
-      if (document.visibilityState === 'visible') healMultitrackAudio()
+      if (document.visibilityState === 'visible') onForeground()
+      else onBackground()
     }
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
-      window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, healMultitrackAudio)
+      clearWakeTimers()
+      window.removeEventListener(APP_BACKGROUND_SUSPEND_EVENT, onBackground)
+      window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, onForeground)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [isOpen, recording])
+  }, [isOpen])
+
+  // Standing watchdog for every other way the camera can go idle (interrupted
+  // session, phone call, another app grabbing the camera): a live picture
+  // clears the prompt, a long dead one raises it.
+  useEffect(() => {
+    if (cameraLive) {
+      wakeDismissedRef.current = false
+      setNeedsWake(false)
+      return
+    }
+    if (
+      !isOpen ||
+      !activePanelId ||
+      pendingReview ||
+      wakeDismissedRef.current ||
+      recording.phase !== 'idle'
+    ) return
+    const timer = window.setTimeout(() => setNeedsWake(true), 5000)
+    return () => window.clearTimeout(timer)
+  }, [activePanelId, cameraLive, isOpen, pendingReview, recording.phase])
+
+  useEffect(() => {
+    if (!isOpen) {
+      setNeedsWake(false)
+      wakeDismissedRef.current = false
+    }
+  }, [isOpen])
+
+  const handleWakeTap = useCallback(() => {
+    if (isWaking) return
+    setIsWaking(true)
+    void (async () => {
+      try {
+        // A real tap is the one moment iOS lets us re-arm every engine at once.
+        requestInteractiveMediaRecovery('multitrack-wake-tap')
+        await resumePlaybackAudioContext()
+        await sharedMetronomeEngine.prepareForCountIn()
+        await ensureNativeCameraSessionHealthy()
+        await onWakeCamera?.()
+      } catch (error) {
+        console.warn('[Multitrack] tap-to-reactivate failed', error)
+      } finally {
+        setIsWaking(false)
+        setNeedsWake(false)
+      }
+    })()
+  }, [isWaking, onWakeCamera])
+
+  const handleWakeDismiss = useCallback(() => {
+    wakeDismissedRef.current = true
+    setNeedsWake(false)
+  }, [])
 
   useEffect(() => {
     const targetPanelId = recording.targetPanelId ?? activePanelId
@@ -829,7 +999,35 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
   const handleConfirmTake = useCallback(() => {
     if (!pendingReview) return
-    assignTakeToPanel(pendingReview.panelId, pendingReview.take)
+    const startSec = recordStartSecRef.current
+    recordStartSecRef.current = 0
+
+    if (startSec > 0) {
+      // The take was captured against the mix rolling from `startSec`, so its
+      // downbeat belongs at `startSec` on the timeline, not at zero. Shifting
+      // the offset (rather than the media) keeps one canonical placement that
+      // Play All, the align stage, and the export all read.
+      const take = pendingReview.take
+      const capturedOffsetMs = timelineOffsetMsForTake(take, session.practice.bpm)
+      const offsetMs = Math.round(capturedOffsetMs - startSec * 1000)
+      const placedTake = { ...take, timelineOffsetMs: offsetMs }
+      alignedOffsetRef.current.set(take.id, offsetMs)
+      assignTakeToPanel(pendingReview.panelId, placedTake)
+      sync.setPanelOffset(pendingReview.panelId, offsetMs)
+      // The new box appears exactly while its own part plays.
+      const takeDuration = take.duration ?? 0
+      setPanelSection(
+        pendingReview.panelId,
+        startSec,
+        takeDuration > 0 ? startSec + takeDuration : undefined,
+      )
+      void updateVaultTake(take.id, { timelineOffsetMs: offsetMs }).catch((error) => {
+        console.warn('[Multitrack] could not persist overdub placement', error)
+      })
+    } else {
+      assignTakeToPanel(pendingReview.panelId, pendingReview.take)
+    }
+
     setPendingReview(null)
     recording.cancel()
     setActivePanelId(null)
@@ -845,7 +1043,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     } catch {
       /* storage unavailable */
     }
-  }, [assignTakeToPanel, pendingReview, recording, restoreRecordingReadiness, showAlert])
+  }, [
+    assignTakeToPanel,
+    pendingReview,
+    recording,
+    restoreRecordingReadiness,
+    session.practice.bpm,
+    setPanelSection,
+    showAlert,
+    sync,
+  ])
 
   const handleRetryTake = useCallback(() => {
     if (!pendingReview) return
@@ -863,6 +1070,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const shareDisabled = !hasAnyTake || isExporting || recording.phase !== 'idle'
 
   useEffect(() => {
+    // While the timeline editor is open it owns the live offsets and trims —
+    // it writes every drag straight into sync. Re-deriving them from the saved
+    // session here would snap a clip back mid-gesture, so stand down until the
+    // editor closes and this effect reconciles against the saved values again.
+    if (alignStageOpen) return
     for (const panel of session.panels) {
       if (panel.kind !== 'performance') continue
       sync.setPanelVolume(panel.id, panel.volume ?? 1)
@@ -880,7 +1092,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         0
       sync.setPanelOffset(panel.id, offset)
     }
-  }, [session.panels, session.practice.bpm, sync])
+  }, [alignStageOpen, session.panels, session.practice.bpm, sync])
 
   const tileSheetPanel = session.panels.find(
     (panel) => panel.id === tileSheetPanelId && panel.kind === 'performance',
@@ -905,6 +1117,57 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     [hapticFeedback, onOpenRecordingStage, session.panels, sync],
   )
 
+  /** Timeline "+": claim a box and overdub into it from the playhead. */
+  const handleAddBoxAt = useCallback(
+    (atSec: number) => {
+      const startSec = Math.max(0, atSec)
+      const panelId = addPerformanceBox(
+        startSec > 0 ? { startSec, endSec: undefined } : undefined,
+      )
+      if (!panelId) {
+        void showAlert({
+          message: 'Six boxes is the most one canvas holds. Free one up to add another part.',
+        })
+        return
+      }
+      recordStartSecRef.current = startSec
+      openRecordingForPanel(panelId)
+    },
+    [addPerformanceBox, openRecordingForPanel, showAlert],
+  )
+
+  /** Timeline lane "Record here": overdub into an existing empty box. */
+  const handleRecordBoxAt = useCallback(
+    (panelId: string, atSec: number) => {
+      const startSec = Math.max(0, atSec)
+      recordStartSecRef.current = startSec
+      if (startSec > 0) setPanelSection(panelId, startSec, undefined)
+      openRecordingForPanel(panelId)
+    },
+    [openRecordingForPanel, setPanelSection],
+  )
+
+  /** Timeline "+ image": pick a screenshot that cuts in at the playhead. */
+  const handleAddImageAt = useCallback((atSec: number) => {
+    pendingImageAtSecRef.current = Math.max(0, atSec)
+    sheetMusicInputRef.current?.click()
+  }, [])
+
+  /**
+   * Removing an image from the timeline. The opening image is the panel's base
+   * asset rather than a cue, so it has to be cleared through assignSheetMusic —
+   * whichever cue comes next then takes over the top of the song.
+   */
+  const handleRemoveSheetImage = useCallback(
+    (cueId: string) => {
+      if (cueId === SHEET_BASE_CUE_ID) {
+        assignSheetMusic(session.sheetMusic.id, null)
+        return
+      }
+      removeSheetCue(cueId)
+    },
+    [assignSheetMusic, removeSheetCue, session.sheetMusic.id],
+  )
 
   const mixerPanels = session.panels.filter(
     (panel) => panel.kind === 'performance' && panel.take !== null,
@@ -1013,8 +1276,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 {isExporting ? 'Rendering…' : 'Export'}
               </Pressable>
             </header>
-            <div className="multitrack-overlay__body">
-              <div className="multitrack-mix-strip" aria-label="Project audio sources">
+            <div className={`multitrack-overlay__body ${alignStageOpen ? 'multitrack-overlay__body--editing' : ''}`}>
+              <div className="multitrack-mix-strip" aria-label="Project audio sources" hidden={alignStageOpen}>
                 {/* Practice toggles lead the strip — they are tapped most and must
                     stay reachable without scrolling past a long backing/file name. */}
                 <Pressable
@@ -1057,16 +1320,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   type="button"
                   intensity="soft"
                   onClick={() => {
-                    if (session.sheetMusic.asset) setActiveSourceSheet('visual')
+                    if (layoutSheetAsset) setActiveSourceSheet('visual')
                     else sheetMusicInputRef.current?.click()
                   }}
-                  className={`multitrack-source-chip ${session.sheetMusic.asset ? 'multitrack-source-chip--active' : ''}`}
+                  className={`multitrack-source-chip ${layoutSheetAsset ? 'multitrack-source-chip--active' : ''}`}
                 >
                   <FileMusic className="h-3.5 w-3.5" />
                   <span className="multitrack-source-chip__label multitrack-source-chip__label--truncate">
-                    {session.sheetMusic.asset?.fileName ?? 'Music / photo / PDF'}
+                    {layoutSheetAsset?.fileName ?? 'Music / photo / PDF'}
                   </span>
-                  {session.sheetMusic.asset ? <span className="multitrack-source-chip__dot" /> : null}
+                  {layoutSheetAsset ? <span className="multitrack-source-chip__dot" /> : null}
                 </Pressable>
               </div>
               <MultitrackPanelGrid layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
@@ -1078,27 +1341,62 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onTapPerformance={(id) => { triggerLightHaptic(hapticFeedback); setTileSheetPanelId(id) }}
                 onRemoveTake={(id) => assignTakeToPanel(id, null)}
                 onSheetMusicChange={handleSheetMusicAssetChange}
+                onSheetCueAssetChange={updateSheetCueAsset}
+                onRemoveSheetCue={handleRemoveSheetImage}
                 onEditSheetMusic={() => setActiveSourceSheet('visual')}
                 currentTimeSec={sync.state.currentTime}
                 onRegisterMedia={registerPanelMedia} />
             </div>
-            <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
-              activeLayoutId={session.layoutId}
-              onSelectLayout={setLayout}
-              onOpenMixer={() => setActiveSourceSheet('mixer')}
-              onOpenAlign={hasAnyTake ? () => setAlignStageOpen(true) : undefined}
-              onTogglePlay={() => {
-                if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
+            {/* The timeline editor docks under the live canvas rather than
+                covering it: the grid above IS the preview you are editing. */}
+            {alignStageOpen ? (
+              <MultitrackAlignStage
+                isOpen={alignStageOpen}
+                panels={session.panels.filter(
+                  (panel): panel is PerformancePanelState => panel.kind === 'performance',
+                )}
+                sheetMusic={session.sheetMusic}
+                bpm={session.practice.bpm}
+                sync={sync}
+                busy={isExporting || recording.phase !== 'idle'}
+                onClose={() => {
                   pauseAllPlayback()
-                  return
-                }
-                void playAllFromStart()
-              }} onRestart={() => void playAllFromStart()} onSeek={(time) => {
-                if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
-                  pauseAllPlayback()
-                }
-                sync.seek(time)
-              }} />
+                  setAlignStageOpen(false)
+                }}
+                onPreviewToggle={() => {
+                  if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
+                    pauseAllPlayback()
+                    return
+                  }
+                  void playAllFromStart()
+                }}
+                onAddBox={handleAddBoxAt}
+                onRecordBox={handleRecordBoxAt}
+                onAddImage={handleAddImageAt}
+                onMoveImage={moveSheetCue}
+                onRemoveImage={handleRemoveSheetImage}
+                onSectionChange={setPanelSection}
+                onDone={handleSaveAlignChanges}
+              />
+            ) : (
+              <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
+                activeLayoutId={session.layoutId}
+                onSelectLayout={setLayout}
+                onOpenMixer={() => setActiveSourceSheet('mixer')}
+                onOpenAlign={() => setAlignStageOpen(true)}
+                onTogglePlay={() => {
+                  if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
+                    pauseAllPlayback()
+                    return
+                  }
+                  void playAllFromStart()
+                }} onRestart={() => void playAllFromStart()} onSeek={(time) => {
+                  if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
+                    pauseAllPlayback()
+                  }
+                  sync.seek(time)
+                }} />
+            )}
             {!activePanel ? (
               <MultitrackPracticeOverlay
                 boundaryRef={shellRef}
@@ -1140,6 +1438,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               reviewMediaRef={inGridReviewMediaRef}
               monitorSources={monitorSources}
               onToggleMonitorSource={toggleMonitorSource}
+              hasBacking={session.backing.kind !== 'none'}
               onPracticeChange={handlePracticeChange}
               onRecord={() => {
                 if (isRecording || isStopping) return
@@ -1205,12 +1504,58 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 sync.pause()
                 pauseBacking()
                 recording.cancel()
+                // Backing out of a mid-song overdub leaves no clip behind, so the
+                // empty box should not keep the window that was staged for it.
+                if (recordStartSecRef.current > 0 && activePanel.kind === 'performance' && !activePanel.take) {
+                  setPanelSection(activePanel.id, undefined, undefined)
+                }
+                recordStartSecRef.current = 0
                 setActivePanelId(null)
               }}
             />
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Last-resort recovery. Everything above tries to heal itself first; this
+          only appears when the camera still has no picture after that. */}
+      <AnimatePresence>
+        {isOpen && needsWake ? (
+          <motion.div
+            key="mt-wake-veil"
+            className="multitrack-wake-veil"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="alertdialog"
+            aria-label="Multitrack went to sleep"
+          >
+            <Pressable
+              type="button"
+              intensity="normal"
+              haptic="medium"
+              className="multitrack-wake-veil__card"
+              onClick={handleWakeTap}
+              disabled={isWaking}
+            >
+              <RefreshCw className={`h-7 w-7 ${isWaking ? 'multitrack-wake-veil__spin' : ''}`} />
+              <strong>{isWaking ? 'Waking up…' : 'Tap to reactivate'}</strong>
+              <span>
+                The camera and audio went to sleep while you were away. Your boxes and takes are
+                still here.
+              </span>
+            </Pressable>
+            <Pressable
+              type="button"
+              intensity="soft"
+              className="multitrack-wake-veil__dismiss"
+              onClick={handleWakeDismiss}
+            >
+              Not now
+            </Pressable>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
       <MultitrackTakePicker isOpen={takePickerPanelId !== null} takes={takes} onClose={() => setTakePickerPanelId(null)} onSelectTake={(take) => { if (takePickerPanelId) assignTakeToPanel(takePickerPanelId, take); setTakePickerPanelId(null); setActivePanelId(null) }} />
 
       {/* Backing audio/iframe must outlive the on-demand sheet UI. */}
@@ -1223,7 +1568,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         />
       ) : null}
 
-      {/* Sheet music / image picker (triggered from the tile sheet). */}
+      {/* Sheet music / image picker (triggered from the tile sheet and from the
+          timeline's "Add image here"). */}
       <input
         ref={sheetMusicInputRef}
         type="file"
@@ -1231,16 +1577,29 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0]
+          const atSec = pendingImageAtSecRef.current
+          pendingImageAtSecRef.current = null
           if (!file) return
           void loadSheetMusicFile(file).then((asset) => {
-            assignSheetMusic(session.sheetMusic.id, asset)
-            setActiveSourceSheet('visual')
+            if (atSec === null) {
+              // Picked from the mix strip / tile sheet: this is the panel image.
+              assignSheetMusic(session.sheetMusic.id, asset)
+              setActiveSourceSheet('visual')
+              return
+            }
+            // Picked from the timeline: cut it in at that second, and only open
+            // the placement sheet for the very first image, when the panel is
+            // still deciding where it lives.
+            const isFirstImage =
+              !session.sheetMusic.asset && (session.sheetMusic.cues?.length ?? 0) === 0
+            addSheetCue(asset, atSec)
+            if (isFirstImage) setActiveSourceSheet('visual')
           })
           event.currentTarget.value = ''
         }}
       />
 
-      {session.sheetMusic.asset ? (
+      {layoutSheetAsset ? (
         <AnimatedBottomSheet
           isOpen={activeSourceSheet === 'visual' && isOpen}
           onClose={() => setActiveSourceSheet(null)}
@@ -1274,7 +1633,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </div>
               <div className="multitrack-visual-editor__placements" role="radiogroup" aria-label="Image panel placement">
                 {SHEET_FRAME_OPTIONS.map(({ value, label, detail }) => {
-                  const active = (session.sheetMusic.asset?.framePosition ?? 'top') === value
+                  const active = (layoutSheetAsset?.framePosition ?? 'top') === value
                   return (
                     <Pressable
                       key={value}
@@ -1285,8 +1644,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                       className={`multitrack-visual-editor__placement ${active ? 'is-active' : ''}`}
                       onClick={() => updateSheetMusicAsset({ framePosition: value })}
                     >
-                      {session.sheetMusic.asset ? (
-                        <SheetPlacementDiagram preset={layout} asset={session.sheetMusic.asset} position={value} />
+                      {layoutSheetAsset ? (
+                        <SheetPlacementDiagram preset={layout} asset={layoutSheetAsset} position={value} />
                       ) : null}
                       <span>
                         <strong>{label}</strong>
@@ -1298,7 +1657,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </div>
             </section>
 
-            {session.sheetMusic.asset.mimeType !== 'application/pdf' ? (
+            {layoutSheetAsset.mimeType !== 'application/pdf' ? (
               <section className="multitrack-visual-editor__section">
                 <div className="multitrack-visual-editor__section-title">
                   <strong>Image framing</strong>
@@ -1309,7 +1668,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                     ['fill', 'Fill panel', 'Edge-to-edge; crops if needed'],
                     ['fit', 'Show full image', 'No cropping; may show margins'],
                   ] as const).map(([value, label, detail]) => {
-                    const active = (session.sheetMusic.asset?.contentMode ?? 'fill') === value
+                    const active = (layoutSheetAsset?.contentMode ?? 'fill') === value
                     return (
                       <Pressable
                         key={value}
@@ -1335,13 +1694,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   <strong>Panel size</strong>
                   <small>How much layout space it receives</small>
                 </span>
-                <output>{Math.round((session.sheetMusic.asset.frameScale ?? 1) * 100)}%</output>
+                <output>{Math.round((layoutSheetAsset.frameScale ?? 1) * 100)}%</output>
                 <input
                   type="range"
                   min={0.65}
                   max={1.8}
                   step={0.05}
-                  value={session.sheetMusic.asset.frameScale ?? 1}
+                  value={layoutSheetAsset.frameScale ?? 1}
                   onChange={(event) => updateSheetMusicAsset({ frameScale: Number(event.target.value) })}
                 />
               </label>
@@ -1350,13 +1709,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   <strong>Image zoom</strong>
                   <small>You can also pinch directly on the image</small>
                 </span>
-                <output>{Math.round((session.sheetMusic.asset.scale ?? 1) * 100)}%</output>
+                <output>{Math.round((layoutSheetAsset.scale ?? 1) * 100)}%</output>
                 <input
                   type="range"
                   min={0.6}
                   max={2.5}
                   step={0.05}
-                  value={session.sheetMusic.asset.scale ?? 1}
+                  value={layoutSheetAsset.scale ?? 1}
                   onChange={(event) => updateSheetMusicAsset({ scale: Number(event.target.value) })}
                 />
               </label>
@@ -1465,7 +1824,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 }}
               >
                 <SlidersHorizontal className="h-4 w-4" />
-                Align
+                Timeline
               </Pressable>
               <Pressable
                 type="button"
@@ -1504,15 +1863,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </Pressable>
             </div>
           )}
-          {tileSheetPanel?.kind === 'performance' ? (
-            <MultitrackSectionEditor
-              panel={tileSheetPanel}
-              durationSec={sync.state.duration}
-              currentTimeSec={sync.state.currentTime}
-              onChange={(startSec, endSec) => {
-                if (tileSheetPanelId) setPanelSection(tileSheetPanelId, startSec, endSec)
-              }}
-            />
+          {tileSheetPanel?.kind === 'performance' && tileSheetTake ? (
+            <p className="multitrack-sheet__footnote">
+              {hasSectionWindow(tileSheetPanel)
+                ? 'This box only appears for part of the song. Open Timeline to move or widen that window.'
+                : 'Open Timeline to trim this part, slide it in time, or make the box appear for only part of the song.'}
+            </p>
           ) : null}
         </div>
       </AnimatedBottomSheet>
@@ -1541,27 +1897,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           />
         </div>
       </AnimatedBottomSheet>
-
-      <MultitrackAlignStage
-        isOpen={alignStageOpen && isOpen}
-        panels={session.panels.filter(
-          (panel): panel is PerformancePanelState => panel.kind === 'performance',
-        )}
-        bpm={session.practice.bpm}
-        sync={sync}
-        onClose={() => {
-          pauseAllPlayback()
-          setAlignStageOpen(false)
-        }}
-        onPreviewToggle={() => {
-          if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
-            pauseAllPlayback()
-            return
-          }
-          void playAllFromStart()
-        }}
-        onDone={handleSaveAlignChanges}
-      />
 
       <AnimatedBottomSheet
         isOpen={activeSourceSheet === 'export' && isOpen}

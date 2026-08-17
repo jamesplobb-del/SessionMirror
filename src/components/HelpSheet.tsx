@@ -39,14 +39,16 @@ export default function HelpSheet({ topic, onClose }: HelpSheetProps) {
           </div>
           <div className="help-sheet__body min-h-0 flex-1 overflow-y-auto px-5 pb-7 pt-4">
             <p className="help-sheet__intro">{topic.body}</p>
-            <div className="mt-4 space-y-2.5">
-              {topic.bullets.map((bullet) => (
-                <div key={bullet} className="help-sheet__bullet">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>{bullet}</span>
-                </div>
-              ))}
-            </div>
+            {topic.bullets.length > 0 ? (
+              <div className="mt-4 space-y-2.5">
+                {topic.bullets.map((bullet) => (
+                  <div key={bullet} className="help-sheet__bullet">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{bullet}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </>
       )}

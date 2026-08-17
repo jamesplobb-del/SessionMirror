@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { FileImage, Move, SlidersHorizontal, Trash2, Upload } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import type { SheetMusicAsset, SheetMusicPanelState } from '../types'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from './sheetMusicUtils'
+import { sheetCueWindows } from './sheetMusicTimeline'
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
@@ -35,15 +36,36 @@ function distanceBetween(first: GesturePoint, second: GesturePoint): number {
   return Math.hypot(second.x - first.x, second.y - first.y)
 }
 
-export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
+export default function SheetMusicPanel({
+  panel,
+  currentTimeSec = 0,
+  onAssetChange,
+  onCueAssetChange,
+  onRemoveCue,
+  onEdit,
+}: {
   panel: SheetMusicPanelState
+  /** Timeline position — decides which screenshot in the cue list is on screen. */
+  currentTimeSec?: number
   onAssetChange: (asset: SheetMusicAsset | null) => void
+  onCueAssetChange?: (cueId: string, asset: SheetMusicAsset) => void
+  onRemoveCue?: (cueId: string) => void
   onEdit?: () => void
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadedAssetUrlRef = useRef<string | null>(null)
-  const initialTransform = panel.asset
-    ? { x: panel.asset.x ?? 0.5, y: panel.asset.y ?? 0.5, scale: panel.asset.scale ?? 1 }
+
+  // Which screenshot is up right now, and where it sits in the sequence.
+  const cueWindows = useMemo(() => sheetCueWindows(panel), [panel])
+  let activeIndex = 0
+  for (let i = 0; i < cueWindows.length; i += 1) {
+    if (cueWindows[i].startSec <= currentTimeSec) activeIndex = i
+  }
+  const activeCue = cueWindows[activeIndex] ?? null
+  const activeAsset = activeCue?.asset ?? null
+
+  const initialTransform = activeAsset
+    ? { x: activeAsset.x ?? 0.5, y: activeAsset.y ?? 0.5, scale: activeAsset.scale ?? 1 }
     : DEFAULT_TRANSFORM
   const [draftTransform, setDraftTransform] = useState<SheetTransform>(initialTransform)
   const transformRef = useRef<SheetTransform>(initialTransform)
@@ -55,15 +77,15 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
     startDistance: 0,
   })
 
-  // Revoke the uploaded file's blob URL once it's no longer the active asset
+  // Revoke the uploaded file's blob URL once no cue references it any more
   // (replaced, removed, or the panel unmounts) to avoid leaking memory.
   useEffect(() => {
-    if (panel.asset && panel.asset.src === uploadedAssetUrlRef.current) return
-    if (uploadedAssetUrlRef.current) {
-      URL.revokeObjectURL(uploadedAssetUrlRef.current)
-      uploadedAssetUrlRef.current = null
-    }
-  }, [panel.asset])
+    const uploaded = uploadedAssetUrlRef.current
+    if (!uploaded) return
+    if (cueWindows.some((window) => window.asset.src === uploaded)) return
+    URL.revokeObjectURL(uploaded)
+    uploadedAssetUrlRef.current = null
+  }, [cueWindows])
 
   useEffect(() => {
     return () => {
@@ -75,17 +97,17 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
   }, [])
 
   useEffect(() => {
-    if (!panel.asset || gestureRef.current.points.size > 0) return
+    if (!activeAsset || gestureRef.current.points.size > 0) return
     const next = {
-      x: panel.asset.x ?? 0.5,
-      y: panel.asset.y ?? 0.5,
-      scale: panel.asset.scale ?? 1,
+      x: activeAsset.x ?? 0.5,
+      y: activeAsset.y ?? 0.5,
+      scale: activeAsset.scale ?? 1,
     }
     transformRef.current = next
     setDraftTransform(next)
-  }, [panel.asset?.src, panel.asset?.x, panel.asset?.y, panel.asset?.scale])
+  }, [activeAsset?.src, activeAsset?.x, activeAsset?.y, activeAsset?.scale])
 
-  if (!panel.asset) {
+  if (!activeCue || !activeAsset) {
     return (
       <div className="multitrack-panel multitrack-panel--empty">
         <input
@@ -111,8 +133,8 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
     )
   }
 
-  const asset = panel.asset
-  const isPdf = panel.asset.mimeType === 'application/pdf'
+  const asset = activeAsset
+  const isPdf = asset.mimeType === 'application/pdf'
   // Older saved image assets predate contentMode. Treat them as fill so they
   // receive the same stripe-free behavior as newly imported photos.
   const contentMode = isPdf ? 'fit' : (asset.contentMode ?? 'fill')
@@ -216,7 +238,9 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
     }
 
     const next = transformRef.current
-    onAssetChange({ ...asset, x: next.x, y: next.y, scale: next.scale })
+    const moved = { ...asset, x: next.x, y: next.y, scale: next.scale }
+    if (activeCue.isBase) onAssetChange(moved)
+    else onCueAssetChange?.(activeCue.id, moved)
     gesture.baseline = next
     gesture.startPoint = null
     gesture.startCenter = null
@@ -242,6 +266,11 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
         <div className="multitrack-panel__label">
           <FileImage className="h-3.5 w-3.5" />
           <span className="truncate">{asset.fileName}</span>
+          {cueWindows.length > 1 ? (
+            <span className="multitrack-panel__sheet-cue-count">
+              {activeIndex + 1}/{cueWindows.length}
+            </span>
+          ) : null}
         </div>
         <div className="multitrack-panel__sheet-actions">
           {onEdit ? (
@@ -250,7 +279,16 @@ export default function SheetMusicPanel({ panel, onAssetChange, onEdit }: {
               Layout
             </Pressable>
           ) : null}
-          <Pressable type="button" intensity="soft" onClick={() => onAssetChange(null)} aria-label="Remove image or PDF" className="multitrack-panel__action">
+          <Pressable
+            type="button"
+            intensity="soft"
+            onClick={() => {
+              if (activeCue.isBase) onAssetChange(null)
+              else onRemoveCue?.(activeCue.id)
+            }}
+            aria-label="Remove image or PDF"
+            className="multitrack-panel__action"
+          >
             <Trash2 className="h-4 w-4" />
           </Pressable>
         </div>

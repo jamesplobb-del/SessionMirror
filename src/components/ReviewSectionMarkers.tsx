@@ -18,7 +18,7 @@ export default function ReviewSectionMarkers({
 
   return (
     <div className="review-section-markers pointer-events-auto mt-3 px-1">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">
+      <p className="mb-2 text-xs font-medium text-white/50">
         Practice sections
       </p>
       <div className="flex flex-wrap gap-2">

@@ -1,9 +1,23 @@
-import { useState, type ReactNode } from 'react'
-import { ArrowLeft, ChevronDown, LockKeyhole, Mic, Play } from 'lucide-react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
+import {
+  ArrowLeft,
+  ChevronDown,
+  Mic,
+  Play,
+} from 'lucide-react'
 import type { PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import type { PitchReadout } from '../../utils/pitchUtils'
-import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
+import { writtenMidiToConcertMidi } from '../../utils/tunerTransposition'
 import {
   BALANCE_DIRECTION_LABELS,
   BALANCE_INSTRUMENTS,
@@ -14,30 +28,25 @@ import {
   routineSummary,
 } from './balanceMusic'
 import { formatBalanceDuration, toleranceCentsForSettings } from './balanceStorage'
-import { BALANCE_CHARACTERS, getBalanceCharacter } from './balanceCharacters'
-import {
-  BALANCE_TROPHIES,
-  isBalanceCharacterUnlocked,
-  trophyForCharacter,
-} from './balanceTrophies'
+import { startBalanceTone, type DroneHandle } from './balanceAudio'
+import BalanceScene from './BalanceScene'
+import { centsFromConcertTarget, movementSpeedForCents } from './balanceScoring'
 import type {
   BalanceCustomRoutine,
   BalanceScaleDirection,
   BalanceScaleType,
   BalanceSettings,
-  BalanceStoredDataV2,
   BalanceTarget,
-  BalanceTolerancePreset,
 } from './balanceTypes'
 import BalanceRoutineEditor from './BalanceRoutineEditor'
-import BalanceTrophyCase from './BalanceTrophyCase'
 
-type SetupSection = 'routine' | 'instrument' | 'goal' | 'sound' | 'rewards'
+type SetupSection = 'routine' | 'instrument'
+
+const GOAL_OPTIONS = [5, 8, 10, 15] as const
 
 interface BalanceSetupProps {
   settings: BalanceSettings
   customRoutines: BalanceCustomRoutine[]
-  progression: Pick<BalanceStoredDataV2, 'trophies' | 'unlockedCharacterIds'>
   previewTarget: BalanceTarget | null
   bestBalancedMs: number
   readout: PitchReadout
@@ -45,6 +54,7 @@ interface BalanceSetupProps {
   permissionBlocked: boolean
   permissionPending: boolean
   hapticFeedback: boolean
+  suppressUntilRef: MutableRefObject<number>
   onBack: () => void
   onStart: () => void
   onRequestMic: () => void
@@ -87,32 +97,20 @@ function SetupGroup({
   )
 }
 
-function NoteSelect({
-  id,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  id: string
-  value: number
-  min: number
-  max: number
-  onChange: (midi: number) => void
-}) {
-  return (
-    <select id={id} value={value} onChange={(event) => onChange(Number(event.target.value))}>
-      {Array.from({ length: max - min + 1 }, (_, index) => min + index).map((midi) => (
-        <option key={midi} value={midi}>{midiToBalanceNoteName(midi)}</option>
-      ))}
-    </select>
-  )
+function pointerRatio(
+  event: ReactPointerEvent<HTMLElement>,
+  orientation: 'horizontal' | 'vertical',
+): number {
+  const rect = event.currentTarget.getBoundingClientRect()
+  if (orientation === 'vertical') {
+    return Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / Math.max(1, rect.height)))
+  }
+  return Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width)))
 }
 
 export default function BalanceSetup({
   settings,
   customRoutines,
-  progression,
   previewTarget,
   bestBalancedMs,
   readout,
@@ -120,6 +118,7 @@ export default function BalanceSetup({
   permissionBlocked,
   permissionPending,
   hapticFeedback,
+  suppressUntilRef,
   onBack,
   onStart,
   onRequestMic,
@@ -129,17 +128,8 @@ export default function BalanceSetup({
 }: BalanceSetupProps) {
   const [openSection, setOpenSection] = useState<SetupSection | null>(null)
   const instrument = getBalanceInstrument(settings.instrumentId)
-  const selectedCharacter = getBalanceCharacter(settings.characterId)
-  const earnedTrophyCount = Object.keys(progression.trophies).length
   const hasPitch = readout.noteName !== '—' && readout.frequencyHz > 0
   const selectedCustom = customRoutines.find((routine) => routine.id === settings.selectedCustomRoutineId)
-  const restLabel =
-    settings.soundRest.restDuration === 'matchGoal'
-      ? 'match goal'
-      : settings.soundRest.restDuration === 'manual'
-        ? 'manual'
-        : `${settings.soundRest.restDuration}s`
-  const goalLabel = settings.goalMode === 'personalBest' ? 'Personal Best' : `${settings.goalSeconds} sec per note`
   const tolerance = toleranceCentsForSettings(settings)
   const scaleSpan = settings.scale.octaveRange * 12
   const maxScaleRoot = Math.max(instrument.minWrittenMidi, instrument.maxWrittenMidi - scaleSpan)
@@ -153,8 +143,220 @@ export default function BalanceSetup({
           ? 'Microphone unavailable'
           : 'Play a note to check your mic'
 
-  const updateSound = (patch: Partial<BalanceSettings['soundRest']>) =>
-    onUpdate({ soundRest: { ...settings.soundRest, ...patch } })
+  const targetMidi =
+    settings.routineType === 'scale' ? settings.scale.rootWrittenMidi : settings.single.writtenMidi
+  const targetMin = instrument.minWrittenMidi
+  const targetMax = settings.routineType === 'scale' ? maxScaleRoot : instrument.maxWrittenMidi
+  const targetCanChange = settings.routineType !== 'custom' && targetMax > targetMin
+
+  const pitchToneRef = useRef<DroneHandle | null>(null)
+  const pitchToneStartRef = useRef<Promise<DroneHandle> | null>(null)
+  const pitchToneActiveRef = useRef(false)
+  const previewConcertMidiRef = useRef<number | null>(null)
+  const previewStopTimerRef = useRef<number | null>(null)
+
+  const stopPitchPreview = useCallback(() => {
+    pitchToneActiveRef.current = false
+    previewConcertMidiRef.current = null
+    if (previewStopTimerRef.current !== null) {
+      window.clearTimeout(previewStopTimerRef.current)
+      previewStopTimerRef.current = null
+    }
+    const tone = pitchToneRef.current
+    pitchToneRef.current = null
+    void tone?.stop()
+    // Keep the speaker tail out of the live pitch detector.
+    suppressUntilRef.current = performance.now() + 380
+  }, [suppressUntilRef])
+
+  const playPitchPreview = useCallback((writtenMidi: number, autoStopMs?: number) => {
+    const concertMidi = Math.round(
+      writtenMidiToConcertMidi(writtenMidi, instrument.transposition),
+    )
+    const previousConcertMidi = previewConcertMidiRef.current
+    previewConcertMidiRef.current = concertMidi
+    pitchToneActiveRef.current = true
+
+    if (previewStopTimerRef.current !== null) {
+      window.clearTimeout(previewStopTimerRef.current)
+      previewStopTimerRef.current = null
+    }
+    if (autoStopMs !== undefined) {
+      previewStopTimerRef.current = window.setTimeout(stopPitchPreview, autoStopMs)
+    }
+    suppressUntilRef.current = performance.now() + (autoStopMs ?? 60_000) + 380
+
+    const pitchClass = ((concertMidi % 12) + 12) % 12
+    const octave = Math.floor(concertMidi / 12) - 1
+    const activeTone = pitchToneRef.current
+    if (activeTone) {
+      if (previousConcertMidi !== concertMidi) {
+        void activeTone.setPitch(pitchClass, octave)
+      }
+      return
+    }
+
+    if (pitchToneStartRef.current) return
+    const pendingTone = startBalanceTone(concertMidi, 1)
+    pitchToneStartRef.current = pendingTone
+    void pendingTone
+      .then((tone) => {
+        if (pitchToneStartRef.current === pendingTone) pitchToneStartRef.current = null
+        if (!pitchToneActiveRef.current) {
+          void tone.stop()
+          return
+        }
+        pitchToneRef.current = tone
+        const desiredMidi = previewConcertMidiRef.current
+        if (desiredMidi !== null && desiredMidi !== concertMidi) {
+          const desiredPitchClass = ((desiredMidi % 12) + 12) % 12
+          const desiredOctave = Math.floor(desiredMidi / 12) - 1
+          void tone.setPitch(desiredPitchClass, desiredOctave)
+        }
+      })
+      .catch(() => {
+        if (pitchToneStartRef.current === pendingTone) pitchToneStartRef.current = null
+      })
+  }, [instrument.transposition, stopPitchPreview, suppressUntilRef])
+
+  useEffect(() => stopPitchPreview, [stopPitchPreview])
+
+  const setTargetMidi = (midi: number): number => {
+    const clamped = Math.max(targetMin, Math.min(targetMax, Math.round(midi)))
+    if (clamped === targetMidi) return clamped
+    if (settings.routineType === 'scale') {
+      onUpdate({ scale: { ...settings.scale, rootWrittenMidi: clamped } })
+    } else {
+      onUpdate({ single: { ...settings.single, writtenMidi: clamped } })
+    }
+    return clamped
+  }
+
+  const previewVisualRef = useRef({
+    cents: 0,
+    progress: 0,
+    speed: 0,
+    balancedMs: 0,
+    confidentMs: 0,
+    pitchPresent: false,
+  })
+  const [previewHeldMs, setPreviewHeldMs] = useState(0)
+  const previewHeldMsRef = useRef(0)
+  const previewInputRef = useRef({ readout, previewTarget, tolerance, goalMs: 1 })
+  const fixedGoalMs = settings.goalSeconds * 1000
+  const previewGoalMs = settings.goalMode === 'personalBest'
+    ? Math.max(fixedGoalMs, bestBalancedMs || fixedGoalMs)
+    : fixedGoalMs
+  previewInputRef.current = { readout, previewTarget, tolerance, goalMs: previewGoalMs }
+
+  useEffect(() => {
+    previewHeldMsRef.current = 0
+    setPreviewHeldMs(0)
+    previewVisualRef.current = {
+      cents: 0,
+      progress: 0,
+      speed: 0,
+      balancedMs: 0,
+      confidentMs: 0,
+      pitchPresent: false,
+    }
+  }, [previewTarget?.id])
+
+  useEffect(() => {
+    let lastAt = performance.now()
+    const timer = window.setInterval(() => {
+      const now = performance.now()
+      const elapsed = Math.min(160, Math.max(0, now - lastAt))
+      lastAt = now
+      const input = previewInputRef.current
+      const pitchPresent = input.readout.noteName !== '—' && input.readout.frequencyHz > 0
+      const cents = input.previewTarget
+        ? centsFromConcertTarget(
+            input.readout.midi,
+            input.readout.cents,
+            input.previewTarget.concertMidi,
+          )
+        : 0
+      const targetPitchPresent = pitchPresent && Math.abs(cents) < 50
+      const inWindow = targetPitchPresent && Math.abs(cents) <= input.tolerance
+      const nextHeldMs = inWindow
+        ? Math.min(input.goalMs, previewHeldMsRef.current + elapsed)
+        : Math.max(0, previewHeldMsRef.current - elapsed * (targetPitchPresent ? 0.35 : 0.18))
+
+      previewHeldMsRef.current = nextHeldMs
+      previewVisualRef.current.cents = cents
+      previewVisualRef.current.progress = Math.min(1, nextHeldMs / Math.max(1, input.goalMs))
+      previewVisualRef.current.speed = targetPitchPresent
+        ? movementSpeedForCents(cents, input.tolerance)
+        : 0
+      previewVisualRef.current.balancedMs = nextHeldMs
+      previewVisualRef.current.confidentMs = nextHeldMs
+      previewVisualRef.current.pitchPresent = targetPitchPresent
+
+      const displayMs = Math.round(nextHeldMs / 100) * 100
+      setPreviewHeldMs((current) => current === displayMs ? current : displayMs)
+    }, 80)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const previewCents = previewTarget && hasPitch
+    ? centsFromConcertTarget(readout.midi, readout.cents, previewTarget.concertMidi)
+    : null
+  const previewInTune = previewCents !== null && Math.abs(previewCents) <= tolerance
+  const targetLabel = previewTarget?.writtenLabel ?? midiToBalanceNoteName(targetMidi)
+  const goalLabel = settings.goalMode === 'personalBest' ? 'Beat best' : `${settings.goalSeconds} sec`
+  const goalIndex = Math.max(0, GOAL_OPTIONS.indexOf(settings.goalSeconds))
+  const pitchRatio = targetMax > targetMin ? (targetMidi - targetMin) / (targetMax - targetMin) : 0.5
+  const toleranceRatio = (tolerance - 3) / 27
+  const routineLabel = settings.routineType === 'custom'
+    ? selectedCustom?.name ?? 'Choose a custom routine'
+    : routineSummary(settings, customRoutines)
+
+  const updatePitchFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!targetCanChange) return
+    const ratio = pointerRatio(event, 'vertical')
+    const nextMidi = setTargetMidi(targetMin + ratio * (targetMax - targetMin))
+    playPitchPreview(nextMidi)
+  }
+
+  const updateToleranceFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const ratio = pointerRatio(event, 'horizontal')
+    onUpdate({
+      tolerancePreset: 'custom',
+      customToleranceCents: Math.round(3 + ratio * 27),
+    })
+  }
+
+  const handlePitchKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!targetCanChange) return
+    if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
+      event.preventDefault()
+      playPitchPreview(setTargetMidi(targetMidi + 1), 720)
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
+      event.preventDefault()
+      playPitchPreview(setTargetMidi(targetMidi - 1), 720)
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      playPitchPreview(setTargetMidi(targetMin), 720)
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      playPitchPreview(setTargetMidi(targetMax), 720)
+    }
+  }
+
+  const handleToleranceKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const delta = event.key === 'ArrowRight' || event.key === 'ArrowUp'
+      ? 1
+      : event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+        ? -1
+        : 0
+    if (delta === 0) return
+    event.preventDefault()
+    onUpdate({
+      tolerancePreset: 'custom',
+      customToleranceCents: Math.max(3, Math.min(30, tolerance + delta)),
+    })
+  }
 
   return (
     <div className="balance-screen balance-screen--setup">
@@ -167,60 +369,150 @@ export default function BalanceSetup({
       </header>
 
       <section className="balance-setup-preview">
-        <div className="balance-setup-preview__scene" aria-hidden>
-          <span className="balance-preview-cloud" />
-          <span className="balance-preview-platform" />
-          <span className="balance-preview-rope" />
-          {selectedCharacter.asset ? (
-            <img
-              className="balance-preview-character"
-              src={selectedCharacter.asset}
-              alt=""
-              draggable={false}
-              style={{ transform: `translateX(-50%) scale(${selectedCharacter.scale})` }}
-            />
+        <div className="balance-setup-preview__scene">
+          {/* The real game renderer, held at its idle frame — the setup screen
+              and the run you are about to play are the same world at the same
+              angle, not a flat drawing of it. */}
+          <BalanceScene
+            phase="setup"
+            target={previewTarget}
+            visualRef={previewVisualRef}
+            characterId={settings.characterId}
+            toleranceCents={tolerance}
+          />
+
+          {targetCanChange ? (
+            <div
+              className="balance-preview-pitch-control"
+              role="slider"
+              tabIndex={0}
+              aria-label="Target pitch"
+              aria-orientation="vertical"
+              aria-valuemin={targetMin}
+              aria-valuemax={targetMax}
+              aria-valuenow={targetMidi}
+              aria-valuetext={targetLabel}
+              onKeyDown={handlePitchKey}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId)
+                updatePitchFromPointer(event)
+              }}
+              onPointerMove={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  updatePitchFromPointer(event)
+                }
+              }}
+              onPointerUp={(event) => {
+                event.currentTarget.releasePointerCapture(event.pointerId)
+                stopPitchPreview()
+              }}
+              onPointerCancel={stopPitchPreview}
+            >
+              <small>Drag pitch</small>
+              <span className="balance-preview-pitch-control__rail" aria-hidden />
+              <output
+                className="balance-preview-pitch-control__thumb"
+                style={{ top: `${(1 - pitchRatio) * 100}%` }}
+              >{targetLabel}</output>
+            </div>
           ) : (
-            <span className="balance-preview-person"><i /><b /></span>
+            <Pressable
+              intensity="soft"
+              hapticFeedback={hapticFeedback}
+              className="balance-preview-edit-routine"
+              onClick={() => setOpenSection('routine')}
+            >Edit routine</Pressable>
           )}
-          <span className="balance-preview-note">{previewTarget?.writtenLabel ?? 'C5'}</span>
+
+          <div
+            className="balance-preview-rope-control"
+            role="slider"
+            tabIndex={0}
+            aria-label="Rope width and pitch tolerance"
+            aria-valuemin={3}
+            aria-valuemax={30}
+            aria-valuenow={tolerance}
+            aria-valuetext={`plus or minus ${tolerance} cents`}
+            style={{
+              ['--balance-rope-control-width' as string]: `${1.5 + toleranceRatio * 3}rem`,
+            }}
+            onKeyDown={handleToleranceKey}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId)
+              updateToleranceFromPointer(event)
+            }}
+            onPointerMove={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                updateToleranceFromPointer(event)
+              }
+            }}
+            onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+          >
+            <output>Drag rope · ±{tolerance}¢</output>
+            <span aria-hidden><i /><b /><i /></span>
+          </div>
         </div>
-        <h2>Stay centered to keep moving.</h2>
-        <p>{previewTarget ? `Written ${previewTarget.writtenLabel} · Concert ${previewTarget.concertLabel}` : 'Choose a routine to preview its first note.'}</p>
+        <div className="balance-preview-summary">
+          <span>
+            <small>{previewInTune ? 'In tune' : 'Live setup'}</small>
+            <strong>{routineLabel}</strong>
+          </span>
+          <div className="balance-preview-goal-control">
+            <span><small>Hold</small><output>{goalLabel}</output></span>
+            <input
+              type="range"
+              min={0}
+              max={GOAL_OPTIONS.length - 1}
+              step={1}
+              value={goalIndex}
+              disabled={settings.goalMode === 'personalBest'}
+              aria-label="Hold goal per note"
+              onChange={(event) => onUpdate({
+                goalMode: 'fixed',
+                goalSeconds: GOAL_OPTIONS[Number(event.target.value)] ?? 10,
+              })}
+            />
+            <button
+              type="button"
+              className={settings.goalMode === 'personalBest' ? 'is-active' : ''}
+              aria-pressed={settings.goalMode === 'personalBest'}
+              onClick={() => onUpdate({
+                goalMode: settings.goalMode === 'personalBest' ? 'fixed' : 'personalBest',
+              })}
+            >Best</button>
+          </div>
+          <p className={previewInTune ? 'is-growing' : ''} aria-live="polite">
+            {previewInTune
+              ? `Growing · ${(previewHeldMs / 1000).toFixed(1)}s`
+              : `Play ${targetLabel} to grow the rope`}
+          </p>
+        </div>
       </section>
 
-      <div className="balance-start">
-        <Pressable
-          haptic="medium"
-          hapticFeedback={hapticFeedback}
-          className="balance-primary-button"
-          onClick={() => {
-            onRequestMic()
-            onStart()
-          }}
-          disabled={settings.routineType === 'custom' && !selectedCustom}
-        ><Play aria-hidden /> Start</Pressable>
-        <Pressable
-          intensity="soft"
-          hapticFeedback={hapticFeedback}
-          onClick={onRequestMic}
-          className={`balance-mic-check ${hasPitch ? 'is-live' : ''} ${permissionBlocked ? 'is-error' : ''}`}
-        >
-          <Mic aria-hidden />
-          <span>{micLabel}<small>Nothing is recorded or stored.</small></span>
-          <strong>{hasPitch ? `${readout.noteName} ${Math.round(readout.cents) >= 0 ? '+' : ''}${Math.round(readout.cents)}¢` : '—'}</strong>
-        </Pressable>
-      </div>
-
-      <SetupGroup
-        id="rewards"
-        open={openSection === 'rewards'}
-        title="Trophies & Characters"
-        summary={`${earnedTrophyCount}/${BALANCE_TROPHIES.length} trophies earned`}
-        hapticFeedback={hapticFeedback}
-        onToggle={(id) => setOpenSection(openSection === id ? null : id)}
-      >
-        <BalanceTrophyCase trophies={progression.trophies} />
-      </SetupGroup>
+      <div className="balance-setup-sheet">
+        <div className="balance-start">
+          <Pressable
+            haptic="medium"
+            hapticFeedback={hapticFeedback}
+            className="balance-primary-button"
+            onClick={() => {
+              stopPitchPreview()
+              onRequestMic()
+              onStart()
+            }}
+            disabled={settings.routineType === 'custom' && !selectedCustom}
+          ><Play aria-hidden /> Start</Pressable>
+          <Pressable
+            intensity="soft"
+            hapticFeedback={hapticFeedback}
+            onClick={onRequestMic}
+            className={`balance-mic-check ${hasPitch ? 'is-live' : ''} ${permissionBlocked ? 'is-error' : ''}`}
+          >
+            <Mic aria-hidden />
+            <span>{micLabel}<small>Nothing is recorded or stored.</small></span>
+            <strong>{hasPitch ? `${readout.noteName} ${Math.round(readout.cents) >= 0 ? '+' : ''}${Math.round(readout.cents)}¢` : '—'}</strong>
+          </Pressable>
+        </div>
 
       <SetupGroup
         id="routine"
@@ -245,23 +537,15 @@ export default function BalanceSetup({
         </div>
 
         {settings.routineType === 'single' && (
-          <>
-            <label className="balance-setting-row" htmlFor="balance-single-note"><span>Target written note</span>
-              <NoteSelect id="balance-single-note" value={settings.single.writtenMidi} min={instrument.minWrittenMidi} max={instrument.maxWrittenMidi} onChange={(writtenMidi) => onUpdate({ single: { ...settings.single, writtenMidi } })} />
-            </label>
-            <label className="balance-setting-row" htmlFor="balance-repetitions"><span>Repetitions</span>
-              <select id="balance-repetitions" value={settings.single.repetitions} onChange={(event) => onUpdate({ single: { ...settings.single, repetitions: Number(event.target.value) } })}>
-                {[1, 2, 3, 4, 5, 6, 8, 10].map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </label>
-          </>
+          <label className="balance-setting-row" htmlFor="balance-repetitions"><span>Repetitions</span>
+            <select id="balance-repetitions" value={settings.single.repetitions} onChange={(event) => onUpdate({ single: { ...settings.single, repetitions: Number(event.target.value) } })}>
+              {[1, 2, 3, 4, 5, 6, 8, 10].map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
         )}
 
         {settings.routineType === 'scale' && (
           <>
-            <label className="balance-setting-row" htmlFor="balance-scale-root"><span>Root written note</span>
-              <NoteSelect id="balance-scale-root" value={Math.min(settings.scale.rootWrittenMidi, maxScaleRoot)} min={instrument.minWrittenMidi} max={maxScaleRoot} onChange={(rootWrittenMidi) => onUpdate({ scale: { ...settings.scale, rootWrittenMidi } })} />
-            </label>
             <label className="balance-setting-row" htmlFor="balance-scale-type"><span>Scale type</span>
               <select id="balance-scale-type" value={settings.scale.scaleType} onChange={(event) => onUpdate({ scale: { ...settings.scale, scaleType: event.target.value as BalanceScaleType } })}>
                 {(Object.keys(BALANCE_SCALE_TYPE_LABELS) as BalanceScaleType[]).map((type) => <option key={type} value={type}>{BALANCE_SCALE_TYPE_LABELS[type]}</option>)}
@@ -337,105 +621,10 @@ export default function BalanceSetup({
           <span>Written range<strong>{midiToBalanceNoteName(instrument.minWrittenMidi)}–{midiToBalanceNoteName(instrument.maxWrittenMidi)}</strong></span>
           <span>Current target<strong>{previewTarget ? `Written ${previewTarget.writtenLabel} · Concert ${previewTarget.concertLabel}` : '—'}</strong></span>
         </div>
-        <div className="balance-character-picker" role="radiogroup" aria-label="Character">
-          <p>Character</p>
-          <div className="balance-character-picker__grid">
-            {BALANCE_CHARACTERS.map((character) => {
-              const unlocked = isBalanceCharacterUnlocked(
-                character.id,
-                progression.unlockedCharacterIds,
-              )
-              const requiredTrophy = trophyForCharacter(character.id)
-              return (
-                <Pressable
-                  key={character.id}
-                  type="button"
-                  intensity="soft"
-                  hapticFeedback={hapticFeedback}
-                  className={`balance-character-option ${settings.characterId === character.id ? 'is-selected' : ''} ${unlocked ? '' : 'is-locked'}`}
-                  role="radio"
-                  aria-checked={settings.characterId === character.id}
-                  aria-label={
-                    unlocked
-                      ? `Choose ${character.name}`
-                      : `${character.name} locked. Earn ${requiredTrophy?.title ?? 'a trophy'} to unlock.`
-                  }
-                  disabled={!unlocked}
-                  onClick={() => onUpdate({ characterId: character.id })}
-                >
-                  <span className="balance-character-option__preview" aria-hidden>
-                    {character.asset ? (
-                      <img
-                        src={character.asset}
-                        alt=""
-                        draggable={false}
-                        style={{ transform: `scale(${character.scale})` }}
-                      />
-                    ) : (
-                      <span className="balance-character-option__balancer"><i /><b /></span>
-                    )}
-                    {!unlocked && <LockKeyhole className="balance-character-option__lock" />}
-                  </span>
-                  <span>{character.name}</span>
-                  {!unlocked && <small>{requiredTrophy?.title}</small>}
-                </Pressable>
-              )
-            })}
-          </div>
-        </div>
       </SetupGroup>
 
-      <SetupGroup
-        id="goal"
-        open={openSection === 'goal'}
-        title="Goal & Precision"
-        summary={`${goalLabel} · ${settings.tolerancePreset === 'custom' ? 'Custom' : settings.tolerancePreset[0]?.toUpperCase() + settings.tolerancePreset.slice(1)} ±${tolerance}¢`}
-        hapticFeedback={hapticFeedback}
-        onToggle={(id) => setOpenSection(openSection === id ? null : id)}
-      >
-        <label className="balance-setting-row" htmlFor="balance-goal-mode"><span>Goal mode</span>
-          <select id="balance-goal-mode" value={settings.goalMode} onChange={(event) => onUpdate({ goalMode: event.target.value as BalanceSettings['goalMode'] })}>
-            <option value="fixed">Fixed duration</option><option value="personalBest">Personal Best</option>
-          </select>
-        </label>
-        {settings.goalMode === 'fixed' && (
-          <label className="balance-setting-row" htmlFor="balance-duration"><span>Duration per note</span>
-            <select id="balance-duration" value={settings.goalSeconds} onChange={(event) => onUpdate({ goalSeconds: Number(event.target.value) as BalanceSettings['goalSeconds'] })}>
-              {[5, 8, 10, 15].map((value) => <option key={value} value={value}>{value} seconds</option>)}
-            </select>
-          </label>
-        )}
-        <label className="balance-setting-row" htmlFor="balance-tolerance"><span>Pitch tolerance</span>
-          <select id="balance-tolerance" value={settings.tolerancePreset} onChange={(event) => onUpdate({ tolerancePreset: event.target.value as BalanceTolerancePreset })}>
-            <option value="beginner">Beginner ±15¢</option><option value="standard">Standard ±10¢</option><option value="precision">Precision ±5¢</option><option value="custom">Custom</option>
-          </select>
-        </label>
-        {settings.tolerancePreset === 'custom' && (
-          <label className="balance-range-row" htmlFor="balance-custom-tolerance"><span>Custom tolerance <strong>±{settings.customToleranceCents}¢</strong></span>
-            <input id="balance-custom-tolerance" type="range" min={3} max={30} value={settings.customToleranceCents} onChange={(event) => onUpdate({ customToleranceCents: Number(event.target.value) })} />
-          </label>
-        )}
-      </SetupGroup>
 
-      <SetupGroup
-        id="sound"
-        open={openSection === 'sound'}
-        title="Sound & Rest"
-        summary={`${settings.soundRest.referencePitch ? 'Reference on' : 'Reference off'} · Rest ${restLabel}`}
-        hapticFeedback={hapticFeedback}
-        onToggle={(id) => setOpenSection(openSection === id ? null : id)}
-      >
-        <label className="balance-switch-row"><span>Reference pitch before each note</span><IOSSwitch checked={settings.soundRest.referencePitch} onChange={(referencePitch) => updateSound({ referencePitch })} ariaLabel="Reference pitch before each note" hapticFeedback={hapticFeedback} /></label>
-        <label className="balance-switch-row"><span>Continuous drone</span><IOSSwitch checked={settings.soundRest.continuousDrone} onChange={(continuousDrone) => updateSound({ continuousDrone })} ariaLabel="Continuous drone" hapticFeedback={hapticFeedback} /></label>
-        <label className="balance-range-row" htmlFor="balance-volume"><span>Reference/drone volume <strong>{Math.round(settings.soundRest.volume * 100)}%</strong></span><input id="balance-volume" type="range" min={10} max={100} value={settings.soundRest.volume * 100} onChange={(event) => updateSound({ volume: Number(event.target.value) / 100 })} /></label>
-        <label className="balance-switch-row"><span>Count-in</span><IOSSwitch checked={settings.soundRest.countIn} onChange={(countIn) => updateSound({ countIn })} ariaLabel="Count in" hapticFeedback={hapticFeedback} /></label>
-        <label className="balance-setting-row" htmlFor="balance-rest"><span>Rest between notes</span>
-          <select id="balance-rest" value={String(settings.soundRest.restDuration)} onChange={(event) => updateSound({ restDuration: event.target.value === 'matchGoal' || event.target.value === 'manual' ? event.target.value : Number(event.target.value) as 5 | 10 })}>
-            <option value="matchGoal">Match goal duration</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="manual">Manual</option>
-          </select>
-        </label>
-        <label className="balance-switch-row"><span>Auto-advance after rest</span><IOSSwitch checked={settings.soundRest.autoAdvance} onChange={(autoAdvance) => updateSound({ autoAdvance })} ariaLabel="Auto advance after rest" hapticFeedback={hapticFeedback} /></label>
-      </SetupGroup>
+      </div>
     </div>
   )
 }

@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { Pause, Play, RotateCcw, X } from 'lucide-react'
+import { Check, ImagePlus, Pause, Play, Plus, RotateCcw, Trash2, Video, X, ZoomIn, ZoomOut } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
-import type { PerformancePanelState } from '../types'
+import type { PerformancePanelState, SheetMusicPanelState } from '../types'
 import type { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { extractNativeWaveformPeaks } from '../../utils/nativeWaveform'
 import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
+import { hasSectionWindow } from '../layout/sectionVisibility'
+import { sheetCueWindows } from '../sheetMusic/sheetMusicTimeline'
 
 type SyncApi = ReturnType<typeof useMultitrackSync>
 
-/** Pixels per second of timeline — the single knob controlling zoom. */
-const PX_PER_SEC = 70
+/** Timeline zoom steps in pixels per second. */
+const ZOOM_STEPS = [24, 40, 70, 120]
+const DEFAULT_ZOOM_INDEX = 1
 /** Left padding so a clip can be dragged to start before timeline zero (negative offset). */
-const TIMELINE_ORIGIN_PX = 220
+const TIMELINE_ORIGIN_PX = 96
 const MIN_CLIP_SEC = 0.2
 
 export interface AlignClipState {
@@ -25,26 +28,38 @@ export interface AlignClipState {
   offsetMs: number
   trimStart: number
   trimEnd: number | undefined
+  /** True while this box is scoped to its own clip instead of the whole song. */
+  windowed: boolean
 }
 
 interface MultitrackAlignStageProps {
   isOpen: boolean
   panels: PerformancePanelState[]
+  sheetMusic: SheetMusicPanelState
   bpm: number
   sync: SyncApi
+  /** Blocks edits while a render or recording owns the transport. */
+  busy?: boolean
   onClose: () => void
   onPreviewToggle: () => void
+  /** Claim a new box and start recording over the mix at this second. */
+  onAddBox: (atSec: number) => void
+  /** Record into an existing empty box, starting at this second. */
+  onRecordBox: (panelId: string, atSec: number) => void
+  onAddImage: (atSec: number) => void
+  onMoveImage: (cueId: string, startSec: number) => void
+  onRemoveImage: (cueId: string) => void
+  onSectionChange: (panelId: string, startSec: number | undefined, endSec: number | undefined) => void
   onDone: (
     changes: Array<{ panelId: string; takeId: string; offsetMs: number; trimStart: number; trimEnd: number | undefined }>,
   ) => Promise<void>
 }
 
-function secToPx(sec: number): number {
-  return TIMELINE_ORIGIN_PX + sec * PX_PER_SEC
-}
-
-function pxToSec(px: number): number {
-  return px / PX_PER_SEC
+function formatClock(seconds: number): string {
+  const total = Math.max(0, seconds)
+  const mins = Math.floor(total / 60)
+  const secs = Math.floor(total % 60)
+  return `${mins}:${String(secs).padStart(2, '0')}`
 }
 
 /** Waveform bars for one clip's KEPT (trimmed) region only, scaled to fill the block. */
@@ -117,11 +132,13 @@ function ClipWaveform({
 
 function ClipTrack({
   clip,
+  pxPerSec,
   onChange,
   selected,
   onSelect,
 }: {
   clip: AlignClipState
+  pxPerSec: number
   onChange: (next: Partial<Pick<AlignClipState, 'offsetMs' | 'trimStart' | 'trimEnd'>>) => void
   selected: boolean
   onSelect: () => void
@@ -138,8 +155,8 @@ function ClipTrack({
   const trimEndValue = clip.trimEnd ?? duration
   const clipStartSec = -clip.offsetMs / 1000
   const clipDurationSec = Math.max(MIN_CLIP_SEC, trimEndValue - clip.trimStart)
-  const leftPx = secToPx(clipStartSec)
-  const widthPx = Math.max(24, clipDurationSec * PX_PER_SEC)
+  const leftPx = TIMELINE_ORIGIN_PX + clipStartSec * pxPerSec
+  const widthPx = Math.max(24, clipDurationSec * pxPerSec)
 
   const beginDrag = (mode: 'move' | 'trim-start' | 'trim-end') => (event: ReactPointerEvent) => {
     event.stopPropagation()
@@ -157,8 +174,7 @@ function ClipTrack({
   const onPointerMove = (event: ReactPointerEvent) => {
     const drag = dragRef.current
     if (!drag) return
-    const deltaPx = event.clientX - drag.startX
-    const deltaSec = pxToSec(deltaPx)
+    const deltaSec = (event.clientX - drag.startX) / pxPerSec
 
     if (drag.mode === 'move') {
       onChange({ offsetMs: Math.round(drag.startOffsetMs - deltaSec * 1000) })
@@ -193,41 +209,38 @@ function ClipTrack({
   }
 
   return (
-    <div className={`multitrack-align-stage__track ${selected ? 'is-selected' : ''}`} onPointerDown={onSelect}>
-      <div className="multitrack-align-stage__track-label">{clip.label}</div>
-      <div className="multitrack-align-stage__track-lane">
-        <div
-          className="multitrack-align-stage__clip"
-          style={{ left: leftPx, width: widthPx }}
-          onPointerDown={beginDrag('move')}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-        >
-          <ClipWaveform
-            filePath={clip.filePath}
-            videoUrl={clip.videoUrl}
-            duration={duration}
-            trimStart={clip.trimStart}
-            trimEndValue={trimEndValue}
-            widthPx={widthPx}
-          />
-          <div
-            className="multitrack-align-stage__handle multitrack-align-stage__handle--left"
-            onPointerDown={beginDrag('trim-start')}
-            onPointerMove={onPointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-          />
-          <div
-            className="multitrack-align-stage__handle multitrack-align-stage__handle--right"
-            onPointerDown={beginDrag('trim-end')}
-            onPointerMove={onPointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-          />
-        </div>
-      </div>
+    <div
+      className="multitrack-align-stage__clip"
+      style={{ left: leftPx, width: widthPx }}
+      onPointerDown={beginDrag('move')}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      data-selected={selected ? 'true' : 'false'}
+    >
+      <ClipWaveform
+        filePath={clip.filePath}
+        videoUrl={clip.videoUrl}
+        duration={duration}
+        trimStart={clip.trimStart}
+        trimEndValue={trimEndValue}
+        widthPx={widthPx}
+      />
+      <span className="multitrack-align-stage__clip-name">{clip.label}</span>
+      <div
+        className="multitrack-align-stage__handle multitrack-align-stage__handle--left"
+        onPointerDown={beginDrag('trim-start')}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      />
+      <div
+        className="multitrack-align-stage__handle multitrack-align-stage__handle--right"
+        onPointerDown={beginDrag('trim-end')}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      />
     </div>
   )
 }
@@ -235,23 +248,48 @@ function ClipTrack({
 export default function MultitrackAlignStage({
   isOpen,
   panels,
+  sheetMusic,
   bpm,
   sync,
+  busy = false,
   onClose,
   onPreviewToggle,
+  onAddBox,
+  onRecordBox,
+  onAddImage,
+  onMoveImage,
+  onRemoveImage,
+  onSectionChange,
   onDone,
 }: MultitrackAlignStageProps) {
   const [clips, setClips] = useState<Record<string, AlignClipState>>({})
+  /** Mirror of `clips` so drag handlers can read and write without a stale closure. */
+  const clipsRef = useRef<Record<string, AlignClipState>>({})
   const initialClipsRef = useRef<Record<string, AlignClipState>>({})
+  /** Section windows as they were when the editor opened, for Cancel. */
+  const initialSectionsRef = useRef<Record<string, [number | undefined, number | undefined]>>({})
   const dirtyRef = useRef<Set<string>>(new Set())
+
+  const commitClips = useCallback((next: Record<string, AlignClipState>) => {
+    clipsRef.current = next
+    setClips(next)
+  }, [])
   const [saving, setSaving] = useState(false)
-  const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
+  const [selection, setSelection] = useState<{ kind: 'clip' | 'image'; id: string } | null>(null)
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const pxPerSec = ZOOM_STEPS[zoomIndex]
+
+  const secToPx = useCallback((sec: number) => TIMELINE_ORIGIN_PX + sec * pxPerSec, [pxPerSec])
 
   useEffect(() => {
     if (!isOpen) return
     const next: Record<string, AlignClipState> = {}
+    const sections: Record<string, [number | undefined, number | undefined]> = {}
     for (const panel of panels) {
-      if (panel.kind !== 'performance' || !panel.take) continue
+      if (panel.kind !== 'performance') continue
+      sections[panel.id] = [panel.sectionStartSec, panel.sectionEndSec]
+      if (!panel.take) continue
       next[panel.id] = {
         panelId: panel.id,
         takeId: panel.take.id,
@@ -262,52 +300,128 @@ export default function MultitrackAlignStage({
         offsetMs: timelineOffsetMsForTake(panel.take, bpm),
         trimStart: panel.trimStartSec ?? 0,
         trimEnd: panel.trimEndSec,
+        windowed: hasSectionWindow(panel),
       }
     }
-    setClips(next)
+    commitClips(next)
     initialClipsRef.current = next
+    initialSectionsRef.current = sections
     dirtyRef.current = new Set()
-    setSelectedPanelId(Object.keys(next)[0] ?? null)
+    setSelection(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
-  const clipList = useMemo(() => Object.values(clips), [clips])
+  // Boxes recorded while the editor is open (the "+" flow) arrive as new takes —
+  // fold them in without disturbing clips the user is already dragging.
+  useEffect(() => {
+    if (!isOpen) return
+    let changed = false
+    const next = { ...clipsRef.current }
+    for (const panel of panels) {
+      if (panel.kind !== 'performance') continue
+      if (!panel.take) {
+        if (next[panel.id]) {
+          delete next[panel.id]
+          changed = true
+        }
+        continue
+      }
+      if (next[panel.id]?.takeId === panel.take.id) continue
+      next[panel.id] = {
+        panelId: panel.id,
+        takeId: panel.take.id,
+        label: panel.take.name || 'Performance',
+        filePath: panel.take.filePath,
+        videoUrl: panel.take.videoUrl,
+        duration: sync.getPanelMediaDuration(panel.id) || panel.take.duration || 0,
+        offsetMs: timelineOffsetMsForTake(panel.take, bpm),
+        trimStart: panel.trimStartSec ?? 0,
+        trimEnd: panel.trimEndSec,
+        windowed: hasSectionWindow(panel),
+      }
+      changed = true
+    }
+    if (changed) commitClips(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, panels])
+
+  const performancePanels = useMemo(
+    () => panels.filter((panel): panel is PerformancePanelState => panel.kind === 'performance'),
+    [panels],
+  )
+
+  const imageWindows = useMemo(() => sheetCueWindows(sheetMusic), [sheetMusic])
 
   const maxDurationSec = useMemo(() => {
-    let max = 8
-    for (const clip of clipList) {
+    let max = Math.max(8, sync.state.duration)
+    for (const clip of Object.values(clips)) {
       const trimEndValue = clip.trimEnd ?? (clip.duration > 0 ? clip.duration : 60)
       const end = -clip.offsetMs / 1000 + Math.max(MIN_CLIP_SEC, trimEndValue - clip.trimStart)
       max = Math.max(max, end)
     }
+    for (const window of imageWindows) max = Math.max(max, window.startSec + 2)
     return max
-  }, [clipList])
+  }, [clips, imageWindows, sync.state.duration])
 
-  const timelineWidth = secToPx(maxDurationSec) + 120
+  const timelineWidth = secToPx(maxDurationSec) + 160
+
+  const clipTimelineWindow = useCallback((clip: AlignClipState) => {
+    const trimEndValue = clip.trimEnd ?? (clip.duration > 0 ? clip.duration : 60)
+    const start = -clip.offsetMs / 1000
+    return { start, end: start + Math.max(MIN_CLIP_SEC, trimEndValue - clip.trimStart) }
+  }, [])
 
   const updateClip = useCallback(
     (panelId: string, patch: Partial<Pick<AlignClipState, 'offsetMs' | 'trimStart' | 'trimEnd'>>) => {
+      const current = clipsRef.current[panelId]
+      if (!current) return
       dirtyRef.current.add(panelId)
-      setClips((prev) => {
-        const current = prev[panelId]
-        if (!current) return prev
-        const nextClip = { ...current, ...patch }
-        sync.setPanelOffset(panelId, nextClip.offsetMs)
-        sync.setPanelTrim(panelId, nextClip.trimStart, nextClip.trimEnd ?? null)
-        return { ...prev, [panelId]: nextClip }
-      })
+      const nextClip = { ...current, ...patch }
+      sync.setPanelOffset(panelId, nextClip.offsetMs)
+      sync.setPanelTrim(panelId, nextClip.trimStart, nextClip.trimEnd ?? null)
+      commitClips({ ...clipsRef.current, [panelId]: nextClip })
+      // A windowed box is on screen exactly while its own clip plays, so
+      // dragging the clip drags the box's appearance with it.
+      if (nextClip.windowed) {
+        const window = clipTimelineWindow(nextClip)
+        onSectionChange(panelId, Math.max(0, window.start), window.end)
+      }
     },
-    [sync],
+    [clipTimelineWindow, commitClips, onSectionChange, sync],
   )
 
-  const handleReset = (panelId: string) => {
-    updateClip(panelId, { offsetMs: 0, trimStart: 0, trimEnd: undefined })
-  }
+  const toggleWindowed = useCallback(
+    (panelId: string) => {
+      const current = clipsRef.current[panelId]
+      if (!current) return
+      const windowed = !current.windowed
+      commitClips({ ...clipsRef.current, [panelId]: { ...current, windowed } })
+      if (windowed) {
+        const window = clipTimelineWindow(current)
+        onSectionChange(panelId, Math.max(0, window.start), window.end)
+      } else {
+        onSectionChange(panelId, undefined, undefined)
+      }
+    },
+    [clipTimelineWindow, commitClips, onSectionChange],
+  )
+
+  const handleReset = useCallback(
+    (panelId: string) => {
+      updateClip(panelId, { offsetMs: 0, trimStart: 0, trimEnd: undefined })
+    },
+    [updateClip],
+  )
 
   const handleCancel = () => {
     for (const clip of Object.values(initialClipsRef.current)) {
       sync.setPanelOffset(clip.panelId, clip.offsetMs)
       sync.setPanelTrim(clip.panelId, clip.trimStart, clip.trimEnd ?? null)
+    }
+    // Window toggles are written straight to the session as you make them, so
+    // discarding has to put them back too.
+    for (const [panelId, [startSec, endSec]] of Object.entries(initialSectionsRef.current)) {
+      onSectionChange(panelId, startSec, endSec)
     }
     onClose()
   }
@@ -332,21 +446,132 @@ export default function MultitrackAlignStage({
     }
   }
 
+  // ── Scrubbing ────────────────────────────────────────────────────────────
+  const seekFromClientX = useCallback(
+    (clientX: number) => {
+      const scroll = scrollRef.current
+      if (!scroll) return
+      const rect = scroll.getBoundingClientRect()
+      const px = clientX - rect.left + scroll.scrollLeft - TIMELINE_ORIGIN_PX
+      sync.seek(Math.max(0, px / pxPerSec))
+    },
+    [pxPerSec, sync],
+  )
+
+  const rulerDragRef = useRef(false)
+  const onRulerDown = (event: ReactPointerEvent) => {
+    rulerDragRef.current = true
+    ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+    seekFromClientX(event.clientX)
+  }
+  const onRulerMove = (event: ReactPointerEvent) => {
+    if (rulerDragRef.current) seekFromClientX(event.clientX)
+  }
+  const onRulerUp = (event: ReactPointerEvent) => {
+    rulerDragRef.current = false
+    try {
+      ;(event.currentTarget as Element).releasePointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Keep the playhead on screen while the mix rolls, the way a video editor
+  // does. Only re-centre once it actually leaves the comfortable middle band —
+  // chasing it every tick would restart the scroll animation continuously.
   const playheadPx = secToPx(sync.state.currentTime)
-  const selectedClip = selectedPanelId ? clips[selectedPanelId] : undefined
-  const selectedTrimEnd = selectedClip
-    ? selectedClip.trimEnd ?? (selectedClip.duration > 0 ? selectedClip.duration : 0)
-    : 0
+  useEffect(() => {
+    if (!isOpen || !sync.state.isPlaying) return
+    const scroll = scrollRef.current
+    if (!scroll) return
+    const left = scroll.scrollLeft
+    const width = scroll.clientWidth
+    if (playheadPx > left + width * 0.2 && playheadPx < left + width * 0.8) return
+    scroll.scrollLeft = Math.max(0, playheadPx - width * 0.4)
+  }, [isOpen, playheadPx, sync.state.isPlaying])
+
+  // ── Image cue dragging ───────────────────────────────────────────────────
+  const [imageDrag, setImageDrag] = useState<{ cueId: string; startSec: number } | null>(null)
+  const imageDragRef = useRef<{ cueId: string; startX: number; startSec: number } | null>(null)
+
+  const beginImageDrag = (cueId: string, startSec: number) => (event: ReactPointerEvent) => {
+    event.stopPropagation()
+    setSelection({ kind: 'image', id: cueId })
+    ;(event.target as Element).setPointerCapture(event.pointerId)
+    imageDragRef.current = { cueId, startX: event.clientX, startSec }
+  }
+
+  const onImageDragMove = (event: ReactPointerEvent) => {
+    const drag = imageDragRef.current
+    if (!drag) return
+    const deltaSec = (event.clientX - drag.startX) / pxPerSec
+    setImageDrag({ cueId: drag.cueId, startSec: Math.max(0, drag.startSec + deltaSec) })
+  }
+
+  const endImageDrag = (event: ReactPointerEvent) => {
+    const drag = imageDragRef.current
+    if (!drag) return
+    imageDragRef.current = null
+    const dropped = imageDrag
+    setImageDrag(null)
+    if (dropped && dropped.cueId === drag.cueId) {
+      onMoveImage(drag.cueId, Math.round(dropped.startSec * 10) / 10)
+    }
+    try {
+      ;(event.target as Element).releasePointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+  }
 
   if (!isOpen) return null
 
+  const selectedClip =
+    selection?.kind === 'clip' ? clips[selection.id] : undefined
+  const selectedImage =
+    selection?.kind === 'image'
+      ? imageWindows.find((window) => window.id === selection.id) ?? null
+      : null
+  const playheadSec = Math.max(0, sync.state.currentTime)
+
   return (
-    <div className="multitrack-align-stage" role="dialog" aria-modal="true" aria-label="Align tracks">
+    <section className="multitrack-align-stage" aria-label="Timeline editor">
       <header className="multitrack-align-stage__header">
-        <Pressable type="button" intensity="icon" className="multitrack-align-stage__close" onClick={handleCancel} aria-label="Cancel alignment changes">
+        <Pressable
+          type="button"
+          intensity="icon"
+          className="multitrack-align-stage__close"
+          onClick={handleCancel}
+          aria-label="Discard timeline changes"
+        >
           <X className="h-5 w-5" />
         </Pressable>
-        <p className="multitrack-align-stage__title">Align tracks</p>
+        <div className="multitrack-align-stage__titles">
+          <p className="multitrack-align-stage__title">Timeline</p>
+          <span className="multitrack-align-stage__clock">
+            {formatClock(playheadSec)} / {formatClock(maxDurationSec)}
+          </span>
+        </div>
+        <div className="multitrack-align-stage__zoom" aria-label="Timeline zoom">
+          <Pressable
+            type="button"
+            intensity="icon"
+            onClick={() => setZoomIndex((index) => Math.max(0, index - 1))}
+            disabled={zoomIndex === 0}
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Pressable>
+          <Pressable
+            type="button"
+            intensity="icon"
+            onClick={() => setZoomIndex((index) => Math.min(ZOOM_STEPS.length - 1, index + 1))}
+            disabled={zoomIndex === ZOOM_STEPS.length - 1}
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Pressable>
+        </div>
         <Pressable
           type="button"
           intensity="normal"
@@ -359,47 +584,206 @@ export default function MultitrackAlignStage({
         </Pressable>
       </header>
 
-      <p className="multitrack-align-stage__hint">
-        Drag a clip to shift it. Drag either edge to trim it. Saved edits are used by Play All and the final export.
-      </p>
+      <div className="multitrack-align-stage__actions">
+        <Pressable
+          type="button"
+          intensity="normal"
+          haptic="medium"
+          className="multitrack-align-stage__action multitrack-align-stage__action--primary"
+          disabled={busy}
+          onClick={() => onAddBox(playheadSec)}
+        >
+          <Plus className="h-4 w-4" />
+          Add box here
+        </Pressable>
+        <Pressable
+          type="button"
+          intensity="soft"
+          className="multitrack-align-stage__action"
+          disabled={busy}
+          onClick={() => onAddImage(playheadSec)}
+        >
+          <ImagePlus className="h-4 w-4" />
+          Add image here
+        </Pressable>
+        <Pressable
+          type="button"
+          intensity="soft"
+          className="multitrack-align-stage__action multitrack-align-stage__action--play"
+          onClick={onPreviewToggle}
+        >
+          {sync.state.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {sync.state.isPlaying ? 'Pause' : 'Preview'}
+        </Pressable>
+      </div>
 
       {selectedClip ? (
         <div className="multitrack-align-stage__inspector">
           <div className="multitrack-align-stage__selection">
             <strong>{selectedClip.label}</strong>
             <span>
-              Starts {(-selectedClip.offsetMs / 1000).toFixed(3)}s · keeps {selectedClip.trimStart.toFixed(3)}–{selectedTrimEnd.toFixed(3)}s
+              Starts {formatClock(Math.max(0, -selectedClip.offsetMs / 1000))} ·{' '}
+              {selectedClip.windowed ? 'box appears only here' : 'box shows all song'}
             </span>
           </div>
           <div className="multitrack-align-stage__nudge" aria-label="Fine alignment controls">
             <Pressable type="button" intensity="soft" onClick={() => updateClip(selectedClip.panelId, { offsetMs: selectedClip.offsetMs + 10 })}>−10ms</Pressable>
             <Pressable type="button" intensity="soft" onClick={() => updateClip(selectedClip.panelId, { offsetMs: selectedClip.offsetMs - 10 })}>+10ms</Pressable>
-            <Pressable type="button" intensity="soft" onClick={() => handleReset(selectedClip.panelId)}>Reset track</Pressable>
+            <Pressable type="button" intensity="soft" onClick={() => handleReset(selectedClip.panelId)}>
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Pressable>
           </div>
         </div>
       ) : null}
 
-      <div className="multitrack-align-stage__scroll">
+      {selectedImage ? (
+        <div className="multitrack-align-stage__inspector">
+          <div className="multitrack-align-stage__selection">
+            <strong>{selectedImage.asset.fileName}</strong>
+            <span>
+              {selectedImage.isBase
+                ? 'First image — on screen from the start'
+                : `Cuts in at ${formatClock(selectedImage.startSec)}`}
+            </span>
+          </div>
+          <div className="multitrack-align-stage__nudge">
+            <Pressable
+              type="button"
+              intensity="soft"
+              className="multitrack-align-stage__nudge-danger"
+              onClick={() => {
+                onRemoveImage(selectedImage.id)
+                setSelection(null)
+              }}
+              aria-label="Remove this image"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Pressable>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="multitrack-align-stage__scroll" ref={scrollRef}>
         <div className="multitrack-align-stage__timeline" style={{ width: timelineWidth }}>
-          <div className="multitrack-align-stage__ruler">
-            {Array.from({ length: Math.ceil(maxDurationSec) + 2 }, (_, sec) => (
-              <div key={sec} className="multitrack-align-stage__tick" style={{ left: secToPx(sec) }}>
-                {sec % 2 === 0 && <span>{sec}s</span>}
-              </div>
-            ))}
+          <div
+            className="multitrack-align-stage__ruler"
+            onPointerDown={onRulerDown}
+            onPointerMove={onRulerMove}
+            onPointerUp={onRulerUp}
+            onPointerCancel={onRulerUp}
+          >
+            {Array.from({ length: Math.ceil(maxDurationSec) + 2 }, (_, sec) => sec).map((sec) => {
+              const labelEvery = pxPerSec >= 70 ? 2 : pxPerSec >= 40 ? 5 : 10
+              return (
+                <div key={sec} className="multitrack-align-stage__tick" style={{ left: secToPx(sec) }}>
+                  {sec % labelEvery === 0 && <span>{formatClock(sec)}</span>}
+                </div>
+              )
+            })}
           </div>
           <div className="multitrack-align-stage__zero-line" style={{ left: TIMELINE_ORIGIN_PX }} />
           <div className="multitrack-align-stage__playhead" style={{ left: playheadPx }} />
+
           <div className="multitrack-align-stage__tracks">
-            {clipList.map((clip) => (
-              <ClipTrack
-                key={clip.panelId}
-                clip={clip}
-                selected={clip.panelId === selectedPanelId}
-                onSelect={() => setSelectedPanelId(clip.panelId)}
-                onChange={(patch) => updateClip(clip.panelId, patch)}
-              />
-            ))}
+            {imageWindows.length > 0 ? (
+              <div className="multitrack-align-stage__track multitrack-align-stage__track--images">
+                <div className="multitrack-align-stage__track-label">
+                  <span className="multitrack-align-stage__track-name">Music</span>
+                </div>
+                <div className="multitrack-align-stage__track-lane">
+                  {imageWindows.map((window) => {
+                    const startSec =
+                      imageDrag?.cueId === window.id ? imageDrag.startSec : window.startSec
+                    const endSec = window.endSec ?? maxDurationSec
+                    const width = Math.max(28, (endSec - startSec) * pxPerSec)
+                    return (
+                      <div
+                        key={window.id}
+                        className="multitrack-align-stage__image-cue"
+                        style={{ left: secToPx(startSec), width }}
+                        data-selected={selection?.kind === 'image' && selection.id === window.id ? 'true' : 'false'}
+                        data-pinned={window.isBase ? 'true' : 'false'}
+                        onPointerDown={
+                          window.isBase
+                            ? () => setSelection({ kind: 'image', id: window.id })
+                            : beginImageDrag(window.id, window.startSec)
+                        }
+                        onPointerMove={window.isBase ? undefined : onImageDragMove}
+                        onPointerUp={window.isBase ? undefined : endImageDrag}
+                        onPointerCancel={window.isBase ? undefined : endImageDrag}
+                      >
+                        {window.asset.mimeType === 'application/pdf' ? null : (
+                          <img
+                            src={window.asset.src}
+                            alt=""
+                            className="multitrack-align-stage__image-thumb"
+                            draggable={false}
+                          />
+                        )}
+                        <span className="multitrack-align-stage__image-name">
+                          {window.asset.fileName}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {performancePanels.map((panel, index) => {
+              const clip = clips[panel.id]
+              const label = clip?.label ?? `Box ${index + 1}`
+              return (
+                <div
+                  key={panel.id}
+                  className={`multitrack-align-stage__track ${
+                    selection?.kind === 'clip' && selection.id === panel.id ? 'is-selected' : ''
+                  }`}
+                >
+                  <div className="multitrack-align-stage__track-label">
+                    <span className="multitrack-align-stage__track-name">{label}</span>
+                    {clip ? (
+                      <Pressable
+                        type="button"
+                        intensity="soft"
+                        className={`multitrack-align-stage__window-chip ${clip.windowed ? 'is-on' : ''}`}
+                        onClick={() => toggleWindowed(panel.id)}
+                        aria-pressed={clip.windowed}
+                      >
+                        {clip.windowed ? <Check className="h-3 w-3" /> : null}
+                        {clip.windowed ? 'Only here' : 'All song'}
+                      </Pressable>
+                    ) : null}
+                  </div>
+                  <div
+                    className="multitrack-align-stage__track-lane"
+                    onPointerDown={() => setSelection({ kind: 'clip', id: panel.id })}
+                  >
+                    {clip ? (
+                      <ClipTrack
+                        clip={clip}
+                        pxPerSec={pxPerSec}
+                        selected={selection?.kind === 'clip' && selection.id === panel.id}
+                        onSelect={() => setSelection({ kind: 'clip', id: panel.id })}
+                        onChange={(patch) => updateClip(panel.id, patch)}
+                      />
+                    ) : (
+                      <Pressable
+                        type="button"
+                        intensity="soft"
+                        className="multitrack-align-stage__empty-clip"
+                        style={{ left: secToPx(playheadSec) }}
+                        disabled={busy}
+                        onClick={() => onRecordBox(panel.id, playheadSec)}
+                      >
+                        <Video className="h-3.5 w-3.5" />
+                        Record here
+                      </Pressable>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -416,16 +800,11 @@ export default function MultitrackAlignStage({
           <RotateCcw className="h-4 w-4" />
           Reset all
         </Pressable>
-        <Pressable
-          type="button"
-          intensity="normal"
-          className="multitrack-align-stage__transport-btn multitrack-align-stage__transport-btn--primary"
-          onClick={onPreviewToggle}
-        >
-          {sync.state.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-          {sync.state.isPlaying ? 'Pause' : 'Preview'}
-        </Pressable>
+        <p className="multitrack-align-stage__hint">
+          Drag clips to move them, edges to trim. “Add box here” records a new part over the mix
+          from the playhead.
+        </p>
       </footer>
-    </div>
+    </section>
   )
 }

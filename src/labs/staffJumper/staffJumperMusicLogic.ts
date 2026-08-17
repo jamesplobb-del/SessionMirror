@@ -6,6 +6,7 @@ import {
   getStaffPositionForNote,
   NOTE_SPACING_PX,
   STAFF_FIRST_NOTE_X,
+  STAFF_MIDDLE_Y,
   STAFF_NOTE_LETTERS,
   type StaffJumperClef,
   type StaffNoteLetter,
@@ -83,9 +84,9 @@ export const DIFFICULTY_LABELS: Record<StaffJumperDifficulty, string> = {
 }
 
 export const DIFFICULTY_DESCRIPTIONS: Record<StaffJumperDifficulty, string> = {
-  easy: 'Note names shown. Stepwise runs and neighbour tones.',
-  medium: 'Adds triads, broken thirds and turns.',
-  hard: 'Adds seventh chords, wide intervals and key signatures.',
+  easy: 'Note names shown. Stepwise runs, neighbour tones and rests on the beat.',
+  medium: 'Adds triads, broken thirds, turns and rests that split a beat.',
+  hard: 'Adds seventh chords, wide intervals and entries after a rest.',
 }
 
 export const DIFFICULTY_TIMEOUT_SECONDS: Record<StaffJumperDifficulty, number> = {
@@ -183,6 +184,14 @@ export interface TargetNote {
   writtenLetter: StaffNoteLetter
   writtenOctave: number
   showLabel: boolean
+  /**
+   * True when this step is silence rather than a note to play.
+   *
+   * The pitch fields still describe the note that *follows* the rest, because
+   * a rest borrows the pitch stream position it has not consumed. Nothing may
+   * judge a player's pitch against them while `isRest` is set.
+   */
+  isRest: boolean
   /** Rhythm — how the note is written and where it falls in the bar. */
   rhythm: RhythmSlot
   /** World X of the notehead, spaced by duration rather than by index. */
@@ -543,7 +552,13 @@ export function degreeForSequenceStep(config: StaffJumperConfig, sequenceStep: n
  */
 /** Rhythm for one step, keyed off the config object so the stream is stable. */
 export function getRhythmForStep(config: StaffJumperConfig, sequenceStep: number): RhythmSlot {
-  return getRhythmSlot(config, config.meter, config.sessionSeed ?? 1, sequenceStep)
+  return getRhythmSlot(
+    config,
+    config.meter,
+    config.difficulty,
+    config.sessionSeed ?? 1,
+    sequenceStep,
+  )
 }
 
 /** World X of a notehead, from accumulated duration-based spacing. */
@@ -552,7 +567,10 @@ export function noteXForStep(config: StaffJumperConfig, sequenceStep: number): n
 }
 
 export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: number): TargetNote {
-  const exerciseStep = exerciseStepForSequenceStep(config, sequenceStep)
+  const rhythm = getRhythmForStep(config, sequenceStep)
+  // Rests take no pitch, so the exercise is walked by note index rather than by
+  // step — silence never costs the player a note of the pattern they are on.
+  const exerciseStep = exerciseStepForSequenceStep(config, rhythm.noteIndex)
   const degreeIndex = exerciseStep.degree
   const rootMidi = resolveScaleRootMidi(config)
   const midi = midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
@@ -561,18 +579,19 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
   const rootOctave = Math.floor(rootMidi / 12) - 1
   const written = writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
   const staff = getStaffPositionForNote(written.letter, written.octave, config.clef)
-  const rhythm = getRhythmForStep(config, sequenceStep)
   return {
     sequenceIndex: sequenceStep,
     midi,
     pitchClass,
     noteLabel: written.label,
-    yPx: staff.yPx,
-    kind: staff.kind,
-    ledgerLineYPx: staff.ledgerLineYPx,
+    // A rest is written against the middle line whatever pitch surrounds it.
+    yPx: rhythm.isRest ? STAFF_MIDDLE_Y : staff.yPx,
+    kind: rhythm.isRest ? 'line' : staff.kind,
+    ledgerLineYPx: rhythm.isRest ? [] : staff.ledgerLineYPx,
     writtenLetter: written.letter,
     writtenOctave: written.octave,
-    showLabel: showNoteLabels(config.difficulty),
+    showLabel: showNoteLabels(config.difficulty) && !rhythm.isRest,
+    isRest: rhythm.isRest,
     rhythm,
     xPx: STAFF_FIRST_NOTE_X + rhythm.spacingPosition * NOTE_SPACING_PX,
     patternName: exerciseStep.patternName,

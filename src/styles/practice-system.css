@@ -138,7 +138,7 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   font-size: clamp(0.69rem, 3vw, 0.81rem);
   letter-spacing: 0;
   transition:
-    transform 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
     border-color 360ms ease,
     background-color 360ms ease,
     color 360ms ease,
@@ -298,12 +298,17 @@ html.app-dark-mode
   border: 0;
   background: rgba(247, 248, 250, 0.18);
   color: #17304a;
-  pointer-events: auto;
+  /* The button is full-bleed so its backdrop can dim the stage, but it must not
+     swallow taps: while it showed, Drone / Pitch Insights / Settings underneath
+     were all unreachable. Only the prompt card itself takes the tap — clicks on
+     it still bubble to this button, so reactivation keeps working. */
+  pointer-events: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 .pitch-tuner-recovery__prompt {
   display: grid;
+  pointer-events: auto;
   min-width: min(248px, 82vw);
   min-height: 102px;
   place-items: center;
@@ -328,13 +333,13 @@ html.app-dark-mode
 
 .pitch-tuner-recovery__prompt strong {
   font-size: 14px;
-  font-weight: 730;
+  font-weight: 700;
 }
 
 .pitch-tuner-recovery__prompt small {
   color: rgba(23, 48, 74, 0.58);
   font-size: 10px;
-  font-weight: 590;
+  font-weight: 600;
 }
 
 .pitch-audio-stage--besttake {
@@ -548,7 +553,7 @@ html.app-dark-mode
   backdrop-filter: blur(22px) saturate(1.12);
   -webkit-backdrop-filter: blur(22px) saturate(1.12);
   font-size: 11px;
-  font-weight: 760;
+  font-weight: 700;
   transition:
     background-color 560ms cubic-bezier(0.22, 1, 0.36, 1),
     border-color 560ms ease,
@@ -579,7 +584,7 @@ html.app-dark-mode
   color: color-mix(in srgb, var(--pitch-stage-hue) 46%, #17304a);
   font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: clamp(72px, 20vw, 104px);
-  font-weight: 760;
+  font-weight: 700;
   line-height: 0.9;
   text-shadow: 0 12px 34px
     color-mix(in srgb, var(--pitch-stage-hue) 13%, transparent);
@@ -591,7 +596,7 @@ html.app-dark-mode
 .pitch-living-readout__note small {
   margin-top: 8px;
   font-size: 0.27em;
-  font-weight: 720;
+  font-weight: 700;
   opacity: 0.64;
 }
 
@@ -609,7 +614,7 @@ html.app-dark-mode
 .pitch-living-readout__detail strong {
   color: rgba(23, 48, 74, 0.82);
   font-size: 16px;
-  font-weight: 770;
+  font-weight: 700;
 }
 
 .pitch-living-canvas__direction {
@@ -622,10 +627,9 @@ html.app-dark-mode
   flex-direction: column;
   justify-content: space-between;
   color: rgba(23, 48, 74, 0.42);
-  font-size: 9px;
-  font-weight: 760;
+  font-size: 11px;
+  font-weight: 600;
   pointer-events: none;
-  text-transform: uppercase;
   transform: translateY(-50%);
 }
 
@@ -671,7 +675,7 @@ html.app-dark-mode
   backdrop-filter: blur(24px) saturate(1.14);
   -webkit-backdrop-filter: blur(24px) saturate(1.14);
   transition:
-    transform 160ms cubic-bezier(0.32, 0.72, 0, 1),
+    transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
     border-color 360ms ease,
     background-color 360ms ease,
     box-shadow 360ms ease;
@@ -686,7 +690,7 @@ html.app-dark-mode
 
 .pitch-living-drone-trigger span {
   font-size: 11px;
-  font-weight: 780;
+  font-weight: 700;
 }
 
 .pitch-living-drone-trigger small {
@@ -694,7 +698,7 @@ html.app-dark-mode
   overflow: hidden;
   color: rgba(24, 49, 73, 0.58);
   font-size: 9px;
-  font-weight: 680;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -872,6 +876,44 @@ html.app-dark-mode
   height: 17px;
 }
 
+.tuner-settings-source {
+  padding: 0.85rem 1rem 0.9rem;
+  border-bottom: 1px solid rgba(24, 32, 51, 0.08);
+}
+
+.tuner-settings-source__label {
+  margin: 0 0 0.5rem;
+  color: #172033;
+  font-size: var(--sm-text-label);
+  font-weight: var(--sm-weight-medium);
+}
+
+.tuner-settings-source div[role='radiogroup'] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border-radius: 0.9rem;
+  background: rgba(24, 32, 51, 0.05);
+}
+
+.tuner-settings-source button {
+  padding: 0.45rem 0.3rem;
+  border: 0;
+  border-radius: 0.6rem;
+  color: #667085;
+  background: transparent;
+  font-size: var(--sm-text-value);
+  font-weight: var(--sm-weight-body);
+}
+
+.tuner-settings-source button.is-selected {
+  color: #172033;
+  background: #fff;
+  font-weight: var(--sm-weight-medium);
+  box-shadow: 0 1px 3px rgba(23, 35, 58, 0.14);
+}
+
 .tuner-transposition-menu__list {
   min-height: 0;
   flex: 1 1 auto;
@@ -886,10 +928,8 @@ html.app-dark-mode
   margin: 0;
   padding: 16px 0 6px;
   color: var(--tt-faint);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* No card, no fill — the group is defined by a rule above its first row. */
@@ -939,7 +979,7 @@ html.app-dark-mode
 .tuner-transposition-menu__copy strong {
   color: var(--tt-ink);
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 600;
 }
 
 .tuner-transposition-menu__copy small {
@@ -953,11 +993,11 @@ html.app-dark-mode
    Deliberately no tint, gradient, or glow. */
 .tuner-transposition-menu__option--selected .tuner-transposition-menu__key {
   color: var(--tt-ink);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .tuner-transposition-menu__option--selected .tuner-transposition-menu__copy strong {
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .tuner-transposition-menu__check {
@@ -1122,9 +1162,8 @@ html.app-dark-mode
 
 .harmonic-ribbon__eyebrow {
   color: var(--audio-text-secondary, #6c7077);
-  font-size: 10px;
-  font-weight: 750;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .harmonic-ribbon__header strong {
@@ -1153,9 +1192,8 @@ html.app-dark-mode
 }
 
 .harmonic-ribbon__root-readout small {
-  font-size: 8px;
-  font-weight: 750;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .harmonic-ribbon__root-readout strong {
@@ -1175,7 +1213,7 @@ html.app-dark-mode
   background: var(--audio-bg-base, #f7f8fa);
   color: var(--audio-text-secondary, #6c7077);
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .harmonic-ribbon__power svg {
@@ -1267,15 +1305,15 @@ html.app-dark-mode
   color: var(--audio-text-secondary, #6c7077);
   scroll-snap-align: center;
   transition:
-    border-color 130ms ease,
-    background 130ms ease,
-    color 130ms ease,
-    transform 130ms ease;
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
 }
 
 .harmonic-ribbon__note span {
   font-size: 14px;
-  font-weight: 760;
+  font-weight: 700;
 }
 
 .harmonic-ribbon__note small {
@@ -1321,7 +1359,7 @@ html.app-dark-mode
   background: transparent;
   color: var(--audio-text-secondary, #6c7077);
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .harmonic-ribbon__mode .harmonic-ribbon__mode--active {
@@ -1368,9 +1406,8 @@ html.app-dark-mode
 }
 
 .harmonic-ribbon__octave small {
-  font-size: 8px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .harmonic-ribbon__octave strong {
@@ -1897,8 +1934,8 @@ html.app-dark-mode
   background: #f47b20 !important;
   color: #ffffff !important;
   box-shadow: 0 0.12rem 0.35rem rgba(0, 0, 0, 0.2);
-  font-size: 0.58rem;
-  font-weight: 760;
+  font-size: 0.62rem;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -1912,7 +1949,7 @@ html.app-dark-mode
   gap: 0.08rem;
   color: rgba(36, 67, 88, 0.92);
   font-size: 0.62rem;
-  font-weight: 520;
+  font-weight: 400;
   line-height: 1;
 }
 
@@ -1934,7 +1971,7 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode .audio-vault-button,
 .app-ui-overlay--audio-mode .audio-camera-button,
 .app-ui-overlay--audio-mode .audio-pill-action {
-  transition: opacity 140ms ease;
+  transition: opacity 180ms ease;
 }
 
 .app-ui-overlay--audio-mode .audio-vault-button:active,
@@ -2314,7 +2351,7 @@ html.app-dark-mode
 
   .app-ui-overlay--audio-mode .audio-pill-action__content,
   .app-ui-overlay--audio-mode .audio-camera-button__content {
-    font-size: 0.63rem;
+    font-size: 0.62rem;
   }
 }
 

@@ -285,6 +285,22 @@ export interface BestTakeAudioPluginType {
       scale: number
       contentMode: 'fill' | 'fit'
     } | null
+    /**
+     * Timed sheet-music screenshots. Each cue owns the music panel between
+     * startSec and endSec (omitted = to the end), letting a player cut line to
+     * line. When present these replace the static `sheetMusic` layer.
+     */
+    sheetMusicCues?: Array<{
+      path: string
+      fileType: string
+      rect: NativeRectPercent
+      x: number
+      y: number
+      scale: number
+      contentMode: 'fill' | 'fit'
+      startSec: number
+      endSec?: number
+    }>
     backingAudio: { path: string; gain: number } | null
   }): Promise<NativeMultitrackRenderResult>
   prepareMultitrackMonitor(options: {

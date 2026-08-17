@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRightLeft, BarChart3, Music2 } from 'lucide-react'
+import { BarChart3, Music2, Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
   useLivePitchTracker,
@@ -48,6 +48,7 @@ interface LivePitchTunerProps {
   tunerTransposition?: TunerTranspositionId
   /** Audio tuner: opens the written-pitch picker and persists a selection upstream. */
   onTunerTranspositionChange?: (value: TunerTranspositionId) => void
+  onTunerInstrumentChange?: (value: TunerInstrument) => void
   hapticsEnabled?: boolean
   /** Widget-only: analyze live mic instead of media element. */
   pitchSource?: 'media' | 'microphone'
@@ -180,6 +181,7 @@ function LiveAudioTunerPane({
   tunerInstrument,
   tunerTransposition,
   onTunerTranspositionChange,
+  onTunerInstrumentChange,
   hapticsEnabled,
   insightsEnabled = false,
   audioToolsEnabled = true,
@@ -191,6 +193,7 @@ function LiveAudioTunerPane({
   tunerInstrument?: TunerInstrument
   tunerTransposition: TunerTranspositionId
   onTunerTranspositionChange?: (value: TunerTranspositionId) => void
+  onTunerInstrumentChange?: (value: TunerInstrument) => void
   hapticsEnabled?: boolean
   insightsEnabled?: boolean
   audioToolsEnabled?: boolean
@@ -307,10 +310,10 @@ function LiveAudioTunerPane({
                   onClick={toggleTransposition}
                   aria-expanded={transpositionOpen}
                   aria-controls="pitch-living-transposition-panel"
-                  title={transpositionOpen ? 'Hide transposition' : 'Choose transposition'}
+                  title={transpositionOpen ? 'Hide tuner settings' : 'Open tuner settings'}
                 >
-                  <ArrowRightLeft aria-hidden />
-                  <span>Transpose</span>
+                  <Settings aria-hidden />
+                  <span>Settings</span>
                   <small>{transposition.shortLabel}</small>
                 </button>
               ) : null}
@@ -356,6 +359,8 @@ function LiveAudioTunerPane({
                     value={tunerTransposition}
                     onChange={selectTransposition}
                     onClose={toggleTransposition}
+                    instrument={tunerInstrument}
+                    onInstrumentChange={onTunerInstrumentChange}
                   />
                 </motion.section>
               ) : null}
@@ -446,6 +451,7 @@ function LivePitchTunerAudio({
   tunerInstrument?: TunerInstrument
   tunerTransposition?: TunerTranspositionId
   onTunerTranspositionChange?: (value: TunerTranspositionId) => void
+  onTunerInstrumentChange?: (value: TunerInstrument) => void
   hapticsEnabled?: boolean
   liveMicOnly?: boolean
   drone?: LivePitchTunerProps['drone']
@@ -780,7 +786,7 @@ export default function LivePitchTuner({
         <div className="shrink-0 border-b border-white/8 px-5 py-4">
           <div className="flex items-end justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35">
+              <p className="text-[11px] font-medium text-white/35">
                 {label}
               </p>
               {takeName && (
@@ -832,7 +838,7 @@ export default function LivePitchTuner({
       <div className="shrink-0 border-b border-white/8 px-4 py-3">
         <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">
+            <p className="text-[11px] font-medium text-white/35">
               {label}
             </p>
             {takeName && (

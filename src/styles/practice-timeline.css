@@ -47,7 +47,7 @@
   border: 2px dashed var(--audio-divider);
   background: var(--audio-surface);
   color: var(--audio-blue);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 600;
   box-shadow: var(--audio-shadow-card);
 }
@@ -79,7 +79,7 @@
   border-radius: 0 var(--audio-radius-card) var(--audio-radius-card) 0;
   background: #e5484d;
   color: #fff;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
@@ -184,7 +184,7 @@
 }
 
 .practice-timeline__summary-label {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
@@ -193,7 +193,7 @@
 }
 
 .practice-timeline__summary-line {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   line-height: 1.55;
   margin: 0;
 }
@@ -202,7 +202,7 @@
   text-align: center;
   color: var(--audio-text-secondary);
   opacity: 0.45;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   padding: 0.15rem 0;
 }
 
@@ -244,8 +244,8 @@
 .practice-timeline__footer-btn {
   flex: 1;
   padding: 0.82rem 0.75rem;
-  border-radius: 1.1rem;
-  font-size: 0.96rem;
+  border-radius: 1.15rem;
+  font-size: 0.95rem;
   font-weight: 700;
   text-align: center;
 }
@@ -286,7 +286,7 @@
 }
 
 .practice-timeline-editor__title {
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 700;
 }
 
@@ -316,7 +316,7 @@
   border-radius: 0.9rem;
   border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 600;
   box-shadow: var(--audio-shadow-fab);
 }
@@ -356,7 +356,7 @@
   font: inherit;
   line-height: 1.1;
   cursor: text;
-  border-radius: 0.65rem;
+  border-radius: 0.6rem;
   padding: 0.1rem 0.25rem;
 }
 
@@ -369,7 +369,7 @@
   width: 100%;
   min-width: 3.5rem;
   border: 1px solid var(--audio-blue-border);
-  border-radius: 0.65rem;
+  border-radius: 0.6rem;
   background: var(--audio-surface);
   color: var(--audio-text-primary);
   font: inherit;
@@ -396,7 +396,7 @@
   border-radius: 999px;
   border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
 }
@@ -414,7 +414,7 @@
   border-radius: 1rem;
   border: 1px solid var(--audio-divider);
   background: transparent;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
 }
@@ -499,7 +499,7 @@
   border-radius: 0.75rem;
   border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--audio-blue);
 }
@@ -541,7 +541,7 @@
 }
 
 .practice-timeline__playback-options-summary {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
   line-height: 1.35;
@@ -584,10 +584,10 @@
   min-height: 2.75rem;
   padding: 0.55rem 2rem 0.55rem 0.85rem;
   border: 1.5px solid var(--audio-divider);
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: var(--audio-surface);
   color: var(--audio-text-primary);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 600;
   text-align: left;
   box-shadow: var(--audio-shadow-fab);
@@ -624,7 +624,7 @@
   z-index: 50;
   max-height: min(16rem, 42vh);
   overflow-y: auto;
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   border: 1px solid var(--audio-divider);
   background: var(--audio-bg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
@@ -645,7 +645,7 @@
 
 .practice-timeline-editor .metronome-audio-select__option--header {
   padding: 0.45rem 0.85rem 0.25rem;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -707,15 +707,14 @@
 }
 
 .practice-timeline-playback__stat-label {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--audio-text-secondary);
-  text-transform: uppercase;
   letter-spacing: 0;
   margin-top: 0.2rem;
 }
 
 .practice-timeline-playback__next {
-  font-size: 1rem;
+  font-size: 1.02rem;
   color: var(--audio-text-secondary);
   margin-bottom: 2rem;
 }
@@ -742,14 +741,13 @@
   border-radius: 999px;
   background: #171a22;
   color: #fff;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 700;
 }
 
 .practice-timeline-library__section-title {
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 0.76rem;
+  font-weight: 600;
   letter-spacing: 0;
   color: var(--audio-text-secondary);
   padding: 0.75rem 1.25rem 0.35rem;
@@ -765,12 +763,12 @@
 
 .practice-timeline-library__row-name {
   flex: 1;
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 600;
 }
 
 .practice-timeline-library__row-meta {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--audio-text-secondary);
 }
 
@@ -858,12 +856,12 @@
 
 .practice-timeline-session__measure-progress--dock
   .practice-timeline-session__measure-progress-label {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .practice-timeline-session__measure-progress--dock
   .practice-timeline-session__measure-progress-value {
-  font-size: 1.08rem;
+  font-size: 1.1rem;
 }
 
 .practice-timeline-session__measure-progress--dock .practice-timeline-session__measure-numbers {
@@ -872,7 +870,7 @@
 }
 
 .practice-timeline-session__measure-progress--dock .practice-timeline-session__measure-number {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
 }
 
 .app-ui-overlay--practice-session-active .practice-timeline-session__body {
@@ -926,12 +924,12 @@
 .practice-timeline-session__meta-sep {
   color: var(--audio-text-secondary);
   opacity: 0.55;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .practice-timeline-session__measure {
   margin: 0;
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   font-weight: 700;
   color: var(--audio-text-primary);
   font-variant-numeric: tabular-nums;
@@ -939,7 +937,7 @@
 
 .practice-timeline-session__timing {
   margin: 0;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0;
   color: var(--audio-text-tertiary, var(--audio-text-secondary));
@@ -952,7 +950,7 @@
 
 .practice-timeline-session__next {
   margin: 0.1rem 0 0;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   color: var(--audio-text-secondary);
   opacity: 0.75;
 }
@@ -996,7 +994,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
   padding-top: 0.35rem;
   border-top: 1px solid var(--audio-divider);
@@ -1004,7 +1002,7 @@
 
 .practice-timeline-editor__hint {
   margin: 0.35rem 0 0;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--audio-text-secondary);
   opacity: 0.85;
 }
@@ -1019,7 +1017,7 @@
   min-width: 2.1rem;
   height: 2.1rem;
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -1050,7 +1048,7 @@
 
 .practice-timeline-session__scale {
   margin: 0.15rem 0 0;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
 }
@@ -1082,7 +1080,7 @@
   border-radius: 999px;
   border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
   max-width: 5.5rem;
@@ -1119,22 +1117,20 @@
 }
 
 .practice-timeline-session__measure-progress-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--audio-text-secondary);
 }
 
 .practice-timeline-session__measure-progress-value {
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--audio-gold);
 }
 
 .practice-timeline-session__measure-progress-total {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
 }
@@ -1187,7 +1183,7 @@
   border: 1px solid var(--audio-gold-border);
   background: color-mix(in srgb, var(--audio-gold-soft) 88%, #fff);
   color: var(--audio-gold);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   box-shadow: 0 4px 14px color-mix(in srgb, var(--audio-gold) 24%, transparent);
@@ -1246,7 +1242,7 @@
   display: flex;
   justify-content: space-between;
   margin-top: 0.3rem;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
   opacity: 0.75;
@@ -1299,16 +1295,15 @@
 }
 
 .practice-timeline-session__tempo-unit {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--audio-text-secondary);
-  text-transform: uppercase;
   letter-spacing: 0;
 }
 
 .practice-timeline-session__tempo-scale {
   margin-top: 0.15rem;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--audio-gold);
 }
@@ -1349,7 +1344,7 @@
 }
 
 .practice-timeline-editor__pattern-step-title {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: var(--audio-text-secondary);
   text-transform: none;
@@ -1359,10 +1354,10 @@
 .practice-timeline-editor__pattern-add {
   width: 100%;
   padding: 0.65rem;
-  border-radius: 0.65rem;
+  border-radius: 0.6rem;
   border: 1px dashed var(--audio-divider);
   background: transparent;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--audio-blue);
 }
@@ -1430,7 +1425,7 @@
   border-radius: 999px;
   background: var(--audio-blue-soft);
   color: var(--audio-blue);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -1467,8 +1462,8 @@
 .practice-timeline__empty h2 {
   margin: 0;
   color: var(--audio-text-primary);
-  font-size: 0.98rem;
-  font-weight: 750;
+  font-size: 0.95rem;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -1479,7 +1474,7 @@
   margin: 0.2rem 0 0;
   color: var(--audio-text-secondary);
   font-size: 0.76rem;
-  font-weight: 550;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -1540,10 +1535,8 @@
 .practice-timeline__section-order {
   margin-bottom: 0.12rem;
   color: var(--audio-text-secondary);
-  font-size: 0.66rem;
-  font-weight: 750;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .practice-timeline__section-title {
@@ -1591,8 +1584,8 @@
 
 .practice-timeline__section-meta small {
   color: var(--audio-text-secondary);
-  font-size: 0.64rem;
-  font-weight: 650;
+  font-size: 0.62rem;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -1600,8 +1593,8 @@
   max-width: 100%;
   overflow: hidden;
   color: var(--audio-text-primary);
-  font-size: 0.8rem;
-  font-weight: 720;
+  font-size: 0.82rem;
+  font-weight: 700;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1614,10 +1607,10 @@
 .practice-timeline__section-detail {
   margin: 0.6rem 0 0;
   padding: 0.48rem 0.6rem;
-  border-radius: 0.7rem;
+  border-radius: 0.75rem;
   background: var(--audio-gold-soft);
   color: color-mix(in srgb, var(--audio-gold) 78%, var(--audio-text-primary));
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -1644,10 +1637,10 @@
   gap: 0.35rem;
   padding: 0.5rem 0.6rem;
   border: 1px solid transparent;
-  border-radius: 0.78rem;
+  border-radius: 0.75rem;
   background: color-mix(in srgb, var(--audio-bg-base) 78%, transparent);
-  font-size: 0.78rem;
-  font-weight: 720;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .practice-timeline__section-action--edit {
@@ -1670,7 +1663,7 @@
   height: 1.15rem;
   align-items: center;
   padding: 0;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .practice-timeline__add-btn {
@@ -1705,7 +1698,7 @@
 }
 
 .practice-timeline__playback-options-summary {
-  font-size: 0.69rem;
+  font-size: 0.7rem;
 }
 
 .practice-timeline__track-settings {
@@ -1718,7 +1711,7 @@
 .practice-timeline__track-settings-intro {
   margin: 0 0 0.75rem;
   color: var(--audio-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   line-height: 1.4;
 }
 
@@ -1735,14 +1728,14 @@
 .practice-timeline__record-copy strong {
   color: var(--audio-text-primary);
   font-size: 0.82rem;
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .practice-timeline__track-settings-loop-copy small,
 .practice-timeline__record-copy small {
   color: var(--audio-text-secondary);
-  font-size: 0.68rem;
-  font-weight: 550;
+  font-size: 0.7rem;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1812,7 +1805,7 @@
 
 .practice-timeline__summary-list strong {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   line-height: 1.25;
 }
 
@@ -1820,7 +1813,7 @@
   margin: 0.15rem 0 0;
   color: var(--audio-text-secondary);
   font-size: 0.7rem;
-  font-weight: 550;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -1906,14 +1899,14 @@
 .practice-timeline-editor__title small {
   color: var(--audio-text-secondary);
   font-size: 0.62rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .practice-timeline-editor__title strong {
   max-width: 100%;
   overflow: hidden;
-  font-size: 0.92rem;
-  font-weight: 760;
+  font-size: 0.95rem;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1925,7 +1918,7 @@
   background: var(--audio-blue-soft);
   color: var(--audio-blue);
   font-size: 0.82rem;
-  font-weight: 760;
+  font-weight: 700;
 }
 
 .practice-timeline-editor__body {
@@ -1960,8 +1953,8 @@
 .practice-timeline-editor__group-heading h2 {
   margin: 0;
   color: var(--audio-text-primary);
-  font-size: 0.98rem;
-  font-weight: 750;
+  font-size: 0.95rem;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -1969,7 +1962,7 @@
   margin: 0.2rem 0 0;
   color: var(--audio-text-secondary);
   font-size: 0.76rem;
-  font-weight: 550;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -1994,7 +1987,7 @@
   margin-bottom: 0.38rem;
   color: var(--audio-text-secondary);
   font-size: 0.76rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1.3;
   text-transform: none;
@@ -2004,12 +1997,12 @@
   min-height: 3.25rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--audio-divider);
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: var(--audio-surface);
   color: var(--audio-text-primary);
   box-shadow: none;
-  font-size: 0.92rem;
-  font-weight: 650;
+  font-size: 0.95rem;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -2044,7 +2037,7 @@
   height: 2.75rem;
   flex-shrink: 0;
   border: 1px solid var(--audio-divider);
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: var(--audio-surface);
   color: var(--audio-text-primary);
   box-shadow: none;
@@ -2061,8 +2054,6 @@
   display: inline-block;
   margin-left: 0.28rem;
   font-size: 0.45em;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 .practice-timeline-editor__select-grid {
@@ -2079,7 +2070,7 @@
   padding: 0;
   color: var(--audio-text-secondary);
   font-size: 0.76rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1.3;
   text-align: left;
@@ -2095,12 +2086,12 @@
   min-height: 3.2rem;
   padding: 0.72rem 2.2rem 0.72rem 0.85rem;
   border: 1px solid var(--audio-divider);
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: var(--audio-surface);
   color: var(--audio-text-primary);
   box-shadow: none;
   font-size: 0.88rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.3;
   text-align: left;
 }
@@ -2203,14 +2194,14 @@
 
 .practice-timeline-editor__advanced-copy strong {
   font-size: 0.82rem;
-  font-weight: 760;
+  font-weight: 700;
 }
 
 .practice-timeline-editor__advanced-copy small {
   overflow: hidden;
   color: var(--audio-text-secondary);
-  font-size: 0.66rem;
-  font-weight: 550;
+  font-size: 0.7rem;
+  font-weight: 600;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2222,7 +2213,7 @@
 
 .practice-timeline-editor__hint {
   margin-top: 0.3rem;
-  font-size: 0.69rem;
+  font-size: 0.7rem;
   line-height: 1.4;
 }
 
@@ -2254,13 +2245,13 @@
   margin-bottom: 0;
   color: var(--audio-text-primary);
   font-size: 0.95rem;
-  font-weight: 760;
+  font-weight: 700;
 }
 
 .practice-timeline-editor__tempo-marker-row {
   padding: 0.7rem;
   border: 1px solid var(--audio-divider);
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: color-mix(in srgb, var(--audio-bg-base) 70%, transparent);
 }
 

@@ -42,6 +42,7 @@ interface ControlDeckProps {
   pitchTrackerEnabled?: boolean
   showTakeCards?: boolean
   showMetronome?: boolean
+  metronomeToggleVisible?: boolean
   audioEnhancerEnabled?: boolean
   pitchToggleVisible?: boolean
   onPitchTrackerChange?: (enabled: boolean) => void
@@ -103,6 +104,7 @@ function ControlDeck({
   pitchTrackerEnabled = false,
   showTakeCards = true,
   showMetronome = false,
+  metronomeToggleVisible = true,
   audioEnhancerEnabled = false,
   pitchToggleVisible = true,
   onPitchTrackerChange,
@@ -298,6 +300,7 @@ function ControlDeck({
         handsFreeToggleVisible={Boolean(onAutoSoundRecordingChange) && !isRecording}
         onHandsFreeChange={onAutoSoundRecordingChange}
         layoutMode={settingsLayoutMode}
+        metronomeToggleVisible={metronomeToggleVisible}
         tunerTakePillsVisible={tunerTakePillsVisible}
         tunerTakePillsToggleVisible={tunerTakePillsToggleVisible}
         pitchToggleVisible={pitchToggleVisible}

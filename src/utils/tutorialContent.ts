@@ -129,14 +129,14 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
   {
     id: 'instrument',
     title: 'What do you play?',
-    body: 'Sets the tuner to read your written notes and listen for your instrument. Change it any time in Settings.',
+    body: 'So the tuner shows your written notes, not concert pitch.',
     cta: 'Continue',
   },
   {
     id: 'closing',
     title: 'Record your best take',
     body: 'Then beat it.',
-    cta: 'Start Tour',
+    cta: 'Start tour',
   },
 ]
 
@@ -194,7 +194,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
     selector: '[data-movable-take-card="true"]',
     placement: 'top',
     advance: 'take-card-layout-finished',
-    continueHint: 'Keep your finger down through steps 1–3.',
+    continueHint: 'Keep your finger down until step 3.',
     instructions: [
       'Press and hold the picture without moving.',
       'Wait for the vibration and wiggle.',
@@ -207,7 +207,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'open-overlays',
     title: 'Open Overlays',
-    body: 'The stacked-layers icon opens the controls you can place over Camera mode, including take cards, pitch, metronome, audio enhancement, and Hands-free.',
+    body: 'The stacked-layers icon opens the controls you can lay over the camera.',
     selector: '[data-tutorial="overlays-button"]',
     placement: 'top',
     advance: 'overlays-opened',
@@ -219,7 +219,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'close-overlays',
     title: 'Close Overlays',
-    body: 'Tap the same stacked-layers icon again to close the overlay controls.',
+    body: 'The same icon closes it.',
     selector: '[data-tutorial="overlays-button"]',
     placement: 'top',
     advance: 'overlays-closed',
@@ -231,7 +231,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'discover-multitrack',
     title: 'Build a Multitrack',
-    body: 'The four-panel icon opens Multitrack, where you can layer separate performances into one project. You can come back to it after the tour.',
+    body: 'The four-panel icon opens Multitrack, where you can layer separate performances into one project.',
     selector: '[data-tutorial="multitrack-button"]',
     placement: 'top',
     advance: 'tap-screen',
@@ -265,7 +265,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'close-expand-view',
     title: 'Close Expand View',
-    body: 'Tap the collapse button to return to Camera Mode.',
+    body: 'Puts you back in Camera Mode.',
     selector: '[data-tutorial="best-take-collapse"]',
     placement: 'left',
     advance: 'split-view-close',
@@ -288,7 +288,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'visit-metronome',
     title: 'Open the Metronome',
-    body: 'Tap Metronome.',
+    body: 'Tempo, time signature, subdivision, and timed practice routines.',
     selector: '[data-tutorial="audio-tab-metronome"]',
     placement: 'bottom',
     advance: 'audio-tab-metronome',
@@ -300,7 +300,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'visit-tuner',
     title: 'Try the Tuner',
-    body: 'Tap Tuner for live pitch feedback and reference drones.',
+    body: 'Live pitch and cents, plus drones you can hold under a passage.',
     selector: '[data-tutorial="audio-tab-tuner"]',
     placement: 'bottom',
     advance: 'audio-tab-tuner',
@@ -324,7 +324,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'return-to-audio',
     title: 'Return to Audio',
-    body: 'Tap Audio to return to recording and take comparison.',
+    body: 'Back to recording and comparing takes.',
     selector: '[data-tutorial="audio-tab-audio"]',
     placement: 'bottom',
     advance: 'audio-tab-audio',
@@ -336,7 +336,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'open-take-vault',
     title: 'Open the Take Vault',
-    body: 'Tap Take Vault to see saved recordings.',
+    body: 'Every take you record lands here automatically.',
     selector: '[data-tutorial="vault-button"]',
     placement: 'top',
     advance: 'vault-open',
@@ -359,7 +359,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'open-settings',
     title: 'Open Settings',
-    body: 'Tap the cog to open Settings.',
+    body: 'Your instrument, hands-free timing, and drone setup live here.',
     selector: '[data-tutorial="settings-button"]',
     placement: 'top',
     advance: 'settings-open',
@@ -372,7 +372,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'open-quick-tools',
     title: 'iPhone Quick Tools',
-    body: 'Open Quick Tools Access. Tuner and Metronome each include setup for the Action Button, Lock Screen widget/control, and Control Center.',
+    body: 'Put the tuner or metronome on your Lock Screen, Control Center, or Action Button.',
     selector: '[data-tutorial="quick-tools-access"]',
     placement: 'bottom',
     advance: 'quick-tools-opened',
@@ -385,7 +385,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'camera-mode',
     title: 'Camera Mode',
-    body: 'Camera Mode keeps visual technique, quick comparison, and the controls you use most in one view.',
+    body: 'Record video takes and compare them side by side.',
     bullets: [
       'Bottom pill: Take Vault, Overlays, Record, Tools, Settings',
       'Tap the full red Record button to start or stop a video take',
@@ -397,7 +397,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'audio-mode',
     title: 'Audio Mode',
-    body: 'Audio Mode is the fast-listening home inside Tools, with a calm idle waveform and immediate playback after each take.',
+    body: 'Record without video. Each take plays back the moment you stop.',
     bullets: [
       'Bottom pill: Take Vault, Overlays, Record, Camera, Settings',
       'Use Audio, Metronome, Tuner, and Games from the top tabs',
@@ -436,24 +436,21 @@ export const HELP_TOPICS: HelpTopic[] = [
       'Record or assign a take to each performance panel',
       'Add a backing track, click, pitch guide, or sheet music when needed',
       'Balance the parts and align their starts before exporting',
-      'Your original Take Vault recordings remain separate',
     ],
   },
   {
     id: 'practice-games',
     title: 'Practice Games',
-    body: 'The Games tab uses live pitch to make focused fundamentals more visual. Microphone input is processed live and is not saved.',
+    body: 'Two games that listen to what you play. Nothing from the mic is saved.',
     bullets: [
-      'Staff Jumper responds to detected notes for sight-reading practice',
-      'Staff Jumper does not grade full rhythm accuracy or note duration',
-      'Balance measures centered pitch time during long tones',
-      'Game results report measurable pitch data, not tone or technique',
+      'Staff Jumper is sight-reading — it listens for pitch, not rhythm',
+      'Balance times how long you hold a note dead center',
     ],
   },
   {
     id: 'practice-sessions',
     title: 'Practice Routines',
-    body: 'Open Program from the Metronome tab to turn a difficult passage or full program into a reusable sequence of timed sections.',
+    body: 'Open Program from the Metronome tab to build a passage or a whole program into timed sections you can run again.',
     bullets: [
       'Add sections with bars, tempo, time signature, feel, and repeats',
       'Drag section cards to reorder the routine',
@@ -475,10 +472,10 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'tuner-drones',
     title: 'Tuner & Drones',
-    body: 'The Tuner tab combines responsive live pitch with sustained reference tones for intonation practice.',
+    body: 'Live pitch on one side, a drone you can play against on the other.',
     bullets: [
-      'Choose Voice, Strings, or Winds in Settings for note guidance',
-      'Use Transpose on the right so displayed notes match your instrument’s written pitch',
+      'Choose Voice, Strings, or Winds in Settings so detection suits your instrument',
+      'Use Transpose on the right so the notes shown match what you read',
       'Play to see pitch direction and cents in real time',
       'Tap drone notes on or off, or combine notes into chords',
       'Adjust drone volume and waveform in Settings',
@@ -487,12 +484,12 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'pitch-insights',
     title: 'Pitch Insights',
-    body: 'Pitch Insights learns where your stable notes tend to sit while you use the tuner. Everything stays on your device.',
+    body: 'Shows where each of your notes actually tends to sit. Everything stays on your device.',
     bullets: [
       'Open Insights from the center button beneath the pitch graph',
-      'BestTake saves one derived observation per stable held note—not raw audio or tuner frames',
-      'Each note moves from Collecting Data to Early and Established tendencies as evidence grows',
-      'Open a note for recent versus overall tendency, consistency, and a lightweight trend',
+      'Every stable note you hold in the tuner adds one reading, never audio',
+      'A note needs a while before its tendency is worth trusting',
+      'Open any note for its recent vs overall tendency and how consistent it is',
     ],
   },
   {
@@ -509,7 +506,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'take-vault',
     title: 'Take Vault',
-    body: 'The Take Vault saves recordings automatically and keeps each session’s references and new work together.',
+    body: 'Every recording saves here on its own, session by session.',
     bullets: [
       'Open it from the left end of the Camera or Audio pill',
       'Search, sort, select, favorite, trim, share, or delete takes',
@@ -520,7 +517,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'take-cards',
     title: 'Take Cards',
-    body: 'Best Take and Current Take support two distinct gestures: a direct take swap and a held layout move.',
+    body: 'Two gestures on the same cards: drag the label to swap takes, hold the picture to move the card.',
     bullets: [
       'To swap takes, drag immediately from one card’s text label onto the other card',
       'To change the layout, press the picture area and hold still until the haptic and wiggle begin',
@@ -532,28 +529,26 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'pinning-best-takes',
     title: 'Best Take Pinning',
-    body: 'Pin a performance as Best Take when you want a stable reference for the repetitions that follow.',
+    body: 'Pin a take as Best when you want something to beat on the next run.',
     bullets: [
       'Pin Current Take from its card or choose a take in the Vault',
       'Drag Current Take directly onto Best Take to promote it; the previous Best moves to Current',
-      'Pinning does not duplicate or remove the original recording',
     ],
   },
   {
     id: 'drag-to-best-take',
     title: 'Swap Best & Current',
-    body: 'Drag immediately from a take’s text label to the other card. This is intentionally different from holding a card to rearrange the layout.',
+    body: 'Drag straight from a take’s text label onto the other card.',
     bullets: [
-      'Current to Best promotes the new reference and moves the previous Best to Current',
-      'Best to Current performs the same two-way swap in reverse',
-      'For layout changes, wait for the haptic and wiggle before dragging',
-      'Swapping never deletes either recording from the Take Vault',
+      'Current onto Best promotes it, and the old Best drops to Current',
+      'Best onto Current swaps them back the same way',
+      'Dragging the picture area instead moves the card — wait for the wiggle',
     ],
   },
   {
     id: 'expand-mode',
     title: 'Expand View',
-    body: 'Expand View creates a larger split comparison for takes, imported references, and YouTube practice material.',
+    body: 'A bigger split screen for takes, imported references, and YouTube.',
     bullets: [
       'In Camera Mode, tap Expand View directly above Record',
       'Drag the middle divider to give either side more room',
@@ -564,11 +559,11 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'vault-settings',
     title: 'Vault Settings',
-    body: 'Vault controls keep organization, selection, and cleanup actions close to saved recordings.',
+    body: 'Search, sort, and clean up a long session.',
     bullets: [
       'Use search and sort to narrow a long session',
-      'Select multiple takes for batch actions',
-      'Use destructive actions carefully; deleted takes cannot always be recovered',
+      'Select multiple takes to act on them at once',
+      'Deleting a take is usually permanent, so check before you confirm',
     ],
   },
   {
@@ -578,22 +573,17 @@ export const HELP_TOPICS: HelpTopic[] = [
     bullets: [
       'Open Expand View for the clearest side-by-side layout',
       'Load a YouTube play-along or upload an audio or video reference',
-      'Reference media stays separate from your Take Vault recordings',
-      'Use headphones to reduce reference sound bleeding into the microphone',
+      'Use headphones, or the mic will pick up the reference along with you',
     ],
   },
   {
     id: 'reset-tutorials',
     title: 'Reset Tutorials',
-    body: 'Replay the updated introduction and contextual coach marks whenever you want a fresh walkthrough.',
-    bullets: [
-      'Restarts the onboarding cards',
-      'Restarts the guided Camera and Tools tour',
-      'Does not change recordings, routines, or app settings',
-    ],
+    body: 'Run the intro cards and the guided tour again. Your recordings and settings are untouched.',
+    bullets: [],
   },
 ]
 
 // Versioned so users who completed the older interface tutorial see this revised walkthrough.
-export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v6'
-export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v7'
+export const ONBOARDING_STORAGE_KEY = 'sessionmirror:tutorial:onboarding-complete-v7'
+export const COACH_STORAGE_KEY = 'sessionmirror:tutorial:coach-seen-v8'

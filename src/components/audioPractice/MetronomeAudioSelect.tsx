@@ -65,9 +65,15 @@ export default function MetronomeAudioSelect<T extends string>({
             setOpen((visible) => !visible)
           }}
         >
-          <span className="metronome-audio-select__value">{selectedOption?.label ?? value}</span>
+          <span className="metronome-audio-select__selection">
+            <span className="metronome-audio-select__value">{selectedOption?.label ?? value}</span>
+            <ChevronDown
+              className="metronome-audio-select__chevron"
+              strokeWidth={2.2}
+              aria-hidden
+            />
+          </span>
         </button>
-        <ChevronDown className="metronome-audio-select__chevron" strokeWidth={2.2} aria-hidden />
         {open && (
           <div
             id={listboxId}

@@ -9,6 +9,7 @@ interface BalanceSceneProps {
   target: BalanceTarget | null
   visualRef: MutableRefObject<BalanceVisualSnapshot>
   characterId: BalanceCharacterId
+  toleranceCents: number
 }
 
 export default function BalanceScene({
@@ -16,6 +17,7 @@ export default function BalanceScene({
   target,
   visualRef,
   characterId,
+  toleranceCents,
 }: BalanceSceneProps) {
   const sceneRef = useRef<HTMLDivElement>(null)
   const characterRef = useRef<HTMLDivElement>(null)
@@ -107,6 +109,10 @@ export default function BalanceScene({
         (completing || resting) && visualProgress >= 0.96,
       )
       scene.style.setProperty('--balance-progress', String(visualProgress))
+      // Reveal the rope from the near anchor up to the character. Progress is
+      // accumulated balanced time, so holding the note literally builds the
+      // path forward instead of merely filling a detached progress bar.
+      scene.style.setProperty('--balance-rope-clip', `${Math.max(0, ropeY - 2)}%`)
       scene.style.setProperty('--balance-camera-x', `${cameraX}px`)
       scene.style.setProperty('--balance-camera-y', `${cameraY}px`)
       scene.style.setProperty('--balance-destination-scale', String(0.88 + visualProgress * 0.38))
@@ -127,8 +133,23 @@ export default function BalanceScene({
     }
   }, [prefersReducedMotion, visualRef])
 
+  const toleranceRatio =
+    (Math.max(3, Math.min(30, toleranceCents)) - 3) / (30 - 3)
+  const ropeLineWidth = 3.75 + toleranceRatio * 8.25
+
   return (
-    <div ref={sceneRef} className="balance-scene" data-phase={phase} data-target={target?.writtenLabel ?? ''} aria-hidden>
+    <div
+      ref={sceneRef}
+      className="balance-scene"
+      data-phase={phase}
+      data-target={target?.writtenLabel ?? ''}
+      style={{
+        ['--balance-rope-line-width' as string]: ropeLineWidth.toFixed(2),
+        ['--balance-rope-shadow-width' as string]: (ropeLineWidth + 2.2).toFixed(2),
+        ['--balance-rope-twist-width' as string]: Math.max(1.8, ropeLineWidth * 0.42).toFixed(2),
+      }}
+      aria-hidden
+    >
       <div className="balance-scene__sky">
         <span className="balance-sky-glow" />
         <span className="balance-cloud-cluster balance-cloud-cluster--one" />
@@ -168,10 +189,13 @@ export default function BalanceScene({
         <span className="balance-cloud-mound balance-cloud-mound--six" />
         <span className="balance-cloud-mound balance-cloud-mound--seven" />
 
-        <svg className="balance-rope" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path className="balance-rope__shadow" d="M75 0 C55 30 35 67 20 100" />
-          <path className="balance-rope__line" d="M75 0 C55 30 35 67 20 100" />
-          <path className="balance-rope__twist" d="M75 0 C55 30 35 67 20 100" />
+        <svg className="balance-rope balance-rope--guide" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <path d="M20 100 C35 67 55 30 75 0" />
+        </svg>
+        <svg className="balance-rope balance-rope--live" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <path className="balance-rope__shadow" d="M20 100 C35 67 55 30 75 0" />
+          <path className="balance-rope__line" d="M20 100 C35 67 55 30 75 0" />
+          <path className="balance-rope__twist" d="M20 100 C35 67 55 30 75 0" />
         </svg>
 
         <div className="balance-destination-island">

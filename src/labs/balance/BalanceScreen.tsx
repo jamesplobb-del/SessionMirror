@@ -100,7 +100,6 @@ export default function BalanceScreen({
       <BalanceSetup
         settings={game.state.settings}
         customRoutines={game.customRoutines}
-        progression={game.data}
         previewTarget={previewTargets[0] ?? null}
         bestBalancedMs={game.state.bestBalancedMs}
         readout={readout}
@@ -108,6 +107,7 @@ export default function BalanceScreen({
         permissionBlocked={micPermissionBlocked}
         permissionPending={micPermissionPending}
         hapticFeedback={hapticFeedback}
+        suppressUntilRef={game.suppressUntilRef}
         onBack={onBack}
         onStart={game.start}
         onRequestMic={onRequestMicStream}
@@ -219,6 +219,7 @@ export default function BalanceScreen({
           target={nextTarget}
           visualRef={game.visualRef}
           characterId={game.state.settings.characterId}
+          toleranceCents={game.toleranceCents}
         />
         <section className="balance-rest-card">
           <p className="balance-eyebrow">Rest</p>
@@ -274,6 +275,7 @@ export default function BalanceScreen({
         target={target}
         visualRef={game.visualRef}
         characterId={game.state.settings.characterId}
+        toleranceCents={game.toleranceCents}
       />
 
       <section className="balance-game-hud" aria-label="Live balance status">

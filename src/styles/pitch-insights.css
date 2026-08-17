@@ -95,7 +95,7 @@ html.app-dark-mode .pitch-insights-screen {
   margin: 0;
   color: var(--pi-text-primary);
   font-size: 1.3rem;
-  font-weight: 780;
+  font-weight: 700;
   letter-spacing: -0.025em;
 }
 
@@ -147,7 +147,7 @@ html.app-dark-mode .pitch-insights-screen {
   gap: 0.7rem;
   overflow: hidden;
   border: 1px solid var(--pi-border);
-  border-radius: 1.4rem;
+  border-radius: 1.35rem;
   background: var(--pi-surface);
   padding: 1.3rem 1.3rem 1.2rem;
   text-align: center;
@@ -179,7 +179,7 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-hero__status {
   font-size: 1.28rem;
-  font-weight: 780;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -201,18 +201,18 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-hero__ticks span {
   color: var(--pi-text-tertiary);
-  font-size: 0.66rem;
-  font-weight: 650;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .pitch-insights-hero__sub {
   margin: 0;
   color: var(--pi-text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .pitch-insights-hero__sub strong {
-  font-weight: 780;
+  font-weight: 700;
 }
 
 .pitch-insights-hero__sub strong.is-improving {
@@ -318,7 +318,7 @@ html.app-dark-mode .pitch-insights-screen {
   background: var(--pi-surface);
   padding: 0.4rem 0.85rem;
   color: var(--pi-text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
   box-shadow: var(--pi-shadow-card);
 }
@@ -361,7 +361,7 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-list > header span {
   color: var(--pi-text-primary);
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   text-transform: none;
@@ -419,7 +419,7 @@ html.app-dark-mode .pitch-insights-screen {
   border-radius: 0.9rem;
   background: var(--pi-surface-soft);
   color: var(--pi-text-primary);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   place-items: center;
@@ -469,7 +469,7 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-row__collecting {
   color: var(--pi-text-tertiary);
   font-size: 0.7rem;
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -506,15 +506,15 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-link-row__copy strong {
   display: block;
   color: var(--pi-text-primary);
-  font-size: 0.9rem;
-  font-weight: 650;
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .pitch-insights-link-row__copy span {
   display: block;
   margin-top: 0.1rem;
   color: var(--pi-text-tertiary);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
 }
 
 .pitch-insights-link-row__count {
@@ -567,7 +567,7 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-detail__trend-basis {
   margin: 0.35rem 0 0;
   color: var(--pi-text-tertiary);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   line-height: 1.4;
 }
 
@@ -592,7 +592,7 @@ html.app-dark-mode .pitch-insights-screen {
   left: 0;
   width: 2.2rem;
   color: var(--pi-text-tertiary);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -623,7 +623,7 @@ html.app-dark-mode .pitch-insights-screen {
   border-radius: 0.9rem;
   background: var(--pi-surface-soft);
   color: var(--pi-text-tertiary);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   place-items: center;
 }
 
@@ -634,12 +634,12 @@ html.app-dark-mode .pitch-insights-screen {
   gap: 0.5rem;
   margin-top: 0.5rem;
   color: var(--pi-text-tertiary);
-  font-size: 0.65rem;
+  font-size: 0.62rem;
 }
 
 .pitch-insights-all-time > footer strong {
   color: var(--pi-text-primary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -657,8 +657,8 @@ html.app-dark-mode .pitch-insights-screen {
   background: var(--pi-danger-soft);
   padding: 0.4rem 0.7rem;
   color: var(--pi-danger);
-  font-size: 0.68rem;
-  font-weight: 720;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 /* Practice Days & Session Rows */
@@ -678,7 +678,7 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-days > header span,
 .pitch-insights-sessions > header span {
   color: var(--pi-text-primary);
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   text-transform: none;
@@ -749,10 +749,8 @@ html.app-dark-mode .pitch-insights-screen {
 }
 
 .pitch-insights-day-row__date small {
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .pitch-insights-day-row__date strong {
@@ -772,7 +770,7 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-day-row__copy > strong {
   overflow: hidden;
   color: var(--pi-text-primary);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -789,7 +787,7 @@ html.app-dark-mode .pitch-insights-screen {
   color: var(--pi-text-primary);
   font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 780;
+  font-weight: 700;
 }
 
 .pitch-insights-day-row__open > svg {
@@ -827,8 +825,8 @@ html.app-dark-mode .pitch-insights-screen {
   background: transparent;
   padding: 0.4rem 0.9rem;
   color: var(--pi-accent);
-  font-size: 0.78rem;
-  font-weight: 750;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .pitch-insights-session-row {
@@ -854,7 +852,7 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-session-row > div > strong {
   color: var(--pi-text-primary);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
 }
 
 .pitch-insights-session-row > div > span {
@@ -865,7 +863,7 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-session-row > div > span.pitch-insights-session-row__note {
   margin-top: 0.1rem;
   color: var(--pi-accent);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   line-height: 1.4;
 }
 
@@ -873,7 +871,7 @@ html.app-dark-mode .pitch-insights-screen {
   color: var(--pi-text-primary);
   font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 780;
+  font-weight: 700;
 }
 
 /* Detail Views */
@@ -886,7 +884,7 @@ html.app-dark-mode .pitch-insights-screen {
   background: transparent;
   padding: 0 0.2rem;
   color: var(--pi-accent);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -901,7 +899,7 @@ html.app-dark-mode .pitch-insights-screen {
   justify-content: space-between;
   gap: 1rem;
   border: 1px solid var(--pi-border);
-  border-radius: 1.4rem;
+  border-radius: 1.35rem;
   background: var(--pi-surface);
   padding: 1.25rem;
   box-shadow: var(--pi-shadow-card);
@@ -909,7 +907,7 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-detail__hero span {
   color: var(--pi-text-tertiary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -928,7 +926,7 @@ html.app-dark-mode .pitch-insights-screen {
   max-width: 24rem;
   margin: 0.5rem 0 0;
   color: var(--pi-text-secondary);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   line-height: 1.42;
 }
 
@@ -960,7 +958,7 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-detail__metrics article > span {
   color: var(--pi-text-tertiary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -976,7 +974,7 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-detail__metrics article > small {
   margin-top: 0.25rem;
   color: var(--pi-text-tertiary);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
 }
 
 .pitch-insights-trend-label {
@@ -987,7 +985,7 @@ html.app-dark-mode .pitch-insights-screen {
   background: var(--pi-surface-soft);
   padding: 0.35rem 0.6rem;
   color: var(--pi-text-secondary);
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
 }
 
@@ -1006,7 +1004,7 @@ html.app-dark-mode .pitch-insights-screen {
   justify-content: flex-end;
   margin-top: 0.6rem;
   color: var(--pi-text-tertiary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .pitch-insights-detail__comparison strong {
@@ -1022,7 +1020,7 @@ html.app-dark-mode .pitch-insights-screen {
   gap: 1rem;
   margin-top: 1.25rem;
   border: 1px solid var(--pi-danger-border);
-  border-radius: 1.2rem;
+  border-radius: 1.15rem;
   background: var(--pi-danger-soft);
   padding: 1rem 1.15rem;
 }
@@ -1040,7 +1038,7 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-reset-zone span {
   color: var(--pi-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .pitch-insights-reset-button {
@@ -1052,8 +1050,8 @@ html.app-dark-mode .pitch-insights-screen {
   background: var(--pi-danger-soft);
   padding: 0.45rem 0.85rem;
   color: var(--pi-danger);
-  font-size: 0.75rem;
-  font-weight: 750;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .pitch-insights-reset-button svg {
@@ -1071,7 +1069,7 @@ html.app-dark-mode .pitch-insights-screen {
   gap: 0.65rem;
   margin-top: 1rem;
   border: 1px solid var(--pi-border);
-  border-radius: 1.4rem;
+  border-radius: 1.35rem;
   background: var(--pi-surface);
   padding: 2rem;
   color: var(--pi-text-secondary);
@@ -1086,7 +1084,7 @@ html.app-dark-mode .pitch-insights-screen {
 
 .pitch-insights-state strong {
   color: var(--pi-text-primary);
-  font-size: 0.98rem;
+  font-size: 0.95rem;
 }
 
 .pitch-insights-state p {
@@ -1103,8 +1101,8 @@ html.app-dark-mode .pitch-insights-screen {
   background: var(--pi-accent-soft);
   padding: 0.5rem 1rem;
   color: var(--pi-accent);
-  font-size: 0.8rem;
-  font-weight: 750;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .pitch-insights-state__spinner {

@@ -34,10 +34,28 @@ export interface PerformancePanelState {
   sectionEndSec?: number
 }
 
+/**
+ * One image in the music panel's timeline. Musicians reading off a photo of the
+ * page want to cut line to line, so the panel holds a sequence of screenshots
+ * instead of a single picture: each cue takes over at `startSec` and stays up
+ * until the next one starts.
+ */
+export interface SheetMusicCue {
+  id: string
+  asset: SheetMusicAsset
+  startSec: number
+}
+
 export interface SheetMusicPanelState {
   kind: 'sheet-music'
   id: string
+  /**
+   * The first image — on screen from timeline zero, and the one whose
+   * framePosition/frameScale place the panel in the grid for the whole song.
+   */
   asset: SheetMusicAsset | null
+  /** Later images, each cutting in at its own timeline second. */
+  cues?: SheetMusicCue[]
 }
 
 export type MultitrackPanelState = PerformancePanelState | SheetMusicPanelState

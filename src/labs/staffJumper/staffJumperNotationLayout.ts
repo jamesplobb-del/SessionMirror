@@ -82,7 +82,8 @@ export function layoutRhythm(slots: PlatformSlot[]): RhythmLayout {
     const slot = slots[index]!
     const { rhythm } = slot.note
 
-    if (!hasStem(rhythm.value)) {
+    // A rest is a single glyph — no stem, no flag, and no place in a beam.
+    if (rhythm.isRest || !hasStem(rhythm.value)) {
       index += 1
       continue
     }

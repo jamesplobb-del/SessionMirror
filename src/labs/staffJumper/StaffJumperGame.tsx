@@ -47,6 +47,7 @@ import {
   type StemDirection,
 } from './staffNotationMap'
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
+import StaffRest from './StaffRest'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
 import { layoutRhythm } from './staffJumperNotationLayout'
 import { isHollowNotehead, METERS } from './staffJumperRhythm'
@@ -145,9 +146,14 @@ export default function StaffJumperGame({
   const isPlayableMatch = isMatch && (config.difficulty !== 'hard' || Math.abs(readout.cents) <= 20)
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
   const cents = Math.round(readout.cents)
-  const targetDisplay = config.difficulty === 'easy' ? target.noteLabel : 'See staff'
-  const responseHint =
-    detectedPc == null
+  const targetDisplay = target.isRest
+    ? 'Rest'
+    : config.difficulty === 'easy'
+      ? target.noteLabel
+      : 'See staff'
+  const responseHint = target.isRest
+    ? 'Rest — count it through'
+    : detectedPc == null
       ? config.difficulty === 'easy'
         ? `Play ${target.noteLabel}`
         : 'Play the note under the player'
@@ -287,8 +293,9 @@ export default function StaffJumperGame({
           : state.feedback === 'wrong'
             ? `Wrong note. ${state.hearts} hearts left.`
             : ''
-  const targetAnnouncement =
-    config.difficulty === 'easy'
+  const targetAnnouncement = target.isRest
+    ? 'Rest. Wait for the next note.'
+    : config.difficulty === 'easy'
       ? `Target ${target.noteLabel}.`
       : `Read the next note for jump ${state.sequenceStep + 1}.`
   const turnFraction = Math.max(0, Math.min(1, turnRemainingMs / Math.max(1, turnDurationMs)))
@@ -462,6 +469,7 @@ export default function StaffJumperGame({
                     className={[
                       'sj-note',
                       `sj-note--${slot.note.kind}`,
+                      slot.note.isRest ? 'sj-note--rest' : '',
                       slot.role === 'target' ? 'sj-note--target' : '',
                       slot.role === 'future' ? 'sj-note--future' : '',
                       slot.role === 'landed' ? 'sj-note--landed' : '',
@@ -472,6 +480,11 @@ export default function StaffJumperGame({
                       .join(' ')}
                     style={{ left: `${slot.xPx}px`, top: `${slot.note.yPx}px` }}
                   >
+                    {/* A rest replaces the whole note: no head, ledgers or label. */}
+                    {slot.note.isRest && (
+                      <StaffRest value={slot.note.rhythm.value} opacity={slot.opacity} />
+                    )}
+
                     {/* Draw every ledger rule required between the staff and this note. */}
                     {slot.note.ledgerLineYPx.map((ledgerY) => (
                       <span
@@ -489,21 +502,23 @@ export default function StaffJumperGame({
 
                     {/* Notehead oval — centered at (0, 0) = note center.
                         Half and whole notes are rings rather than filled. */}
-                    <span
-                      className={`sj-note__head ${
-                        isHollowNotehead(slot.note.rhythm.value) ? 'sj-note__head--hollow' : ''
-                      }`}
-                      style={{
-                        width: `${NOTEHEAD_W}px`,
-                        height: `${NOTEHEAD_H}px`,
-                        opacity: slot.opacity,
-                        borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
-                      }}
-                      aria-hidden
-                    />
+                    {!slot.note.isRest && (
+                      <span
+                        className={`sj-note__head ${
+                          isHollowNotehead(slot.note.rhythm.value) ? 'sj-note__head--hollow' : ''
+                        }`}
+                        style={{
+                          width: `${NOTEHEAD_W}px`,
+                          height: `${NOTEHEAD_H}px`,
+                          opacity: slot.opacity,
+                          borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
+                        }}
+                        aria-hidden
+                      />
+                    )}
 
                     {/* Augmentation dot, always in a space. */}
-                    {slot.note.rhythm.dotted && (
+                    {!slot.note.isRest && slot.note.rhythm.dotted && (
                       <span
                         className="sj-note__dot"
                         style={{
@@ -694,19 +709,22 @@ export default function StaffJumperGame({
               <p className={`sj-target-dock__hint ${isPlayableMatch ? 'sj-target-dock__hint--match' : ''}`}>
                 {responseHint}
               </p>
-              <div
-                className="sj-turn-timer"
-                key={`sj-turn-${state.sequenceStep}-${state.missToken}`}
-                style={
-                  {
-                    '--sj-turn-remaining': `${turnRemainingMs}ms`,
-                    '--sj-turn-fraction': turnFraction,
-                  } as CSSProperties
-                }
-                aria-hidden
-              >
-                <span />
-              </div>
+              {/* Nothing is being timed during a rest, so nothing counts down. */}
+              {!target.isRest && (
+                <div
+                  className="sj-turn-timer"
+                  key={`sj-turn-${state.sequenceStep}-${state.missToken}`}
+                  style={
+                    {
+                      '--sj-turn-remaining': `${turnRemainingMs}ms`,
+                      '--sj-turn-fraction': turnFraction,
+                    } as CSSProperties
+                  }
+                  aria-hidden
+                >
+                  <span />
+                </div>
+              )}
             </div>
           )}
         </div>

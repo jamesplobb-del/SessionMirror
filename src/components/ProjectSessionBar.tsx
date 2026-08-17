@@ -64,7 +64,7 @@ export default function ProjectSessionBar({
 
   return (
     <div className={`mb-4 flex flex-col gap-2 ${className}`.trim()}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sessions</p>
+      <p className="text-xs font-medium text-stone-500">Sessions</p>
 
       <AnimatedExpand open={isNamingSession}>
         <form

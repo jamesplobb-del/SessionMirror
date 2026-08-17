@@ -501,10 +501,8 @@ html.app-audio-mode #root {
   border-radius: var(--audio-radius-pill);
   padding: 0.28rem 0.62rem;
   font-family: var(--audio-font);
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: #ffffff;
   background: var(--audio-blue);
 }
@@ -749,10 +747,10 @@ html.app-audio-mode #root {
 .app-ui-overlay--split-open.app-ui-overlay--audio-mode .pip-empty-state--split .pip-empty-action {
   min-height: 2.05rem;
   border: 0 !important;
-  border-radius: 0.82rem;
+  border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.92) !important;
   color: var(--audio-text-primary) !important;
-  font-weight: 650;
+  font-weight: 600;
   box-shadow:
     0 8px 20px rgba(23, 26, 34, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
@@ -859,7 +857,7 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 .audio-mode-status-pill time {
   min-width: 2.75rem;
   font-size: 0.95rem;
-  font-weight: 550;
+  font-weight: 600;
   letter-spacing: -0.015em;
 }
 
@@ -981,7 +979,7 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
   margin: 0;
   color: var(--audio-text-secondary);
   font-size: clamp(0.78rem, 1.55vh, 0.9rem);
-  font-weight: 520;
+  font-weight: 400;
 }
 
 .audio-mode-take-stack {
@@ -1067,7 +1065,7 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
   color: var(--audio-text-secondary);
   font-size: clamp(0.68rem, 2.8vw, 0.79rem);
   font-variant-numeric: tabular-nums;
-  font-weight: 520;
+  font-weight: 400;
 }
 
 .audio-mode-take-card__duration > span {
@@ -1099,7 +1097,7 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 }
 
 .audio-mode-waveform:focus-visible {
-  border-radius: 0.35rem;
+  border-radius: 0.3rem;
   outline: 2px solid color-mix(in srgb, var(--audio-blue) 65%, transparent);
   outline-offset: 0.2rem;
 }

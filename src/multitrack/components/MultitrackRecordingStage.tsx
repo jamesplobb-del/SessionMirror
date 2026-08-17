@@ -32,6 +32,7 @@ import {
   subscribeNativeCameraPreviewFrames,
 } from '../../utils/nativeCameraFrameBridge'
 import { setNativeCameraFrameBridgeEnabled } from '../../utils/nativeCameraTest'
+import { APP_FOREGROUND_RECOVERY_EVENT } from '../../utils/appForeground'
 import type { MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
 import MultitrackClickSettings from './MultitrackClickSettings'
@@ -65,6 +66,8 @@ interface MultitrackRecordingStageProps {
   /** "You'll hear" chips: other tiles + backing + click, all-on by default. */
   monitorSources: MultitrackMonitorSource[]
   onToggleMonitorSource: (id: string) => void
+  /** A backing track is loaded — the click starts off because it rarely lines up with it. */
+  hasBacking?: boolean
   /** Native iOS camera bridge is delivering live frames — show the canvas, hide the WebKit video. */
   nativeLivePreviewActive?: boolean
   /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
@@ -101,6 +104,7 @@ export default function MultitrackRecordingStage({
   reviewMediaRef: externalReviewMediaRef,
   monitorSources,
   onToggleMonitorSource,
+  hasBacking = false,
   nativeLivePreviewActive = false,
   nativeCameraBridgeEnabled = false,
   onPracticeChange,
@@ -118,11 +122,17 @@ export default function MultitrackRecordingStage({
   const emptyMediaRef = useRef<HTMLMediaElement | null>(null)
   const nativePreviewCanvasRef = useRef<HTMLCanvasElement>(null)
   const nativeFramePumpRef = useRef<ReturnType<typeof createNativePreviewFramePump> | null>(null)
-  const nativeBridgePrimedRef = useRef(false)
+  const nativeBridgePrimedRef = useRef(nativeLivePreviewActive)
   const [reviewPlaying, setReviewPlaying] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [headphonesActive, setHeadphonesActive] = useState(() => isHeadphoneOutputActive())
   const showNativeBridgeCanvas = nativeCameraBridgeEnabled || nativeLivePreviewActive
+
+  // Kept in sync every render — see MultitrackCapturePanel: an effect keyed on
+  // `nativeLivePreviewActive` alone cannot re-arm this after a teardown that
+  // happened while the flag never changed (Retry), and the canvas then silently
+  // drops every frame.
+  nativeBridgePrimedRef.current = nativeLivePreviewActive
 
   useEffect(() => subscribeHeadphoneOutput(setHeadphonesActive), [])
 
@@ -178,7 +188,6 @@ export default function MultitrackRecordingStage({
       cancelled = true
       removeListener?.()
       void setNativeCameraFrameBridgeEnabled(false)
-      nativeBridgePrimedRef.current = false
       pump.stop()
       nativeFramePumpRef.current = null
       const canvas = nativePreviewCanvasRef.current
@@ -189,9 +198,16 @@ export default function MultitrackRecordingStage({
     }
   }, [inGrid, nativeCameraBridgeEnabled])
 
+  // Stopping the native capture session for background also clears its
+  // frame-bridge request; re-ask for frames whenever the app comes back.
   useEffect(() => {
-    nativeBridgePrimedRef.current = nativeLivePreviewActive
-  }, [nativeLivePreviewActive])
+    if (inGrid || !nativeCameraBridgeEnabled) return
+    const reassertFrameBridge = () => {
+      void setNativeCameraFrameBridgeEnabled(true)
+    }
+    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, reassertFrameBridge)
+    return () => window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, reassertFrameBridge)
+  }, [inGrid, nativeCameraBridgeEnabled])
 
   useEffect(() => {
     setReviewPlaying(false)
@@ -454,6 +470,12 @@ export default function MultitrackRecordingStage({
                 onChange={(clickEnabled) => onPracticeChange({ clickEnabled })}
               />
             </label>
+            {hasBacking && !practice.clickEnabled ? (
+              <p className="multitrack-countin-sheet__hint">
+                Off by default with a backing track — its tempo rarely matches the click. Turn it on
+                if your backing really is at {Math.round(practice.bpm)} BPM.
+              </p>
+            ) : null}
             <label className="multitrack-countin-sheet__row">
               <span>Count-in bars</span>
               <div className="multitrack-recording-stage__stepper">

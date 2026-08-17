@@ -112,7 +112,7 @@ function createQuickFunctionSetups(
       `Select BestTake ${toolName}.`,
       'Press and hold the Action Button to test it.',
     ],
-    note: 'Action Button availability depends on your iPhone model. BestTake cannot detect or change this assignment for you.',
+    note: 'Only iPhone 15 Pro and later have an Action Button.',
   },
   {
     id: 'siriOrShortcuts',
@@ -217,7 +217,7 @@ function QuickFunctionAccessRow({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <strong className="text-sm font-semibold text-stone-900">{setup.title}</strong>
-          <small className="rounded-full bg-stone-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-stone-500">
+          <small className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500">
             {setup.availability}
           </small>
         </span>
@@ -539,7 +539,7 @@ export default function SettingsDrawer({
           </nav>
 
           <section id="settings-section-general" className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+            <h3 className="text-xs font-medium text-stone-400">
               General
             </h3>
 
@@ -559,7 +559,7 @@ export default function SettingsDrawer({
           </section>
 
           <section id="settings-section-recording" className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+            <h3 className="text-xs font-medium text-stone-400">
               Audio Recording
             </h3>
 
@@ -609,7 +609,7 @@ export default function SettingsDrawer({
           </section>
 
           <section id="settings-section-tuner" className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+            <h3 className="text-xs font-medium text-stone-400">
               Pitch & Tuning
             </h3>
 
@@ -740,7 +740,7 @@ export default function SettingsDrawer({
           </section>
 
           <section id="settings-section-playback" className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+            <h3 className="text-xs font-medium text-stone-400">
               Playback
             </h3>
 
@@ -779,7 +779,7 @@ export default function SettingsDrawer({
 
           <div id="settings-section-more" className="space-y-5">
           <section className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+            <h3 className="text-xs font-medium text-stone-400">
               Storage
             </h3>
 
@@ -793,7 +793,7 @@ export default function SettingsDrawer({
 
           {onOpenLabs && (
             <section className="settings-group space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              <h3 className="text-xs font-medium text-stone-400">
                 Practice
               </h3>
 
@@ -814,7 +814,7 @@ export default function SettingsDrawer({
           )}
 
           <section className="settings-group space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+            <h3 className="text-xs font-medium text-stone-400">
               Learn the App
             </h3>
 

@@ -48,7 +48,7 @@ export interface PitchTunerProfile {
 
 const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Voice',
-  description: 'Sensitive live mic with a smooth trace and forgiving intonation readout.',
+  description: 'Listens gently and smooths the trace, so vibrato does not read as bad tuning.',
   minHz: 65,
   maxHz: 1100,
   clarityMin: 0.7,
@@ -77,7 +77,7 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
 
 const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Strings',
-  description: 'Exact intonation readout; trace eases between notes to stay readable.',
+  description: 'Reads cents exactly, and eases between notes so slides stay readable.',
   minHz: 82,
   maxHz: 1400,
   clarityMin: 0.76,
@@ -105,8 +105,7 @@ const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
 
 const WINDS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Winds',
-  description:
-    'Responsive tuning for flute, clarinet, saxophone, oboe, trumpet, horn, and other wind instruments.',
+  description: 'Reacts fast across a wide range, for anything from piccolo down to horn.',
   minHz: 55,
   maxHz: 1760,
   clarityMin: 0.68,

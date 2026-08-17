@@ -1,6 +1,14 @@
-import { Gamepad2, Music4, Play, Trophy, X } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Gamepad2, Music4, Play, Trophy, X } from 'lucide-react'
 import balanceShot from '../../assets/games/balance.jpg'
 import staffJumperShot from '../../assets/games/staff-jumper.jpg'
+import {
+  getPracticeGameCharacter,
+  loadPracticeGameCharacter,
+  PRACTICE_GAME_CHARACTERS,
+  savePracticeGameCharacter,
+  type PracticeGameCharacterId,
+} from '../../labs/practiceGameCharacters'
 import { loadBestScore as loadStaffJumperBestScore } from '../../labs/staffJumper/staffJumperMusicLogic'
 import { formatBalanceDuration, loadBalanceBestMs } from '../../labs/balance/balanceStorage'
 import Pressable from '../ui/Pressable'
@@ -19,6 +27,15 @@ export default function LabsMenu({
 }: LabsMenuProps) {
   const staffJumperBest = loadStaffJumperBestScore()
   const balanceBest = loadBalanceBestMs()
+  const [selectedCharacterId, setSelectedCharacterId] = useState<PracticeGameCharacterId>(
+    loadPracticeGameCharacter,
+  )
+  const selectedCharacter = getPracticeGameCharacter(selectedCharacterId)
+
+  const selectCharacter = (id: PracticeGameCharacterId) => {
+    setSelectedCharacterId(id)
+    savePracticeGameCharacter(id)
+  }
 
   return (
     <div className="arcade-menu flex min-h-0 flex-1 flex-col">
@@ -51,6 +68,44 @@ export default function LabsMenu({
         <h1>Choose a game</h1>
         <p>Your microphone hears every note — no buttons, no tapping.</p>
       </header>
+
+      <section className="arcade-character-picker" aria-labelledby="arcade-character-title">
+        <header>
+          <span>
+            <small>Character</small>
+            <h2 id="arcade-character-title">{selectedCharacter.name}</h2>
+          </span>
+          <p>Used in both games</p>
+        </header>
+        <div className="arcade-character-picker__rail" role="radiogroup" aria-label="Game character">
+          {PRACTICE_GAME_CHARACTERS.map((character) => {
+            const selected = selectedCharacterId === character.id
+            return (
+              <Pressable
+                key={character.id}
+                type="button"
+                intensity="soft"
+                hapticFeedback={hapticFeedback}
+                className={`arcade-character-option ${selected ? 'is-selected' : ''}`}
+                role="radio"
+                aria-checked={selected}
+                aria-label={`Use ${character.name} in both games`}
+                onClick={() => selectCharacter(character.id)}
+              >
+                <span aria-hidden>
+                  <img
+                    src={character.asset}
+                    alt=""
+                    draggable={false}
+                    style={{ transform: `scale(${character.scale})` }}
+                  />
+                  {selected && <Check />}
+                </span>
+              </Pressable>
+            )
+          })}
+        </div>
+      </section>
 
       <div className="arcade-menu__section-head">
         <h2>Games</h2>

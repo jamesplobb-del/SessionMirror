@@ -8,6 +8,7 @@ import {
   subscribeNativeCameraPreviewFrames,
 } from '../../utils/nativeCameraFrameBridge'
 import { setNativeCameraFrameBridgeEnabled } from '../../utils/nativeCameraTest'
+import { APP_FOREGROUND_RECOVERY_EVENT } from '../../utils/appForeground'
 import type { MultitrackRecordingPhase } from '../types'
 
 interface MultitrackCapturePanelProps {
@@ -42,8 +43,15 @@ export default function MultitrackCapturePanel({
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const framePumpRef = useRef<ReturnType<typeof createNativePreviewFramePump> | null>(null)
-  const bridgePrimedRef = useRef(false)
+  const bridgePrimedRef = useRef(nativeLivePreviewActive)
   const showNativeCanvas = nativeCameraBridgeEnabled || nativeLivePreviewActive
+
+  // Synced on every render on purpose. The frame-bridge effect below clears this
+  // on teardown (entering review after Stop), and an effect keyed only on
+  // `nativeLivePreviewActive` never re-runs to re-arm it when that flag stayed
+  // true the whole time — which is exactly what happens on Retry, leaving the
+  // canvas dropping every frame it receives (black stage, working recording).
+  bridgePrimedRef.current = nativeLivePreviewActive
 
   useEffect(() => {
     if (reviewTake || nativeLivePreviewActive) return
@@ -86,7 +94,6 @@ export default function MultitrackCapturePanel({
       cancelled = true
       removeListener?.()
       void setNativeCameraFrameBridgeEnabled(false)
-      bridgePrimedRef.current = false
       pump.stop()
       framePumpRef.current = null
       const canvas = canvasRef.current
@@ -95,9 +102,18 @@ export default function MultitrackCapturePanel({
     }
   }, [nativeCameraBridgeEnabled, reviewTake])
 
+  // Backgrounding tears the native capture session down, and stopping it clears
+  // the frame-bridge request with it. The Capacitor listener survives, so the
+  // tile would sit black on return until something remounted it — re-ask for
+  // frames on every foreground instead.
   useEffect(() => {
-    bridgePrimedRef.current = nativeLivePreviewActive
-  }, [nativeLivePreviewActive])
+    if (reviewTake || !nativeCameraBridgeEnabled) return
+    const reassertFrameBridge = () => {
+      void setNativeCameraFrameBridgeEnabled(true)
+    }
+    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, reassertFrameBridge)
+    return () => window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, reassertFrameBridge)
+  }, [nativeCameraBridgeEnabled, reviewTake])
 
   if (reviewTake) {
     return (

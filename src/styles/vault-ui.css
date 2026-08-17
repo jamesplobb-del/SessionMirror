@@ -93,9 +93,9 @@
   color: var(--audio-text-primary);
   box-shadow: var(--audio-shadow-fab);
   transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .native-bottom-sheet--vault .vault-header-icon-btn:hover {
@@ -114,16 +114,16 @@
   background: var(--audio-surface);
   padding: 0.42rem 0.72rem;
   color: var(--audio-text-primary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   box-shadow: var(--audio-shadow-fab);
   transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    border-color 160ms ease,
-    opacity 160ms ease;
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease,
+    opacity 180ms ease;
 }
 
 .native-bottom-sheet--vault .vault-header-action-btn:hover:not(:disabled) {
@@ -235,13 +235,13 @@
   background: var(--audio-surface);
   padding: 0.42rem 0.85rem;
   color: var(--audio-text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   box-shadow: var(--audio-shadow-fab);
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
 }
 
 .native-bottom-sheet--vault .vault-filter-pill:hover {
@@ -273,12 +273,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
-  border-radius: 0.55rem;
+  border-radius: 0.6rem;
   border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
   padding: 0.38rem 0.62rem;
   color: var(--audio-text-primary);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   box-shadow: var(--audio-shadow-fab);
 }
@@ -299,7 +299,7 @@
   width: 1.85rem;
   align-items: center;
   justify-content: center;
-  border-radius: 0.5rem;
+  border-radius: 0.45rem;
   border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
   color: var(--audio-text-secondary);
@@ -357,8 +357,8 @@
   padding: 0.62rem;
   box-shadow: var(--audio-shadow-card);
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .native-bottom-sheet--vault .vault-take-row--expanded {
@@ -425,9 +425,8 @@
   background: var(--audio-blue);
   padding: 0.14rem 0.4rem;
   color: #ffffff;
-  font-size: 0.5rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
   line-height: 1.2;
 }
 
@@ -482,7 +481,7 @@
 
 .native-bottom-sheet--vault .vault-take-row__date {
   color: var(--audio-text-secondary);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 500;
 }
 
@@ -490,7 +489,6 @@
   margin-top: 0.18rem;
   color: var(--audio-gold);
   font-size: 0.62rem;
-  letter-spacing: 0.08em;
   line-height: 1.2;
 }
 
@@ -519,10 +517,8 @@
   gap: 0.35rem;
   margin-bottom: 0.38rem;
   color: var(--audio-text-secondary);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .native-bottom-sheet--vault .vault-take-row__notes-input {
@@ -558,12 +554,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border-radius: 0.65rem;
+  border-radius: 0.6rem;
   border: 1px solid var(--audio-divider);
   background: var(--audio-bg-base);
   padding: 0.45rem 0.62rem;
   color: var(--audio-text-primary);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
 }
 
@@ -600,10 +596,8 @@
   align-items: center;
   gap: 0.28rem;
   color: var(--audio-text-secondary);
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .native-bottom-sheet--vault .vault-take-row__actions {
@@ -690,7 +684,7 @@
   z-index: 20;
   min-width: 9.5rem;
   overflow: hidden;
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   border: 1px solid var(--audio-divider);
   background: var(--audio-surface);
   padding: 0.28rem;
@@ -702,10 +696,10 @@
   width: 100%;
   align-items: center;
   gap: 0.45rem;
-  border-radius: 0.5rem;
+  border-radius: 0.45rem;
   padding: 0.48rem 0.55rem;
   color: var(--audio-text-primary);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 500;
   text-align: left;
 }
@@ -795,10 +789,10 @@
   animation-delay: 70ms;
 }
 .native-bottom-sheet--vault .vault-take-list > *:nth-child(4) {
-  animation-delay: 105ms;
+  animation-delay: 120ms;
 }
 .native-bottom-sheet--vault .vault-take-list > *:nth-child(n + 5) {
-  animation-delay: 140ms;
+  animation-delay: 180ms;
 }
 
 @keyframes vault-row-in {
@@ -833,7 +827,7 @@
 
 .native-bottom-sheet--vault .vault-skeleton-line {
   height: 0.65rem;
-  border-radius: 0.35rem;
+  border-radius: 0.3rem;
   background: rgba(23, 26, 34, 0.08);
 }
 

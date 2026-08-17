@@ -43,8 +43,8 @@
   display: grid;
   place-items: center;
   color: var(--audio-text-secondary, #6c7077);
-  font-size: 0.86rem;
-  font-weight: 650;
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .quick-metronome-screen {
@@ -83,7 +83,7 @@
   color: var(--audio-text-secondary, #6c7077);
   background: var(--audio-surface, #fff);
   box-shadow: 0 4px 14px rgba(23, 26, 34, 0.05);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -126,16 +126,14 @@
 .quick-tuner-header p {
   margin: 0 0 0.12rem;
   color: var(--audio-gold, #f7a600);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .quick-tuner-header h1 {
   margin: 0;
   font-size: clamp(1.18rem, 4.8vw, 1.55rem);
-  font-weight: 720;
+  font-weight: 700;
   letter-spacing: -0.025em;
 }
 
@@ -171,7 +169,7 @@
   color: var(--audio-blue, #1598ff);
   background: var(--audio-surface, #fff);
   box-shadow: 0 4px 14px rgba(23, 26, 34, 0.05);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -193,7 +191,7 @@
   margin: 0.3rem auto 0;
   color: var(--audio-text-secondary, #6c7077);
   font-size: clamp(0.68rem, 2.7vw, 0.78rem);
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .quick-tuner-stage {
@@ -285,7 +283,7 @@
   max-width: 24rem;
   margin: 0.65rem auto 1.25rem;
   color: var(--audio-text-secondary, #6c7077);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   line-height: 1.55;
 }
 
@@ -297,7 +295,7 @@
   border-radius: 999px;
   color: var(--audio-blue, #1598ff);
   background: var(--audio-blue-soft, rgba(21, 152, 255, 0.12));
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -342,7 +340,7 @@
   border-radius: 999px;
   color: var(--audio-text-secondary, #6c7077);
   background: transparent;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 

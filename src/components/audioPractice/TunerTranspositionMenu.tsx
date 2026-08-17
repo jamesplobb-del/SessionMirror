@@ -5,17 +5,23 @@ import {
   TUNER_TRANSPOSITION_OPTIONS,
   type TunerTranspositionId,
 } from '../../utils/tunerTransposition'
+import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../../utils/pitchConfig'
 
 interface TunerTranspositionMenuProps {
   value: TunerTranspositionId
   onChange: (value: TunerTranspositionId) => void
   onClose: () => void
+  instrument?: TunerInstrument
+  /** Detection profile — how forgiving the tuner is about what it hears. */
+  onInstrumentChange?: (value: TunerInstrument) => void
 }
 
 function TunerTranspositionMenu({
   value,
   onChange,
   onClose,
+  instrument,
+  onInstrumentChange,
 }: TunerTranspositionMenuProps) {
   const selectedRef = useRef<HTMLButtonElement | null>(null)
 
@@ -24,16 +30,36 @@ function TunerTranspositionMenu({
   }, [])
 
   return (
-    <section className="tuner-transposition-menu" aria-label="Tuner transposition">
+    <section className="tuner-transposition-menu" aria-label="Tuner settings">
       <header className="tuner-transposition-menu__header">
         <div>
-          <h2>Written pitch</h2>
-          <span>Note names follow your part. Frequency and cents stay at concert pitch.</span>
+          <h2>Tuner settings</h2>
+          <span>Note names follow your part. Cents stay at concert pitch.</span>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close transposition menu">
+        <button type="button" onClick={onClose} aria-label="Close tuner settings">
           <X aria-hidden />
         </button>
       </header>
+
+      {instrument && onInstrumentChange ? (
+        <div className="tuner-settings-source">
+          <p className="tuner-settings-source__label">Instrument</p>
+          <div role="radiogroup" aria-label="Instrument">
+            {TUNER_INSTRUMENTS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={id === instrument}
+                className={id === instrument ? 'is-selected' : ''}
+                onClick={() => onInstrumentChange(id)}
+              >
+                {getTunerProfile(id).label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="tuner-transposition-menu__list" role="radiogroup" aria-label="Instrument">
         {TUNER_TRANSPOSITION_GROUPS.map((group) => (
@@ -58,7 +84,6 @@ function TunerTranspositionMenu({
                       </span>
                       <span className="tuner-transposition-menu__copy">
                         <strong>{option.label}</strong>
-                        <small>{option.detail}</small>
                       </span>
                       <span className="tuner-transposition-menu__check" aria-hidden>
                         {selected ? <Check /> : null}

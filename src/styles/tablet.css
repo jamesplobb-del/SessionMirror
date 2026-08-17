@@ -25,7 +25,7 @@
   .hud-header__vault {
     max-width: min(100%, 22rem);
     padding: 0.5rem 1.125rem;
-    font-size: 0.875rem;
+    font-size: 0.88rem;
   }
 
   .app-hud-bottom {
@@ -114,7 +114,7 @@
   .control-deck--camera .control-deck__vault-btn span.absolute {
     height: 1.25rem;
     min-width: 1.25rem;
-    font-size: 0.625rem;
+    font-size: 0.62rem;
   }
 
   .control-deck--camera .control-deck__settings-btn {
@@ -170,11 +170,11 @@
 
   .auto-sound-hint {
     max-width: 18rem;
-    font-size: 0.8125rem;
+    font-size: 0.82rem;
   }
 
   .control-deck--camera .control-deck__main-row .text-xs {
-    font-size: 0.875rem;
+    font-size: 0.88rem;
   }
 
   .animated-bottom-sheet {
@@ -239,7 +239,7 @@
     min-height: 3rem;
     max-width: min(100%, 26rem);
     padding: 0.58rem 1.25rem;
-    font-size: 1rem;
+    font-size: 1.02rem;
   }
 
   .hud-header__vault svg {
@@ -334,7 +334,7 @@
 
   .split-compare-panel {
     min-height: clamp(15rem, 28vh, 22rem);
-    border-radius: 1.55rem;
+    border-radius: 1.5rem;
   }
 
   .split-ratio-handle {
@@ -514,11 +514,11 @@
   }
 
   .settings-group-row p:first-child {
-    font-size: 1rem;
+    font-size: 1.02rem;
   }
 
   .settings-group-row p:last-child {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     line-height: 1.35;
   }
 
@@ -537,7 +537,7 @@
   .native-bottom-sheet--vault .vault-take-row {
     gap: 1rem;
     padding: 0.85rem;
-    border-radius: 1.25rem;
+    border-radius: 1.15rem;
   }
 
   .native-bottom-sheet--vault .vault-take-row__thumb {
@@ -546,11 +546,11 @@
   }
 
   .native-bottom-sheet--vault .vault-take-row__title {
-    font-size: 1.05rem;
+    font-size: 1.02rem;
   }
 
   .native-bottom-sheet--vault .vault-take-row__date {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
   }
 
   .native-bottom-sheet--vault .vault-take-row__icon-btn,
@@ -1605,7 +1605,7 @@
   .app-ui-overlay--audio-mode
     .audio-practice-metronome__tempo-scrubber
     .metronome-audio-stage__bpm-label {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
   }
 
   .app-ui-overlay--audio-mode
@@ -1613,7 +1613,7 @@
     .audio-practice-metronome__step-btn {
     width: 4.25rem;
     height: 4.25rem;
-    font-size: 1rem;
+    font-size: 1.02rem;
   }
 
   .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
@@ -1664,7 +1664,7 @@
     .audio-practice-metronome__transport-row
     :is(.audio-practice-metronome__tap-btn, .audio-practice-metronome__program-btn) {
     min-height: 3.25rem;
-    font-size: 1rem;
+    font-size: 1.02rem;
   }
 
   /* Tuner: align the navigation and lower tool rail to Audio's 46rem/34rem
@@ -1679,7 +1679,7 @@
 
   .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn {
     min-height: 2.9rem;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
 
   .pitch-living-readout {
@@ -1690,7 +1690,7 @@
   .pitch-living-readout__status {
     min-height: 2rem;
     padding: 0.45rem 0.85rem;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
   }
 
   .pitch-living-readout__note {
@@ -1702,7 +1702,7 @@
   .pitch-living-readout__detail {
     min-height: 2rem;
     margin-top: 0.6rem;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
 
   .pitch-living-readout__detail strong {
@@ -1755,11 +1755,11 @@
   }
 
   .pitch-living-tool-rail > .pitch-living-drone-trigger span {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
   }
 
   .pitch-living-tool-rail > .pitch-living-drone-trigger small {
-    font-size: 0.68rem;
+    font-size: 0.7rem;
   }
 
   .pitch-living-tool-rail .pitch-living-insights-trigger {
@@ -1791,7 +1791,7 @@
 
   .labs-overlay .arcade-menu__hero p:last-child {
     max-width: 42rem;
-    font-size: 1rem;
+    font-size: 1.02rem;
   }
 
   .labs-overlay .arcade-game-list {
