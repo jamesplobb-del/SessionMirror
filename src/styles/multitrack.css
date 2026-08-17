@@ -1475,6 +1475,9 @@
 }
 
 .multitrack-layout-strip__item {
+  /* Nine presets overflow the row — keep each glyph legible and let the strip
+     scroll rather than letting flex squash them into slivers. */
+  flex: 0 0 auto;
   width: 2.6rem;
   height: 2.1rem;
   border-radius: 0.6rem;
@@ -2133,15 +2136,16 @@
 
 /* ── Timeline editor (CapCut-style: live canvas above, tracks below) ──
    Docked under the multitrack grid rather than covering it, so the boxes you
-   are retiming stay on screen and keep playing while you drag. */
+   are retiming stay on screen and keep playing while you drag. Uses the app's
+   elevated-light sheet palette so it reads as part of the canvas above it. */
 .multitrack-align-stage {
   display: flex;
   flex-direction: column;
   flex: 1 1 55%;
   min-height: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(9, 13, 20, 0.94);
-  color: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid #e7e5e4;
+  background: #fafaf9;
+  color: #1c1917;
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
@@ -2150,7 +2154,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #e7e5e4;
+  background: #fff;
 }
 
 .multitrack-align-stage__titles {
@@ -2163,17 +2168,17 @@
 .multitrack-align-stage__title {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #fff;
+  color: #1c1917;
 }
 
 .multitrack-align-stage__clock {
   font-size: 0.66rem;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.55);
+  color: #a8a29e;
 }
 
 .multitrack-align-stage__close {
-  color: rgba(255, 255, 255, 0.7);
+  color: #57534e;
 }
 
 .multitrack-align-stage__zoom {
@@ -2189,23 +2194,24 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  color: #44403c;
 }
 
 .multitrack-align-stage__zoom button:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
 }
 
 .multitrack-align-stage__done {
   flex-shrink: 0;
   min-height: 2.1rem;
-  padding: 0 0.85rem;
+  padding: 0 0.9rem;
   border-radius: 0.6rem;
-  background: #f7ae1c;
-  color: #1c1917;
+  background: #1c1917;
+  color: #fff;
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .multitrack-align-stage__actions {
@@ -2228,21 +2234,21 @@
   min-height: 2.2rem;
   padding: 0 0.7rem;
   border-radius: 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  color: #44403c;
   font-size: 0.74rem;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .multitrack-align-stage__action:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
 }
 
 .multitrack-align-stage__action--primary {
-  border-color: rgba(37, 164, 241, 0.5);
-  background: rgba(37, 164, 241, 0.22);
+  border-color: #1c1917;
+  background: #1c1917;
   color: #fff;
 }
 
@@ -2256,9 +2262,9 @@
   justify-content: space-between;
   gap: 0.6rem;
   margin: 0 0.75rem 0.35rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #e7e5e4;
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: #fff;
   padding: 0.4rem 0.5rem;
 }
 
@@ -2276,12 +2282,12 @@
 
 .multitrack-align-stage__selection strong {
   font-size: 0.74rem;
-  color: #fff;
+  color: #292524;
 }
 
 .multitrack-align-stage__selection span {
   margin-top: 0.05rem;
-  color: rgba(255, 255, 255, 0.55);
+  color: #78716c;
   font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
 }
@@ -2299,16 +2305,18 @@
   min-height: 1.9rem;
   min-width: 2.1rem;
   border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #e7e5e4;
+  background: #f5f5f4;
   padding: 0 0.45rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: #44403c;
   font-size: 0.68rem;
   font-weight: 700;
 }
 
 .multitrack-align-stage__nudge-danger {
-  background: rgba(220, 38, 38, 0.25) !important;
-  color: #fecaca !important;
+  border-color: #fecaca !important;
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
 }
 
 .multitrack-align-stage__scroll {
@@ -2329,7 +2337,7 @@
   top: 0;
   z-index: 5;
   height: 1.6rem;
-  background: rgba(9, 13, 20, 0.96);
+  background: #fafaf9;
   touch-action: none;
 }
 
@@ -2338,7 +2346,7 @@
   top: 0.55rem;
   bottom: 0;
   width: 1px;
-  background: rgba(255, 255, 255, 0.14);
+  background: #e7e5e4;
 }
 
 .multitrack-align-stage__tick span {
@@ -2348,7 +2356,7 @@
   font-size: 0.6rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.45);
+  color: #a8a29e;
   white-space: nowrap;
 }
 
@@ -2357,7 +2365,7 @@
   top: 1.6rem;
   bottom: 0;
   width: 2px;
-  background: rgba(255, 255, 255, 0.18);
+  background: #d6d3d1;
   z-index: 1;
 }
 
@@ -2366,8 +2374,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #f7ae1c;
-  box-shadow: 0 0 6px rgba(247, 174, 28, 0.6);
+  background: #dc2626;
   z-index: 6;
   pointer-events: none;
 }
@@ -2397,20 +2404,20 @@
   gap: 0.2rem;
   width: 5.25rem;
   padding-left: 0.5rem;
-  background: linear-gradient(90deg, rgba(9, 13, 20, 0.98) 72%, rgba(9, 13, 20, 0));
+  background: linear-gradient(90deg, #fafaf9 72%, rgba(250, 250, 249, 0));
 }
 
 .multitrack-align-stage__track-name {
   font-size: 0.66rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.75);
+  color: #78716c;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .multitrack-align-stage__track.is-selected .multitrack-align-stage__track-name {
-  color: #fff;
+  color: #1c1917;
 }
 
 .multitrack-align-stage__window-chip {
@@ -2421,9 +2428,9 @@
   min-height: 1.3rem;
   padding: 0 0.35rem;
   border-radius: 0.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  color: #a8a29e;
   font-size: 0.56rem;
   font-weight: 800;
   letter-spacing: 0.01em;
@@ -2431,9 +2438,9 @@
 }
 
 .multitrack-align-stage__window-chip.is-on {
-  border-color: rgba(247, 174, 28, 0.6);
-  background: rgba(247, 174, 28, 0.2);
-  color: #f7ae1c;
+  border-color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 /* The lane spans the full timeline width and slides back under the sticky
@@ -2446,7 +2453,7 @@
   margin-left: -5.25rem;
   height: 3rem;
   border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(231, 229, 228, 0.55);
 }
 
 .multitrack-align-stage__track--images .multitrack-align-stage__track-lane {
@@ -2458,15 +2465,15 @@
   top: 0;
   height: 3rem;
   border-radius: 0.5rem;
-  background: #2f4a63;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  background: #44403c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   touch-action: none;
   cursor: grab;
 }
 
 .multitrack-align-stage__clip[data-selected='true'] {
-  box-shadow: 0 0 0 2px #f7ae1c, 0 3px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 2px #dc2626, 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .multitrack-align-stage__clip-waveform {
@@ -2485,7 +2492,7 @@
   white-space: nowrap;
   font-size: 0.58rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.8);
   pointer-events: none;
 }
 
@@ -2494,7 +2501,7 @@
   top: 0;
   bottom: 0;
   width: 14px;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.32);
   touch-action: none;
   cursor: ew-resize;
 }
@@ -2519,20 +2526,21 @@
   gap: 0.3rem;
   padding: 0 0.35rem;
   border-radius: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(247, 174, 28, 0.16);
+  border: 1px solid #e7e5e4;
+  background: #fff;
   overflow: hidden;
   touch-action: none;
   cursor: grab;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .multitrack-align-stage__image-cue[data-selected='true'] {
-  box-shadow: 0 0 0 2px #f7ae1c;
+  box-shadow: 0 0 0 2px #dc2626;
 }
 
 .multitrack-align-stage__image-cue[data-pinned='true'] {
   cursor: default;
-  background: rgba(255, 255, 255, 0.08);
+  background: #f5f5f4;
 }
 
 .multitrack-align-stage__image-thumb {
@@ -2550,7 +2558,7 @@
   white-space: nowrap;
   font-size: 0.6rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
+  color: #44403c;
   pointer-events: none;
 }
 
@@ -2563,9 +2571,9 @@
   height: 2.2rem;
   padding: 0 0.6rem;
   border-radius: 0.5rem;
-  border: 1px dashed rgba(255, 255, 255, 0.32);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.7);
+  border: 1px dashed #d6d3d1;
+  background: #fff;
+  color: #78716c;
   font-size: 0.66rem;
   font-weight: 700;
   white-space: nowrap;
@@ -2576,7 +2584,8 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.4rem 0.75rem 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #e7e5e4;
+  background: #fff;
 }
 
 .multitrack-align-stage__transport-btn {
@@ -2588,9 +2597,9 @@
   min-height: 2.1rem;
   padding: 0 0.7rem;
   border-radius: 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  color: #44403c;
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -2598,7 +2607,7 @@
 .multitrack-align-stage__hint {
   font-size: 0.62rem;
   line-height: 1.25;
-  color: rgba(255, 255, 255, 0.45);
+  color: #a8a29e;
 }
 
 /* While the timeline editor is docked the canvas gives up half the screen. */

@@ -412,7 +412,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       // The native renderer composites one fixed rect per source for the whole
       // video, so a box scoped to a section keeps its slot the entire time in the
       // export instead of the grid reflowing around it as it does on the canvas.
-      if (session.panels.some((panel) => panel.kind === 'performance' && hasSectionWindow(panel))) {
+      // Only a box that actually holds a clip can reflow the canvas, so an empty
+      // one carrying a leftover window must not trigger this warning.
+      if (session.panels.some(
+        (panel) => panel.kind === 'performance' && panel.take !== null && hasSectionWindow(panel),
+      )) {
         const proceed = await showConfirm({
           title: 'Section boxes export full length',
           message:
@@ -1117,20 +1121,24 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     [hapticFeedback, onOpenRecordingStage, session.panels, sync],
   )
 
-  /** Timeline "+": claim a box and overdub into it from the playhead. */
+  /**
+   * Timeline "+": claim a box and overdub into it from the playhead.
+   *
+   * The box's section window is deliberately NOT set here. It is set once the
+   * take actually lands (handleConfirmTake), so abandoning the recording leaves
+   * nothing behind to clean up — a stale window on an empty box would drop it
+   * out of the grid and reshuffle the canvas on the next Play All.
+   */
   const handleAddBoxAt = useCallback(
     (atSec: number) => {
-      const startSec = Math.max(0, atSec)
-      const panelId = addPerformanceBox(
-        startSec > 0 ? { startSec, endSec: undefined } : undefined,
-      )
+      const panelId = addPerformanceBox()
       if (!panelId) {
         void showAlert({
           message: 'Six boxes is the most one canvas holds. Free one up to add another part.',
         })
         return
       }
-      recordStartSecRef.current = startSec
+      recordStartSecRef.current = Math.max(0, atSec)
       openRecordingForPanel(panelId)
     },
     [addPerformanceBox, openRecordingForPanel, showAlert],
@@ -1139,12 +1147,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   /** Timeline lane "Record here": overdub into an existing empty box. */
   const handleRecordBoxAt = useCallback(
     (panelId: string, atSec: number) => {
-      const startSec = Math.max(0, atSec)
-      recordStartSecRef.current = startSec
-      if (startSec > 0) setPanelSection(panelId, startSec, undefined)
+      recordStartSecRef.current = Math.max(0, atSec)
       openRecordingForPanel(panelId)
     },
-    [openRecordingForPanel, setPanelSection],
+    [openRecordingForPanel],
   )
 
   /** Timeline "+ image": pick a screenshot that cuts in at the playhead. */
@@ -1504,11 +1510,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 sync.pause()
                 pauseBacking()
                 recording.cancel()
-                // Backing out of a mid-song overdub leaves no clip behind, so the
-                // empty box should not keep the window that was staged for it.
-                if (recordStartSecRef.current > 0 && activePanel.kind === 'performance' && !activePanel.take) {
-                  setPanelSection(activePanel.id, undefined, undefined)
-                }
                 recordStartSecRef.current = 0
                 setActivePanelId(null)
               }}

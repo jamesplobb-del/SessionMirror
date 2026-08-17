@@ -6,6 +6,10 @@ export function hasSectionWindow(panel: PerformancePanelState): boolean {
 }
 
 export function isPanelActiveAt(panel: PerformancePanelState, timeSec: number): boolean {
+  // An empty box has nothing to show or hide, so a window on it means nothing
+  // yet. It keeps its slot — otherwise a box staged for an overdub that was
+  // never recorded would silently reshuffle the whole canvas on the next play.
+  if (!panel.take) return true
   const { sectionStartSec: start, sectionEndSec: end } = panel
   if (start === undefined && end === undefined) return true
   if (start !== undefined && timeSec < start) return false

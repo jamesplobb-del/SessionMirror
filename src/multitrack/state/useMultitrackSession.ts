@@ -79,43 +79,30 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
    * Claims a box for a part being added mid-song: reuses an empty one when there
    * is one, otherwise grows the grid by one slot. Returns the box id so the
    * caller can point the recorder at it, or null once the grid is full.
+   *
+   * Deliberately does not touch the section window — a box only earns one when a
+   * clip actually lands in it.
    */
-  const addPerformanceBox = useCallback(
-    (section?: { startSec?: number; endSec?: number }): string | null => {
-      const performancePanels = session.panels.filter(
-        (panel): panel is PerformancePanelState => panel.kind === 'performance',
-      )
-      const vacant = performancePanels.find((panel) => panel.take === null)
-      const grownPreset = vacant
-        ? null
-        : MULTITRACK_LAYOUT_PRESETS.find(
-            (preset) => preset.panelCount === performancePanels.length + 1,
-          )
-      const targetId = vacant?.id ?? MULTITRACK_PANEL_SLOT_IDS[performancePanels.length]
-      if (!vacant && (!grownPreset || !targetId)) return null
+  const addPerformanceBox = useCallback((): string | null => {
+    const performancePanels = session.panels.filter(
+      (panel): panel is PerformancePanelState => panel.kind === 'performance',
+    )
+    const vacant = performancePanels.find((panel) => panel.take === null)
+    if (vacant) return vacant.id
 
-      setSession((prev) => {
-        const panels = grownPreset
-          ? mergePanelsIntoLayout(grownPreset, prev.panels)
-          : prev.panels
-        return {
-          ...prev,
-          ...(grownPreset ? { layoutId: grownPreset.id } : null),
-          panels: panels.map((panel) =>
-            panel.id === targetId && panel.kind === 'performance'
-              ? {
-                  ...panel,
-                  sectionStartSec: section?.startSec,
-                  sectionEndSec: section?.endSec,
-                }
-              : panel,
-          ),
-        }
-      })
-      return targetId
-    },
-    [session.panels],
-  )
+    const grownPreset = MULTITRACK_LAYOUT_PRESETS.find(
+      (preset) => preset.panelCount === performancePanels.length + 1,
+    )
+    const targetId = MULTITRACK_PANEL_SLOT_IDS[performancePanels.length]
+    if (!grownPreset || !targetId) return null
+
+    setSession((prev) => ({
+      ...prev,
+      layoutId: grownPreset.id,
+      panels: mergePanelsIntoLayout(grownPreset, prev.panels),
+    }))
+    return targetId
+  }, [session.panels])
 
   const assignTakeToPanel = useCallback((panelId: string, take: Take | null) => {
     setSession((prev) => ({

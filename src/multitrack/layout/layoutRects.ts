@@ -1,15 +1,26 @@
-import { MULTITRACK_LAYOUT_PRESETS } from './layoutPresets'
+import { MULTITRACK_LAYOUT_PRESETS, MULTITRACK_PANEL_SLOT_IDS } from './layoutPresets'
 import type { MultitrackLayoutPreset, SheetMusicAsset } from '../types'
 
-const PANEL_IDS = ['a', 'b', 'c', 'd', 'e', 'f']
+const PANEL_IDS: readonly string[] = MULTITRACK_PANEL_SLOT_IDS
 
 function clampMusicScale(asset: SheetMusicAsset | null): number {
   return Math.min(1.8, Math.max(0.65, asset?.frameScale ?? 1))
 }
 
+/** Boxes beside a vertical music panel; wider grids need a third column so nine
+    boxes don't become five stacked rows of slivers. */
+function sideColumnsFor(panelCount: number): number {
+  if (panelCount <= 1) return 1
+  return panelCount <= 6 ? 2 : 3
+}
+
 function performanceRows(panelCount: number, columns: number): string[] {
+  // Only slots this preset actually has may appear. Slicing the full id list
+  // would name boxes that do not exist and leave holes in the grid.
+  const slots = PANEL_IDS.slice(0, panelCount)
   return Array.from({ length: Math.ceil(panelCount / columns) }, (_, rowIndex) => {
-    const ids = PANEL_IDS.slice(rowIndex * columns, rowIndex * columns + columns)
+    const ids = slots.slice(rowIndex * columns, rowIndex * columns + columns)
+    // A short final row stretches its last box across the remainder.
     while (ids.length < columns) ids.push(ids[ids.length - 1] ?? 'a')
     return ids.join(' ')
   })
@@ -42,7 +53,7 @@ export function resolveMultitrackGridModel(
   const musicScale = clampMusicScale(musicAsset)
 
   if (position === 'left' || position === 'right') {
-    const sideColumns = preset.panelCount <= 1 ? 1 : 2
+    const sideColumns = sideColumnsFor(preset.panelCount)
     const rows = performanceRows(preset.panelCount, sideColumns)
     const areas = rows.map((row) => (position === 'left' ? `music ${row}` : `${row} music`))
     const panelWeights = Array(sideColumns).fill(1)
