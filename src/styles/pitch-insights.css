@@ -1119,3 +1119,92 @@ html.app-dark-mode .pitch-insights-screen {
     transform: rotate(360deg);
   }
 }
+
+/* Add an instrument. The pills only show what you have played, so multi-
+   instrument players need a way to name a horn before there is any history
+   for it. */
+.pitch-insights-instrument-filter__add {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.15rem;
+  padding: 0.4rem;
+}
+
+.pitch-insights-instrument-filter__add svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.pitch-insights-instrument-picker {
+  margin-top: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--pi-border);
+  border-radius: 1rem;
+  background: var(--pi-surface);
+  box-shadow: var(--pi-shadow-card);
+}
+
+.pitch-insights-instrument-picker > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.9rem 0.5rem;
+}
+
+.pitch-insights-instrument-picker > header strong {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.pitch-insights-instrument-picker > header button {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: var(--pi-text-secondary);
+  background: transparent;
+}
+
+.pitch-insights-instrument-picker > header button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.pitch-insights-instrument-picker > div {
+  display: grid;
+  max-height: 15rem;
+  overflow-y: auto;
+}
+
+.pitch-insights-instrument-picker > div button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-top: 1px solid var(--pi-border);
+  text-align: left;
+  background: transparent;
+  color: var(--pi-text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pitch-insights-instrument-picker > div button span {
+  display: grid;
+  min-width: 2.1rem;
+  height: 1.6rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--pi-accent-soft);
+  color: var(--pi-accent-strong, #0c447c);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pitch-insights-instrument-picker > div button.is-added {
+  opacity: 0.5;
+}

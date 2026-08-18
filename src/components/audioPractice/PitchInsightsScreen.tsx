@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Clock3,
   Minus,
+  Plus,
   RotateCcw,
   TrendingDown,
   TrendingUp,
@@ -36,9 +37,10 @@ import {
 } from '../../utils/pitchInsightsAnalytics'
 import { triggerLightHaptic } from '../../utils/haptics'
 import { iosSpringSnappy } from '../../utils/motionPresets'
-import { TUNER_INSTRUMENTS, getTunerProfile, type TunerInstrument } from '../../utils/pitchConfig'
+import type { TunerInstrument } from '../../utils/pitchConfig'
 import {
   getTunerTransposition,
+  TUNER_TRANSPOSITION_OPTIONS,
   type TunerTranspositionId,
 } from '../../utils/tunerTransposition'
 import AnimatedBottomSheet from '../ui/AnimatedBottomSheet'
@@ -61,6 +63,7 @@ interface CentsGraphPoint {
   cents: number
 }
 
+const ADDED_INSTRUMENTS_KEY = 'besttake:pitch-insights-instruments'
 const DAY_PREVIEW_COUNT = 6
 const GRAPH_POINT_LIMIT = 160
 /** Half-range of the rail widget in cents — the visual scale a dot moves across. */
@@ -1010,9 +1013,31 @@ export default function PitchInsightsScreen({
   const [overviewRoute, setOverviewRoute] = useState<'notes' | 'days' | null>(null)
   const [showAllDays, setShowAllDays] = useState(false)
   const [resettingKey, setResettingKey] = useState<string | null>(null)
-  const [selectedInstrument, setSelectedInstrument] = useState<TunerInstrument | 'all'>(
-    tunerInstrument ?? 'all',
-  )
+  const [selectedSource, setSelectedSource] = useState<string>('all')
+  const [addedInstruments, setAddedInstruments] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(ADDED_INSTRUMENTS_KEY)
+      const parsed = raw ? (JSON.parse(raw) as unknown) : null
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+    } catch {
+      return []
+    }
+  })
+  const [instrumentPickerOpen, setInstrumentPickerOpen] = useState(false)
+
+  const addInstrument = useCallback((id: string) => {
+    setAddedInstruments((current) => {
+      const next = current.includes(id) ? current : [...current, id]
+      try {
+        localStorage.setItem(ADDED_INSTRUMENTS_KEY, JSON.stringify(next))
+      } catch {
+        /* Private browsing must not break the filter. */
+      }
+      return next
+    })
+    setSelectedSource(id)
+    setInstrumentPickerOpen(false)
+  }, [])
 
   const activeRef = useRef(false)
   const loadSequenceRef = useRef(0)
@@ -1133,9 +1158,9 @@ export default function PitchInsightsScreen({
       setOverviewRoute(null)
       setShowAllDays(false)
       setResettingKey(null)
-      setSelectedInstrument(tunerInstrument ?? 'all')
+      setSelectedSource(transpositionId)
     }
-  }, [isOpen, tunerInstrument])
+  }, [isOpen, tunerInstrument, transpositionId])
 
   // Observations are tagged with the instrument that was active when they
   // were captured. Pooling e.g. Voice and Winds tendencies for "the same"
@@ -1143,18 +1168,22 @@ export default function PitchInsightsScreen({
   // number, so only show the filter (and apply it) once more than one
   // instrument actually shows up in the history — most players only ever
   // see one and the screen stays exactly as before.
-  const instrumentsPresent = useMemo(
-    () =>
-      TUNER_INSTRUMENTS.filter((instrument) =>
-        observations.some((observation) => observation.tunerInstrument === instrument),
-      ),
-    [observations],
-  )
-  const showInstrumentFilter = instrumentsPresent.length > 1
+  /* An instrument is its transposition — a trumpet and a horn both record as
+     'winds', so the profile cannot tell them apart. Instruments you have played
+     appear automatically; the + lets you add one before you have any history
+     for it. */
+  const instrumentIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const observation of observations) ids.add(observation.transpositionId)
+    for (const id of addedInstruments) ids.add(id)
+    return [...ids]
+  }, [observations, addedInstruments])
+
+  const showInstrumentFilter = instrumentIds.length > 1 || addedInstruments.length > 0
   const visibleObservations = useMemo(() => {
-    if (!showInstrumentFilter || selectedInstrument === 'all') return observations
-    return observations.filter((observation) => observation.tunerInstrument === selectedInstrument)
-  }, [observations, showInstrumentFilter, selectedInstrument])
+    if (selectedSource === 'all') return observations
+    return observations.filter((observation) => observation.transpositionId === selectedSource)
+  }, [observations, selectedSource])
   const allObservationsDayCount = useMemo(
     () =>
       new Set(observations.map((observation) => localPracticeDayBounds(observation.observedAt).key))
@@ -1383,7 +1412,7 @@ export default function PitchInsightsScreen({
                   <>
                     <PitchInsightsHero observations={scopedObservations} registerNote={registerNote} />
 
-                    {showInstrumentFilter ? (
+                    {true ? (
                       <div
                         className="pitch-insights-instrument-filter"
                         role="tablist"
@@ -1392,34 +1421,73 @@ export default function PitchInsightsScreen({
                         <button
                           type="button"
                           role="tab"
-                          aria-selected={selectedInstrument === 'all'}
+                          aria-selected={selectedSource === 'all'}
                           className={`pitch-insights-instrument-filter__pill ${
-                            selectedInstrument === 'all' ? 'is-active' : ''
+                            selectedSource === 'all' ? 'is-active' : ''
                           }`}
                           onClick={() => {
                             triggerLightHaptic(hapticFeedback)
-                            setSelectedInstrument('all')
+                            setSelectedSource('all')
                           }}
                         >
                           All instruments
                         </button>
-                        {instrumentsPresent.map((instrument) => (
+                        {instrumentIds.map((id) => (
                           <button
-                            key={instrument}
+                            key={id}
                             type="button"
                             role="tab"
-                            aria-selected={selectedInstrument === instrument}
+                            aria-selected={selectedSource === id}
                             className={`pitch-insights-instrument-filter__pill ${
-                              selectedInstrument === instrument ? 'is-active' : ''
+                              selectedSource === id ? 'is-active' : ''
                             }`}
                             onClick={() => {
                               triggerLightHaptic(hapticFeedback)
-                              setSelectedInstrument(instrument)
+                              setSelectedSource(id)
                             }}
                           >
-                            {getTunerProfile(instrument).label}
+                            {getTunerTransposition(id as TunerTranspositionId).shortLabel}
                           </button>
                         ))}
+                        <button
+                          type="button"
+                          className="pitch-insights-instrument-filter__pill pitch-insights-instrument-filter__add"
+                          onClick={() => {
+                            triggerLightHaptic(hapticFeedback)
+                            setInstrumentPickerOpen(true)
+                          }}
+                          aria-label="Add an instrument"
+                        >
+                          <Plus aria-hidden />
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {instrumentPickerOpen ? (
+                      <div className="pitch-insights-instrument-picker" role="dialog" aria-label="Add an instrument">
+                        <header>
+                          <strong>Add an instrument</strong>
+                          <button
+                            type="button"
+                            onClick={() => setInstrumentPickerOpen(false)}
+                            aria-label="Close"
+                          >
+                            <X aria-hidden />
+                          </button>
+                        </header>
+                        <div>
+                          {TUNER_TRANSPOSITION_OPTIONS.map((option) => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              className={instrumentIds.includes(option.id) ? 'is-added' : ''}
+                              onClick={() => addInstrument(option.id)}
+                            >
+                              <span>{option.keyLabel}</span>
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ) : null}
 
