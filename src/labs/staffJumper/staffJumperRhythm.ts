@@ -43,6 +43,15 @@ export interface MeterSpec {
   tickUnits: number
   ticksPerPulse: number
   ticksPerBar: number
+  /**
+   * Sounded length that makes a bar feel like the end of a phrase.
+   *
+   * A half note in 4/4 and a dotted quarter in 6/8 — one that occupies enough
+   * of the bar to read as an arrival rather than another note going past. A
+   * note followed by rests counts its silence towards this: the breath after a
+   * short note closes a phrase just as convincingly as holding a long one.
+   */
+  closingMinUnits: number
 }
 
 export const METERS: Record<StaffJumperMeter, MeterSpec> = {
@@ -59,6 +68,7 @@ export const METERS: Record<StaffJumperMeter, MeterSpec> = {
     tickUnits: 4,
     ticksPerPulse: 1,
     ticksPerBar: 4,
+    closingMinUnits: 8,
   },
   compound: {
     id: 'compound',
@@ -74,6 +84,7 @@ export const METERS: Record<StaffJumperMeter, MeterSpec> = {
     tickUnits: 2,
     ticksPerPulse: 3,
     ticksPerBar: 6,
+    closingMinUnits: 6,
   },
 }
 
@@ -230,6 +241,48 @@ export interface RhythmMeasure {
   capacityUnits: number
   events: readonly RhythmValue[]
   tier: StaffJumperDifficulty
+  /** True when this bar ends on an arrival — see `closingMinUnits`. */
+  closes: boolean
+}
+
+/**
+ * Bars to a phrase.
+ *
+ * Four is the norm music is built out of, but at easy the tempo is slow and
+ * the reading is the hard part, so two bars puts a breath within reach and
+ * makes the antecedent/consequent pairing audible as a four-bar period rather
+ * than an eight-bar one nobody can hold in their head.
+ */
+export const PHRASE_BARS: Record<StaffJumperDifficulty, number> = {
+  easy: 2,
+  medium: 4,
+  hard: 4,
+}
+
+/**
+ * Does this bar end like the end of a phrase?
+ *
+ * Two ways to close: hold the last note long, or play a shorter one and leave
+ * the rest of the bar silent. Both read as arrival. What does *not* close is a
+ * bar whose last sounded note is shorter than a beat — a sixteenth followed by
+ * rests sounds clipped off, not finished — so the last note must be at least a
+ * quarter before its trailing silence is allowed to count towards the length.
+ */
+function measureCloses(meter: MeterSpec, events: readonly RhythmValue[]): boolean {
+  let lastSoundedIndex = -1
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (!events[index]!.isRest) {
+      lastSoundedIndex = index
+      break
+    }
+  }
+  if (lastSoundedIndex < 0) return false
+  const lastSounded = events[lastSoundedIndex]!
+  if (lastSounded.durationUnits < DURATION_UNITS.quarter) return false
+  const trailingRestUnits = events
+    .slice(lastSoundedIndex + 1)
+    .reduce((sum, event) => sum + event.durationUnits, 0)
+  return lastSounded.durationUnits + trailingRestUnits >= meter.closingMinUnits
 }
 
 export function measureDurationUnits(measure: Pick<RhythmMeasure, 'events'>): number {
@@ -252,6 +305,7 @@ function validateMeasures(
       capacityUnits: meter.capacityUnits,
       events: template.events,
       tier: template.tier,
+      closes: measureCloses(meter, template.events),
     }
     const actualUnits = measureDurationUnits(measure)
     if (actualUnits !== meter.capacityUnits) {
@@ -324,9 +378,22 @@ export interface RhythmSlot {
   beamGroupSize: number
 }
 
+/** Where one phrase sits in the stream of sounded notes. */
+export interface PhraseSpan {
+  index: number
+  /** Index of this phrase's first sounded note. */
+  firstNoteIndex: number
+  /** How many sounded notes the phrase's bars turned out to contain. */
+  noteCount: number
+}
+
 interface RhythmTimeline {
   slots: RhythmSlot[]
   measureCount: number
+  /** Completed phrases, in order — appended as each phrase's last bar lands. */
+  phrases: PhraseSpan[]
+  /** Note cursor as the phrase under construction began. */
+  phraseStartNoteCursor: number
   unitCursor: number
   spacingCursor: number
   beamCursor: number
@@ -420,7 +487,20 @@ function appendMeasure(
 ): void {
   const measures = measuresFor(meter.id, difficulty)
   const rng = mulberry32(seed + timeline.measureCount * 2654435761)
-  const measure = measures[Math.floor(rng() * measures.length)]!
+
+  /**
+   * The last bar of a phrase closes; the bars before it keep going.
+   *
+   * This is the whole reason a phrase is audible rather than merely counted:
+   * the long note or the breath arrives where the melodic line arrives, so the
+   * two agree instead of cutting across each other. Either pool can be empty
+   * for a given meter and tier, in which case any bar is better than none.
+   */
+  const phraseBars = PHRASE_BARS[difficulty]
+  const closesPhrase = timeline.measureCount % phraseBars === phraseBars - 1
+  const preferred = measures.filter((measure) => measure.closes === closesPhrase)
+  const pool = preferred.length > 0 ? preferred : measures
+  const measure = pool[Math.floor(rng() * pool.length)]!
   const firstNewIndex = timeline.slots.length
   const measureStartUnits = timeline.measureCount * meter.capacityUnits
   timeline.unitCursor = measureStartUnits
@@ -460,6 +540,15 @@ function appendMeasure(
   }
   timeline.measureCount += 1
   assignBeams(timeline.slots, firstNewIndex, timeline, meter)
+
+  if (timeline.measureCount % PHRASE_BARS[difficulty] === 0) {
+    timeline.phrases.push({
+      index: timeline.phrases.length,
+      firstNoteIndex: timeline.phraseStartNoteCursor,
+      noteCount: timeline.noteCursor - timeline.phraseStartNoteCursor,
+    })
+    timeline.phraseStartNoteCursor = timeline.noteCursor
+  }
 }
 
 const timelineCache = new WeakMap<object, RhythmTimeline>()
@@ -468,18 +557,14 @@ const timelineCache = new WeakMap<object, RhythmTimeline>()
  * Rhythm for one note index, generated lazily and memoized against the config
  * object so repeated reads during a render are free and stay consistent.
  */
-export function getRhythmSlot(
-  configKey: object,
-  meter: StaffJumperMeter,
-  difficulty: StaffJumperDifficulty,
-  seed: number,
-  index: number,
-): RhythmSlot {
+function getTimeline(configKey: object): RhythmTimeline {
   let timeline = timelineCache.get(configKey)
   if (!timeline) {
     timeline = {
       slots: [],
       measureCount: 0,
+      phrases: [],
+      phraseStartNoteCursor: 0,
       unitCursor: 0,
       spacingCursor: 0,
       beamCursor: 0,
@@ -487,10 +572,43 @@ export function getRhythmSlot(
     }
     timelineCache.set(configKey, timeline)
   }
+  return timeline
+}
+
+export function getRhythmSlot(
+  configKey: object,
+  meter: StaffJumperMeter,
+  difficulty: StaffJumperDifficulty,
+  seed: number,
+  index: number,
+): RhythmSlot {
+  const timeline = getTimeline(configKey)
   while (index >= timeline.slots.length) {
     appendMeasure(timeline, METERS[meter], difficulty, seed)
   }
   return timeline.slots[index]!
+}
+
+/**
+ * The note-index range one phrase covers.
+ *
+ * The pitch stream is built phrase by phrase against this, which is what lets
+ * a melodic line arrive exactly where the rhythm arrives. Bars are appended
+ * until the phrase is complete, so the count returned is final — the rhythm
+ * decides how many notes a phrase holds, and the melody fills that many.
+ */
+export function getPhraseSpan(
+  configKey: object,
+  meter: StaffJumperMeter,
+  difficulty: StaffJumperDifficulty,
+  seed: number,
+  phraseIndex: number,
+): PhraseSpan {
+  const timeline = getTimeline(configKey)
+  while (phraseIndex >= timeline.phrases.length) {
+    appendMeasure(timeline, METERS[meter], difficulty, seed)
+  }
+  return timeline.phrases[phraseIndex]!
 }
 
 /** Half and whole notes are drawn as rings rather than filled ovals. */

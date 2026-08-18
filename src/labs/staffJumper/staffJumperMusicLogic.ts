@@ -17,11 +17,12 @@ import {
   type StaffJumperTransposition,
 } from './staffJumperInstrumentRanges'
 import {
+  getPhraseSpan,
   getRhythmSlot,
   type RhythmSlot,
   type StaffJumperMeter,
 } from './staffJumperRhythm'
-import { buildExerciseBlock, type PatternStep } from './staffJumperPatterns'
+import { buildPhraseSteps, type PatternStep } from './staffJumperPatterns'
 
 export const STAFF_JUMPER_MAJOR_KEYS = [
   'C',
@@ -482,7 +483,16 @@ export function buildScaleIntroDegreePath(
 
 interface ExerciseCache {
   steps: PatternStep[]
-  blockCount: number
+  phraseCount: number
+  /**
+   * Degrees of the opening scale statement still owed to the player.
+   *
+   * Drained a phrase at a time rather than laid down in one go, so the scale
+   * occupies whole phrases like everything else — the opening is the first
+   * period of the exercise, not a preamble sitting outside the structure.
+   */
+  introQueue: number[]
+  lastPatternId: string | null
 }
 
 const exerciseCache = new WeakMap<StaffJumperConfig, ExerciseCache>()
@@ -498,57 +508,130 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-function appendExerciseBlock(config: StaffJumperConfig, cache: ExerciseCache): void {
-  const previous = cache.steps.at(-1)
-  // The very first block follows the opening scale, which always lands on the
-  // tonic — so that is what it has to avoid restating.
-  const previousDegree = previous?.degree ?? buildScaleIntroDegreePath(config).at(-1) ?? 0
-  const block = buildExerciseBlock({
-    difficulty: config.difficulty,
-    topDegree: topDegreeForRange(config.range),
-    rng: mulberry32((config.sessionSeed ?? 1) + cache.blockCount * 7919),
-    previousDegree,
-    previousPatternId: previous?.patternId ?? null,
-  })
-  cache.blockCount += 1
+/**
+ * Fill the next phrase with exactly as many notes as its bars hold.
+ *
+ * The rhythm decides the count — its phrase has already been drawn, ending on
+ * a closing bar — and the melody fills it. Getting the length exactly right is
+ * what keeps the two streams in step: the phrase's final degree and the long
+ * note the closing bar gives it are then the same event.
+ */
+function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
+  const seed = config.sessionSeed ?? 1
+  const span = getPhraseSpan(config, config.meter, config.difficulty, seed, cache.phraseCount)
+  const rng = mulberry32(seed + cache.phraseCount * 7919)
+  const steps: PatternStep[] = []
 
-  // Never restate the note the player is already standing on.
-  while (block.length > 0 && block[0]!.degree === previousDegree) block.shift()
-  cache.steps.push(...block)
+  // The opening statement is not bent to a cadence — a scale is a scale, and
+  // forcing its sixth note onto the tonic would break the one part of the run
+  // the player is using to hear the key.
+  while (cache.introQueue.length > 0 && steps.length < span.noteCount) {
+    steps.push({ degree: cache.introQueue.shift()!, patternId: 'scale', patternName: 'Scale' })
+  }
+
+  if (steps.length < span.noteCount) {
+    const phrase = buildPhraseSteps({
+      difficulty: config.difficulty,
+      topDegree: topDegreeForRange(config.range),
+      rng,
+      noteCount: span.noteCount - steps.length,
+      startDegree: steps.at(-1)?.degree ?? cache.steps.at(-1)?.degree ?? 0,
+      // Odd phrases answer even ones: a question on the dominant, then an
+      // answer that settles on the tonic.
+      cadence: cache.phraseCount % 2 === 0 ? 'open' : 'closed',
+      previousPatternId: cache.lastPatternId,
+    })
+    steps.push(...phrase)
+    cache.lastPatternId = phrase.at(-1)?.patternId ?? cache.lastPatternId
+  }
+
+  // The phrase must be exactly the length the rhythm asked for or every note
+  // index after it is off by one. Stepwise descent is the neutral filler; it
+  // should never be reached, because a phrase that fits the range always
+  // produces notes.
+  while (steps.length < span.noteCount) {
+    const previous = steps.at(-1)?.degree ?? 0
+    steps.push({
+      degree: previous > 0 ? previous - 1 : 1,
+      patternId: 'scale',
+      patternName: 'Scale',
+    })
+  }
+  steps.length = span.noteCount
+
+  /**
+   * No two adjacent notes may restate the same degree.
+   *
+   * Musically a repeated note reads as a stutter here rather than a figure,
+   * and there is a harder reason too: the game recognises a note by its pitch
+   * changing, so a re-articulated unison is very nearly invisible to it — the
+   * player would tongue a second note and watch nothing happen. The cadence
+   * degree is fixed, so a clash against it moves the note in front instead.
+   */
+  const topDegree = topDegreeForRange(config.range)
+  let previousDegree = cache.steps.at(-1)?.degree ?? null
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index]!
+    if (previousDegree !== step.degree) {
+      previousDegree = step.degree
+      continue
+    }
+    const above = Math.min(topDegree, step.degree + 1)
+    const below = Math.max(0, step.degree - 1)
+    if (index === steps.length - 1 && index > 0) {
+      // Widen to a third if a step either side is blocked — the note before
+      // the cadence and the cadence itself are both fixed points here, and
+      // settling for one of them would simply put the unison back.
+      const before = steps[index - 2]?.degree
+      const approach =
+        [below, above, Math.max(0, step.degree - 2), Math.min(topDegree, step.degree + 2)].find(
+          (candidate) => candidate !== step.degree && candidate !== before,
+        ) ?? below
+      steps[index - 1] = { ...steps[index - 1]!, degree: approach }
+      previousDegree = step.degree
+      continue
+    }
+    // Move away from the note that follows as well, or the clash is merely
+    // pushed one place along the phrase.
+    const next = steps[index + 1]?.degree
+    const moved =
+      [above, below].find((candidate) => candidate !== step.degree && candidate !== next) ??
+      (above !== step.degree ? above : below)
+    steps[index] = { ...step, degree: moved }
+    previousDegree = moved
+  }
+
+  cache.phraseCount += 1
+  cache.steps.push(...steps)
 }
 
 /**
- * Pattern work for one step past the opening scale, generated lazily.
+ * Degree and pattern for one sounded note, generated a phrase at a time.
  *
  * Memoized against the config object, which carries the run's `sessionSeed` —
  * a new run means a new object and therefore a new exercise.
  */
-function exerciseStepAt(config: StaffJumperConfig, patternIndex: number): PatternStep {
-  let cache = exerciseCache.get(config)
-  if (!cache) {
-    cache = { steps: [], blockCount: 0 }
-    exerciseCache.set(config, cache)
-  }
-  // Blocks can come back empty if a pattern does not fit the range; the counter
-  // still advances, so the seed moves on and this cannot spin forever.
-  let guard = 0
-  while (patternIndex >= cache.steps.length && guard < 64) {
-    appendExerciseBlock(config, cache)
-    guard += 1
-  }
-  return cache.steps[patternIndex] ?? { degree: 0, patternId: 'tonic', patternName: 'Tonic' }
-}
-
-/** Degree and pattern for a step — the intro scale, then randomized patterns. */
 export function exerciseStepForSequenceStep(
   config: StaffJumperConfig,
   sequenceStep: number,
 ): PatternStep {
-  const intro = buildScaleIntroDegreePath(config)
-  if (sequenceStep < intro.length) {
-    return { degree: intro[sequenceStep]!, patternId: 'scale', patternName: 'Scale' }
+  let cache = exerciseCache.get(config)
+  if (!cache) {
+    cache = {
+      steps: [],
+      phraseCount: 0,
+      introQueue: buildScaleIntroDegreePath(config),
+      lastPatternId: null,
+    }
+    exerciseCache.set(config, cache)
   }
-  return exerciseStepAt(config, sequenceStep - intro.length)
+  // Every phrase contributes at least one note, so this always terminates.
+  let guard = 0
+  while (sequenceStep >= cache.steps.length && guard < 256) {
+    appendPhrase(config, cache)
+    guard += 1
+  }
+  return cache.steps[sequenceStep] ?? { degree: 0, patternId: 'tonic', patternName: 'Tonic' }
 }
 
 export function degreeForSequenceStep(config: StaffJumperConfig, sequenceStep: number): number {
