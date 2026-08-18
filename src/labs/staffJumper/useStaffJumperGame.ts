@@ -14,7 +14,7 @@ import {
   type StaffJumperState,
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
-import { durationMs, judgeTiming, METERS, secondsPerPulse } from './staffJumperRhythm'
+import { durationMs, judgeTiming, lingerMs, METERS, secondsPerPulse } from './staffJumperRhythm'
 import {
   startClickTrack,
   startDrone,
@@ -64,7 +64,8 @@ function createRunSeed(): number {
 
 type Action =
   | { type: 'START'; config: StaffJumperConfig }
-  | { type: 'SUCCESS'; quality: 'perfect' | 'good'; timing: StaffJumperTiming; timingErrorMs: number }
+  | { type: 'NOTE_ACCEPTED'; quality: 'perfect' | 'good'; timing: StaffJumperTiming; timingErrorMs: number }
+  | { type: 'NOTE_COMPLETE' }
   | { type: 'REST_COMPLETE' }
   | { type: 'MISS'; reason: 'wrong' | 'timeout' }
   | { type: 'FALL_COMPLETE' }
@@ -100,6 +101,7 @@ function createInitialState(): StaffJumperState {
     timingErrorMs: 0,
     onTimeCount: 0,
     isCountingIn: false,
+    isSustaining: false,
   }
 }
 
@@ -122,18 +124,22 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
     case 'COUNT_IN_COMPLETE':
       return state.isCountingIn ? { ...state, isCountingIn: false } : state
 
-    case 'SUCCESS': {
+    /**
+     * The written pitch has been recognised.
+     *
+     * Scoring, timing and feedback all happen here, at the attack, so the
+     * player is told immediately that the note was right. The hop is *not*
+     * here: the run lingers on this note for a beat proportional to its written
+     * length first, which is what `isSustaining` marks.
+     */
+    case 'NOTE_ACCEPTED': {
       if (state.phase !== 'playing' || !state.config) return state
-      const nextStep = state.sequenceStep + 1
-      const target = getTargetNoteAtStep(state.config, nextStep)
       const streak = state.streak + 1
       // Landing on the beat is worth an extra point — timing is a bonus, never
       // a penalty, so a late note still advances and still scores.
       const onTime = action.timing === 'on'
       return {
         ...state,
-        sequenceStep: nextStep,
-        targetPitchClass: target.pitchClass,
         score: state.score + (onTime ? 2 : 1),
         streak,
         bestStreak: Math.max(state.bestStreak, streak),
@@ -141,9 +147,28 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         onTimeCount: state.onTimeCount + (onTime ? 1 : 0),
         timing: action.timing,
         timingErrorMs: action.timingErrorMs,
-        advanceToken: state.advanceToken + 1,
+        isSustaining: true,
         feedback: action.quality,
         feedbackToken: state.feedbackToken + 1,
+      }
+    }
+
+    /**
+     * The accepted note has been lingered on long enough — now hop.
+     *
+     * Nothing is scored a second time; this only moves the run on, which is
+     * why a whole note and an eighth note are worth the same but hold the
+     * player on the staff for noticeably different lengths of time.
+     */
+    case 'NOTE_COMPLETE': {
+      if (state.phase !== 'playing' || !state.config || !state.isSustaining) return state
+      const nextStep = state.sequenceStep + 1
+      return {
+        ...state,
+        sequenceStep: nextStep,
+        targetPitchClass: getTargetNoteAtStep(state.config, nextStep).pitchClass,
+        advanceToken: state.advanceToken + 1,
+        isSustaining: false,
       }
     }
 
@@ -194,6 +219,7 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         streak: 0,
         missCount: state.missCount + 1,
         missToken: state.missToken + 1,
+        isSustaining: false,
         feedback,
         feedbackToken: state.feedbackToken + 1,
       }
@@ -212,8 +238,23 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
     case 'RESUME': {
       if (state.phase !== 'paused') return state
       const resumedAt = Date.now()
+      // A note paused mid-linger has already scored, and the loop that was
+      // timing the dwell died with the pause. Settle it here rather than
+      // resuming into a dwell nothing is counting down, or re-judging a note
+      // the player has already been paid for.
+      const settled =
+        state.isSustaining && state.config
+          ? {
+              ...state,
+              sequenceStep: state.sequenceStep + 1,
+              targetPitchClass: getTargetNoteAtStep(state.config, state.sequenceStep + 1)
+                .pitchClass,
+              advanceToken: state.advanceToken + 1,
+              isSustaining: false,
+            }
+          : state
       return {
-        ...state,
+        ...settled,
         phase: 'playing',
         pausedAtMs: null,
         // Resuming replays the count-in, so pitch is ignored until it lands.
@@ -497,6 +538,15 @@ export function useStaffJumperGame(
     let restEndsAt: number | null = null
     let restResolved = false
 
+    /**
+     * When the accepted note stops lingering and the player hops on.
+     *
+     * Wall clock rather than the click's grid: the run is paced by the player,
+     * not the transport, so this is a dwell — long enough to feel the note's
+     * length — and not an attempt to land the hop on the next beat.
+     */
+    let lingerUntilMs: number | null = null
+
     const initialRemainingMs = Math.max(0, Math.min(noteTimeoutMs, noteRemainingMsRef.current))
     let targetDeadlineAt = performance.now() + initialRemainingMs
     noteDeadlineAtRef.current = targetDeadlineAt
@@ -537,6 +587,25 @@ export function useStaffJumperGame(
         expectedPulseRef.current = click?.isRunning() ? click.pulsesElapsed() : 0
         resetTargetDeadline(now)
         dispatch({ type: 'COUNT_IN_COMPLETE' })
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+
+      // A note that has been recognised and is now being lingered on. Nothing
+      // is judged here: the pitch already scored at the attack, and the note
+      // clock is held full so the dwell cannot expire into a miss.
+      if (current.isSustaining) {
+        resetTargetDeadline(now)
+        // A null deadline means the loop was torn down and rebuilt mid-dwell;
+        // there is nothing left to wait for, so hop rather than strand the run.
+        if (lingerUntilMs == null || now >= lingerUntilMs) {
+          lingerUntilMs = null
+          correctStableMs = 0
+          wrongStableMs = 0
+          actionLockUntilRef.current =
+            now + DIFFICULTY_TIMING[current.config.difficulty].cooldownMs
+          dispatch({ type: 'NOTE_COMPLETE' })
+        }
         rafId = requestAnimationFrame(tick)
         return
       }
@@ -588,7 +657,7 @@ export function useStaffJumperGame(
       }
       const isReleasingPreviousNote = releasingPitchClassRef.current != null
 
-      const startNextNote = (quality: 'perfect' | 'good') => {
+      const acceptNote = (quality: 'perfect' | 'good') => {
         correctStableMs = 0
         wrongStableMs = 0
         resetTargetDeadline(now)
@@ -616,8 +685,13 @@ export function useStaffJumperGame(
           expectedPulseRef.current = verdict.nextExpectedPulse
         }
 
+        // Linger in proportion to what is written, so a whole note reads as
+        // longer than an eighth without stalling the run for four beats.
+        lingerUntilMs =
+          now + lingerMs(stepRhythm.durationUnits, stepMeter, current.config!.tempoBpm)
+
         dispatch({
-          type: 'SUCCESS',
+          type: 'NOTE_ACCEPTED',
           quality,
           timing: placement,
           timingErrorMs: Math.round(errorMs),
@@ -632,7 +706,7 @@ export function useStaffJumperGame(
         // needs a longer hold before it counts — there was no fresh attack.
         const requiredMs = isReleasingPreviousNote ? REPEATED_NOTE_HOLD_MS : timing.correctMs
         if (correctStableMs >= requiredMs) {
-          startNextNote(Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good')
+          acceptNote(Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good')
         }
       } else if (
         !isReleasingPreviousNote &&

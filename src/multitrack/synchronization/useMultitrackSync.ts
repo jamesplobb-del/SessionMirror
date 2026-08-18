@@ -26,6 +26,13 @@ const UI_TIME_UPDATE_INTERVAL_MS = 100
 const VISUAL_SYNC_INTERVAL_MS = 50
 /** Gross deviation (stall / external scrub) past which the transport re-locks to real playback. */
 const TRANSPORT_RELOCK_SEC = 0.25
+/**
+ * Minimum gap between corrective seeks on one element. A decoder that is behind
+ * needs time to actually land a seek; re-issuing one every frame restarts H.264
+ * decode over and over, which reads as the tile looping its video.
+ */
+const VISUAL_RESEEK_COOLDOWN_MS = 700
+const AUDIBLE_RESEEK_COOLDOWN_MS = 250
 
 function primeElementForPlayback(element: HTMLMediaElement): void {
   element.preload = 'auto'
@@ -62,6 +69,8 @@ export function useMultitrackSync() {
    * then — the loop would otherwise "correct" the lead-in straight back out.
    */
   const prerollUntilRef = useRef(0)
+  /** performance.now() of the last corrective seek per panel (see cooldowns). */
+  const lastReseekAtRef = useRef<Map<string, number>>(new Map())
   /** Timeline position playback was prepared/started at (used to anchor the transport). */
   const preparedStartRef = useRef(0)
   /**
@@ -501,12 +510,24 @@ export function useMultitrackSync() {
   const prepareVisualAtStart = useCallback((startTime = 0) => {
     visualOnlyModeRef.current = true
     preparedStartRef.current = startTime
+    lastReseekAtRef.current.clear()
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
     for (const [panelId, element] of getEntries()) {
       element.pause()
       applyMixState(panelId, element)
       element.setAttribute('playsinline', 'true')
+      element.preload = 'auto'
+      // A take restored onto the canvas has never been fetched, so its metadata
+      // (and duration) is still missing. Kick the load here rather than letting
+      // playback start against an unreadable clip window.
+      if (element.readyState < HTMLMediaElement.HAVE_METADATA && (element.src || element.currentSrc)) {
+        try {
+          element.load()
+        } catch {
+          /* ignore */
+        }
+      }
       try {
         const win = clipWindowFor(panelId, element)
         // Overdubbing part-way into the song parks every reference at the media
@@ -754,6 +775,7 @@ export function useMultitrackSync() {
     visualOnlyModeRef.current = false
     visualPlaybackGenerationRef.current += 1
     prerollUntilRef.current = 0
+    lastReseekAtRef.current.clear()
     pendingStartRef.current.clear()
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
@@ -938,6 +960,17 @@ export function useMultitrackSync() {
               ? VISUAL_SLAVE_TOLERANCE_SEC
               : SLAVE_TOLERANCE_SEC
 
+            // An element with no metadata yet (a take pulled back up onto a
+            // restored canvas) has a duration of NaN, so its clip window - and
+            // therefore this deviation - is meaningless. A seek cannot land on
+            // it either, so the correction would re-fire every single frame.
+            const metadataReady =
+              el.readyState >= HTMLMediaElement.HAVE_METADATA && Number.isFinite(el.duration)
+            const lastReseekAt = lastReseekAtRef.current.get(panelId) ?? 0
+            const reseekCooldownMs = visualOnly
+              ? VISUAL_RESEEK_COOLDOWN_MS
+              : AUDIBLE_RESEEK_COOLDOWN_MS
+
             // Native-audio playback lets videos free-run unless they are
             // visibly far off. Frequent seeks make iOS restart H.264 decode
             // and were the source of the laggy/stuttering Play All visuals.
@@ -945,8 +978,14 @@ export function useMultitrackSync() {
               (!masterEntry || el !== masterEntry[1]) &&
               !el.paused &&
               !el.ended &&
+              metadataReady &&
+              // A seek already in flight will land on its own; stacking another
+              // on top of it is what turns a lagging tile into a loop.
+              !el.seeking &&
+              tickNow - lastReseekAt >= reseekCooldownMs &&
               deviation > slaveTolerance
             ) {
+              lastReseekAtRef.current.set(panelId, tickNow)
               el.currentTime = Math.max(win.trimStart, timeline + win.trimStart + win.offset)
             }
           } catch {

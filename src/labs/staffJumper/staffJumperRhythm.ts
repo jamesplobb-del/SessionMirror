@@ -518,6 +518,30 @@ export function durationMs(durationUnits: number, meter: MeterSpec, bpm: number)
   return (durationUnits / meter.pulseUnits) * secondsPerPulse(bpm) * 1000
 }
 
+/**
+ * How long the player lingers on a note before hopping to the next one.
+ *
+ * Deliberately *not* the note's written length: holding a whole note for its
+ * full four beats makes the game feel stalled, and the game does not claim to
+ * assess duration anyway. This is a compressed version of the written length —
+ * long notes visibly dwell longer than short ones, but the spread is squared
+ * off so the longest note costs a beat's worth of pause rather than a bar's.
+ *
+ * Scaling on the square root keeps the ordering the player reads on the page
+ * (sixteenth < eighth < quarter < half < whole) while pulling the extremes in
+ * towards each other.
+ */
+const LINGER_QUARTER_MS = 260
+const LINGER_MAX_MS = 700
+/** Never dwell past the note itself — the binding limit at fast tempos. */
+const LINGER_MAX_FRACTION = 0.7
+
+export function lingerMs(durationUnits: number, meter: MeterSpec, bpm: number): number {
+  const writtenMs = durationMs(durationUnits, meter, bpm)
+  const scaled = LINGER_QUARTER_MS * Math.sqrt(durationUnits / DURATION_UNITS.quarter)
+  return Math.min(scaled, LINGER_MAX_MS, writtenMs * LINGER_MAX_FRACTION)
+}
+
 export const STAFF_JUMPER_TEMPO_MIN = 40
 export const STAFF_JUMPER_TEMPO_MAX = 200
 export const STAFF_JUMPER_TEMPO_DEFAULT = 80

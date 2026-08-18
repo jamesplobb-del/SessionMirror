@@ -171,6 +171,15 @@ export interface StaffJumperState {
   onTimeCount: number
   /** True while the count-in is still running and pitch is ignored. */
   isCountingIn: boolean
+  /**
+   * True while an accepted note is being held for its written length.
+   *
+   * The note has already scored by this point; the run is waiting out its
+   * duration before hopping on, so a whole note keeps the player on its
+   * platform for four beats instead of moving the instant the pitch is
+   * recognised.
+   */
+  isSustaining: boolean
 }
 
 export interface TargetNote {
