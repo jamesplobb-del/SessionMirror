@@ -39,10 +39,13 @@ import type {
   BalanceTarget,
 } from './balanceTypes'
 import BalanceRoutineEditor from './BalanceRoutineEditor'
+import {
+  BALANCE_GOAL_OPTIONS,
+  balanceDestinationGeometry,
+  balanceGoalIndex,
+} from './balanceGoal'
 
 type SetupSection = 'routine' | 'instrument'
-
-const GOAL_OPTIONS = [5, 8, 10, 15] as const
 
 interface BalanceSetupProps {
   settings: BalanceSettings
@@ -127,6 +130,9 @@ export default function BalanceSetup({
   onDeleteCustom,
 }: BalanceSetupProps) {
   const [openSection, setOpenSection] = useState<SetupSection | null>(null)
+  const [distanceDragging, setDistanceDragging] = useState(false)
+  const previewSceneRef = useRef<HTMLDivElement | null>(null)
+  const distancePointerIdRef = useRef<number | null>(null)
   const instrument = getBalanceInstrument(settings.instrumentId)
   const hasPitch = readout.noteName !== '—' && readout.frequencyHz > 0
   const selectedCustom = customRoutines.find((routine) => routine.id === settings.selectedCustomRoutineId)
@@ -305,7 +311,8 @@ export default function BalanceSetup({
   const previewInTune = previewCents !== null && Math.abs(previewCents) <= tolerance
   const targetLabel = previewTarget?.writtenLabel ?? midiToBalanceNoteName(targetMidi)
   const goalLabel = settings.goalMode === 'personalBest' ? 'Beat best' : `${settings.goalSeconds} sec`
-  const goalIndex = Math.max(0, GOAL_OPTIONS.indexOf(settings.goalSeconds))
+  const goalIndex = balanceGoalIndex(settings.goalSeconds)
+  const destination = balanceDestinationGeometry(settings.goalSeconds)
   const pitchRatio = targetMax > targetMin ? (targetMidi - targetMin) / (targetMax - targetMin) : 0.5
   const toleranceRatio = (tolerance - 3) / 27
   const routineLabel = settings.routineType === 'custom'
@@ -325,6 +332,32 @@ export default function BalanceSetup({
       tolerancePreset: 'custom',
       customToleranceCents: Math.round(3 + ratio * 27),
     })
+  }
+
+  const setGoalIndex = (index: number) => {
+    const clampedIndex = Math.max(0, Math.min(BALANCE_GOAL_OPTIONS.length - 1, index))
+    const goalSeconds = BALANCE_GOAL_OPTIONS[clampedIndex] ?? 10
+    if (goalSeconds === settings.goalSeconds && settings.goalMode === 'fixed') return
+    onUpdate({ goalMode: 'fixed', goalSeconds })
+  }
+
+  const updateGoalFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const scene = previewSceneRef.current
+    if (!scene) return
+    const rect = scene.getBoundingClientRect()
+    const pointerX = (event.clientX - rect.left) / Math.max(1, rect.width) * 100
+    const pointerY = (event.clientY - rect.top) / Math.max(1, rect.height) * 100
+    const close = balanceDestinationGeometry(BALANCE_GOAL_OPTIONS[0])
+    const far = balanceDestinationGeometry(BALANCE_GOAL_OPTIONS[BALANCE_GOAL_OPTIONS.length - 1])
+    const vectorX = far.x - close.x
+    const vectorY = far.y - close.y
+    const projectedRatio = (
+      (pointerX - close.x) * vectorX + (pointerY - close.y) * vectorY
+    ) / (vectorX * vectorX + vectorY * vectorY)
+    const nextIndex = Math.round(
+      Math.max(0, Math.min(1, projectedRatio)) * (BALANCE_GOAL_OPTIONS.length - 1),
+    )
+    setGoalIndex(nextIndex)
   }
 
   const handlePitchKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -358,6 +391,24 @@ export default function BalanceSetup({
     })
   }
 
+  const handleGoalKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const delta = event.key === 'ArrowUp' || event.key === 'ArrowRight'
+      ? 1
+      : event.key === 'ArrowDown' || event.key === 'ArrowLeft'
+        ? -1
+        : 0
+    if (delta !== 0) {
+      event.preventDefault()
+      setGoalIndex(goalIndex + delta)
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      setGoalIndex(0)
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      setGoalIndex(BALANCE_GOAL_OPTIONS.length - 1)
+    }
+  }
+
   return (
     <div className="balance-screen balance-screen--setup">
       <header className="balance-head">
@@ -369,7 +420,26 @@ export default function BalanceSetup({
       </header>
 
       <section className="balance-setup-preview">
-        <div className="balance-setup-preview__scene">
+        <div
+          ref={previewSceneRef}
+          className="balance-setup-preview__scene"
+          onPointerMove={(event) => {
+            if (distancePointerIdRef.current === event.pointerId) updateGoalFromPointer(event)
+          }}
+          onPointerUp={(event) => {
+            if (distancePointerIdRef.current !== event.pointerId) return
+            distancePointerIdRef.current = null
+            setDistanceDragging(false)
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId)
+            }
+          }}
+          onPointerCancel={(event) => {
+            if (distancePointerIdRef.current !== event.pointerId) return
+            distancePointerIdRef.current = null
+            setDistanceDragging(false)
+          }}
+        >
           {/* The real game renderer, held at its idle frame — the setup screen
               and the run you are about to play are the same world at the same
               angle, not a flat drawing of it. */}
@@ -379,7 +449,33 @@ export default function BalanceSetup({
             visualRef={previewVisualRef}
             characterId={settings.characterId}
             toleranceCents={tolerance}
+            goalSeconds={settings.goalSeconds}
           />
+
+          <div
+            className={`balance-preview-distance-control ${distanceDragging ? 'is-dragging' : ''}`}
+            role="slider"
+            tabIndex={0}
+            aria-label="Hold duration by destination distance"
+            aria-valuemin={BALANCE_GOAL_OPTIONS[0]}
+            aria-valuemax={BALANCE_GOAL_OPTIONS[BALANCE_GOAL_OPTIONS.length - 1]}
+            aria-valuenow={settings.goalSeconds}
+            aria-valuetext={goalLabel}
+            style={{
+              left: `${destination.x}%`,
+              top: `${destination.y - 1.2}%`,
+            }}
+            onKeyDown={handleGoalKey}
+            onPointerDown={(event) => {
+              distancePointerIdRef.current = event.pointerId
+              setDistanceDragging(true)
+              previewSceneRef.current?.setPointerCapture(event.pointerId)
+              updateGoalFromPointer(event)
+            }}
+          >
+            <output>{goalLabel}</output>
+            <span aria-hidden>Drag distance ↗</span>
+          </div>
 
           {targetCanChange ? (
             <div
@@ -457,30 +553,14 @@ export default function BalanceSetup({
             <small>{previewInTune ? 'In tune' : 'Live setup'}</small>
             <strong>{routineLabel}</strong>
           </span>
-          <div className="balance-preview-goal-control">
-            <span><small>Hold</small><output>{goalLabel}</output></span>
-            <input
-              type="range"
-              min={0}
-              max={GOAL_OPTIONS.length - 1}
-              step={1}
-              value={goalIndex}
-              disabled={settings.goalMode === 'personalBest'}
-              aria-label="Hold goal per note"
-              onChange={(event) => onUpdate({
-                goalMode: 'fixed',
-                goalSeconds: GOAL_OPTIONS[Number(event.target.value)] ?? 10,
-              })}
-            />
-            <button
-              type="button"
-              className={settings.goalMode === 'personalBest' ? 'is-active' : ''}
-              aria-pressed={settings.goalMode === 'personalBest'}
-              onClick={() => onUpdate({
-                goalMode: settings.goalMode === 'personalBest' ? 'fixed' : 'personalBest',
-              })}
-            >Best</button>
-          </div>
+          <button
+            type="button"
+            className={`balance-preview-best-goal ${settings.goalMode === 'personalBest' ? 'is-active' : ''}`}
+            aria-pressed={settings.goalMode === 'personalBest'}
+            onClick={() => onUpdate({
+              goalMode: settings.goalMode === 'personalBest' ? 'fixed' : 'personalBest',
+            })}
+          >{settings.goalMode === 'personalBest' ? 'Using best' : 'Beat best'}</button>
           <p className={previewInTune ? 'is-growing' : ''} aria-live="polite">
             {previewInTune
               ? `Growing · ${(previewHeldMs / 1000).toFixed(1)}s`

@@ -220,6 +220,7 @@ export default function BalanceScreen({
           visualRef={game.visualRef}
           characterId={game.state.settings.characterId}
           toleranceCents={game.toleranceCents}
+          goalSeconds={game.state.settings.goalSeconds}
         />
         <section className="balance-rest-card">
           <p className="balance-eyebrow">Rest</p>
@@ -276,6 +277,7 @@ export default function BalanceScreen({
         visualRef={game.visualRef}
         characterId={game.state.settings.characterId}
         toleranceCents={game.toleranceCents}
+        goalSeconds={game.state.settings.goalSeconds}
       />
 
       <section className="balance-game-hud" aria-label="Live balance status">

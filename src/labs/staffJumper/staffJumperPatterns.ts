@@ -10,7 +10,73 @@
  * chosen at random from the difficulty's vocabulary and often sequenced up or
  * down the scale the way a real exercise book would.
  */
+import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { StaffJumperDifficulty } from './staffJumperMusicLogic'
+
+/**
+ * Widest melodic interval a tier may write, in scale degrees.
+ *
+ * A third at easy, a sixth at medium, an octave at hard — the octave being the
+ * point of the octave-leap and triad-to-the-octave shapes rather than an
+ * accident. Degrees, not semitones: the scale is the unit the exercise thinks
+ * in, and a third is a third whether it is major or minor.
+ */
+const TIER_MAX_LEAP: Record<StaffJumperDifficulty, number> = {
+  easy: 3,
+  medium: 5,
+  hard: 7,
+}
+
+/**
+ * How much of that a fast note gives back.
+ *
+ * The interval is only half of what makes a leap hard — the other half is how
+ * long the player has to make it. An octave on a half note and the same octave
+ * on an eighth are different skills entirely, so the cap tightens as the notes
+ * get shorter and running passagework stays close to stepwise.
+ */
+function speedAllowance(shorterUnits: number): number {
+  if (shorterUnits <= 1) return -3
+  if (shorterUnits <= 2) return -2
+  if (shorterUnits <= 3) return -1
+  return 0
+}
+
+/**
+ * What the instrument itself makes hard.
+ *
+ * Singers pitch an interval from nothing, with no fingering to lean on, so a
+ * wide one is harder for them at any speed. Winds — brass especially — change
+ * partial or register to leap, and that costs *time*: this is the rule that
+ * stops an octave slur landing in a run of eighths under a trumpet player.
+ * Strings sit at the baseline; a leap there is a shift or a string crossing,
+ * which the tier cap already covers.
+ */
+function instrumentAllowance(instrument: TunerInstrument, shorterUnits: number): number {
+  if (instrument === 'voice') return -1
+  if (instrument === 'winds') return shorterUnits <= 2 ? -1 : 0
+  return 0
+}
+
+/**
+ * The widest interval allowed between two particular notes.
+ *
+ * `shorterUnits` is the shorter of the pair — a leap is only as comfortable as
+ * the quicker of the two notes it joins. Never drops below a step, or there
+ * would be no legal move at all.
+ */
+export function maxLeapDegrees(
+  difficulty: StaffJumperDifficulty,
+  instrument: TunerInstrument,
+  shorterUnits: number,
+): number {
+  return Math.max(
+    1,
+    TIER_MAX_LEAP[difficulty] +
+      speedAllowance(shorterUnits) +
+      instrumentAllowance(instrument, shorterUnits),
+  )
+}
 
 /**
  * Which way the shape travels, as the ear hears it.
@@ -84,6 +150,37 @@ export interface PatternStep {
   patternName: string
 }
 
+const widestStepCache = new Map<string, number>()
+
+/**
+ * The widest interval printed inside the shape.
+ *
+ * Only the intervals the shape actually contains — a four-note run is stepwise
+ * and a seventh chord is a stack of thirds, whatever they may add up to end to
+ * end. Repeating a shape up the scale does create one more interval at the
+ * join, but that is a property of the sequencing rather than of the shape, and
+ * folding it in here banned scalar runs from exactly the fast easy passages
+ * they belong in.
+ */
+export function widestStepInPattern(pattern: ScalePattern): number {
+  const cached = widestStepCache.get(pattern.id)
+  if (cached !== undefined) return cached
+
+  let widest = 0
+  for (let index = 1; index < pattern.offsets.length; index += 1) {
+    widest = Math.max(widest, Math.abs(pattern.offsets[index]! - pattern.offsets[index - 1]!))
+  }
+  widestStepCache.set(pattern.id, widest)
+  return widest
+}
+
+/** The interval created where a repeated shape rejoins itself. */
+function sequenceSeamInterval(pattern: ScalePattern, direction: number): number {
+  const head = pattern.offsets[0] ?? 0
+  const tail = pattern.offsets.at(-1) ?? 0
+  return Math.abs(head + direction - tail)
+}
+
 function offsetRange(pattern: ScalePattern): { min: number; max: number } {
   return {
     min: Math.min(...pattern.offsets),
@@ -108,6 +205,14 @@ export interface ExerciseBlockOptions {
   previousDegree: number
   /** Pattern used by the previous block, so the next one can answer it. */
   previousPattern: ScalePattern | null
+  /**
+   * Widest interval this block may contain or arrive by.
+   *
+   * Applied to the vocabulary rather than to the notes afterwards: a shape is
+   * either playable at this speed on this instrument or it is not offered, so
+   * the exercise keeps whole musical figures instead of flattened ones.
+   */
+  maxLeap: number
   /**
    * Degree the phrase's contour wants this block to sit near.
    *
@@ -171,11 +276,22 @@ function pickWeighted<T>(items: readonly T[], weightOf: (item: T) => number, rng
  * shape is drilled in practice.
  */
 export function buildExerciseBlock(options: ExerciseBlockOptions): PatternStep[] {
-  const { difficulty, topDegree, rng, previousDegree, previousPattern, targetDegree } = options
-  const candidates = patternsForDifficulty(difficulty).filter(
+  const { difficulty, topDegree, rng, previousDegree, previousPattern, targetDegree, maxLeap } =
+    options
+  const inRange = patternsForDifficulty(difficulty).filter(
     (pattern) => validStarts(pattern, topDegree).length > 0,
   )
-  if (candidates.length === 0) return []
+  if (inRange.length === 0) return []
+
+  // Drop shapes that are too wide for these notes. If nothing survives — very
+  // fast notes on a tight instrument — fall back to the narrowest shapes there
+  // are rather than giving up on the block.
+  const playable = inRange.filter((pattern) => widestStepInPattern(pattern) <= maxLeap)
+  const narrowest = Math.min(...inRange.map(widestStepInPattern))
+  const candidates =
+    playable.length > 0
+      ? playable
+      : inRange.filter((pattern) => widestStepInPattern(pattern) === narrowest)
 
   // Avoid running the same shape twice in a row when there is an alternative.
   const fresh = candidates.filter((pattern) => pattern.id !== previousPattern?.id)
@@ -190,13 +306,31 @@ export function buildExerciseBlock(options: ExerciseBlockOptions): PatternStep[]
   // A descending shape like [3, 2, 1, 0] begins on its highest offset, so
   // placing its start on the target would enter a third above it — which is
   // how a phrase ending low was being answered by a leap of a tenth.
-  const aim = (targetDegree + previousDegree) / 2 - (pattern.offsets[0] ?? 0)
+  const firstOffset = pattern.offsets[0] ?? 0
+  const aim = (targetDegree + previousDegree) / 2 - firstOffset
   const nearest = starts.reduce((best, start) =>
     Math.abs(start - aim) < Math.abs(best - aim) ? start : best,
   )
   const jitter = Math.floor(rng() * 3) - 1
-  const startIndex = Math.max(0, Math.min(starts.length - 1, starts.indexOf(nearest) + jitter))
-  const start = starts[startIndex]!
+  const aimed = starts[Math.max(0, Math.min(starts.length - 1, starts.indexOf(nearest) + jitter))]!
+
+  // The join into this block is a melodic interval like any other, and it is
+  // the one the old code never looked at — which is how a stepwise easy-mode
+  // exercise could still hand the player a tenth between two shapes.
+  const reachable = starts.filter(
+    (candidate) => Math.abs(candidate + firstOffset - previousDegree) <= maxLeap,
+  )
+  const start =
+    reachable.length > 0
+      ? reachable.reduce((best, candidate) =>
+          Math.abs(candidate - aimed) < Math.abs(best - aimed) ? candidate : best,
+        )
+      : starts.reduce((best, candidate) =>
+          Math.abs(candidate + firstOffset - previousDegree) <
+          Math.abs(best + firstOffset - previousDegree)
+            ? candidate
+            : best,
+        )
 
   const steps: PatternStep[] = []
   /**
@@ -211,9 +345,15 @@ export function buildExerciseBlock(options: ExerciseBlockOptions): PatternStep[]
     steps.push({ degree, patternId: pattern.id, patternName: pattern.name })
   }
 
+  const wanted = rng() > 0.5 ? 1 : -1
+  // Repeating the shape adds one interval the printed figure does not contain.
+  // Prefer the direction the draw wanted, take the other if only it fits, and
+  // fall back to stating the shape once rather than forcing a join too wide
+  // for these notes.
+  const direction = sequenceSeamInterval(pattern, wanted) <= maxLeap ? wanted : -wanted
+  const seamFits = sequenceSeamInterval(pattern, direction) <= maxLeap
   const sequenceLength =
-    pattern.sequenceable && rng() > 0.45 ? 2 + Math.floor(rng() * 3) : 1
-  const direction = rng() > 0.5 ? 1 : -1
+    pattern.sequenceable && seamFits && rng() > 0.45 ? 2 + Math.floor(rng() * 3) : 1
 
   for (let repeat = 0; repeat < sequenceLength; repeat += 1) {
     const shifted = start + repeat * direction
@@ -291,6 +431,9 @@ export interface PhraseOptions {
   startDegree: number
   cadence: PhraseCadence
   previousPatternId: string | null
+  /** Written length of each note the phrase has room for, in sixteenths. */
+  noteDurations: readonly number[]
+  instrument: TunerInstrument
 }
 
 /**
@@ -306,7 +449,36 @@ export function buildPhraseSteps(options: PhraseOptions): PatternStep[] {
   const { difficulty, topDegree, rng, noteCount, startDegree, cadence } = options
   if (noteCount <= 0) return []
 
+  const { noteDurations, instrument } = options
+
+  /**
+   * The cap for a block starting here, taken over the notes it is likely to
+   * cover. A shape is chosen once but spans several notes, so it has to suit
+   * the quickest of them rather than the first.
+   */
+  const capAt = (position: number) => {
+    const window = noteDurations.slice(Math.max(0, position - 1), position + 4)
+    const shortest = window.length > 0 ? Math.min(...window) : 4
+    return maxLeapDegrees(difficulty, instrument, shortest)
+  }
+
   const contour = pickWeighted(CONTOUR_WEIGHTS, ([, weight]) => weight, rng)[0]
+
+  /**
+   * Where the phrase is going to land, decided before a note is written.
+   *
+   * The contour says where the line ends up; snapping that to the nearest
+   * stable degree gives the arrival. Knowing it up front is what lets the
+   * phrase *head for* the cadence over its closing notes instead of being
+   * yanked onto it at the last moment — which is how a stepwise easy line
+   * ended up leaping a fourth into its own final note.
+   */
+  const cadenceDegree = nearestDegreeOfClass(
+    contourDegree(contour, 1, topDegree),
+    CADENCE_DEGREE_CLASS[cadence],
+    topDegree,
+  )
+
   const steps: PatternStep[] = []
   let previousPattern: ScalePattern | null =
     SCALE_PATTERNS.find((pattern) => pattern.id === options.previousPatternId) ?? null
@@ -318,13 +490,18 @@ export function buildPhraseSteps(options: PhraseOptions): PatternStep[] {
   while (steps.length < noteCount && guard < 32) {
     guard += 1
     const progress = steps.length / noteCount
+    // Past the two-thirds mark the contour gives way to the cadence, so the
+    // closing shapes are already chosen to sit near where the phrase lands.
+    const homing = Math.max(0, (progress - 0.62) / 0.38)
     const block = buildExerciseBlock({
       difficulty,
       topDegree,
       rng,
       previousDegree: steps.at(-1)?.degree ?? startDegree,
       previousPattern,
-      targetDegree: contourDegree(contour, progress, topDegree),
+      targetDegree:
+        contourDegree(contour, progress, topDegree) * (1 - homing) + cadenceDegree * homing,
+      maxLeap: capAt(steps.length),
     })
     if (block.length === 0) break
     previousPattern = SCALE_PATTERNS.find((pattern) => pattern.id === block[0]!.patternId) ?? null
@@ -337,38 +514,10 @@ export function buildPhraseSteps(options: PhraseOptions): PatternStep[] {
   if (steps.length === 0) return []
   steps.length = Math.min(steps.length, noteCount)
 
-  // ── The cadence ──
-  // Bend the final note onto a stable degree, and approach it by step. A
-  // phrase that arrives by leap onto the tonic sounds cut off; the step down
-  // from the supertonic, or up from the leading tone, is what makes it land.
-  const last = steps.at(-1)!
-  const finalDegree = nearestDegreeOfClass(
-    last.degree,
-    CADENCE_DEGREE_CLASS[cadence],
-    topDegree,
-  )
-  steps[steps.length - 1] = { ...last, degree: finalDegree }
-
-  const penultimate = steps.at(-2)
-  if (penultimate) {
-    const gap = penultimate.degree - finalDegree
-    if (gap === 0 || Math.abs(gap) > 2) {
-      // Approach from whichever side the line was already on, falling back to
-      // the other when the range or the note before rules it out. Both
-      // exclusions matter: landing on the cadence degree would make the
-      // arrival a restatement, and matching the note before it would put a
-      // repeated note immediately in front of the cadence.
-      const above = Math.min(topDegree, finalDegree + 1)
-      const below = Math.max(0, finalDegree - 1)
-      const ordered = gap > 0 ? [above, below] : [below, above]
-      const before = steps.at(-3)?.degree
-      const approach =
-        ordered.find((candidate) => candidate !== finalDegree && candidate !== before) ??
-        ordered.find((candidate) => candidate !== finalDegree) ??
-        penultimate.degree
-      steps[steps.length - 2] = { ...penultimate, degree: approach }
-    }
-  }
+  // The arrival itself. Leading the line into it is the caller's job — it owns
+  // the note lengths, so it is the only place that knows how far the phrase is
+  // allowed to move on each of its closing notes.
+  steps[steps.length - 1] = { ...steps.at(-1)!, degree: cadenceDegree }
 
   return steps
 }

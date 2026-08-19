@@ -150,10 +150,10 @@
 .balance-preview-rope-control {
   position: absolute;
   z-index: 12;
-  top: 45%;
-  left: 18%;
-  width: 62%;
-  height: 9rem;
+  top: 62%;
+  left: 22%;
+  width: 44%;
+  height: 7rem;
   outline: none;
   color: #684217;
   cursor: ew-resize;
@@ -163,19 +163,18 @@
 .balance-preview-rope-control output {
   position: absolute;
   top: 0.3rem;
-  left: 50%;
+  left: 0;
   color: #67400f;
   font-size: var(--sm-text-value);
   font-weight: var(--sm-weight-strong);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-shadow: 0 1px rgba(255,255,255,0.9);
-  transform: translateX(-50%);
 }
 
 .balance-preview-rope-control > span {
   position: absolute;
-  top: 3.35rem;
+  top: 4.35rem;
   left: 50%;
   display: grid;
   width: var(--balance-rope-control-width, 4rem);
@@ -201,6 +200,51 @@
   border-top: 0.12rem dashed rgba(106,74,36,0.56);
 }
 
+.balance-preview-distance-control {
+  position: absolute;
+  z-index: 14;
+  width: clamp(6.4rem, 34vw, 9.5rem);
+  height: 5.2rem;
+  outline: none;
+  cursor: grab;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+  transition: left 180ms ease, top 180ms ease;
+}
+
+.balance-preview-distance-control::after {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  width: 63%;
+  height: 24%;
+  border: 1px dashed rgba(113,70,19,0.5);
+  border-radius: 50%;
+  content: '';
+  transform: translate(-50%, -50%);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.balance-preview-distance-control output,
+.balance-preview-distance-control > span {
+  position: absolute;
+  left: 50%;
+  color: #664015;
+  font-weight: var(--sm-weight-strong);
+  white-space: nowrap;
+  text-shadow: 0 1px rgba(255,255,255,0.9);
+  transform: translateX(-50%);
+}
+
+.balance-preview-distance-control output { top: -0.2rem; font-size: var(--sm-text-value); }
+.balance-preview-distance-control > span { bottom: -0.05rem; font-size: var(--sm-text-caption); }
+.balance-preview-distance-control.is-dragging { cursor: grabbing; transition: none; }
+.balance-preview-distance-control.is-dragging::after { border-color: #784810; transform: translate(-50%, -50%) scale(1.08); }
+.balance-preview-distance-control:focus-visible::after {
+  border-color: rgba(29, 112, 144, 0.7);
+  box-shadow: 0 0 0 0.18rem rgba(29, 112, 144, 0.3);
+}
+
 .balance-preview-summary {
   display: grid;
   min-height: 4.8rem;
@@ -216,19 +260,8 @@
 .balance-preview-summary > p { grid-column: 1 / -1; margin: 0; color: #697588; font-size: var(--sm-text-caption); font-weight: var(--sm-weight-body); line-height: 1.35; text-align: left; }
 .balance-preview-summary > p.is-growing { color: #227c5d; }
 
-.balance-preview-goal-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.18rem 0.45rem;
-}
-
-.balance-preview-goal-control > span { display: flex; grid-column: 1 / -1; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.balance-preview-goal-control small { color: var(--balance-muted); font-size: var(--sm-text-caption); font-weight: var(--sm-weight-body); }
-.balance-preview-goal-control output { color: #38475b; font-size: var(--sm-text-caption); font-weight: var(--sm-weight-medium); }
-.balance-preview-goal-control input { width: 100%; height: 0.9rem; margin: 0; accent-color: #2c8b69; }
-.balance-preview-goal-control button { padding: 0 0 0.12rem; border-bottom: 1px solid #aab4b7; color: #66727f; background: transparent; font-size: var(--sm-text-caption); font-weight: var(--sm-weight-body); }
-.balance-preview-goal-control button.is-active { border-bottom-color: #257b60; color: #257b60; }
+.balance-preview-best-goal { justify-self: end; padding: 0 0 0.12rem; border-bottom: 1px solid #aab4b7; color: #66727f; background: transparent; font-size: var(--sm-text-caption); font-weight: var(--sm-weight-body); }
+.balance-preview-best-goal.is-active { border-bottom-color: #257b60; color: #257b60; }
 
 .balance-setup-sheet {
   display: grid;
@@ -379,7 +412,7 @@
 .balance-music-flag > i { position: absolute; left: 0.18rem; bottom: 0; width: 0.11rem; height: 100%; border-radius: 999px; background: #9f927e; }
 .balance-music-flag > b { position: absolute; left: 0.26rem; top: 0; display: grid; width: 1.18rem; height: 0.82rem; place-items: center; color: #fff; background: #14517c; clip-path: polygon(0 0, 100% 12%, 92% 100%, 0 84%); font-size: 0.7rem; font-weight: 800; }
 
-.balance-rope { position: absolute; left: 30%; top: 36.8%; width: 40%; height: 44%; overflow: visible; }
+.balance-rope { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .balance-rope path { fill: none; vector-effect: non-scaling-stroke; }
 .balance-rope--guide { z-index: 4; opacity: 0.32; }
 .balance-rope--guide path { stroke: #8c7659; stroke-width: var(--balance-rope-line-width, 5); stroke-linecap: round; stroke-dasharray: 2 7; }
@@ -388,7 +421,7 @@
 .balance-rope__line { stroke: #f5ae35; stroke-width: var(--balance-rope-line-width, 5); stroke-linecap: round; }
 .balance-rope__twist { stroke: rgba(255,220,124,0.95); stroke-width: var(--balance-rope-twist-width, 2.25); stroke-linecap: round; stroke-dasharray: 3 6; stroke-dashoffset: var(--balance-rope-shift); }
 
-.balance-destination-island { position: absolute; z-index: 4; top: 32.5%; left: 61%; width: min(46vw, 27rem); height: 18%; transform: translateX(-50%) scale(var(--balance-destination-scale)); transform-origin: 50% 65%; }
+.balance-destination-island { position: absolute; z-index: 4; top: var(--balance-destination-top, 32.5%); left: var(--balance-destination-left, 61%); width: min(46vw, 27rem); height: 18%; transform: translateX(-50%) scale(var(--balance-destination-scale)); transform-origin: 50% 65%; }
 .balance-destination-island__base { position: absolute; inset: 26% 8% 0; background: linear-gradient(105deg, #b4e2f7 0%, #83c9ed 65%, #a6dcf5 100%); clip-path: polygon(3% 0, 97% 0, 80% 100%, 20% 100%); filter: drop-shadow(0 0.8rem 1rem rgba(74,145,181,0.12)); }
 .balance-destination-island__clouds { position: absolute; z-index: 2; top: 12%; left: 1%; width: 98%; height: 44%; border-radius: 50%; background: rgba(255,255,255,0.9); }
 .balance-destination-island__clouds i { position: absolute; border-radius: 50%; background: inherit; }

@@ -1,8 +1,9 @@
 import { useEffect, useRef, type MutableRefObject } from 'react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
-import type { BalancePhase, BalanceTarget, BalanceVisualSnapshot } from './balanceTypes'
+import type { BalancePhase, BalanceSettings, BalanceTarget, BalanceVisualSnapshot } from './balanceTypes'
 import type { BalanceCharacterId } from './balanceCharacters'
 import BalanceCharacter from './BalanceCharacter'
+import { balanceDestinationGeometry } from './balanceGoal'
 
 interface BalanceSceneProps {
   phase: BalancePhase
@@ -10,6 +11,7 @@ interface BalanceSceneProps {
   visualRef: MutableRefObject<BalanceVisualSnapshot>
   characterId: BalanceCharacterId
   toleranceCents: number
+  goalSeconds: BalanceSettings['goalSeconds']
 }
 
 export default function BalanceScene({
@@ -18,11 +20,24 @@ export default function BalanceScene({
   visualRef,
   characterId,
   toleranceCents,
+  goalSeconds,
 }: BalanceSceneProps) {
   const sceneRef = useRef<HTMLDivElement>(null)
   const characterRef = useRef<HTMLDivElement>(null)
   const prefersReducedMotion = usePrefersReducedMotion()
   const active = phase === 'active'
+  const destination = balanceDestinationGeometry(goalSeconds)
+  const ropeStart = { x: 38, y: 80.8 }
+  const ropeEnd = { x: destination.x, y: destination.y }
+  const ropeControlOne = {
+    x: ropeStart.x + (ropeEnd.x - ropeStart.x) * 0.34,
+    y: ropeStart.y + (ropeEnd.y - ropeStart.y) * 0.32,
+  }
+  const ropeControlTwo = {
+    x: ropeStart.x + (ropeEnd.x - ropeStart.x) * 0.68,
+    y: ropeStart.y + (ropeEnd.y - ropeStart.y) * 0.7,
+  }
+  const ropePath = `M${ropeStart.x} ${ropeStart.y} C${ropeControlOne.x} ${ropeControlOne.y} ${ropeControlTwo.x} ${ropeControlTwo.y} ${ropeEnd.x} ${ropeEnd.y}`
 
   useEffect(() => {
     const scene = sceneRef.current
@@ -70,13 +85,13 @@ export default function BalanceScene({
         (completing && visualProgress < 0.975)
       if (walking && !prefersReducedMotion) travel += dt * Math.max(0.28, snapshot.speed) * 0.042
 
-      // Follow the same normalized cubic used by the SVG rope. The visible
-      // journey starts above the foreground anchor and ends on the far deck.
-      const ropeT = 0.73 + (0.025 - 0.73) * visualProgress
-      const ropeX = cubic(75, 55, 35, 20, ropeT)
-      const ropeY = cubic(0, 30, 67, 100, ropeT)
-      const characterX = sceneWidth * (0.3 + (ropeX / 100) * 0.4)
-      const characterY = sceneHeight * (0.368 + (ropeY / 100) * 0.44)
+      // Follow the same near-to-far cubic used by the SVG. A longer hold moves
+      // the destination farther away, so duration changes the actual course.
+      const ropeT = 0.22 + 0.78 * visualProgress
+      const ropeX = cubic(ropeStart.x, ropeControlOne.x, ropeControlTwo.x, ropeEnd.x, ropeT)
+      const ropeY = cubic(ropeStart.y, ropeControlOne.y, ropeControlTwo.y, ropeEnd.y, ropeT)
+      const characterX = sceneWidth * (ropeX / 100)
+      const characterY = sceneHeight * (ropeY / 100)
       // Once the player moves out from the foreground platform, keep them in
       // a stable lower-middle follow zone. The world moves around that anchor,
       // which makes the next island visibly approach instead of shrinking the
@@ -115,7 +130,7 @@ export default function BalanceScene({
       scene.style.setProperty('--balance-rope-clip', `${Math.max(0, ropeY - 2)}%`)
       scene.style.setProperty('--balance-camera-x', `${cameraX}px`)
       scene.style.setProperty('--balance-camera-y', `${cameraY}px`)
-      scene.style.setProperty('--balance-destination-scale', String(0.88 + visualProgress * 0.38))
+      scene.style.setProperty('--balance-destination-scale', String(destination.scale + visualProgress * 0.38))
       scene.style.setProperty('--balance-drift-left', `${(travel % 96) * -0.018}px`)
       scene.style.setProperty('--balance-drift-right', `${(travel % 96) * 0.025}px`)
       scene.style.setProperty('--balance-parallax-far', `${visualProgress * sceneHeight * 0.012 + (travel % 96) * 0.018}px`)
@@ -131,7 +146,7 @@ export default function BalanceScene({
       resizeObserver.disconnect()
       window.cancelAnimationFrame(frame)
     }
-  }, [prefersReducedMotion, visualRef])
+  }, [destination.scale, prefersReducedMotion, ropeControlOne.x, ropeControlOne.y, ropeControlTwo.x, ropeControlTwo.y, ropeEnd.x, ropeEnd.y, visualRef])
 
   const toleranceRatio =
     (Math.max(3, Math.min(30, toleranceCents)) - 3) / (30 - 3)
@@ -147,6 +162,9 @@ export default function BalanceScene({
         ['--balance-rope-line-width' as string]: ropeLineWidth.toFixed(2),
         ['--balance-rope-shadow-width' as string]: (ropeLineWidth + 2.2).toFixed(2),
         ['--balance-rope-twist-width' as string]: Math.max(1.8, ropeLineWidth * 0.42).toFixed(2),
+        ['--balance-destination-left' as string]: `${destination.x}%`,
+        ['--balance-destination-top' as string]: `${destination.y - 4.85}%`,
+        ['--balance-destination-scale' as string]: destination.scale.toFixed(3),
       }}
       aria-hidden
     >
@@ -190,12 +208,12 @@ export default function BalanceScene({
         <span className="balance-cloud-mound balance-cloud-mound--seven" />
 
         <svg className="balance-rope balance-rope--guide" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path d="M20 100 C35 67 55 30 75 0" />
+          <path d={ropePath} />
         </svg>
         <svg className="balance-rope balance-rope--live" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path className="balance-rope__shadow" d="M20 100 C35 67 55 30 75 0" />
-          <path className="balance-rope__line" d="M20 100 C35 67 55 30 75 0" />
-          <path className="balance-rope__twist" d="M20 100 C35 67 55 30 75 0" />
+          <path className="balance-rope__shadow" d={ropePath} />
+          <path className="balance-rope__line" d={ropePath} />
+          <path className="balance-rope__twist" d={ropePath} />
         </svg>
 
         <div className="balance-destination-island">

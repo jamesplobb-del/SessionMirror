@@ -17,12 +17,13 @@ import {
   type StaffJumperTransposition,
 } from './staffJumperInstrumentRanges'
 import {
+  getPhraseNoteDurations,
   getPhraseSpan,
   getRhythmSlot,
   type RhythmSlot,
   type StaffJumperMeter,
 } from './staffJumperRhythm'
-import { buildPhraseSteps, type PatternStep } from './staffJumperPatterns'
+import { buildPhraseSteps, maxLeapDegrees, type PatternStep } from './staffJumperPatterns'
 
 export const STAFF_JUMPER_MAJOR_KEYS = [
   'C',
@@ -458,11 +459,51 @@ export function resolveScaleRootMidi(
     }
   }
 
-  return bestRoot
+  /**
+   * A root below the instrument's floor is unplayable however well it centres.
+   *
+   * When a two-octave scale cannot fit the range at all, the two overflow
+   * terms tie and the centring term decides — which is how a bass voice, whose
+   * written range is exactly two octaves, was handed a scale starting a fourth
+   * below its lowest note. Lift the root into the range and let the exercise
+   * be short at the top instead, which `topDegreeForConfig` then does.
+   */
+  let root = bestRoot
+  while (root < minMidi && root + 12 <= maxMidi) root += 12
+  return root
 }
 
-function topDegreeForRange(range: StaffJumperRange): number {
-  return range === '1-octave' ? 7 : 14
+const topDegreeCache = new WeakMap<object, number>()
+
+/**
+ * How far up the scale this exercise may actually go.
+ *
+ * The setting asks for one octave or two, but the instrument gets the final
+ * say: a two-octave scale needs a two-octave range *starting on the tonic*,
+ * and outside a handful of keys no bass voice, horn or trumpet has that. Where
+ * it does not fit, the exercise is shortened at the top rather than written
+ * above the instrument's practical ceiling.
+ */
+function topDegreeForConfig(config: StaffJumperConfig): number {
+  const cached = topDegreeCache.get(config)
+  if (cached !== undefined) return cached
+
+  const wanted = config.range === '1-octave' ? 7 : 14
+  const rootMidi = resolveScaleRootMidi(config)
+  const { maxMidi } = getWrittenRange(
+    config.transposition,
+    config.clef,
+    config.tunerInstrument,
+  )
+  let top = 0
+  while (top < wanted && midiForScaleDegree(config.scaleMode, top + 1, rootMidi) <= maxMidi) {
+    top += 1
+  }
+  // A floor so there is always an exercise to read, even on the narrowest
+  // range — a fifth is enough for every stepwise shape in the vocabulary.
+  const resolved = Math.max(4, top)
+  topDegreeCache.set(config, resolved)
+  return resolved
 }
 
 /**
@@ -471,10 +512,8 @@ function topDegreeForRange(range: StaffJumperRange): number {
  * It orients the player in the key before the patterns start, and it is the one
  * part of the exercise that is the same every time.
  */
-export function buildScaleIntroDegreePath(
-  config: Pick<StaffJumperConfig, 'range'>,
-): number[] {
-  const topDegree = topDegreeForRange(config.range)
+export function buildScaleIntroDegreePath(config: StaffJumperConfig): number[] {
+  const topDegree = topDegreeForConfig(config)
   return [
     ...Array.from({ length: topDegree + 1 }, (_, degree) => degree),
     ...Array.from({ length: topDegree }, (_, index) => topDegree - 1 - index),
@@ -493,6 +532,8 @@ interface ExerciseCache {
    */
   introQueue: number[]
   lastPatternId: string | null
+  /** Written length of the last note emitted, for the leap check at the seam. */
+  lastNoteUnits: number | null
 }
 
 const exerciseCache = new WeakMap<StaffJumperConfig, ExerciseCache>()
@@ -519,6 +560,13 @@ function mulberry32(seed: number): () => number {
 function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
   const seed = config.sessionSeed ?? 1
   const span = getPhraseSpan(config, config.meter, config.difficulty, seed, cache.phraseCount)
+  const noteDurations = getPhraseNoteDurations(
+    config,
+    config.meter,
+    config.difficulty,
+    seed,
+    cache.phraseCount,
+  )
   const rng = mulberry32(seed + cache.phraseCount * 7919)
   const steps: PatternStep[] = []
 
@@ -532,7 +580,7 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
   if (steps.length < span.noteCount) {
     const phrase = buildPhraseSteps({
       difficulty: config.difficulty,
-      topDegree: topDegreeForRange(config.range),
+      topDegree: topDegreeForConfig(config),
       rng,
       noteCount: span.noteCount - steps.length,
       startDegree: steps.at(-1)?.degree ?? cache.steps.at(-1)?.degree ?? 0,
@@ -540,6 +588,8 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
       // answer that settles on the tonic.
       cadence: cache.phraseCount % 2 === 0 ? 'open' : 'closed',
       previousPatternId: cache.lastPatternId,
+      noteDurations: noteDurations.slice(steps.length),
+      instrument: config.tunerInstrument,
     })
     steps.push(...phrase)
     cache.lastPatternId = phrase.at(-1)?.patternId ?? cache.lastPatternId
@@ -560,47 +610,86 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
   steps.length = span.noteCount
 
   /**
-   * No two adjacent notes may restate the same degree.
+   * Two invariants the written line must satisfy, whatever produced it.
    *
-   * Musically a repeated note reads as a stutter here rather than a figure,
-   * and there is a harder reason too: the game recognises a note by its pitch
-   * changing, so a re-articulated unison is very nearly invisible to it — the
-   * player would tongue a second note and watch nothing happen. The cadence
-   * degree is fixed, so a clash against it moves the note in front instead.
+   * 1. No interval exceeds what the tier, the speed of the two notes and the
+   *    instrument allow. The vocabulary is filtered up front, but seams and
+   *    the cadence can still overreach — without this backstop an all-stepwise
+   *    easy exercise was handing out tenths where two shapes met.
+   * 2. No two adjacent notes restate the same degree. Musically a repeat reads
+   *    as a stutter, and the game recognises a note by its pitch *changing*, so
+   *    a re-articulated unison is very nearly invisible to it — the player
+   *    would tongue a second note and watch nothing happen.
    */
-  const topDegree = topDegreeForRange(config.range)
-  let previousDegree = cache.steps.at(-1)?.degree ?? null
-  for (let index = 0; index < steps.length; index += 1) {
-    const step = steps[index]!
-    if (previousDegree !== step.degree) {
-      previousDegree = step.degree
-      continue
+  const topDegree = topDegreeForConfig(config)
+  const clamp = (degree: number) => Math.max(0, Math.min(topDegree, degree))
+  const seamDegree = cache.steps.at(-1)?.degree ?? null
+  const unitsAt = (index: number) =>
+    index < 0 ? (cache.lastNoteUnits ?? 4) : (noteDurations[index] ?? 4)
+  const capBetween = (left: number, right: number) =>
+    maxLeapDegrees(
+      config.difficulty,
+      config.tunerInstrument,
+      Math.min(unitsAt(left), unitsAt(right)),
+    )
+
+  /**
+   * Lead the closing notes into the arrival.
+   *
+   * Walking backwards from the cadence, each note is pulled only as far as it
+   * must be to be reachable from the one after it, and the walk stops at the
+   * first note that already connects. On a fast easy phrase that turns a leap
+   * onto the tonic into the stepwise descent the player should be reading.
+   */
+  for (let index = steps.length - 2; index >= 0; index -= 1) {
+    const gap = steps[index]!.degree - steps[index + 1]!.degree
+    const cap = capBetween(index, index + 1)
+    if (Math.abs(gap) <= cap && gap !== 0) break
+    const pulled =
+      gap === 0
+        ? steps[index + 1]!.degree + 1
+        : steps[index + 1]!.degree + Math.sign(gap) * cap
+    const settled = clamp(pulled)
+    steps[index] = {
+      ...steps[index]!,
+      degree:
+        settled === steps[index + 1]!.degree
+          ? clamp(steps[index + 1]!.degree - Math.sign(pulled - steps[index + 1]!.degree || 1))
+          : settled,
     }
-    const above = Math.min(topDegree, step.degree + 1)
-    const below = Math.max(0, step.degree - 1)
-    if (index === steps.length - 1 && index > 0) {
-      // Widen to a third if a step either side is blocked — the note before
-      // the cadence and the cadence itself are both fixed points here, and
-      // settling for one of them would simply put the unison back.
-      const before = steps[index - 2]?.degree
-      const approach =
-        [below, above, Math.max(0, step.degree - 2), Math.min(topDegree, step.degree + 2)].find(
-          (candidate) => candidate !== step.degree && candidate !== before,
-        ) ?? below
-      steps[index - 1] = { ...steps[index - 1]!, degree: approach }
-      previousDegree = step.degree
-      continue
-    }
-    // Move away from the note that follows as well, or the clash is merely
-    // pushed one place along the phrase.
-    const next = steps[index + 1]?.degree
-    const moved =
-      [above, below].find((candidate) => candidate !== step.degree && candidate !== next) ??
-      (above !== step.degree ? above : below)
-    steps[index] = { ...step, degree: moved }
-    previousDegree = moved
   }
 
+  /**
+   * Then guarantee it, left to right.
+   *
+   * Each note is settled against a predecessor that is already final, so one
+   * pass is enough and there is nothing for a second pass to undo — the
+   * earlier version iterated, and the cadence and the leap rule simply took
+   * turns dragging the same note back and forth.
+   *
+   * This runs after the backward pass and therefore outranks it: where a
+   * phrase genuinely has too few notes to walk from the previous phrase's last
+   * note to its cadence, the arrival gives way rather than the leap rule. A
+   * phrase landing on the mediant is a small musical compromise; a leap the
+   * player cannot make is a bug.
+   */
+  for (let index = 0; index < steps.length; index += 1) {
+    const before = index === 0 ? seamDegree : steps[index - 1]!.degree
+    if (before === null) continue
+    const cap = capBetween(index - 1, index)
+    const gap = steps[index]!.degree - before
+    if (gap !== 0 && Math.abs(gap) <= cap) continue
+    const direction = gap === 0 ? 1 : Math.sign(gap)
+    const pulled = clamp(before + direction * (gap === 0 ? 1 : cap))
+    steps[index] = {
+      ...steps[index]!,
+      // At the top or bottom of the range the pull can land back on `before`;
+      // the only room left is the other way.
+      degree: pulled === before ? clamp(before - direction * (gap === 0 ? 1 : cap)) : pulled,
+    }
+  }
+
+    cache.lastNoteUnits = noteDurations.at(-1) ?? cache.lastNoteUnits
   cache.phraseCount += 1
   cache.steps.push(...steps)
 }
@@ -622,6 +711,7 @@ export function exerciseStepForSequenceStep(
       phraseCount: 0,
       introQueue: buildScaleIntroDegreePath(config),
       lastPatternId: null,
+      lastNoteUnits: null,
     }
     exerciseCache.set(config, cache)
   }
@@ -718,7 +808,7 @@ function prettyNoteLabel(letter: StaffNoteLetter, accidental: '#' | 'b' | null, 
  * checkable at a glance instead of a surprise on the first note.
  */
 export function getScaleRangePreview(config: StaffJumperConfig): ScaleRangePreview {
-  const topDegree = topDegreeForRange(config.range)
+  const topDegree = topDegreeForConfig(config)
   const rootMidi = resolveScaleRootMidi(config)
   const rootOctave = Math.floor(rootMidi / 12) - 1
 

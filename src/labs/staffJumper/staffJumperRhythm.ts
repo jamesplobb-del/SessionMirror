@@ -611,6 +611,33 @@ export function getPhraseSpan(
   return timeline.phrases[phraseIndex]!
 }
 
+/**
+ * Written length of every note in a phrase, in sixteenth-note units.
+ *
+ * What the melody needs in order to know how much time the player has at each
+ * step: the same interval is a different skill on a half note and on an
+ * eighth, so the leap rules are applied against these.
+ */
+export function getPhraseNoteDurations(
+  configKey: object,
+  meter: StaffJumperMeter,
+  difficulty: StaffJumperDifficulty,
+  seed: number,
+  phraseIndex: number,
+): number[] {
+  const span = getPhraseSpan(configKey, meter, difficulty, seed, phraseIndex)
+  const timeline = getTimeline(configKey)
+  const lastNoteIndex = span.firstNoteIndex + span.noteCount - 1
+  const durations: number[] = []
+  for (const slot of timeline.slots) {
+    if (slot.isRest) continue
+    if (slot.noteIndex < span.firstNoteIndex) continue
+    if (slot.noteIndex > lastNoteIndex) break
+    durations.push(slot.durationUnits)
+  }
+  return durations
+}
+
 /** Half and whole notes are drawn as rings rather than filled ovals. */
 export function isHollowNotehead(value: NoteValue): boolean {
   return value === 'whole' || value === 'half'
