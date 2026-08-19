@@ -1025,6 +1025,19 @@ export default function PitchInsightsScreen({
   })
   const [instrumentPickerOpen, setInstrumentPickerOpen] = useState(false)
 
+  const removeInstrument = useCallback((id: string) => {
+    setAddedInstruments((current) => {
+      const next = current.filter((entry) => entry !== id)
+      try {
+        localStorage.setItem(ADDED_INSTRUMENTS_KEY, JSON.stringify(next))
+      } catch {
+        /* Private browsing must not break the filter. */
+      }
+      return next
+    })
+    setSelectedSource((current) => (current === id ? 'all' : current))
+  }, [])
+
   const addInstrument = useCallback((id: string) => {
     setAddedInstruments((current) => {
       const next = current.includes(id) ? current : [...current, id]
@@ -1386,6 +1399,111 @@ export default function PitchInsightsScreen({
                 exit={{ opacity: 0, x: -14 }}
                 transition={iosSpringSnappy}
               >
+                {/* The instrument picker lives above the state switch on
+                    purpose: selecting an instrument you have not recorded yet
+                    empties the screen, and when this sat inside the content
+                    branch it vanished with everything else — leaving no way to
+                    switch back. */}
+                {!loading && !loadError ? (
+                  <>
+                    <div
+                      className="pitch-insights-instrument-filter"
+                      role="tablist"
+                      aria-label="Filter Pitch Insights by instrument"
+                    >
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={selectedSource === 'all'}
+                        className={`pitch-insights-instrument-filter__pill ${
+                          selectedSource === 'all' ? 'is-active' : ''
+                        }`}
+                        onClick={() => {
+                          triggerLightHaptic(hapticFeedback)
+                          setSelectedSource('all')
+                        }}
+                      >
+                        All instruments
+                      </button>
+                      {instrumentIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          role="tab"
+                          aria-selected={selectedSource === id}
+                          className={`pitch-insights-instrument-filter__pill ${
+                            selectedSource === id ? 'is-active' : ''
+                          }`}
+                          onClick={() => {
+                            triggerLightHaptic(hapticFeedback)
+                            setSelectedSource(id)
+                          }}
+                        >
+                          {getTunerTransposition(id as TunerTranspositionId).shortLabel}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="pitch-insights-instrument-filter__pill pitch-insights-instrument-filter__add"
+                        onClick={() => {
+                          triggerLightHaptic(hapticFeedback)
+                          setInstrumentPickerOpen(true)
+                        }}
+                        aria-label="Add an instrument"
+                      >
+                        <Plus aria-hidden />
+                      </button>
+                    </div>
+                    {instrumentPickerOpen ? (
+                      <div className="pitch-insights-instrument-picker" role="dialog" aria-label="Add an instrument">
+                        <header>
+                          <strong>Add an instrument</strong>
+                          <button
+                            type="button"
+                            onClick={() => setInstrumentPickerOpen(false)}
+                            aria-label="Close"
+                          >
+                            <X aria-hidden />
+                          </button>
+                        </header>
+                        <div>
+                          {TUNER_TRANSPOSITION_OPTIONS.map((option) => {
+                            const added = addedInstruments.includes(option.id)
+                            const hasHistory = observations.some(
+                              (observation) => observation.transpositionId === option.id,
+                            )
+                            return (
+                              <div
+                                key={option.id}
+                                className={`pitch-insights-instrument-picker__row ${
+                                  added || hasHistory ? 'is-added' : ''
+                                }`}
+                              >
+                                <button type="button" onClick={() => addInstrument(option.id)}>
+                                  <span>{option.keyLabel}</span>
+                                  {option.label}
+                                </button>
+                                {added ? (
+                                  <button
+                                    type="button"
+                                    className="pitch-insights-instrument-picker__remove"
+                                    onClick={() => removeInstrument(option.id)}
+                                    aria-label={`Remove ${option.label}`}
+                                  >
+                                    <X aria-hidden />
+                                  </button>
+                                ) : hasHistory ? (
+                                  <small>Recorded</small>
+                                ) : null}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+
                 {loading ? (
                   <div className="pitch-insights-state" role="status">
                     <span className="pitch-insights-state__spinner" />
@@ -1412,84 +1530,7 @@ export default function PitchInsightsScreen({
                   <>
                     <PitchInsightsHero observations={scopedObservations} registerNote={registerNote} />
 
-                    {true ? (
-                      <div
-                        className="pitch-insights-instrument-filter"
-                        role="tablist"
-                        aria-label="Filter Pitch Insights by instrument"
-                      >
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={selectedSource === 'all'}
-                          className={`pitch-insights-instrument-filter__pill ${
-                            selectedSource === 'all' ? 'is-active' : ''
-                          }`}
-                          onClick={() => {
-                            triggerLightHaptic(hapticFeedback)
-                            setSelectedSource('all')
-                          }}
-                        >
-                          All instruments
-                        </button>
-                        {instrumentIds.map((id) => (
-                          <button
-                            key={id}
-                            type="button"
-                            role="tab"
-                            aria-selected={selectedSource === id}
-                            className={`pitch-insights-instrument-filter__pill ${
-                              selectedSource === id ? 'is-active' : ''
-                            }`}
-                            onClick={() => {
-                              triggerLightHaptic(hapticFeedback)
-                              setSelectedSource(id)
-                            }}
-                          >
-                            {getTunerTransposition(id as TunerTranspositionId).shortLabel}
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          className="pitch-insights-instrument-filter__pill pitch-insights-instrument-filter__add"
-                          onClick={() => {
-                            triggerLightHaptic(hapticFeedback)
-                            setInstrumentPickerOpen(true)
-                          }}
-                          aria-label="Add an instrument"
-                        >
-                          <Plus aria-hidden />
-                        </button>
-                      </div>
-                    ) : null}
 
-                    {instrumentPickerOpen ? (
-                      <div className="pitch-insights-instrument-picker" role="dialog" aria-label="Add an instrument">
-                        <header>
-                          <strong>Add an instrument</strong>
-                          <button
-                            type="button"
-                            onClick={() => setInstrumentPickerOpen(false)}
-                            aria-label="Close"
-                          >
-                            <X aria-hidden />
-                          </button>
-                        </header>
-                        <div>
-                          {TUNER_TRANSPOSITION_OPTIONS.map((option) => (
-                            <button
-                              key={option.id}
-                              type="button"
-                              className={instrumentIds.includes(option.id) ? 'is-added' : ''}
-                              onClick={() => addInstrument(option.id)}
-                            >
-                              <span>{option.keyLabel}</span>
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
 
                     {worthReviewing.length > 0 ? (
                       <section className="pitch-insights-list" aria-label="Notes worth reviewing">

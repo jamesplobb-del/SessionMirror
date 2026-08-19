@@ -1208,3 +1208,40 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-instrument-picker > div button.is-added {
   opacity: 0.5;
 }
+
+.pitch-insights-instrument-picker__row {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--pi-border);
+}
+
+.pitch-insights-instrument-picker__row > button:first-child {
+  flex: 1 1 auto;
+  border-top: 0;
+}
+
+.pitch-insights-instrument-picker__row small {
+  flex: 0 0 auto;
+  padding-right: 0.9rem;
+  color: var(--pi-text-muted, var(--pi-text-secondary));
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.pitch-insights-instrument-picker__remove {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  margin-right: 0.55rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: var(--pi-text-secondary);
+  background: transparent;
+}
+
+.pitch-insights-instrument-picker__remove svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}

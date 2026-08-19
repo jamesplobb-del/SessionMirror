@@ -490,30 +490,11 @@ export default function BalanceSetup({
       </section>
 
       <div className="balance-setup-sheet">
-        <div className="balance-start">
-          <Pressable
-            haptic="medium"
-            hapticFeedback={hapticFeedback}
-            className="balance-primary-button"
-            onClick={() => {
-              stopPitchPreview()
-              onRequestMic()
-              onStart()
-            }}
-            disabled={settings.routineType === 'custom' && !selectedCustom}
-          ><Play aria-hidden /> Start</Pressable>
-          <Pressable
-            intensity="soft"
-            hapticFeedback={hapticFeedback}
-            onClick={onRequestMic}
-            className={`balance-mic-check ${hasPitch ? 'is-live' : ''} ${permissionBlocked ? 'is-error' : ''}`}
-          >
-            <Mic aria-hidden />
-            <span>{micLabel}<small>Nothing is recorded or stored.</small></span>
-            <strong>{hasPitch ? `${readout.noteName} ${Math.round(readout.cents) >= 0 ? '+' : ''}${Math.round(readout.cents)}¢` : '—'}</strong>
-          </Pressable>
-        </div>
-
+        {/* Above Start, not below it: these were off the bottom of the screen
+            and a new player had no reason to scroll past a big Start button to
+            find out the game was configurable at all. Closed they sit two-up;
+            the open one takes the full width. */}
+        <div className="balance-setup-quick">
       <SetupGroup
         id="routine"
         open={openSection === 'routine'}
@@ -622,6 +603,32 @@ export default function BalanceSetup({
           <span>Current target<strong>{previewTarget ? `Written ${previewTarget.writtenLabel} · Concert ${previewTarget.concertLabel}` : '—'}</strong></span>
         </div>
       </SetupGroup>
+        </div>
+
+        <div className="balance-start">
+          <Pressable
+            haptic="medium"
+            hapticFeedback={hapticFeedback}
+            className="balance-primary-button"
+            onClick={() => {
+              stopPitchPreview()
+              onRequestMic()
+              onStart()
+            }}
+            disabled={settings.routineType === 'custom' && !selectedCustom}
+          ><Play aria-hidden /> Start</Pressable>
+          <Pressable
+            intensity="soft"
+            hapticFeedback={hapticFeedback}
+            onClick={onRequestMic}
+            className={`balance-mic-check ${hasPitch ? 'is-live' : ''} ${permissionBlocked ? 'is-error' : ''}`}
+          >
+            <Mic aria-hidden />
+            <span>{micLabel}<small>Nothing is recorded or stored.</small></span>
+            <strong>{hasPitch ? `${readout.noteName} ${Math.round(readout.cents) >= 0 ? '+' : ''}${Math.round(readout.cents)}¢` : '—'}</strong>
+          </Pressable>
+        </div>
+
 
 
       </div>

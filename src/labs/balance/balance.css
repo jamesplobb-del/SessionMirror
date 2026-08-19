@@ -606,3 +606,40 @@
   .balance-pitch-strip__track b,
   .balance-progress i { transition: none; }
 }
+
+/* Setup tiles — two across so both are on screen under the world, matching the
+   scene's soft-card look rather than reading as a settings list. */
+.balance-setup-quick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.balance-setup-quick .balance-setup-group.is-open {
+  grid-column: 1 / -1;
+}
+
+.balance-setup-quick .balance-setup-group__head {
+  min-height: 0;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.62rem 0.7rem;
+}
+
+.balance-setup-quick .balance-setup-group__head > span {
+  gap: 0.12rem;
+}
+
+.balance-setup-quick .balance-setup-group__head strong {
+  font-size: 0.8rem;
+}
+
+.balance-setup-quick .balance-setup-group__head small {
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.balance-setup-quick .balance-setup-group__head svg {
+  margin-top: 0.1rem;
+}
