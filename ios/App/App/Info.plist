@@ -25,6 +25,51 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Practice routines shared between musicians. Declaring the type is what
+	     makes BestTake appear in "Open With" for a .btroutine attachment; iOS then
+	     copies the file into Documents/Inbox and delivers the URL via appUrlOpen. -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>BestTake Practice Routine</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.besttake.app.routine</string>
+			</array>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.besttake.app.routine</string>
+			<key>UTTypeDescription</key>
+			<string>BestTake Practice Routine</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>btroutine</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/json</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	<!-- Copy the file into our Inbox rather than editing the sender's copy in place. -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

@@ -69,6 +69,15 @@ const ActionSheetContext = createContext<ActionSheetContextValue | null>(null)
 let liveShowAlert: ActionSheetContextValue['showAlert'] | null = null
 
 /**
+ * Whether an alert raised right now would actually reach the user. Lets a
+ * caller running during boot wait for the provider instead of dropping the
+ * message into a warning.
+ */
+export function canShowAlertOutsideTree(): boolean {
+  return liveShowAlert !== null
+}
+
+/**
  * Show an alert from outside the React tree. No-ops if no provider is mounted,
  * so it is safe during boot and teardown.
  */

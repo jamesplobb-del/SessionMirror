@@ -6,12 +6,14 @@ import { createEmptyTimeline } from '../sectionDefaults'
 import {
   deleteTimeline,
   duplicateTimeline,
-  importTimeline,
+  importRoutineFromText,
   loadTimelines,
   saveTimeline,
-  shareTimelineExport,
   toggleTimelineFavorite,
 } from '../storage/timelineStorage'
+import { ROUTINE_FILE_EXTENSION } from '../storage/routineFile'
+import { shareRoutineFile } from '../storage/routineShare'
+import { useActionSheet } from '../../context/ActionSheetContext'
 import type { PracticeTimeline } from '../types'
 
 interface TimelineLibrarySheetProps {
@@ -29,16 +31,46 @@ export default function TimelineLibrarySheet({
 }: TimelineLibrarySheetProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [saved, setSaved] = useState<PracticeTimeline[]>([])
+  const { showAlert } = useActionSheet()
 
+  /* activeTimelineId is in the deps because a routine can be imported while
+   * this sheet is open — tapping a shared file switches the active routine,
+   * and without the refresh the new one is missing from the list. */
   useEffect(() => {
     if (open) setSaved(loadTimelines())
-  }, [open])
+  }, [open, activeTimelineId])
 
   const handleNewRoutine = () => {
     const count = saved.length + 1
     const created = saveTimeline(createEmptyTimeline(`My Practice ${count}`))
     onSelect(created)
     onClose()
+  }
+
+  const handleShare = (timeline: PracticeTimeline) => {
+    void shareRoutineFile(timeline).then((result) => {
+      if (result.ok) return
+      void showAlert({ title: 'Unable to Share', message: result.error, tone: 'error' })
+    })
+  }
+
+  const handleImportFile = (file: File) => {
+    void file.text().then((raw) => {
+      const result = importRoutineFromText(raw)
+      if (!result.ok) {
+        void showAlert({ title: "Couldn't Open Routine", message: result.error, tone: 'error' })
+        return
+      }
+      onSelect(result.routine)
+      onClose()
+      /* Say what changed rather than letting a section quietly play wrong. */
+      if (result.warnings.length) {
+        void showAlert({
+          title: `Imported "${result.routine.name}"`,
+          message: `Some settings were adjusted to fit this version:\n\n${result.warnings.join('\n')}`,
+        })
+      }
+    })
   }
 
   return (
@@ -133,8 +165,8 @@ export default function TimelineLibrarySheet({
                 <Pressable
                   type="button"
                   intensity="icon"
-                  aria-label="Export"
-                  onClick={() => void shareTimelineExport(timeline)}
+                  aria-label="Share routine"
+                  onClick={() => handleShare(timeline)}
                 >
                   <Upload size={18} />
                 </Pressable>
@@ -153,16 +185,11 @@ export default function TimelineLibrarySheet({
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/json,.json"
+            accept={`.${ROUTINE_FILE_EXTENSION},application/json,.json`}
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0]
-              if (file) {
-                void file.text().then((text) => {
-                  onSelect(importTimeline(text))
-                  onClose()
-                })
-              }
+              if (file) handleImportFile(file)
               event.target.value = ''
             }}
           />

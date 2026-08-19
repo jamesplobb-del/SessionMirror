@@ -1,10 +1,15 @@
 import { BookOpen, Pencil, Play, Plus } from 'lucide-react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
 import { describeSection } from '../naturalLanguage'
 import { stashPendingMarkers } from '../recording/timelineMarkers'
+import {
+  clearRoutineOpen,
+  getPendingRoutineOpen,
+  subscribeRoutineFileOpen,
+} from '../storage/routineFileOpen'
 import { effectiveBars } from '../timeSignatureLogic'
 import TimelineLibrarySheet from './TimelineLibrarySheet'
 import TimelinePracticeSessionView from './TimelinePracticeSessionView'
@@ -71,6 +76,21 @@ export default function PracticeTimelineView({
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(timeline.name)
   const practiceRecordingStartedRef = useRef(false)
+
+  /* A routine tapped in Messages or Files is imported and announced by the file
+   * handler regardless of which screen is showing. If this view happens to be
+   * mounted, swap to the new routine so it is on screen and ready to play. */
+  const openedRoutine = useSyncExternalStore(
+    subscribeRoutineFileOpen,
+    getPendingRoutineOpen,
+    () => null,
+  )
+
+  useEffect(() => {
+    if (!openedRoutine) return
+    if (openedRoutine.status === 'imported') loadTimeline(openedRoutine.routine)
+    clearRoutineOpen(openedRoutine.id)
+  }, [openedRoutine, loadTimeline])
 
   const handleAddSection = () => {
     addSection()

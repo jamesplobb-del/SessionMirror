@@ -120,10 +120,3 @@ export interface TimelinePlaybackState {
   patternStepMeter?: MetronomeMeter
   patternLabel?: string
 }
-
-export const PRACTICE_TIMELINE_EXPORT_VERSION = 1
-
-export interface PracticeTimelineExport {
-  version: typeof PRACTICE_TIMELINE_EXPORT_VERSION
-  timeline: PracticeTimeline
-}

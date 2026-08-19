@@ -1,6 +1,7 @@
-import type { PracticeTimeline, PracticeTimelineExport, TimelineSection } from '../types'
+import type { PracticeTimeline } from '../types'
 import { createEmptyTimeline, createTimelineId } from '../sectionDefaults'
 import { normalizeTimeline } from '../timelineNormalize'
+import { parseRoutineFile } from './routineFile'
 
 const STORAGE_KEY = 'besttake:practice-timelines'
 const ACTIVE_KEY = 'besttake:practice-timeline-active'
@@ -89,45 +90,33 @@ export function loadOrCreateActiveTimeline(): PracticeTimeline {
   return saveTimeline(createEmptyTimeline())
 }
 
-export function exportTimeline(timeline: PracticeTimeline): string {
-  const payload: PracticeTimelineExport = { version: 1, timeline }
-  return JSON.stringify(payload, null, 2)
-}
+export type RoutineImportResult =
+  | { ok: true; routine: PracticeTimeline; warnings: string[] }
+  | { ok: false; error: string }
 
-export function importTimeline(json: string): PracticeTimeline {
-  const parsed = JSON.parse(json) as PracticeTimelineExport | PracticeTimeline
-  const timeline =
-    'version' in parsed && parsed.version === 1 ? parsed.timeline : (parsed as PracticeTimeline)
-  const now = Date.now()
-  return saveTimeline(normalizeTimeline({
-    ...timeline,
-    id: createTimelineId(),
-    createdAt: now,
-    updatedAt: now,
-    sections: timeline.sections.map((section: TimelineSection) => ({
-      ...section,
-      id: `${section.id}-imported-${now}`,
-    })),
-  }))
-}
-
-export async function shareTimelineExport(timeline: PracticeTimeline): Promise<void> {
-  const json = exportTimeline(timeline)
-  const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  try {
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      const file = new File([json], `${timeline.name.replace(/\s+/g, '-')}.besttake-timeline.json`, {
-        type: 'application/json',
-      })
-      await navigator.share({ title: timeline.name, files: [file] })
-      return
-    }
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${timeline.name.replace(/\s+/g, '-')}.besttake-timeline.json`
-    anchor.click()
-  } finally {
-    URL.revokeObjectURL(url)
+/** Keeps a shared routine from hiding behind an identically named existing one. */
+function uniqueRoutineName(name: string): string {
+  const existing = new Set(readAll().map((timeline) => timeline.name))
+  if (!existing.has(name)) return name
+  for (let suffix = 2; suffix < 100; suffix += 1) {
+    const candidate = `${name} (${suffix})`
+    if (!existing.has(candidate)) return candidate
   }
+  return `${name} (${Date.now()})`
+}
+
+/**
+ * The one entry point for routines arriving from outside this device, whether
+ * picked from Files or tapped in Messages. Validation lives in parseRoutineFile;
+ * this adds the naming and persistence around it, and makes the imported
+ * routine active so it is ready to play.
+ */
+export function importRoutineFromText(text: string): RoutineImportResult {
+  const parsed = parseRoutineFile(text)
+  if (!parsed.ok) return parsed
+  const routine = saveTimeline({
+    ...parsed.routine,
+    name: uniqueRoutineName(parsed.routine.name),
+  })
+  return { ok: true, routine, warnings: parsed.warnings }
 }

@@ -15,6 +15,7 @@ import { primeWebStatusBarChrome } from './utils/nativeStatusBar'
 import { registerAppForegroundLifecycle } from './utils/appForeground'
 import { initializeQuickTunerLaunch } from './utils/quickTunerLaunch'
 import { initCrashReporting } from './utils/crashReporting'
+import { initializeRoutineFileOpen } from './practiceTimeline/storage/routineFileOpen'
 
 async function bootstrap() {
   // First thing, before any other init — anything that throws during boot
@@ -27,6 +28,9 @@ async function bootstrap() {
   primeWebStatusBarChrome()
   registerAppForegroundLifecycle()
   await initializeQuickTunerLaunch()
+  // Not awaited — a routine tapped in Messages surfaces through its own
+  // store once ready, and shouldn't hold up first paint.
+  void initializeRoutineFileOpen()
 
   createRoot(rootEl).render(
     <StrictMode>
