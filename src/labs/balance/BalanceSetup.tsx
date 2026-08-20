@@ -311,6 +311,7 @@ export default function BalanceSetup({
   const previewInTune = previewCents !== null && Math.abs(previewCents) <= tolerance
   const targetLabel = previewTarget?.writtenLabel ?? midiToBalanceNoteName(targetMidi)
   const goalLabel = settings.goalMode === 'personalBest' ? 'Beat best' : `${settings.goalSeconds} sec`
+  const goalDisplayLabel = settings.goalMode === 'personalBest' ? 'Best' : `${settings.goalSeconds}s`
   const goalIndex = balanceGoalIndex(settings.goalSeconds)
   const destination = balanceDestinationGeometry(settings.goalSeconds)
   const pitchRatio = targetMax > targetMin ? (targetMidi - targetMin) / (targetMax - targetMin) : 0.5
@@ -473,8 +474,8 @@ export default function BalanceSetup({
               updateGoalFromPointer(event)
             }}
           >
-            <output>{goalLabel}</output>
-            <span aria-hidden>Drag distance ↗</span>
+            <output>{goalDisplayLabel}</output>
+            <span aria-hidden><i /><i /><i /></span>
           </div>
 
           {targetCanChange ? (
@@ -504,7 +505,7 @@ export default function BalanceSetup({
               }}
               onPointerCancel={stopPitchPreview}
             >
-              <small>Drag pitch</small>
+              <small aria-hidden>↕</small>
               <span className="balance-preview-pitch-control__rail" aria-hidden />
               <output
                 className="balance-preview-pitch-control__thumb"
@@ -544,7 +545,7 @@ export default function BalanceSetup({
             }}
             onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
           >
-            <output>Drag rope · ±{tolerance}¢</output>
+            <output>±{tolerance}¢</output>
             <span aria-hidden><i /><b /><i /></span>
           </div>
         </div>
@@ -564,7 +565,7 @@ export default function BalanceSetup({
           <p className={previewInTune ? 'is-growing' : ''} aria-live="polite">
             {previewInTune
               ? `Growing · ${(previewHeldMs / 1000).toFixed(1)}s`
-              : `Play ${targetLabel} to grow the rope`}
+              : 'Drag island for time · note for pitch · rope for cents'}
           </p>
         </div>
       </section>

@@ -1,0 +1,902 @@
+/*
+ * Learn Your Instrument
+ *
+ * Deliberately plain: a white page, black notation, and a fingering chart that
+ * looks like the one printed in the front of a method book. The only colour in
+ * the game screen is the green that says "yes, that was the note".
+ */
+
+.li-screen {
+  --li-ink: #1c1917;
+  --li-muted: #78716c;
+  --li-line: rgba(28, 25, 23, 0.12);
+  --li-hair: rgba(28, 25, 23, 0.07);
+  --li-green: #15803d;
+  --li-green-soft: #dcfce7;
+  --li-amber: #b45309;
+  --li-amber-soft: #fef3c7;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  color: var(--li-ink);
+  background: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+}
+
+.li-screen button:focus-visible,
+.li-screen [role='radio']:focus-visible {
+  outline: 3px solid rgba(28, 25, 23, 0.35);
+  outline-offset: 3px;
+}
+
+.li-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Shared controls ─────────────────────────────────────────────────── */
+
+.li-icon-button {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--li-ink);
+  background: rgba(28, 25, 23, 0.05);
+}
+
+.li-icon-button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke-width: 2.2;
+}
+
+.li-button {
+  display: inline-flex;
+  min-height: 3.1rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 1.4rem;
+  border: 1px solid var(--li-line);
+  border-radius: 999px;
+  color: var(--li-ink);
+  background: #fff;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.li-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke-width: 2.4;
+}
+
+.li-button--primary {
+  border-color: transparent;
+  color: #fff;
+  background: var(--li-ink);
+}
+
+.li-button--primary[disabled] {
+  opacity: 0.45;
+}
+
+.li-button--quiet {
+  border-color: transparent;
+  color: var(--li-muted);
+  background: transparent;
+}
+
+.li-button--wide {
+  width: 100%;
+}
+
+/* ── Setup ───────────────────────────────────────────────────────────── */
+
+.li-setup {
+  background: #f7f7f6;
+}
+
+.li-setup__head {
+  display: flex;
+  width: 100%;
+  max-width: 34rem;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 auto;
+  padding: calc(0.7rem + env(safe-area-inset-top, 0px)) 1rem 0.6rem;
+}
+
+.li-setup__head h1 {
+  margin: 0;
+  font-size: 1.16rem;
+  font-weight: 750;
+  letter-spacing: -0.028em;
+}
+
+.li-setup__body {
+  width: 100%;
+  max-width: 34rem;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0 auto;
+  padding: 0 1rem 1rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.li-step + .li-step {
+  margin-top: 1.5rem;
+}
+
+.li-step h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.75rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.li-step__number {
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--li-ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.li-picker + .li-picker {
+  margin-top: 0.85rem;
+}
+
+.li-picker h3 {
+  margin: 0 0 0.42rem 0.15rem;
+  color: var(--li-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.li-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.4rem, 1fr));
+  gap: 0.5rem;
+}
+
+.li-choice {
+  min-height: 3.05rem;
+  padding: 0 0.7rem;
+  border: 1.5px solid var(--li-line);
+  border-radius: 0.85rem;
+  color: var(--li-ink);
+  background: #fff;
+  font-size: 0.94rem;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+}
+
+.li-choice.is-selected {
+  border-color: var(--li-ink);
+  color: #fff;
+  background: var(--li-ink);
+}
+
+.li-goals {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.li-goal {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border: 1.5px solid var(--li-line);
+  border-radius: 0.95rem;
+  background: #fff;
+  text-align: left;
+}
+
+.li-goal.is-selected {
+  border-color: var(--li-ink);
+}
+
+.li-goal__copy {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 0.12rem;
+}
+
+.li-goal__copy strong {
+  font-size: 0.98rem;
+  font-weight: 680;
+  letter-spacing: -0.015em;
+}
+
+.li-goal__copy small {
+  color: var(--li-muted);
+  font-size: 0.8rem;
+}
+
+.li-goal__tick {
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1.5px solid var(--li-line);
+  border-radius: 999px;
+  color: #fff;
+}
+
+.li-goal.is-selected .li-goal__tick {
+  border-color: var(--li-ink);
+  background: var(--li-ink);
+}
+
+.li-goal__tick svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  stroke-width: 3;
+}
+
+.li-step__note {
+  margin: 0.7rem 0 0 0.15rem;
+  color: var(--li-muted);
+  font-size: 0.8rem;
+}
+
+.li-setup__foot {
+  display: grid;
+  width: 100%;
+  max-width: 34rem;
+  flex: 0 0 auto;
+  gap: 0.6rem;
+  margin: 0 auto;
+  padding: 0.7rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--li-hair);
+  background: #f7f7f6;
+}
+
+.li-mic {
+  display: flex;
+  min-height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  color: var(--li-muted);
+  background: rgba(28, 25, 23, 0.04);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.li-mic svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+  stroke-width: 2.2;
+}
+
+.li-mic.is-live {
+  color: var(--li-green);
+  background: var(--li-green-soft);
+}
+
+.li-mic.is-error {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+/* ── Play ────────────────────────────────────────────────────────────── */
+
+.li-play__head {
+  display: flex;
+  width: 100%;
+  max-width: 34rem;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 auto;
+  padding: calc(0.55rem + env(safe-area-inset-top, 0px)) 0.7rem 0.5rem;
+}
+
+.li-dots {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+}
+
+.li-dots i {
+  width: 0.44rem;
+  height: 0.44rem;
+  border-radius: 999px;
+  background: rgba(28, 25, 23, 0.16);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.li-dots i[data-state='done'] {
+  background: var(--li-green);
+}
+
+.li-dots i[data-state='now'] {
+  background: var(--li-ink);
+  transform: scale(1.5);
+}
+
+/* Stepping through the notes by hand — smaller than the leave-the-lesson
+   arrow so the two are never mistaken for each other. */
+.li-step-button {
+  width: 2.3rem;
+  height: 2.3rem;
+}
+
+.li-step-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.li-step-button[disabled] {
+  opacity: 0.3;
+}
+
+/* A long chromatic run has too many notes to dot, so it gets a bar with a
+   marker for where the student is standing. */
+.li-progress {
+  position: relative;
+  height: 0.42rem;
+  flex: 1 1 auto;
+  margin: 0 0.4rem;
+  border-radius: 999px;
+  background: rgba(28, 25, 23, 0.12);
+}
+
+.li-progress__done {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--li-green);
+  transition: width 0.25s ease;
+}
+
+.li-progress__here {
+  position: absolute;
+  top: 50%;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  background: var(--li-ink);
+  transform: translate(-50%, -50%);
+  transition: left 0.25s ease;
+}
+
+.li-count {
+  flex: 0 0 auto;
+  color: var(--li-muted);
+  font-size: 0.86rem;
+  font-weight: 640;
+  font-variant-numeric: tabular-nums;
+}
+
+.li-play__body {
+  display: flex;
+  width: 100%;
+  max-width: 34rem;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  /* A row-shaped chart can leave slack: split it above and below the pair
+     rather than letting the cards drift to the top of the screen. */
+  justify-content: center;
+  gap: 0.7rem;
+  margin: 0 auto;
+  padding: 0.2rem 0.9rem 0.7rem;
+}
+
+.li-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem 0.8rem 0.85rem;
+  border: 1.5px solid var(--li-hair);
+  border-radius: 1.1rem;
+  background: #fff;
+}
+
+.li-card--note {
+  flex: 0 1 auto;
+}
+
+/*
+ * A column chart needs height more than the staff does, so on those lessons
+ * the staff gives most of the screen back to the fingering.
+ */
+.li-play__body[data-chart-shape='column'] .li-card--note {
+  max-height: 40%;
+}
+
+.li-card--chart {
+  flex: 5 1 0;
+}
+
+/*
+ * A flute, trumpet or trombone chart is a row, not a column: it only needs its
+ * own height, and the staff above is happier with the space it gives back.
+ */
+.li-card--chart.is-wide {
+  flex: 0 0 auto;
+}
+
+.li-card--chart.is-wide .li-chart {
+  flex: 0 0 auto;
+}
+
+.li-card--chart.is-wide .li-chart__svg {
+  height: auto;
+  max-width: 24rem;
+}
+
+.li-card__title {
+  margin: 0;
+  color: var(--li-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.li-note-name {
+  margin-top: 0.05rem;
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.li-recipe {
+  margin: 0.5rem 0 0;
+  color: var(--li-muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* Correct note: the card confirms it before the screen moves on. */
+.li-play[data-status='correct'] .li-card--note {
+  border-color: var(--li-green);
+  background: var(--li-green-soft);
+}
+
+.li-play[data-status='correct'] .li-note-name {
+  color: var(--li-green);
+}
+
+/* ── Listening bar ───────────────────────────────────────────────────── */
+
+.li-listen {
+  display: flex;
+  width: 100%;
+  max-width: 34rem;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 auto;
+  padding: 0.7rem 1.1rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--li-hair);
+}
+
+.li-listen__icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--li-muted);
+  background: rgba(28, 25, 23, 0.06);
+}
+
+.li-listen__icon svg {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2.3;
+}
+
+.li-listen__text {
+  flex: 1 1 auto;
+  color: var(--li-muted);
+  font-size: 0.92rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.li-listen__meter {
+  width: 4.2rem;
+  height: 0.38rem;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(28, 25, 23, 0.09);
+}
+
+.li-listen__meter i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--li-ink);
+  transition: width 0.08s linear;
+}
+
+.li-listen__retry {
+  padding: 0.42rem 0.8rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--li-ink);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.li-play[data-status='holding'] .li-listen__icon {
+  color: var(--li-amber);
+  background: var(--li-amber-soft);
+}
+
+.li-play[data-status='holding'] .li-listen__meter i {
+  background: var(--li-amber);
+}
+
+.li-play[data-status='correct'] .li-listen__icon {
+  color: #fff;
+  background: var(--li-green);
+}
+
+.li-play[data-status='correct'] .li-listen__text {
+  color: var(--li-green);
+}
+
+.li-play[data-status='correct'] .li-listen__meter i {
+  background: var(--li-green);
+}
+
+.li-play[data-status='error'] .li-listen__icon {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+/* ── Staff ───────────────────────────────────────────────────────────── */
+
+.li-staff {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+  max-height: 100%;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.li-staff__world {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.li-staff__line,
+.li-staff__ledger {
+  position: absolute;
+  background: var(--li-ink);
+}
+
+.li-staff__line {
+  left: 0;
+}
+
+.li-staff__ledger {
+  transform: translate(-50%, -50%);
+}
+
+.li-staff__clef,
+.li-staff__accidental {
+  color: var(--li-ink);
+}
+
+/* A whole note: an open ring, tipped the way an engraved head is. */
+.li-staff__notehead {
+  position: absolute;
+  border-style: solid;
+  border-color: var(--li-ink);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotate(-15deg);
+}
+
+.li-play[data-status='correct'] .li-staff__notehead {
+  border-color: var(--li-green);
+}
+
+/* ── Fingering chart ─────────────────────────────────────────────────── */
+
+.li-chart {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0.35rem 0 0;
+}
+
+.li-chart__svg {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  color: var(--li-ink);
+}
+
+/*
+ * Which key is down has to survive a glance: the pressed mark is solid, wears
+ * a soft halo if it is one of the small side keys, and states its own name in
+ * full-strength ink while the open keys stay grey.
+ */
+.li-chart__halo {
+  fill: rgba(28, 25, 23, 0.11);
+}
+
+/* One half of a two-part key that this fingering does not use — the flute B♭
+   thumb key beside the B key, for instance. The element selector is there to
+   outrank the pressed-key fill, which is declared later in the file. */
+.li-chart__mark[data-state='closed'] rect.li-chart__key--ghost {
+  fill: #fff;
+}
+
+/* Braces: structure, not a control, so they sit back from the tubing. */
+.li-chart__brace {
+  fill: rgba(28, 25, 23, 0.55);
+}
+
+.li-chart__legend {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1rem;
+  margin-top: 0.35rem;
+  color: var(--li-muted);
+  font-size: 0.72rem;
+  font-weight: 640;
+}
+
+.li-chart__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.li-chart__legend i {
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 2px solid var(--li-ink);
+  border-radius: 50%;
+}
+
+.li-chart__legend span[data-state='closed'] i {
+  background: var(--li-ink);
+}
+
+/* Open: an outline. Closed: filled solid. Nothing else carries meaning. */
+.li-chart__hole {
+  fill: #fff;
+  stroke: var(--li-ink);
+}
+
+.li-chart__mark[data-state='closed'] .li-chart__hole {
+  fill: var(--li-ink);
+}
+
+.li-chart__key {
+  fill: #fff;
+  stroke: var(--li-ink);
+}
+
+.li-chart__mark[data-state='closed'] .li-chart__key {
+  fill: var(--li-ink);
+}
+
+.li-chart__half {
+  fill: var(--li-ink);
+}
+
+/* The instrument itself is a hairline: the chart is about the circles. */
+.li-chart__body {
+  stroke: rgba(28, 25, 23, 0.16);
+  stroke-width: 3;
+}
+
+.li-chart__divider {
+  stroke: rgba(28, 25, 23, 0.3);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.li-chart__label {
+  fill: var(--li-muted);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.li-chart__mark[data-state='closed'] .li-chart__label,
+.li-chart__mark[data-state='half'] .li-chart__label {
+  fill: var(--li-ink);
+  font-weight: 750;
+}
+
+.li-chart__hand-text {
+  fill: var(--li-muted);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.li-chart__valve-number {
+  fill: var(--li-ink);
+  font-size: 42px;
+  font-weight: 700;
+}
+
+.li-chart__mark[data-state='closed'] .li-chart__valve-number {
+  fill: #fff;
+}
+
+.li-chart__valve-state {
+  fill: var(--li-muted);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.li-chart__horn {
+  fill: #fff;
+  stroke: var(--li-ink);
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+
+.li-chart__tube {
+  stroke: var(--li-ink);
+  stroke-linecap: round;
+}
+
+/* The stretch of slide the horn can reach, drawn as a faint track. */
+.li-chart__travel {
+  stroke: rgba(28, 25, 23, 0.13);
+  stroke-width: 15;
+  stroke-linecap: round;
+}
+
+/* The travel past first position, called out the way a printed slide chart
+   colours the extension. */
+.li-chart__tube--out {
+  stroke: var(--li-amber);
+}
+
+.li-chart__slide-rail {
+  stroke: rgba(28, 25, 23, 0.18);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.li-chart__slide-tick line {
+  stroke: rgba(28, 25, 23, 0.28);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.li-chart__slide-tick[data-state='on'] line {
+  stroke: var(--li-amber);
+  stroke-width: 6;
+}
+
+.li-chart__slide-tick-label {
+  fill: var(--li-muted);
+  font-size: 19px;
+  font-weight: 640;
+}
+
+.li-chart__slide-tick[data-state='on'] .li-chart__slide-tick-label {
+  fill: var(--li-amber);
+  font-weight: 780;
+}
+
+.li-chart__slide-caption {
+  fill: var(--li-ink);
+  font-size: 26px;
+  font-weight: 720;
+  letter-spacing: -0.01em;
+}
+
+/* ── Finished ────────────────────────────────────────────────────────── */
+
+.li-done {
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem calc(2rem + env(safe-area-inset-bottom, 0px));
+  text-align: center;
+}
+
+.li-done__tick {
+  display: grid;
+  width: 4.2rem;
+  height: 4.2rem;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--li-green);
+}
+
+.li-done__tick svg {
+  width: 2.1rem;
+  height: 2.1rem;
+  stroke-width: 3;
+}
+
+.li-done h1 {
+  margin: 1.1rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 740;
+  letter-spacing: -0.03em;
+}
+
+.li-done p {
+  margin: 0.45rem 0 0;
+  max-width: 22rem;
+  color: var(--li-muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.li-done__actions {
+  display: grid;
+  width: 100%;
+  max-width: 18rem;
+  gap: 0.55rem;
+  margin-top: 1.6rem;
+}
+
+/* Landscape and tablets: the note and the chart sit side by side. */
+@media (min-width: 43rem) and (orientation: landscape) {
+  .li-play__body {
+    max-width: 52rem;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .li-card--note,
+  .li-card--chart {
+    flex: 1 1 0;
+  }
+}

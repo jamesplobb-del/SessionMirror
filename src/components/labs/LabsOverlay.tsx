@@ -10,8 +10,11 @@ import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
 import LabsMenu from './LabsMenu'
 
 const BalanceScreen = lazy(() => import('../../labs/balance/BalanceScreen'))
+const LearnInstrumentScreen = lazy(
+  () => import('../../labs/learnInstrument/LearnInstrumentScreen'),
+)
 
-export type LabsRoute = 'menu' | 'staff-jumper' | 'balance'
+export type LabsRoute = 'menu' | 'staff-jumper' | 'balance' | 'learn-instrument'
 
 interface LabsOverlayProps {
   isOpen: boolean
@@ -26,6 +29,7 @@ interface LabsOverlayProps {
   onClose: () => void
   onNavigate: (route: LabsRoute) => void
   onRequestMicStream: () => void
+  onReleaseMicStream: () => void
   onTunerSettingsChange: (settings: {
     tunerInstrument: TunerInstrument
     tunerTransposition: TunerTranspositionId
@@ -45,6 +49,7 @@ export default function LabsOverlay({
   onClose,
   onNavigate,
   onRequestMicStream,
+  onReleaseMicStream,
   onTunerSettingsChange,
 }: LabsOverlayProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
@@ -171,6 +176,7 @@ export default function LabsOverlay({
               hapticFeedback={hapticFeedback}
               onOpenStaffJumper={() => onNavigate('staff-jumper')}
               onOpenBalance={() => onNavigate('balance')}
+              onOpenLearnInstrument={() => onNavigate('learn-instrument')}
               onBack={onClose}
             />
           ) : route === 'staff-jumper' ? (
@@ -182,7 +188,7 @@ export default function LabsOverlay({
               onRequestMicStream={onRequestMicStream}
               onBack={() => onNavigate('menu')}
             />
-          ) : (
+          ) : route === 'balance' ? (
             <Suspense fallback={<div className="balance-route-loading" role="status">Opening Balance…</div>}>
               <BalanceScreen
                 streamRef={streamRef}
@@ -194,6 +200,19 @@ export default function LabsOverlay({
                 micPermissionPending={micPermissionPending}
                 onRequestMicStream={onRequestMicStream}
                 onTunerSettingsChange={onTunerSettingsChange}
+                onBack={() => onNavigate('menu')}
+              />
+            </Suspense>
+          ) : (
+            <Suspense fallback={<div className="learn-instrument-route-loading" role="status">Opening Learn Your Instrument…</div>}>
+              <LearnInstrumentScreen
+                streamRef={streamRef}
+                streamGeneration={streamGeneration}
+                hapticFeedback={hapticFeedback}
+                micPermissionBlocked={micPermissionBlocked}
+                micPermissionPending={micPermissionPending}
+                onRequestMicStream={onRequestMicStream}
+                onReleaseMicStream={onReleaseMicStream}
                 onBack={() => onNavigate('menu')}
               />
             </Suspense>

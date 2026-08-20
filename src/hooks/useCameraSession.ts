@@ -519,6 +519,7 @@ export function useCameraSession({
   }, [detachAllPreviewTargets])
 
   const releaseLiveStream = useCallback(() => {
+    captureSessionEpochRef.current += 1
     stopStreamTracks(streamRef.current)
     streamRef.current = null
     resetCameraPreviewZoom()

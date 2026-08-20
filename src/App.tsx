@@ -1823,7 +1823,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     const previous = previousLabsRouteRef.current
     previousLabsRouteRef.current = labsRoute
-    if (previous === 'balance' && labsRoute !== 'balance') {
+    const previousUsedLiveMic =
+      previous === 'staff-jumper' || previous === 'balance' || previous === 'learn-instrument'
+    if (previousUsedLiveMic && labsRoute !== previous) {
       releaseLiveStream()
     }
   }, [labsRoute, releaseLiveStream])
@@ -4883,6 +4885,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onClose={handleCloseLabs}
                     onNavigate={handleLabsNavigate}
                     onRequestMicStream={handleRequestLabsMicStream}
+                    onReleaseMicStream={releaseLiveStream}
                     onTunerSettingsChange={(next) => updateSettings(next)}
                   />
 

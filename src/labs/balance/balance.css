@@ -60,7 +60,7 @@
 
 .balance-setup-preview__scene {
   position: relative;
-  height: clamp(26rem, 62dvh, 37rem);
+  height: clamp(21rem, 49dvh, 28.5rem);
   overflow: hidden;
 }
 
@@ -86,12 +86,12 @@
 
 .balance-preview-pitch-control > small {
   position: absolute;
-  top: -1.55rem;
+  top: -1.3rem;
   right: 0;
   width: 4.4rem;
   color: rgba(42, 65, 81, 0.76);
-  font-size: var(--sm-text-caption);
-  font-weight: var(--sm-weight-body);
+  font-size: 1rem;
+  font-weight: var(--sm-weight-medium);
   text-align: center;
   text-shadow: 0 1px rgba(255,255,255,0.8);
 }
@@ -162,8 +162,8 @@
 
 .balance-preview-rope-control output {
   position: absolute;
-  top: 0.3rem;
-  left: 0;
+  top: 3.95rem;
+  left: 0.1rem;
   color: #67400f;
   font-size: var(--sm-text-value);
   font-weight: var(--sm-weight-strong);
@@ -225,8 +225,7 @@
   transition: border-color 160ms ease, transform 160ms ease;
 }
 
-.balance-preview-distance-control output,
-.balance-preview-distance-control > span {
+.balance-preview-distance-control output {
   position: absolute;
   left: 50%;
   color: #664015;
@@ -237,7 +236,21 @@
 }
 
 .balance-preview-distance-control output { top: -0.2rem; font-size: var(--sm-text-value); }
-.balance-preview-distance-control > span { bottom: -0.05rem; font-size: var(--sm-text-caption); }
+.balance-preview-distance-control > span {
+  position: absolute;
+  bottom: 0.38rem;
+  left: 50%;
+  display: flex;
+  gap: 0.16rem;
+  transform: translateX(-50%);
+}
+.balance-preview-distance-control > span i {
+  width: 0.2rem;
+  height: 0.2rem;
+  border-radius: 50%;
+  background: rgba(102,64,21,0.7);
+  box-shadow: 0 1px rgba(255,255,255,0.65);
+}
 .balance-preview-distance-control.is-dragging { cursor: grabbing; transition: none; }
 .balance-preview-distance-control.is-dragging::after { border-color: #784810; transform: translate(-50%, -50%) scale(1.08); }
 .balance-preview-distance-control:focus-visible::after {
@@ -247,11 +260,11 @@
 
 .balance-preview-summary {
   display: grid;
-  min-height: 4.8rem;
+  min-height: 4rem;
   grid-template-columns: minmax(0, 1fr) minmax(8.6rem, 0.9fr);
   align-items: center;
   gap: 0.2rem 0.7rem;
-  padding: 0.6rem 0.78rem 0.68rem;
+  padding: 0.48rem 0.78rem 0.52rem;
 }
 
 .balance-preview-summary > span { display: grid; min-width: 0; gap: 0.12rem; }
@@ -265,11 +278,11 @@
 
 .balance-setup-sheet {
   display: grid;
-  gap: 0.78rem;
-  margin-top: 0.82rem;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
 }
 
-.balance-start { display: grid; gap: 0.55rem; margin: 0; padding: 0.8rem; border: 1px solid rgba(23,35,58,0.06); border-radius: 1.15rem; background: #fff; }
+.balance-start { display: grid; gap: 0.45rem; margin: 0; padding: 0.55rem; border: 1px solid rgba(23,35,58,0.06); border-radius: 1.15rem; background: #fff; }
 .balance-primary-button {
   display: inline-flex;
   min-height: 3.15rem;
@@ -608,7 +621,7 @@
 
 @media (min-width: 744px) {
   .balance-screen--setup { padding-inline: max(2rem, env(safe-area-inset-left, 0px)); }
-  .balance-setup-preview__scene { height: min(37rem, 62dvh); }
+  .balance-setup-preview__scene { height: min(34rem, 58dvh); }
   .balance-game-hud { width: min(84vw, 46rem); }
   .balance-destination-island { width: min(44vw, 29rem); }
   .balance-start-island { width: min(112vw, 72rem); }
