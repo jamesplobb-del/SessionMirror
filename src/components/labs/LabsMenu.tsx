@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, Gamepad2, Music4, Play, Trophy, Wind, X } from 'lucide-react'
 import balanceShot from '../../assets/games/balance.jpg'
+import learnInstrumentShot from '../../assets/games/learn-instrument.jpg'
 import staffJumperShot from '../../assets/games/staff-jumper.jpg'
 import {
   getPracticeGameCharacter,
@@ -120,6 +121,31 @@ export default function LabsMenu({
             type="button"
             intensity="normal"
             hapticFeedback={hapticFeedback}
+            onClick={onOpenLearnInstrument}
+            className="arcade-game-card arcade-game-card--wind"
+            aria-label="Open Learn Your Instrument"
+          >
+            <span className="arcade-game-card__copy">
+              <span className="arcade-game-card__badge">
+                <Wind aria-hidden /> Note by note
+              </span>
+              <h3>Learn Your Instrument</h3>
+              <p>See the note, match the fingering chart, and play it.</p>
+              <span className="arcade-game-card__meta">
+                <span>7 instruments · beginner</span>
+              </span>
+            </span>
+            <span className="arcade-game-card__art arcade-game-card__art--wind" aria-hidden>
+              <img className="arcade-game-card__shot" src={learnInstrumentShot} alt="" decoding="async" />
+              <span className="arcade-game-card__go"><Play aria-hidden /></span>
+            </span>
+          </Pressable>
+        </li>
+        <li>
+          <Pressable
+            type="button"
+            intensity="normal"
+            hapticFeedback={hapticFeedback}
             onClick={onOpenStaffJumper}
             className="arcade-game-card arcade-game-card--staff"
             aria-label={`Play Staff Jumper. Personal best ${staffJumperBest}`}
@@ -163,41 +189,6 @@ export default function LabsMenu({
             </span>
             <span className="arcade-game-card__art arcade-game-card__art--balance" aria-hidden>
               <img className="arcade-game-card__shot" src={balanceShot} alt="" decoding="async" />
-              <span className="arcade-game-card__go"><Play aria-hidden /></span>
-            </span>
-          </Pressable>
-        </li>
-        <li>
-          <Pressable
-            type="button"
-            intensity="normal"
-            hapticFeedback={hapticFeedback}
-            onClick={onOpenLearnInstrument}
-            className="arcade-game-card arcade-game-card--wind"
-            aria-label="Open Learn Your Instrument"
-          >
-            <span className="arcade-game-card__copy">
-              <span className="arcade-game-card__badge">
-                <Wind aria-hidden /> Note by note
-              </span>
-              <h3>Learn Your Instrument</h3>
-              <p>See the note, match the fingering chart, and play it.</p>
-              <span className="arcade-game-card__meta">
-                <span>7 instruments · beginner</span>
-              </span>
-            </span>
-            <span className="arcade-game-card__art arcade-game-card__art--wind" aria-hidden>
-              <span className="arcade-wind-preview">
-                <strong>D</strong>
-                <span>
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              </span>
               <span className="arcade-game-card__go"><Play aria-hidden /></span>
             </span>
           </Pressable>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { AcceptedPitchFrame } from '../../hooks/useLivePitchTracker'
 import { triggerSuccessHaptic } from '../../utils/haptics'
+import { centsFromMidi } from '../../utils/pitchUtils'
 import {
   INSTRUMENTS,
   LESSON_GOALS,
@@ -13,6 +14,17 @@ import {
   type InstrumentId,
   type LessonNote,
 } from './instrumentData'
+
+/**
+ * How far out of tune the note may sit and still count as played.
+ *
+ * Rounding the detected pitch to the nearest semitone punishes a beginner who
+ * is blowing sharp: forty cents high on the right note gets rounded onto the
+ * note above and reported as wrong. Measuring the distance from the target
+ * instead, with a wide window, means "sharp but recognisably this note" is
+ * accepted. A genuine wrong note is a hundred cents away and still misses.
+ */
+export const MATCH_TOLERANCE_CENTS = 80
 
 export const MATCH_HOLD_MS = 300
 export const SUCCESS_DWELL_MS = 600
@@ -594,7 +606,16 @@ export function useLearnInstrumentGame(
 
       const detectedMidi = Math.round(frame.readout.midi)
       const targetConcertMidi = getConcertMidi(instrument, note)
-      if (detectedMidi !== targetConcertMidi) {
+      // Measured against the target itself, not against the nearest semitone.
+      // centsFromMidi answers 0 for a silent frame, so silence has to be ruled
+      // out first or it would read as a perfectly in-tune note.
+      const heardHz = frame.readout.frequencyHz
+      const offCents = centsFromMidi(heardHz, targetConcertMidi)
+      const onTarget =
+        heardHz > 0 &&
+        Number.isFinite(offCents) &&
+        Math.abs(offCents) <= MATCH_TOLERANCE_CENTS
+      if (!onTarget) {
         resetHoldAttempt()
         dispatch({
           type: 'SET_DETECTION',

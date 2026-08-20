@@ -416,9 +416,11 @@ const FL_ALL: readonly WoodwindControlId[] = [
 ]
 
 const FLUTE_KEYS: KeyTable = {
-  60: [...FL_ALL, 'side-eb', 'foot-c'], // C4
-  61: [...FL_ALL, 'side-eb', 'foot-csharp'],
-  62: [...FL_ALL], // D4 — the one note without the E♭ key
+  // The right pinky sits on one key at a time: low C and C♯ move it onto a
+  // foot key, so the E♭ key comes off. D4 takes no pinky key at all.
+  60: [...FL_ALL, 'foot-c'], // C4
+  61: [...FL_ALL, 'foot-csharp'],
+  62: [...FL_ALL], // D4 — no pinky key
   63: [...FL_ALL, 'side-eb'],
   64: ['thumb', 'lh-1', 'lh-2', 'lh-3', 'rh-1', 'rh-2', 'side-eb'],
   65: ['thumb', 'lh-1', 'lh-2', 'lh-3', 'rh-1', 'side-eb'],
@@ -430,7 +432,10 @@ const FLUTE_KEYS: KeyTable = {
   71: ['thumb', 'lh-1', 'side-eb'],
   72: ['lh-1', 'side-eb'], // C5 — thumb comes off
   73: ['side-eb'],
-  74: ['thumb', 'lh-2', 'lh-3', 'rh-1', 'rh-2', 'rh-3'], // D5 — vented, no E♭
+  // Second-octave D lifts the left first finger to vent. Like the D below it,
+  // it is the one note that leaves the E♭ key alone — that key opens the very
+  // hole that would turn the note into an E♭.
+  74: ['thumb', 'lh-2', 'lh-3', 'rh-1', 'rh-2', 'rh-3'],
   75: ['thumb', 'lh-2', 'lh-3', 'rh-1', 'rh-2', 'rh-3', 'side-eb'],
   76: ['thumb', 'lh-1', 'lh-2', 'lh-3', 'rh-1', 'rh-2', 'side-eb'],
   77: ['thumb', 'lh-1', 'lh-2', 'lh-3', 'rh-1', 'side-eb'],

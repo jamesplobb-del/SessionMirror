@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
 import { ArrowLeft, Headphones, Mic, Minus, Play, Plus, Shuffle, X } from 'lucide-react'
 import './staff-jumper.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
+import { GAME_TEST_INPUT, SILENT_READOUT, syntheticReadout, TEST_TAP_HOLD_MS } from '../gameTestInput'
 import {
   computeAccuracy,
   DIFFICULTY_DESCRIPTIONS,
@@ -9,6 +11,7 @@ import {
   DIFFICULTY_TIMEOUT_SECONDS,
   getConcertTonicPitchClass,
   getScaleRangePreview,
+  getTargetNoteAtStep,
   keysForScaleMode,
   pitchClassLabel,
   RANGE_LABELS,
@@ -49,7 +52,7 @@ interface StaffJumperScreenProps {
   streamGeneration: number
   tunerInstrument: TunerInstrument
   hapticFeedback: boolean
-  onRequestMicStream: () => void
+  onRequestMicStream: GameMicRequest
   onBack: () => void
 }
 
@@ -123,11 +126,20 @@ export default function StaffJumperScreen({
   }, [onRequestMicStream, streamGeneration])
 
   const pitchEnabled = true
+  /*
+   * Coming back from the background, the stream is usually dead while
+   * still looking present. This re-acquires it and, through the epoch in
+   * the tracker key below, rebuilds the analysis graph on top of it —
+   * without which the game returns to a suspended AudioContext and hears
+   * nothing at all.
+   */
+  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream)
+
   const { readout } = useLivePitchTracker(
     mediaRef,
     pitchEnabled,
     pitchEnabled,
-    `staff-jumper-${streamGeneration}`,
+    `staff-jumper-${streamGeneration}-${micEpoch}`,
     canvasRef,
     'solid',
     {
@@ -140,6 +152,36 @@ export default function StaffJumperScreen({
     },
   )
 
+  /**
+   * Instrument-free testing: a tap sounds the note the game is waiting for.
+   *
+   * The synthetic reading is substituted for the microphone's, so the game
+   * itself is unaware of it — pitch matching, the stability window, timing
+   * against the click and the linger all behave exactly as they would with a
+   * horn. Holding it for a fixed spell and then falling silent is what makes
+   * one tap advance exactly one note.
+   */
+  const [tapMidi, setTapMidi] = useState<number | null>(null)
+  const targetMidiRef = useRef<number | null>(null)
+  const tapTimerRef = useRef<number | null>(null)
+  const effectiveReadout = !GAME_TEST_INPUT
+    ? readout
+    : tapMidi == null
+      ? SILENT_READOUT
+      : syntheticReadout(tapMidi)
+
+  useEffect(() => () => {
+    if (tapTimerRef.current != null) window.clearTimeout(tapTimerRef.current)
+  }, [])
+
+  const playTestNote = () => {
+    const midi = targetMidiRef.current
+    if (midi == null) return
+    if (tapTimerRef.current != null) window.clearTimeout(tapTimerRef.current)
+    setTapMidi(midi)
+    tapTimerRef.current = window.setTimeout(() => setTapMidi(null), TEST_TAP_HOLD_MS)
+  }
+
   const {
     state,
     start,
@@ -150,7 +192,12 @@ export default function StaffJumperScreen({
     resume,
     noteRemainingMs,
     noteTimeoutMs,
-  } = useStaffJumperGame(readout, pitchEnabled, hapticFeedback)
+  } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
+
+  targetMidiRef.current =
+    state.config && state.phase === 'playing'
+      ? getTargetNoteAtStep(state.config, state.sequenceStep).midi
+      : null
   const draftConfig = useMemo(
     () => ({
       key: draftKey,
@@ -660,15 +707,31 @@ export default function StaffJumperScreen({
     )
   }
 
-  return (
+  const game = (
     <StaffJumperGame
       state={state}
-      readout={readout}
+      readout={effectiveReadout}
       onPause={pause}
       hapticFeedback={hapticFeedback}
       onFallComplete={completeFall}
       turnRemainingMs={noteRemainingMs}
       turnDurationMs={noteTimeoutMs}
     />
+  )
+
+  if (!GAME_TEST_INPUT) return game
+
+  return (
+    <div
+      className="sj-test-input"
+      onPointerDown={(event) => {
+        // Let the pause button and any other control keep its own press.
+        if ((event.target as HTMLElement).closest('button')) return
+        playTestNote()
+      }}
+    >
+      {game}
+      <span className="sj-test-input__badge" aria-hidden>tap = play note</span>
+    </div>
   )
 }

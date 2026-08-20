@@ -2090,12 +2090,11 @@ button.compact-take-caption:active {
   .record-carousel-slot--camera {
   width: 3.15rem !important;
   height: 3.15rem !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.3) !important;
-  background:
-    linear-gradient(145deg, #ff5e66 0%, #ed334b 56%, #cf1f3d 100%) !important;
+  border: 3px solid rgba(255, 255, 255, 0.98) !important;
+  background: rgba(7, 8, 12, 0.58) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    0 0.35rem 0.9rem rgba(151, 19, 48, 0.34) !important;
+    0 0 0 1px rgba(6, 7, 10, 0.72),
+    0 0.35rem 0.9rem rgba(0, 0, 0, 0.34) !important;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -2118,12 +2117,11 @@ button.compact-take-caption:active {
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-carousel-slot--camera.record-carousel-slot--recording {
-  border-color: rgba(255, 226, 226, 0.38) !important;
-  background:
-    linear-gradient(145deg, #ec3b50 0%, #cf1f3d 58%, #a81231 100%) !important;
+  border-color: rgba(255, 255, 255, 0.98) !important;
+  background: rgba(7, 8, 12, 0.58) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    0 0.4rem 1rem rgba(142, 16, 43, 0.4) !important;
+    0 0 0 1px rgba(6, 7, 10, 0.72),
+    0 0.4rem 1rem rgba(0, 0, 0, 0.4) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
@@ -2146,8 +2144,14 @@ button.compact-take-caption:active {
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .camera-control-pill
   .record-orbit-icon__stop {
-  fill: rgba(255, 255, 255, 0.96);
-  filter: drop-shadow(0 0.1rem 0.18rem rgba(103, 8, 28, 0.24));
+  fill: #ef172f;
+  filter: drop-shadow(0 0.1rem 0.18rem rgba(80, 0, 12, 0.28));
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode)
+  .camera-control-pill
+  .record-orbit-icon__dot {
+  transform: scale(3.7);
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)

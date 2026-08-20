@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import type { GameMicRequest } from '../../labs/useGameMicRecovery'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, type RefObject } from 'react'
@@ -28,7 +29,7 @@ interface LabsOverlayProps {
   micPermissionPending: boolean
   onClose: () => void
   onNavigate: (route: LabsRoute) => void
-  onRequestMicStream: () => void
+  onRequestMicStream: GameMicRequest
   onReleaseMicStream: () => void
   onTunerSettingsChange: (settings: {
     tunerInstrument: TunerInstrument

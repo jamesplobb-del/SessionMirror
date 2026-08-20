@@ -220,50 +220,75 @@ function TriangleKey({
  * silhouette matters more than their names here: C♯ is the upright loop, E♭
  * is the short upper roller, and C is the lower oval.
  */
+/**
+ * The right-hand pinky cluster at the end of a flute chart.
+ *
+ * The E♭ key is the wide oval the pinky rests on, and it is down for nearly
+ * every note on the instrument — so it gets the prominent shape, sitting right
+ * after the third right-hand finger. The two rollers beyond it are the foot
+ * C♯ and C keys, which the pinky only slides onto for the bottom two notes.
+ * Each one is named when it is in use: a chart that lights the wrong pinky key
+ * teaches the wrong hand.
+ */
 function FluteFootKeys({
   x,
   y,
+  labelY,
   c,
   cSharp,
   eFlat,
 }: {
   x: number
   y: number
+  labelY: number
   c: MarkState
   cSharp: MarkState
   eFlat: MarkState
 }) {
+  const rollerY = (offset: number) => y + offset
+
   return (
-    <g aria-hidden>
-      <g className="li-chart__mark" data-state={cSharp}>
-        <path
+    <g>
+      <g className="li-chart__mark" data-state={eFlat}>
+        <Halo x={x - 23} y={y - 29} w={46} h={58} show={eFlat !== 'open'} />
+        <ellipse
           className="li-chart__key"
-          strokeWidth={SMALL_STROKE}
-          d={`M ${x - 28} ${y + 3}
-              C ${x - 42} ${y - 5} ${x - 42} ${y - 23} ${x - 27} ${y - 34}
-              C ${x - 17} ${y - 24} ${x - 13} ${y - 7} ${x - 28} ${y + 3} Z`}
+          cx={x}
+          cy={y}
+          rx={15}
+          ry={21}
+          strokeWidth={STROKE}
         />
       </g>
-      <g className="li-chart__mark" data-state={eFlat}>
+      <Caption x={x} y={labelY} text="E♭" />
+
+      <g className="li-chart__mark" data-state={cSharp}>
+        <Halo x={x + 30} y={rollerY(-19) - 8} w={44} h={30} show={cSharp !== 'open'} />
         <rect
           className="li-chart__key"
-          x={x - 12}
-          y={y - 29}
-          width={42}
-          height={14}
-          rx={7}
+          x={x + 34}
+          y={rollerY(-19)}
+          width={36}
+          height={12}
+          rx={6}
           strokeWidth={SMALL_STROKE}
         />
       </g>
       <g className="li-chart__mark" data-state={c}>
-        <path
+        <Halo x={x + 30} y={rollerY(7) - 8} w={44} h={30} show={c !== 'open'} />
+        <rect
           className="li-chart__key"
+          x={x + 34}
+          y={rollerY(7)}
+          width={36}
+          height={12}
+          rx={6}
           strokeWidth={SMALL_STROKE}
-          d={`M ${x - 10} ${y - 8}
-              C ${x + 2} ${y - 14} ${x + 25} ${y - 12} ${x + 31} ${y - 3}
-              C ${x + 23} ${y + 8} ${x + 1} ${y + 10} ${x - 10} ${y + 3} Z`}
         />
       </g>
+      {(cSharp !== 'open' || c !== 'open') && (
+        <Caption x={x + 52} y={labelY} text={cSharp !== 'open' ? 'C♯' : 'C'} />
+      )}
     </g>
   )
 }
@@ -788,8 +813,9 @@ function FluteChart({ closed }: { closed: ReadonlySet<string> }) {
       {/* Keep the familiar three-part foot-key silhouette visible on every
           note, exactly as it appears at the end of a printed flute chart. */}
       <FluteFootKeys
-        x={432}
-        y={FL.row + 9}
+        x={392}
+        y={FL.row}
+        labelY={FL.labelY}
         c={st('foot-c')}
         cSharp={st('foot-csharp')}
         eFlat={st('side-eb')}

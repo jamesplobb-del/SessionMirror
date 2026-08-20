@@ -1781,8 +1781,11 @@
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 9999px;
-  border: 4px solid rgba(255, 255, 255, 0.92);
-  background: transparent;
+  border: 4px solid rgba(255, 255, 255, 0.98);
+  background: rgba(7, 8, 12, 0.58);
+  box-shadow:
+    0 0 0 1.5px rgba(6, 7, 10, 0.72),
+    0 0.45rem 1.1rem rgba(0, 0, 0, 0.34);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1797,7 +1800,8 @@
   width: 3.4rem;
   height: 3.4rem;
   border-radius: 9999px;
-  background: #ef4444;
+  background: #ef172f;
+  box-shadow: 0 0.1rem 0.2rem rgba(80, 0, 12, 0.28);
   transition: border-radius 180ms ease, width 180ms ease, height 180ms ease;
 }
 
@@ -2979,22 +2983,22 @@
 .multitrack-recording-stage--in-grid .multitrack-recording-stage__record-big {
   width: 4.5rem;
   height: 4.5rem;
-  border: 0.5px solid rgba(255, 255, 255, 0.3);
-  background: linear-gradient(145deg, #ff5e66 0%, #ed334b 56%, #cf1f3d 100%);
+  border: 4px solid rgba(255, 255, 255, 0.98);
+  background: rgba(7, 8, 12, 0.58);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    0 0.35rem 0.9rem rgba(151, 19, 48, 0.34);
+    0 0 0 1.5px rgba(6, 7, 10, 0.72),
+    0 0.45rem 1.1rem rgba(0, 0, 0, 0.34);
 }
 
 .multitrack-recording-stage--in-grid .multitrack-recording-stage__record-glyph {
-  width: 0.86rem;
-  height: 0.86rem;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0.1rem 0.18rem rgba(103, 8, 28, 0.24);
+  width: 3.4rem;
+  height: 3.4rem;
+  background: #ef172f;
+  box-shadow: 0 0.1rem 0.2rem rgba(80, 0, 12, 0.28);
 }
 
 .multitrack-recording-stage--in-grid .multitrack-recording-stage__record-big.is-recording {
-  background: linear-gradient(145deg, #ec3b50 0%, #cf1f3d 58%, #a81231 100%);
+  background: rgba(7, 8, 12, 0.58);
 }
 
 .multitrack-recording-stage--in-grid

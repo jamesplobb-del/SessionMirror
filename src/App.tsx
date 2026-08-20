@@ -2807,10 +2807,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setLabsRoute(route)
   }, [])
 
-  const handleRequestLabsMicStream = useCallback(() => {
-    requestCameraAccess('audio')
-  }, [requestCameraAccess])
-
   const micStreamIsLiveForTuner = useCallback(() => {
     if (isNativeCaptureSessionActive()) return true
     return Boolean(
@@ -2891,6 +2887,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     },
     [isRecording, micStreamIsLiveForTuner, reacquireStreamForAudioRoute, requestCameraAccess]
   )
+
+  /**
+   * The games get the tuner's recovery-capable request, not a bare permission
+   * prompt.
+   *
+   * They used to call `requestCameraAccess('audio')` once and never again,
+   * which is why a game came back from the background detecting nothing: the
+   * stream was dead, and nothing asked for a new one. This is the same entry
+   * point the tuner uses, so `forceRecovery` waits for the shared camera
+   * lifecycle before forcing a rebuild and cannot open a competing mic.
+   */
+  const handleRequestLabsMicStream = handleRequestTunerMicStream
 
   const schedulePitchTrackerCommit = useCallback(
     (enabled: boolean) => {

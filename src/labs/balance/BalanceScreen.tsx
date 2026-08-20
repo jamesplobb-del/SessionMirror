@@ -1,8 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react'
+import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import { useLivePitchTracker, type PitchSourceHealth } from '../../hooks/useLivePitchTracker'
+import { GAME_TEST_INPUT, syntheticReadout, TEST_HOLD_FRAME_MS } from '../gameTestInput'
 import Pressable from '../../components/ui/Pressable'
 import BalanceResults from './BalanceResults'
 import BalanceScene from './BalanceScene'
@@ -24,7 +34,7 @@ interface BalanceScreenProps {
   hapticFeedback: boolean
   micPermissionBlocked: boolean
   micPermissionPending: boolean
-  onRequestMicStream: () => void
+  onRequestMicStream: GameMicRequest
   onTunerSettingsChange: (settings: {
     tunerInstrument: TunerInstrument
     tunerTransposition: TunerTranspositionId
@@ -65,11 +75,20 @@ export default function BalanceScreen({
     game.state.phase === 'pitchLock' ||
     game.state.phase === 'active'
 
+  /*
+   * Coming back from the background, the stream is usually dead while
+   * still looking present. This re-acquires it and, through the epoch in
+   * the tracker key below, rebuilds the analysis graph on top of it —
+   * without which the game returns to a suspended AudioContext and hears
+   * nothing at all.
+   */
+  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream)
+
   const { readout } = useLivePitchTracker(
     mediaRef,
     pitchEnabled,
     pitchEnabled,
-    `balance-${streamGeneration}-${game.state.settings.instrumentId}`,
+    `balance-${streamGeneration}-${micEpoch}-${game.state.settings.instrumentId}`,
     canvasRef,
     'solid',
     {
@@ -89,6 +108,56 @@ export default function BalanceScreen({
     if (!pitchEnabled) return
     onRequestMicStream()
   }, [onRequestMicStream, pitchEnabled, streamGeneration])
+
+  /**
+   * Instrument-free testing: press and hold to sound the target note.
+   *
+   * Frames are pushed at roughly the rate the real detector delivers them, so
+   * the lock-on, the tolerance band and the balance timer all run through
+   * their normal path — the game cannot tell the difference between this and a
+   * perfectly steady player.
+   */
+  const testHoldRef = useRef<number | null>(null)
+  const targetConcertMidiRef = useRef<number | null>(null)
+  targetConcertMidiRef.current = game.currentTarget?.concertMidi ?? null
+
+  /**
+   * The game object is rebuilt on every render, so it is reached through a ref
+   * rather than closed over. Depending on it directly made these callbacks
+   * change identity each render, which re-ran the unmount effect below and had
+   * its cleanup cancel the hold a frame after it started — the press worked,
+   * but exactly one frame ever reached the game.
+   */
+  const gameRef = useRef(game)
+  gameRef.current = game
+
+  const stopTestHold = useCallback(() => {
+    if (testHoldRef.current == null) return
+    window.clearInterval(testHoldRef.current)
+    testHoldRef.current = null
+    gameRef.current.handleAcceptedPitchFrame(null)
+  }, [])
+
+  const startTestHold = useCallback(() => {
+    if (testHoldRef.current != null) return
+    const pushFrame = () => {
+      const midi = targetConcertMidiRef.current
+      if (midi == null) return
+      // Mute the real microphone for as long as the press lasts. Without this
+      // the room's own noise keeps arriving between synthetic frames, reads as
+      // wildly out of tune, and knocks the lock straight off again.
+      gameRef.current.suppressUntilRef.current = performance.now() + TEST_HOLD_FRAME_MS * 4
+      gameRef.current.handleAcceptedPitchFrame({
+        readout: syntheticReadout(midi),
+        confidence: 1,
+        timestamp: Date.now(),
+      })
+    }
+    pushFrame()
+    testHoldRef.current = window.setInterval(pushFrame, TEST_HOLD_FRAME_MS)
+  }, [])
+
+  useEffect(() => stopTestHold, [stopTestHold])
 
   const previewTargets = useMemo(
     () => buildBalanceTargets(game.state.settings, game.customRoutines),
@@ -167,6 +236,7 @@ export default function BalanceScreen({
   }
 
   const target = game.currentTarget
+
   const cents = Math.round(game.hud.cents)
   const indicatorPosition = Math.max(0, Math.min(100, 50 + (game.hud.cents / Math.max(20, game.toleranceCents * 1.8)) * 50))
   const detectedTargetCents =
@@ -255,7 +325,20 @@ export default function BalanceScreen({
             : 'sharp'
 
   return (
-    <div className="balance-play-screen">
+    <div
+      className={`balance-play-screen ${GAME_TEST_INPUT ? 'balance-play-screen--test-input' : ''}`}
+      {...(GAME_TEST_INPUT
+        ? {
+            onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
+              if ((event.target as HTMLElement).closest('button')) return
+              startTestHold()
+            },
+            onPointerUp: stopTestHold,
+            onPointerCancel: stopTestHold,
+            onPointerLeave: stopTestHold,
+          }
+        : {})}
+    >
       <header className="balance-play-header">
         <div className="balance-target-card">
           <small>Target</small>
@@ -296,6 +379,9 @@ export default function BalanceScreen({
         <p className={`balance-pitch-feedback balance-pitch-feedback--${pitchFeedbackTone}`} aria-live="polite">{pitchFeedback}</p>
         <div className="balance-progress" aria-label={`${Math.round(game.hud.progress * 100)} percent complete`}><i style={{ width: `${game.hud.progress * 100}%` }} /></div>
       </section>
+      {GAME_TEST_INPUT ? (
+        <span className="balance-test-input-badge" aria-hidden>hold anywhere = play the note</span>
+      ) : null}
     </div>
   )
 }

@@ -505,12 +505,34 @@ export default function BalanceSetup({
               }}
               onPointerCancel={stopPitchPreview}
             >
-              <small aria-hidden>↕</small>
+              {/*
+                * The pulley the pitch line hangs from.
+                *
+                * This was a bare "↕" character, which iOS renders as a colour
+                * emoji — a system-blue rounded square sitting on top of a
+                * hand-drawn scene, and the single most out-of-place thing on
+                * it. Drawn instead from the same parts as the rest of the
+                * world: a brown bracket, a wheel, a cream outline.
+                */}
+              <svg
+                className="balance-preview-pitch-control__pulley"
+                viewBox="0 0 24 26"
+                aria-hidden
+                focusable="false"
+              >
+                <path className="balance-pulley__bracket" d="M9.2 1.6h5.6a2 2 0 0 1 2 2v4.2H7.2V3.6a2 2 0 0 1 2-2Z" />
+                <circle className="balance-pulley__wheel" cx="12" cy="15.4" r="7" />
+                <circle className="balance-pulley__groove" cx="12" cy="15.4" r="4.6" />
+                <circle className="balance-pulley__hub" cx="12" cy="15.4" r="1.9" />
+              </svg>
               <span className="balance-preview-pitch-control__rail" aria-hidden />
               <output
                 className="balance-preview-pitch-control__thumb"
                 style={{ top: `${(1 - pitchRatio) * 100}%` }}
-              >{targetLabel}</output>
+              >
+                <i className="balance-preview-pitch-control__eyelet" aria-hidden />
+                {targetLabel}
+              </output>
             </div>
           ) : (
             <Pressable

@@ -84,47 +84,103 @@
   touch-action: none;
 }
 
-.balance-preview-pitch-control > small {
+/*
+ * The whole setup scene is hand-drawn, so its controls are built from the same
+ * parts as the world they sit on: the rope's own amber, the posts' brown, and
+ * the cream outline every sticker in the scene carries. Nothing here is a
+ * generic slider wearing a costume — the line *is* a rope, the handle hangs
+ * off it, and it is strung from a pulley.
+ */
+.balance-preview-pitch-control__pulley {
   position: absolute;
-  top: -1.3rem;
-  right: 0;
-  width: 4.4rem;
-  color: rgba(42, 65, 81, 0.76);
-  font-size: 1rem;
-  font-weight: var(--sm-weight-medium);
-  text-align: center;
-  text-shadow: 0 1px rgba(255,255,255,0.8);
+  top: -1.55rem;
+  left: 50%;
+  width: 1.5rem;
+  height: 1.62rem;
+  overflow: visible;
+  filter: drop-shadow(0 0.14rem 0.26rem rgba(73,48,20,0.28));
+  transform: translateX(-50%);
 }
 
+.balance-pulley__bracket { fill: #6a4a24; stroke: rgba(255,247,235,0.94); stroke-width: 1.5; }
+.balance-pulley__wheel { fill: #8a6231; stroke: rgba(255,247,235,0.94); stroke-width: 1.5; }
+.balance-pulley__groove { fill: none; stroke: rgba(255,220,124,0.75); stroke-width: 1.3; }
+.balance-pulley__hub { fill: #ffe3a4; }
+
+/*
+ * Rope, not a dashed rule — the same amber core and lighter twist the scene's
+ * own rope is drawn with, so the line reads as hanging from the pulley rather
+ * than as a track drawn over the picture.
+ */
 .balance-preview-pitch-control__rail {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 0.18rem;
-  border-radius: 0.1rem;
-  background: repeating-linear-gradient(180deg, rgba(51,91,103,0.5) 0 0.12rem, transparent 0.12rem 0.52rem);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.32);
+  width: 0.3rem;
+  border-radius: 0.15rem;
+  background:
+    repeating-linear-gradient(
+      166deg,
+      rgba(255,236,183,0.95) 0 0.1rem,
+      transparent 0.1rem 0.4rem
+    ),
+    linear-gradient(90deg, #c17a18 0%, #f5ae35 42%, #f5ae35 62%, #c8801b 100%);
+  box-shadow: 0 0.1rem 0.3rem rgba(114,74,20,0.22);
   transform: translateX(-50%);
 }
 
+/* A stopper knot, so the rope ends rather than merely stopping. */
+.balance-preview-pitch-control__rail::after {
+  position: absolute;
+  bottom: -0.2rem;
+  left: 50%;
+  width: 0.62rem;
+  height: 0.46rem;
+  border: 0.09rem solid rgba(255,247,235,0.92);
+  border-radius: 0.3rem;
+  background: radial-gradient(circle at 36% 30%, #a97840 0%, #7a5226 66%, #5f3d18 100%);
+  box-shadow: 0 0.09rem 0.22rem rgba(73,48,20,0.3);
+  content: '';
+  transform: translateX(-50%);
+}
+
+/*
+ * A wooden note tag threaded onto the rope. The eyelet is what sells it: the
+ * rope visibly passes through the handle instead of disappearing behind a
+ * floating rounded rectangle.
+ */
 .balance-preview-pitch-control__thumb {
   position: absolute;
   left: 50%;
   display: grid;
-  min-width: 2.55rem;
-  height: 2.05rem;
-  padding: 0 0.4rem;
+  min-width: 2.6rem;
+  height: 2.15rem;
+  padding: 0.32rem 0.45rem 0;
   place-items: center;
-  border: 0.14rem solid rgba(255,255,255,0.92);
-  border-radius: 0.45rem;
-  color: #723b0d;
-  background: #ffc35c;
-  box-shadow: 0 0.22rem 0.65rem rgba(64,69,52,0.22);
+  border: 0.14rem solid rgba(255,247,235,0.95);
+  border-radius: 0.5rem 0.5rem 0.62rem 0.62rem;
+  color: #6d3708;
+  background: linear-gradient(180deg, #ffd98a 0%, #ffc35c 52%, #f0a838 100%);
+  box-shadow:
+    0 0.24rem 0.6rem rgba(114,74,20,0.3),
+    inset 0 -0.14rem 0 rgba(193,122,24,0.28);
   font-size: var(--sm-text-value);
   font-weight: var(--sm-weight-strong);
   font-variant-numeric: tabular-nums;
   transform: translate(-50%, -50%);
+}
+
+.balance-preview-pitch-control__eyelet {
+  position: absolute;
+  top: 0.2rem;
+  left: 50%;
+  width: 0.46rem;
+  height: 0.46rem;
+  border: 0.09rem solid rgba(140,92,32,0.55);
+  border-radius: 50%;
+  background: rgba(120,74,22,0.42);
+  transform: translateX(-50%);
 }
 
 .balance-preview-pitch-control:focus-visible .balance-preview-pitch-control__thumb,
@@ -179,25 +235,34 @@
   display: grid;
   width: var(--balance-rope-control-width, 4rem);
   height: 1rem;
-  grid-template-columns: 0.25rem minmax(0, 1fr) 0.25rem;
+  grid-template-columns: 0.54rem minmax(0, 1fr) 0.54rem;
   align-items: center;
   transform: translateX(-50%) rotate(24deg);
   transition: width 180ms ease;
 }
 
+/* Knots, not bars — the two ends of a rope the player lets out or hauls in. */
 .balance-preview-rope-control > span i {
   z-index: 1;
-  width: 0.25rem;
-  height: 0.78rem;
-  border: 0.08rem solid rgba(255,255,255,0.88);
-  border-radius: 0.12rem;
-  background: #6a4a24;
-  box-shadow: 0 0.1rem 0.22rem rgba(73,48,20,0.24);
+  width: 0.54rem;
+  height: 0.54rem;
+  border: 0.1rem solid rgba(255,247,235,0.94);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #a97840 0%, #7a5226 62%, #5f3d18 100%);
+  box-shadow: 0 0.1rem 0.24rem rgba(73,48,20,0.3);
 }
 
 .balance-preview-rope-control > span b {
-  height: 0;
-  border-top: 0.12rem dashed rgba(106,74,36,0.56);
+  height: 0.22rem;
+  border-radius: 0.11rem;
+  background:
+    repeating-linear-gradient(
+      104deg,
+      rgba(255,236,183,0.9) 0 0.08rem,
+      transparent 0.08rem 0.34rem
+    ),
+    linear-gradient(180deg, #f5ae35 0%, #d68f21 100%);
+  box-shadow: 0 0.08rem 0.2rem rgba(114,74,20,0.22);
 }
 
 .balance-preview-distance-control {
@@ -218,7 +283,7 @@
   left: 50%;
   width: 63%;
   height: 24%;
-  border: 1px dashed rgba(113,70,19,0.5);
+  border: 0.13rem dashed rgba(214,143,33,0.72);
   border-radius: 50%;
   content: '';
   transform: translate(-50%, -50%);
@@ -244,12 +309,18 @@
   gap: 0.16rem;
   transform: translateX(-50%);
 }
+/*
+ * Beads, echoing the beaded chain the balloon already hangs by, rather than
+ * three grey dots. Staves were tried here and read as something dangling off
+ * the platform by accident.
+ */
 .balance-preview-distance-control > span i {
-  width: 0.2rem;
-  height: 0.2rem;
+  width: 0.3rem;
+  height: 0.3rem;
+  border: 0.06rem solid rgba(255,247,235,0.92);
   border-radius: 50%;
-  background: rgba(102,64,21,0.7);
-  box-shadow: 0 1px rgba(255,255,255,0.65);
+  background: radial-gradient(circle at 34% 30%, #ffe3a4 0%, #f0a838 62%, #c17a18 100%);
+  box-shadow: 0 0.07rem 0.16rem rgba(114,74,20,0.26);
 }
 .balance-preview-distance-control.is-dragging { cursor: grabbing; transition: none; }
 .balance-preview-distance-control.is-dragging::after { border-color: #784810; transform: translate(-50%, -50%) scale(1.08); }
@@ -328,13 +399,61 @@
 .balance-setting-row,
 .balance-switch-row,
 .balance-range-row { display: flex; min-height: 3.1rem; align-items: center; justify-content: space-between; gap: 0.75rem; border-top: 1px solid rgba(23,35,58,0.075); font-size: 0.76rem; font-weight: 600; }
-.balance-setting-row select { max-width: 56%; min-height: 2.25rem; padding: 0 1.7rem 0 0.55rem; border-radius: 0.6rem; color: #344054; background: #f3f5f7; font-size: 0.7rem; text-align: right; }
+/*
+ * Selects, wearing the app's clothes.
+ *
+ * Left native these render as iOS system controls — a different type stack, a
+ * system chevron and a slightly different fill — which reads as a web form
+ * dropped into the middle of a hand-made screen. `appearance: none` takes the
+ * platform's paint off; the chevron below is drawn in the same muted ink the
+ * rest of the setup rows use. Tapping still opens the real iOS picker, which
+ * is the part a phone user actually wants to keep.
+ */
+.balance-setting-row select,
+.balance-note-editor__row select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 2.25rem;
+  padding: 0 1.85rem 0 0.7rem;
+  border: 1px solid rgba(23,35,58,0.09);
+  border-radius: 0.6rem;
+  color: var(--balance-ink);
+  background-color: #f3f5f7;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.4 1.7 6 6.3l4.6-4.6' fill='none' stroke='%23778193' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.62rem center;
+  background-size: 0.62rem auto;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.balance-setting-row select {
+  max-width: 56%;
+  text-align: right;
+  /* Right-aligns the *chosen* value, not just the option list. */
+  text-align-last: right;
+}
+
+.balance-setting-row select:active,
+.balance-note-editor__row select:active {
+  border-color: rgba(23,35,58,0.16);
+  background-color: #e9edf1;
+}
+
+.balance-setting-row select:focus-visible,
+.balance-note-editor__row select:focus-visible,
+.balance-text-input:focus-visible {
+  outline: 0.14rem solid rgba(44,154,113,0.5);
+  outline-offset: 0.12rem;
+}
 .balance-range-row { display: grid; padding: 0.65rem 0; }
 .balance-range-row span { display: flex; justify-content: space-between; }
 .balance-range-row input { width: 100%; accent-color: var(--balance-mint-strong); }
 .balance-switch-row { cursor: pointer; }
 .balance-field-label { display: block; margin: 0.65rem 0 0.35rem; font-size: 0.7rem; font-weight: 600; }
-.balance-text-input { width: 100%; min-height: 2.6rem; padding: 0.5rem 0.65rem; border-radius: 0.6rem; background: #f3f5f7; font-size: 0.76rem; }
+.balance-text-input { width: 100%; min-height: 2.6rem; padding: 0.5rem 0.7rem; border: 1px solid rgba(23,35,58,0.09); border-radius: 0.6rem; color: var(--balance-ink); background: #f3f5f7; font: inherit; font-size: 0.76rem; font-weight: 600; }
 
 .balance-instrument-facts { display: grid; gap: 0.55rem; padding: 0.75rem 0 0.2rem; border-top: 1px solid rgba(23,35,58,0.075); }
 .balance-instrument-facts span { display: grid; gap: 0.08rem; color: var(--balance-muted); font-size: 0.62rem; }
@@ -688,4 +807,27 @@
 
 .balance-setup-quick .balance-setup-group__head svg {
   margin-top: 0.1rem;
+}
+
+/* ─────────────────────────────────────────────
+   Instrument-free test input (VITE_GAME_TEST_INPUT=1 builds only)
+───────────────────────────────────────────── */
+.balance-play-screen--test-input {
+  touch-action: none;
+}
+
+.balance-test-input-badge {
+  position: fixed;
+  z-index: 40;
+  bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(23, 26, 34, 0.62);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  transform: translateX(-50%);
 }

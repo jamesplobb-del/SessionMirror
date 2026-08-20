@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
+import { GAME_TEST_INPUT } from '../gameTestInput'
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Mic, Play, RotateCcw } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import {
@@ -23,7 +25,7 @@ interface LearnInstrumentScreenProps {
   hapticFeedback: boolean
   micPermissionBlocked: boolean
   micPermissionPending: boolean
-  onRequestMicStream: () => void
+  onRequestMicStream: GameMicRequest
   onReleaseMicStream: () => void
   onBack: () => void
 }
@@ -93,11 +95,20 @@ export default function LearnInstrumentScreen({
   const pitchEnabled =
     game.state.phase !== 'complete' && (sharedMicReady || micPermissionPending)
 
+  /*
+   * Coming back from the background, the stream is usually dead while
+   * still looking present. This re-acquires it and, through the epoch in
+   * the tracker key below, rebuilds the analysis graph on top of it —
+   * without which the game returns to a suspended AudioContext and hears
+   * nothing at all.
+   */
+  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream)
+
   const { readout } = useLivePitchTracker(
     mediaRef,
     pitchEnabled,
     pitchEnabled,
-    `learn-instrument-${streamGeneration}-${game.state.instrumentId}`,
+    `learn-instrument-${streamGeneration}-${micEpoch}-${game.state.instrumentId}`,
     canvasRef,
     'solid',
     {
@@ -291,7 +302,7 @@ export default function LearnInstrumentScreen({
           <Pressable
             intensity="soft"
             hapticFeedback={hapticFeedback}
-            onClick={onRequestMicStream}
+            onClick={() => void onRequestMicStream({ forceRecovery: true })}
             aria-label={`${micLabel}. Tap to reconnect the microphone.`}
             className={`li-mic ${hasPitch ? 'is-live' : ''} ${micTrouble ? 'is-error' : ''}`}
           >
@@ -342,6 +353,11 @@ export default function LearnInstrumentScreen({
                   ) ?? readout.noteName
                 } — try again`
               : 'Listening…'
+
+  // In a test build, show how many times the microphone has been rebuilt. It
+  // is the only way to see from outside whether a resume actually triggered
+  // recovery, which is exactly the failure this screen used to hide.
+  const micLine = GAME_TEST_INPUT ? `${statusText} · mic ${micEpoch}` : statusText
 
   return (
     <main className="li-screen li-play" data-status={status}>
@@ -451,13 +467,13 @@ export default function LearnInstrumentScreen({
           {status === 'correct' ? <Check /> : <Mic />}
         </span>
         <span className="li-listen__text" aria-live="polite">
-          {statusText}
+          {micLine}
         </span>
         {micTrouble ? (
           <Pressable
             intensity="soft"
             hapticFeedback={hapticFeedback}
-            onClick={onRequestMicStream}
+            onClick={() => void onRequestMicStream({ forceRecovery: true })}
             className="li-listen__retry"
           >
             Retry
