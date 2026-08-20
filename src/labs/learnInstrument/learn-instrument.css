@@ -723,6 +723,12 @@
   stroke: var(--li-ink);
 }
 
+.li-chart__key-arm {
+  stroke: var(--li-ink);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+}
+
 .li-chart__mark[data-state='closed'] .li-chart__key {
   fill: var(--li-ink);
 }
@@ -788,13 +794,14 @@
 
 .li-chart__tube {
   stroke: var(--li-ink);
+  stroke-width: 10;
   stroke-linecap: round;
 }
 
 /* The stretch of slide the horn can reach, drawn as a faint track. */
 .li-chart__travel {
   stroke: rgba(28, 25, 23, 0.13);
-  stroke-width: 15;
+  stroke-width: 10;
   stroke-linecap: round;
 }
 
@@ -804,21 +811,37 @@
   stroke: var(--li-amber);
 }
 
+.li-chart__slide-grip {
+  fill: var(--li-amber);
+}
+
+.li-chart__bell-guide {
+  stroke: rgba(28, 25, 23, 0.3);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 6;
+}
+
+.li-chart__bell-badge {
+  fill: #fff;
+  stroke: rgba(28, 25, 23, 0.48);
+  stroke-width: 2;
+}
+
 .li-chart__slide-rail {
   stroke: rgba(28, 25, 23, 0.18);
   stroke-width: 3;
   stroke-linecap: round;
 }
 
-.li-chart__slide-tick line {
-  stroke: rgba(28, 25, 23, 0.28);
+.li-chart__slide-stop {
+  fill: #fff;
+  stroke: rgba(28, 25, 23, 0.42);
   stroke-width: 3;
-  stroke-linecap: round;
 }
 
-.li-chart__slide-tick[data-state='on'] line {
+.li-chart__slide-tick[data-state='on'] .li-chart__slide-stop {
+  fill: var(--li-amber);
   stroke: var(--li-amber);
-  stroke-width: 6;
 }
 
 .li-chart__slide-tick-label {
@@ -828,15 +851,29 @@
 }
 
 .li-chart__slide-tick[data-state='on'] .li-chart__slide-tick-label {
-  fill: var(--li-amber);
+  fill: #fff;
   font-weight: 780;
 }
 
 .li-chart__slide-caption {
   fill: var(--li-ink);
-  font-size: 26px;
+  font-size: 28px;
+  font-weight: 780;
+  letter-spacing: 0.05em;
+}
+
+.li-chart__direction-label,
+.li-chart__landmark-label {
+  fill: var(--li-muted);
+  font-size: 13px;
   font-weight: 720;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.08em;
+}
+
+.li-chart__slide-cue {
+  fill: var(--li-ink);
+  font-size: 19px;
+  font-weight: 680;
 }
 
 /* ── Finished ────────────────────────────────────────────────────────── */

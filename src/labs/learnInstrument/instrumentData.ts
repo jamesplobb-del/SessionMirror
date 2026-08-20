@@ -535,7 +535,7 @@ const SAX_LOW: KeyTable = {
   70: ['lh-1', 'bis'], // B♭ on the bis key
   71: ['lh-1'],
   72: ['lh-2'], // C with the middle finger alone
-  73: ['lh-1', 'side-c'],
+  73: [], // C♯5 — open; the side-C key is an alternate, not the primary fingering
 }
 
 /** Everything from D5 up repeats the low fingering with the octave key. */
@@ -546,11 +546,11 @@ const SAX_KEYS: KeyTable = (() => {
     if (below) table[midi] = ['octave', ...below]
   }
   // Palm keys carry the top of the range.
-  table[86] = ['octave', 'lh-1', 'lh-2', 'lh-3', 'palm-d']
-  table[87] = ['octave', 'lh-1', 'lh-2', 'lh-3', 'palm-d', 'palm-eb']
-  table[88] = ['octave', 'lh-1', 'lh-2', 'lh-3', 'palm-d', 'palm-eb', 'palm-f']
-  table[89] = ['octave', 'lh-1', 'lh-2', 'palm-d', 'palm-eb', 'palm-f']
-  table[90] = ['octave', 'lh-1', 'lh-2', 'lh-3', 'side-f-sharp']
+  table[86] = ['octave', 'palm-d']
+  table[87] = ['octave', 'palm-d', 'palm-eb']
+  table[88] = ['octave', 'palm-d', 'palm-eb', 'rh-1']
+  table[89] = ['octave', 'palm-d', 'palm-eb', 'palm-f', 'rh-1']
+  table[90] = ['octave', 'front-f', 'lh-2', 'side-f-sharp']
   return table
 })()
 
