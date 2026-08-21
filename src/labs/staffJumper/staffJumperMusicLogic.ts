@@ -12,10 +12,10 @@ import {
   type StaffNoteLetter,
 } from './staffNotationMap'
 import {
-  getWrittenRange,
   STAFF_CENTER_MIDI,
   type StaffJumperTransposition,
 } from './staffJumperInstrumentRanges'
+import { preferredScaleRootMidi, resolveWrittenRange } from './staffJumperInstruments'
 import {
   getPhraseNoteDurations,
   getPhraseSpan,
@@ -135,6 +135,12 @@ export interface StaffJumperConfig {
   clef: StaffJumperClef
   tunerInstrument: TunerInstrument
   transposition: StaffJumperTransposition
+  /**
+   * The instrument the player picked, or null when they set the clef and
+   * written pitch by hand. It supplies the written range and the octave the
+   * home scale is printed in.
+   */
+  instrumentId: string | null
   playerModel: PracticeGameCharacterId
   meter: StaffJumperMeter
   tempoBpm: number
@@ -429,20 +435,30 @@ function midiForScaleDegree(
  *
  * This is what keeps a 2-octave Bb trumpet scale on Bb3–Bb5 instead of running
  * up to Bb6 on four ledger lines.
+ *
+ * A chosen instrument gets a third say: in its own home key it knows which
+ * octave the method book prints, and that beats centring without ever beating
+ * a fit — which is what puts a tuba's Bb scale on the low Bb it is taught on.
  */
 const RANGE_OVERFLOW_WEIGHT = 100
+const HOME_OCTAVE_WEIGHT = 50
 
 export function resolveScaleRootMidi(
-  config: Pick<StaffJumperConfig, 'key' | 'range' | 'clef' | 'transposition' | 'tunerInstrument'>,
+  config: Pick<
+    StaffJumperConfig,
+    'key' | 'scaleMode' | 'range' | 'clef' | 'transposition' | 'tunerInstrument' | 'instrumentId'
+  >,
 ): number {
   const rootPitchClass = keyPitchClass(config.key)
   const spanSemitones = (config.range === '1-octave' ? 1 : 2) * 12
-  const { minMidi, maxMidi } = getWrittenRange(
+  const { minMidi, maxMidi } = resolveWrittenRange(
+    config.instrumentId,
     config.transposition,
     config.clef,
     config.tunerInstrument,
   )
   const staffCenter = STAFF_CENTER_MIDI[config.clef]
+  const homeRoot = preferredScaleRootMidi(config.instrumentId, config.key, config.scaleMode)
 
   let bestRoot = minMidi
   let bestScore = Number.POSITIVE_INFINITY
@@ -452,7 +468,8 @@ export function resolveScaleRootMidi(
     const overflow =
       Math.max(0, minMidi - candidate) + Math.max(0, candidate + spanSemitones - maxMidi)
     const centerError = Math.abs(candidate + spanSemitones / 2 - staffCenter)
-    const score = overflow * RANGE_OVERFLOW_WEIGHT + centerError
+    const homeBonus = candidate === homeRoot ? HOME_OCTAVE_WEIGHT : 0
+    const score = overflow * RANGE_OVERFLOW_WEIGHT + centerError - homeBonus
     if (score < bestScore) {
       bestScore = score
       bestRoot = candidate
@@ -490,7 +507,8 @@ function topDegreeForConfig(config: StaffJumperConfig): number {
 
   const wanted = config.range === '1-octave' ? 7 : 14
   const rootMidi = resolveScaleRootMidi(config)
-  const { maxMidi } = getWrittenRange(
+  const { maxMidi } = resolveWrittenRange(
+    config.instrumentId,
     config.transposition,
     config.clef,
     config.tunerInstrument,

@@ -27,6 +27,7 @@ export type InstrumentId =
   | 'alto-sax'
   | 'tenor-sax'
   | 'bb-trumpet'
+  | 'french-horn'
   | 'trombone'
   | 'baritone'
   | 'tuba'
@@ -650,10 +651,21 @@ const TRUMPET_PARTIALS = [60, 67, 72, 76, 79, 82, 84]
 const LOW_BRASS_PARTIALS = [46, 53, 58, 62, 65, 70, 72]
 /** Concert open partials for the BB♭ tuba, an octave below. */
 const TUBA_PARTIALS = [34, 41, 46, 50, 53, 58, 60]
+/**
+ * Written open partials for the single F horn.
+ *
+ * The horn plays far higher in its harmonic series than the other brass, so
+ * the open notes come thick and fast — C5, D5 and E5 are all open, which is
+ * why a horn player's first scale has so few valve changes in it. The badly
+ * out-of-tune seventh and eleventh partials are left out, exactly as a printed
+ * horn chart leaves them out.
+ */
+const HORN_PARTIALS = [48, 55, 60, 64, 67, 72, 74, 76, 79, 84]
 
 const TRUMPET = brassFingerings(TRUMPET_PARTIALS, 54, 84)
 const LOW_BRASS = brassFingerings(LOW_BRASS_PARTIALS, 40, 70)
 const TUBA = brassFingerings(TUBA_PARTIALS, 28, 58)
+const HORN = brassFingerings(HORN_PARTIALS, 53, 84)
 
 /* ── The instruments ──────────────────────────────────────────────────────
    Each beginner course is one octave of the concert B♭ major scale, written
@@ -810,6 +822,35 @@ export const INSTRUMENTS = [
     },
   },
   {
+    id: 'french-horn',
+    name: 'F French Horn',
+    shortName: 'French Horn',
+    family: 'brass',
+    clef: 'treble',
+    // Sounds a perfect fifth below what it reads.
+    transpositionSemitones: -7,
+    chartKind: 'valves',
+    courses: {
+      beginner: course(
+        'french-horn-beginner-v2',
+        'First 8 notes',
+        BEGINNER_BLURB,
+        buildValveNotes(HORN.valves, {
+          prefix: 'hn-beg',
+          midis: [65, 67, 69, 70, 72, 74, 76, 77],
+          detail:
+            'Keep the right hand relaxed in the bell and let the air, not the lip, find the note.',
+        }),
+      ),
+      chromatic: course(
+        'french-horn-chromatic-v2',
+        'Every note',
+        'Written F3 to C6 · every semitone',
+        buildValveNotes(HORN.valves, { prefix: 'hn-chr', midis: range(53, 84) }),
+      ),
+    },
+  },
+  {
     id: 'trombone',
     name: 'Tenor Trombone',
     shortName: 'Trombone',
@@ -934,7 +975,7 @@ export const INSTRUMENT_GROUPS = [
   {
     id: 'brass',
     label: 'Brass',
-    instrumentIds: ['bb-trumpet', 'trombone', 'baritone', 'tuba'],
+    instrumentIds: ['bb-trumpet', 'french-horn', 'trombone', 'baritone', 'tuba'],
   },
 ] as const satisfies readonly InstrumentGroup[]
 

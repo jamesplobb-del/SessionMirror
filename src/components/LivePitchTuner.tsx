@@ -52,6 +52,8 @@ interface LivePitchTunerProps {
   hapticsEnabled?: boolean
   /** Widget-only: analyze live mic instead of media element. */
   pitchSource?: 'media' | 'microphone'
+  /** Widget-only: use the centered living-tuner presentation. */
+  widgetPresentation?: 'compact' | 'living'
   /** Audio mode: analyze live mic stream (recording or idle tuner). */
   liveMicOnly?: boolean
   /** Audio tuner only: reports whether live PCM is actually arriving. */
@@ -424,6 +426,30 @@ function CompactPitchWidgetPane({
   )
 }
 
+function LivingPitchWidgetPane({
+  readout,
+  canvasRef,
+}: {
+  readout: PitchReadout
+  canvasRef: RefObject<HTMLCanvasElement | null>
+}) {
+  const active = readout.noteName !== '—'
+  const zone = active ? getIntonationZone(readout.cents) : 'idle'
+
+  return (
+    <div className={`pitch-widget-living pitch-audio-stage--${zone}`}>
+      <div className="pitch-living-canvas pitch-widget-living__canvas">
+        <PitchChartCanvas canvasRef={canvasRef} glass fill living />
+        <TuningGauge readout={readout} />
+        <div className="pitch-living-canvas__direction" aria-hidden>
+          <span>Sharp</span>
+          <span>Flat</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LivePitchTunerAudio({
   mediaRef,
   isPlaying,
@@ -662,6 +688,7 @@ export default function LivePitchTuner({
   onTunerTranspositionChange,
   hapticsEnabled,
   pitchSource = 'media',
+  widgetPresentation = 'compact',
   liveMicOnly = false,
   drone,
   onLiveSourceHealthChange,
@@ -731,11 +758,15 @@ export default function LivePitchTuner({
     return (
       <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col">
         <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget pitch-glass-panel--elevated relative flex h-full min-h-0 w-full flex-col overflow-hidden">
-          <CompactPitchWidgetPane
-            readout={displayReadout}
-            canvasRef={canvasRef}
-            isPlaying={trackerPlaying}
-          />
+          {widgetPresentation === 'living' ? (
+            <LivingPitchWidgetPane readout={displayReadout} canvasRef={canvasRef} />
+          ) : (
+            <CompactPitchWidgetPane
+              readout={displayReadout}
+              canvasRef={canvasRef}
+              isPlaying={trackerPlaying}
+            />
+          )}
           {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
             <p className="pitch-widget-hint pointer-events-none shrink-0 px-3 pb-2 text-center">
               Pitch trace during playback

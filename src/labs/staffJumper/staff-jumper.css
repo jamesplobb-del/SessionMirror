@@ -472,6 +472,49 @@
   font-weight: 600;
 }
 
+/* ── Instrument picker ──
+   A native control on purpose: iOS renders it as the system wheel, so a list
+   this long scrolls like every other picker on the phone and needs no scroll
+   container of ours. Only the closed state is ours to style. */
+.sj-select {
+  position: relative;
+}
+
+.sj-select__control {
+  width: 100%;
+  min-height: 2.9rem;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 2.4rem 0 0.85rem;
+  border: 1px solid var(--sj-hair);
+  border-radius: 0.7rem;
+  color: var(--sj-ink);
+  background: var(--sj-paper);
+  font-family: inherit;
+  /* iOS zooms the page when a focused control sits under 16px. */
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.sj-select__control:focus-visible {
+  border-color: var(--sj-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(35, 152, 232, 0.22);
+}
+
+.sj-select__chevron {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--sj-muted);
+  pointer-events: none;
+  stroke-width: 2.4;
+  transform: translateY(-50%);
+}
+
 /* ── Key grid ── */
 .sj-keys {
   display: grid;

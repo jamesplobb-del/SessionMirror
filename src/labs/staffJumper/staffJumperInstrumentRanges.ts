@@ -10,6 +10,11 @@
  * band literature), not the extreme professional range. Staff Jumper uses them
  * to pick the octave a scale is written in, so overshooting here is what puts
  * a 2-octave trumpet Bb scale on double high Bb instead of the normal Bb5.
+ *
+ * A player who picks their instrument gets that instrument's own bounds from
+ * `staffJumperInstruments` instead; this table is what remains for a setup
+ * whose clef and written pitch were set by hand, where the transposition is
+ * all we know about the horn.
  */
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'

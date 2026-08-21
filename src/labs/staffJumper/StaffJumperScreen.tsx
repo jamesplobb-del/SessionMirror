@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
-import { ArrowLeft, Headphones, Mic, Minus, Play, Plus, Shuffle, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronDown,
+  Headphones,
+  Mic,
+  Minus,
+  Play,
+  Plus,
+  Shuffle,
+  X,
+} from 'lucide-react'
 import './staff-jumper.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import { GAME_TEST_INPUT, SILENT_READOUT, syntheticReadout, TEST_TAP_HOLD_MS } from '../gameTestInput'
@@ -24,6 +34,14 @@ import {
   type StaffJumperScaleMode,
 } from './staffJumperMusicLogic'
 import type { StaffJumperTransposition } from './staffJumperInstrumentRanges'
+import {
+  getStaffJumperInstrument,
+  getStaffJumperInstrumentsByFamily,
+  homeKeyForInstrument,
+  loadStaffJumperInstrumentId,
+  saveStaffJumperInstrumentId,
+  STAFF_JUMPER_INSTRUMENT_FAMILIES,
+} from './staffJumperInstruments'
 import {
   METERS,
   STAFF_JUMPER_METERS,
@@ -57,9 +75,9 @@ interface StaffJumperScreenProps {
 }
 
 /**
- * The transposition picker reads as an instrument choice, because that is the
- * decision the player is actually making. A bare "Written pitch" dropdown of
- * key names made everyone guess.
+ * The manual written-pitch row, kept underneath the instrument picker for
+ * anything the list does not name. Each key is labelled with the instruments
+ * that read it, because a bare dropdown of key names made everyone guess.
  */
 const WRITTEN_PITCH_CHOICES: {
   id: StaffJumperTransposition
@@ -77,6 +95,146 @@ const WRITTEN_PITCH_CHOICES: {
 /** Only one settings group is open at a time, so the screen stays scannable. */
 type SetupSection = 'exercise' | 'instrument' | 'tempo'
 
+interface InstrumentSetup {
+  instrumentId: string | null
+  clef: StaffJumperClef
+  transposition: StaffJumperTransposition
+  key: StaffJumperKey
+}
+
+/**
+ * What the saved instrument decides before the screen has drawn anything.
+ *
+ * With no instrument saved this is the old concert-pitch default, and the
+ * picker opens on "Other", which is also what a hand-set clef leaves behind.
+ */
+function initialInstrumentSetup(): InstrumentSetup {
+  const instrument = getStaffJumperInstrument(loadStaffJumperInstrumentId())
+  if (!instrument) {
+    return { instrumentId: null, clef: 'treble', transposition: 'concert', key: 'C' }
+  }
+  return {
+    instrumentId: instrument.id,
+    clef: instrument.clef,
+    transposition: instrument.transposition,
+    key: homeKeyForInstrument(instrument, 'major'),
+  }
+}
+
+/*
+ * The three pieces of setup furniture below live at module scope on purpose.
+ *
+ * The screen re-renders on every microphone reading — several times a second,
+ * so the mic check can say what it hears. Declared inside that render they
+ * would be a brand-new component type each time, and React would throw away
+ * the whole open panel and build it again: harmless-looking, except that iOS
+ * closes a native picker the instant its <select> is replaced, which made the
+ * instrument dropdown impossible to open on a phone.
+ */
+
+/** Inline text options — the choice is just the word, underlined when on. */
+function Options<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+  hapticFeedback,
+}: {
+  value: T
+  options: { id: T; label: string }[]
+  onChange: (next: T) => void
+  label: string
+  hapticFeedback: boolean
+}) {
+  return (
+    <div className="sj-options" role="group" aria-label={label}>
+      {options.map((option) => (
+        <Pressable
+          key={option.id}
+          type="button"
+          intensity="soft"
+          hapticFeedback={hapticFeedback}
+          onClick={() => onChange(option.id)}
+          className={`sj-option ${value === option.id ? 'sj-option--on' : ''}`}
+          aria-pressed={value === option.id}
+        >
+          {option.label}
+        </Pressable>
+      ))}
+    </div>
+  )
+}
+
+/* Every setting is already on screen as a chip, so a section is just the
+   editor for whichever chip you tapped — no header, no summary, and only
+   one open at a time. */
+function Section({
+  id,
+  title,
+  openSection,
+  onClose,
+  hapticFeedback,
+  children,
+}: {
+  id: SetupSection
+  title: string
+  openSection: SetupSection | null
+  onClose: () => void
+  hapticFeedback: boolean
+  children: React.ReactNode
+}) {
+  if (openSection !== id) return null
+  return (
+    <section className="sj-panel">
+      <div className="sj-panel__head">
+        <strong>{title}</strong>
+        <Pressable
+          type="button"
+          intensity="icon"
+          hapticFeedback={hapticFeedback}
+          onClick={onClose}
+          className="sj-panel__close"
+          aria-label={`Close ${title}`}
+        >
+          <X aria-hidden />
+        </Pressable>
+      </div>
+      <div className="sj-group__body">{children}</div>
+    </section>
+  )
+}
+
+function ChipGrid({
+  chips,
+  openSection,
+  onToggle,
+  hapticFeedback,
+}: {
+  chips: { label: string; value: string; section: SetupSection }[]
+  openSection: SetupSection | null
+  onToggle: (section: SetupSection) => void
+  hapticFeedback: boolean
+}) {
+  return (
+    <div className="sj-chips" role="group" aria-label="Exercise settings">
+      {chips.map((chip) => (
+        <Pressable
+          key={chip.label}
+          type="button"
+          intensity="soft"
+          hapticFeedback={hapticFeedback}
+          onClick={() => onToggle(chip.section)}
+          className={`sj-chip ${openSection === chip.section ? 'sj-chip--active' : ''}`}
+          aria-expanded={openSection === chip.section}
+        >
+          <span className="sj-chip__label">{chip.label}</span>
+          <span className="sj-chip__value">{chip.value}</span>
+        </Pressable>
+      ))}
+    </div>
+  )
+}
+
 function formatRunTime(seconds: number): string {
   const rounded = Math.max(0, Math.round(seconds))
   const minutes = Math.floor(rounded / 60)
@@ -93,12 +251,16 @@ export default function StaffJumperScreen({
 }: StaffJumperScreenProps) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [savedSetup] = useState(initialInstrumentSetup)
   const [draftScaleMode, setDraftScaleMode] = useState<StaffJumperScaleMode>('major')
-  const [draftKey, setDraftKey] = useState<StaffJumperKey>('C')
+  const [draftKey, setDraftKey] = useState<StaffJumperKey>(savedSetup.key)
   const [draftRange, setDraftRange] = useState<StaffJumperRange>('1-octave')
   const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>('easy')
-  const [draftClef, setDraftClef] = useState<StaffJumperClef>('treble')
-  const [draftTransposition, setDraftTransposition] = useState<StaffJumperTransposition>('concert')
+  const [draftInstrumentId, setDraftInstrumentId] = useState<string | null>(savedSetup.instrumentId)
+  const [draftClef, setDraftClef] = useState<StaffJumperClef>(savedSetup.clef)
+  const [draftTransposition, setDraftTransposition] = useState<StaffJumperTransposition>(
+    savedSetup.transposition,
+  )
   const [draftPlayerModel] = useState<PracticeGameCharacterId>(
     loadPracticeGameCharacter,
   )
@@ -120,6 +282,53 @@ export default function StaffJumperScreen({
       setDraftKey(availableKeys[0]!)
     }
   }, [availableKeys, draftKey])
+
+  const selectedInstrument = getStaffJumperInstrument(draftInstrumentId)
+
+  /**
+   * Picking an instrument rewrites the reading context wholesale: the clef it
+   * is printed in, the pitch it is written at, and the scale its method book
+   * opens on. That last one is the point — a trombonist should land on B♭ in
+   * bass clef, not on the concert C every setup used to start from.
+   */
+  const chooseInstrument = (id: string) => {
+    const instrument = getStaffJumperInstrument(id)
+    setDraftInstrumentId(instrument?.id ?? null)
+    saveStaffJumperInstrumentId(instrument?.id ?? null)
+    if (!instrument) return
+    setDraftClef(instrument.clef)
+    setDraftTransposition(instrument.transposition)
+    setDraftKey(homeKeyForInstrument(instrument, draftScaleMode))
+  }
+
+  /** Setting the clef or written pitch by hand means this is nobody's preset. */
+  const clearInstrument = () => {
+    if (draftInstrumentId === null) return
+    setDraftInstrumentId(null)
+    saveStaffJumperInstrumentId(null)
+  }
+
+  const chooseClef = (clef: StaffJumperClef) => {
+    setDraftClef(clef)
+    if (selectedInstrument && selectedInstrument.clef !== clef) clearInstrument()
+  }
+
+  const chooseTransposition = (transposition: StaffJumperTransposition) => {
+    setDraftTransposition(transposition)
+    if (selectedInstrument && selectedInstrument.transposition !== transposition) clearInstrument()
+  }
+
+  /**
+   * Major and minor keep the same signature across the switch, so a player who
+   * never left their instrument's home key stays home. One who chose their own
+   * key keeps it.
+   */
+  const chooseScaleMode = (scaleMode: StaffJumperScaleMode) => {
+    setDraftScaleMode(scaleMode)
+    if (!selectedInstrument) return
+    if (draftKey !== homeKeyForInstrument(selectedInstrument, draftScaleMode)) return
+    setDraftKey(homeKeyForInstrument(selectedInstrument, scaleMode))
+  }
 
   useEffect(() => {
     onRequestMicStream()
@@ -207,6 +416,7 @@ export default function StaffJumperScreen({
       clef: draftClef,
       tunerInstrument,
       transposition: draftTransposition,
+      instrumentId: draftInstrumentId,
       playerModel: draftPlayerModel,
       meter: draftMeter,
       tempoBpm: draftTempo,
@@ -217,6 +427,7 @@ export default function StaffJumperScreen({
       draftClef,
       draftDifficulty,
       draftDrone,
+      draftInstrumentId,
       draftKey,
       draftMetronome,
       draftPlayerModel,
@@ -242,71 +453,9 @@ export default function StaffJumperScreen({
     Boolean(readout.noteName && readout.noteName !== '—')
 
   if (state.phase === 'setup') {
-    const selectedInstrument =
+    const writtenPitchChoice =
       WRITTEN_PITCH_CHOICES.find((item) => item.id === draftTransposition) ??
       WRITTEN_PITCH_CHOICES[0]!
-
-    /** Inline text options — the choice is just the word, underlined when on. */
-    const Options = <T extends string>({
-      value,
-      options,
-      onChange,
-      label,
-    }: {
-      value: T
-      options: { id: T; label: string }[]
-      onChange: (next: T) => void
-      label: string
-    }) => (
-      <div className="sj-options" role="group" aria-label={label}>
-        {options.map((option) => (
-          <Pressable
-            key={option.id}
-            type="button"
-            intensity="soft"
-            hapticFeedback={hapticFeedback}
-            onClick={() => onChange(option.id)}
-            className={`sj-option ${value === option.id ? 'sj-option--on' : ''}`}
-            aria-pressed={value === option.id}
-          >
-            {option.label}
-          </Pressable>
-        ))}
-      </div>
-    )
-
-    /* Every setting is already on screen as a chip, so a section is just the
-       editor for whichever chip you tapped — no header, no summary, and only
-       one open at a time. */
-    const Section = ({
-      id,
-      title,
-      children,
-    }: {
-      id: SetupSection
-      title: string
-      children: React.ReactNode
-    }) => {
-      if (openSection !== id) return null
-      return (
-        <section className="sj-panel">
-          <div className="sj-panel__head">
-            <strong>{title}</strong>
-            <Pressable
-              type="button"
-              intensity="icon"
-              hapticFeedback={hapticFeedback}
-              onClick={() => setOpenSection(null)}
-              className="sj-panel__close"
-              aria-label={`Close ${title}`}
-            >
-              <X aria-hidden />
-            </Pressable>
-          </div>
-          <div className="sj-group__body">{children}</div>
-        </section>
-      )
-    }
 
     const soundLabel =
       [draftMetronome ? 'Click' : null, draftDrone ? 'Drone' : null]
@@ -314,33 +463,18 @@ export default function StaffJumperScreen({
         .join(' + ') || 'Silent'
 
     /* Everything else is edited on the score. Level has no musical home there,
-       and transposition must stay visible — reading Bb parts against a concert
+       and the instrument must stay visible — reading Bb parts against a concert
        pitch setting makes every target note wrong, so it cannot be buried. */
     const chips: { label: string; value: string; section: SetupSection }[] = [
       { label: 'Level', value: DIFFICULTY_LABELS[draftDifficulty], section: 'exercise' },
-      { label: 'Instrument', value: selectedInstrument.name, section: 'instrument' },
+      {
+        label: 'Instrument',
+        value: selectedInstrument?.shortName ?? `${writtenPitchChoice.name} · custom`,
+        section: 'instrument',
+      },
       { label: 'Range', value: RANGE_LABELS[draftRange], section: 'exercise' },
       { label: 'Sound', value: soundLabel, section: 'tempo' },
     ]
-
-    const ChipGrid = () => (
-      <div className="sj-chips" role="group" aria-label="Exercise settings">
-        {chips.map((chip) => (
-          <Pressable
-            key={chip.label}
-            type="button"
-            intensity="soft"
-            hapticFeedback={hapticFeedback}
-            onClick={() => setOpenSection(openSection === chip.section ? null : chip.section)}
-            className={`sj-chip ${openSection === chip.section ? 'sj-chip--active' : ''}`}
-            aria-expanded={openSection === chip.section}
-          >
-            <span className="sj-chip__label">{chip.label}</span>
-            <span className="sj-chip__value">{chip.value}</span>
-          </Pressable>
-        ))}
-      </div>
-    )
 
     return (
       <div className="sj-screen sj-screen--setup">
@@ -456,22 +590,31 @@ export default function StaffJumperScreen({
           )}
         </div>
 
-        <ChipGrid />
+        <ChipGrid
+          chips={chips}
+          openSection={openSection}
+          onToggle={(section) => setOpenSection(openSection === section ? null : section)}
+          hapticFeedback={hapticFeedback}
+        />
 
         <Section
           id="exercise"
           title="Exercise"
+          openSection={openSection}
+          onClose={() => setOpenSection(null)}
+          hapticFeedback={hapticFeedback}
         >
           <div className="sj-field">
             <p className="sj-field__label">Scale</p>
             <Options
               label="Scale"
               value={draftScaleMode}
-              onChange={setDraftScaleMode}
+              onChange={chooseScaleMode}
               options={[
                 { id: 'major' as const, label: 'Major' },
                 { id: 'minor' as const, label: 'Minor' },
               ]}
+              hapticFeedback={hapticFeedback}
             />
           </div>
 
@@ -501,6 +644,7 @@ export default function StaffJumperScreen({
               value={draftRange}
               onChange={setDraftRange}
               options={STAFF_JUMPER_RANGES.map((range) => ({ id: range, label: RANGE_LABELS[range] }))}
+              hapticFeedback={hapticFeedback}
             />
           </div>
 
@@ -516,6 +660,7 @@ export default function StaffJumperScreen({
                 id: level,
                 label: DIFFICULTY_LABELS[level],
               }))}
+              hapticFeedback={hapticFeedback}
             />
             <p className="sj-field__note">{DIFFICULTY_DESCRIPTIONS[draftDifficulty]}</p>
           </div>
@@ -524,16 +669,60 @@ export default function StaffJumperScreen({
         <Section
           id="instrument"
           title="Instrument"
+          openSection={openSection}
+          onClose={() => setOpenSection(null)}
+          hapticFeedback={hapticFeedback}
         >
           <div className="sj-field sj-field--stack">
             <p className="sj-field__label">
-              Written pitch <span>{selectedInstrument.instruments}</span>
+              I play
+              <span>
+                {selectedInstrument
+                  ? `${CLEF_LABELS[selectedInstrument.clef]} clef · reads ${selectedInstrument.range.label} · starts in ${homeKeyForInstrument(selectedInstrument, draftScaleMode)}`
+                  : 'Set the clef and written pitch yourself below.'}
+              </span>
+            </p>
+            {/*
+              * A plain <select>, like the onboarding picker: iOS draws it as
+              * the system wheel, so a list this long scrolls the way every
+              * other picker on the phone does.
+              */}
+            <div className="sj-select">
+              <select
+                className="sj-select__control"
+                aria-label="Instrument"
+                value={draftInstrumentId ?? ''}
+                onChange={(event) => chooseInstrument(event.target.value)}
+              >
+                <option value="">Other / custom</option>
+                {STAFF_JUMPER_INSTRUMENT_FAMILIES.map((family) => (
+                  <optgroup key={family} label={family}>
+                    {getStaffJumperInstrumentsByFamily(family).map((instrument) => (
+                      <option key={instrument.id} value={instrument.id}>
+                        {instrument.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <ChevronDown className="sj-select__chevron" aria-hidden />
+            </div>
+            <p className="sj-field__note">
+              Picking an instrument sets the clef, the written pitch and the scale its
+              method book starts on. Change either below to set your own.
+            </p>
+          </div>
+
+          <div className="sj-field sj-field--stack">
+            <p className="sj-field__label">
+              Written pitch <span>{writtenPitchChoice.instruments}</span>
             </p>
             <Options
               label="Written pitch"
               value={draftTransposition}
-              onChange={setDraftTransposition}
+              onChange={chooseTransposition}
               options={WRITTEN_PITCH_CHOICES.map((item) => ({ id: item.id, label: item.name }))}
+              hapticFeedback={hapticFeedback}
             />
           </div>
 
@@ -542,8 +731,9 @@ export default function StaffJumperScreen({
             <Options
               label="Clef"
               value={draftClef}
-              onChange={setDraftClef}
+              onChange={chooseClef}
               options={STAFF_JUMPER_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
+              hapticFeedback={hapticFeedback}
             />
           </div>
 
@@ -552,6 +742,9 @@ export default function StaffJumperScreen({
         <Section
           id="tempo"
           title="Tempo & sound"
+          openSection={openSection}
+          onClose={() => setOpenSection(null)}
+          hapticFeedback={hapticFeedback}
         >
           <div className="sj-field">
             <p className="sj-field__label">Tempo</p>
@@ -605,6 +798,7 @@ export default function StaffJumperScreen({
                 id: meter,
                 label: `${METERS[meter].label}  ${METERS[meter].name}`,
               }))}
+              hapticFeedback={hapticFeedback}
             />
           </div>
 

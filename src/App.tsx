@@ -4361,6 +4361,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             mediaKey={mainVideoPitchSource.mediaKey}
                             label="Live Pitch"
                             pitchSource="microphone"
+                            widgetPresentation="living"
                             micStreamRef={streamRef}
                             layoutRegion="main"
                             positionId="main-pitch-video"
