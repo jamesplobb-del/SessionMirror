@@ -49,18 +49,34 @@ export function interpolateRampBpm(
   return Math.round(startBpm + (endBpm - startBpm) * curved)
 }
 
+/**
+ * The pin in force at a position — the latest one at or before it.
+ *
+ * A pin reads as a written tempo marking, so it holds from where it is placed
+ * until the next pin or the end of the section, rather than colouring a single
+ * beat and reverting.
+ */
 export function findTempoMarker(
   markers: SectionTempoMarker[] | undefined,
   measure: number,
   beat: number,
 ): SectionTempoMarker | undefined {
   if (!markers?.length) return undefined
-  const beatSpecific = markers.find((m) => m.measure === measure && m.beat === beat)
-  if (beatSpecific) return beatSpecific
-  if (beat === 1) {
-    return markers.find((m) => m.measure === measure && !m.beat)
+
+  let active: SectionTempoMarker | undefined
+  for (const marker of markers) {
+    const markerBeat = marker.beat ?? 1
+    if (marker.measure > measure) continue
+    if (marker.measure === measure && markerBeat > beat) continue
+    if (
+      !active ||
+      marker.measure > active.measure ||
+      (marker.measure === active.measure && markerBeat >= (active.beat ?? 1))
+    ) {
+      active = marker
+    }
   }
-  return undefined
+  return active
 }
 
 export function resolveMasterBpmAt(
@@ -84,11 +100,12 @@ export function resolveSectionPlaybackBpm(
   beat = 1,
   pulseCount = 4,
 ): number {
+  // A pin overrides the ramp for as long as it is in force. Like section.bpm it
+  // is a master tempo, so a meter pattern still converts it to the step's pulse.
   const marker = findTempoMarker(section.advanced?.tempoMarkers, measure, beat)
-  if (marker) return clampBpm(marker.bpm)
-
-  const ramp = section.advanced?.tempoRamp
-  const masterBpm = resolveMasterBpmAt(section, measure, beat, pulseCount, ramp)
+  const masterBpm = marker
+    ? clampBpm(marker.bpm)
+    : resolveMasterBpmAt(section, measure, beat, pulseCount, section.advanced?.tempoRamp)
 
   if (sectionHasMeterPattern(section)) {
     const { step } = locatePatternStep(section, measure)

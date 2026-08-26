@@ -61,6 +61,7 @@ export class TimelinePlaybackEngine {
   private recordingOffsetSeconds = 0
   private lastPatternStepIndex: number | null = null
   private conductingBeat = 1
+  private barFlipPending = false
 
   setCallbacks(callbacks: TimelinePlaybackCallbacks): void {
     this.callbacks = callbacks
@@ -70,11 +71,25 @@ export class TimelinePlaybackEngine {
     return clampBpm(Math.round(baseBpm * this.tempoScale))
   }
 
+  /**
+   * The bar the listener is currently hearing.
+   *
+   * A bar event fires the moment the scheduler *queues* the last tick of a bar,
+   * while pulse events fire on the audio clock — so `measure` advances before
+   * that bar's final pulses have sounded. Resolving those trailing pulses
+   * against the new measure ran a tempo ramp a whole bar ahead and then snapped
+   * it back on the downbeat, which is heard as a rush into every barline
+   * instead of a gradual accelerando.
+   */
+  private soundingMeasure(): number {
+    return this.barFlipPending ? Math.max(1, this.measure - 1) : this.measure
+  }
+
   private baseBpmForCurrentMeasure(section: TimelineSection): number {
     const timing = this.getTimingForCurrentMeasure(section)
     return resolveSectionPlaybackBpm(
       section,
-      this.measure,
+      this.soundingMeasure(),
       this.conductingBeat,
       timing.pulseCount,
     )
@@ -83,7 +98,7 @@ export class TimelinePlaybackEngine {
   private getTimingForCurrentMeasure(section: TimelineSection) {
     const previousSection =
       this.sectionIndex > 0 ? this.timeline?.sections[this.sectionIndex - 1] : undefined
-    return resolveSectionTimingAtMeasure(section, this.measure, previousSection)
+    return resolveSectionTimingAtMeasure(section, this.soundingMeasure(), previousSection)
   }
 
   private patternFieldsForState(section: TimelineSection) {
@@ -151,6 +166,7 @@ export class TimelinePlaybackEngine {
     this.sectionIndex = startIndex
     this.measure = 1
     this.conductingBeat = 1
+    this.barFlipPending = false
     this.sessionActive = true
     this.playing = false
     this.finished = false
@@ -218,6 +234,7 @@ export class TimelinePlaybackEngine {
     this.sectionIndex = 0
     this.measure = 1
     this.conductingBeat = 1
+    this.barFlipPending = false
     this.finished = false
     this.countInRemaining = 0
     this.lastPatternStepIndex = null
@@ -236,6 +253,7 @@ export class TimelinePlaybackEngine {
     this.sectionIndex = 0
     this.measure = 1
     this.conductingBeat = 1
+    this.barFlipPending = false
     this.tempoScale = 1
     this.countInRemaining = 0
     this.emitState()
@@ -274,6 +292,7 @@ export class TimelinePlaybackEngine {
     this.sectionIndex = index
     this.measure = 1
     this.conductingBeat = 1
+    this.barFlipPending = false
     this.countInRemaining = 0
     this.finished = false
     this.lastPatternStepIndex = null
@@ -296,6 +315,7 @@ export class TimelinePlaybackEngine {
 
     this.measure = nextMeasure
     this.conductingBeat = 1
+    this.barFlipPending = false
     this.countInRemaining = 0
     this.finished = false
     this.applyCurrentSection({ forceResetBeat: true })
@@ -323,13 +343,21 @@ export class TimelinePlaybackEngine {
     if (!this.playing || !this.timeline || this.finished) return
     if (this.countInRemaining > 0) return
 
+    // The first pulse of a bar is where the audio clock catches up with the
+    // scheduler's early bar advance.
+    if (beatIndex === 0) this.barFlipPending = false
     this.conductingBeat = beatIndex + 1
     const section = this.getCurrentSection()
     if (!section) return
 
     const timing = this.getTimingForCurrentMeasure(section)
     const nextBpm = this.scaledBpm(
-      resolveSectionPlaybackBpm(section, this.measure, this.conductingBeat, timing.pulseCount),
+      resolveSectionPlaybackBpm(
+        section,
+        this.soundingMeasure(),
+        this.conductingBeat,
+        timing.pulseCount,
+      ),
     )
     const currentBpm = sharedMetronomeEngine.getSnapshot().bpm
     if (nextBpm === currentBpm) return
@@ -353,7 +381,9 @@ export class TimelinePlaybackEngine {
     this.callbacks.onStateChange?.(this.getState())
   }
 
-  private armCountInForCurrentPosition(context: 'start' | 'jump' | 'loop'): void {
+  private armCountInForCurrentPosition(
+    context: 'start' | 'jump' | 'section' | 'loop',
+  ): void {
     const section = this.getCurrentSection()
     if (!section || !this.timeline) return
 
@@ -361,19 +391,16 @@ export class TimelinePlaybackEngine {
     const sectionCountIn = section.advanced?.countInBars ?? 0
     let bars = sectionCountIn
 
+    // A section's own count-in always applies. The track count-in belongs to the
+    // top of the routine — the first start, a manual jump, and, on 'every-loop',
+    // each wrap back to section 1. Section-to-section changes stay seamless.
     if (bars <= 0 && settings.countInBars > 0) {
-      if (sectionCountIn === 0) {
-        if (context === 'loop' && settings.countInWhen !== 'every-loop') {
-          bars = 0
-        } else if (context === 'start' && this.sectionIndex !== 0) {
-          bars = settings.countInBars
-        } else if (context === 'jump') {
-          bars = settings.countInBars
-        } else if (context === 'start' && this.sectionIndex === 0) {
-          bars = settings.countInBars
-        } else if (context === 'loop') {
-          bars = settings.countInBars
-        }
+      if (
+        context === 'start' ||
+        context === 'jump' ||
+        (context === 'loop' && settings.countInWhen === 'every-loop')
+      ) {
+        bars = settings.countInBars
       }
     }
 
@@ -448,6 +475,7 @@ export class TimelinePlaybackEngine {
     this.sectionIndex = 0
     this.measure = 1
     this.conductingBeat = 1
+    this.barFlipPending = false
     this.finished = false
     this.countInRemaining = 0
     this.lastPatternStepIndex = null
@@ -473,6 +501,7 @@ export class TimelinePlaybackEngine {
         return
       }
       this.measure = 1
+      this.barFlipPending = false
       this.emitState()
       return
     }
@@ -483,7 +512,8 @@ export class TimelinePlaybackEngine {
 
     if (nextMeasure <= totalMeasures) {
       this.measure = nextMeasure
-      this.conductingBeat = 1
+      // conductingBeat stays on the audio clock — the downbeat pulse resets it.
+      this.barFlipPending = true
       const nextTiming = resolveSectionTimingAtMeasure(
         section,
         nextMeasure,
@@ -544,10 +574,11 @@ export class TimelinePlaybackEngine {
     this.sectionIndex = nextIndex
     this.measure = 1
     this.conductingBeat = 1
+    this.barFlipPending = false
     this.countInRemaining = 0
     this.lastPatternStepIndex = null
     this.applyCurrentSection()
-    this.armCountInForCurrentPosition('loop')
+    this.armCountInForCurrentPosition('section')
     this.recordSectionMarker()
     this.emitState()
   }

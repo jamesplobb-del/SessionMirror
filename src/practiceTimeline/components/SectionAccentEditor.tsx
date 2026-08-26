@@ -24,12 +24,20 @@ export default function SectionAccentEditor({
     <div className="practice-timeline-editor__accent-row">
       {Array.from({ length: pulseCount }, (_, index) => {
         const level = accentLevels[index] ?? 'weak'
+        // Matches the Metronome tab, where a strong beat 1 is the downbeat.
+        const isDownbeat = index === 0 && level === 'strong'
         return (
           <Pressable
             key={index}
             type="button"
             intensity="soft"
-            className={`practice-timeline-editor__accent-beat practice-timeline-editor__accent-beat--${level}`}
+            className={[
+              'practice-timeline-editor__accent-beat',
+              `practice-timeline-editor__accent-beat--${level}`,
+              isDownbeat ? 'practice-timeline-editor__accent-beat--downbeat' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
             aria-label={`Beat ${index + 1}, ${LEVEL_LABEL[level]}. Tap to change.`}
             onClick={() => {
               const next = [...accentLevels]

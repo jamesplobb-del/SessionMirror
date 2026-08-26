@@ -1026,15 +1026,25 @@
   background: var(--audio-surface);
 }
 
+/* Accent levels follow the Metronome tab's beat row: blue marks an accented
+   beat and gold is reserved for the downbeat, so a strong beat 3 no longer
+   reads as another bar line. */
 .practice-timeline-editor__accent-beat--strong {
-  border-color: var(--audio-gold-border);
-  background: var(--audio-gold-soft);
-  color: var(--audio-gold);
+  border-color: var(--audio-blue-border);
+  background: var(--audio-blue-soft);
+  color: var(--audio-blue);
 }
 
 .practice-timeline-editor__accent-beat--medium {
-  border-color: color-mix(in srgb, var(--audio-gold) 45%, var(--audio-divider));
-  background: color-mix(in srgb, var(--audio-gold-soft) 60%, transparent);
+  border-color: color-mix(in srgb, var(--audio-blue) 32%, var(--audio-divider));
+  background: color-mix(in srgb, var(--audio-blue-soft) 55%, transparent);
+  color: color-mix(in srgb, var(--audio-blue) 70%, var(--audio-text-secondary));
+}
+
+.practice-timeline-editor__accent-beat--downbeat {
+  border-color: rgba(247, 166, 0, 0.72);
+  background: var(--audio-gold-soft);
+  color: var(--audio-gold);
 }
 
 .practice-timeline-editor__accent-beat--silent {
