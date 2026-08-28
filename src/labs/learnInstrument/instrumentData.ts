@@ -19,7 +19,7 @@
  * valve combination or slide position follows exactly from the partial.
  */
 
-export const LESSON_DATA_VERSION = 2 as const
+export const LESSON_DATA_VERSION = 3 as const
 
 export type InstrumentId =
   | 'flute'
@@ -74,6 +74,7 @@ export type WoodwindControlId =
   | 'side-a'
   | 'side-bb'
   | 'side-c'
+  | 'side-e'
   | 'side-eb'
   | 'side-f-sharp'
   | 'side-1'
@@ -240,6 +241,7 @@ const CONTROL_WORDS: Partial<Record<ControlId, string>> = {
   bis: 'bis key',
   'side-bb': 'side B♭',
   'side-c': 'side C',
+  'side-e': 'side E',
   'side-eb': 'E♭ key',
   'side-f-sharp': 'side F♯',
   'side-1': 'side key 1',
@@ -285,13 +287,25 @@ function valveRecipe(pressed: readonly ValveControlId[]): string {
     .join(' + ')}.`
 }
 
-function holeRecipe(covered: readonly RecorderControlId[]): string {
-  if (covered.length === 0) return 'Every hole open.'
+function holeRecipe(
+  covered: readonly RecorderControlId[],
+  halfClosed: readonly RecorderControlId[] = [],
+): string {
+  if (covered.length === 0 && halfClosed.length === 0) return 'Every hole open.'
   const front = covered.filter((id) => id !== 'thumb').map((id) => id.replace('hole-', ''))
   const parts: string[] = []
   if (covered.includes('thumb')) parts.push('the thumb hole')
   if (front.length) parts.push(`holes ${front.join(', ')}`)
-  return `Cover ${parts.join(' and ')}.`
+  const instructions: string[] = []
+  if (parts.length) instructions.push(`Cover ${parts.join(' and ')}.`)
+  for (const id of halfClosed) {
+    instructions.push(
+      id === 'thumb'
+        ? 'Pinch the thumb hole so only a tiny opening remains.'
+        : `Cover one of the two small bores at hole ${id.replace('hole-', '')}.`,
+    )
+  }
+  return instructions.join(' ')
 }
 
 /* ── Course builders ──────────────────────────────────────────────────── */
@@ -389,7 +403,7 @@ function buildHoleNotes(table: HoleTable, options: BuildOptions): LessonNote[] {
         closed: entry.covered,
         ...(entry.half ? { halfClosed: entry.half } : {}),
       },
-      recipe: holeRecipe(entry.covered),
+      recipe: holeRecipe(entry.covered, entry.half),
       detail: options.detail ?? 'Seal each hole with the pad of the finger and blow gently.',
     }
   })
@@ -490,10 +504,10 @@ const CLARINET_CHALUMEAU: KeyTable = {
   60: ['thumb', 'lh-1', 'lh-2', 'lh-3'],
   61: ['thumb', 'lh-1', 'lh-2', 'lh-3', 'lp-csharp'],
   62: ['thumb', 'lh-1', 'lh-2'],
-  63: ['thumb', 'lh-1', 'lh-2', 'side-1'], // throat E♭ on the top side key
+  63: ['thumb', 'lh-1', 'lh-2', 'side-4'], // E♭4 — lowest right-side lever
   64: ['thumb', 'lh-1'],
   65: ['thumb'],
-  66: ['side-3', 'side-4'], // throat F♯
+  66: ['lh-1'], // throat F♯ — primary beginner fingering
   67: [], // throat G — everything open
   68: ['key-gsharp'],
   69: ['key-a'],
@@ -526,10 +540,10 @@ const SX_ALL: readonly WoodwindControlId[] = [
 ]
 
 const SAX_LOW: KeyTable = {
-  58: [...SX_ALL, 'lp-bb'], // written B♭3, the bottom of the horn
-  59: [...SX_ALL, 'lp-b'],
+  58: [...SX_ALL, 'lp-bb', 'rp-c'], // low B♭ closes the low-C cup too
+  59: [...SX_ALL, 'lp-b', 'rp-c'],
   60: [...SX_ALL, 'rp-c'],
-  61: [...SX_ALL, 'lp-csharp'],
+  61: [...SX_ALL, 'lp-csharp', 'rp-c'],
   62: [...SX_ALL],
   63: [...SX_ALL, 'rp-eb'],
   64: ['lh-1', 'lh-2', 'lh-3', 'rh-1', 'rh-2'],
@@ -554,8 +568,8 @@ const SAX_KEYS: KeyTable = (() => {
   // Palm keys carry the top of the range.
   table[86] = ['octave', 'palm-d']
   table[87] = ['octave', 'palm-d', 'palm-eb']
-  table[88] = ['octave', 'palm-d', 'palm-eb', 'rh-1']
-  table[89] = ['octave', 'palm-d', 'palm-eb', 'palm-f', 'rh-1']
+  table[88] = ['octave', 'palm-d', 'palm-eb', 'side-e']
+  table[89] = ['octave', 'palm-d', 'palm-eb', 'palm-f', 'side-e']
   table[90] = ['octave', 'front-f', 'lh-2', 'side-f-sharp']
   return table
 })()
@@ -581,28 +595,28 @@ const RECORDER_HOLES: HoleTable = {
   60: { covered: RC_ALL },
   61: { covered: RC_ALL.slice(0, 7) as RecorderControlId[], half: ['hole-7'] },
   62: { covered: RC_ALL.slice(0, 7) as RecorderControlId[] },
-  63: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-5', 'hole-7'] },
+  63: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-5'], half: ['hole-6'] },
   64: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-5'] },
   65: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-6', 'hole-7'] },
-  66: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3', 'hole-4'] },
+  66: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3', 'hole-5', 'hole-6'] },
   67: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3'] },
-  68: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-3', 'hole-5', 'hole-6'] },
+  68: { covered: ['thumb', 'hole-1', 'hole-2', 'hole-4', 'hole-5'], half: ['hole-6'] },
   69: { covered: ['thumb', 'hole-1', 'hole-2'] },
   70: { covered: ['thumb', 'hole-1', 'hole-3', 'hole-4'] },
   71: { covered: ['thumb', 'hole-1'] },
   72: { covered: ['thumb', 'hole-2'] },
-  73: { covered: ['hole-2'] },
-  74: { covered: ['hole-1', 'hole-2'], half: ['thumb'] },
-  75: { covered: ['hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-5'], half: ['thumb'] },
-  76: { covered: ['hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-6'], half: ['thumb'] },
-  77: { covered: ['hole-1', 'hole-2', 'hole-3', 'hole-5', 'hole-6'], half: ['thumb'] },
+  73: { covered: ['hole-1', 'hole-2'] },
+  74: { covered: ['hole-2'] },
+  75: { covered: ['hole-2', 'hole-3', 'hole-4', 'hole-5', 'hole-6'] },
+  76: { covered: ['hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-5'], half: ['thumb'] },
+  77: { covered: ['hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-6'], half: ['thumb'] },
   78: { covered: ['hole-1', 'hole-2', 'hole-3', 'hole-5'], half: ['thumb'] },
   79: { covered: ['hole-1', 'hole-2', 'hole-3'], half: ['thumb'] },
-  80: { covered: ['hole-1', 'hole-2', 'hole-4', 'hole-5'], half: ['thumb'] },
-  81: { covered: ['hole-1', 'hole-2', 'hole-4'], half: ['thumb'] },
-  82: { covered: ['hole-1', 'hole-3', 'hole-4'], half: ['thumb'] },
-  83: { covered: ['hole-1', 'hole-2', 'hole-3', 'hole-4', 'hole-5'], half: ['thumb'] },
-  84: { covered: ['hole-1', 'hole-2', 'hole-4', 'hole-5'], half: ['thumb'] },
+  80: { covered: ['hole-1', 'hole-2', 'hole-4'], half: ['thumb'] },
+  81: { covered: ['hole-1', 'hole-2'], half: ['thumb'] },
+  82: { covered: ['hole-1', 'hole-2', 'hole-4', 'hole-5', 'hole-6'], half: ['thumb'] },
+  83: { covered: ['hole-1', 'hole-2', 'hole-4', 'hole-5'], half: ['thumb'] },
+  84: { covered: ['hole-1', 'hole-4', 'hole-5'], half: ['thumb'] },
 }
 
 /* ── Brass ────────────────────────────────────────────────────────────────

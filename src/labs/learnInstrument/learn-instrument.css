@@ -439,7 +439,7 @@
  * the staff gives most of the screen back to the fingering.
  */
 .li-play__body[data-chart-shape='column'] .li-card--note {
-  max-height: 40%;
+  max-height: 34%;
 }
 
 .li-card--chart {
@@ -726,6 +726,13 @@
 .li-chart__key-arm {
   stroke: var(--li-ink);
   stroke-width: 3.4;
+  stroke-linecap: round;
+}
+
+.li-chart__mechanism {
+  fill: none;
+  stroke: var(--li-ink);
+  stroke-width: 2;
   stroke-linecap: round;
 }
 

@@ -30,26 +30,6 @@ function hasAny(set: ReadonlySet<string>, ids: readonly string[]): boolean {
   return ids.some((id) => set.has(id))
 }
 
-const AUXILIARY_LABELS: Readonly<Record<string, string>> = {
-  'palm-d': 'palm D',
-  'palm-eb': 'palm E♭',
-  'palm-f': 'palm F',
-  'side-e': 'side E',
-  'side-c': 'side C',
-  'side-bb': 'side B♭',
-  'lp-gsharp': 'G♯',
-  'lp-csharp': 'C♯',
-  'lp-b': 'low B',
-  'lp-bb': 'low B♭',
-  'lp-e': 'low E',
-  'lp-fsharp': 'F♯',
-  'lp-ab': 'A♭',
-  'pinky-f': 'low F',
-  'rp-e': 'E',
-  'rp-fsharp': 'F♯',
-  'rp-ab': 'A♭',
-}
-
 /* ── Shape kit ────────────────────────────────────────────────────────── */
 
 interface KeyProps {
@@ -135,40 +115,6 @@ function SmallHole({
   )
 }
 
-/**
- * A shaped auxiliary touchpiece with a narrow arm. Rotating the whole key is
- * enough to make the small clarinet/saxophone clusters read like their real
- * hardware instead of a stack of identical pills.
- */
-function PaddleKey({
-  x,
-  y,
-  angle = 0,
-  state = 'open',
-  label,
-  labelX,
-  labelY,
-  halo,
-}: KeyProps & { x: number; y: number; angle?: number }) {
-  return (
-    <g className="li-chart__mark" data-state={state}>
-      <Halo x={x - 24} y={y - 20} w={48} h={40} show={halo && state !== 'open'} />
-      <g transform={`rotate(${angle} ${x} ${y})`}>
-        <line className="li-chart__key-arm" x1={x - 18} x2={x + 4} y1={y} y2={y} />
-        <path
-          className="li-chart__key"
-          strokeWidth={SMALL_STROKE}
-          d={`M ${x + 1} ${y - 9}
-              C ${x + 13} ${y - 10} ${x + 22} ${y - 5} ${x + 22} ${y}
-              C ${x + 22} ${y + 5} ${x + 13} ${y + 10} ${x + 1} ${y + 9}
-              C ${x - 3} ${y + 6} ${x - 3} ${y - 6} ${x + 1} ${y - 9} Z`}
-        />
-      </g>
-      {label && <Caption x={labelX ?? x} y={labelY ?? y + 28} text={label} />}
-    </g>
-  )
-}
-
 /** The clarinet register key — a teardrop, point up, behind the thumb. */
 function TeardropKey({
   x,
@@ -180,12 +126,13 @@ function TeardropKey({
 }: KeyProps & { x: number; y: number }) {
   return (
     <g className="li-chart__mark" data-state={state}>
-      <Halo x={x - 25} y={y - 37} w={50} h={68} show={halo && state !== 'open'} />
+      <Halo x={x - 16} y={y - 37} w={32} h={68} show={halo && state !== 'open'} />
       <path
         className="li-chart__key"
         strokeWidth={STROKE}
-        d={`M ${x} ${y - 29} C ${x + 16} ${y - 7} ${x + 16} ${y + 16} ${x} ${y + 22}
-            C ${x - 16} ${y + 16} ${x - 16} ${y - 7} ${x} ${y - 29} Z`}
+        d={`M ${x} ${y - 31}
+            C ${x + 9} ${y - 11} ${x + 8} ${y + 14} ${x} ${y + 23}
+            C ${x - 8} ${y + 14} ${x - 9} ${y - 11} ${x} ${y - 31} Z`}
       />
       {label && <Caption x={x} y={labelY ?? y + 46} text={label} />}
     </g>
@@ -208,120 +155,246 @@ function TriangleKey({
         className="li-chart__key"
         strokeWidth={STROKE}
         strokeLinejoin="round"
-        d={`M ${x} ${y - 21} L ${x + 20} ${y + 15} L ${x - 20} ${y + 15} Z`}
+        d={`M ${x} ${y - 20} L ${x + 16} ${y + 16} L ${x - 16} ${y + 16} Z`}
       />
       {label && <Caption x={x} y={labelY ?? y + 40} text={label} />}
     </g>
   )
 }
 
-/**
- * The three foot-joint touchpieces at the end of a simple flute chart. Their
- * silhouette matters more than their names here: C♯ is the upright loop, E♭
- * is the short upper roller, and C is the lower oval.
- */
-/**
- * The right-hand pinky cluster at the end of a flute chart.
- *
- * The E♭ key is the wide oval the pinky rests on, and it is down for nearly
- * every note on the instrument — so it gets the prominent shape, sitting right
- * after the third right-hand finger. The two rollers beyond it are the foot
- * C♯ and C keys, which the pinky only slides onto for the bottom two notes.
- * Each one is named when it is in use: a chart that lights the wrong pinky key
- * teaches the wrong hand.
- */
+/** The asymmetric E♭ leaf and the two foot-joint rollers printed on flute charts. */
 function FluteFootKeys({
   x,
   y,
-  labelY,
   c,
   cSharp,
   eFlat,
 }: {
   x: number
   y: number
-  labelY: number
   c: MarkState
   cSharp: MarkState
   eFlat: MarkState
 }) {
-  const rollerY = (offset: number) => y + offset
+  const showRollers = c !== 'open' || cSharp !== 'open'
 
   return (
-    <g>
+    <g aria-hidden>
       <g className="li-chart__mark" data-state={eFlat}>
-        <Halo x={x - 23} y={y - 29} w={46} h={58} show={eFlat !== 'open'} />
         <ellipse
           className="li-chart__key"
           cx={x}
           cy={y}
-          rx={15}
+          rx={10}
           ry={21}
           strokeWidth={STROKE}
+          transform={`rotate(-10 ${x} ${y})`}
         />
       </g>
-      <Caption x={x} y={labelY} text="E♭" />
 
-      <g className="li-chart__mark" data-state={cSharp}>
-        <Halo x={x + 30} y={rollerY(-19) - 8} w={44} h={30} show={cSharp !== 'open'} />
-        <rect
-          className="li-chart__key"
-          x={x + 34}
-          y={rollerY(-19)}
-          width={36}
-          height={12}
-          rx={6}
-          strokeWidth={SMALL_STROKE}
-        />
-      </g>
-      <g className="li-chart__mark" data-state={c}>
-        <Halo x={x + 30} y={rollerY(7) - 8} w={44} h={30} show={c !== 'open'} />
-        <rect
-          className="li-chart__key"
-          x={x + 34}
-          y={rollerY(7)}
-          width={36}
-          height={12}
-          rx={6}
-          strokeWidth={SMALL_STROKE}
-        />
-      </g>
-      {(cSharp !== 'open' || c !== 'open') && (
-        <Caption x={x + 52} y={labelY} text={cSharp !== 'open' ? 'C♯' : 'C'} />
+      {showRollers && (
+        <g>
+          {/* The supplied chart fixes this orientation: C is the upper roller,
+              C♯ is the lower one. */}
+          <g className="li-chart__mark" data-state={c}>
+            <rect
+              className="li-chart__key"
+              x={x + 13}
+              y={y - 12}
+              width={36}
+              height={12}
+              rx={6}
+              strokeWidth={SMALL_STROKE}
+            />
+          </g>
+          <g className="li-chart__mark" data-state={cSharp}>
+            <rect
+              className="li-chart__key"
+              x={x + 13}
+              y={y + 2}
+              width={36}
+              height={12}
+              rx={6}
+              strokeWidth={SMALL_STROKE}
+            />
+          </g>
+        </g>
       )}
     </g>
   )
 }
 
-/**
- * The compact linked low-E/low-F symbol used at the bottom of beginner
- * clarinet charts. It supplies the one neighbouring key a student needs for
- * orientation without drawing the entire lower-joint mechanism.
- */
-function ClarinetEndKeys({
+/** B-natural thumb almond plus the neighbouring B♭ pearl, between two rails. */
+function FluteThumbKeys({ thumb, thumbBFlat }: { thumb: MarkState; thumbBFlat: MarkState }) {
+  return (
+    <g aria-hidden>
+      <line className="li-chart__mechanism" x1={78} x2={194} y1={140} y2={140} />
+      <line className="li-chart__mechanism" x1={78} x2={194} y1={172} y2={172} />
+      <ToneHole cx={101} cy={156} r={12} state={thumbBFlat} />
+      <g className="li-chart__mark" data-state={thumb}>
+        <ellipse
+          className="li-chart__key"
+          cx={145}
+          cy={156}
+          rx={39}
+          ry={12}
+          strokeWidth={SMALL_STROKE}
+        />
+      </g>
+    </g>
+  )
+}
+
+/** The small offset G♯ oval used by basic flute fingering charts. */
+function FluteGSharpKey({ state }: { state: MarkState }) {
+  return (
+    <g className="li-chart__mark" data-state={state} aria-hidden>
+      <ellipse
+        className="li-chart__key"
+        cx={207}
+        cy={49}
+        rx={9}
+        ry={15}
+        strokeWidth={SMALL_STROKE}
+        transform="rotate(-16 207 49)"
+      />
+    </g>
+  )
+}
+
+/** A small throat-key touchpiece, drawn like the compact method-book symbol. */
+function ClarinetTopKey({
   x,
   y,
-  lowE,
-  lowF,
+  state,
+  shape,
 }: {
   x: number
   y: number
-  lowE: MarkState
-  lowF: MarkState
+  state: MarkState
+  shape: 'oval' | 'leaf'
 }) {
-  const keyPath = (offsetY: number, flip: boolean) =>
-    `M ${x - 24} ${y + offsetY}
-     C ${x - 11} ${y + offsetY - (flip ? -8 : 8)} ${x + 15} ${y + offsetY - (flip ? -7 : 7)} ${x + 27} ${y + offsetY}
-     C ${x + 14} ${y + offsetY + (flip ? -8 : 8)} ${x - 11} ${y + offsetY + (flip ? -7 : 7)} ${x - 24} ${y + offsetY} Z`
+  return (
+    <g className="li-chart__mark" data-state={state} aria-hidden>
+      {shape === 'oval' ? (
+        <ellipse className="li-chart__key" cx={x} cy={y} rx={7} ry={15} strokeWidth={SMALL_STROKE} />
+      ) : (
+        <ellipse
+          className="li-chart__key"
+          cx={x}
+          cy={y}
+          rx={8}
+          ry={17}
+          strokeWidth={SMALL_STROKE}
+          transform={`rotate(-10 ${x} ${y})`}
+        />
+      )}
+    </g>
+  )
+}
+
+function ClarinetSpoon({
+  x,
+  y,
+  state,
+  angle = 0,
+}: {
+  x: number
+  y: number
+  state: MarkState
+  angle?: number
+}) {
+  return (
+    <g className="li-chart__mark" data-state={state} transform={`rotate(${angle} ${x} ${y})`}>
+      <ellipse className="li-chart__key" cx={x} cy={y} rx={17} ry={7} strokeWidth={SMALL_STROKE} />
+    </g>
+  )
+}
+
+/** Four small pinky-key ovals in the familiar beginner-chart clover. */
+function ClarinetFootCluster({
+  x,
+  y,
+  states,
+}: {
+  x: number
+  y: number
+  states: {
+    upperLeft: MarkState
+    upperRight: MarkState
+    lowerLeft: MarkState
+    lowerRight: MarkState
+  }
+}) {
+  const slots = [
+    { id: 'upper-left', x: x - 18, y: y - 10, state: states.upperLeft, angle: -5 },
+    { id: 'upper-right', x: x + 18, y: y - 10, state: states.upperRight, angle: 5 },
+    { id: 'lower-left', x: x - 18, y: y + 12, state: states.lowerLeft, angle: 5 },
+    { id: 'lower-right', x: x + 18, y: y + 12, state: states.lowerRight, angle: -5 },
+  ].sort((a, b) => Number(a.state === 'closed') - Number(b.state === 'closed'))
 
   return (
     <g aria-hidden>
-      <g className="li-chart__mark" data-state={lowF}>
-        <path className="li-chart__key" strokeWidth={SMALL_STROKE} d={keyPath(-7, false)} />
+      {slots.map((slot) => (
+        <ClarinetSpoon
+          key={slot.id}
+          x={slot.x}
+          y={slot.y}
+          state={slot.state}
+          angle={slot.angle}
+        />
+      ))}
+    </g>
+  )
+}
+
+/** The separate four-key fan beside C♯4; it is not the lower pinky clover. */
+function ClarinetCSharpFan({ state }: { state: MarkState }) {
+  return (
+    <g aria-hidden>
+      <g className="li-chart__mark" data-state={state}>
+        <ellipse className="li-chart__key" cx={205} cy={266} rx={17} ry={6} strokeWidth={SMALL_STROKE} />
       </g>
-      <g className="li-chart__mark" data-state={lowE}>
-        <path className="li-chart__key" strokeWidth={SMALL_STROKE} d={keyPath(7, true)} />
+      <g className="li-chart__mark" data-state="open" transform="rotate(-12 240 280)">
+        <ellipse className="li-chart__key" cx={240} cy={280} rx={14} ry={5} strokeWidth={SMALL_STROKE} />
       </g>
+      <g className="li-chart__mark" data-state="open" transform="rotate(-5 224 309)">
+        <ellipse className="li-chart__key" cx={224} cy={309} rx={6} ry={20} strokeWidth={SMALL_STROKE} />
+      </g>
+      <g className="li-chart__mark" data-state="open" transform="rotate(6 247 310)">
+        <ellipse className="li-chart__key" cx={247} cy={310} rx={6} ry={20} strokeWidth={SMALL_STROKE} />
+      </g>
+    </g>
+  )
+}
+
+/** Four simple right-side key ovals, vertically staggered for orientation. */
+function ClarinetSideFan({ states }: { states: readonly MarkState[] }) {
+  const slots = [
+    { cx: 238, cy: 258, rx: 14, ry: 5, angle: 3 },
+    { cx: 247, cy: 278, rx: 12, ry: 5, angle: 12 },
+    { cx: 251, cy: 306, rx: 6, ry: 17, angle: -4 },
+    { cx: 271, cy: 321, rx: 6, ry: 17, angle: 5 },
+  ]
+  return (
+    <g aria-hidden>
+      {slots.map((slot, index) => (
+        <g
+          key={`${slot.cx}-${slot.cy}`}
+          className="li-chart__mark"
+          data-state={states[index] ?? 'open'}
+          transform={`rotate(${slot.angle} ${slot.cx} ${slot.cy})`}
+        >
+          <ellipse
+            className="li-chart__key"
+            cx={slot.cx}
+            cy={slot.cy}
+            rx={slot.rx}
+            ry={slot.ry}
+            strokeWidth={SMALL_STROKE}
+          />
+        </g>
+      ))}
     </g>
   )
 }
@@ -344,43 +417,96 @@ function SaxophoneLowKeys({
         <path
           className="li-chart__key"
           strokeWidth={SMALL_STROKE}
-          d={`M ${x - 23} ${y} A 23 12 0 0 1 ${x + 23} ${y} L ${x - 23} ${y} Z`}
+          d={`M ${x - 23} ${y} Q ${x} ${y - 18} ${x + 23} ${y} L ${x - 23} ${y} Z`}
         />
       </g>
       <g className="li-chart__mark" data-state={lowC}>
         <path
           className="li-chart__key"
           strokeWidth={SMALL_STROKE}
-          d={`M ${x - 23} ${y} A 23 12 0 0 0 ${x + 23} ${y} L ${x - 23} ${y} Z`}
+          d={`M ${x - 23} ${y} Q ${x} ${y + 18} ${x + 23} ${y} L ${x - 23} ${y} Z`}
         />
       </g>
     </g>
   )
 }
 
-/** Three tiny side-key touchpieces, kept as a compact landmark block. */
-function SaxophoneSideBlock({
-  x,
-  y,
+/** The four-cell left-pinky table printed to the right of the sax stack. */
+function SaxophoneLeftPinkyTable({
   states,
 }: {
-  x: number
-  y: number
-  states: readonly MarkState[]
+  states: {
+    gSharp: MarkState
+    b: MarkState
+    cSharp: MarkState
+    bFlat: MarkState
+  }
 }) {
+  return (
+    <g aria-hidden>
+      <g className="li-chart__mark" data-state={states.gSharp}>
+        <rect className="li-chart__key" x={232} y={244} width={46} height={18} rx={2} strokeWidth={SMALL_STROKE} />
+      </g>
+      <g className="li-chart__mark" data-state={states.b}>
+        <rect className="li-chart__key" x={232} y={264} width={22} height={18} rx={2} strokeWidth={SMALL_STROKE} />
+      </g>
+      <g className="li-chart__mark" data-state={states.cSharp}>
+        <rect className="li-chart__key" x={256} y={264} width={22} height={18} rx={2} strokeWidth={SMALL_STROKE} />
+      </g>
+      <g className="li-chart__mark" data-state={states.bFlat}>
+        <rect className="li-chart__key" x={232} y={284} width={46} height={18} rx={2} strokeWidth={SMALL_STROKE} />
+      </g>
+    </g>
+  )
+}
+
+/** Narrow right-hand side-key ladder on the opposite side of the pinky table. */
+function SaxophoneSideLadder({ states }: { states: readonly MarkState[] }) {
   return (
     <g aria-hidden>
       {states.map((state, index) => (
         <g key={index} className="li-chart__mark" data-state={state}>
           <rect
             className="li-chart__key"
-            x={x + (index % 2) * 18}
-            y={y + Math.floor(index / 2) * 18}
-            width={15}
-            height={14}
-            rx={3}
-            strokeWidth={SMALL_STROKE}
+            x={118 + (index === 1 ? 2 : 0)}
+            y={304 + index * 19}
+            width={8}
+            height={17}
+            rx={4}
+            strokeWidth={2.6}
           />
+        </g>
+      ))}
+    </g>
+  )
+}
+
+/** The staggered high-F♯ touchpiece and its outlined location neighbour. */
+function SaxophoneHighFSharpPair({ state }: { state: MarkState }) {
+  return (
+    <g aria-hidden>
+      <g className="li-chart__mark" data-state={state}>
+        <ellipse className="li-chart__key" cx={132} cy={384} rx={6} ry={13} strokeWidth={SMALL_STROKE} />
+      </g>
+      <g className="li-chart__mark" data-state="open">
+        <ellipse className="li-chart__key" cx={112} cy={402} rx={6} ry={13} strokeWidth={SMALL_STROKE} />
+      </g>
+    </g>
+  )
+}
+
+/** Three long palm loops plus the small hollow neighbour in the reference chart. */
+function SaxophonePalmFan({ states }: { states: readonly MarkState[] }) {
+  const loops = [
+    { id: 0, cx: 216, cy: 108 },
+    { id: 1, cx: 233, cy: 126 },
+    { id: 2, cx: 216, cy: 143 },
+  ]
+  return (
+    <g aria-hidden>
+      {loops.map(({ id, cx, cy }) => (
+        <g key={id} className="li-chart__mark" data-state={states[id] ?? 'open'}>
+          <ellipse className="li-chart__key" cx={cx} cy={cy} rx={5} ry={11} strokeWidth={2.7} />
         </g>
       ))}
     </g>
@@ -401,10 +527,8 @@ const CL = {
   divider: 287,
 } as const
 
-const CL_THROAT_KEYS = ['key-a', 'key-gsharp'] as const
-const CL_LEFT_PINKY_KEYS = ['lp-fsharp', 'lp-ab', 'lp-csharp'] as const
 const CL_SIDE_KEYS = ['side-1', 'side-2', 'side-3', 'side-4'] as const
-const CL_RIGHT_PINKY_KEYS = ['rp-e', 'rp-fsharp', 'rp-ab'] as const
+const CL_FOOT_KEYS = ['lp-e', 'pinky-f', 'rp-fsharp', 'rp-ab'] as const
 
 function ClarinetChart({
   closed,
@@ -414,13 +538,12 @@ function ClarinetChart({
   half: ReadonlySet<string>
 }) {
   const st = (id: string) => stateOf(id, closed, half)
-  const showThroat = hasAny(closed, CL_THROAT_KEYS)
-  const showLeftPinky = hasAny(closed, CL_LEFT_PINKY_KEYS)
-  const showSide = hasAny(closed, CL_SIDE_KEYS)
-  const showRightPinky = hasAny(closed, CL_RIGHT_PINKY_KEYS)
+  const usesThroat = hasAny(closed, ['key-a', 'key-gsharp'])
+  const usesSide = hasAny(closed, CL_SIDE_KEYS)
+  const usesFootCluster = hasAny(closed, CL_FOOT_KEYS)
 
   return (
-    <svg className="li-chart__svg" viewBox="0 0 340 532" preserveAspectRatio="xMidYMid meet">
+    <svg className="li-chart__svg" viewBox="0 0 340 552" preserveAspectRatio="xMidYMid meet">
       <line
         className="li-chart__divider"
         x1={CL.column - 34}
@@ -434,29 +557,11 @@ function ClarinetChart({
       <TeardropKey x={CL.rail} y={75} state={st('octave')} />
       <ToneHole cx={CL.rail} cy={CL.lh[0]} r={15} state={st('thumb')} />
 
-      {/* A and A♭/G♯ are shown as a pair only when one is part of the note. */}
-      {showThroat && (
+      {/* A and G♯ form one tight landmark pair in the supplied chart. */}
+      {usesThroat && (
         <g>
-          <PaddleKey
-            x={258}
-            y={102}
-            angle={-18}
-            state={st('key-a')}
-            label={closed.has('key-a') ? 'A key' : undefined}
-            labelX={286}
-            labelY={78}
-            halo
-          />
-          <PaddleKey
-            x={264}
-            y={132}
-            angle={12}
-            state={st('key-gsharp')}
-            label={closed.has('key-gsharp') ? 'G♯ key' : undefined}
-            labelX={288}
-            labelY={164}
-            halo
-          />
+          <ClarinetTopKey x={176} y={76} state={st('key-a')} shape="oval" />
+          <ClarinetTopKey x={216} y={76} state={st('key-gsharp')} shape="leaf" />
         </g>
       )}
 
@@ -469,46 +574,10 @@ function ClarinetChart({
         />
       ))}
 
-      {/* A contextual pair replaces the full four-key left pinky table. */}
-      {showLeftPinky && (
-        <g>
-          {(() => {
-            const selected = CL_LEFT_PINKY_KEYS.find((id) => closed.has(id))!
-            const neighbour = selected === 'lp-csharp' ? 'lp-ab' : 'lp-csharp'
-            return [selected, neighbour].map((id, index) => (
-              <PaddleKey
-                key={id}
-                x={100 - index * 8}
-                y={248 + index * 27}
-                angle={index === 0 ? 12 : -12}
-                state={st(id)}
-                label={closed.has(id) ? AUXILIARY_LABELS[id] : undefined}
-                labelX={52}
-                labelY={254 + index * 27}
-                halo
-              />
-            ))
-          })()}
-        </g>
-      )}
+      {/* The side trill keys, drawn only on the notes that use one. */}
+      {usesSide && <ClarinetSideFan states={CL_SIDE_KEYS.map((id) => st(id))} />}
 
-      {showSide && (
-        <g>
-          {CL_SIDE_KEYS.map((id, index) => (
-            <PaddleKey
-              key={id}
-              x={256 + (index % 2) * 8}
-              y={298 + index * 26}
-              angle={index % 2 === 0 ? -10 : 10}
-              state={st(id)}
-              label={closed.has(id) ? `side ${index + 1}` : undefined}
-              labelX={304}
-              labelY={304 + index * 26}
-              halo
-            />
-          ))}
-        </g>
-      )}
+      {closed.has('lp-csharp') && <ClarinetCSharpFan state={st('lp-csharp')} />}
 
       {CL.rh.map((y, index) => (
         <ToneHole
@@ -519,33 +588,18 @@ function ClarinetChart({
         />
       ))}
 
-      {showRightPinky && (
-        <g>
-          {(() => {
-            const selected = CL_RIGHT_PINKY_KEYS.find((id) => closed.has(id))!
-            const neighbour = selected === 'rp-ab' ? 'rp-fsharp' : 'rp-ab'
-            return [selected, neighbour].map((id, index) => (
-              <PaddleKey
-                key={id}
-                x={252 + index * 42}
-                y={470}
-                angle={index === 0 ? -8 : 8}
-                state={st(id)}
-                label={closed.has(id) ? AUXILIARY_LABELS[id] : undefined}
-                labelY={503}
-                halo
-              />
-            ))
-          })()}
-        </g>
+      {usesFootCluster && (
+        <ClarinetFootCluster
+          x={172}
+          y={492}
+          states={{
+            upperLeft: st('rp-ab'),
+            upperRight: st('rp-fsharp'),
+            lowerLeft: st('lp-e'),
+            lowerRight: st('pinky-f'),
+          }}
+        />
       )}
-
-      <ClarinetEndKeys
-        x={CL.column}
-        y={492}
-        lowE={st('lp-e')}
-        lowF={st('pinky-f')}
-      />
     </svg>
   )
 }
@@ -574,7 +628,10 @@ function SaxophoneChart({
   half: ReadonlySet<string>
 }) {
   const st = (id: string) => stateOf(id, closed, half)
-  const showLeftPinky = hasAny(closed, SX_LEFT_PINKY_KEYS)
+  const usesPalm = hasAny(closed, SX_PALM_KEYS)
+  const usesLeftPinky = hasAny(closed, SX_LEFT_PINKY_KEYS)
+  const usesSide = hasAny(closed, SX_SIDE_KEYS)
+  const usesLowKey = hasAny(closed, ['rp-c', 'rp-eb'])
 
   return (
     <svg className="li-chart__svg" viewBox="0 0 340 516" preserveAspectRatio="xMidYMid meet">
@@ -586,27 +643,15 @@ function SaxophoneChart({
         y2={SX.divider}
       />
 
-      {/* Printed charts keep these few landmarks in place on every note. */}
-      <TriangleKey x={112} y={SX.lh[0]} state={st('octave')} />
-      <SmallHole cx={SX.column} cy={82} r={7} state={st('front-f')} />
-
-      <g aria-hidden>
-        {SX_PALM_KEYS.map((id, index) => (
-          <SmallHole
-            key={id}
-            cx={236 + (index === 1 ? 17 : 0)}
-            cy={92 + index * 18}
-            r={6}
-            state={st(id)}
-          />
-        ))}
-      </g>
+      {/* The octave landmark stays visible; smaller mechanisms appear only
+          when that local group helps locate a pressed key. */}
+      <TriangleKey x={112} y={174} state={st('octave')} />
+      {closed.has('front-f') && <SmallHole cx={SX.column} cy={86} r={6} state="closed" />}
+      {usesPalm && <SaxophonePalmFan states={SX_PALM_KEYS.map((id) => st(id))} />}
 
       {/* Bis is the small pearl tucked between L1 and L2; those two large
           neighbours remain visible, so its location is immediately clear. */}
-      {closed.has('bis') && (
-        <SmallHole cx={144} cy={154} r={8} state="closed" />
-      )}
+      {closed.has('bis') && <SmallHole cx={198} cy={160} r={6} state="closed" />}
 
       {SX.lh.map((y, index) => (
         <ToneHole
@@ -618,25 +663,15 @@ function SaxophoneChart({
         />
       ))}
 
-      <SaxophoneSideBlock x={232} y={218} states={SX_SIDE_KEYS.map(st)} />
-
-      {showLeftPinky && (
-        <g>
-          {(() => {
-            const selected = SX_LEFT_PINKY_KEYS.find((id) => closed.has(id))!
-            const neighbour = selected === 'lp-bb' ? 'lp-b' : 'lp-bb'
-            return [selected, neighbour].map((id, index) => (
-              <PaddleKey
-                key={id}
-                x={105 - index * 7}
-                y={292 + index * 27}
-                angle={index === 0 ? 10 : -10}
-                state={st(id)}
-                halo
-              />
-            ))
-          })()}
-        </g>
+      {usesLeftPinky && (
+        <SaxophoneLeftPinkyTable
+          states={{
+            gSharp: st('lp-gsharp'),
+            b: st('lp-b'),
+            cSharp: st('lp-csharp'),
+            bFlat: st('lp-bb'),
+          }}
+        />
       )}
 
       {SX.rh.map((y, index) => (
@@ -649,26 +684,17 @@ function SaxophoneChart({
         />
       ))}
 
-      {/* The lower side-key pair is a permanent location cue. */}
-      <SmallHole cx={132} cy={338} r={6} state="open" />
-      <SmallHole cx={132} cy={358} r={6} state="open" />
+      {usesSide && <SaxophoneSideLadder states={SX_SIDE_KEYS.map((id) => st(id))} />}
+      {closed.has('side-f-sharp') && <SaxophoneHighFSharpPair state="closed" />}
 
-      {closed.has('side-f-sharp') && (
-        <PaddleKey
-          x={260}
-          y={344}
-          angle={-12}
-          state="closed"
-          halo
+      {usesLowKey && (
+        <SaxophoneLowKeys
+          x={112}
+          y={468}
+          lowC={st('rp-c')}
+          lowEFlat={st('rp-eb')}
         />
       )}
-
-      <SaxophoneLowKeys
-        x={SX.column}
-        y={474}
-        lowC={st('rp-c')}
-        lowEFlat={st('rp-eb')}
-      />
     </svg>
   )
 }
@@ -697,20 +723,6 @@ function RecorderChart({
   return (
     <svg className="li-chart__svg" viewBox="0 0 300 496" preserveAspectRatio="xMidYMid meet">
       <line
-        className="li-chart__body"
-        x1={RC.column}
-        x2={RC.column}
-        y1={RC.front[0] - 32}
-        y2={RC.divider - 16}
-      />
-      <line
-        className="li-chart__body"
-        x1={RC.column}
-        x2={RC.column}
-        y1={RC.divider + 16}
-        y2={RC.front[6] + 32}
-      />
-      <line
         className="li-chart__divider"
         x1={RC.column - 32}
         x2={RC.column + 32}
@@ -718,7 +730,7 @@ function RecorderChart({
         y2={RC.divider}
       />
 
-      <ToneHole cx={RC.rail} cy={RC.front[0]} r={17} state={st('thumb')} label="thumb" halo />
+      <ToneHole cx={RC.rail} cy={RC.front[0]} r={17} state={st('thumb')} label="thumb" />
 
       {RC.front.slice(0, 5).map((y, index) => (
         <ToneHole
@@ -740,12 +752,17 @@ function RecorderChart({
         return (
           <g key={`hole-${index + 1}`}>
             <ToneHole
-              cx={RC.column - 15}
-              cy={y}
-              r={11}
+              cx={RC.column - 10}
+              cy={y - 4}
+              r={9}
               state={state === 'half' ? 'closed' : state}
             />
-            <ToneHole cx={RC.column + 15} cy={y} r={11} state={state === 'half' ? 'open' : state} />
+            <ToneHole
+              cx={RC.column + 10}
+              cy={y + 4}
+              r={9}
+              state={state === 'half' ? 'open' : state}
+            />
             <Caption x={RC.column + 44} y={y + 7} text={`${index + 1}`} />
           </g>
         )
@@ -765,19 +782,15 @@ const FL = {
   lh: [110, 154, 198],
   rh: [252, 296, 340],
   divider: 225,
-  labelY: 112,
 } as const
 
 function FluteChart({ closed }: { closed: ReadonlySet<string> }) {
   const empty = new Set<string>()
   const st = (id: string) => stateOf(id, closed, empty)
-  const thumbDown = st('thumb') === 'closed'
   const showTrills = hasAny(closed, ['trill-d', 'trill-dsharp'])
 
   return (
     <svg className="li-chart__svg" viewBox="0 0 490 190" preserveAspectRatio="xMidYMid meet">
-      <line className="li-chart__body" x1={86} x2={366} y1={FL.row} y2={FL.row} />
-
       {FL.lh.map((x, index) => (
         <ToneHole
           key={`lh-${index + 1}`}
@@ -785,8 +798,6 @@ function FluteChart({ closed }: { closed: ReadonlySet<string> }) {
           cy={FL.row}
           r={17}
           state={st(`lh-${index + 1}`)}
-          label={`L${index + 1}`}
-          labelY={FL.labelY}
         />
       ))}
 
@@ -805,67 +816,28 @@ function FluteChart({ closed }: { closed: ReadonlySet<string> }) {
           cy={FL.row}
           r={17}
           state={st(`rh-${index + 1}`)}
-          label={`R${index + 1}`}
-          labelY={FL.labelY}
         />
       ))}
 
-      {/* Keep the familiar three-part foot-key silhouette visible on every
-          note, exactly as it appears at the end of a printed flute chart. */}
+      {/* Keep the familiar three-part foot-key symbol visible on every note. */}
       <FluteFootKeys
-        x={392}
+        x={369}
         y={FL.row}
-        labelY={FL.labelY}
         c={st('foot-c')}
         cSharp={st('foot-csharp')}
         eFlat={st('side-eb')}
       />
 
-      {/* The neighbouring B♭ thumb lever remains hollow beside the pressed
-          B lever. This is exactly the small bit of context a student needs. */}
-      {thumbDown && (
-        <g className="li-chart__mark" data-state="closed">
-          <Halo x={58} y={132} w={134} h={44} show />
-          <rect
-            className="li-chart__key li-chart__key--ghost"
-            x={68}
-            y={140}
-            width={54}
-            height={28}
-            rx={14}
-            strokeWidth={SMALL_STROKE}
-          />
-          <rect
-            className="li-chart__key"
-            x={126}
-            y={140}
-            width={56}
-            height={28}
-            rx={14}
-            strokeWidth={SMALL_STROKE}
-          />
-          <Caption x={126} y={187} text="thumb" />
-        </g>
-      )}
+      <FluteThumbKeys thumb={st('thumb')} thumbBFlat={st('thumb-bb')} />
 
-      {closed.has('key-gsharp') && (
-        <PaddleKey x={252} y={154} angle={-8} state="closed" label="G♯" labelY={186} halo />
-      )}
+      {closed.has('key-gsharp') && <FluteGSharpKey state="closed" />}
 
       {showTrills && (
         <g>
-          <SmallHole cx={318} cy={154} r={12} state={st('trill-d')} />
-          <SmallHole cx={354} cy={154} r={12} state={st('trill-dsharp')} />
-          <Caption x={336} y={186} text={closed.has('trill-d') ? 'D trill' : 'D♯ trill'} />
+          <SmallHole cx={314} cy={154} r={8} state={st('trill-d')} />
+          <SmallHole cx={340} cy={154} r={8} state={st('trill-dsharp')} />
         </g>
       )}
-
-      <text className="li-chart__hand-text" x={154} y={FL.row - 38} textAnchor="middle">
-        LEFT HAND
-      </text>
-      <text className="li-chart__hand-text" x={296} y={FL.row - 38} textAnchor="middle">
-        RIGHT HAND
-      </text>
     </svg>
   )
 }

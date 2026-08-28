@@ -12,6 +12,7 @@ import {
 } from '../../labs/practiceGameCharacters'
 import { loadBestScore as loadStaffJumperBestScore } from '../../labs/staffJumper/staffJumperMusicLogic'
 import { formatBalanceDuration, loadBalanceBestMs } from '../../labs/balance/balanceStorage'
+import { INSTRUMENTS as LEARN_INSTRUMENTS } from '../../labs/learnInstrument/instrumentData'
 import Pressable from '../ui/Pressable'
 
 interface LabsMenuProps {
@@ -21,6 +22,9 @@ interface LabsMenuProps {
   onOpenLearnInstrument: () => void
   onBack: () => void
 }
+/** Kept in step with the lesson data so the card never goes stale. */
+const LEARN_INSTRUMENT_COUNT = LEARN_INSTRUMENTS.length
+
 export default function LabsMenu({
   hapticFeedback,
   onOpenStaffJumper,
@@ -132,7 +136,7 @@ export default function LabsMenu({
               <h3>Learn Your Instrument</h3>
               <p>See the note, match the fingering chart, and play it.</p>
               <span className="arcade-game-card__meta">
-                <span>7 instruments · beginner</span>
+                <span>{LEARN_INSTRUMENT_COUNT} instruments · beginner</span>
               </span>
             </span>
             <span className="arcade-game-card__art arcade-game-card__art--wind" aria-hidden>
