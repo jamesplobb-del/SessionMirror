@@ -1,6 +1,6 @@
 import type { AppSettings } from './appSettings'
 
-/** Toggles owned by the Camera/Audio Mode Overlays menu. */
+/** Toggles owned by the Camera/Audio Mode Workspace menu. */
 export type HudQuickSettings = Pick<
   AppSettings,
   'pitchTrackerEnabled' | 'showTakeCards' | 'showMetronome' | 'audioEnhancerEnabled'

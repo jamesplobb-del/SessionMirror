@@ -1,5 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { AudioLines, LayoutGrid, MicVocal, Sparkles } from 'lucide-react'
+import {
+  AudioLines,
+  Columns2,
+  Grid2X2,
+  LayoutGrid,
+  MicVocal,
+  Sparkles,
+} from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useTutorialAction } from '../context/TutorialContext'
@@ -27,18 +34,31 @@ interface SettingsBranchWheelProps {
   tunerTakePillsToggleVisible?: boolean
   pitchToggleVisible: boolean
   takeCardsToggleVisible?: boolean
+  expandViewActive?: boolean
+  workspaceActionsVisible?: boolean
   onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
   onShowMetronomeChange: (show: boolean) => void
   onAudioEnhancerChange: (enabled: boolean) => void
   onTunerTakePillsChange?: (show: boolean) => void
   onHandsFreeChange?: (enabled: boolean) => void
+  onToggleExpandView?: () => void
+  onOpenMultitrack?: () => void
 }
 
 interface BranchItem {
   id: string
   label: string
-  icon: 'pitch' | 'take-cards' | 'tuner-takes' | 'metronome' | 'enhancer' | 'hands-free'
+  icon:
+    | 'pitch'
+    | 'take-cards'
+    | 'tuner-takes'
+    | 'metronome'
+    | 'enhancer'
+    | 'hands-free'
+    | 'expand'
+    | 'multitrack'
+  kind?: 'toggle' | 'action'
   active: boolean
   onSelect: () => void
 }
@@ -62,12 +82,16 @@ export default function SettingsBranchWheel({
   tunerTakePillsToggleVisible = false,
   pitchToggleVisible,
   takeCardsToggleVisible = true,
+  expandViewActive = false,
+  workspaceActionsVisible = false,
   onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
   onAudioEnhancerChange,
   onTunerTakePillsChange,
   onHandsFreeChange,
+  onToggleExpandView,
+  onOpenMultitrack,
 }: SettingsBranchWheelProps) {
   const notifyTutorial = useTutorialAction()
   const [anchor, setAnchor] = useState<{
@@ -206,18 +230,43 @@ export default function SettingsBranchWheel({
       })
     }
 
+    if (workspaceActionsVisible && onToggleExpandView) {
+      items.push({
+        id: 'expand-view',
+        label: 'Expand View',
+        icon: 'expand',
+        kind: 'action',
+        active: expandViewActive,
+        onSelect: onToggleExpandView,
+      })
+    }
+
+    if (workspaceActionsVisible && onOpenMultitrack) {
+      items.push({
+        id: 'multitrack',
+        label: 'Multitrack',
+        icon: 'multitrack',
+        kind: 'action',
+        active: false,
+        onSelect: onOpenMultitrack,
+      })
+    }
+
     return items
   }, [
     audioEnhancerEnabled,
     handsFreeEnabled,
     handsFreeToggleVisible,
+    expandViewActive,
     metronomeToggleVisible,
     onAudioEnhancerChange,
     onHandsFreeChange,
+    onOpenMultitrack,
     onPitchTrackerChange,
     onShowMetronomeChange,
     onShowTakeCardsChange,
     onTunerTakePillsChange,
+    onToggleExpandView,
     pitchToggleVisible,
     pitchTrackerEnabled,
     showMetronome,
@@ -225,6 +274,7 @@ export default function SettingsBranchWheel({
     takeCardsToggleVisible,
     tunerTakePillsToggleVisible,
     tunerTakePillsVisible,
+    workspaceActionsVisible,
   ])
 
   const trayGeometry = useMemo(() => {
@@ -264,7 +314,7 @@ export default function SettingsBranchWheel({
             exit={{ opacity: 0 }}
             transition={BRANCH_MOTION}
             style={motionGpuLayer}
-            aria-label="Close overlays"
+            aria-label="Close workspace"
             onPointerDown={(event) => event.preventDefault()}
             onClick={onClose}
           />
@@ -281,7 +331,7 @@ export default function SettingsBranchWheel({
             <motion.div
               className={`settings-branch-tray settings-branch-tray--${layoutMode} pointer-events-auto relative`}
               role="menu"
-              aria-label="Overlays"
+              aria-label="Workspace"
               initial={{ opacity: 0, y: 10, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -292,7 +342,7 @@ export default function SettingsBranchWheel({
               }}
             >
               <div className="settings-branch-tray__header">
-                <span className="settings-branch-tray__title">Overlays</span>
+                <span className="settings-branch-tray__title">Workspace</span>
               </div>
 
               <div className="settings-branch-tray__grid">
@@ -302,13 +352,17 @@ export default function SettingsBranchWheel({
                       ? 'branch-pitch'
                       : item.id === 'metronome'
                         ? 'branch-metronome'
+                        : item.id === 'expand-view'
+                          ? 'expand-view-button'
+                          : item.id === 'multitrack'
+                            ? 'multitrack-button'
                         : undefined
 
                   return (
                     <motion.button
                       key={item.id}
                       type="button"
-                      role="menuitemcheckbox"
+                      role={item.kind === 'action' ? 'menuitem' : 'menuitemcheckbox'}
                       {...(tutorialTarget ? { 'data-tutorial': tutorialTarget } : {})}
                       className={`settings-branch-tray__item ${NATIVE_SQUISH} ${
                         item.active ? 'settings-branch-tray__item--active' : ''
@@ -319,10 +373,11 @@ export default function SettingsBranchWheel({
                       transition={BRANCH_MOTION}
                       style={motionGpuLayer}
                       aria-label={item.label}
-                      aria-checked={item.active}
+                      {...(item.kind === 'action' ? {} : { 'aria-checked': item.active })}
                       onClick={() => {
                         triggerLightHaptic()
                         item.onSelect()
+                        if (item.kind === 'action') onClose()
                         notifyTutorial?.('branch-widget-selected')
                       }}
                     >
@@ -336,6 +391,10 @@ export default function SettingsBranchWheel({
                             <Sparkles strokeWidth={2.1} />
                           ) : item.icon === 'hands-free' ? (
                             <MicVocal strokeWidth={2.1} />
+                          ) : item.icon === 'expand' ? (
+                            <Columns2 strokeWidth={2.1} />
+                          ) : item.icon === 'multitrack' ? (
+                            <Grid2X2 strokeWidth={2.1} />
                           ) : (
                             <MetronomeIcon />
                           )}

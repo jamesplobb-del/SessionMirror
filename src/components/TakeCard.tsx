@@ -337,6 +337,11 @@ function TakeCard({
             {take.notes.trim() && !detailOpen && (
               <p className="vault-take-row__notes-hint truncate">{take.notes}</p>
             )}
+            {take.intention?.trim() && !detailOpen && !take.notes.trim() && (
+              <p className="vault-take-row__notes-hint truncate">
+                Next-take cue: {take.intention}
+              </p>
+            )}
           </div>
 
           <div className="vault-take-row__footer">
@@ -382,6 +387,15 @@ function TakeCard({
 
       {detailOpen && !selectionMode && (
         <div className="vault-take-row__detail">
+          {take.intention?.trim() && (
+            <div className="vault-take-row__detail-section vault-take-row__intention">
+              <p className="vault-take-row__detail-label">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                Cue before this take
+              </p>
+              <p>{take.intention}</p>
+            </div>
+          )}
           <div className="vault-take-row__detail-section" onClick={stopNestedClick}>
             <p className="vault-take-row__detail-label">Rating</p>
             <StarRating rating={take.rating} onChange={(rating) => onUpdate({ rating })} />
@@ -505,6 +519,7 @@ export default memo(TakeCard, (previous, next) =>
   previous.take.thumbnailUrl === next.take.thumbnailUrl &&
   previous.take.name === next.take.name &&
   previous.take.notes === next.take.notes &&
+  previous.take.intention === next.take.intention &&
   previous.take.rating === next.take.rating &&
   previous.take.mediaType === next.take.mediaType &&
   previous.isBenchmark === next.isBenchmark &&

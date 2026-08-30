@@ -12,8 +12,8 @@
     --pitch-tuner-edge-gap: 32px;
     --pitch-pip-row-block: calc(var(--ipad-pip-width) * 9 / 16 + 1.25rem);
     --pitch-control-deck-block: calc(var(--ipad-record-size) + 2.5rem);
-    /* The iPad control deck is taller than the phone's, so the Expand /
-       Multitrack row needs more lift or it lands on top of the deck. */
+    /* The iPad control deck is taller than the phone's, so the take-card
+       layout toolbar needs more lift or it lands on top of the deck. */
     --take-card-top-control-lift: 8.25rem;
   }
 

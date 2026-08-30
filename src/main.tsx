@@ -4,6 +4,7 @@ import './index.css'
 import './styles/drone-keyboard.css'
 import './styles/drone-sound-wheel.css'
 import './styles/practice-system.css'
+import './styles/practice-hub.css'
 import './styles/quick-tuner.css'
 import './styles/pitch-insights.css'
 // Keep adaptive iPad overrides last so feature-specific styles cannot restore

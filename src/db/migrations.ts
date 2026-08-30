@@ -9,6 +9,10 @@ const TAKE_COLUMN_MIGRATIONS = [
   "ALTER TABLE takes ADD COLUMN recording_orientation TEXT NOT NULL DEFAULT 'portrait'",
   'ALTER TABLE takes ADD COLUMN enhancer_baked INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE takes ADD COLUMN timeline_offset_ms INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE takes ADD COLUMN practice_session_id TEXT',
+  "ALTER TABLE takes ADD COLUMN intention TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE takes ADD COLUMN pitch_series_json TEXT NOT NULL DEFAULT ''",
+  'ALTER TABLE takes ADD COLUMN performance_start_seconds REAL',
 ] as const
 
 /** Idempotent column adds for existing installs. */
@@ -47,6 +51,30 @@ export async function migrateVaultSchema(db: SQLiteDBConnection): Promise<void> 
   )
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS best_take_history (
+      id TEXT PRIMARY KEY NOT NULL,
+      project_id TEXT NOT NULL,
+      take_id TEXT NOT NULL,
+      marked_at INTEGER NOT NULL,
+      UNIQUE(project_id, take_id),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (take_id) REFERENCES takes(id) ON DELETE CASCADE
+    )
+  `)
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_best_take_history_project ON best_take_history(project_id, marked_at DESC)',
+  )
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_best_take_history_marked_at ON best_take_history(marked_at DESC)',
+  )
+  await db.execute(`
+    INSERT OR IGNORE INTO best_take_history (id, project_id, take_id, marked_at)
+    SELECT 'legacy-best-' || id, project_id, id, created_at
+    FROM takes
+    WHERE is_best_take = 1
+  `)
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS pitch_observations (
       id TEXT PRIMARY KEY NOT NULL,
       midi_note INTEGER NOT NULL,
@@ -82,4 +110,33 @@ export async function migrateVaultSchema(db: SQLiteDBConnection): Promise<void> 
   if (!projectExisting.has('benchmark_ref_id')) {
     await db.execute('ALTER TABLE projects ADD COLUMN benchmark_ref_id TEXT')
   }
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS practice_sessions (
+      id TEXT PRIMARY KEY NOT NULL,
+      project_id TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      focus_area TEXT NOT NULL DEFAULT '',
+      comparison_mode TEXT NOT NULL DEFAULT 'current-best',
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `)
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_practice_sessions_project ON practice_sessions(project_id, started_at DESC)',
+  )
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS practice_item_states (
+      project_id TEXT PRIMARY KEY NOT NULL,
+      focus_area TEXT NOT NULL DEFAULT '',
+      comparison_mode TEXT NOT NULL DEFAULT 'current-best',
+      loop_start_seconds REAL,
+      loop_end_seconds REAL,
+      pending_intention TEXT NOT NULL DEFAULT '',
+      last_session_id TEXT,
+      last_opened_at INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (last_session_id) REFERENCES practice_sessions(id) ON DELETE SET NULL
+    )
+  `)
 }

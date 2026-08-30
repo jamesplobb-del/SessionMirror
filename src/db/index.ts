@@ -1,6 +1,15 @@
 export { initVaultDatabase, getVaultDatabase, isVaultDatabaseReady } from './connection'
 export { DEFAULT_PROJECT_NAME, DB_NAME, DB_VERSION } from './schema'
-export type { Project, SaveTakeInput, VaultTake, VaultTakeUpdate } from './types'
+export type {
+  BestTakeHistoryEntry,
+  Project,
+  SaveTakeInput,
+  VaultTake,
+  VaultTakeUpdate,
+  PracticeComparisonMode,
+  PracticeItemState,
+  PracticeSession,
+} from './types'
 export { findBestTakeId, hydrateVaultTakeRowsProgressive, loadUiTakesForProject, uiTakesFromVaultRows, uiTakesFromVaultRowsFast, vaultTakeToUiTake } from './takeBridge'
 export {
   clearProjectBestTake,
@@ -9,6 +18,7 @@ export {
   deleteVaultTake,
   deleteTakesByProject,
   getTakesByProject,
+  listBestTakeHistory,
   listProjects,
   saveTake,
   setProjectBestTake,
@@ -27,6 +37,14 @@ export {
   updateLibraryItemName,
 } from './libraryRepository'
 export type { VaultLibraryItem } from './types'
+export {
+  getPracticeItemState,
+  listPracticeItemStates,
+  listPracticeSessions,
+  resumePracticeSession,
+  startPracticeSession,
+  updatePracticeItemState,
+} from './practiceRepository'
 export {
   clearPitchObservations,
   deletePitchObservationsInRange,

@@ -1,11 +1,16 @@
 import {
   Camera,
+  Check,
   ChevronDown,
+  House,
   Layers3,
-  ListMusic,
+  MessageSquareText,
   Mic,
+  RotateCcw,
+  ScanSearch,
   Settings,
   Trash2,
+  X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
@@ -26,11 +31,19 @@ interface ControlDeckProps {
   recordingMode: RecordingMode
   onRecordingModeChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
-  onOpenVault: () => void
+  onOpenHome: () => void
   onOpenSettings: () => void
-  takeCount: number
-  isVaultOpen?: boolean
-  vaultToggleEnabled?: boolean
+  expandViewActive?: boolean
+  onToggleExpandView?: () => void
+  onOpenMultitrack?: () => void
+  focusedPostTakeActive?: boolean
+  focusedPostTakeReviewed?: boolean
+  focusedPostTakeHasNote?: boolean
+  focusedRecordingGoal?: string
+  onFocusedPostTakeReview?: () => void
+  onFocusedPostTakeNote?: () => void
+  onFocusedPostTakeRetry?: () => void
+  onFocusedPostTakeDismiss?: () => void
   handsFreeRecording?: boolean
   handsFreeListeningReady?: boolean
   handsFreePlaybackPending?: boolean
@@ -88,11 +101,19 @@ function ControlDeck({
   recordingMode,
   onRecordingModeChange,
   onToggleRecord,
-  onOpenVault,
+  onOpenHome,
   onOpenSettings,
-  takeCount,
-  isVaultOpen = false,
-  vaultToggleEnabled = false,
+  expandViewActive = false,
+  onToggleExpandView,
+  onOpenMultitrack,
+  focusedPostTakeActive = false,
+  focusedPostTakeReviewed = false,
+  focusedPostTakeHasNote = false,
+  focusedRecordingGoal = '',
+  onFocusedPostTakeReview,
+  onFocusedPostTakeNote,
+  onFocusedPostTakeRetry,
+  onFocusedPostTakeDismiss,
   handsFreeRecording = false,
   handsFreeListeningReady = false,
   handsFreePlaybackPending = false,
@@ -305,6 +326,10 @@ function ControlDeck({
         tunerTakePillsToggleVisible={tunerTakePillsToggleVisible}
         pitchToggleVisible={pitchToggleVisible}
         takeCardsToggleVisible={recordingMode !== 'audio'}
+        expandViewActive={expandViewActive}
+        workspaceActionsVisible={isCameraPresentation && !isRecording && !isStopping}
+        onToggleExpandView={onToggleExpandView}
+        onOpenMultitrack={onOpenMultitrack}
         onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
         onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}
@@ -312,27 +337,84 @@ function ControlDeck({
         onTunerTakePillsChange={(show) => onTunerTakePillsChange?.(show)}
       />
 
-      {isCameraPresentation ? (
+      {isRecording && focusedRecordingGoal.trim() && (
+        <div className="focused-recording-goal" role="status">
+          <MessageSquareText aria-hidden />
+          <span>Goal</span>
+          <strong>{focusedRecordingGoal.trim()}</strong>
+        </div>
+      )}
+
+      {focusedPostTakeActive && !isRecording && !isStopping ? (
+        <section className="focused-post-take-dock" aria-label="Focused practice next steps">
+          <header>
+            <div>
+              <span>Focused Practice</span>
+              <strong>Take saved</strong>
+            </div>
+            <Pressable
+              type="button"
+              intensity="icon"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              onClick={onFocusedPostTakeDismiss}
+              aria-label="Return to recording controls"
+            >
+              <X aria-hidden />
+            </Pressable>
+          </header>
+          <div className="focused-post-take-actions">
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              className={focusedPostTakeReviewed ? 'is-complete' : 'is-recommended'}
+              onClick={onFocusedPostTakeReview}
+            >
+              {focusedPostTakeReviewed ? <Check aria-hidden /> : <ScanSearch aria-hidden />}
+              <span>Review</span>
+            </Pressable>
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              className={focusedPostTakeHasNote ? 'is-complete' : ''}
+              onClick={onFocusedPostTakeNote}
+            >
+              {focusedPostTakeHasNote ? <Check aria-hidden /> : <MessageSquareText aria-hidden />}
+              <span>Next goal</span>
+            </Pressable>
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              className="is-primary"
+              onClick={onFocusedPostTakeRetry}
+            >
+              <RotateCcw aria-hidden />
+              <span>Try again</span>
+            </Pressable>
+          </div>
+        </section>
+      ) : isCameraPresentation ? (
         <div className="camera-control-deck__main-row">
           <div className="camera-control-pill">
             <Pressable
               type="button"
               intensity="icon"
               squish={false}
-              onClick={onOpenVault}
+              onClick={onOpenHome}
               haptic="light"
               hapticFeedback={hapticFeedback}
-              data-tutorial="vault-button"
+              data-tutorial="home-button"
               className="control-deck__vault-btn camera-vault-button pointer-events-auto"
-              aria-label={`Open Take Vault${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
+              aria-label="Open Practice Home"
             >
               <span className="ui-orient-spin camera-vault-button__icon-wrap">
-                <ListMusic aria-hidden strokeWidth={1.85} />
-                {takeCount > 0 && (
-                  <span className="camera-vault-button__badge">
-                    {takeCount > 99 ? '99+' : takeCount}
-                  </span>
-                )}
+                <House aria-hidden strokeWidth={1.85} />
               </span>
             </Pressable>
 
@@ -353,13 +435,13 @@ function ControlDeck({
               data-tutorial="overlays-button"
               className="camera-pill-action camera-overlays-button pointer-events-auto"
               disabled={settingsBranchDisabled}
-              aria-label={branchActive ? 'Close overlays' : 'Open overlays'}
+              aria-label={branchActive ? 'Close workspace' : 'Open workspace'}
               aria-expanded={branchActive}
               aria-haspopup="menu"
             >
               <span className="ui-orient-spin camera-pill-action__content">
                 <Layers3 aria-hidden className="camera-overlays-button__icon" />
-                <span>Overlays</span>
+                <span>Workspace</span>
               </span>
             </Pressable>
 
@@ -429,24 +511,15 @@ function ControlDeck({
               type="button"
               intensity="icon"
               squish={false}
-              onClick={onOpenVault}
+              onClick={onOpenHome}
               haptic="light"
               hapticFeedback={hapticFeedback}
-              data-tutorial="vault-button"
+              data-tutorial="home-button"
               className="control-deck__vault-btn audio-vault-button pointer-events-auto"
-              aria-label={
-                vaultToggleEnabled && isVaultOpen
-                  ? 'Close take vault'
-                  : `View takes${takeCount > 0 ? `, ${takeCount} saved` : ''}`
-              }
+              aria-label="Open Practice Home"
             >
               <span className="ui-orient-spin audio-vault-button__icon-wrap">
-                <ListMusic aria-hidden strokeWidth={1.85} />
-                {takeCount > 0 && (
-                  <span className="audio-vault-button__badge">
-                    {takeCount > 99 ? '99+' : takeCount}
-                  </span>
-                )}
+                <House aria-hidden strokeWidth={1.85} />
               </span>
             </Pressable>
 
@@ -467,13 +540,13 @@ function ControlDeck({
               data-tutorial="overlays-button"
               className="audio-pill-action audio-overlays-button pointer-events-auto"
               disabled={settingsBranchDisabled}
-              aria-label={branchActive ? 'Close overlays' : 'Open overlays'}
+              aria-label={branchActive ? 'Close workspace' : 'Open workspace'}
               aria-expanded={branchActive}
               aria-haspopup="menu"
             >
               <span className="ui-orient-spin audio-pill-action__content">
                 <Layers3 aria-hidden className="audio-overlays-button__icon" />
-                <span>Overlays</span>
+                <span>Workspace</span>
               </span>
             </Pressable>
 

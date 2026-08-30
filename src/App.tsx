@@ -128,17 +128,24 @@ import {
   getProjectBenchmarkBinding,
   getTakesByProject,
   initVaultDatabase,
+  listBestTakeHistory,
+  listPracticeItemStates,
   listProjects,
+  resumePracticeSession,
   saveLibraryAudioItem,
   saveTake,
   setProjectBenchmarkBinding,
   setProjectBestTake,
   setProjectLibraryBenchmark,
   setTakeEnhancerBaked,
+  startPracticeSession,
   uiTakesFromVaultRowsFast,
   hydrateVaultTakeRowsProgressive,
   updateLibraryItemName,
+  updatePracticeItemState,
   updateVaultTake,
+  type BestTakeHistoryEntry,
+  type PracticeItemState,
   type Project,
 } from './db'
 import { resolveBenchmarkPlayback } from './utils/benchmarkReference'
@@ -224,6 +231,10 @@ import {
   saveTakeMarkers,
 } from './practiceTimeline/recording/timelineMarkers'
 import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
+import PracticeHub, {
+  type FocusedPracticeSelection,
+} from './components/PracticeHub'
+import FocusedPracticeCue from './components/FocusedPracticeCue'
 import {
   AudioModePlaybackProvider,
   audioModePlaybackControlsRef,
@@ -232,6 +243,7 @@ import type { AudioPracticeTab } from './types/audioPractice'
 import { requestQuickFunctionFromApp } from './utils/quickTunerLaunch'
 import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
 import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
+import { analyzeTakeForFocusedPractice } from './utils/takePracticeAnalysis'
 
 const AUTO_PLAYBACK_POST_COOLDOWN_MS = 0
 const AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS = 240
@@ -300,6 +312,8 @@ interface AppBootSnapshot {
   challengerId: string | null
   libraryItems: HydratedLibraryItem[]
   benchmarkBinding: BenchmarkBinding | null
+  bestTakeHistory: BestTakeHistoryEntry[]
+  practiceItemStates: PracticeItemState[]
 }
 
 const BOOT_REVEAL_DELAY_MS = 500
@@ -321,6 +335,10 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
   let challengerId: string | null = null
   let libraryItems: HydratedLibraryItem[] = []
   let benchmarkBinding: BenchmarkBinding | null = null
+  const [bestTakeHistory, practiceItemStates] = await Promise.all([
+    listBestTakeHistory(),
+    listPracticeItemStates(),
+  ])
 
   if (initialId) {
     const rows = await getTakesByProject(initialId)
@@ -358,6 +376,8 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
     challengerId,
     libraryItems,
     benchmarkBinding,
+    bestTakeHistory,
+    practiceItemStates,
   }
 }
 
@@ -465,6 +485,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [benchmarkBinding, setBenchmarkBinding] = useState<BenchmarkBinding | null>(
     bootSnapshot.benchmarkBinding
   )
+  const [bestTakeHistory, setBestTakeHistory] = useState<BestTakeHistoryEntry[]>(
+    bootSnapshot.bestTakeHistory,
+  )
+  const [practiceItemStates, setPracticeItemStates] = useState<PracticeItemState[]>(
+    bootSnapshot.practiceItemStates,
+  )
+  const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(() => isOnboardingComplete())
+  const [focusedPractice, setFocusedPractice] = useState<FocusedPracticeSelection | null>(null)
+  const [focusedCueOpen, setFocusedCueOpen] = useState(false)
+  const [focusedPostTakeId, setFocusedPostTakeId] = useState<string | null>(null)
+  const [focusedPostTakeReviewed, setFocusedPostTakeReviewed] = useState(false)
+  const [focusedPracticeSessionId, setFocusedPracticeSessionId] = useState<string | null>(null)
+  const [focusedReferenceTakeId, setFocusedReferenceTakeId] = useState<string | null>(null)
+  const focusedPreviousChallengerRef = useRef<string | null>(null)
   const [isVaultOpen, setIsVaultOpen] = useState(false)
   const [reviewSlot, setReviewSlot] = useState<ReviewSlot | null>(null)
   const [reviewContext, setReviewContext] = useState<ReviewContext>('compare')
@@ -586,13 +620,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
+  const focusedPracticeRef = useRef<FocusedPracticeSelection | null>(focusedPractice)
+  focusedPracticeRef.current = focusedPractice
+  const focusedPracticeSessionIdRef = useRef<string | null>(focusedPracticeSessionId)
+  focusedPracticeSessionIdRef.current = focusedPracticeSessionId
+  const practiceItemStatesRef = useRef<PracticeItemState[]>(practiceItemStates)
+  practiceItemStatesRef.current = practiceItemStates
 
   const isReviewOpen = reviewSlot !== null
   const isLabsOpen = labsRoute !== null
   const isExperimentalOpen = isLabsOpen || multitrackOpen
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
     ? 'review'
-    : isVaultOpen || isSettingsOpen || isExperimentalOpen
+    : isVaultOpen || isSettingsOpen || isExperimentalOpen || isPracticeHubOpen
     ? 'sheet'
     : 'idle'
 
@@ -600,6 +640,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (!isExperimentalOpen) return
     setIsVaultOpen(false)
     setIsSettingsOpen(false)
+    setIsPracticeHubOpen(false)
   }, [isExperimentalOpen])
 
   useLayoutEffect(() => {
@@ -622,12 +663,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
     setShowOnboardingTutorial(false)
     setTutorialTourEnabled(true)
+    setIsPracticeHubOpen(true)
   }, [updateSettings])
 
   const handleSkipOnboardingTutorial = useCallback(() => {
     markAllCoachMarksSeen()
     setShowOnboardingTutorial(false)
     setTutorialTourEnabled(false)
+    setIsPracticeHubOpen(true)
   }, [])
 
   /** Onboarding instrument pick — sets the tuner profile, written pitch, and auto-record gate. */
@@ -1222,6 +1265,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setBenchmarkId(null)
     setChallengerId(null)
     challengerUserDismissedRef.current = false
+    return project
   }, [])
 
   const handleDeleteProject = useCallback(
@@ -1248,6 +1292,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             }))
 
       await deleteProject(projectId)
+      setPracticeItemStates((current) =>
+        current.filter((state) => state.projectId !== projectId),
+      )
+      setBestTakeHistory((current) =>
+        current.filter((entry) => entry.projectId !== projectId),
+      )
 
       for (const row of takeRows) {
         await deleteCachedTakeThumbnail(row.id)
@@ -1413,6 +1463,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         resolveTakePlaybackUrlFast(filePath, videoUrl) ??
         (videoUrl ? resolveMediaPlaybackSrc(videoUrl) : '')
       const projectId = activeProjectIdRef.current
+      const focusedAtCapture = focusedPracticeRef.current
+      const practiceSessionIdAtCapture = focusedPracticeSessionIdRef.current
+      const practiceStateAtCapture = focusedAtCapture
+        ? practiceItemStatesRef.current.find(
+            (state) => state.projectId === focusedAtCapture.projectId,
+          ) ?? null
+        : null
+      const intentionAtCapture =
+        focusedAtCapture?.projectId === projectId
+          ? practiceStateAtCapture?.pendingIntention.trim() ?? ''
+          : ''
+
+      if (focusedAtCapture?.projectId === projectId) {
+        setFocusedPostTakeId(takeId)
+        setFocusedPostTakeReviewed(false)
+      }
 
       if (mediaType === 'audio') {
         audioTakeReadinessInputRef.current.set(takeId, {
@@ -1451,6 +1517,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           ...(autoPerformanceStartSeconds !== undefined
             ? { performanceStartSeconds: autoPerformanceStartSeconds }
             : null),
+          ...(focusedAtCapture?.projectId === projectId && practiceSessionIdAtCapture
+            ? { practiceSessionId: practiceSessionIdAtCapture }
+            : null),
+          ...(intentionAtCapture ? { intention: intentionAtCapture } : null),
           ...(referenceTrackId !== undefined ? { referenceTrackId } : null),
           ...(referenceStartBeat !== undefined ? { referenceStartBeat } : null),
           ...(payload.captureDiagnostics?.playbackGainMetadata
@@ -1561,8 +1631,61 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             mediaType,
             recordingOrientation,
             timelineOffsetMs,
+            practiceSessionId:
+              focusedAtCapture?.projectId === projectId
+                ? practiceSessionIdAtCapture ?? undefined
+                : undefined,
+            intention: intentionAtCapture,
+            performanceStartSeconds: autoPerformanceStartSeconds,
             name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
           })
+
+          if (intentionAtCapture) {
+            const latestState = practiceItemStatesRef.current.find(
+              (state) => state.projectId === projectId,
+            )
+            if (latestState?.pendingIntention.trim() === intentionAtCapture) {
+              setPracticeItemStates((current) =>
+                current.map((state) =>
+                  state.projectId === projectId ? { ...state, pendingIntention: '' } : state,
+                ),
+              )
+              void updatePracticeItemState(projectId, { pendingIntention: '' }).catch((error) => {
+                console.warn('[FocusedPractice] note clear failed', error)
+              })
+            }
+          }
+
+          if (focusedAtCapture?.projectId === projectId) {
+            void analyzeTakeForFocusedPractice(resolvedFilePath)
+              .then(async (analysis) => {
+                if (!analysis) return
+                await updateVaultTake(takeId, {
+                  timelineOffsetMs: analysis.timelineOffsetMs,
+                  pitchSeries: analysis.pitchSeries,
+                  ...(analysis.performanceStartSeconds !== undefined
+                    ? { performanceStartSeconds: analysis.performanceStartSeconds }
+                    : null),
+                })
+                setTakes((current) =>
+                  current.map((take) =>
+                    take.id === takeId
+                      ? {
+                          ...take,
+                          timelineOffsetMs: analysis.timelineOffsetMs,
+                          pitchSeries: analysis.pitchSeries,
+                          ...(analysis.performanceStartSeconds !== undefined
+                            ? { performanceStartSeconds: analysis.performanceStartSeconds }
+                            : null),
+                        }
+                      : take,
+                  ),
+                )
+              })
+              .catch((error) => {
+                console.warn('[FocusedPractice] take analysis persistence failed', error)
+              })
+          }
         }
 
         if (mediaType === 'audio') {
@@ -2118,6 +2241,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const autoMonitoringAllowed =
     !isVaultOpen &&
     !isSettingsOpen &&
+    !isPracticeHubOpen &&
     !isReviewOpen &&
     !isExperimentalOpen &&
     (ready || nativeHandsFreeCaptureActive)
@@ -2463,23 +2587,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [markOverlayClosed, settings.hapticFeedback])
 
-  const handleOpenVault = useCallback(() => {
-    if (!canOpenOverlaySheet() || isExperimentalOpen) return
-    triggerLightHaptic(settings.hapticFeedback)
-    setShowPitch(false)
-    setIsSettingsOpen(false)
-    setIsVaultOpen(true)
-    deferHudMediaPause()
-  }, [canOpenOverlaySheet, deferHudMediaPause, isExperimentalOpen, settings.hapticFeedback])
-
-  const handleToggleVault = useCallback(() => {
-    if (isVaultOpen) {
-      handleCloseVault()
-      return
-    }
-    handleOpenVault()
-  }, [handleCloseVault, handleOpenVault, isVaultOpen])
-
   const handleVaultEnterComplete = useCallback(() => {
     if (vaultEnterLoadDoneRef.current) return
     vaultEnterLoadDoneRef.current = true
@@ -2557,6 +2664,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleReplayOnboardingTutorial = useCallback(() => {
     setIsSettingsOpen(false)
     setIsVaultOpen(false)
+    setIsPracticeHubOpen(false)
     setIsSplitView(false)
     setQuickSettingsOpen(false)
     setPracticeSessionActive(false)
@@ -2591,6 +2699,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     toggleRecording,
     updateSettings,
   ])
+
+  const handleFocusedPostTakeRetry = useCallback(() => {
+    setFocusedCueOpen(false)
+    setFocusedPostTakeId(null)
+    setFocusedPostTakeReviewed(false)
+    handleToggleRecord()
+  }, [handleToggleRecord])
 
   const handleAutoSoundRecordingChange = useCallback(
     (enabled: boolean) => {
@@ -2643,6 +2758,236 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsSettingsOpen(false)
     requestQuickFunctionFromApp('metronome', 'inAppSettings')
   }, [])
+
+  const handleOpenPracticeHome = useCallback(() => {
+    if (isRecording || isStopping) return
+    if (!canOpenOverlaySheet() || isExperimentalOpen) return
+    triggerLightHaptic(settings.hapticFeedback)
+    setShowPitch(false)
+    setQuickSettingsOpen(false)
+    setIsVaultOpen(false)
+    setIsSettingsOpen(false)
+    setIsPracticeHubOpen(true)
+    deferHudMediaPause()
+  }, [
+    canOpenOverlaySheet,
+    deferHudMediaPause,
+    isExperimentalOpen,
+    isRecording,
+    isStopping,
+    settings.hapticFeedback,
+  ])
+
+  /**
+   * Leaving Practice Home lands the finger on the live HUD underneath, so borrow
+   * the same close suppression the vault/settings sheets use.
+   */
+  const dismissPracticeHub = useCallback(() => {
+    markOverlayClosed()
+    setIsPracticeHubOpen(false)
+  }, [markOverlayClosed])
+
+  const handleOpenQuickPractice = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    setFocusedPractice(null)
+    setFocusedReferenceTakeId(null)
+    setFocusedPracticeSessionId(null)
+    focusedPreviousChallengerRef.current = null
+    dismissPracticeHub()
+  }, [dismissPracticeHub, settings.hapticFeedback])
+
+  /**
+   * Closing the sheet resumes whatever context is already live — it never
+   * fabricates a focus the musician did not choose, or the deck pill starts
+   * lying about the session.
+   */
+  const handleClosePracticeHub = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    dismissPracticeHub()
+  }, [dismissPracticeHub, settings.hapticFeedback])
+
+  /**
+   * Resolve the take the next run is measured against. Session-scoped: it moves
+   * the compare reference without rewriting the project's persisted Best Take.
+   */
+  const resolveComparisonTakeId = useCallback(
+    async (
+      projectId: string,
+      comparison: FocusedPracticeSelection['comparison'],
+    ): Promise<string | null> => {
+      const rows = await getTakesByProject(projectId)
+      if (comparison === 'reference-track') return null
+      if (rows.length === 0) return null
+      const bestId = findBestTakeId(rows)
+      if (comparison === 'current-best') return bestId
+      const newestFirst = [...rows].sort((a, b) => b.createdAt - a.createdAt)
+      if (comparison === 'previous-take') return newestFirst[0]?.id ?? bestId
+      const startOfToday = new Date().setHours(0, 0, 0, 0)
+      return newestFirst.find((row) => row.createdAt < startOfToday)?.id ?? bestId
+    },
+    [],
+  )
+
+  const prepareFocusedComparisonAnalysis = useCallback((projectId: string) => {
+    void (async () => {
+      const rows = await getTakesByProject(projectId)
+      const bestId = findBestTakeId(rows)
+      const candidates = [
+        rows.find((row) => row.id === bestId),
+        ...rows.slice(0, 2),
+      ]
+        .filter((row): row is NonNullable<typeof row> => Boolean(row))
+        .filter(
+          (row, index, all) =>
+            all.findIndex((candidate) => candidate.id === row.id) === index &&
+            (!row.pitchSeries || row.pitchSeries.length === 0),
+        )
+
+      for (const row of candidates) {
+        const analysis = await analyzeTakeForFocusedPractice(row.filePath)
+        if (!analysis) continue
+        await updateVaultTake(row.id, {
+          timelineOffsetMs: analysis.timelineOffsetMs,
+          pitchSeries: analysis.pitchSeries,
+          ...(analysis.performanceStartSeconds !== undefined
+            ? { performanceStartSeconds: analysis.performanceStartSeconds }
+            : null),
+        })
+        if (activeProjectIdRef.current !== projectId) continue
+        setTakes((current) =>
+          current.map((take) =>
+            take.id === row.id
+              ? {
+                  ...take,
+                  timelineOffsetMs: analysis.timelineOffsetMs,
+                  pitchSeries: analysis.pitchSeries,
+                  ...(analysis.performanceStartSeconds !== undefined
+                    ? { performanceStartSeconds: analysis.performanceStartSeconds }
+                    : null),
+                }
+              : take,
+          ),
+        )
+      }
+    })().catch((error) => {
+      console.warn('[FocusedPractice] comparison analysis backfill failed', error)
+    })
+  }, [])
+
+  const handleStartFocusedPractice = useCallback(
+    async (selection: FocusedPracticeSelection) => {
+      focusedPreviousChallengerRef.current = null
+      if (selection.projectId !== activeProjectIdRef.current) {
+        await handleSelectProject(selection.projectId)
+      }
+      if (!showTakeCardsRef.current) {
+        showTakeCardsRef.current = true
+        updateSettings({ showTakeCards: true })
+      }
+      const referenceTakeId = await resolveComparisonTakeId(
+        selection.projectId,
+        selection.comparison,
+      )
+      prepareFocusedComparisonAnalysis(selection.projectId)
+      const { session, state } = await startPracticeSession({
+        projectId: selection.projectId,
+        focusArea: selection.focusArea,
+        comparison: selection.comparison,
+      })
+      setPracticeItemStates((current) => [
+        state,
+        ...current.filter((item) => item.projectId !== state.projectId),
+      ])
+      setFocusedPracticeSessionId(session.id)
+      setFocusedReferenceTakeId(referenceTakeId)
+      setFocusedPostTakeId(null)
+      setFocusedPostTakeReviewed(false)
+      triggerLightHaptic(settings.hapticFeedback)
+      setFocusedPractice(selection)
+      dismissPracticeHub()
+    },
+    [
+      dismissPracticeHub,
+      handleSelectProject,
+      prepareFocusedComparisonAnalysis,
+      resolveComparisonTakeId,
+      settings.hapticFeedback,
+      updateSettings,
+    ],
+  )
+
+  const handleResumeFocusedPractice = useCallback(
+    async (projectId: string) => {
+      const saved = await resumePracticeSession(projectId)
+      if (!saved) {
+        await handleStartFocusedPractice({
+          projectId,
+          focusArea: '',
+          comparison: 'current-best',
+        })
+        return
+      }
+
+      if (projectId !== activeProjectIdRef.current) await handleSelectProject(projectId)
+      if (!showTakeCardsRef.current) {
+        showTakeCardsRef.current = true
+        updateSettings({ showTakeCards: true })
+      }
+      const selection: FocusedPracticeSelection = {
+        projectId,
+        focusArea: saved.focusArea,
+        comparison: saved.comparison,
+      }
+      const referenceTakeId = await resolveComparisonTakeId(projectId, saved.comparison)
+      prepareFocusedComparisonAnalysis(projectId)
+      focusedPreviousChallengerRef.current = null
+      setPracticeItemStates((current) => [
+        saved,
+        ...current.filter((item) => item.projectId !== projectId),
+      ])
+      setFocusedPracticeSessionId(saved.lastSessionId)
+      setFocusedReferenceTakeId(referenceTakeId)
+      setFocusedPostTakeId(null)
+      setFocusedPostTakeReviewed(false)
+      setFocusedPractice(selection)
+      triggerLightHaptic(settings.hapticFeedback)
+      dismissPracticeHub()
+    },
+    [
+      dismissPracticeHub,
+      handleSelectProject,
+      handleStartFocusedPractice,
+      prepareFocusedComparisonAnalysis,
+      resolveComparisonTakeId,
+      settings.hapticFeedback,
+      updateSettings,
+    ],
+  )
+
+  const handleOpenPracticeGames = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    setFocusedPractice(null)
+    setFocusedReferenceTakeId(null)
+    setFocusedPracticeSessionId(null)
+    focusedPreviousChallengerRef.current = null
+    dismissPracticeHub()
+    handleRecordingModeChange('audio')
+    setLabsRoute('menu')
+    deferHudMediaPause()
+  }, [
+    deferHudMediaPause,
+    dismissPracticeHub,
+    handleRecordingModeChange,
+    settings.hapticFeedback,
+  ])
+
+  const handleOpenVaultFromPracticeHub = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    setIsPracticeHubOpen(false)
+    setIsSettingsOpen(false)
+    setIsVaultOpen(true)
+    deferHudMediaPause()
+  }, [deferHudMediaPause, settings.hapticFeedback])
 
   const handleOpenMultitrack = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
@@ -3005,7 +3350,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
   }, [])
 
-  const suspendPipPlayback = isVaultOpen || isReviewOpen || isSettingsOpen || isExperimentalOpen
+  const suspendPipPlayback =
+    isVaultOpen || isReviewOpen || isSettingsOpen || isExperimentalOpen || isPracticeHubOpen
 
   const handsFreeBackgroundTake = useMemo(() => {
     if (!autoPlaybackTakeId || recordingMode !== 'video') return null
@@ -3018,8 +3364,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [handsFreeBackgroundTake])
 
   const resolvedBenchmark = useMemo(
-    () => resolveBenchmarkPlayback(benchmarkBinding, benchmarkId, takes, libraryItems),
-    [benchmarkBinding, benchmarkId, libraryItems, takes]
+    () =>
+      focusedPractice && focusedReferenceTakeId
+        ? resolveBenchmarkPlayback(null, focusedReferenceTakeId, takes, libraryItems)
+        : resolveBenchmarkPlayback(benchmarkBinding, benchmarkId, takes, libraryItems),
+    [
+      benchmarkBinding,
+      benchmarkId,
+      focusedPractice,
+      focusedReferenceTakeId,
+      libraryItems,
+      takes,
+    ],
   )
 
   const benchmarkTake = resolvedBenchmark.take
@@ -3029,6 +3385,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     () => takes.find((t) => t.id === challengerId) ?? null,
     [takes, challengerId]
   )
+
+  useEffect(() => {
+    if (focusedPractice?.comparison !== 'previous-take') {
+      focusedPreviousChallengerRef.current = null
+      return
+    }
+    if (!challengerId) return
+
+    const previousChallengerId = focusedPreviousChallengerRef.current
+    if (!previousChallengerId) {
+      focusedPreviousChallengerRef.current = challengerId
+      return
+    }
+    if (previousChallengerId === challengerId) return
+
+    setFocusedReferenceTakeId(previousChallengerId)
+    focusedPreviousChallengerRef.current = challengerId
+  }, [challengerId, focusedPractice?.comparison, focusedPractice?.projectId])
 
   takesRef.current = takes
 
@@ -3162,7 +3536,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [pitchTrackerActive, recordingMode, ready, isRecording])
 
-  const pitchHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen
+  const pitchHudSuspended =
+    isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen || isPracticeHubOpen
 
   const showMainPitchWidget = mainAudioPitchSource !== null || mainVideoPitchSource !== null
 
@@ -3180,7 +3555,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     sharedMetronomeEngine.reconcileAfterModeSwitch(recordingMode)
   }, [recordingMode, nativeLivePreviewActive, metronomePlaying])
 
-  const metronomeHudSuspended = isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen
+  const metronomeHudSuspended =
+    isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen || isPracticeHubOpen
 
   const showFloatingMetronomeWidget =
     showMetronomeWidget &&
@@ -3315,7 +3691,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setActiveCaptureProfile('natural')
   }, [])
 
-  const audioPracticeSheetOpen = isVaultOpen || isSettingsOpen || isExperimentalOpen
+  const audioPracticeSheetOpen = isVaultOpen || isSettingsOpen || isExperimentalOpen || isPracticeHubOpen
 
   const isAudioPracticeMetronomeTab = recordingMode === 'audio' && audioPracticeTab === 'metronome'
 
@@ -3433,6 +3809,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const sortedTakes = useMemo(() => sortTakes(takes, sortMode), [takes, sortMode])
 
+  const refreshBestTakeHistory = useCallback(() => {
+    void listBestTakeHistory()
+      .then(setBestTakeHistory)
+      .catch((error) => console.warn('[BestTakeHistory] refresh failed', error))
+  }, [])
+
   const handlePinBenchmark = useCallback(
     (id: string) => {
       triggerBestTakeHaptic(settings.hapticFeedback)
@@ -3460,12 +3842,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         })
         return id
       })
+      if (focusedPractice?.comparison === 'current-best') {
+        setFocusedReferenceTakeId(id)
+      }
       if (activeProjectIdRef.current) {
-        void setProjectBestTake(activeProjectIdRef.current, id)
+        void setProjectBestTake(activeProjectIdRef.current, id).then(refreshBestTakeHistory)
       }
     },
     [
       pausePipVideos,
+      focusedPractice?.comparison,
+      refreshBestTakeHistory,
       releaseAutoRecordSuppress,
       settings.hapticFeedback,
       sortMode,
@@ -3593,6 +3980,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [deferHudMediaPause]
   )
 
+  const handleFocusedPostTakeReview = useCallback(() => {
+    if (!focusedPostTakeId) return
+    challengerUserDismissedRef.current = false
+    pendingChallengerIdRef.current = focusedPostTakeId
+    setChallengerId(focusedPostTakeId)
+    setFocusedPostTakeReviewed(true)
+    handleOpenCompareReview('challenger')
+  }, [focusedPostTakeId, handleOpenCompareReview])
+
   const handleCloseReview = useCallback(() => {
     startTransition(() => {
       setReviewSlot(null)
@@ -3655,6 +4051,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             name: uploadedTake.name,
           })
           await setProjectBestTake(projectId, takeId)
+          refreshBestTakeHistory()
         }
 
         setTakes((prev) => [...prev, uploadedTake])
@@ -3675,7 +4072,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           })
       })()
     },
-    [pausePipVideos, takes.length]
+    [pausePipVideos, refreshBestTakeHistory, takes.length]
   )
 
   const handleUpdateTake = useCallback((id: string, updates: TakeUpdate) => {
@@ -3738,6 +4135,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       )
       if (removedIds.size > 0) {
         setTakes((prev) => prev.filter((take) => !removedIds.has(take.id)))
+        setBestTakeHistory((current) =>
+          current.filter((entry) => !removedIds.has(entry.takeId)),
+        )
+        setFocusedReferenceTakeId((current) =>
+          current && removedIds.has(current) ? null : current,
+        )
         setBenchmarkId((current) => (current && removedIds.has(current) ? null : current))
         setChallengerId((current) => (current && removedIds.has(current) ? null : current))
       }
@@ -3787,6 +4190,65 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
     [projects, activeProjectId]
+  )
+
+  const focusedPracticeState = useMemo(
+    () =>
+      focusedPractice
+        ? practiceItemStates.find((state) => state.projectId === focusedPractice.projectId) ?? null
+        : null,
+    [focusedPractice, practiceItemStates],
+  )
+
+  useEffect(() => {
+    if (focusedPractice) return
+    setFocusedCueOpen(false)
+    setFocusedPostTakeId(null)
+    setFocusedPostTakeReviewed(false)
+  }, [focusedPractice])
+
+  useEffect(() => {
+    if (!focusedPostTakeId) return
+    if (takes.some((take) => take.id === focusedPostTakeId)) return
+    setFocusedPostTakeId(null)
+    setFocusedPostTakeReviewed(false)
+  }, [focusedPostTakeId, takes])
+
+  const handleFocusedPracticeIntentionChange = useCallback(
+    (pendingIntention: string) => {
+      const projectId = focusedPracticeRef.current?.projectId
+      if (!projectId) return
+      setPracticeItemStates((current) =>
+        current.map((state) =>
+          state.projectId === projectId ? { ...state, pendingIntention } : state,
+        ),
+      )
+      void updatePracticeItemState(projectId, { pendingIntention }).catch((error) => {
+        console.warn('[FocusedPractice] note persistence failed', error)
+      })
+    },
+    [],
+  )
+
+  const handleFocusedLoopRangeChange = useCallback(
+    (loopStartSeconds: number | null, loopEndSeconds: number | null) => {
+      const projectId = focusedPracticeRef.current?.projectId
+      if (!projectId) return
+      setPracticeItemStates((current) =>
+        current.map((state) =>
+          state.projectId === projectId
+            ? { ...state, loopStartSeconds, loopEndSeconds }
+            : state,
+        ),
+      )
+      void updatePracticeItemState(projectId, {
+        loopStartSeconds,
+        loopEndSeconds,
+      }).catch((error) => {
+        console.warn('[FocusedPractice] loop persistence failed', error)
+      })
+    },
+    [],
   )
 
   const clearBenchmarkTake = useCallback(
@@ -4039,7 +4501,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   return (
     <TutorialProvider
-      active={showOnboardingTutorial}
+      active={showOnboardingTutorial || isPracticeHubOpen}
       enabled={tutorialTourEnabled}
       signals={tutorialSignals}
       onComplete={() => setTutorialTourEnabled(false)}
@@ -4068,6 +4530,44 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   'webkit-playsinline': 'true',
                 } as React.AudioHTMLAttributes<HTMLAudioElement>)}
               />
+
+              <PracticeHub
+                isOpen={isPracticeHubOpen}
+                projects={projects}
+                activeProject={activeProject}
+                takes={takes}
+                bestTakeHistory={bestTakeHistory}
+                focusedPractice={focusedPractice}
+                practiceItemStates={practiceItemStates}
+                tunerInstrument={settings.tunerInstrument}
+                tunerTransposition={settings.tunerTransposition}
+                hapticFeedback={settings.hapticFeedback}
+                onClose={handleClosePracticeHub}
+                onOpenQuickPractice={handleOpenQuickPractice}
+                onStartFocusedPractice={handleStartFocusedPractice}
+                onResumeFocusedPractice={handleResumeFocusedPractice}
+                onCreatePracticeItem={handleCreateProject}
+                onOpenGames={handleOpenPracticeGames}
+                onOpenVault={handleOpenVaultFromPracticeHub}
+                onOpenTuner={handleOpenQuickTunerFromSettings}
+                onOpenMetronome={handleOpenQuickMetronomeFromSettings}
+              />
+
+              {focusedPractice &&
+                focusedPracticeState &&
+                !isPracticeHubOpen &&
+                !isReviewOpen &&
+                !isExperimentalOpen &&
+                !isRecording &&
+                !isStopping && (
+                  <FocusedPracticeCue
+                    open={focusedCueOpen}
+                    value={focusedPracticeState.pendingIntention}
+                    hapticFeedback={settings.hapticFeedback}
+                    onOpenChange={setFocusedCueOpen}
+                    onChange={handleFocusedPracticeIntentionChange}
+                  />
+                )}
 
               {takeDeleteError && (
                 <div
@@ -4671,7 +5171,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             onSubmitYoutube={handleSubmitYoutube}
                             onClearYoutube={handleClearYoutube}
                             onToggleSplitView={handleToggleSplitView}
-                            onOpenMultitrack={handleOpenMultitrack}
                             onExpandBenchmark={handleExpandBenchmark}
                             onExpandChallenger={handleExpandChallenger}
                             onDragStateChange={handlePipDragStateChange}
@@ -4700,13 +5199,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         recordingMode={recordingMode}
                         onRecordingModeChange={handleRecordingModeChange}
                         onToggleRecord={handleToggleRecord}
-                        onOpenVault={
-                          recordingMode === 'audio' ? handleToggleVault : handleOpenVault
-                        }
-                        isVaultOpen={isVaultOpen}
-                        vaultToggleEnabled={recordingMode === 'audio'}
+                        onOpenHome={handleOpenPracticeHome}
                         onOpenSettings={handleOpenSettings}
-                        takeCount={takes.length}
+                        expandViewActive={isSplitView}
+                        onToggleExpandView={handleToggleSplitView}
+                        onOpenMultitrack={handleOpenMultitrack}
+                        focusedPostTakeActive={Boolean(focusedPostTakeId)}
+                        focusedPostTakeReviewed={focusedPostTakeReviewed}
+                        focusedPostTakeHasNote={Boolean(
+                          focusedPracticeState?.pendingIntention.trim(),
+                        )}
+                        focusedRecordingGoal={
+                          focusedPracticeState?.pendingIntention.trim() ?? ''
+                        }
+                        onFocusedPostTakeReview={handleFocusedPostTakeReview}
+                        onFocusedPostTakeNote={() => setFocusedCueOpen(true)}
+                        onFocusedPostTakeRetry={handleFocusedPostTakeRetry}
+                        onFocusedPostTakeDismiss={() => {
+                          setFocusedPostTakeId(null)
+                          setFocusedPostTakeReviewed(false)
+                        }}
                         handsFreeRecording={handsFreeRecording}
                         handsFreeListeningReady={handsFreeListeningReady}
                         handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
@@ -4736,7 +5248,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         tunerTakePillsToggleVisible={isAudioPracticeTunerTab}
                         onTunerTakePillsChange={setShowTunerTakePills}
                         settingsBranchDisabled={
-                          isSettingsOpen || isVaultOpen || isReviewOpen || isExperimentalOpen
+                          isSettingsOpen ||
+                          isVaultOpen ||
+                          isReviewOpen ||
+                          isExperimentalOpen ||
+                          isPracticeHubOpen
                         }
                         onBranchOpenChange={handleQuickSettingsOpenChange}
                         hapticFeedback={settings.hapticFeedback}
@@ -4820,6 +5336,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onDeleteTake={handleDeleteTake}
                         onFavoriteTake={handlePinBenchmark}
                         onPlaybackActiveChange={setReviewPlaybackPlaying}
+                        focusedPractice={Boolean(focusedPractice)}
+                        initialLoopStartSeconds={focusedPracticeState?.loopStartSeconds}
+                        initialLoopEndSeconds={focusedPracticeState?.loopEndSeconds}
+                        onLoopRangeChange={handleFocusedLoopRangeChange}
                       />
                     )}
                   </AnimatePresence>
@@ -4832,9 +5352,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     projects={projects}
                     activeProject={activeProject}
                     onSelectProject={handleSelectProject}
-                    onCreateProject={handleCreateProject}
+                    onCreateProject={async (name) => {
+                      await handleCreateProject(name)
+                    }}
                     onDeleteProject={handleDeleteProject}
                     takes={takes}
+                    bestTakeHistory={bestTakeHistory}
                     sortedTakes={sortedTakes}
                     sortMode={sortMode}
                     onSortChange={setSortMode}

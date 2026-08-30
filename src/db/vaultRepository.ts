@@ -1,7 +1,35 @@
 import { getVaultDatabase, persistVaultWebStore } from './connection'
-import type { Project, SaveTakeInput, VaultTake, VaultTakeUpdate } from './types'
+import type {
+  BestTakeHistoryEntry,
+  Project,
+  SaveTakeInput,
+  VaultTake,
+  VaultTakeUpdate,
+} from './types'
 
 type SqlRow = Record<string, unknown>
+
+function parsePitchSeries(value: unknown): VaultTake['pitchSeries'] {
+  if (typeof value !== 'string' || !value) return undefined
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return undefined
+    const samples = parsed
+      .map((sample) => {
+        if (!sample || typeof sample !== 'object') return null
+        const row = sample as Record<string, unknown>
+        const time = Number(row.time)
+        const frequencyHz = Number(row.frequencyHz)
+        return Number.isFinite(time) && Number.isFinite(frequencyHz) && frequencyHz > 0
+          ? { time, frequencyHz }
+          : null
+      })
+      .filter((sample): sample is { time: number; frequencyHz: number } => sample !== null)
+    return samples.length > 0 ? samples : undefined
+  } catch {
+    return undefined
+  }
+}
 
 function mapProjectRow(row: SqlRow): Project {
   return {
@@ -30,6 +58,28 @@ function mapTakeRow(row: SqlRow): VaultTake {
         : 'portrait',
     enhancerBaked: Number(row.enhancer_baked ?? 0) === 1,
     timelineOffsetMs: Number(row.timeline_offset_ms ?? 0),
+    practiceSessionId: row.practice_session_id ? String(row.practice_session_id) : undefined,
+    intention: String(row.intention ?? ''),
+    pitchSeries: parsePitchSeries(row.pitch_series_json),
+    performanceStartSeconds:
+      row.performance_start_seconds === null || row.performance_start_seconds === undefined
+        ? undefined
+        : Number(row.performance_start_seconds),
+  }
+}
+
+function mapBestTakeHistoryRow(row: SqlRow): BestTakeHistoryEntry {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    projectName: String(row.project_name ?? ''),
+    takeId: String(row.take_id),
+    takeName: String(row.take_name ?? ''),
+    markedAt: Number(row.marked_at),
+    takeCreatedAt: Number(row.take_created_at),
+    duration: Number(row.duration ?? 0),
+    mediaType: String(row.media_type ?? 'video') === 'audio' ? 'audio' : 'video',
+    isCurrentBest: Number(row.is_current_best) === 1,
   }
 }
 
@@ -101,13 +151,19 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
     recordingOrientation: input.recordingOrientation ?? 'portrait',
     enhancerBaked: false,
     timelineOffsetMs: input.timelineOffsetMs ?? 0,
+    practiceSessionId: input.practiceSessionId,
+    intention: input.intention?.trim() ?? '',
+    pitchSeries: input.pitchSeries,
+    performanceStartSeconds: input.performanceStartSeconds,
   }
 
   await db.run(
     `INSERT INTO takes (
       id, project_id, file_path, duration, is_best_take, created_at,
-      name, mime_type, media_type, rating, notes, recording_orientation, enhancer_baked, timeline_offset_ms
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      name, mime_type, media_type, rating, notes, recording_orientation, enhancer_baked,
+      timeline_offset_ms, practice_session_id, intention, pitch_series_json,
+      performance_start_seconds
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       take.id,
       take.projectId,
@@ -123,6 +179,10 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
       take.recordingOrientation ?? 'portrait',
       0,
       take.timelineOffsetMs ?? 0,
+      take.practiceSessionId ?? null,
+      take.intention,
+      take.pitchSeries ? JSON.stringify(take.pitchSeries) : '',
+      take.performanceStartSeconds ?? null,
     ],
   )
 
@@ -150,6 +210,18 @@ export async function updateVaultTake(takeId: string, updates: VaultTakeUpdate):
   if (updates.timelineOffsetMs !== undefined) {
     fields.push('timeline_offset_ms = ?')
     values.push(Math.round(updates.timelineOffsetMs))
+  }
+  if (updates.intention !== undefined) {
+    fields.push('intention = ?')
+    values.push(updates.intention)
+  }
+  if (updates.pitchSeries !== undefined) {
+    fields.push('pitch_series_json = ?')
+    values.push(JSON.stringify(updates.pitchSeries))
+  }
+  if (updates.performanceStartSeconds !== undefined) {
+    fields.push('performance_start_seconds = ?')
+    values.push(updates.performanceStartSeconds)
   }
 
   if (fields.length === 0) return
@@ -188,7 +260,21 @@ export async function toggleBestTake(takeId: string): Promise<VaultTake> {
   }
 
   const nextValue = Number(row.is_best_take) === 1 ? 0 : 1
-  await db.run('UPDATE takes SET is_best_take = ? WHERE id = ?', [nextValue, takeId])
+  const statements = [
+    {
+      statement: 'UPDATE takes SET is_best_take = ? WHERE id = ?',
+      values: [nextValue, takeId],
+    },
+  ]
+  if (nextValue === 1) {
+    statements.push({
+      statement: `INSERT OR IGNORE INTO best_take_history
+                  (id, project_id, take_id, marked_at)
+                  VALUES (?, ?, ?, ?)`,
+      values: [crypto.randomUUID(), String(row.project_id), takeId, Date.now()],
+    })
+  }
+  await db.executeSet(statements, true)
 
   await persistWebStore()
 
@@ -201,13 +287,57 @@ export async function toggleBestTake(takeId: string): Promise<VaultTake> {
 /** Mark one take as Best Take for a session; clears the flag on siblings. */
 export async function setProjectBestTake(projectId: string, takeId: string): Promise<void> {
   const db = getVaultDatabase()
-  await db.run('UPDATE takes SET is_best_take = 0 WHERE project_id = ?', [projectId])
-  await db.run('UPDATE takes SET is_best_take = 1 WHERE id = ?', [takeId])
-  await db.run(
-    'UPDATE projects SET benchmark_source = ?, benchmark_ref_id = ? WHERE id = ?',
-    ['take', takeId, projectId],
+  await db.executeSet(
+    [
+      {
+        statement: 'UPDATE takes SET is_best_take = 0 WHERE project_id = ?',
+        values: [projectId],
+      },
+      {
+        statement: 'UPDATE takes SET is_best_take = 1 WHERE id = ? AND project_id = ?',
+        values: [takeId, projectId],
+      },
+      {
+        statement: `INSERT OR IGNORE INTO best_take_history
+                    (id, project_id, take_id, marked_at)
+                    VALUES (?, ?, ?, ?)`,
+        values: [crypto.randomUUID(), projectId, takeId, Date.now()],
+      },
+      {
+        statement: 'UPDATE projects SET benchmark_source = ?, benchmark_ref_id = ? WHERE id = ?',
+        values: ['take', takeId, projectId],
+      },
+    ],
+    true,
   )
   await persistWebStore()
+}
+
+export async function listBestTakeHistory(
+  projectId?: string,
+): Promise<BestTakeHistoryEntry[]> {
+  const db = getVaultDatabase()
+  const where = projectId ? 'WHERE history.project_id = ?' : ''
+  const result = await db.query(
+    `SELECT
+       history.id,
+       history.project_id,
+       projects.name AS project_name,
+       history.take_id,
+       takes.name AS take_name,
+       history.marked_at,
+       takes.created_at AS take_created_at,
+       takes.duration,
+       takes.media_type,
+       takes.is_best_take AS is_current_best
+     FROM best_take_history AS history
+     JOIN takes ON takes.id = history.take_id
+     JOIN projects ON projects.id = history.project_id
+     ${where}
+     ORDER BY history.marked_at DESC`,
+    projectId ? [projectId] : [],
+  )
+  return (result.values ?? []).map((row) => mapBestTakeHistoryRow(row as SqlRow))
 }
 
 /** Clear one persisted Best Take without overwriting a newer benchmark selection. */

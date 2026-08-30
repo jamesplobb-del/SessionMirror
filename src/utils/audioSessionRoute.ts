@@ -378,6 +378,14 @@ export interface BestTakeAudioPluginType {
     searchMs?: number
   }): Promise<NativeTakeAlignmentResult>
   extractWaveformPeaks(options: { path: string; barCount: number }): Promise<NativeWaveformPeaksResult>
+  analyzePracticeTake(options: { path: string }): Promise<{
+    performanceStartSeconds?: number
+    leadInMs: number
+    pitchSeries: Array<{ time: number; frequencyHz: number }>
+  }>
+  getSpokenFeedbackPermission(): Promise<{ status: 'granted' | 'denied' | 'prompt' }>
+  startSpokenFeedback(): Promise<{ active: boolean }>
+  stopSpokenFeedback(): Promise<{ transcript?: string }>
   playNativeCameraTestPostProcess(options: { url: string }): Promise<NativeCameraPostProcessPlaybackResult>
   stopNativeCameraTestPostProcess(): Promise<void>
   /** Native pre-warmed Taptic Engine impact. iOS only. */
@@ -410,6 +418,14 @@ export interface BestTakeAudioPluginType {
   addListener(
     eventName: 'nativeAudioPitchFrame',
     listenerFunc: (data: { pcmBase64?: string; sampleRate?: number; sampleCount?: number }) => void,
+  ): Promise<PluginListenerHandle>
+  addListener(
+    eventName: 'spokenFeedbackResult',
+    listenerFunc: (data: { transcript?: string; isFinal?: boolean }) => void,
+  ): Promise<PluginListenerHandle>
+  addListener(
+    eventName: 'spokenFeedbackError',
+    listenerFunc: (data: { message?: string }) => void,
   ): Promise<PluginListenerHandle>
 }
 

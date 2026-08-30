@@ -39,6 +39,11 @@ export function vaultTakeToUiTake(
     mirrorPlayback: false,
     recordingOrientation: vaultTake.recordingOrientation ?? 'portrait',
     enhancerBaked: vaultTake.enhancerBaked,
+    timelineOffsetMs: vaultTake.timelineOffsetMs,
+    practiceSessionId: vaultTake.practiceSessionId,
+    intention: vaultTake.intention,
+    pitchSeries: vaultTake.pitchSeries,
+    performanceStartSeconds: vaultTake.performanceStartSeconds,
   }
 }
 

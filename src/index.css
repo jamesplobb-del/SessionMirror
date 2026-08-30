@@ -5942,7 +5942,7 @@ html.app-dark-mode .pitch-spectrogram--glass {
   cursor: grabbing;
 }
 
-/* Anchored Overlays tray shared by Camera and Tools. The transparent backdrop
+/* Anchored Workspace tray shared by Camera and Tools. The transparent backdrop
  * preserves the live context while still making outside-tap dismissal easy. */
 .settings-branch-backdrop {
   padding: 0;

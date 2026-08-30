@@ -500,6 +500,13 @@
   line-height: 1.3;
 }
 
+.native-bottom-sheet--vault .vault-take-row__intention > p:last-child {
+  margin: 0.25rem 0 0;
+  color: var(--audio-text-secondary, #6c7077);
+  font-size: 0.72rem;
+  line-height: 1.42;
+}
+
 .native-bottom-sheet--vault .vault-take-row__detail {
   width: 100%;
   margin-top: 0.72rem;

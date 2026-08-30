@@ -47,6 +47,10 @@ export interface Take {
   performanceStartOffsetBeats?: number
   /** Seconds from file start to the hands-free performance trigger. */
   performanceStartSeconds?: number
+  /** Focused Practice session that produced this take. */
+  practiceSessionId?: string
+  /** Optional spoken or typed cue that was set before this take. */
+  intention?: string
   /** Legacy overdub reference id. New multitrack takes share a project transport instead. */
   referenceTrackId?: string
   /** Overdub takes: count-in beat when the reference started. */

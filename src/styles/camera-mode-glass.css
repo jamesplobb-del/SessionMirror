@@ -1607,57 +1607,6 @@ button.compact-take-caption:active {
   transform: translateX(-50%);
 }
 
-.camera-view-mode-controls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: min(13.1rem, calc(100vw - 1.25rem));
-  align-items: center;
-  gap: 0.42rem;
-}
-
-.camera-compare-toggle {
-  display: flex;
-  width: 100%;
-  min-height: 1.9rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.34rem;
-  margin: 0;
-  padding: 0.35rem 0.68rem;
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
-    rgba(8, 12, 18, 0.16);
-  color: rgba(255, 255, 255, 0.84);
-  box-shadow:
-    0 0.3rem 0.85rem rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.11);
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.025em;
-  line-height: 1;
-  -webkit-backdrop-filter: blur(14px) saturate(1.12);
-  backdrop-filter: blur(14px) saturate(1.12);
-}
-
-.camera-compare-toggle:active {
-  opacity: 0.7;
-  transform: scale(0.95);
-}
-
-.camera-compare-toggle svg {
-  width: 0.8rem;
-  height: 0.8rem;
-  color: #61bdff;
-  stroke-width: 1.75;
-}
-
-.camera-multitrack-toggle svg {
-  color: #f7ae1c;
-  stroke-width: 1.7;
-}
-
 /* Multitrack supplies its own Camera Mode HUD while it is active. Keep the
    live camera layer beneath it, but prevent the standard HUD from showing
    through or receiving taps. */

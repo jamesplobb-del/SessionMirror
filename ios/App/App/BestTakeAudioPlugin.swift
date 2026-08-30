@@ -2,6 +2,7 @@ import AVFoundation
 import Capacitor
 import PDFKit
 import Photos
+import Speech
 import UIKit
 
 @objc(BestTakeAudioPlugin)
@@ -63,6 +64,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getAudioOutputLatencyMs", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "computeTakeAlignment", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "extractWaveformPeaks", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "analyzePracticeTake", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getSpokenFeedbackPermission", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startSpokenFeedback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopSpokenFeedback", returnType: CAPPluginReturnPromise),
     ]
 
     private let nativeCameraEngine = NativeCameraRecordingEngine.shared
@@ -70,6 +75,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     private var nativeTestPlayer: AVPlayer?
     private var nativeTestEndObserver: NSObjectProtocol?
     private var playbackRouteRestorePending = false
+    private var jsAudioTapEnabled = false
+    private var spokenFeedbackActive = false
+    private var spokenFeedbackRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var spokenFeedbackTask: SFSpeechRecognitionTask?
+    private var spokenFeedbackTranscript = ""
+    private let spokenFeedbackQueue = DispatchQueue(label: "com.besttake.spoken-feedback")
 
     // MARK: - Haptics
     // Pre-instantiated feedback generators kept warm via prepare() so every
@@ -105,6 +116,11 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 "sampleRate": sampleRate,
                 "sampleCount": sampleCount,
             ])
+            self?.appendSpokenFeedbackAudio(
+                pcmBase64: pcmBase64,
+                sampleRate: sampleRate,
+                sampleCount: sampleCount
+            )
         }
         routeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
@@ -1622,8 +1638,142 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setNativeAudioTapEnabled(_ call: CAPPluginCall) {
         let enabled = call.getBool("enabled") ?? false
-        nativeCameraEngine.setAudioTapEnabled(enabled)
+        jsAudioTapEnabled = enabled
+        nativeCameraEngine.setAudioTapEnabled(enabled || spokenFeedbackActive)
         call.resolve()
+    }
+
+    @objc func getSpokenFeedbackPermission(_ call: CAPPluginCall) {
+        let status: String
+        switch SFSpeechRecognizer.authorizationStatus() {
+        case .authorized: status = "granted"
+        case .denied, .restricted: status = "denied"
+        case .notDetermined: status = "prompt"
+        @unknown default: status = "prompt"
+        }
+        call.resolve(["status": status])
+    }
+
+    @objc func startSpokenFeedback(_ call: CAPPluginCall) {
+        let begin = { [weak self] in
+            guard let self = self else {
+                call.reject("Spoken feedback is unavailable")
+                return
+            }
+            self.beginSpokenFeedback(call)
+        }
+
+        if SFSpeechRecognizer.authorizationStatus() == .authorized {
+            DispatchQueue.main.async(execute: begin)
+            return
+        }
+
+        SFSpeechRecognizer.requestAuthorization { status in
+            DispatchQueue.main.async {
+                guard status == .authorized else {
+                    call.reject("Speech recognition permission was not granted")
+                    return
+                }
+                begin()
+            }
+        }
+    }
+
+    @objc func stopSpokenFeedback(_ call: CAPPluginCall) {
+        let transcript = spokenFeedbackTranscript
+        finishSpokenFeedback(cancel: false)
+        call.resolve(["transcript": transcript])
+    }
+
+    private func beginSpokenFeedback(_ call: CAPPluginCall) {
+        finishSpokenFeedback(cancel: true)
+        guard let recognizer = SFSpeechRecognizer(locale: Locale.current), recognizer.isAvailable else {
+            call.reject("Speech recognition is temporarily unavailable")
+            return
+        }
+
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        if #available(iOS 16.0, *) {
+            request.addsPunctuation = true
+        }
+        spokenFeedbackRequest = request
+        spokenFeedbackTranscript = ""
+        spokenFeedbackActive = true
+        nativeCameraEngine.setAudioTapEnabled(true)
+
+        spokenFeedbackTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            guard let self = self else { return }
+            if let result = result {
+                let transcript = result.bestTranscription.formattedString
+                self.spokenFeedbackTranscript = transcript
+                DispatchQueue.main.async {
+                    self.notifyListeners("spokenFeedbackResult", data: [
+                        "transcript": transcript,
+                        "isFinal": result.isFinal,
+                    ])
+                }
+                if result.isFinal {
+                    self.finishSpokenFeedback(cancel: false)
+                }
+            } else if let error = error, self.spokenFeedbackActive {
+                DispatchQueue.main.async {
+                    self.notifyListeners("spokenFeedbackError", data: [
+                        "message": error.localizedDescription,
+                    ])
+                }
+                self.finishSpokenFeedback(cancel: true)
+            }
+        }
+        call.resolve(["active": true])
+    }
+
+    private func finishSpokenFeedback(cancel: Bool) {
+        let request = spokenFeedbackRequest
+        let task = spokenFeedbackTask
+        spokenFeedbackRequest = nil
+        spokenFeedbackTask = nil
+        spokenFeedbackActive = false
+        if cancel {
+            task?.cancel()
+        } else {
+            request?.endAudio()
+            task?.finish()
+        }
+        nativeCameraEngine.setAudioTapEnabled(jsAudioTapEnabled)
+    }
+
+    private func appendSpokenFeedbackAudio(
+        pcmBase64: String,
+        sampleRate: Double,
+        sampleCount: Int
+    ) {
+        guard spokenFeedbackActive, let request = spokenFeedbackRequest,
+              let data = Data(base64Encoded: pcmBase64), sampleCount > 0,
+              let format = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: sampleRate,
+                channels: 1,
+                interleaved: false
+              ),
+              let buffer = AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: AVAudioFrameCount(sampleCount)
+              ),
+              let destination = buffer.floatChannelData?[0] else { return }
+
+        buffer.frameLength = AVAudioFrameCount(sampleCount)
+        data.withUnsafeBytes { rawBuffer in
+            guard let source = rawBuffer.bindMemory(to: Float.self).baseAddress else { return }
+            destination.update(from: source, count: min(sampleCount, data.count / MemoryLayout<Float>.size))
+        }
+        spokenFeedbackQueue.async { [weak self, weak request] in
+            guard let self = self,
+                  let request = request,
+                  self.spokenFeedbackActive,
+                  self.spokenFeedbackRequest === request else { return }
+            request.append(buffer)
+        }
     }
 
     @objc func enhanceTakeAudio(_ call: CAPPluginCall) {
@@ -2124,6 +2274,37 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             } catch {
                 DispatchQueue.main.async {
                     call.reject("Waveform extract failed", error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    @objc func analyzePracticeTake(_ call: CAPPluginCall) {
+        guard let path = call.getString("path"), let sourceURL = fileURL(from: path) else {
+            call.reject("Missing or invalid path")
+            return
+        }
+
+        DispatchQueue.global(qos: .utility).async {
+            do {
+                let (samples, sampleRate) = try NativeAudioDecoder.readMonoPCM(url: sourceURL)
+                let analysis = TakeAlignmentEngine.analyzePracticeTake(
+                    samples: samples,
+                    sampleRate: sampleRate
+                )
+                DispatchQueue.main.async {
+                    var payload: [String: Any] = [
+                        "leadInMs": analysis.leadInMs,
+                        "pitchSeries": analysis.pitchSeries,
+                    ]
+                    if let performanceStartSeconds = analysis.performanceStartSeconds {
+                        payload["performanceStartSeconds"] = performanceStartSeconds
+                    }
+                    call.resolve(payload)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    call.reject("Practice analysis failed", error.localizedDescription)
                 }
             }
         }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { CheckSquare, Download, Search, Trash2, X } from 'lucide-react'
+import { CheckSquare, Download, Search, Star, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
 import GallerySortStrip from './GallerySortStrip'
 import VaultMediaSegment from './VaultMediaSegment'
@@ -18,7 +18,7 @@ import { getTakeMediaType } from '../utils/mediaType'
 import type { SortMode, Take, TakeUpdate } from '../types'
 import type { VaultMediaFilter } from './VaultMediaSegment'
 import type { BenchmarkBinding } from '../types/library'
-import type { Project } from '../db/types'
+import type { BestTakeHistoryEntry, Project } from '../db/types'
 import type { HydratedLibraryItem } from '../utils/libraryBridge'
 
 interface TakeVaultDrawerProps {
@@ -30,6 +30,7 @@ interface TakeVaultDrawerProps {
   onCreateProject: (name: string) => void | Promise<void>
   onDeleteProject?: (projectId: string) => void | Promise<void>
   takes: Take[]
+  bestTakeHistory: BestTakeHistoryEntry[]
   sortedTakes: Take[]
   sortMode: SortMode
   onSortChange: (mode: SortMode) => void
@@ -66,6 +67,7 @@ export default function TakeVaultDrawer({
   onCreateProject,
   onDeleteProject,
   takes,
+  bestTakeHistory,
   sortedTakes,
   sortMode,
   onSortChange,
@@ -127,21 +129,28 @@ export default function TakeVaultDrawer({
   )
   const vaultBenchmarkTakeId =
     benchmarkBinding?.source === 'take' ? benchmarkBinding.refId : benchmarkId
+  const bestHistoryByTakeId = useMemo(() => {
+    if (!contentReady) return new Map<string, BestTakeHistoryEntry>()
+    const availableTakeIds = new Set(takes.map((take) => take.id))
+    return new Map(
+      bestTakeHistory
+        .filter(
+          (entry) =>
+            entry.projectId === activeProject?.id && availableTakeIds.has(entry.takeId),
+        )
+        .map((entry) => [entry.takeId, entry]),
+    )
+  }, [activeProject?.id, bestTakeHistory, contentReady, takes])
   const bestCount = useMemo(
-    () =>
-      contentReady && vaultBenchmarkTakeId
-        ? takes.filter((take) => take.id === vaultBenchmarkTakeId).length
-        : 0,
-    [contentReady, takes, vaultBenchmarkTakeId],
+    () => bestHistoryByTakeId.size,
+    [bestHistoryByTakeId],
   )
   const filteredTakes = useMemo(
     () => {
       if (!contentReady) return []
       let list = sortedTakes
       if (vaultMediaTab === 'best') {
-        list = vaultBenchmarkTakeId
-          ? sortedTakes.filter((take) => take.id === vaultBenchmarkTakeId)
-          : []
+        list = sortedTakes.filter((take) => bestHistoryByTakeId.has(take.id))
       } else if (vaultMediaTab !== 'all') {
         list = sortedTakes.filter((take) => getTakeMediaType(take) === vaultMediaTab)
       }
@@ -151,10 +160,11 @@ export default function TakeVaultDrawer({
       return list.filter(
         (take) =>
           take.name.toLowerCase().includes(query) ||
-          take.notes.toLowerCase().includes(query),
+          take.notes.toLowerCase().includes(query) ||
+          Boolean(take.intention?.toLowerCase().includes(query)),
       )
     },
-    [contentReady, searchQuery, sortedTakes, vaultBenchmarkTakeId, vaultMediaTab],
+    [bestHistoryByTakeId, contentReady, searchQuery, sortedTakes, vaultMediaTab],
   )
   const takeCountLabel = `${takes.length} take${takes.length === 1 ? '' : 's'}`
 
@@ -494,9 +504,27 @@ export default function TakeVaultDrawer({
                     )}
                   </div>
                   <div className="vault-take-list">
-                    {filteredTakes.map((take) => (
-                      <TakeCard
-                        key={take.id}
+                    {filteredTakes.map((take) => {
+                      const bestHistoryEntry = bestHistoryByTakeId.get(take.id)
+                      return (
+                      <div key={take.id} className="space-y-2">
+                        {vaultMediaTab === 'best' && bestHistoryEntry && (
+                          <div className="flex items-center gap-1.5 px-1 text-[0.68rem] font-medium text-amber-700">
+                            <Star className="h-3.5 w-3.5 fill-current" aria-hidden />
+                            <span>
+                              {bestHistoryEntry.isCurrentBest ? 'Current best' : 'Personal best'}
+                              {' · '}
+                              {new Intl.DateTimeFormat(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              }).format(bestHistoryEntry.markedAt)}
+                            </span>
+                          </div>
+                        )}
+                        <TakeCard
                         take={take}
                         takeIndex={takeIndexById.get(take.id) ?? 0}
                         isBenchmark={take.id === vaultBenchmarkTakeId}
@@ -560,8 +588,10 @@ export default function TakeVaultDrawer({
                         onUpdate={(updates) => onUpdateTake(take.id, updates)}
                         onDelete={() => onDeleteTake(take.id)}
                         exportBusy={exportingTakeId === take.id}
-                      />
-                    ))}
+                        />
+                      </div>
+                      )
+                    })}
                   </div>
                 </>
               )}

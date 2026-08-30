@@ -17,8 +17,7 @@ export type CoachMarkId =
   | 'visit-tuner'
   | 'visit-games'
   | 'return-to-audio'
-  | 'open-take-vault'
-  | 'close-take-vault'
+  | 'open-practice-home'
   | 'open-settings'
   | 'open-quick-tools'
 
@@ -206,24 +205,12 @@ export const COACH_MARKS: CoachMarkContent[] = [
   },
   {
     id: 'open-overlays',
-    title: 'Open Overlays',
-    body: 'The stacked-layers icon opens the controls you can lay over the camera.',
+    title: 'Open Workspace',
+    body: 'The stacked-layers icon opens quick controls for the recorder and comparison layout.',
     selector: '[data-tutorial="overlays-button"]',
     placement: 'top',
     advance: 'overlays-opened',
-    continueHint: 'Tap Overlays.',
-    icon: 'overlays',
-    requiresSplitView: 'closed',
-    requiresRecordingMode: 'video',
-  },
-  {
-    id: 'close-overlays',
-    title: 'Close Overlays',
-    body: 'The same icon closes it.',
-    selector: '[data-tutorial="overlays-button"]',
-    placement: 'top',
-    advance: 'overlays-closed',
-    continueHint: 'Tap Overlays again.',
+    continueHint: 'Tap Workspace.',
     icon: 'overlays',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'video',
@@ -231,7 +218,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'discover-multitrack',
     title: 'Build a Multitrack',
-    body: 'The four-panel icon opens Multitrack, where you can layer separate performances into one project.',
+    body: 'Multitrack now lives here in Workspace, ready when you want to layer separate performances into one project.',
     selector: '[data-tutorial="multitrack-button"]',
     placement: 'top',
     advance: 'tap-screen',
@@ -334,27 +321,17 @@ export const COACH_MARKS: CoachMarkContent[] = [
     requiresAudioPracticeTab: 'tuner',
   },
   {
-    id: 'open-take-vault',
-    title: 'Open the Take Vault',
-    body: 'Every take you record lands here automatically.',
-    selector: '[data-tutorial="vault-button"]',
+    id: 'open-practice-home',
+    title: 'Practice Home',
+    body: 'The house icon opens your hub: pick a practice mode, and reach the Take Vault holding every take you record.',
+    selector: '[data-tutorial="home-button"]',
     placement: 'top',
-    advance: 'vault-open',
-    continueHint: 'Tap Take Vault.',
+    advance: 'tap-screen',
+    continueHint: 'Tap anywhere to continue.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'audio',
     requiresAudioPracticeTab: 'audio',
     requiresVault: 'closed',
-  },
-  {
-    id: 'close-take-vault',
-    title: 'Close the Take Vault',
-    body: 'Search, sort, pin, trim, and share takes here. Tap Close to continue.',
-    selector: '[data-tutorial="vault-close"]',
-    placement: 'left',
-    advance: 'vault-close',
-    continueHint: 'Tap Close.',
-    requiresVault: 'open',
   },
   {
     id: 'open-settings',
@@ -387,7 +364,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Camera Mode',
     body: 'Record video takes and compare them side by side.',
     bullets: [
-      'Bottom pill: Take Vault, Overlays, Record, Tools, Settings',
+      'Bottom pill: Practice Home, Workspace, Record, Tools, Settings',
       'Tap the full red Record button to start or stop a video take',
       'Drag a take label directly to swap Best and Current; hold the picture area to move the card',
       'Use Expand for a larger comparison or Multitrack to layer performances',
@@ -399,7 +376,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Audio Mode',
     body: 'Record without video. Each take plays back the moment you stop.',
     bullets: [
-      'Bottom pill: Take Vault, Overlays, Record, Camera, Settings',
+      'Bottom pill: Practice Home, Workspace, Record, Camera, Settings',
       'Use Audio, Metronome, Tuner, and Games from the top tabs',
       'Open Program from Metronome to build a timed practice routine',
       'Tap Camera to return to video recording',
@@ -419,12 +396,12 @@ export const HELP_TOPICS: HelpTopic[] = [
   },
   {
     id: 'overlays',
-    title: 'Overlays',
-    body: 'Tap the stacked-layers icon beside Record in Camera or Audio Mode to open the on-screen controls menu.',
+    title: 'Workspace',
+    body: 'Tap the stacked-layers icon beside Record in Camera or Audio Mode to arrange the recorder and open related views.',
     bullets: [
-      'Camera: Pitch Analysis, Take Cards, Metronome, Audio Enhancer, and Hands-free',
-      'Audio and tool tabs show the overlays that fit the current workspace',
-      'Tap an overlay to show or hide it without opening Settings',
+      'Camera: Pitch Analysis, Take Cards, Metronome, Audio Enhancer, Hands-free, Expand View, and Multitrack',
+      'Audio and tool tabs show the controls that fit the current workspace',
+      'Tap a control to show, hide, or open it without visiting Settings',
       'Use the cog at the right end of the pill for full settings',
     ],
   },
@@ -465,7 +442,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     bullets: [
       'Swipe vertically on BPM, use +/−, type a tempo, or tap it in',
       'Choose Time, Rhythm, pulse, beat grouping, accents, and Sound',
-      'Open Overlays to show the draggable metronome in Camera or Audio Mode',
+      'Open Workspace to show the draggable metronome in Camera or Audio Mode',
       'Pinch the floating metronome to resize; double-tap to reset its size',
     ],
   },
@@ -508,7 +485,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Take Vault',
     body: 'Every recording saves here on its own, session by session.',
     bullets: [
-      'Open it from the left end of the Camera or Audio pill',
+      'Open Practice Home from the left end of the Camera or Audio pill, then tap Best Take Vault',
       'Search, sort, select, favorite, trim, share, or delete takes',
       'Pin a take as Best Take or Current Take',
       'Open any recording full screen for focused review',

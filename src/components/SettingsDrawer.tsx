@@ -27,7 +27,7 @@ interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
   settings: AppSettings
-  /** Shared overlay values — the on-screen Overlays menu owns their toggles. */
+  /** Shared overlay values — the on-screen Workspace menu owns their toggles. */
   hudQuickSettings: HudQuickSettings
   onUpdate: (patch: Partial<AppSettings>) => void
   onAudioEnhancerChange: (enabled: boolean) => void
@@ -161,7 +161,7 @@ const LEARN_APP_SECTIONS: {
       { id: 'camera-mode', label: 'Camera Mode' },
       { id: 'audio-mode', label: 'Audio Mode' },
       { id: 'hands-free-recording', label: 'Hands-Free Recording' },
-      { id: 'overlays', label: 'Overlays' },
+      { id: 'overlays', label: 'Workspace' },
       { id: 'multitrack', label: 'Multitrack' },
     ],
   },
@@ -616,7 +616,7 @@ export default function SettingsDrawer({
             <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
               <p className="text-sm font-semibold text-stone-900">Pitch Analysis</p>
               <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                Turn it on from Overlays. The options below choose how pitch is detected and what happens between takes.
+                Turn it on from Workspace. The options below choose how pitch is detected and what happens between takes.
               </p>
             </div>
 
@@ -764,7 +764,7 @@ export default function SettingsDrawer({
 
             <SettingToggle
               label="Mute Metronome During Take Playback"
-              description="When the metronome is shown from Overlays, silence its clicks while a take plays. Its timing keeps running so it stays locked when playback ends."
+              description="When the metronome is shown from Workspace, silence its clicks while a take plays. Its timing keeps running so it stays locked when playback ends."
               checked={settings.muteMetronomeDuringPlayback}
               onChange={(checked) => onUpdate({ muteMetronomeDuringPlayback: checked })}
             />

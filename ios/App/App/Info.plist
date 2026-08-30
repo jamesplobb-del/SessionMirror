@@ -126,6 +126,8 @@
 	<string>BestTake needs the camera to record practice takes.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>BestTake needs the microphone to record audio with your takes.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>BestTake uses speech recognition when you choose to dictate a note for your next take.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>BestTake needs permission to save your takes to Photos.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

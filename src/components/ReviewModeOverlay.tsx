@@ -5,9 +5,12 @@ import {
   ChevronLeft,
   Download,
   Ellipsis,
+  Eye,
+  EyeOff,
   Heart,
   Info,
   Pencil,
+  Repeat2,
   Share2,
   Trash2,
 } from 'lucide-react'
@@ -15,6 +18,7 @@ import ReviewTimeline from './ReviewTimeline'
 import ReviewSectionMarkers from './ReviewSectionMarkers'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
+import PitchComparisonGraph from './PitchComparisonGraph'
 import Pressable from './ui/Pressable'
 import { iosEaseOut, iosScreenEnter, iosScreenExit, motionGpuLayer } from '../utils/motionPresets'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
@@ -206,6 +210,10 @@ interface ReviewModeOverlayProps {
   onDeleteTake?: (id: string) => void
   onFavoriteTake?: (id: string) => void
   onPlaybackActiveChange?: (playing: boolean) => void
+  focusedPractice?: boolean
+  initialLoopStartSeconds?: number | null
+  initialLoopEndSeconds?: number | null
+  onLoopRangeChange?: (start: number | null, end: number | null) => void
 }
 
 export default function ReviewModeOverlay({
@@ -241,6 +249,10 @@ export default function ReviewModeOverlay({
   onDeleteTake,
   onFavoriteTake,
   onPlaybackActiveChange,
+  focusedPractice = false,
+  initialLoopStartSeconds = null,
+  initialLoopEndSeconds = null,
+  onLoopRangeChange,
 }: ReviewModeOverlayProps) {
   const { showAlert, showConfirm } = useActionSheet()
   const audioPlayback = useAudioModePlayback()
@@ -257,6 +269,7 @@ export default function ReviewModeOverlay({
   const isScrubbingRef = useRef(false)
   const wasPlayingBeforeScrubRef = useRef(false)
   const trimRangeRef = useRef({ start: 0, end: 0 })
+  const pendingComparisonTimeRef = useRef<number | null>(null)
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -266,6 +279,15 @@ export default function ReviewModeOverlay({
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [showPitch, setShowPitch] = useState(false)
+  const [showPitchComparison, setShowPitchComparison] = useState(focusedPractice)
+  const [blindMode, setBlindMode] = useState(false)
+  const [blindSwapped, setBlindSwapped] = useState(false)
+  const [loopStartSeconds, setLoopStartSeconds] = useState<number | null>(
+    initialLoopStartSeconds,
+  )
+  const [loopEndSeconds, setLoopEndSeconds] = useState<number | null>(
+    initialLoopEndSeconds,
+  )
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [trimMode, setTrimMode] = useState(false)
   const [trimRange, setTrimRange] = useState({ start: 0, end: 0 })
@@ -280,7 +302,9 @@ export default function ReviewModeOverlay({
   const isVault = context === 'vault'
   const vaultTake = isVault ? vaultTakes[vaultIndex] ?? null : null
 
-  const activeName = isVault
+  const activeName = blindMode && !isVault
+    ? undefined
+    : isVault
     ? vaultTake?.name
     : activeSlot === 'benchmark'
       ? benchmarkName
@@ -290,16 +314,24 @@ export default function ReviewModeOverlay({
     : activeSlot === 'benchmark'
       ? benchmarkTake
       : challengerTake
-  const activeTimestamp = activeTake?.timestamp
+  const benchmarkBlindLabel = blindSwapped ? 'B' : 'A'
+  const challengerBlindLabel = blindSwapped ? 'A' : 'B'
+  const activeBlindLabel =
+    activeSlot === 'benchmark' ? benchmarkBlindLabel : challengerBlindLabel
+  const activeTimestamp = blindMode && !isVault ? undefined : activeTake?.timestamp
   const activeDate = formatReviewDate(activeTimestamp)
   const activeTime = formatReviewTime(activeTimestamp)
-  const activeLabel = isVault
+  const activeLabel = blindMode && !isVault
+    ? `Take ${activeBlindLabel}`
+    : isVault
     ? 'Take Vault'
     : activeSlot === 'benchmark'
       ? 'Best Take'
       : challengerName ?? 'Current Take'
 
-  const dynamicTakeLabel = challengerName ?? 'Current Take'
+  const dynamicTakeLabel = blindMode ? `Take ${challengerBlindLabel}` : challengerName ?? 'Current Take'
+
+  const activeOffsetSeconds = Math.max(0, (activeTake?.timelineOffsetMs ?? 0) / 1_000)
 
   const canSwipeLeft = isVault
     ? vaultIndex < vaultTakes.length - 1
@@ -390,6 +422,7 @@ export default function ReviewModeOverlay({
   const displayIsPlaying = activeAudioPlaybackItem && audioControllerActive
     ? audioPlayback.state.isPlaying
     : isPlaying
+  const alignedCurrentTime = Math.max(0, displayCurrentTime - activeOffsetSeconds)
   const trimAvailable = Boolean(activeTake?.filePath) && displayDuration >= 0.1
   const safeTrimStart = Math.max(0, Math.min(trimRange.start, displayDuration || trimRange.start))
   const safeTrimEnd = Math.max(safeTrimStart, Math.min(trimRange.end, displayDuration || trimRange.end))
@@ -434,6 +467,63 @@ export default function ReviewModeOverlay({
       ? benchmarkVideoRef.current
       : challengerVideoRef.current
   }, [activeAudioPlaybackItem, activeSlot, audioPlayback.playerRef, isVault])
+
+  const switchComparisonSlot = useCallback(
+    (nextSlot: ReviewSlot) => {
+      if (isVault || nextSlot === activeSlot) return
+      const media = getActiveVideo()
+      const rawTime = media?.currentTime ?? displayCurrentTime
+      pendingComparisonTimeRef.current = Math.max(0, rawTime - activeOffsetSeconds)
+      if (activeAudioPlaybackItem) {
+        audioPlayback.pause()
+      } else {
+        pauseVideoElement(media)
+      }
+      onSlotChange(nextSlot)
+    }, [
+      activeAudioPlaybackItem,
+      activeOffsetSeconds,
+      activeSlot,
+      audioPlayback,
+      displayCurrentTime,
+      getActiveVideo,
+      isVault,
+      onSlotChange,
+    ],
+  )
+
+  const toggleBlindMode = useCallback(() => {
+    if (isVault) return
+    if (blindMode) {
+      setBlindMode(false)
+      return
+    }
+    const swapped = Math.random() < 0.5
+    setBlindSwapped(swapped)
+    setBlindMode(true)
+    pendingComparisonTimeRef.current = 0
+    onSlotChange(swapped ? 'challenger' : 'benchmark')
+  }, [blindMode, isVault, onSlotChange])
+
+  const cycleLoopRange = useCallback(() => {
+    if (loopStartSeconds === null) {
+      const start = alignedCurrentTime
+      setLoopStartSeconds(start)
+      setLoopEndSeconds(null)
+      onLoopRangeChange?.(start, null)
+      return
+    }
+    if (loopEndSeconds === null) {
+      const minimumEnd = loopStartSeconds + 0.25
+      const end = Math.max(minimumEnd, alignedCurrentTime)
+      setLoopEndSeconds(end)
+      onLoopRangeChange?.(loopStartSeconds, end)
+      return
+    }
+    setLoopStartSeconds(null)
+    setLoopEndSeconds(null)
+    onLoopRangeChange?.(null, null)
+  }, [alignedCurrentTime, loopEndSeconds, loopStartSeconds, onLoopRangeChange])
 
   const scheduleHideOverlay = useCallback(() => {
     if (hideOverlayTimerRef.current !== null) {
@@ -531,13 +621,51 @@ export default function ReviewModeOverlay({
         return
       }
 
+      if (
+        !isVault &&
+        loopStartSeconds !== null &&
+        loopEndSeconds !== null &&
+        video.currentTime - activeOffsetSeconds >= loopEndSeconds - 0.015
+      ) {
+        video.currentTime = loopStartSeconds + activeOffsetSeconds
+      }
+
       scheduleTimeUpdate(video.currentTime)
       syncDurationFromVideo(video)
       progressLoopRef.current = requestAnimationFrame(tick)
     }
 
     progressLoopRef.current = requestAnimationFrame(tick)
-  }, [getActiveVideo, scheduleTimeUpdate, stopAtTrimEnd, stopProgressLoop, syncDurationFromVideo])
+  }, [
+    activeOffsetSeconds,
+    getActiveVideo,
+    isVault,
+    loopEndSeconds,
+    loopStartSeconds,
+    scheduleTimeUpdate,
+    stopAtTrimEnd,
+    stopProgressLoop,
+    syncDurationFromVideo,
+  ])
+
+  useEffect(() => {
+    if (
+      !activeAudioPlaybackItem ||
+      !audioPlayback.state.isPlaying ||
+      loopStartSeconds === null ||
+      loopEndSeconds === null
+    ) return
+    if (audioPlayback.state.currentTime - activeOffsetSeconds < loopEndSeconds - 0.015) return
+    audioPlayback.seek(loopStartSeconds + activeOffsetSeconds)
+  }, [
+    activeAudioPlaybackItem,
+    activeOffsetSeconds,
+    audioPlayback,
+    audioPlayback.state.currentTime,
+    audioPlayback.state.isPlaying,
+    loopEndSeconds,
+    loopStartSeconds,
+  ])
 
   const scrubToClientX = useCallback(
     (clientX: number) => {
@@ -771,9 +899,16 @@ export default function ReviewModeOverlay({
   useEffect(() => {
     if (!isOpen) {
       setShowPitch(false)
+      setShowPitchComparison(false)
+      setBlindMode(false)
       setActionMenuOpen(false)
     }
   }, [isOpen])
+
+  useEffect(() => {
+    setLoopStartSeconds(initialLoopStartSeconds)
+    setLoopEndSeconds(initialLoopEndSeconds)
+  }, [initialLoopEndSeconds, initialLoopStartSeconds, isOpen])
 
   useEffect(() => {
     setActionMenuOpen(false)
@@ -823,6 +958,10 @@ export default function ReviewModeOverlay({
     if (activeAudioPlaybackItem) {
       audioPlayback.openFullscreen(activeAudioPlaybackItem)
       setShowPlayOverlay(true)
+      const alignedTime = pendingComparisonTimeRef.current ?? 0
+      pendingComparisonTimeRef.current = null
+      const rawTime = alignedTime + activeOffsetSeconds
+      window.requestAnimationFrame(() => audioPlayback.seek(rawTime))
       return
     }
 
@@ -837,12 +976,15 @@ export default function ReviewModeOverlay({
     const video = getActiveVideo()
     if (!video) return
 
-    setCurrentTime(0)
+    const alignedTime = pendingComparisonTimeRef.current ?? 0
+    pendingComparisonTimeRef.current = null
+    const rawTime = alignedTime + activeOffsetSeconds
+    setCurrentTime(rawTime)
     setDuration(0)
     setIsPlaying(false)
     setShowPlayOverlay(true)
     video.pause()
-    video.currentTime = 0
+    video.currentTime = rawTime
   }, [
     activeSlot,
     getActiveVideo,
@@ -851,6 +993,7 @@ export default function ReviewModeOverlay({
     vaultTake?.id,
     vaultIndex,
     activeAudioPlaybackItem,
+    activeOffsetSeconds,
     audioPlayback,
   ])
 
@@ -1125,6 +1268,13 @@ export default function ReviewModeOverlay({
 
   const completeSwipe = useCallback(
     (direction: 'left' | 'right') => {
+      if (!isVault) {
+        const media = getActiveVideo()
+        pendingComparisonTimeRef.current = Math.max(
+          0,
+          (media?.currentTime ?? displayCurrentTime) - activeOffsetSeconds,
+        )
+      }
       resetVideoPlayback(getActiveVideo())
       setSlideDirection(direction)
       setSwipeOffset(0)
@@ -1144,10 +1294,19 @@ export default function ReviewModeOverlay({
           onSlotChange(nextSlot)
         }
         setSlideDirection(null)
-        setCurrentTime(0)
+        if (isVault) setCurrentTime(0)
       }, 220)
     },
-    [getActiveVideo, isVault, onSlotChange, onVaultIndexChange, vaultIndex, vaultTakes.length],
+    [
+      activeOffsetSeconds,
+      displayCurrentTime,
+      getActiveVideo,
+      isVault,
+      onSlotChange,
+      onVaultIndexChange,
+      vaultIndex,
+      vaultTakes.length,
+    ],
   )
 
   const swipeLayerStyle = {
@@ -1285,7 +1444,11 @@ export default function ReviewModeOverlay({
                   {activeName || activeLabel}
                 </p>
                 <p className="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#6c7077]">
-                  {activeTime ? `${activeDate} · ${activeTime}` : activeDate}
+                  {blindMode && !isVault
+                    ? 'Identity hidden until Blind Compare is turned off'
+                    : activeTime
+                      ? `${activeDate} · ${activeTime}`
+                      : activeDate}
                 </p>
               </div>
 
@@ -1301,6 +1464,7 @@ export default function ReviewModeOverlay({
                   className="review-nav-button"
                   aria-label="More actions"
                   aria-expanded={actionMenuOpen}
+                  disabled={blindMode && !isVault}
                 >
                   <Ellipsis className="h-6 w-6" strokeWidth={2.4} />
                 </Pressable>
@@ -1492,6 +1656,80 @@ export default function ReviewModeOverlay({
             >
               <div className="ui-orient-spin pointer-events-auto">
                 <div className="review-controls-cluster">
+                  {!isVault && hasBenchmark && hasChallenger && (
+                    <div className="focused-review-strip">
+                      <div className="focused-review-switch" aria-label="Switch comparison take">
+                        <button
+                          type="button"
+                          aria-pressed={
+                            activeSlot === (blindMode && blindSwapped ? 'challenger' : 'benchmark')
+                          }
+                          onClick={() =>
+                            switchComparisonSlot(
+                              blindMode && blindSwapped ? 'challenger' : 'benchmark',
+                            )
+                          }
+                        >
+                          {blindMode ? 'Take A' : 'Best'}
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={
+                            activeSlot === (blindMode && blindSwapped ? 'benchmark' : 'challenger')
+                          }
+                          onClick={() =>
+                            switchComparisonSlot(
+                              blindMode && blindSwapped ? 'benchmark' : 'challenger',
+                            )
+                          }
+                        >
+                          {blindMode ? 'Take B' : 'Current'}
+                        </button>
+                      </div>
+                      {focusedPractice && (
+                        <button
+                          type="button"
+                          className={`focused-review-loop ${loopStartSeconds !== null ? 'focused-review-loop--active' : ''}`}
+                          onClick={cycleLoopRange}
+                          title="Tap once for loop start, again for loop end, and again to clear"
+                        >
+                          <Repeat2 aria-hidden />
+                          <span>
+                            {loopStartSeconds === null
+                              ? 'Loop'
+                              : loopEndSeconds === null
+                                ? 'Set end'
+                                : 'Looping'}
+                          </span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={`focused-review-blind ${blindMode ? 'focused-review-blind--active' : ''}`}
+                        onClick={toggleBlindMode}
+                        aria-pressed={blindMode}
+                      >
+                        {blindMode ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+                        <span>{blindMode ? 'Reveal' : 'Blind'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {!isVault && showPitchComparison && (
+                    <PitchComparisonGraph
+                      benchmarkTake={benchmarkTake}
+                      challengerTake={challengerTake}
+                      currentTime={alignedCurrentTime}
+                      blind={blindMode}
+                      benchmarkLabel={
+                        blindMode ? `Take ${benchmarkBlindLabel}` : benchmarkName ?? 'Best'
+                      }
+                      challengerLabel={
+                        blindMode ? `Take ${challengerBlindLabel}` : challengerName ?? 'Current'
+                      }
+                    />
+                  )}
+
                   <ReviewTimeline
                     trackRef={timelineTrackRef}
                     currentTime={displayCurrentTime}
@@ -1525,28 +1763,38 @@ export default function ReviewModeOverlay({
                   />
 
                   <div className="review-native-toolbar">
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleShareActiveTake} disabled={!activeTake} aria-label="Share">
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleShareActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Share">
                       <Share2 className="h-5 w-5" />
                     </Pressable>
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleFavoriteActiveTake} disabled={!activeTake || !onFavoriteTake} aria-label="Favorite">
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleFavoriteActiveTake} disabled={!activeTake || !onFavoriteTake || (blindMode && !isVault)} aria-label="Mark as Personal Best">
                       <Heart className="h-5 w-5" />
                     </Pressable>
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleInfoActiveTake} disabled={!activeTake} aria-label="Info">
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleInfoActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Info">
                       <Info className="h-5 w-5" />
                     </Pressable>
                     <Pressable
                       type="button"
                       intensity="icon"
                       haptic="light"
-                      className={`review-toolbar-button ${showPitch ? 'review-toolbar-button--active' : ''}`}
-                      onClick={() => setShowPitch((prev) => !prev)}
+                      className={`review-toolbar-button ${
+                        (isVault ? showPitch : showPitchComparison)
+                          ? 'review-toolbar-button--active'
+                          : ''
+                      }`}
+                      onClick={() => {
+                        if (isVault) {
+                          setShowPitch((prev) => !prev)
+                        } else {
+                          setShowPitchComparison((prev) => !prev)
+                        }
+                      }}
                       disabled={!showPitchPanel}
                       aria-label="Pitch Analysis"
-                      aria-pressed={showPitch}
+                      aria-pressed={isVault ? showPitch : showPitchComparison}
                     >
                       <Activity className="h-5 w-5" />
                     </Pressable>
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button review-toolbar-button--destructive" onClick={handleDeleteActiveTake} disabled={!activeTake || !onDeleteTake} aria-label="Delete">
+                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button review-toolbar-button--destructive" onClick={handleDeleteActiveTake} disabled={!activeTake || !onDeleteTake || (blindMode && !isVault)} aria-label="Delete">
                       <Trash2 className="h-5 w-5" />
                     </Pressable>
                   </div>

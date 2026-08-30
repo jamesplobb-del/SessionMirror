@@ -1,4 +1,30 @@
-import type { MediaType } from '../types'
+import type { MediaType, PitchSample } from '../types'
+
+export type PracticeComparisonMode =
+  | 'current-best'
+  | 'previous-take'
+  | 'yesterday'
+  | 'reference-track'
+
+export interface PracticeSession {
+  id: string
+  projectId: string
+  startedAt: number
+  endedAt: number | null
+  focusArea: string
+  comparison: PracticeComparisonMode
+}
+
+export interface PracticeItemState {
+  projectId: string
+  focusArea: string
+  comparison: PracticeComparisonMode
+  loopStartSeconds: number | null
+  loopEndSeconds: number | null
+  pendingIntention: string
+  lastSessionId: string | null
+  lastOpenedAt: number
+}
 
 /** A user-created session / project folder in the vault. */
 export interface Project {
@@ -27,6 +53,10 @@ export interface VaultTake {
   /** Audio Enhancer was baked into the file after recording — playback must skip the live chain. */
   enhancerBaked: boolean
   timelineOffsetMs?: number
+  practiceSessionId?: string
+  intention: string
+  pitchSeries?: PitchSample[]
+  performanceStartSeconds?: number
 }
 
 export interface SaveTakeInput {
@@ -39,6 +69,10 @@ export interface SaveTakeInput {
   mediaType?: MediaType
   recordingOrientation?: 'portrait' | 'landscape'
   timelineOffsetMs?: number
+  practiceSessionId?: string
+  intention?: string
+  pitchSeries?: PitchSample[]
+  performanceStartSeconds?: number
 }
 
 export interface VaultLibraryItem {
@@ -57,6 +91,29 @@ export interface BenchmarkBindingRow {
   refId: string | null
 }
 
+/** A take that was promoted to Best Take at some point in a project's history. */
+export interface BestTakeHistoryEntry {
+  id: string
+  projectId: string
+  projectName: string
+  takeId: string
+  takeName: string
+  markedAt: number
+  takeCreatedAt: number
+  duration: number
+  mediaType: MediaType
+  isCurrentBest: boolean
+}
+
 export type VaultTakeUpdate = Partial<
-  Pick<VaultTake, 'name' | 'rating' | 'notes' | 'timelineOffsetMs'>
+  Pick<
+    VaultTake,
+    | 'name'
+    | 'rating'
+    | 'notes'
+    | 'timelineOffsetMs'
+    | 'intention'
+    | 'pitchSeries'
+    | 'performanceStartSeconds'
+  >
 >

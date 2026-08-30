@@ -1,0 +1,1021 @@
+/**
+ * Floating practice menu.
+ *
+ * This deliberately avoids every Take Vault / bottom-sheet class. The menu is
+ * a centered iOS material surface above the live app, with no drag handle,
+ * drawer gesture, or edge attachment.
+ */
+
+.practice-menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(0.9rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(0.9rem, env(safe-area-inset-left));
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui,
+    sans-serif;
+}
+
+.practice-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: rgba(14, 18, 25, 0.24);
+  backdrop-filter: blur(7px) saturate(0.96);
+  -webkit-backdrop-filter: blur(7px) saturate(0.96);
+}
+
+.practice-menu-card {
+  --practice-menu-surface: rgba(249, 250, 252, 0.92);
+  --practice-menu-group: rgba(255, 255, 255, 0.78);
+  --practice-menu-control: rgba(255, 255, 255, 0.72);
+  --practice-menu-text: #171a22;
+  --practice-menu-secondary: #6c7077;
+  --practice-menu-divider: rgba(23, 26, 34, 0.09);
+  --practice-menu-blue: var(--audio-blue, #1598ff);
+  --practice-menu-blue-soft: var(--audio-blue-soft, rgba(21, 152, 255, 0.12));
+  --practice-menu-gold: var(--audio-gold, #f7a600);
+  --practice-menu-gold-soft: var(--audio-gold-soft, rgba(247, 166, 0, 0.12));
+
+  position: relative;
+  display: flex;
+  width: min(92vw, 24rem);
+  max-height: min(84dvh, 42rem);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 1.7rem;
+  color: var(--practice-menu-text);
+  background: var(--practice-menu-surface);
+  box-shadow:
+    0 28px 70px rgba(12, 18, 28, 0.24),
+    0 6px 18px rgba(12, 18, 28, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(34px) saturate(1.18);
+  -webkit-backdrop-filter: blur(34px) saturate(1.18);
+  outline: none;
+  transform-origin: center;
+}
+
+.practice-menu-header {
+  display: grid;
+  min-height: 5.15rem;
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.9rem 1rem 0.85rem;
+  border-bottom: 1px solid var(--practice-menu-divider);
+}
+
+.practice-menu-header-slot {
+  display: flex;
+  width: 2.75rem;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.practice-menu-header-slot--end {
+  justify-content: flex-end;
+}
+
+.practice-menu-icon-button,
+.practice-menu-brand-mark {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  color: var(--practice-menu-secondary);
+  background: var(--practice-menu-control);
+  box-shadow: 0 3px 10px rgba(23, 26, 34, 0.07);
+}
+
+.practice-menu-brand-mark {
+  color: var(--practice-menu-gold);
+  background: var(--practice-menu-gold-soft);
+}
+
+.practice-menu-icon-button svg,
+.practice-menu-brand-mark svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.practice-menu-title-block {
+  min-width: 0;
+  text-align: center;
+}
+
+.practice-menu-title-block > span {
+  display: block;
+  color: var(--practice-menu-secondary);
+  font-size: 0.58rem;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+}
+
+.practice-menu-title-block h2 {
+  margin: 0.05rem 0 0;
+  color: var(--practice-menu-text);
+  font-size: 1.08rem;
+  font-weight: 680;
+  letter-spacing: -0.018em;
+  line-height: 1.15;
+}
+
+.practice-menu-title-block p {
+  margin: 0.18rem 0 0;
+  color: var(--practice-menu-secondary);
+  font-size: 0.66rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.practice-menu-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.95rem 1rem 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.practice-menu-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.practice-menu-section {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.practice-menu-section > h3 {
+  margin: 0 0 0 0.15rem;
+  color: var(--practice-menu-secondary);
+  font-size: 0.67rem;
+  font-weight: 600;
+  letter-spacing: 0.015em;
+}
+
+.practice-menu-list,
+.practice-menu-form,
+.practice-menu-shortcuts {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 1.05rem;
+  background: var(--practice-menu-group);
+  box-shadow:
+    0 8px 24px rgba(23, 26, 34, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.64);
+}
+
+.practice-menu-row {
+  display: flex;
+  width: 100%;
+  min-height: 4.25rem;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.68rem 0.78rem;
+  border: 0;
+  border-bottom: 1px solid var(--practice-menu-divider);
+  color: var(--practice-menu-text);
+  background: transparent;
+  text-align: left;
+}
+
+.practice-menu-continue {
+  display: flex;
+  width: 100%;
+  min-height: 4.25rem;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.68rem 0.78rem;
+  border: 1px solid color-mix(in srgb, var(--practice-menu-gold) 24%, white);
+  border-radius: 1.05rem;
+  color: var(--practice-menu-text);
+  background: color-mix(in srgb, var(--practice-menu-gold-soft) 58%, white);
+  box-shadow: 0 8px 24px rgba(23, 26, 34, 0.05);
+  text-align: left;
+}
+
+.practice-menu-row:last-child {
+  border-bottom: 0;
+}
+
+.practice-menu-row:active,
+.practice-menu-shortcut:active,
+.practice-menu-icon-button:active {
+  background: color-mix(in srgb, var(--practice-menu-text) 7%, transparent);
+}
+
+.practice-menu-symbol {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.72rem;
+}
+
+.practice-menu-symbol svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.practice-menu-symbol--blue {
+  color: var(--practice-menu-blue);
+  background: var(--practice-menu-blue-soft);
+}
+
+.practice-menu-symbol--gold {
+  color: var(--practice-menu-gold);
+  background: var(--practice-menu-gold-soft);
+}
+
+.practice-menu-row-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.practice-menu-row-copy strong,
+.practice-menu-row-copy small {
+  display: block;
+}
+
+.practice-menu-row-copy strong {
+  margin-bottom: 0.08rem;
+  color: var(--practice-menu-text);
+  font-size: 0.86rem;
+  font-weight: 620;
+}
+
+.practice-menu-row-copy small {
+  color: var(--practice-menu-secondary);
+  font-size: 0.66rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.practice-menu-chevron {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+  color: var(--practice-menu-secondary);
+  opacity: 0.65;
+}
+
+.practice-menu-tag {
+  flex: 0 0 auto;
+  padding: 0.18rem 0.38rem;
+  border-radius: 999px;
+  color: var(--practice-menu-gold);
+  background: var(--practice-menu-gold-soft);
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.practice-menu-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.practice-menu-shortcut {
+  display: flex;
+  min-width: 0;
+  min-height: 4.8rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  padding: 0.55rem 0.25rem;
+  border: 0;
+  border-right: 1px solid var(--practice-menu-divider);
+  color: var(--practice-menu-text);
+  background: transparent;
+  text-align: center;
+}
+
+.practice-menu-shortcut:last-child {
+  border-right: 0;
+}
+
+.practice-menu-shortcut > svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-bottom: 0.12rem;
+  color: var(--practice-menu-blue);
+}
+
+.practice-menu-shortcut:first-child > svg,
+.practice-menu-shortcut:last-child > svg {
+  color: var(--practice-menu-gold);
+}
+
+.practice-menu-shortcut strong,
+.practice-menu-shortcut small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.practice-menu-shortcut strong {
+  font-size: 0.69rem;
+  font-weight: 620;
+}
+
+.practice-menu-shortcut small {
+  color: var(--practice-menu-secondary);
+  font-size: 0.58rem;
+}
+
+.practice-menu-field {
+  display: block;
+  padding: 0.68rem 0.8rem;
+  border-bottom: 1px solid var(--practice-menu-divider);
+}
+
+.practice-menu-field:last-child {
+  border-bottom: 0;
+}
+
+.practice-menu-field > span {
+  display: block;
+  margin-bottom: 0.22rem;
+  color: var(--practice-menu-secondary);
+  font-size: 0.64rem;
+}
+
+.practice-menu-field select,
+.practice-menu-field input {
+  width: 100%;
+  min-height: 1.8rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--practice-menu-text);
+  background: transparent;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.practice-menu-field select:focus,
+.practice-menu-field input:focus {
+  outline: none;
+}
+
+.practice-menu-field input::placeholder {
+  color: color-mix(in srgb, var(--practice-menu-secondary) 76%, transparent);
+}
+
+.practice-menu-create-item {
+  display: flex;
+  min-height: 2.85rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.55rem 0.45rem 0.8rem;
+  border-top: 1px solid var(--practice-menu-divider);
+}
+
+.practice-menu-create-item input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  color: var(--practice-menu-text);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.practice-menu-create-item button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--practice-menu-blue);
+}
+
+.practice-menu-create-item button:disabled {
+  opacity: 0.35;
+}
+
+.practice-menu-create-item svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.practice-menu-note {
+  margin: 0.05rem 0.15rem 0;
+  color: var(--practice-menu-secondary);
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.practice-menu-primary {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.68rem 1rem;
+  border: 0;
+  border-radius: 0.9rem;
+  color: #ffffff;
+  background: var(--practice-menu-blue);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--practice-menu-blue) 24%, transparent);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.practice-menu-primary:disabled {
+  opacity: 0.45;
+}
+
+html.app-dark-mode .practice-menu-card {
+  --practice-menu-surface: rgba(19, 25, 36, 0.91);
+  --practice-menu-group: rgba(34, 42, 56, 0.74);
+  --practice-menu-control: rgba(44, 53, 68, 0.72);
+  --practice-menu-text: #f8fafc;
+  --practice-menu-secondary: #aab3c2;
+  --practice-menu-divider: rgba(226, 232, 240, 0.11);
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 30px 74px rgba(0, 0, 0, 0.5),
+    0 7px 20px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+html.app-dark-mode .practice-menu-list,
+html.app-dark-mode .practice-menu-form,
+html.app-dark-mode .practice-menu-shortcuts,
+html.app-dark-mode .practice-menu-icon-button {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+@media (max-height: 650px) {
+  .practice-menu-card {
+    max-height: calc(100dvh - 1.5rem);
+  }
+
+  .practice-menu-header {
+    min-height: 4.55rem;
+    padding-block: 0.68rem;
+  }
+
+  .practice-menu-scroll {
+    padding-block: 0.72rem;
+  }
+
+  .practice-menu-row {
+    min-height: 3.85rem;
+  }
+}
+
+/** Focused Practice uses the existing recorder footprint for its post-take loop. */
+.focused-post-take-dock {
+  pointer-events: auto;
+  width: min(92vw, 24rem);
+  margin-inline: auto;
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1.2rem;
+  color: rgba(255, 255, 255, 0.96);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    rgba(8, 13, 21, 0.9);
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px) saturate(1.16);
+  -webkit-backdrop-filter: blur(24px) saturate(1.16);
+}
+
+.focused-post-take-dock > header {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.15rem 0.42rem 0.24rem;
+}
+
+.focused-post-take-dock > header div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.38rem;
+}
+
+.focused-post-take-dock > header span {
+  color: rgba(235, 242, 250, 0.58);
+  font-size: 0.58rem;
+  font-weight: 620;
+}
+
+.focused-post-take-dock > header strong {
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.focused-post-take-dock > header button {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.66);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.focused-post-take-dock > header svg {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
+.focused-post-take-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.42rem;
+}
+
+.focused-post-take-actions button {
+  display: flex;
+  min-width: 0;
+  min-height: 3rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.26rem;
+  padding: 0.4rem 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.82rem;
+  color: rgba(250, 252, 255, 0.88);
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 0.62rem;
+  font-weight: 620;
+}
+
+.focused-post-take-actions button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: rgba(235, 242, 250, 0.6);
+}
+
+.focused-post-take-actions button.is-recommended {
+  border-color: var(--sm-blue-border, rgba(21, 152, 255, 0.46));
+  background: var(--sm-blue-soft, rgba(21, 152, 255, 0.14));
+}
+
+.focused-post-take-actions button.is-recommended svg,
+.focused-post-take-actions button.is-complete svg {
+  color: var(--sm-blue, #1598ff);
+}
+
+.focused-post-take-actions button.is-primary {
+  border-color: transparent;
+  color: #fff;
+  background: var(--sm-blue, #1598ff);
+}
+
+.focused-post-take-actions button.is-primary svg {
+  color: #fff;
+}
+
+.app-ui-overlay--audio-mode .focused-post-take-dock {
+  color: var(--audio-text-primary, #171a22);
+  border-color: var(--audio-divider, rgba(23, 26, 34, 0.1));
+  background: var(--audio-surface, rgba(255, 255, 255, 0.96));
+  box-shadow: var(--audio-shadow-segment, 0 10px 28px rgba(23, 26, 34, 0.1));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-ui-overlay--audio-mode .focused-post-take-dock > header span {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.app-ui-overlay--audio-mode .focused-post-take-dock > header button {
+  color: var(--audio-text-secondary, #6c7077);
+  background: rgba(23, 26, 34, 0.055);
+}
+
+.app-ui-overlay--audio-mode .focused-post-take-actions button {
+  color: var(--audio-text-primary, #171a22);
+  border-color: var(--audio-divider, rgba(23, 26, 34, 0.09));
+  background: rgba(23, 26, 34, 0.035);
+}
+
+.app-ui-overlay--audio-mode .focused-post-take-actions button.is-primary {
+  color: #fff;
+  background: var(--audio-blue, #1598ff);
+}
+
+/** The chosen next goal is visible only while the following take is recording. */
+.focused-recording-goal {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 0.7rem);
+  left: 50%;
+  z-index: 58;
+  display: flex;
+  max-width: min(88vw, 28rem);
+  min-height: 2.2rem;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(8, 13, 21, 0.76);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+  transform: translateX(-50%);
+  pointer-events: none;
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+}
+
+.focused-recording-goal svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: 0 0 auto;
+  color: var(--sm-gold, #f7a600);
+}
+
+.focused-recording-goal span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.58rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.focused-recording-goal strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 620;
+}
+
+.app-ui-overlay--audio-mode .focused-recording-goal {
+  top: calc(env(safe-area-inset-top, 0px) + 4.25rem);
+  color: var(--audio-text-primary, #171a22);
+  border-color: var(--audio-divider, rgba(23, 26, 34, 0.1));
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--audio-shadow-segment, 0 10px 28px rgba(23, 26, 34, 0.1));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-ui-overlay--audio-mode .focused-recording-goal span {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.focused-cue-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 118;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(14, 18, 25, 0.3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.focused-cue-card {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 119;
+  display: grid;
+  width: min(91vw, 24rem);
+  gap: 0.72rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 1.45rem;
+  color: #171a22;
+  background: rgba(249, 250, 252, 0.96);
+  box-shadow: 0 28px 70px rgba(12, 18, 28, 0.28);
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+}
+
+.focused-cue-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.focused-cue-card header span {
+  color: #6c7077;
+  font-size: 0.62rem;
+  font-weight: 650;
+}
+
+.focused-cue-card header h2 {
+  margin: 0.12rem 0 0;
+  font-size: 1.02rem;
+  font-weight: 680;
+}
+
+.focused-cue-card header button,
+.focused-cue-clear {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #6c7077;
+  background: rgba(23, 26, 34, 0.06);
+}
+
+.focused-cue-card header svg,
+.focused-cue-clear svg,
+.focused-cue-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.focused-cue-card textarea {
+  width: 100%;
+  resize: none;
+  padding: 0.75rem;
+  border: 1px solid rgba(23, 26, 34, 0.1);
+  border-radius: 0.9rem;
+  color: #171a22;
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  outline: none;
+}
+
+.focused-cue-card textarea:focus {
+  border-color: color-mix(in srgb, var(--audio-blue, #1598ff) 62%, white);
+  box-shadow: 0 0 0 3px rgba(21, 152, 255, 0.1);
+}
+
+.focused-cue-help,
+.focused-cue-error {
+  margin: -0.18rem 0 0;
+  color: #6c7077;
+  font-size: 0.65rem;
+  line-height: 1.35;
+}
+
+.focused-cue-error {
+  color: #c93434;
+}
+
+.focused-cue-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.focused-cue-dictate,
+.focused-cue-done {
+  display: flex;
+  min-height: 2.55rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: 0.78rem;
+  font-size: 0.75rem;
+  font-weight: 640;
+}
+
+.focused-cue-dictate {
+  flex: 1;
+  color: var(--audio-blue, #1598ff);
+  background: rgba(21, 152, 255, 0.1);
+}
+
+.focused-cue-dictate--active {
+  color: #c93434;
+  background: rgba(201, 52, 52, 0.1);
+}
+
+.focused-cue-done {
+  color: #fff;
+  background: var(--audio-blue, #1598ff);
+}
+
+html.app-dark-mode .focused-cue-card {
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(19, 25, 36, 0.96);
+}
+
+html.app-dark-mode .focused-cue-card header span,
+html.app-dark-mode .focused-cue-help {
+  color: #aab3c2;
+}
+
+html.app-dark-mode .focused-cue-card textarea {
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(34, 42, 56, 0.86);
+}
+
+/** Focused Practice comparison controls live inside the existing review surface. */
+.focused-review-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.focused-review-switch {
+  display: grid;
+  min-width: 8rem;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.18rem;
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  border-radius: 0.72rem;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.focused-review-switch button {
+  min-height: 2rem;
+  border: 0;
+  border-radius: 0.55rem;
+  color: #6c7077;
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.focused-review-switch button[aria-pressed='true'] {
+  color: #171a22;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(23, 26, 34, 0.1);
+}
+
+.focused-review-loop,
+.focused-review-blind {
+  display: flex;
+  min-height: 2.35rem;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.4rem 0.58rem;
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  border-radius: 0.72rem;
+  color: #6c7077;
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 0.62rem;
+  font-weight: 640;
+}
+
+.focused-review-loop svg,
+.focused-review-blind svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.focused-review-loop--active,
+.focused-review-blind--active {
+  color: var(--audio-blue, #1598ff);
+  border-color: rgba(21, 152, 255, 0.25);
+  background: rgba(21, 152, 255, 0.1);
+}
+
+.pitch-compare-panel,
+.pitch-compare-empty {
+  margin-bottom: 0.45rem;
+  padding: 0.58rem 0.7rem;
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  border-radius: 0.85rem;
+  color: #171a22;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 6px 20px rgba(23, 26, 34, 0.06);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.pitch-compare-panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.35rem;
+}
+
+.pitch-compare-panel header strong {
+  font-size: 0.68rem;
+}
+
+.pitch-compare-panel header span,
+.pitch-compare-empty {
+  color: #6c7077;
+  font-size: 0.58rem;
+}
+
+.pitch-compare-panel svg {
+  display: block;
+  width: 100%;
+  height: 4.8rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(to bottom, rgba(23, 26, 34, 0.05) 1px, transparent 1px) 0 0 / 100% 23px,
+    rgba(23, 26, 34, 0.025);
+}
+
+.pitch-compare-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.pitch-compare-line--benchmark {
+  stroke: var(--audio-gold, #f7a600);
+}
+
+.pitch-compare-line--challenger {
+  stroke: var(--audio-blue, #1598ff);
+}
+
+.pitch-compare-panel--blind .pitch-compare-line--benchmark {
+  stroke: #7a6ff0;
+}
+
+.pitch-compare-panel--blind .pitch-compare-line--challenger {
+  stroke: #18a7b5;
+}
+
+.pitch-compare-playhead {
+  stroke: rgba(23, 26, 34, 0.28);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.pitch-compare-legend {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 0.35rem;
+  color: #6c7077;
+  font-size: 0.58rem;
+}
+
+.pitch-compare-legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.pitch-compare-key {
+  width: 0.62rem;
+  height: 0.18rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.pitch-compare-key--benchmark {
+  color: var(--audio-gold, #f7a600);
+}
+
+.pitch-compare-key--challenger {
+  color: var(--audio-blue, #1598ff);
+}
+
+.pitch-compare-panel--blind .pitch-compare-key--benchmark {
+  color: #7a6ff0;
+}
+
+.pitch-compare-panel--blind .pitch-compare-key--challenger {
+  color: #18a7b5;
+}
+
+@media (max-width: 370px) {
+  .focused-review-loop span,
+  .focused-review-blind span {
+    display: none;
+  }
+}

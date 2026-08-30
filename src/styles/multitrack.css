@@ -2827,10 +2827,6 @@
 }
 
 @media (max-width: 380px) {
-  .camera-view-mode-controls .camera-compare-toggle {
-    padding-inline: 0.55rem;
-  }
-
   .multitrack-overlay--camera-mode .multitrack-share-btn {
     padding-inline: 0.75rem;
   }

@@ -12,7 +12,7 @@ import {
   type RefObject,
 } from 'react'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { ArrowLeftRight, Columns2, Grid2X2, Pin, RotateCcw, X } from 'lucide-react'
+import { ArrowLeftRight, Pin, RotateCcw, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
@@ -58,7 +58,6 @@ export interface PipCompareRowProps {
   onSubmitYoutube: (embedUrl: string) => void
   onClearYoutube: () => void
   onToggleSplitView: () => void
-  onOpenMultitrack: () => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onDragStateChange?: (state: PipDragUiState) => void
@@ -596,57 +595,6 @@ function CompactPinCurrentButton({
   )
 }
 
-function CompactCompareButton({
-  onToggle,
-  hapticFeedback,
-}: {
-  onToggle: () => void
-  hapticFeedback: boolean
-}) {
-  return (
-    <Pressable
-      type="button"
-      intensity="soft"
-      squish={false}
-      haptic="light"
-      hapticFeedback={hapticFeedback}
-      data-tutorial="expand-view-button"
-      className="camera-compare-toggle pointer-events-auto"
-      onClick={onToggle}
-      aria-label="Open expanded comparison view"
-    >
-      <Columns2 aria-hidden />
-      <span>Expand</span>
-    </Pressable>
-  )
-}
-
-function CompactMultitrackButton({
-  onOpen,
-  hapticFeedback,
-}: {
-  onOpen: () => void
-  hapticFeedback: boolean
-}) {
-  return (
-    <Pressable
-      type="button"
-      intensity="soft"
-      squish={false}
-      haptic="light"
-      hapticFeedback={hapticFeedback}
-      data-tutorial="multitrack-button"
-      className="camera-compare-toggle camera-multitrack-toggle pointer-events-auto"
-      onClick={onOpen}
-      aria-label="Open Multitrack view"
-      aria-haspopup="dialog"
-    >
-      <Grid2X2 aria-hidden />
-      <span>Multitrack</span>
-    </Pressable>
-  )
-}
-
 function TakeCardLayoutToolbar({
   onReset,
   hapticFeedback,
@@ -779,7 +727,6 @@ export default memo(function PipCompareRow({
   onSubmitYoutube,
   onClearYoutube,
   onToggleSplitView,
-  onOpenMultitrack,
   onExpandBenchmark,
   onExpandChallenger,
   onDragStateChange,
@@ -1181,26 +1128,14 @@ export default memo(function PipCompareRow({
       </div>
 
       {compact &&
+        layoutEditing &&
         typeof document !== 'undefined' &&
         createPortal(
           <div className="take-card-top-control">
-            {layoutEditing ? (
-              <TakeCardLayoutToolbar
-                onReset={resetTakeCardLayout}
-                hapticFeedback={hapticFeedback}
-              />
-            ) : (
-              <div className="camera-view-mode-controls">
-                <CompactCompareButton
-                  onToggle={onToggleSplitView}
-                  hapticFeedback={hapticFeedback}
-                />
-                <CompactMultitrackButton
-                  onOpen={onOpenMultitrack}
-                  hapticFeedback={hapticFeedback}
-                />
-              </div>
-            )}
+            <TakeCardLayoutToolbar
+              onReset={resetTakeCardLayout}
+              hapticFeedback={hapticFeedback}
+            />
           </div>,
           readPhysicalUiPortal(),
         )}
