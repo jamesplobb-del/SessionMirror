@@ -16,6 +16,7 @@ import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
+import StarRating from './StarRating'
 import type { RecordingMode } from '../types'
 import { resolveHandsFreePhase } from '../utils/handsFreePhase'
 import { triggerModeSwitchHaptic } from '../utils/haptics'
@@ -39,9 +40,11 @@ interface ControlDeckProps {
   focusedPostTakeActive?: boolean
   focusedPostTakeReviewed?: boolean
   focusedPostTakeHasNote?: boolean
+  focusedPostTakeRating?: number
   focusedRecordingGoal?: string
   onFocusedPostTakeReview?: () => void
   onFocusedPostTakeNote?: () => void
+  onFocusedPostTakeRate?: (rating: number) => void
   onFocusedPostTakeRetry?: () => void
   onFocusedPostTakeDismiss?: () => void
   handsFreeRecording?: boolean
@@ -109,9 +112,11 @@ function ControlDeck({
   focusedPostTakeActive = false,
   focusedPostTakeReviewed = false,
   focusedPostTakeHasNote = false,
+  focusedPostTakeRating = 0,
   focusedRecordingGoal = '',
   onFocusedPostTakeReview,
   onFocusedPostTakeNote,
+  onFocusedPostTakeRate,
   onFocusedPostTakeRetry,
   onFocusedPostTakeDismiss,
   handsFreeRecording = false,
@@ -358,11 +363,18 @@ function ControlDeck({
               haptic="light"
               hapticFeedback={hapticFeedback}
               onClick={onFocusedPostTakeDismiss}
-              aria-label="Return to recording controls"
+              aria-label="Done for now"
             >
               <X aria-hidden />
             </Pressable>
           </header>
+          <div className="focused-post-take-rating">
+            <StarRating
+              rating={focusedPostTakeRating}
+              onChange={(value) => onFocusedPostTakeRate?.(value)}
+              size="md"
+            />
+          </div>
           <div className="focused-post-take-actions">
             <Pressable
               type="button"
@@ -373,7 +385,7 @@ function ControlDeck({
               onClick={onFocusedPostTakeReview}
             >
               {focusedPostTakeReviewed ? <Check aria-hidden /> : <ScanSearch aria-hidden />}
-              <span>Review</span>
+              <span>Compare</span>
             </Pressable>
             <Pressable
               type="button"
@@ -384,7 +396,7 @@ function ControlDeck({
               onClick={onFocusedPostTakeNote}
             >
               {focusedPostTakeHasNote ? <Check aria-hidden /> : <MessageSquareText aria-hidden />}
-              <span>Next goal</span>
+              <span>Note</span>
             </Pressable>
             <Pressable
               type="button"

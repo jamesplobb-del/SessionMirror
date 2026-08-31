@@ -41,6 +41,7 @@ export {
   getPracticeItemState,
   listPracticeItemStates,
   listPracticeSessions,
+  endPracticeSession,
   resumePracticeSession,
   startPracticeSession,
   updatePracticeItemState,

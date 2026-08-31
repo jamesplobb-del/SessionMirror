@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FolderPlus, Trash2 } from 'lucide-react'
+import { Folder, FolderPlus, Trash2 } from 'lucide-react'
 import { useActionSheet } from '../context/ActionSheetContext'
 import type { Project } from '../db/types'
 import AnimatedExpand from './ui/AnimatedExpand'
@@ -24,7 +24,7 @@ export default function ProjectSessionBar({
 }: ProjectSessionBarProps) {
   const { showConfirm } = useActionSheet()
   const [isNamingSession, setIsNamingSession] = useState(false)
-  const [sessionNameDraft, setSessionNameDraft] = useState('New Session')
+  const [sessionNameDraft, setSessionNameDraft] = useState('New Practice Folder')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function ProjectSessionBar({
   }, [isNamingSession])
 
   const openNamingForm = () => {
-    setSessionNameDraft('New Session')
+    setSessionNameDraft('New Practice Folder')
     setIsNamingSession(true)
   }
 
@@ -53,7 +53,7 @@ export default function ProjectSessionBar({
     if (!onDeleteProject) return
     void (async () => {
       const confirmed = await showConfirm({
-        message: `Delete session "${project.name}" and all takes inside it? This cannot be undone.`,
+        message: `Delete practice folder "${project.name}" and all takes inside it? This cannot be undone.`,
         destructive: true,
         confirmLabel: 'Delete',
       })
@@ -64,7 +64,7 @@ export default function ProjectSessionBar({
 
   return (
     <div className={`mb-4 flex flex-col gap-2 ${className}`.trim()}>
-      <p className="text-xs font-medium text-stone-500">Sessions</p>
+      <p className="text-xs font-medium text-stone-500">Practice Folders</p>
 
       <AnimatedExpand open={isNamingSession}>
         <form
@@ -75,7 +75,7 @@ export default function ProjectSessionBar({
           }}
         >
           <label className="text-xs font-medium text-stone-600" htmlFor="new-session-name">
-            Session name
+            Folder name
           </label>
           <input
             ref={inputRef}
@@ -117,14 +117,14 @@ export default function ProjectSessionBar({
           className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-stone-400 hover:bg-stone-50"
         >
           <FolderPlus className="h-3.5 w-3.5" />
-          New Session
+          New Folder
         </Pressable>
         {projects.map((project) => {
           const active = project.id === activeProjectId
           return (
             <div
               key={project.id}
-              className={`flex shrink-0 items-center rounded-full border ${
+              className={`vault-project-folder flex shrink-0 items-center rounded-xl border ${
                 active
                   ? 'border-sky-300 bg-sky-50'
                   : 'border-stone-200 bg-stone-50'
@@ -135,10 +135,11 @@ export default function ProjectSessionBar({
                 intensity="soft"
                 onClick={() => onSelectProject(project.id)}
                 haptic="light"
-                className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium ${
                   active ? 'text-sky-800' : 'text-stone-600 hover:text-stone-800'
                 }`}
               >
+                <Folder className="h-3.5 w-3.5" aria-hidden />
                 {project.name}
               </Pressable>
               {onDeleteProject && (
@@ -148,7 +149,7 @@ export default function ProjectSessionBar({
                   onClick={() => handleDeleteSession(project)}
                   haptic="light"
                   className="rounded-full px-2 py-1.5 text-stone-400 hover:bg-stone-100 hover:text-red-600"
-                  aria-label={`Delete session ${project.name}`}
+                  aria-label={`Delete practice folder ${project.name}`}
                 >
                   <Trash2 className="h-3 w-3" />
                 </Pressable>

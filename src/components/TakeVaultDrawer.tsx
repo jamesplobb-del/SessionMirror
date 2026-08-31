@@ -58,6 +58,24 @@ interface TakeVaultDrawerProps {
   onEnterComplete?: () => void
 }
 
+function takeDayLabel(timestamp: number): string {
+  const date = new Date(timestamp)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  const sameDay = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  if (sameDay(date, today)) return 'Today'
+  if (sameDay(date, yesterday)) return 'Yesterday'
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+  }).format(date)
+}
+
 export default function TakeVaultDrawer({
   isOpen,
   onClose,
@@ -161,7 +179,8 @@ export default function TakeVaultDrawer({
         (take) =>
           take.name.toLowerCase().includes(query) ||
           take.notes.toLowerCase().includes(query) ||
-          Boolean(take.intention?.toLowerCase().includes(query)),
+          Boolean(take.intention?.toLowerCase().includes(query)) ||
+          Boolean(take.focusArea?.toLowerCase().includes(query)),
       )
     },
     [bestHistoryByTakeId, contentReady, searchQuery, sortedTakes, vaultMediaTab],
@@ -306,11 +325,14 @@ export default function TakeVaultDrawer({
 
   const takeIndexById = useMemo(() => {
     const map = new Map<string, number>()
-    sortedTakes.forEach((take, index) => {
+    const chronologicalTakes = [...takes].sort(
+      (left, right) => left.timestamp - right.timestamp,
+    )
+    chronologicalTakes.forEach((take, index) => {
       map.set(take.id, index)
     })
     return map
-  }, [sortedTakes])
+  }, [takes])
 
   const handleCloseClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
@@ -504,10 +526,19 @@ export default function TakeVaultDrawer({
                     )}
                   </div>
                   <div className="vault-take-list">
-                    {filteredTakes.map((take) => {
+                    {filteredTakes.map((take, index) => {
                       const bestHistoryEntry = bestHistoryByTakeId.get(take.id)
+                      const dayLabel = takeDayLabel(take.timestamp)
+                      const previousDayLabel =
+                        index > 0 ? takeDayLabel(filteredTakes[index - 1]!.timestamp) : null
                       return (
                       <div key={take.id} className="space-y-2">
+                        {sortMode === 'newest' && dayLabel !== previousDayLabel && (
+                          <div className="vault-take-day-label">
+                            <span>{dayLabel}</span>
+                            <small>{activeProject?.name ?? 'Practice'}</small>
+                          </div>
+                        )}
                         {vaultMediaTab === 'best' && bestHistoryEntry && (
                           <div className="flex items-center gap-1.5 px-1 text-[0.68rem] font-medium text-amber-700">
                             <Star className="h-3.5 w-3.5 fill-current" aria-hidden />
@@ -529,6 +560,7 @@ export default function TakeVaultDrawer({
                         takeIndex={takeIndexById.get(take.id) ?? 0}
                         isBenchmark={take.id === vaultBenchmarkTakeId}
                         isChallenger={take.id === challengerId}
+                        bestHistoryEntry={bestHistoryByTakeId.get(take.id) ?? null}
                         detailOpen={detailTakeId === take.id}
                         onToggleDetail={() =>
                           setDetailTakeId((current) => (current === take.id ? null : take.id))

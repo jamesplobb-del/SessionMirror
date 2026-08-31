@@ -3,6 +3,7 @@ import { Directory, Filesystem } from '@capacitor/filesystem'
 import { initAppFilesystem, isFilesystemMissingError, nativeDataFileExists, TAKES_DIR } from './filesystemInit'
 import type { CaptureProfile } from './audioCapture'
 import type { RecordingCaptureDiagnostics, RecordingTrackSnapshot } from './recordingDiagnostics'
+import type { PitchSample } from '../types'
 import { reportError } from './crashReporting'
 
 export const NATIVE_VIDEO_MIME = 'video/mp4'
@@ -37,6 +38,8 @@ export interface RecordingCompletePayload {
   performanceStartOffsetBeats?: number
   referenceTrackId?: string
   referenceStartBeat?: number
+  /** Simulator-only demo contour, or a contour supplied by another capture engine. */
+  pitchSeries?: PitchSample[]
   /**
    * Overrides the default video mirror-on-playback behavior. Native camera
    * recordings are already saved in true (unmirrored) orientation, so they

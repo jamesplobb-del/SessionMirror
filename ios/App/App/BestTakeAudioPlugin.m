@@ -57,5 +57,7 @@ CAP_PLUGIN(BestTakeAudioPlugin, "BestTakeAudioPlugin",
     CAP_PLUGIN_METHOD(getSpokenFeedbackPermission, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startSpokenFeedback, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopSpokenFeedback, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(getRuntimeEnvironment, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(createSimulatorTake, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setTakesBackupExcluded, CAPPluginReturnPromise);
 )

@@ -55,6 +55,8 @@ export interface VaultTake {
   timelineOffsetMs?: number
   practiceSessionId?: string
   intention: string
+  /** What the musician was working on when this take was recorded. */
+  focusArea: string
   pitchSeries?: PitchSample[]
   performanceStartSeconds?: number
 }
@@ -71,6 +73,7 @@ export interface SaveTakeInput {
   timelineOffsetMs?: number
   practiceSessionId?: string
   intention?: string
+  focusArea?: string
   pitchSeries?: PitchSample[]
   performanceStartSeconds?: number
 }
@@ -113,6 +116,7 @@ export type VaultTakeUpdate = Partial<
     | 'notes'
     | 'timelineOffsetMs'
     | 'intention'
+    | 'focusArea'
     | 'pitchSeries'
     | 'performanceStartSeconds'
   >

@@ -386,6 +386,8 @@ export interface BestTakeAudioPluginType {
   getSpokenFeedbackPermission(): Promise<{ status: 'granted' | 'denied' | 'prompt' }>
   startSpokenFeedback(): Promise<{ active: boolean }>
   stopSpokenFeedback(): Promise<{ transcript?: string }>
+  getRuntimeEnvironment(): Promise<{ isSimulator: boolean }>
+  createSimulatorTake(options: { durationSeconds: number }): Promise<NativeCameraRecordingStopResult>
   playNativeCameraTestPostProcess(options: { url: string }): Promise<NativeCameraPostProcessPlaybackResult>
   stopNativeCameraTestPostProcess(): Promise<void>
   /** Native pre-warmed Taptic Engine impact. iOS only. */

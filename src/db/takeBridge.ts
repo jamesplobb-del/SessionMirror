@@ -42,6 +42,7 @@ export function vaultTakeToUiTake(
     timelineOffsetMs: vaultTake.timelineOffsetMs,
     practiceSessionId: vaultTake.practiceSessionId,
     intention: vaultTake.intention,
+    focusArea: vaultTake.focusArea,
     pitchSeries: vaultTake.pitchSeries,
     performanceStartSeconds: vaultTake.performanceStartSeconds,
   }

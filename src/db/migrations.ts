@@ -11,6 +11,7 @@ const TAKE_COLUMN_MIGRATIONS = [
   'ALTER TABLE takes ADD COLUMN timeline_offset_ms INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE takes ADD COLUMN practice_session_id TEXT',
   "ALTER TABLE takes ADD COLUMN intention TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE takes ADD COLUMN focus_area TEXT NOT NULL DEFAULT ''",
   "ALTER TABLE takes ADD COLUMN pitch_series_json TEXT NOT NULL DEFAULT ''",
   'ALTER TABLE takes ADD COLUMN performance_start_seconds REAL',
 ] as const

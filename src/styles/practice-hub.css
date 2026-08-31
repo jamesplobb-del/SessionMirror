@@ -34,7 +34,13 @@
 }
 
 .practice-menu-card {
-  --practice-menu-surface: rgba(249, 250, 252, 0.92);
+  --practice-menu-surface: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(248, 249, 251, 0.94) 45%,
+    rgba(247, 248, 250, 0.92) 78%,
+    rgba(244, 246, 248, 0.9) 100%
+  );
   --practice-menu-group: rgba(255, 255, 255, 0.78);
   --practice-menu-control: rgba(255, 255, 255, 0.72);
   --practice-menu-text: #171a22;
@@ -195,19 +201,91 @@
   text-align: left;
 }
 
-.practice-menu-continue {
-  display: flex;
+/** The resume card carries the app's identity: it's the one saturated,
+ * confident element on an otherwise quiet screen — everything else here
+ * stays deliberately restrained so this is the thing your eye lands on. */
+.practice-menu-hero {
+  position: relative;
+  display: block;
   width: 100%;
-  min-height: 4.25rem;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.68rem 0.78rem;
-  border: 1px solid color-mix(in srgb, var(--practice-menu-gold) 24%, white);
-  border-radius: 1.05rem;
-  color: var(--practice-menu-text);
-  background: color-mix(in srgb, var(--practice-menu-gold-soft) 58%, white);
+  overflow: hidden;
+  padding: 1.125rem;
+  border: 1.5px solid color-mix(in srgb, var(--practice-menu-gold) 34%, transparent);
+  border-radius: 1.35rem;
+  background:
+    linear-gradient(165deg, color-mix(in srgb, var(--practice-menu-gold) 8%, transparent), transparent 55%),
+    var(--practice-menu-group);
   box-shadow: 0 8px 24px rgba(23, 26, 34, 0.05);
   text-align: left;
+}
+
+.practice-menu-hero-ring {
+  position: absolute;
+  top: -1.875rem;
+  right: -1.875rem;
+  width: 8.25rem;
+  height: 8.25rem;
+  border: 0.75rem solid color-mix(in srgb, var(--practice-menu-gold) 14%, transparent);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.practice-menu-hero-content {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.practice-menu-hero-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.56rem;
+  border-radius: 999px;
+  background: var(--practice-menu-gold-soft);
+  color: color-mix(in srgb, var(--practice-menu-gold) 78%, black 22%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.practice-menu-hero-badge svg {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+.practice-menu-hero-title {
+  font-size: 1.19rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--practice-menu-text);
+}
+
+.practice-menu-hero-recap {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--practice-menu-secondary);
+}
+
+.practice-menu-hero-cta {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 999px;
+  background: var(--practice-menu-gold);
+  color: #171a22;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.practice-menu-hero-cta svg {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .practice-menu-row:last-child {
@@ -218,6 +296,21 @@
 .practice-menu-shortcut:active,
 .practice-menu-icon-button:active {
   background: color-mix(in srgb, var(--practice-menu-text) 7%, transparent);
+}
+
+/** A thin rule instead of an icon chip: it marks which row is live without
+ * giving every row its own colored badge, which is what made the list read
+ * as generic. Only the row with an active session gets the accent. */
+.practice-menu-spine {
+  width: 0.19rem;
+  flex: 0 0 auto;
+  align-self: stretch;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--practice-menu-text) 12%, transparent);
+}
+
+.practice-menu-spine--active {
+  background: var(--practice-menu-gold);
 }
 
 .practice-menu-symbol {
@@ -446,7 +539,12 @@
 }
 
 html.app-dark-mode .practice-menu-card {
-  --practice-menu-surface: rgba(19, 25, 36, 0.91);
+  --practice-menu-surface: linear-gradient(
+    180deg,
+    rgba(21, 28, 41, 0.93) 0%,
+    rgba(19, 25, 36, 0.91) 55%,
+    rgba(15, 20, 30, 0.9) 100%
+  );
   --practice-menu-group: rgba(34, 42, 56, 0.74);
   --practice-menu-control: rgba(44, 53, 68, 0.72);
   --practice-menu-text: #f8fafc;
@@ -547,6 +645,13 @@ html.app-dark-mode .practice-menu-icon-button {
 .focused-post-take-dock > header svg {
   width: 0.82rem;
   height: 0.82rem;
+}
+
+.focused-post-take-rating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.05rem 0 0.55rem;
 }
 
 .focused-post-take-actions {
@@ -841,6 +946,40 @@ html.app-dark-mode .focused-cue-card textarea {
   background: rgba(34, 42, 56, 0.86);
 }
 
+/** Compare, for a focused session, rises as a sheet over the recorder instead
+ * of pushing into a full-screen page — you never actually leave the take. */
+.review-sheet-backdrop {
+  border: 0;
+  padding: 0;
+  background: rgba(14, 18, 25, 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.review-overlay--sheet {
+  background: var(--audio-surface, #ffffff);
+  box-shadow: 0 -12px 40px rgba(23, 26, 34, 0.22);
+}
+
+html.app-dark-mode .review-overlay--sheet {
+  background: var(--audio-surface, rgba(15, 23, 42, 0.96));
+}
+
+.review-overlay--sheet .sheet-drag-handle {
+  padding: 0.6rem 0 0.35rem;
+}
+
+.review-sheet-handle-bar {
+  width: 2.5rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: rgba(108, 112, 119, 0.35);
+}
+
+html.app-dark-mode .review-sheet-handle-bar {
+  background: rgba(226, 232, 240, 0.3);
+}
+
 /** Focused Practice comparison controls live inside the existing review surface. */
 .focused-review-strip {
   display: flex;
@@ -902,6 +1041,67 @@ html.app-dark-mode .focused-cue-card textarea {
   color: var(--audio-blue, #1598ff);
   border-color: rgba(21, 152, 255, 0.25);
   background: rgba(21, 152, 255, 0.1);
+}
+
+.focused-review-pitch {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  border-radius: 0.72rem;
+  color: #6c7077;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.focused-review-pitch svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.focused-review-pitch--active {
+  color: var(--audio-blue, #1598ff);
+  border-color: rgba(21, 152, 255, 0.25);
+  background: rgba(21, 152, 255, 0.1);
+}
+
+.focused-review-best-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.45rem;
+  padding: 0.48rem 0.58rem;
+  border: 1px solid rgba(209, 165, 62, 0.24);
+  border-radius: 0.78rem;
+  color: #6c7077;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 0.64rem;
+  font-weight: 650;
+}
+
+.focused-review-best-row button {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(209, 165, 62, 0.34);
+  border-radius: 0.62rem;
+  color: #7b5810;
+  background: rgba(246, 230, 176, 0.42);
+  font-size: 0.61rem;
+  font-weight: 720;
+}
+
+.focused-review-best-row button svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.focused-review-best-row--first {
+  border-color: rgba(21, 152, 255, 0.2);
 }
 
 .pitch-compare-panel,

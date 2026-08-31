@@ -60,6 +60,7 @@ function mapTakeRow(row: SqlRow): VaultTake {
     timelineOffsetMs: Number(row.timeline_offset_ms ?? 0),
     practiceSessionId: row.practice_session_id ? String(row.practice_session_id) : undefined,
     intention: String(row.intention ?? ''),
+    focusArea: String(row.focus_area ?? ''),
     pitchSeries: parsePitchSeries(row.pitch_series_json),
     performanceStartSeconds:
       row.performance_start_seconds === null || row.performance_start_seconds === undefined
@@ -153,6 +154,7 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
     timelineOffsetMs: input.timelineOffsetMs ?? 0,
     practiceSessionId: input.practiceSessionId,
     intention: input.intention?.trim() ?? '',
+    focusArea: input.focusArea?.trim() ?? '',
     pitchSeries: input.pitchSeries,
     performanceStartSeconds: input.performanceStartSeconds,
   }
@@ -161,9 +163,9 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
     `INSERT INTO takes (
       id, project_id, file_path, duration, is_best_take, created_at,
       name, mime_type, media_type, rating, notes, recording_orientation, enhancer_baked,
-      timeline_offset_ms, practice_session_id, intention, pitch_series_json,
+      timeline_offset_ms, practice_session_id, intention, focus_area, pitch_series_json,
       performance_start_seconds
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       take.id,
       take.projectId,
@@ -181,6 +183,7 @@ export async function saveTake(input: SaveTakeInput): Promise<VaultTake> {
       take.timelineOffsetMs ?? 0,
       take.practiceSessionId ?? null,
       take.intention,
+      take.focusArea,
       take.pitchSeries ? JSON.stringify(take.pitchSeries) : '',
       take.performanceStartSeconds ?? null,
     ],
@@ -214,6 +217,10 @@ export async function updateVaultTake(takeId: string, updates: VaultTakeUpdate):
   if (updates.intention !== undefined) {
     fields.push('intention = ?')
     values.push(updates.intention)
+  }
+  if (updates.focusArea !== undefined) {
+    fields.push('focus_area = ?')
+    values.push(updates.focusArea)
   }
   if (updates.pitchSeries !== undefined) {
     fields.push('pitch_series_json = ?')

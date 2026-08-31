@@ -120,6 +120,16 @@ export async function startPracticeSession(options: {
   }
 }
 
+/** Closes out one sitting — "done for now" in the record/reflect loop. */
+export async function endPracticeSession(sessionId: string): Promise<void> {
+  const db = getVaultDatabase()
+  await db.run('UPDATE practice_sessions SET ended_at = ? WHERE id = ?', [
+    Date.now(),
+    sessionId,
+  ])
+  await persistVaultWebStore()
+}
+
 export async function resumePracticeSession(projectId: string): Promise<PracticeItemState | null> {
   const db = getVaultDatabase()
   const now = Date.now()

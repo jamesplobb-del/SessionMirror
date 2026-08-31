@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS takes (
   created_at INTEGER NOT NULL,
   practice_session_id TEXT,
   intention TEXT NOT NULL DEFAULT '',
+  focus_area TEXT NOT NULL DEFAULT '',
   pitch_series_json TEXT NOT NULL DEFAULT '',
   performance_start_seconds REAL,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE

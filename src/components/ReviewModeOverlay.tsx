@@ -12,6 +12,7 @@ import {
   Pencil,
   Repeat2,
   Share2,
+  Star,
   Trash2,
 } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
@@ -20,7 +21,8 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import PitchComparisonGraph from './PitchComparisonGraph'
 import Pressable from './ui/Pressable'
-import { iosEaseOut, iosScreenEnter, iosScreenExit, motionGpuLayer } from '../utils/motionPresets'
+import { iosEaseOut, iosFade, iosScreenEnter, iosScreenExit, iosSpringSheet, motionGpuLayer } from '../utils/motionPresets'
+import { useSheetDragDismiss, readSheetSlideDistance } from '../hooks/useSheetDragDismiss'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
 import { isAudioMedia } from '../utils/mediaType'
@@ -279,7 +281,9 @@ export default function ReviewModeOverlay({
   const [swipeOffset, setSwipeOffset] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [showPitch, setShowPitch] = useState(false)
-  const [showPitchComparison, setShowPitchComparison] = useState(focusedPractice)
+  // Focused practice's Compare is a listening moment, not an analysis screen —
+  // the pitch graph only ever shows up in the general (non-focused) A/B view.
+  const [showPitchComparison, setShowPitchComparison] = useState(false)
   const [blindMode, setBlindMode] = useState(false)
   const [blindSwapped, setBlindSwapped] = useState(false)
   const [loopStartSeconds, setLoopStartSeconds] = useState<number | null>(
@@ -700,9 +704,9 @@ export default function ReviewModeOverlay({
   )
 
   const handleCloseClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation()
-      event.preventDefault()
+    (event?: React.MouseEvent<HTMLButtonElement>) => {
+      event?.stopPropagation()
+      event?.preventDefault()
       reviewAutoplayEnabledRef.current = false
       stopProgressLoop()
       if (activeAudioPlaybackItem) {
@@ -1386,38 +1390,81 @@ export default function ReviewModeOverlay({
     setSwipeOffset(0)
   }
 
+  // The focused-practice "just recorded, check it" moment stays a sheet over
+  // the recorder — Vault's full-screen browsing is untouched.
+  const sheetMode = !isVault && focusedPractice
+  const [sheetSlideDistance] = useState(readSheetSlideDistance)
+  const { sheetDragProps, dragHandleProps, backdropOpacity: sheetBackdropOpacity } =
+    useSheetDragDismiss({
+      enabled: sheetMode && isOpen,
+      slideDistance: sheetSlideDistance,
+      onDismiss: handleCloseClick,
+    })
+
   if (!hasMedia) {
     return null
   }
 
   return (
-    <motion.div
-      className={`review-overlay review-overlay--immersive ${activeIsAudio ? 'review-overlay--audio' : 'review-overlay--camera'} fixed inset-0 z-[60] flex h-full w-full flex-col overflow-hidden transform-gpu`}
-      variants={{
-        initial: { opacity: 0, scale: 0.96, y: 10 },
-        animate: {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          transition: iosScreenEnter,
-        },
-        exit: {
-          opacity: 0,
-          scale: 0.98,
-          y: 6,
-          transition: iosScreenExit,
-        },
-      }}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      style={{
-        ...motionGpuLayer,
-        pointerEvents: isOpen ? 'auto' : 'none',
-      }}
-      aria-hidden={!isOpen}
-    >
-      <div ref={reviewBoundsRef} className="relative h-full w-full">
+    <>
+      {sheetMode && (
+        <motion.button
+          type="button"
+          className="review-sheet-backdrop fixed inset-0 z-[59]"
+          style={{ opacity: sheetBackdropOpacity, pointerEvents: isOpen ? 'auto' : 'none' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={iosFade}
+          onClick={handleCloseClick}
+          aria-label="Close comparison"
+        />
+      )}
+      <motion.div
+        className={`review-overlay fixed z-[60] flex w-full flex-col overflow-hidden transform-gpu ${
+          sheetMode
+            ? 'review-overlay--sheet inset-x-0 bottom-0 h-[80dvh] rounded-t-[1.75rem]'
+            : `review-overlay--immersive inset-0 h-full ${activeIsAudio ? 'review-overlay--audio' : 'review-overlay--camera'}`
+        }`}
+        variants={
+          sheetMode
+            ? {
+                initial: { y: '100%' },
+                animate: { y: 0, transition: iosSpringSheet },
+                exit: { y: '100%', transition: iosSpringSheet },
+              }
+            : {
+                initial: { opacity: 0, scale: 0.96, y: 10 },
+                animate: {
+                  opacity: 1,
+                  scale: 1,
+                  y: 0,
+                  transition: iosScreenEnter,
+                },
+                exit: {
+                  opacity: 0,
+                  scale: 0.98,
+                  y: 6,
+                  transition: iosScreenExit,
+                },
+              }
+        }
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        style={{
+          ...motionGpuLayer,
+          pointerEvents: isOpen ? 'auto' : 'none',
+        }}
+        aria-hidden={!isOpen}
+        {...(sheetMode ? sheetDragProps : {})}
+      >
+        {sheetMode && (
+          <div {...dragHandleProps}>
+            <div className="review-sheet-handle-bar" />
+          </div>
+        )}
+        <div ref={reviewBoundsRef} className="relative h-full w-full">
       <AnimatePresence>
         {showPlayOverlay && (
           <motion.div
@@ -1657,6 +1704,7 @@ export default function ReviewModeOverlay({
               <div className="ui-orient-spin pointer-events-auto">
                 <div className="review-controls-cluster">
                   {!isVault && hasBenchmark && hasChallenger && (
+                    <>
                     <div className="focused-review-strip">
                       <div className="focused-review-switch" aria-label="Switch comparison take">
                         <button
@@ -1712,10 +1760,51 @@ export default function ReviewModeOverlay({
                         {blindMode ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
                         <span>{blindMode ? 'Reveal' : 'Blind'}</span>
                       </button>
+                      {showPitchPanel && (
+                        <button
+                          type="button"
+                          className={`focused-review-pitch ${showPitch ? 'focused-review-pitch--active' : ''}`}
+                          onClick={() => setShowPitch((prev) => !prev)}
+                          aria-pressed={showPitch}
+                          aria-label="Pitch analysis"
+                        >
+                          <Activity aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                    {focusedPractice && !blindMode && challengerTake && onFavoriteTake && (
+                      <div className="focused-review-best-row">
+                        <span>Compare to Personal Best</span>
+                        <Pressable
+                          type="button"
+                          intensity="soft"
+                          haptic="success"
+                          onClick={() => onFavoriteTake(challengerTake.id)}
+                        >
+                          <Star aria-hidden />
+                          Make Current Personal Best
+                        </Pressable>
+                      </div>
+                    )}
+                    </>
+                  )}
+
+                  {!isVault && focusedPractice && hasChallenger && !hasBenchmark && challengerTake && onFavoriteTake && (
+                    <div className="focused-review-best-row focused-review-best-row--first">
+                      <span>No Personal Best yet</span>
+                      <Pressable
+                        type="button"
+                        intensity="soft"
+                        haptic="success"
+                        onClick={() => onFavoriteTake(challengerTake.id)}
+                      >
+                        <Star aria-hidden />
+                        Make This Personal Best
+                      </Pressable>
                     </div>
                   )}
 
-                  {!isVault && showPitchComparison && (
+                  {!isVault && !focusedPractice && showPitchComparison && (
                     <PitchComparisonGraph
                       benchmarkTake={benchmarkTake}
                       challengerTake={challengerTake}
@@ -1762,48 +1851,54 @@ export default function ReviewModeOverlay({
                     onSeek={seekToPracticeMarker}
                   />
 
-                  <div className="review-native-toolbar">
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleShareActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Share">
-                      <Share2 className="h-5 w-5" />
-                    </Pressable>
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleFavoriteActiveTake} disabled={!activeTake || !onFavoriteTake || (blindMode && !isVault)} aria-label="Mark as Personal Best">
-                      <Heart className="h-5 w-5" />
-                    </Pressable>
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleInfoActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Info">
-                      <Info className="h-5 w-5" />
-                    </Pressable>
-                    <Pressable
-                      type="button"
-                      intensity="icon"
-                      haptic="light"
-                      className={`review-toolbar-button ${
-                        (isVault ? showPitch : showPitchComparison)
-                          ? 'review-toolbar-button--active'
-                          : ''
-                      }`}
-                      onClick={() => {
-                        if (isVault) {
-                          setShowPitch((prev) => !prev)
-                        } else {
-                          setShowPitchComparison((prev) => !prev)
-                        }
-                      }}
-                      disabled={!showPitchPanel}
-                      aria-label="Pitch Analysis"
-                      aria-pressed={isVault ? showPitch : showPitchComparison}
-                    >
-                      <Activity className="h-5 w-5" />
-                    </Pressable>
-                    <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button review-toolbar-button--destructive" onClick={handleDeleteActiveTake} disabled={!activeTake || !onDeleteTake || (blindMode && !isVault)} aria-label="Delete">
-                      <Trash2 className="h-5 w-5" />
-                    </Pressable>
-                  </div>
+                  {/* Focused practice's Compare is just: listen, switch, blind-test,
+                      decide. Share/info/delete/pitch-analysis are Vault-editing jobs,
+                      not part of that moment. */}
+                  {(isVault || !focusedPractice) && (
+                    <div className="review-native-toolbar">
+                      <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleShareActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Share">
+                        <Share2 className="h-5 w-5" />
+                      </Pressable>
+                      <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleFavoriteActiveTake} disabled={!activeTake || !onFavoriteTake || (blindMode && !isVault)} aria-label="Mark as Personal Best">
+                        <Heart className="h-5 w-5" />
+                      </Pressable>
+                      <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleInfoActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Info">
+                        <Info className="h-5 w-5" />
+                      </Pressable>
+                      <Pressable
+                        type="button"
+                        intensity="icon"
+                        haptic="light"
+                        className={`review-toolbar-button ${
+                          (isVault ? showPitch : showPitchComparison)
+                            ? 'review-toolbar-button--active'
+                            : ''
+                        }`}
+                        onClick={() => {
+                          if (isVault) {
+                            setShowPitch((prev) => !prev)
+                          } else {
+                            setShowPitchComparison((prev) => !prev)
+                          }
+                        }}
+                        disabled={!showPitchPanel}
+                        aria-label="Pitch Analysis"
+                        aria-pressed={isVault ? showPitch : showPitchComparison}
+                      >
+                        <Activity className="h-5 w-5" />
+                      </Pressable>
+                      <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button review-toolbar-button--destructive" onClick={handleDeleteActiveTake} disabled={!activeTake || !onDeleteTake || (blindMode && !isVault)} aria-label="Delete">
+                        <Trash2 className="h-5 w-5" />
+                      </Pressable>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-    </motion.div>
+      </motion.div>
+    </>
   )
 }

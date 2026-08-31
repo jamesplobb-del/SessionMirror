@@ -9,7 +9,9 @@ import {
   Play,
   Sparkles,
   StickyNote,
+  Target,
   Trash2,
+  Trophy,
   Video,
 } from 'lucide-react'
 import StarRating from './StarRating'
@@ -19,6 +21,7 @@ import { triggerLightHaptic } from '../utils/haptics'
 import { getTakeMediaType } from '../utils/mediaType'
 import { reResolveCachedTakeThumbnail } from '../utils/takeThumbnailCache'
 import type { Take, TakeUpdate } from '../types'
+import type { BestTakeHistoryEntry } from '../db'
 import TakeCardThumbnailSkeleton from './ui/TakeCardThumbnailSkeleton'
 
 function TakeCardThumbnailPlaceholder() {
@@ -34,6 +37,8 @@ interface TakeCardProps {
   takeIndex: number
   isBenchmark: boolean
   isChallenger: boolean
+  /** Present when this take has held Best Take at some point in the project. */
+  bestHistoryEntry?: BestTakeHistoryEntry | null
   detailOpen?: boolean
   onToggleDetail?: () => void
   onOpenTake?: () => void
@@ -54,6 +59,7 @@ function TakeCard({
   takeIndex,
   isBenchmark,
   isChallenger,
+  bestHistoryEntry = null,
   detailOpen = false,
   onToggleDetail,
   onOpenTake,
@@ -235,6 +241,14 @@ function TakeCard({
     minute: '2-digit',
   })
 
+  const focusArea = take.focusArea?.trim() ?? ''
+  const bestMarkedDate = bestHistoryEntry
+    ? new Date(bestHistoryEntry.markedAt).toLocaleDateString([], {
+        month: 'short',
+        day: 'numeric',
+      })
+    : ''
+
   return (
     <article className={rowClass} data-tutorial="vault-take-card">
       <div
@@ -328,6 +342,30 @@ function TakeCard({
               )}
             </div>
             <p className="vault-take-row__date">{formattedDate}</p>
+            {(bestHistoryEntry || focusArea) && (
+              <div className="vault-take-row__practice-chips">
+                {bestHistoryEntry && (
+                  <span
+                    className={`vault-take-row__best-chip ${
+                      bestHistoryEntry.isCurrentBest
+                        ? 'vault-take-row__best-chip--current'
+                        : 'vault-take-row__best-chip--past'
+                    }`}
+                  >
+                    <Trophy className="h-3 w-3" aria-hidden />
+                    {bestHistoryEntry.isCurrentBest
+                      ? 'Current best'
+                      : `Previous best · ${bestMarkedDate}`}
+                  </span>
+                )}
+                {focusArea && (
+                  <span className="vault-take-row__focus-chip truncate">
+                    <Target className="h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate">{focusArea}</span>
+                  </span>
+                )}
+              </div>
+            )}
             {take.rating > 0 && !detailOpen && (
               <p className="vault-take-row__rating-hint" aria-hidden>
                 {'★'.repeat(take.rating)}
@@ -387,6 +425,15 @@ function TakeCard({
 
       {detailOpen && !selectionMode && (
         <div className="vault-take-row__detail">
+          {focusArea && (
+            <div className="vault-take-row__detail-section vault-take-row__focus">
+              <p className="vault-take-row__detail-label">
+                <Target className="h-3.5 w-3.5" aria-hidden />
+                Practicing
+              </p>
+              <p>{focusArea}</p>
+            </div>
+          )}
           {take.intention?.trim() && (
             <div className="vault-take-row__detail-section vault-take-row__intention">
               <p className="vault-take-row__detail-label">
@@ -520,6 +567,9 @@ export default memo(TakeCard, (previous, next) =>
   previous.take.name === next.take.name &&
   previous.take.notes === next.take.notes &&
   previous.take.intention === next.take.intention &&
+  previous.take.focusArea === next.take.focusArea &&
+  previous.bestHistoryEntry?.id === next.bestHistoryEntry?.id &&
+  previous.bestHistoryEntry?.isCurrentBest === next.bestHistoryEntry?.isCurrentBest &&
   previous.take.rating === next.take.rating &&
   previous.take.mediaType === next.take.mediaType &&
   previous.isBenchmark === next.isBenchmark &&

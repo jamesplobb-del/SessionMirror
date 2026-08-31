@@ -42,7 +42,9 @@ import {
 } from '../utils/viewportSync'
 import { scheduleAfterPaint } from '../utils/scheduleDeferred'
 import {
+  createSimulatorTake,
   ensureNativeCameraSessionHealthy,
+  getNativeRuntimeEnvironment,
   startNativeCameraBridge,
   startNativeCameraRecording,
   startNativeAudioRecording,
@@ -307,6 +309,7 @@ export function useCameraSession({
   const micInputPreferenceRef = useRef<MicInputPreference>(micInputPreference)
   const queuedMicPreferenceRef = useRef<MicInputPreference | null>(micInputPreference)
   const nativeExperimentalRecordingRef = useRef(false)
+  const simulatorRecordingRef = useRef(false)
   const nativePreRollDiscardRef = useRef(false)
   /** Settle promise of the in-flight native start — Stop awaits this so it never races didStartRecording. */
   const nativeStartSettleRef = useRef<Promise<boolean> | null>(null)
@@ -360,6 +363,17 @@ export function useCameraSession({
   const [isPreviewRecovering, setIsPreviewRecovering] = useState(false)
   const [nativeLivePreviewActive, setNativeLivePreviewActive] = useState(false)
   const [nativeLivePreviewSeedUrl, setNativeLivePreviewSeedUrl] = useState<string | null>(null)
+  const [simulatorCaptureAvailable, setSimulatorCaptureAvailable] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void getNativeRuntimeEnvironment().then(({ isSimulator }) => {
+      if (!cancelled) setSimulatorCaptureAvailable(isSimulator)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   recordingModeRef.current = recordingMode
   isRecordingRef.current = isRecording
@@ -2351,6 +2365,22 @@ export function useCameraSession({
   const startRecording = useCallback((): Promise<boolean> => {
     if (isRecordingRef.current) return Promise.resolve(true)
 
+    if (simulatorCaptureAvailable && recordingModeRef.current === 'video') {
+      const takeId = crypto.randomUUID()
+      activeTakeIdRef.current = takeId
+      activeRecordingIdRef.current = takeId
+      recordingOrientationRef.current = readRecordingOrientation()
+      recordingStartedAtRef.current = performance.now()
+      simulatorRecordingRef.current = true
+      isRecordingRef.current = true
+      flushSync(() => {
+        setIsRecording(true)
+        setElapsed(0)
+        elapsedRef.current = 0
+      })
+      return Promise.resolve(true)
+    }
+
     if (shouldUseNativeExperimentalRecording()) {
       if (
         autoPreRollActiveRef.current &&
@@ -2495,6 +2525,7 @@ export function useCameraSession({
     shouldUseNativeExperimentalRecording,
     startNativeAudioRecordingSession,
     startNativeExperimentalRecording,
+    simulatorCaptureAvailable,
   ])
 
   const startAutoAudioRecording = useCallback(() => {
@@ -2608,6 +2639,59 @@ export function useCameraSession({
 
   const stopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     console.log('[AudioRecordLifecycle] userPressedStop')
+    if (simulatorRecordingRef.current) {
+      simulatorRecordingRef.current = false
+      isRecordingRef.current = false
+      setIsRecording(false)
+      setIsStopping(true)
+      const takeId = activeTakeIdRef.current ?? crypto.randomUUID()
+      activeTakeIdRef.current = null
+      activeRecordingIdRef.current = null
+      const measuredDuration = Math.max(
+        0.6,
+        recordingStartedAtRef.current > 0
+          ? (performance.now() - recordingStartedAtRef.current) / 1000
+          : elapsedRef.current,
+      )
+      recordingStartedAtRef.current = 0
+
+      void createSimulatorTake(measuredDuration)
+        .then((result) => {
+          if (!result) throw new Error('The simulator take could not be created.')
+          const durationSeconds = Math.max(0.6, result.duration || measuredDuration)
+          const pitchSeries = Array.from(
+            { length: Math.max(8, Math.floor((durationSeconds - 0.5) * 8)) },
+            (_, index) => ({
+              time: 0.5 + index / 8,
+              frequencyHz:
+                440 * Math.pow(2, (Math.sin(index / 4) * 0.16 + (index % 7) * 0.012) / 12),
+            }),
+          ).filter((sample) => sample.time <= durationSeconds)
+          onCompleteRef.current({
+            takeId,
+            mimeType: result.mimeType,
+            mediaType: 'video',
+            filePath: result.filePath,
+            videoUrl: Capacitor.convertFileSrc(result.fileURL),
+            durationSeconds,
+            recordingOrientation: recordingOrientationRef.current,
+            mirrorPlayback: false,
+            autoPerformanceStartSeconds: 0.5,
+            timelineOffsetMs: 0,
+            pitchSeries,
+          })
+        })
+        .catch((error) => {
+          reportError(error, { phase: 'simulator.take' })
+          showAlertOutsideTree({
+            title: 'Simulator take failed',
+            message: 'BestTake could not create the black demo clip. Try recording again.',
+            tone: 'error',
+          })
+        })
+        .finally(() => setIsStopping(false))
+      return
+    }
     // Route to the serialized native stop when a native recording is active OR
     // a native start is still settling (bridge warm / didStartRecording window)
     // — that stop path awaits the settle, so Stop is safe at any instant.
@@ -3324,6 +3408,7 @@ export function useCameraSession({
     permissionRequestInFlight,
     requestCameraAccess,
     ready,
+    simulatorCaptureAvailable,
     isRecording,
     isStopping,
     elapsed,

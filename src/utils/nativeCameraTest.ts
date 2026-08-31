@@ -63,6 +63,27 @@ export interface NativeCameraPostProcessPlaybackResult {
   postProcess: boolean
 }
 
+export async function getNativeRuntimeEnvironment(): Promise<{ isSimulator: boolean }> {
+  if (!isNativeCameraTestAvailable()) return { isSimulator: false }
+  try {
+    return await BestTakeAudioPlugin.getRuntimeEnvironment()
+  } catch {
+    return { isSimulator: false }
+  }
+}
+
+export async function createSimulatorTake(
+  durationSeconds: number,
+): Promise<NativeCameraRecordingStopResult | null> {
+  if (!isNativeCameraTestAvailable()) return null
+  try {
+    return await BestTakeAudioPlugin.createSimulatorTake({ durationSeconds })
+  } catch (error) {
+    console.warn('[SimulatorRecording] failed to create demo take', error)
+    return null
+  }
+}
+
 export function isNativeCameraTestAvailable(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
 }

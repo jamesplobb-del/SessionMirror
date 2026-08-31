@@ -1,5 +1,6 @@
 import AVFoundation
 import Capacitor
+import CoreVideo
 import PDFKit
 import Photos
 import Speech
@@ -68,6 +69,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getSpokenFeedbackPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startSpokenFeedback", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopSpokenFeedback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getRuntimeEnvironment", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "createSimulatorTake", returnType: CAPPluginReturnPromise),
     ]
 
     private let nativeCameraEngine = NativeCameraRecordingEngine.shared
@@ -2320,5 +2323,124 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         let session = AVAudioSession.sharedInstance()
         let latencyMs = (session.outputLatency + session.ioBufferDuration) * 1000.0
         call.resolve(["latencyMs": latencyMs])
+    }
+
+    @objc func getRuntimeEnvironment(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        call.resolve(["isSimulator": true])
+        #else
+        call.resolve(["isSimulator": false])
+        #endif
+    }
+
+    @objc func createSimulatorTake(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        let duration = min(30.0, max(0.6, call.getDouble("durationSeconds") ?? 1.0))
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let fileManager = FileManager.default
+                let documents = try fileManager.url(
+                    for: .documentDirectory,
+                    in: .userDomainMask,
+                    appropriateFor: nil,
+                    create: true
+                )
+                let takesDirectory = documents.appendingPathComponent("takes", isDirectory: true)
+                try fileManager.createDirectory(
+                    at: takesDirectory,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+                let filename = "simulator-\(UUID().uuidString).mp4"
+                let outputURL = takesDirectory.appendingPathComponent(filename)
+                let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+                let width = 360
+                let height = 640
+                let framesPerSecond: Int32 = 10
+                let videoInput = AVAssetWriterInput(
+                    mediaType: .video,
+                    outputSettings: [
+                        AVVideoCodecKey: AVVideoCodecType.h264,
+                        AVVideoWidthKey: width,
+                        AVVideoHeightKey: height,
+                    ]
+                )
+                videoInput.expectsMediaDataInRealTime = false
+                let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+                    assetWriterInput: videoInput,
+                    sourcePixelBufferAttributes: [
+                        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                        kCVPixelBufferWidthKey as String: width,
+                        kCVPixelBufferHeightKey as String: height,
+                    ]
+                )
+                guard writer.canAdd(videoInput) else {
+                    throw NSError(domain: "BestTakeSimulator", code: 1, userInfo: [
+                        NSLocalizedDescriptionKey: "Unable to add the simulator video track."
+                    ])
+                }
+                writer.add(videoInput)
+                guard writer.startWriting() else {
+                    throw writer.error ?? NSError(domain: "BestTakeSimulator", code: 2)
+                }
+                writer.startSession(atSourceTime: .zero)
+
+                let frameCount = max(1, Int(ceil(duration * Double(framesPerSecond))))
+                for frame in 0..<frameCount {
+                    while !videoInput.isReadyForMoreMediaData {
+                        Thread.sleep(forTimeInterval: 0.002)
+                    }
+                    guard let pool = adaptor.pixelBufferPool else {
+                        throw NSError(domain: "BestTakeSimulator", code: 3)
+                    }
+                    var pixelBuffer: CVPixelBuffer?
+                    let status = CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
+                    guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+                        throw NSError(domain: "BestTakeSimulator", code: 4)
+                    }
+                    CVPixelBufferLockBaseAddress(buffer, [])
+                    if let address = CVPixelBufferGetBaseAddress(buffer) {
+                        memset(address, 0, CVPixelBufferGetDataSize(buffer))
+                    }
+                    CVPixelBufferUnlockBaseAddress(buffer, [])
+                    let presentationTime = CMTime(value: CMTimeValue(frame), timescale: framesPerSecond)
+                    guard adaptor.append(buffer, withPresentationTime: presentationTime) else {
+                        throw writer.error ?? NSError(domain: "BestTakeSimulator", code: 5)
+                    }
+                }
+
+                videoInput.markAsFinished()
+                writer.finishWriting {
+                    if let error = writer.error {
+                        DispatchQueue.main.async {
+                            call.reject("Simulator take creation failed", error.localizedDescription)
+                        }
+                        return
+                    }
+                    let size = (try? outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                    DispatchQueue.main.async {
+                        call.resolve([
+                            "filePath": "takes/\(filename)",
+                            "fileURL": outputURL.absoluteString,
+                            "duration": duration,
+                            "fileSize": size,
+                            "mimeType": "video/mp4",
+                            "width": width,
+                            "height": height,
+                            "route": "simulator",
+                            "hasAudioTrack": false,
+                            "audioTrackCount": 0,
+                        ])
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    call.reject("Simulator take creation failed", error.localizedDescription)
+                }
+            }
+        }
+        #else
+        call.reject("Simulator recording is only available in the iOS Simulator")
+        #endif
     }
 }

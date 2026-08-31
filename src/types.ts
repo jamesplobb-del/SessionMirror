@@ -51,6 +51,8 @@ export interface Take {
   practiceSessionId?: string
   /** Optional spoken or typed cue that was set before this take. */
   intention?: string
+  /** What the musician was working on — stamped from the Focused Practice session. */
+  focusArea?: string
   /** Legacy overdub reference id. New multitrack takes share a project transport instead. */
   referenceTrackId?: string
   /** Overdub takes: count-in beat when the reference started. */

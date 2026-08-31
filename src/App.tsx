@@ -123,6 +123,7 @@ import {
   deleteProject,
   deleteLibraryItem,
   deleteVaultTake,
+  endPracticeSession,
   findBestTakeId,
   getLibraryItemsByProject,
   getProjectBenchmarkBinding,
@@ -1435,6 +1436,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         performanceStartOffsetBeats,
         referenceTrackId,
         referenceStartBeat,
+        pitchSeries,
       } = payload
 
       void logRecordingOutputVerification({
@@ -1474,6 +1476,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         focusedAtCapture?.projectId === projectId
           ? practiceStateAtCapture?.pendingIntention.trim() ?? ''
           : ''
+      const focusAreaAtCapture =
+        focusedAtCapture?.projectId === projectId ? focusedAtCapture.focusArea.trim() : ''
 
       if (focusedAtCapture?.projectId === projectId) {
         setFocusedPostTakeId(takeId)
@@ -1521,8 +1525,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             ? { practiceSessionId: practiceSessionIdAtCapture }
             : null),
           ...(intentionAtCapture ? { intention: intentionAtCapture } : null),
+          ...(focusAreaAtCapture ? { focusArea: focusAreaAtCapture } : null),
           ...(referenceTrackId !== undefined ? { referenceTrackId } : null),
           ...(referenceStartBeat !== undefined ? { referenceStartBeat } : null),
+          ...(pitchSeries?.length ? { pitchSeries } : null),
           ...(payload.captureDiagnostics?.playbackGainMetadata
             ? {
                 playbackGainMetadata: payload.captureDiagnostics.playbackGainMetadata,
@@ -1636,6 +1642,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 ? practiceSessionIdAtCapture ?? undefined
                 : undefined,
             intention: intentionAtCapture,
+            focusArea: focusAreaAtCapture,
+            pitchSeries,
             performanceStartSeconds: autoPerformanceStartSeconds,
             name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
           })
@@ -1656,7 +1664,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             }
           }
 
-          if (focusedAtCapture?.projectId === projectId) {
+          if (focusedAtCapture?.projectId === projectId && !pitchSeries?.length) {
             void analyzeTakeForFocusedPractice(resolvedFilePath)
               .then(async (analysis) => {
                 if (!analysis) return
@@ -1896,6 +1904,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     permissionRequestInFlight: cameraPermissionRequestInFlight,
     requestCameraAccess,
     ready,
+    simulatorCaptureAvailable,
     isRecording,
     isStopping,
     elapsed,
@@ -2807,23 +2816,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [dismissPracticeHub, settings.hapticFeedback])
 
   /**
-   * Resolve the take the next run is measured against. Session-scoped: it moves
-   * the compare reference without rewriting the project's persisted Best Take.
+   * Resolve what a new take in this session is measured against. A pinned
+   * reference recording always wins (returning null lets the existing
+   * project-benchmark binding show through); otherwise it's whichever take
+   * currently holds Best within this session.
    */
-  const resolveComparisonTakeId = useCallback(
-    async (
-      projectId: string,
-      comparison: FocusedPracticeSelection['comparison'],
-    ): Promise<string | null> => {
+  const resolveSessionReference = useCallback(
+    async (projectId: string): Promise<string | null> => {
+      const binding = await getProjectBenchmarkBinding(projectId)
+      if (binding?.source === 'library') return null
       const rows = await getTakesByProject(projectId)
-      if (comparison === 'reference-track') return null
-      if (rows.length === 0) return null
-      const bestId = findBestTakeId(rows)
-      if (comparison === 'current-best') return bestId
-      const newestFirst = [...rows].sort((a, b) => b.createdAt - a.createdAt)
-      if (comparison === 'previous-take') return newestFirst[0]?.id ?? bestId
-      const startOfToday = new Date().setHours(0, 0, 0, 0)
-      return newestFirst.find((row) => row.createdAt < startOfToday)?.id ?? bestId
+      return findBestTakeId(rows)
     },
     [],
   )
@@ -2875,24 +2878,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const handleStartFocusedPractice = useCallback(
-    async (selection: FocusedPracticeSelection) => {
+    async (projectId: string) => {
       focusedPreviousChallengerRef.current = null
-      if (selection.projectId !== activeProjectIdRef.current) {
-        await handleSelectProject(selection.projectId)
+      if (projectId !== activeProjectIdRef.current) {
+        await handleSelectProject(projectId)
       }
       if (!showTakeCardsRef.current) {
         showTakeCardsRef.current = true
         updateSettings({ showTakeCards: true })
       }
-      const referenceTakeId = await resolveComparisonTakeId(
-        selection.projectId,
-        selection.comparison,
-      )
-      prepareFocusedComparisonAnalysis(selection.projectId)
+      const focusArea = projects.find((project) => project.id === projectId)?.name ?? ''
+      const referenceTakeId = await resolveSessionReference(projectId)
+      prepareFocusedComparisonAnalysis(projectId)
       const { session, state } = await startPracticeSession({
-        projectId: selection.projectId,
-        focusArea: selection.focusArea,
-        comparison: selection.comparison,
+        projectId,
+        focusArea,
+        comparison: 'current-best',
       })
       setPracticeItemStates((current) => [
         state,
@@ -2903,14 +2904,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setFocusedPostTakeId(null)
       setFocusedPostTakeReviewed(false)
       triggerLightHaptic(settings.hapticFeedback)
-      setFocusedPractice(selection)
+      setFocusedPractice({ projectId, focusArea })
       dismissPracticeHub()
     },
     [
       dismissPracticeHub,
       handleSelectProject,
       prepareFocusedComparisonAnalysis,
-      resolveComparisonTakeId,
+      projects,
+      resolveSessionReference,
       settings.hapticFeedback,
       updateSettings,
     ],
@@ -2920,11 +2922,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     async (projectId: string) => {
       const saved = await resumePracticeSession(projectId)
       if (!saved) {
-        await handleStartFocusedPractice({
-          projectId,
-          focusArea: '',
-          comparison: 'current-best',
-        })
+        await handleStartFocusedPractice(projectId)
         return
       }
 
@@ -2933,23 +2931,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         showTakeCardsRef.current = true
         updateSettings({ showTakeCards: true })
       }
-      const selection: FocusedPracticeSelection = {
-        projectId,
-        focusArea: saved.focusArea,
-        comparison: saved.comparison,
-      }
-      const referenceTakeId = await resolveComparisonTakeId(projectId, saved.comparison)
+      const focusArea = projects.find((project) => project.id === projectId)?.name ?? ''
+      const referenceTakeId = await resolveSessionReference(projectId)
       prepareFocusedComparisonAnalysis(projectId)
       focusedPreviousChallengerRef.current = null
       setPracticeItemStates((current) => [
-        saved,
+        { ...saved, focusArea },
         ...current.filter((item) => item.projectId !== projectId),
       ])
       setFocusedPracticeSessionId(saved.lastSessionId)
       setFocusedReferenceTakeId(referenceTakeId)
       setFocusedPostTakeId(null)
       setFocusedPostTakeReviewed(false)
-      setFocusedPractice(selection)
+      setFocusedPractice({ projectId, focusArea })
       triggerLightHaptic(settings.hapticFeedback)
       dismissPracticeHub()
     },
@@ -2958,7 +2952,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       handleSelectProject,
       handleStartFocusedPractice,
       prepareFocusedComparisonAnalysis,
-      resolveComparisonTakeId,
+      projects,
+      resolveSessionReference,
       settings.hapticFeedback,
       updateSettings,
     ],
@@ -3385,24 +3380,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     () => takes.find((t) => t.id === challengerId) ?? null,
     [takes, challengerId]
   )
-
-  useEffect(() => {
-    if (focusedPractice?.comparison !== 'previous-take') {
-      focusedPreviousChallengerRef.current = null
-      return
-    }
-    if (!challengerId) return
-
-    const previousChallengerId = focusedPreviousChallengerRef.current
-    if (!previousChallengerId) {
-      focusedPreviousChallengerRef.current = challengerId
-      return
-    }
-    if (previousChallengerId === challengerId) return
-
-    setFocusedReferenceTakeId(previousChallengerId)
-    focusedPreviousChallengerRef.current = challengerId
-  }, [challengerId, focusedPractice?.comparison, focusedPractice?.projectId])
 
   takesRef.current = takes
 
@@ -3842,7 +3819,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         })
         return id
       })
-      if (focusedPractice?.comparison === 'current-best') {
+      // A pinned reference recording takes priority — don't clobber it with
+      // the newly-starred take.
+      if (focusedPractice && benchmarkBinding?.source !== 'library') {
         setFocusedReferenceTakeId(id)
       }
       if (activeProjectIdRef.current) {
@@ -3851,7 +3830,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     },
     [
       pausePipVideos,
-      focusedPractice?.comparison,
+      benchmarkBinding?.source,
+      focusedPractice,
       refreshBestTakeHistory,
       releaseAutoRecordSuppress,
       settings.hapticFeedback,
@@ -4080,6 +4060,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void updateVaultTake(id, updates)
   }, [])
 
+  /** Rate step of the record/reflect loop — one tap, right after the take. */
+  const handleFocusedPostTakeRate = useCallback(
+    (rating: number) => {
+      if (!focusedPostTakeId) return
+      triggerLightHaptic(settings.hapticFeedback)
+      handleUpdateTake(focusedPostTakeId, { rating })
+    },
+    [focusedPostTakeId, handleUpdateTake, settings.hapticFeedback],
+  )
+
   const handleDeleteTakes = useCallback(
     async (ids: string[]) => {
       if (ids.length === 0) return
@@ -4198,6 +4188,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         ? practiceItemStates.find((state) => state.projectId === focusedPractice.projectId) ?? null
         : null,
     [focusedPractice, practiceItemStates],
+  )
+
+  const focusedPostTakeRating = useMemo(
+    () =>
+      focusedPostTakeId ? takes.find((take) => take.id === focusedPostTakeId)?.rating ?? 0 : 0,
+    [focusedPostTakeId, takes],
   )
 
   useEffect(() => {
@@ -4564,7 +4560,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     open={focusedCueOpen}
                     value={focusedPracticeState.pendingIntention}
                     hapticFeedback={settings.hapticFeedback}
-                    onOpenChange={setFocusedCueOpen}
+                    onOpenChange={(open) => {
+                      setFocusedCueOpen(open)
+                      // Closing the note attaches it to the take you just heard —
+                      // a reflection, not just a cue queued for next time.
+                      if (!open && focusedPostTakeId) {
+                        const reflection = focusedPracticeState.pendingIntention.trim()
+                        if (reflection) handleUpdateTake(focusedPostTakeId, { notes: reflection })
+                      }
+                    }}
                     onChange={handleFocusedPracticeIntentionChange}
                   />
                 )}
@@ -5195,7 +5199,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         isRecording={isRecording}
                         isStopping={isStopping}
                         elapsed={elapsed}
-                        ready={ready}
+                        ready={ready || simulatorCaptureAvailable}
                         recordingMode={recordingMode}
                         onRecordingModeChange={handleRecordingModeChange}
                         onToggleRecord={handleToggleRecord}
@@ -5209,15 +5213,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         focusedPostTakeHasNote={Boolean(
                           focusedPracticeState?.pendingIntention.trim(),
                         )}
+                        focusedPostTakeRating={focusedPostTakeRating}
                         focusedRecordingGoal={
                           focusedPracticeState?.pendingIntention.trim() ?? ''
                         }
                         onFocusedPostTakeReview={handleFocusedPostTakeReview}
                         onFocusedPostTakeNote={() => setFocusedCueOpen(true)}
+                        onFocusedPostTakeRate={handleFocusedPostTakeRate}
                         onFocusedPostTakeRetry={handleFocusedPostTakeRetry}
                         onFocusedPostTakeDismiss={() => {
+                          // Decide: done for now — closes this sitting for real.
+                          const sessionId = focusedPracticeSessionId
                           setFocusedPostTakeId(null)
                           setFocusedPostTakeReviewed(false)
+                          if (sessionId) {
+                            void endPracticeSession(sessionId).catch((error) => {
+                              console.warn('[FocusedPractice] ending sitting failed', error)
+                            })
+                          }
                         }}
                         handsFreeRecording={handsFreeRecording}
                         handsFreeListeningReady={handsFreeListeningReady}

@@ -914,7 +914,7 @@ export default memo(function PipCompareRow({
           onLayoutDragCompleted={markLayoutDragCompleted}
           resetNonce={layoutResetNonce}
           wiggleDirection={-1}
-          positionId="camera-best-take-card"
+          positionId="camera-best-take-card-v2"
           boundaryRef={boundaryRef}
           dropRef={benchmarkDropRef}
           hapticFeedback={hapticFeedback}
@@ -1020,7 +1020,7 @@ export default memo(function PipCompareRow({
           onLayoutDragCompleted={markLayoutDragCompleted}
           resetNonce={layoutResetNonce}
           wiggleDirection={1}
-          positionId="camera-current-take-card"
+          positionId="camera-current-take-card-v2"
           boundaryRef={boundaryRef}
           dropRef={challengerDropRef}
           hapticFeedback={hapticFeedback}
