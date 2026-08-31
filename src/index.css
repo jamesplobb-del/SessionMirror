@@ -5637,6 +5637,76 @@ html.physical-landscape-right .control-deck__vault-btn {
 }
 
 /* Visual refinement pass: cohesive premium glass in Camera Mode, light elevated Audio Mode. */
+.hud-header {
+  min-height: 2.8rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.15rem;
+}
+
+.hud-header__brand {
+  overflow: hidden;
+  color: var(--audio-text-primary, #ffffff);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui,
+    sans-serif;
+  font-size: clamp(1rem, 2.1vh, 1.12rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-header__menu {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--audio-text-primary, #ffffff);
+  background: var(--audio-surface, rgba(15, 23, 42, 0.38));
+  box-shadow: var(--audio-shadow-fab, 0 8px 22px rgba(0, 0, 0, 0.18));
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.16s cubic-bezier(0.32, 0.72, 0, 1),
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.hud-header__menu:active {
+  transform: scale(0.94);
+}
+
+.app-ui-overlay--audio-mode .hud-header__brand {
+  color: var(--audio-text-primary);
+}
+
+.app-ui-overlay--audio-mode .hud-header__menu {
+  border-color: var(--audio-divider);
+  color: var(--audio-text-primary);
+  background: var(--audio-surface);
+  box-shadow: var(--audio-shadow-fab);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-header__brand {
+  color: #ffffff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.42);
+}
+
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-header__menu {
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 42% 22%, rgba(255, 255, 255, 0.2), transparent 60%),
+    rgba(15, 23, 42, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 8px 22px rgba(0, 0, 0, 0.18);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+
 .hud-header__vault {
   border-color: rgba(255, 255, 255, 0.32) !important;
   background: radial-gradient(circle at 70% 0%, rgba(255, 255, 255, 0.12), transparent 52%),
@@ -8241,6 +8311,145 @@ html.app-dark-mode
   }
 }
 
+/* Native audio toolbar — the Audio tools are the top chrome, with no brand row. */
+.app-ui-overlay--audio-mode .audio-practice-top-tabs,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
+  position: relative;
+  display: grid;
+  width: min(calc(100% - 1.35rem), 30rem);
+  min-height: 3.65rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.1rem;
+  margin: clamp(0.42rem, 1.1vh, 0.68rem) auto clamp(0.7rem, 1.5vh, 0.95rem);
+  padding: 0.3rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 1.42rem;
+  background: color-mix(in srgb, var(--audio-surface) 94%, transparent);
+  box-shadow:
+    0 1rem 2.25rem color-mix(in srgb, var(--audio-text-primary) 8%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+  backdrop-filter: blur(24px) saturate(1.12);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs::before {
+  position: absolute;
+  top: 0;
+  right: 12%;
+  left: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
+  content: '';
+  pointer-events: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs__divider {
+  display: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs__btn,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs__btn {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 3.05rem;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0.35rem 0.12rem;
+  border: 1.5px solid transparent;
+  border-radius: 1.08rem;
+  background: transparent;
+  color: var(--audio-text-secondary);
+  box-shadow: none;
+  font-size: clamp(0.72rem, 3.1vw, 0.84rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition:
+    transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    color 220ms ease,
+    background 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs__btn:active {
+  transform: scale(0.94);
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs__btn--active,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs__btn--active {
+  border: 1.5px solid color-mix(in srgb, var(--audio-gold) 70%, transparent);
+  background: var(--audio-surface);
+  color: var(--audio-gold);
+  box-shadow:
+    0 0.35rem 0.9rem color-mix(in srgb, var(--audio-gold) 9%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-top-tabs,
+html.app-dark-mode
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--audio-surface) 72%, transparent);
+  box-shadow:
+    0 0.9rem 2.4rem rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-top-tabs__btn--active,
+html.app-dark-mode
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs__btn--active {
+  border-color: color-mix(in srgb, var(--audio-gold) 72%, transparent);
+  background: color-mix(in srgb, var(--audio-surface) 92%, transparent);
+  color: #ffc04f;
+  box-shadow:
+    0 0.5rem 1.1rem rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* One continuous wash avoids the visible seam between the warm and cool ends. */
+.app-ui-overlay--audio-mode .audio-control-pill {
+  background:
+    radial-gradient(ellipse 72% 145% at -5% 50%, rgba(247, 166, 0, 0.11), transparent 72%),
+    radial-gradient(ellipse 72% 145% at 105% 50%, rgba(21, 152, 255, 0.11), transparent 72%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.14)),
+    rgba(222, 234, 244, 0.16);
+}
+
+.app-ui-overlay--audio-mode .audio-control-pill::before,
+.app-ui-overlay--audio-mode .audio-control-pill::after {
+  display: none !important;
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode .audio-control-pill {
+  background:
+    radial-gradient(ellipse 72% 145% at -5% 50%, rgba(247, 166, 0, 0.1), transparent 72%),
+    radial-gradient(ellipse 72% 145% at 105% 50%, rgba(21, 152, 255, 0.12), transparent 72%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    rgba(8, 12, 18, 0.16);
+}
+
+@media (max-height: 700px) {
+  .app-ui-overlay--audio-mode .audio-practice-top-tabs,
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
+    min-height: 3.2rem;
+    margin-top: 0.2rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-top-tabs__btn,
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner
+    .audio-practice-top-tabs__btn {
+    min-height: 2.68rem;
+  }
+}
+
 @media (min-width: 768px) {
   .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card {
     width: min(100%, 34rem);
@@ -8255,15 +8464,17 @@ html.app-dark-mode
  */
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__visual--large {
-  min-height: clamp(19rem, 61dvh, 34rem);
-  padding-block: clamp(1.35rem, 3dvh, 1.85rem);
+  min-height: clamp(18rem, 56dvh, 31rem);
+  /* This padding is the clear gap above and below the bars — between them and
+     the setup row above, and the transport below. */
+  padding-block: clamp(2.4rem, 5.6dvh, 3.6rem);
 }
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__visual--large
   .audio-practice-metronome__beat-row--spacious {
   --runway-node-width: clamp(5rem, 22vw, 5.85rem);
-  --runway-node-height: clamp(14rem, 44dvh, 23rem);
+  --runway-node-height: clamp(12.5rem, 38dvh, 20rem);
   max-width: 38rem;
 }
 
@@ -8296,7 +8507,7 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__controls {
-  padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem));
+  padding-bottom: max(0.3rem, env(safe-area-inset-bottom, 0px));
 }
 
 @media (max-height: 740px) {

@@ -1,4 +1,4 @@
-# Session Mirror
+# BestTake
 
 Practice recording app with audio/video modes, metronome, tuner, and programmable practice timelines.
 

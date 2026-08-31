@@ -14,17 +14,38 @@ import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import { useLivePitchTracker, type PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import { GAME_TEST_INPUT, syntheticReadout, TEST_HOLD_FRAME_MS } from '../gameTestInput'
 import Pressable from '../../components/ui/Pressable'
+import BalanceArcadeShell from './BalanceArcadeShell'
+import BalanceHome from './BalanceHome'
+import BalanceLevelResults from './BalanceLevelResults'
+import BalanceQuickPlay from './BalanceQuickPlay'
 import BalanceResults from './BalanceResults'
 import BalanceScene from './BalanceScene'
 import BalanceSetup from './BalanceSetup'
+import BalanceTrail from './BalanceTrail'
+import BalanceTrophyCase from './BalanceTrophyCase'
 import {
   buildBalanceTargets,
   inferBalanceInstrument,
 } from './balanceMusic'
+import {
+  balanceCurrentStreak,
+  balanceDailyChallenge,
+  balanceDailyLaunch,
+} from './balanceDaily'
+import {
+  balanceLevelLaunch,
+  getBalanceLevel,
+  BALANCE_LEVELS,
+  type BalanceLevel,
+} from './balanceLevels'
 import { centsFromConcertTarget } from './balanceScoring'
 import { formatBalanceDuration } from './balanceStorage'
-import { balanceInstrumentSettings, useBalanceGame } from './useBalanceGame'
+import { balanceInstrumentSettings, QUICK_PLAY_LAUNCH, useBalanceGame } from './useBalanceGame'
 import './balance.css'
+import './balance-arcade.css'
+
+/** Where the player is when no run is in progress. */
+type BalanceRoute = 'home' | 'trail' | 'quick' | 'options' | 'trophies'
 
 interface BalanceScreenProps {
   streamRef: RefObject<MediaStream | null>
@@ -61,6 +82,7 @@ export default function BalanceScreen({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [sourceHealth, setSourceHealth] = useState<PitchSourceHealth>('idle')
+  const [route, setRoute] = useState<BalanceRoute>('home')
   const game = useBalanceGame({
     initialInstrumentId: initialInstrument.id,
     hapticFeedback,
@@ -68,8 +90,14 @@ export default function BalanceScreen({
       onTunerSettingsChange(balanceInstrumentSettings(instrumentId)),
   })
   const selectedInstrument = balanceInstrumentSettings(game.state.settings.instrumentId)
+  /*
+   * Home, the trail and the trophy case have nothing to listen for, so the
+   * microphone only comes up on the two screens that show a live readout and
+   * for the run itself. Holding it open across the whole menu tree drained the
+   * battery for nothing.
+   */
   const pitchEnabled =
-    game.state.phase === 'setup' ||
+    (game.state.phase === 'setup' && (route === 'quick' || route === 'options')) ||
     game.state.phase === 'countIn' ||
     game.state.phase === 'waitingForPitch' ||
     game.state.phase === 'pitchLock' ||
@@ -164,7 +192,97 @@ export default function BalanceScreen({
     [game.customRoutines, game.state.settings],
   )
 
+  const startLevel = useCallback(
+    (level: BalanceLevel) => {
+      onRequestMicStream()
+      gameRef.current.start(balanceLevelLaunch(level, gameRef.current.state.settings.instrumentId))
+    },
+    [onRequestMicStream],
+  )
+
+  const startDaily = useCallback(() => {
+    onRequestMicStream()
+    const settings = gameRef.current.state.settings
+    gameRef.current.start(balanceDailyLaunch(balanceDailyChallenge(settings.instrumentId)))
+  }, [onRequestMicStream])
+
+  const startQuick = useCallback(() => {
+    onRequestMicStream()
+    gameRef.current.start(QUICK_PLAY_LAUNCH)
+  }, [onRequestMicStream])
+
+  /** Back to a menu screen without carrying the finished run's settings along. */
+  const goTo = useCallback((next: BalanceRoute) => {
+    gameRef.current.reset()
+    setRoute(next)
+  }, [])
+
   if (game.state.phase === 'setup') {
+    if (route === 'home') {
+      return (
+        <BalanceHome
+          instrumentId={game.state.settings.instrumentId}
+          characterId={game.state.settings.characterId}
+          levels={game.data.levels}
+          daily={game.data.daily}
+          trophyCount={Object.keys(game.data.trophies).length}
+          bestBalancedMs={game.state.bestBalancedMs}
+          hapticFeedback={hapticFeedback}
+          onBack={onBack}
+          onStartDaily={startDaily}
+          onQuickPlay={() => setRoute('quick')}
+          onTrail={() => setRoute('trail')}
+          onTrophies={() => setRoute('trophies')}
+        />
+      )
+    }
+
+    if (route === 'trail') {
+      return (
+        <BalanceTrail
+          instrumentId={game.state.settings.instrumentId}
+          levels={game.data.levels}
+          hapticFeedback={hapticFeedback}
+          onBack={() => setRoute('home')}
+          onPlayLevel={startLevel}
+        />
+      )
+    }
+
+    if (route === 'trophies') {
+      return (
+        <BalanceArcadeShell
+          title="Trophies"
+          hapticFeedback={hapticFeedback}
+          onBack={() => setRoute('home')}
+          backLabel="Back to Balance home"
+        >
+          <h1 className="balance-display balance-display--page">Trophies</h1>
+          <BalanceTrophyCase trophies={game.data.trophies} />
+        </BalanceArcadeShell>
+      )
+    }
+
+    if (route === 'quick') {
+      return (
+        <BalanceQuickPlay
+          settings={game.state.settings}
+          customRoutines={game.customRoutines}
+          previewTarget={previewTargets[0] ?? null}
+          bestBalancedMs={game.state.bestBalancedMs}
+          readout={readout}
+          sourceHealth={sourceHealth}
+          permissionBlocked={micPermissionBlocked}
+          permissionPending={micPermissionPending}
+          hapticFeedback={hapticFeedback}
+          onBack={() => setRoute('home')}
+          onStart={startQuick}
+          onOptions={() => setRoute('options')}
+          onRequestMic={onRequestMicStream}
+        />
+      )
+    }
+
     return (
       <BalanceSetup
         settings={game.state.settings}
@@ -177,8 +295,8 @@ export default function BalanceScreen({
         permissionPending={micPermissionPending}
         hapticFeedback={hapticFeedback}
         suppressUntilRef={game.suppressUntilRef}
-        onBack={onBack}
-        onStart={game.start}
+        onBack={() => setRoute('quick')}
+        onStart={startQuick}
         onRequestMic={onRequestMicStream}
         onUpdate={game.updateSettings}
         onSaveCustom={game.saveCustomRoutine}
@@ -188,50 +306,96 @@ export default function BalanceScreen({
   }
 
   if (game.state.phase === 'routineResults' && game.routineResult) {
+    if (game.launch.kind !== 'quick') {
+      const level = game.launch.id ? getBalanceLevel(game.launch.id) : null
+      const nextLevel = level ? BALANCE_LEVELS[level.number] ?? null : null
+      return (
+        <BalanceLevelResults
+          launch={game.launch}
+          level={level}
+          result={game.routineResult}
+          earnedStars={game.levelAward?.earnedStars ?? 0}
+          previousStars={game.levelAward?.previousStars ?? 0}
+          newTrophyIds={game.newTrophyIds}
+          streak={balanceCurrentStreak(game.data.daily)}
+          nextLevel={nextLevel}
+          hapticFeedback={hapticFeedback}
+          onReplay={() => game.start()}
+          onNextLevel={() => nextLevel && startLevel(nextLevel)}
+          onTrail={() => goTo('trail')}
+          onHome={() => goTo('home')}
+        />
+      )
+    }
     return (
       <BalanceResults
         result={game.routineResult}
         newTrophyIds={game.newTrophyIds}
         bestBalancedMs={Math.max(game.state.bestBalancedMs, game.data.routineSummaries[0]?.noteResults.reduce((best, note) => Math.max(best, note.balancedMs), 0) ?? 0)}
         hapticFeedback={hapticFeedback}
-        onReplay={game.start}
-        onSetup={game.reset}
+        onReplay={() => game.start()}
+        onSetup={() => goTo('quick')}
         onGames={onBack}
       />
     )
   }
 
-  if (game.state.phase === 'paused') {
+  /** What the run is, for the bars and cards shown while it is in progress. */
+  const runTitle =
+    game.launch.kind === 'level'
+      ? `Level ${getBalanceLevel(game.launch.id ?? '')?.number ?? ''} · ${game.launch.title}`
+      : game.launch.kind === 'daily'
+        ? game.launch.title
+        : 'Balance'
+
+  /*
+   * Pause / stopped / error share one card. `game.reset` returns to the setup
+   * phase, and `route` is still whichever screen launched the run, so "Quit"
+   * lands the player back on the trail or on Quick Play without extra
+   * bookkeeping.
+   */
+  if (game.state.phase === 'paused' || game.state.phase === 'stopped' || game.state.phase === 'error') {
+    const paused = game.state.phase === 'paused'
+    const errored = game.state.phase === 'error'
     return (
-      <div className="balance-state-screen">
-        <section className="balance-state-card">
-          <p className="balance-eyebrow">Balance</p><h1>Paused</h1>
-          <p>The microphone and movement are paused.</p>
-          <div className="balance-state-actions">
-            <Pressable haptic="medium" hapticFeedback={hapticFeedback} className="balance-primary-button" onClick={game.resume}><Play /> Resume</Pressable>
-            <Pressable intensity="soft" hapticFeedback={hapticFeedback} onClick={game.reset}>Settings</Pressable>
-            <Pressable intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack}>Games</Pressable>
+      <BalanceArcadeShell
+        title={runTitle}
+        hapticFeedback={hapticFeedback}
+        onBack={game.reset}
+        backLabel="Quit run"
+        className="balance-arcade--state"
+      >
+        <div className="balance-arcade__spacer" />
+        <section className="balance-card balance-award">
+          <span className="balance-pill">{paused ? 'Paused' : errored ? 'Problem' : 'Stopped'}</span>
+          <h1 className="balance-award__verdict">
+            {paused ? 'Take a breath' : errored ? 'Unable to start' : 'Run stopped'}
+          </h1>
+          <p className="balance-card__line" style={{ margin: 0 }}>
+            {paused
+              ? 'The microphone and the rope are both on hold.'
+              : errored
+                ? game.state.errorMessage ?? 'The game could not continue.'
+                : 'Nothing more was scored on this run.'}
+          </p>
+          <div className="balance-award__actions">
+            {paused && (
+              <Pressable haptic="medium" hapticFeedback={hapticFeedback} className="balance-cta" onClick={game.resume}>
+                <Play aria-hidden /> Resume
+              </Pressable>
+            )}
+            <Pressable
+              intensity="soft"
+              hapticFeedback={hapticFeedback}
+              className={`balance-cta balance-cta--blue ${paused ? 'balance-cta--small' : ''}`}
+              onClick={game.reset}
+            >
+              Quit run
+            </Pressable>
           </div>
         </section>
-      </div>
-    )
-  }
-
-  if (game.state.phase === 'stopped') {
-    return (
-      <div className="balance-state-screen"><section className="balance-state-card">
-        <p className="balance-eyebrow">Balance</p><h1>Run stopped</h1><p>No additional pitch was scored.</p>
-        <div className="balance-state-actions"><Pressable hapticFeedback={hapticFeedback} className="balance-primary-button" onClick={game.reset}>Settings</Pressable><Pressable intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack}>Games</Pressable></div>
-      </section></div>
-    )
-  }
-
-  if (game.state.phase === 'error') {
-    return (
-      <div className="balance-state-screen"><section className="balance-state-card">
-        <p className="balance-eyebrow">Balance</p><h1>Unable to start</h1><p>{game.state.errorMessage ?? 'The game could not continue.'}</p>
-        <div className="balance-state-actions"><Pressable hapticFeedback={hapticFeedback} className="balance-primary-button" onClick={game.reset}>Back to settings</Pressable><Pressable intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack}>Games</Pressable></div>
-      </section></div>
+        <div className="balance-arcade__spacer" />
+      </BalanceArcadeShell>
     )
   }
 
@@ -341,9 +505,13 @@ export default function BalanceScreen({
     >
       <header className="balance-play-header">
         <div className="balance-target-card">
-          <small>Target</small>
+          <small>{game.launch.kind === 'quick' ? 'Target' : runTitle}</small>
           <strong>{target?.writtenLabel ?? '—'}</strong>
-          <span>Concert {target?.concertLabel ?? '—'}</span>
+          <span>
+            {game.state.targets.length > 1
+              ? `Note ${game.state.targetIndex + 1} of ${game.state.targets.length}`
+              : `Concert ${target?.concertLabel ?? '—'}`}
+          </span>
         </div>
         <Pressable
           intensity="icon"

@@ -9,7 +9,7 @@ import type {
 export type BalanceAction =
   | { type: 'UPDATE_SETTINGS'; settings: BalanceSettings; bestBalancedMs?: number }
   | { type: 'SET_BEST'; bestBalancedMs: number }
-  | { type: 'START'; targets: BalanceTarget[]; bestBalancedMs: number }
+  | { type: 'START'; targets: BalanceTarget[]; settings: BalanceSettings; bestBalancedMs: number }
   | { type: 'SET_PHASE'; phase: Exclude<BalancePhase, 'paused'> }
   | { type: 'SET_REST'; endsAt: number | null }
   | { type: 'COMPLETE_NOTE'; result: BalanceNoteResult }
@@ -18,7 +18,7 @@ export type BalanceAction =
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'STOP' }
-  | { type: 'RESET' }
+  | { type: 'RESET'; settings?: BalanceSettings }
   | { type: 'ERROR'; message: string }
 
 export function createBalanceState(
@@ -64,7 +64,11 @@ export function balanceReducer(state: BalanceState, action: BalanceAction): Bala
       }
       return {
         ...state,
-        phase: openingPhase(state.settings),
+        // The run's own settings, not the stored ones: a Sky Trail level sets
+        // its own duration and tolerance without ever writing them back over
+        // what the player picked in Quick Play.
+        settings: action.settings,
+        phase: openingPhase(action.settings),
         targets: action.targets,
         targetIndex: 0,
         noteResults: [],
@@ -128,6 +132,7 @@ export function balanceReducer(state: BalanceState, action: BalanceAction): Bala
     case 'ERROR':
       return { ...state, phase: 'error', errorMessage: action.message, resumePhase: null }
     case 'RESET':
-      return createBalanceState(state.settings, state.bestBalancedMs)
+      // Back to the player's stored preferences, dropping any level overrides.
+      return createBalanceState(action.settings ?? state.settings, state.bestBalancedMs)
   }
 }

@@ -1,8 +1,8 @@
-# BestTake (SessionMirror) - App Context
+# BestTake - App Context
 
 ## 1. App Naming & Identity
 - **Product Name**: BestTake (Confirmed by `capacitor.config.ts`, `CAPACITOR_SETUP.md`).
-- **Legacy Repository Name**: SessionMirror (Confirmed by `README.md`, `package.json` name).
+- **Legacy Repository Directory**: SessionMirror. Historical storage keys and plugin identifiers intentionally retain this name for compatibility.
 - *Note: BestTake is the current app/product name and should be treated as such, not merely as an internal plugin name.*
 
 ## 2. Core Application Architecture

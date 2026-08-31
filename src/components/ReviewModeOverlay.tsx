@@ -47,7 +47,7 @@ const SWIPE_THRESHOLD = 60
 const OVERLAY_HIDE_MS = 2800
 
 function formatReviewDate(timestamp?: number): string {
-  if (!timestamp) return 'SessionMirror'
+  if (!timestamp) return 'BestTake'
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',

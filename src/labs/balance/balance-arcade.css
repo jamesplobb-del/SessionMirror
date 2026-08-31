@@ -1,0 +1,1023 @@
+/*
+ * Balance — arcade shell.
+ *
+ * The Home / Sky Trail / Quick Play screens that wrap the game. The play scene
+ * itself still lives in balance.css; this file is only the chrome around it.
+ *
+ * Everything here is built from four repeated devices, which is what makes a
+ * mobile game read as one:
+ *   1. a painted sky the screens sit inside rather than on
+ *   2. display type in SF Rounded Black, navy, with a white top highlight
+ *   3. buttons with a hard colour edge underneath that the press collapses
+ *   4. white cards with a matching hard edge, so cards and buttons are kin
+ * No dark-mode block: this is a lit sky at midday, and inverting it would look
+ * like a bug rather than a theme.
+ */
+
+.balance-arcade {
+  --sky-top: #a9dcf5;
+  --sky-mid: #cbeefe;
+  --sky-low: #e6f7ff;
+  --ink: #123a6b;
+  --ink-soft: #4a7099;
+  --ink-faint: #7d9bb8;
+
+  --gold: #ffc94d;
+  --gold-mid: #f5a623;
+  --gold-edge: #c47a08;
+
+  --orange: #ffb03a;
+  --orange-mid: #f28c17;
+  --orange-edge: #c0670a;
+
+  --blue: #58a8e8;
+  --blue-mid: #3d8fd8;
+  --blue-edge: #275f97;
+
+  --green: #58c894;
+  --green-edge: #2b8460;
+
+  --locked: #cdd8e2;
+  --locked-mid: #b6c4d1;
+  --locked-edge: #93a4b4;
+
+  --card: #ffffff;
+  --card-edge: #d3e3ef;
+  --card-lift: 0 0.75rem 1.6rem rgba(30, 84, 138, 0.14);
+
+  --display-font: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --text-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 46%, var(--sky-low) 100%);
+  color: var(--ink);
+  font-family: var(--text-font);
+  isolation: isolate;
+}
+
+/* ---------------------------------------------------------------- sky ---- */
+
+/*
+ * Painted clouds, not drawn ones: layered radial gradients at low opacity read
+ * as soft airbrushed banks at any size, and cost nothing to animate.
+ */
+.balance-arcade__sky {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.balance-arcade__sky i {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.55) 58%, rgba(255, 255, 255, 0) 72%);
+}
+
+.balance-arcade__sky i:nth-child(1) { top: 6%; left: -14%; width: 60%; height: 16%; }
+.balance-arcade__sky i:nth-child(2) { top: 15%; right: -18%; width: 66%; height: 18%; opacity: 0.8; }
+.balance-arcade__sky i:nth-child(3) { top: 38%; left: -22%; width: 72%; height: 20%; opacity: 0.55; }
+.balance-arcade__sky i:nth-child(4) { top: 62%; right: -20%; width: 70%; height: 22%; opacity: 0.5; }
+.balance-arcade__sky i:nth-child(5) { bottom: -6%; left: -12%; width: 130%; height: 26%; opacity: 0.7; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .balance-arcade__sky i {
+    animation: balance-cloud-drift 34s ease-in-out infinite alternate;
+  }
+  .balance-arcade__sky i:nth-child(even) { animation-duration: 46s; animation-direction: alternate-reverse; }
+}
+
+@keyframes balance-cloud-drift {
+  from { transform: translateX(-2.5%); }
+  to { transform: translateX(2.5%); }
+}
+
+.balance-arcade__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  padding:
+    0
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1.15rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+  gap: 0.9rem;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ------------------------------------------------------------- top bar ---- */
+
+.balance-arcade__bar {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 2.9rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding:
+    max(0.7rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    0.35rem
+    max(1rem, env(safe-area-inset-left, 0px));
+}
+
+.balance-arcade__bar-title {
+  min-width: 0;
+  font-family: var(--display-font);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Round glass buttons, the same object at both ends of the bar. */
+.balance-round-button {
+  display: grid;
+  width: 2.9rem;
+  height: 2.9rem;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.22rem 0 rgba(154, 187, 210, 0.55),
+    0 0.4rem 0.9rem rgba(30, 84, 138, 0.14);
+}
+
+.balance-round-button svg { width: 1.25rem; height: 1.25rem; stroke-width: 2.6; }
+.balance-round-button:active { transform: translateY(0.15rem); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 0.07rem 0 rgba(154,187,210,0.55); }
+
+.balance-arcade__bar-stat {
+  display: grid;
+  min-width: 3.4rem;
+  justify-items: end;
+  padding: 0.36rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0.22rem 0 rgba(154, 187, 210, 0.5);
+}
+
+.balance-arcade__bar-stat small { color: var(--ink-faint); font-size: 0.56rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; }
+.balance-arcade__bar-stat strong { font-family: var(--display-font); font-size: 0.86rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------- display type ---- */
+
+.balance-display {
+  margin: 0;
+  font-family: var(--display-font);
+  font-weight: 900;
+  line-height: 0.94;
+  letter-spacing: -0.022em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink);
+  /* A white rim above and a soft blue haze below: the letters sit on the sky
+     rather than being pasted over it. */
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 0 rgba(255, 255, 255, 0.55),
+    0 0.5rem 1.1rem rgba(24, 78, 133, 0.16);
+}
+
+.balance-display--hero { font-size: clamp(2.6rem, 13.5vw, 4.1rem); }
+.balance-display--page { font-size: clamp(1.6rem, 7.4vw, 2.4rem); }
+
+.balance-subdisplay {
+  margin: 0.3rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ buttons ---- */
+
+/*
+ * The hard edge under each button is a solid box-shadow, not a gradient, and
+ * the press moves the button down onto it by exactly the edge height. That one
+ * detail is most of what separates a game button from a web button.
+ */
+.balance-cta {
+  --edge: var(--orange-edge);
+  --edge-height: 0.34rem;
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1.4rem;
+  border-radius: 1.15rem;
+  color: #fff;
+  background: linear-gradient(180deg, var(--orange) 0%, var(--orange-mid) 58%, var(--orange-mid) 100%);
+  box-shadow:
+    inset 0 0.13rem 0 rgba(255, 255, 255, 0.5),
+    inset 0 -0.1rem 0 rgba(0, 0, 0, 0.08),
+    0 var(--edge-height) 0 var(--edge),
+    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(150, 82, 12, 0.3);
+  font-family: var(--display-font);
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  text-shadow: 0 0.1rem 0 rgba(133, 70, 6, 0.45);
+  transition: transform 90ms ease, box-shadow 90ms ease;
+}
+
+.balance-cta svg { width: 1.3rem; height: 1.3rem; stroke-width: 3; }
+
+.balance-cta:active {
+  transform: translateY(var(--edge-height));
+  box-shadow:
+    inset 0 0.13rem 0 rgba(255, 255, 255, 0.4),
+    0 0 0 var(--edge),
+    0 0.2rem 0.4rem rgba(150, 82, 12, 0.26);
+}
+
+.balance-cta:disabled {
+  filter: grayscale(0.55);
+  opacity: 0.62;
+}
+
+.balance-cta--small { min-height: 2.9rem; padding: 0.6rem 1.1rem; font-size: 0.98rem; --edge-height: 0.28rem; }
+
+.balance-cta--blue {
+  --edge: var(--blue-edge);
+  background: linear-gradient(180deg, #6fb6ee 0%, var(--blue-mid) 58%, var(--blue-mid) 100%);
+  text-shadow: 0 0.1rem 0 rgba(24, 70, 115, 0.45);
+  box-shadow:
+    inset 0 0.13rem 0 rgba(255, 255, 255, 0.45),
+    inset 0 -0.1rem 0 rgba(0, 0, 0, 0.08),
+    0 var(--edge-height) 0 var(--edge),
+    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(30, 84, 138, 0.3);
+}
+
+.balance-cta--green {
+  --edge: var(--green-edge);
+  background: linear-gradient(180deg, #6fdcab 0%, var(--green) 58%, var(--green) 100%);
+  text-shadow: 0 0.1rem 0 rgba(24, 96, 70, 0.4);
+  box-shadow:
+    inset 0 0.13rem 0 rgba(255, 255, 255, 0.45),
+    inset 0 -0.1rem 0 rgba(0, 0, 0, 0.08),
+    0 var(--edge-height) 0 var(--edge),
+    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(26, 110, 80, 0.28);
+}
+
+/* The quiet third action — "More options", "Quick Play". */
+.balance-textlink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.6rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.balance-textlink svg { width: 1rem; height: 1rem; stroke-width: 2.4; }
+.balance-textlink:active { background: rgba(255, 255, 255, 0.6); }
+
+/* -------------------------------------------------------------- cards ---- */
+
+.balance-card {
+  position: relative;
+  padding: 1.05rem 1.1rem 1.15rem;
+  border-radius: 1.5rem;
+  background: var(--card);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.28rem 0 var(--card-edge),
+    var(--card-lift);
+}
+
+.balance-card__title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.42rem;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  text-align: center;
+  color: var(--ink);
+}
+
+.balance-card__line {
+  margin: 0.28rem 0 0.9rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* The blue pill under a title: LEVEL 1, TODAY, and so on. */
+.balance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(180deg, #63aeea, var(--blue-mid));
+  box-shadow: 0 0.18rem 0 var(--blue-edge), 0 0.4rem 0.7rem rgba(30, 84, 138, 0.24);
+  font-family: var(--display-font);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------- stat chips ---- */
+
+.balance-chips {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0.5rem;
+}
+
+.balance-chip {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  padding: 0.6rem 0.4rem 0.65rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.2rem 0 var(--card-edge),
+    0 0.4rem 0.8rem rgba(30, 84, 138, 0.1);
+  text-align: center;
+}
+
+.balance-chip small {
+  color: var(--ink-faint);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.balance-chip strong {
+  font-family: var(--display-font);
+  font-size: 1.12rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.balance-chip--tone strong { color: #1f8a63; font-size: 0.98rem; }
+.balance-chip--tone[data-level='Sharp'] strong,
+.balance-chip--tone[data-level='Expert'] strong { color: #b4562a; }
+
+/* ---------------------------------------------------------------- home ---- */
+
+.balance-home__portrait {
+  position: relative;
+  display: grid;
+  width: clamp(8rem, 38vw, 11rem);
+  height: clamp(8rem, 38vw, 11rem);
+  place-items: center;
+  margin: 0.2rem auto 0.1rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.72) 62%, rgba(255, 255, 255, 0.32) 100%);
+  box-shadow:
+    inset 0 0 0 0.35rem rgba(255, 255, 255, 0.75),
+    0 0.7rem 1.5rem rgba(30, 84, 138, 0.16);
+}
+
+.balance-home__portrait img {
+  width: 68%;
+  height: 68%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.35rem 0.5rem rgba(30, 84, 138, 0.22));
+}
+
+/* Sparkles around the portrait — four-point stars, the standard reward mark. */
+.balance-home__portrait b {
+  position: absolute;
+  width: 0.85rem;
+  height: 0.85rem;
+  background: #fff;
+  clip-path: polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%);
+  filter: drop-shadow(0 0 0.3rem rgba(255, 255, 255, 0.9));
+}
+
+.balance-home__portrait b:nth-of-type(1) { top: 4%; right: 12%; }
+.balance-home__portrait b:nth-of-type(2) { top: 26%; left: 2%; width: 0.6rem; height: 0.6rem; }
+.balance-home__portrait b:nth-of-type(3) { bottom: 12%; right: 2%; width: 0.7rem; height: 0.7rem; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .balance-home__portrait b { animation: balance-sparkle 2.6s ease-in-out infinite; }
+  .balance-home__portrait b:nth-of-type(2) { animation-delay: 0.7s; }
+  .balance-home__portrait b:nth-of-type(3) { animation-delay: 1.4s; }
+}
+
+@keyframes balance-sparkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.75) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.1) rotate(45deg); }
+}
+
+.balance-home__challenge { display: grid; gap: 0.7rem; }
+.balance-home__challenge .balance-textlink { justify-self: center; margin-top: -0.15rem; }
+
+.balance-home__done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border-radius: 1.05rem;
+  color: #1f8a63;
+  background: #e6f8ef;
+  box-shadow: inset 0 0 0 1px rgba(43, 132, 96, 0.16);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.balance-home__done svg { width: 1.15rem; height: 1.15rem; stroke-width: 3; }
+
+/* Streak row — flames, then the count. */
+.balance-streak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.8rem 1rem;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.24rem 0 var(--card-edge),
+    0 0.5rem 1rem rgba(30, 84, 138, 0.1);
+}
+
+.balance-streak__flames { display: flex; gap: 0.22rem; }
+
+.balance-streak__flame {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffd88a, #ffb14a);
+  box-shadow: 0 0.16rem 0 #d97d18;
+}
+
+.balance-streak__flame svg { width: 1.05rem; height: 1.05rem; fill: #e2560f; stroke: none; }
+.balance-streak__flame.is-empty {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 0.12rem #dbe5ee;
+}
+
+.balance-streak__flame.is-empty svg { fill: none; stroke: #b9c6d2; stroke-width: 2.2; }
+
+.balance-streak strong {
+  font-family: var(--display-font);
+  font-size: 0.94rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1f8a63;
+}
+
+.balance-streak.is-cold strong { color: var(--ink-faint); }
+
+/* Two nav tiles under the streak. */
+.balance-home__nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+
+.balance-tile {
+  display: grid;
+  min-height: 5.1rem;
+  align-content: center;
+  justify-items: start;
+  gap: 0.12rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 1.25rem;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.24rem 0 var(--card-edge),
+    0 0.5rem 1rem rgba(30, 84, 138, 0.1);
+}
+
+.balance-tile__icon {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  margin-bottom: 0.28rem;
+  border-radius: 0.65rem;
+  color: #fff;
+  background: linear-gradient(180deg, #63aeea, var(--blue-mid));
+  box-shadow: 0 0.14rem 0 var(--blue-edge);
+}
+
+.balance-tile__icon svg { width: 1.05rem; height: 1.05rem; stroke-width: 2.6; }
+.balance-tile--gold .balance-tile__icon { background: linear-gradient(180deg, var(--gold), var(--gold-mid)); box-shadow: 0 0.14rem 0 var(--gold-edge); }
+.balance-tile strong { font-family: var(--display-font); font-size: 0.96rem; font-weight: 900; }
+.balance-tile small { color: var(--ink-faint); font-size: 0.72rem; font-weight: 600; }
+
+/* --------------------------------------------------------- quick play ---- */
+
+.balance-quick__hero {
+  position: relative;
+  min-height: clamp(15rem, 40dvh, 23rem);
+  flex: 1 1 auto;
+  overflow: hidden;
+  border-radius: 1.6rem;
+  box-shadow:
+    inset 0 0 0 0.28rem rgba(255, 255, 255, 0.65),
+    0 0.7rem 1.5rem rgba(30, 84, 138, 0.16);
+}
+
+.balance-quick__hero .balance-scene {
+  width: 100%;
+  height: 100%;
+  left: 0;
+  margin-left: 0;
+  transform: none;
+}
+
+.balance-quick__actions { display: grid; gap: 0.55rem; justify-items: center; }
+.balance-quick__actions .balance-cta { max-width: 24rem; }
+
+/* Mic strip, kept but reskinned to sit with the cards. */
+.balance-quick__mic {
+  display: grid;
+  width: 100%;
+  max-width: 24rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 1.05rem;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0.2rem 0 var(--card-edge);
+}
+
+.balance-quick__mic svg { width: 1.05rem; height: 1.05rem; color: var(--ink-soft); }
+.balance-quick__mic span { display: grid; min-width: 0; }
+.balance-quick__mic span b { font-size: 0.8rem; font-weight: 700; }
+.balance-quick__mic span small { color: var(--ink-faint); font-size: 0.66rem; }
+.balance-quick__mic strong { font-family: var(--display-font); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.balance-quick__mic.is-live { background: #e9f9f1; box-shadow: 0 0.2rem 0 #bfe6d3; }
+.balance-quick__mic.is-live strong { color: #1f8a63; }
+.balance-quick__mic.is-error { background: #fdeeea; box-shadow: 0 0.2rem 0 #f0cfc5; }
+
+/* --------------------------------------------------------------- trail ---- */
+
+.balance-trail__scroll {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  padding: 0 0.25rem 1.4rem;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.balance-trail__world {
+  position: relative;
+  padding: 0.35rem 0 1.1rem;
+}
+
+.balance-trail__banner {
+  position: sticky;
+  z-index: 3;
+  top: 0.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 1rem;
+  color: #fff;
+  background: linear-gradient(180deg, var(--world-accent), var(--world-accent-dark));
+  box-shadow: 0 0.22rem 0 rgba(0, 0, 0, 0.16), 0 0.5rem 1rem rgba(30, 84, 138, 0.2);
+}
+
+.balance-trail__banner strong {
+  font-family: var(--display-font);
+  font-size: 0.98rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-shadow: 0 0.08rem 0 rgba(0, 0, 0, 0.2);
+}
+
+.balance-trail__banner span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.74rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-trail__banner span svg { width: 0.8rem; height: 0.8rem; fill: #ffd66b; stroke: none; }
+
+/* The path: nodes zig-zag, joined by a rope drawn behind them. */
+.balance-trail__path {
+  position: relative;
+  width: min(100%, 22rem);
+  margin: 0.4rem auto 0;
+}
+
+.balance-trail__rope {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.balance-trail__rope path {
+  fill: none;
+  stroke: #f0b24d;
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.balance-trail__rope path.is-shadow { stroke: rgba(151, 96, 26, 0.28); stroke-width: 11; }
+.balance-trail__rope path.is-locked { stroke: #cfdae4; }
+
+/*
+ * Nodes are placed absolutely in the same 0-100 space the rope path uses, so
+ * the two can never disagree about where a level sits.
+ */
+.balance-trail__path > .balance-node {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+}
+
+/* --------------------------------------------------------------- node ---- */
+
+.balance-node {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  background: transparent;
+}
+
+.balance-node__disc {
+  position: relative;
+  display: grid;
+  width: 3.9rem;
+  height: 3.9rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-mid) 100%);
+  box-shadow:
+    inset 0 0 0 0.22rem rgba(255, 255, 255, 0.9),
+    inset 0 0.2rem 0.3rem rgba(255, 255, 255, 0.55),
+    0 0.28rem 0 var(--gold-edge),
+    0 0.55rem 1rem rgba(150, 100, 12, 0.28);
+  font-family: var(--display-font);
+  font-size: 1.5rem;
+  font-weight: 900;
+  text-shadow: 0 0.1rem 0 rgba(140, 84, 8, 0.4);
+}
+
+/* A glossy cap across the top half — the thing that makes it look moulded. */
+.balance-node__disc::before {
+  position: absolute;
+  top: 0.34rem;
+  left: 0.7rem;
+  width: 2.3rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0));
+  content: '';
+  pointer-events: none;
+}
+
+.balance-node--boss .balance-node__disc { width: 4.7rem; height: 4.7rem; font-size: 1.75rem; }
+.balance-node--boss .balance-node__disc::before { width: 2.9rem; height: 1.4rem; left: 0.85rem; }
+
+.balance-node--cleared .balance-node__disc {
+  background: linear-gradient(180deg, #7fe0b3 0%, var(--green) 100%);
+  box-shadow:
+    inset 0 0 0 0.22rem rgba(255, 255, 255, 0.9),
+    inset 0 0.2rem 0.3rem rgba(255, 255, 255, 0.5),
+    0 0.28rem 0 var(--green-edge),
+    0 0.55rem 1rem rgba(26, 110, 80, 0.25);
+  text-shadow: 0 0.1rem 0 rgba(22, 96, 68, 0.38);
+}
+
+.balance-node--locked .balance-node__disc {
+  background: linear-gradient(180deg, #e2eaf1 0%, var(--locked-mid) 100%);
+  box-shadow:
+    inset 0 0 0 0.22rem rgba(255, 255, 255, 0.85),
+    0 0.24rem 0 var(--locked-edge),
+    0 0.45rem 0.8rem rgba(90, 116, 138, 0.2);
+  color: #8ea0b1;
+  text-shadow: none;
+}
+
+.balance-node--locked .balance-node__disc svg { width: 1.3rem; height: 1.3rem; stroke-width: 2.8; }
+
+.balance-node:not(.balance-node--locked):active .balance-node__disc { transform: translateY(0.2rem); }
+
+/* The next playable level pulses and wears a ring, so it is never ambiguous
+   where the player is on a long trail. */
+.balance-node--current .balance-node__disc {
+  outline: 0.2rem solid rgba(255, 255, 255, 0.75);
+  outline-offset: 0.22rem;
+}
+
+/* The dock follows the selection, so the selected node has to be obvious even
+   when it is not the current one. */
+.balance-node.is-selected:not(.balance-node--current) .balance-node__disc {
+  outline: 0.2rem solid var(--ink);
+  outline-offset: 0.22rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .balance-node--current .balance-node__disc { animation: balance-node-bob 2.1s ease-in-out infinite; }
+}
+
+@keyframes balance-node-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.28rem); }
+}
+
+.balance-node__stars {
+  display: flex;
+  gap: 0.1rem;
+  padding: 0.16rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 0.14rem 0 rgba(190, 210, 226, 0.9);
+}
+
+.balance-node__stars svg { width: 0.78rem; height: 0.78rem; }
+.balance-node__stars svg.is-on { fill: #ffc233; stroke: none; filter: drop-shadow(0 0.06rem 0 #d38f08); }
+.balance-node__stars svg.is-off { fill: #dde5ec; stroke: none; }
+
+.balance-node__name {
+  max-width: 8.5rem;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* The bottom sheet on the trail: the selected level and its Play button. */
+.balance-trail__dock {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem 0.9rem max(0.9rem, env(safe-area-inset-bottom, 0px));
+  border-radius: 1.5rem 1.5rem 0 0;
+  background: var(--card);
+  box-shadow: 0 -0.5rem 1.4rem rgba(30, 84, 138, 0.18);
+}
+
+.balance-trail__dock header { display: grid; justify-items: center; gap: 0.28rem; }
+.balance-trail__dock h2 { margin: 0; font-family: var(--display-font); font-size: 1.2rem; font-weight: 900; }
+.balance-trail__dock p { margin: 0; color: var(--ink-soft); font-size: 0.86rem; font-weight: 600; text-align: center; }
+
+/* ------------------------------------------------------------ results ---- */
+
+.balance-award { display: grid; justify-items: center; gap: 0.55rem; }
+
+.balance-award__stars { display: flex; gap: 0.5rem; }
+
+.balance-award__stars svg { width: 2.9rem; height: 2.9rem; }
+.balance-award__stars svg.is-on { fill: #ffc233; stroke: none; filter: drop-shadow(0 0.18rem 0 #d38f08) drop-shadow(0 0.4rem 0.6rem rgba(190, 130, 12, 0.35)); }
+.balance-award__stars svg.is-off { fill: #dde5ec; stroke: none; filter: drop-shadow(0 0.14rem 0 #c3cfda); }
+
+/* The middle star sits higher, the way an award row is always drawn. */
+.balance-award__stars svg:nth-child(2) { width: 3.5rem; height: 3.5rem; margin-top: -0.55rem; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .balance-award__stars svg.is-on { animation: balance-star-pop 460ms cubic-bezier(0.2, 1.4, 0.4, 1) backwards; }
+  .balance-award__stars svg.is-on:nth-child(2) { animation-delay: 160ms; }
+  .balance-award__stars svg.is-on:nth-child(3) { animation-delay: 320ms; }
+}
+
+@keyframes balance-star-pop {
+  from { opacity: 0; transform: scale(0.2) rotate(-35deg); }
+  to { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+.balance-award__verdict {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  text-align: center;
+}
+
+.balance-award__stats {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0.15rem 0 0;
+}
+
+.balance-award__stats > div {
+  display: grid;
+  justify-items: center;
+  gap: 0.06rem;
+  padding: 0.55rem 0.3rem;
+  border-radius: 0.9rem;
+  background: #f2f7fb;
+}
+
+.balance-award__stats dt { color: var(--ink-faint); font-size: 0.58rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.balance-award__stats dd { margin: 0; font-family: var(--display-font); font-size: 1.02rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+.balance-award__actions { display: grid; width: 100%; gap: 0.5rem; }
+.balance-award__next { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+.balance-award__unlocks {
+  display: grid;
+  width: 100%;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 1rem;
+  background: #fff7e6;
+  box-shadow: inset 0 0 0 1px rgba(214, 152, 32, 0.22);
+}
+
+.balance-award__unlocks > header { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 800; color: #9a6a06; }
+.balance-award__unlocks > header svg { width: 1rem; height: 1rem; }
+.balance-award__unlocks div { display: grid; gap: 0.05rem; }
+.balance-award__unlocks strong { font-size: 0.84rem; font-weight: 800; }
+.balance-award__unlocks small { color: var(--ink-soft); font-size: 0.72rem; }
+
+/* -------------------------------------------------------------- misc ---- */
+
+.balance-arcade__spacer { flex: 1 1 auto; min-height: 0.25rem; }
+
+/* Scores and detail tables stay readable; the arcade shell only wraps them. */
+.balance-arcade .balance-results-screen,
+.balance-arcade .balance-state-screen {
+  background: transparent;
+}
+
+/* ------------------------------------- options (the rebuilt setup) ---- */
+
+/*
+ * The full configuration screen, wearing the arcade's clothes. The controls
+ * themselves are untouched — the island still sets the duration, the note
+ * hangs from its pulley, the rope still sets the cents — but the page around
+ * them now matches Home and the Trail instead of looking like a settings form
+ * the game happens to link to.
+ */
+.balance-screen--setup.balance-screen--arcade {
+  --card-edge: #d3e3ef;
+  --display-font: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  max-width: 34rem;
+  background: linear-gradient(180deg, #a9dcf5 0%, #cbeefe 46%, #e6f7ff 100%);
+}
+
+.balance-screen--arcade .balance-head h1 {
+  font-family: var(--display-font);
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: #123a6b;
+}
+
+.balance-screen--arcade .balance-head > div p { color: #4a7099; font-weight: 600; }
+
+.balance-screen--arcade .balance-head > button {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 50%;
+  color: #123a6b;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.22rem 0 rgba(154, 187, 210, 0.55);
+}
+
+.balance-screen--arcade .balance-head__best {
+  padding: 0.36rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0.22rem 0 rgba(154, 187, 210, 0.5);
+}
+
+.balance-screen--arcade .balance-head__best small { color: #7d9bb8; font-size: 0.56rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; }
+.balance-screen--arcade .balance-head__best strong { font-family: var(--display-font); font-weight: 800; }
+
+.balance-screen--arcade .balance-setup-preview {
+  border: 0;
+  border-radius: 1.6rem;
+  box-shadow:
+    inset 0 0 0 0.28rem rgba(255, 255, 255, 0.65),
+    0 0.7rem 1.5rem rgba(30, 84, 138, 0.16);
+}
+
+.balance-screen--arcade .balance-setup-group,
+.balance-screen--arcade .balance-start {
+  border: 0;
+  border-radius: 1.25rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.24rem 0 var(--card-edge),
+    0 0.5rem 1rem rgba(30, 84, 138, 0.1);
+}
+
+.balance-screen--arcade .balance-setup-group__head strong {
+  font-family: var(--display-font);
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+/* The Start button is the same object as PLAY on Quick Play, at card scale. */
+.balance-screen--arcade .balance-primary-button {
+  min-height: 3.35rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, #ffb03a 0%, #f28c17 58%, #f28c17 100%);
+  box-shadow:
+    inset 0 0.13rem 0 rgba(255, 255, 255, 0.5),
+    0 0.32rem 0 #c0670a,
+    0 0.74rem 0.85rem rgba(150, 82, 12, 0.3);
+  font-family: var(--display-font);
+  font-size: 1.12rem;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  text-shadow: 0 0.1rem 0 rgba(133, 70, 6, 0.45);
+  transition: transform 90ms ease, box-shadow 90ms ease;
+}
+
+.balance-screen--arcade .balance-primary-button svg { width: 1.25rem; height: 1.25rem; stroke-width: 3; }
+
+.balance-screen--arcade .balance-primary-button:active {
+  transform: translateY(0.32rem);
+  box-shadow: inset 0 0.13rem 0 rgba(255, 255, 255, 0.4), 0 0 0 #c0670a;
+}
+
+.balance-screen--arcade .balance-mic-check {
+  border-radius: 1.05rem;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0.2rem 0 var(--card-edge);
+}
+
+.balance-screen--arcade .balance-mic-check.is-live { background: #e9f9f1; box-shadow: 0 0.2rem 0 #bfe6d3; }
+.balance-screen--arcade .balance-mic-check.is-error { background: #fdeeea; box-shadow: 0 0.2rem 0 #f0cfc5; }
+
+.balance-screen--arcade .balance-choice-row button,
+.balance-screen--arcade .balance-routine-editor__saved button {
+  border-radius: 0.85rem;
+  box-shadow: 0 0.16rem 0 #dbe4ec;
+}
+
+.balance-screen--arcade .balance-choice-row button.is-selected,
+.balance-screen--arcade .balance-routine-editor__saved button.is-selected {
+  color: #fff;
+  background: linear-gradient(180deg, #63aeea, #3d8fd8);
+  box-shadow: 0 0.16rem 0 #275f97;
+}
+
+/* The play screen's target card now carries the level name, which is longer
+   than "Target" ever was — hold it to one line so the card keeps its shape. */
+.balance-target-card > small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

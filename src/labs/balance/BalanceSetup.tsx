@@ -411,7 +411,7 @@ export default function BalanceSetup({
   }
 
   return (
-    <div className="balance-screen balance-screen--setup">
+    <div className="balance-screen balance-screen--setup balance-screen--arcade">
       <header className="balance-head">
         <Pressable intensity="icon" hapticFeedback={hapticFeedback} onClick={onBack} aria-label="Back to Practice Games">
           <ArrowLeft aria-hidden />

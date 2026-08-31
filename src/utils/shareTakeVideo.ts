@@ -269,13 +269,13 @@ export async function shareTakeToSystem(take: Take): Promise<ShareTakeResult> {
     if (Capacitor.getPlatform() === 'ios') {
       await BestTakeAudioPlugin.shareMediaFile({
         path: url,
-        title: take.name || 'SessionMirror Take',
+        title: take.name || 'BestTake Take',
         audioGain: resolveNativeExportAudioGain(take),
       })
     } else {
       await Share.share({
-        title: take.name || 'SessionMirror Take',
-        text: take.name || 'SessionMirror Take',
+        title: take.name || 'BestTake Take',
+        text: take.name || 'BestTake Take',
         url,
         dialogTitle: 'Share Take',
       })

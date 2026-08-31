@@ -870,9 +870,11 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 }
 
 .audio-mode-status-pill__divider {
-  width: 1px;
-  height: 1.05rem;
-  background: var(--audio-divider);
+  width: auto;
+  height: auto;
+  background: transparent;
+  color: var(--audio-text-primary);
+  font-weight: 700;
 }
 
 .audio-mode-status-pill--recording strong {
@@ -886,93 +888,62 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 
 .audio-recording-waveform {
   position: relative;
-  display: flex;
   width: 100%;
   max-width: 34rem;
   height: clamp(6.8rem, 17vh, 10rem);
-  align-items: center;
-  justify-content: center;
-  gap: clamp(1px, 0.42vw, 2.8px);
-  padding-inline: 0.2rem;
   overflow: hidden;
-  color: var(--audio-blue);
-  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
-}
-
-.audio-recording-waveform__bar {
-  width: clamp(1.5px, 0.5vw, 2.7px);
-  height: 100%;
-  flex: 0 1 2.7px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0.43;
-  transform: scaleY(var(--audio-recording-peak, 0.2));
-  transform-origin: center;
-  transition:
-    transform 55ms linear,
-    opacity 120ms ease,
-    color 120ms ease;
 }
 
 .audio-recording-waveform--idle {
   max-width: 32rem;
-  padding-inline: clamp(0.65rem, 3vw, 1.1rem);
-  color: color-mix(in srgb, var(--audio-blue) 68%, var(--audio-text-secondary));
 }
 
-.audio-recording-waveform--idle::before {
+.audio-breathing-ribbon__canvas {
   position: absolute;
-  right: 7%;
-  left: 7%;
-  height: 1px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--audio-blue) 13%, transparent) 16%,
-    color-mix(in srgb, var(--audio-blue) 24%, transparent) 50%,
-    color-mix(in srgb, var(--audio-blue) 13%, transparent) 84%,
-    transparent
-  );
-  content: '';
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.audio-recording-waveform--idle .audio-recording-waveform__bar {
-  width: clamp(1.25px, 0.42vw, 2.25px);
-  flex-basis: 2.25px;
-  opacity: 0.36;
-  transition: none;
+.audio-breathing-ribbon__body,
+.audio-breathing-ribbon__glow,
+.audio-breathing-ribbon__reflection {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: d 70ms linear;
 }
 
-.audio-recording-waveform--idle .audio-recording-waveform__bar:nth-child(4n + 2) {
-  opacity: 0.5;
+.audio-breathing-ribbon__glow {
+  stroke-width: 10;
+  opacity: 0.16;
+  filter: blur(5px);
 }
 
-.audio-recording-waveform--recording .audio-recording-waveform__bar {
-  opacity: 0.9;
+.audio-breathing-ribbon__reflection {
+  stroke: color-mix(in srgb, var(--audio-gold) 38%, var(--audio-text-secondary));
+  stroke-width: 7;
+  opacity: 0.085;
+  filter: blur(2.5px) saturate(0.55);
+  transform: translateY(1.1rem) scaleY(-0.48);
 }
 
-.audio-recording-waveform--recording .audio-recording-waveform__bar--future {
-  color: var(--audio-divider);
-  opacity: 0.52;
+.audio-breathing-ribbon__body {
+  stroke-width: 3.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 1;
+  filter: saturate(1.04);
+  animation: audio-ribbon-breathe 4.8s ease-in-out infinite;
 }
 
-.audio-recording-waveform__bar--current {
-  opacity: 1 !important;
-  box-shadow: 0 0 0.28rem rgba(21, 152, 255, 0.24);
+.audio-breathing-ribbon--recording .audio-breathing-ribbon__body {
+  animation-duration: 2.1s;
 }
 
-.audio-recording-waveform__live-edge {
-  position: absolute;
-  top: 8%;
-  bottom: 8%;
-  left: 72.6%;
-  width: 1px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--audio-blue) 62%, transparent);
-  box-shadow: 0 0 0.4rem rgba(21, 152, 255, 0.18);
-  pointer-events: none;
+@keyframes audio-ribbon-breathe {
+  0%, 100% { transform: scaleY(0.92); }
+  50% { transform: scaleY(1.06); }
 }
 
 .audio-mode-hero p {
@@ -1144,7 +1115,8 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .audio-recording-waveform--recording .audio-recording-waveform__bar {
-    transition: none;
+  .audio-breathing-ribbon__body,
+  .audio-breathing-ribbon__reflection {
+    animation: none;
   }
 }

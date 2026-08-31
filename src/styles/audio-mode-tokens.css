@@ -1,5 +1,5 @@
 /**
- * Session Mirror accent palette — shared by audio UI and camera glass HUD.
+ * BestTake accent palette — shared by audio UI and camera glass HUD.
  */
 :root {
   --sm-gold: #f7a600;
@@ -69,6 +69,10 @@ html.app-audio-mode,
   --audio-blue-border: rgba(21, 152, 255, 0.45);
   --audio-blue-soft: rgba(21, 152, 255, 0.12);
 
+  --audio-ribbon-violet: #7868f2;
+  --audio-ribbon-sheen: rgba(255, 255, 255, 0.72);
+  --audio-ribbon-halo: rgba(21, 152, 255, 0.12);
+
   --audio-surface: #ffffff;
   --audio-divider: rgba(23, 26, 34, 0.08);
 
@@ -112,6 +116,10 @@ html.app-dark-mode .app-ui-overlay--audio-mode {
   --audio-gold-soft: rgba(247, 166, 0, 0.16);
   --audio-blue-border: rgba(21, 152, 255, 0.54);
   --audio-blue-soft: rgba(21, 152, 255, 0.17);
+
+  --audio-ribbon-violet: #9d8cff;
+  --audio-ribbon-sheen: rgba(255, 255, 255, 0.58);
+  --audio-ribbon-halo: rgba(84, 125, 255, 0.2);
 
   --audio-surface: rgba(15, 23, 42, 0.82);
   --audio-divider: rgba(226, 232, 240, 0.12);

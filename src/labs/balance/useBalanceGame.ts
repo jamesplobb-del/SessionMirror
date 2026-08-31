@@ -12,7 +12,12 @@ import { loadPracticeGameCharacter } from '../practiceGameCharacters'
 import { triggerSuccessHaptic } from '../../utils/haptics'
 import { startBalanceCountIn, startBalanceTone, type BalanceCountInHandle, type DroneHandle } from './balanceAudio'
 import { balanceReducer, createBalanceState } from './balanceEngine'
-import { buildBalanceTargets, getBalanceInstrument, routineSummary } from './balanceMusic'
+import {
+  buildBalanceTargets,
+  buildBalanceTargetsFromWritten,
+  getBalanceInstrument,
+  routineSummary,
+} from './balanceMusic'
 import {
   addBalancePitchSample,
   BALANCE_DROPOUT_GRACE_MS,
@@ -27,18 +32,46 @@ import {
 import {
   getBalanceBestMs,
   loadBalanceData,
+  recordBalanceLaunch,
   recordBalanceResult,
   saveBalanceData,
   toleranceCentsForSettings,
 } from './balanceStorage'
 import type {
   BalanceCustomRoutine,
+  BalanceLaunch,
   BalanceRoutineResult,
   BalanceSettings,
-  BalanceStoredDataV2,
+  BalanceStoredDataV3,
   BalanceTrophyId,
   BalanceVisualSnapshot,
 } from './balanceTypes'
+
+export const QUICK_PLAY_LAUNCH: BalanceLaunch = {
+  kind: 'quick',
+  id: null,
+  title: 'Quick Play',
+  subtitle: '',
+  writtenMidi: null,
+  goalSeconds: null,
+  toleranceCents: null,
+}
+
+/**
+ * The settings a run actually uses: the player's stored preferences with the
+ * launch's duration and tolerance laid over the top. Quick Play overrides
+ * nothing, so it is the stored settings unchanged.
+ */
+function settingsForLaunch(settings: BalanceSettings, launch: BalanceLaunch): BalanceSettings {
+  if (launch.kind === 'quick') return settings
+  return {
+    ...settings,
+    goalMode: 'fixed',
+    goalSeconds: launch.goalSeconds ?? settings.goalSeconds,
+    tolerancePreset: 'custom',
+    customToleranceCents: launch.toleranceCents ?? toleranceCentsForSettings(settings),
+  }
+}
 
 const EMPTY_VISUAL: BalanceVisualSnapshot = {
   cents: 0,
@@ -90,7 +123,7 @@ interface UseBalanceGameOptions {
 
 export interface UseBalanceGameResult {
   state: ReturnType<typeof createBalanceState>
-  data: BalanceStoredDataV2
+  data: BalanceStoredDataV3
   newTrophyIds: BalanceTrophyId[]
   customRoutines: BalanceCustomRoutine[]
   visualRef: MutableRefObject<BalanceVisualSnapshot>
@@ -99,8 +132,12 @@ export interface UseBalanceGameResult {
   toleranceCents: number
   currentTarget: ReturnType<typeof buildBalanceTargets>[number] | null
   routineResult: BalanceRoutineResult | null
+  /** What the current (or most recent) run is: quick play, a level, or the daily. */
+  launch: BalanceLaunch
+  /** Stars just earned on a level run, and what the level already held. */
+  levelAward: { earnedStars: number; previousStars: number } | null
   updateSettings: (patch: Partial<BalanceSettings>) => void
-  start: () => void
+  start: (launch?: BalanceLaunch) => void
   reset: () => void
   pause: () => void
   resume: () => void
@@ -118,7 +155,7 @@ export function useBalanceGame({
   hapticFeedback,
   onInstrumentChange,
 }: UseBalanceGameOptions): UseBalanceGameResult {
-  const [data, setData] = useState<BalanceStoredDataV2>(() => {
+  const [data, setData] = useState<BalanceStoredDataV3>(() => {
     const stored = loadBalanceData(initialInstrumentId)
     return {
       ...stored,
@@ -140,6 +177,10 @@ export function useBalanceGame({
   const visualRef = useRef<BalanceVisualSnapshot>({ ...EMPTY_VISUAL })
   const [hud, setHud] = useState<BalanceVisualSnapshot>({ ...EMPTY_VISUAL })
   const [newTrophyIds, setNewTrophyIds] = useState<BalanceTrophyId[]>([])
+  const [launch, setLaunch] = useState<BalanceLaunch>(QUICK_PLAY_LAUNCH)
+  const [levelAward, setLevelAward] = useState<{ earnedStars: number; previousStars: number } | null>(null)
+  const launchRef = useRef(launch)
+  launchRef.current = launch
   const suppressUntilRef = useRef(0)
   const accumulatorRef = useRef<BalanceScoreAccumulator | null>(null)
   const lockStartedAtRef = useRef<number | null>(null)
@@ -366,7 +407,14 @@ export function useBalanceGame({
     if (resultPersistedRef.current === result.id) return
     resultPersistedRef.current = result.id
     const previousTrophies = dataRef.current.trophies
-    const next = recordBalanceResult(dataRef.current, result)
+    const scored = recordBalanceResult(dataRef.current, result)
+    const awarded = recordBalanceLaunch(scored, launchRef.current, result)
+    const next = awarded.data
+    setLevelAward(
+      launchRef.current.kind === 'level'
+        ? { earnedStars: awarded.earnedStars, previousStars: awarded.previousStars }
+        : null,
+    )
     setNewTrophyIds(
       (Object.keys(next.trophies) as BalanceTrophyId[]).filter((id) => !previousTrophies[id]),
     )
@@ -409,18 +457,44 @@ export function useBalanceGame({
     [onInstrumentChange],
   )
 
-  const start = useCallback(() => {
-    clearAttempt()
-    setNewTrophyIds([])
-    resultPersistedRef.current = null
-    const targets = buildBalanceTargets(stateRef.current.settings, dataRef.current.customRoutines)
-    dispatch({ type: 'START', targets, bestBalancedMs: getBalanceBestMs(dataRef.current) })
-  }, [clearAttempt])
+  /**
+   * Begin a run. With no argument this replays whatever was launched last, so
+   * "Play again" on the results screen repeats the level rather than dropping
+   * the player back into their quick-play settings.
+   */
+  const start = useCallback(
+    (nextLaunch?: BalanceLaunch) => {
+      clearAttempt()
+      setNewTrophyIds([])
+      setLevelAward(null)
+      resultPersistedRef.current = null
+      const activeLaunch = nextLaunch ?? launchRef.current
+      launchRef.current = activeLaunch
+      setLaunch(activeLaunch)
+      const settings = settingsForLaunch(dataRef.current.settings, activeLaunch)
+      const targets = activeLaunch.writtenMidi
+        ? buildBalanceTargetsFromWritten(
+            activeLaunch.writtenMidi,
+            getBalanceInstrument(settings.instrumentId),
+          )
+        : buildBalanceTargets(settings, dataRef.current.customRoutines)
+      dispatch({
+        type: 'START',
+        targets,
+        settings,
+        bestBalancedMs: getBalanceBestMs(dataRef.current),
+      })
+    },
+    [clearAttempt],
+  )
 
   const reset = useCallback(() => {
     stopTone()
     clearAttempt()
-    dispatch({ type: 'RESET' })
+    setLevelAward(null)
+    launchRef.current = QUICK_PLAY_LAUNCH
+    setLaunch(QUICK_PLAY_LAUNCH)
+    dispatch({ type: 'RESET', settings: dataRef.current.settings })
   }, [clearAttempt, stopTone])
 
   const pause = useCallback(() => {
@@ -484,6 +558,8 @@ export function useBalanceGame({
     toleranceCents,
     currentTarget,
     routineResult,
+    launch,
+    levelAward,
     updateSettings,
     start,
     reset,

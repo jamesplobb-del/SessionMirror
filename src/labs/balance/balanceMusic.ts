@@ -18,24 +18,24 @@ const SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A
 const N = (pitchClass: number, octave: number) => (octave + 1) * 12 + pitchClass
 
 export const BALANCE_INSTRUMENTS: readonly BalanceInstrument[] = [
-  { id: 'concert', name: 'Concert Pitch', transposition: 'concert', tunerInstrument: 'voice', clef: 'treble', minWrittenMidi: N(0, 3), maxWrittenMidi: N(0, 6) },
-  { id: 'bb-trumpet', name: 'B♭ Trumpet', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(6, 3), maxWrittenMidi: N(2, 6) },
-  { id: 'bb-clarinet', name: 'B♭ Clarinet', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(4, 3), maxWrittenMidi: N(7, 6) },
-  { id: 'soprano-sax', name: 'Soprano Saxophone', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), maxWrittenMidi: N(6, 6) },
-  { id: 'tenor-sax', name: 'Tenor Saxophone', transposition: 'bb_octave', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), maxWrittenMidi: N(6, 6) },
-  { id: 'alto-sax', name: 'E♭ Alto Saxophone', transposition: 'eb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), maxWrittenMidi: N(6, 6) },
-  { id: 'baritone-sax', name: 'E♭ Baritone Saxophone', transposition: 'eb_octave', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), maxWrittenMidi: N(6, 6) },
-  { id: 'f-horn', name: 'F Horn', transposition: 'f', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(5, 3), maxWrittenMidi: N(0, 6) },
-  { id: 'flute', name: 'Flute', transposition: 'concert', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(0, 4), maxWrittenMidi: N(3, 7) },
-  { id: 'oboe', name: 'Oboe', transposition: 'concert', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), maxWrittenMidi: N(7, 6) },
-  { id: 'bassoon', name: 'Bassoon', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(10, 1), maxWrittenMidi: N(4, 5) },
-  { id: 'trombone', name: 'Trombone', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 2), maxWrittenMidi: N(5, 5) },
-  { id: 'euphonium', name: 'Euphonium', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 2), maxWrittenMidi: N(10, 4) },
-  { id: 'tuba', name: 'Tuba', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 1), maxWrittenMidi: N(5, 4) },
-  { id: 'violin', name: 'Violin', transposition: 'concert', tunerInstrument: 'strings', clef: 'treble', minWrittenMidi: N(7, 3), maxWrittenMidi: N(4, 7) },
-  { id: 'viola', name: 'Viola', transposition: 'concert', tunerInstrument: 'strings', clef: 'alto', minWrittenMidi: N(0, 3), maxWrittenMidi: N(4, 6) },
-  { id: 'cello', name: 'Cello', transposition: 'concert', tunerInstrument: 'strings', clef: 'bass', minWrittenMidi: N(0, 2), maxWrittenMidi: N(0, 6) },
-  { id: 'voice', name: 'Voice', transposition: 'concert', tunerInstrument: 'voice', clef: 'treble', minWrittenMidi: N(0, 3), maxWrittenMidi: N(0, 6) },
+  { id: 'concert', name: 'Concert Pitch', transposition: 'concert', tunerInstrument: 'voice', clef: 'treble', minWrittenMidi: N(0, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(0, 6) },
+  { id: 'bb-trumpet', name: 'B♭ Trumpet', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(6, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(2, 6) },
+  { id: 'bb-clarinet', name: 'B♭ Clarinet', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(4, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(7, 6) },
+  { id: 'soprano-sax', name: 'Soprano Saxophone', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
+  { id: 'tenor-sax', name: 'Tenor Saxophone', transposition: 'bb_octave', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
+  { id: 'alto-sax', name: 'E♭ Alto Saxophone', transposition: 'eb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
+  { id: 'baritone-sax', name: 'E♭ Baritone Saxophone', transposition: 'eb_octave', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
+  { id: 'f-horn', name: 'F Horn', transposition: 'f', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(5, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(0, 6) },
+  { id: 'flute', name: 'Flute', transposition: 'concert', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(0, 4), homeWrittenMidi: N(11, 4), maxWrittenMidi: N(3, 7) },
+  { id: 'oboe', name: 'Oboe', transposition: 'concert', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(0, 5), maxWrittenMidi: N(7, 6) },
+  { id: 'bassoon', name: 'Bassoon', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(10, 1), homeWrittenMidi: N(5, 3), maxWrittenMidi: N(4, 5) },
+  { id: 'trombone', name: 'Trombone', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 2), homeWrittenMidi: N(5, 3), maxWrittenMidi: N(5, 5) },
+  { id: 'euphonium', name: 'Euphonium', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 2), homeWrittenMidi: N(5, 3), maxWrittenMidi: N(10, 4) },
+  { id: 'tuba', name: 'Tuba', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 1), homeWrittenMidi: N(5, 2), maxWrittenMidi: N(5, 4) },
+  { id: 'violin', name: 'Violin', transposition: 'concert', tunerInstrument: 'strings', clef: 'treble', minWrittenMidi: N(7, 3), homeWrittenMidi: N(9, 4), maxWrittenMidi: N(4, 7) },
+  { id: 'viola', name: 'Viola', transposition: 'concert', tunerInstrument: 'strings', clef: 'alto', minWrittenMidi: N(0, 3), homeWrittenMidi: N(2, 4), maxWrittenMidi: N(4, 6) },
+  { id: 'cello', name: 'Cello', transposition: 'concert', tunerInstrument: 'strings', clef: 'bass', minWrittenMidi: N(0, 2), homeWrittenMidi: N(2, 3), maxWrittenMidi: N(0, 6) },
+  { id: 'voice', name: 'Voice', transposition: 'concert', tunerInstrument: 'voice', clef: 'treble', minWrittenMidi: N(0, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(0, 6) },
 ] as const
 
 const SCALE_INTERVALS: Record<Exclude<BalanceScaleType, 'melodicMinor'>, readonly number[]> = {
@@ -117,6 +117,29 @@ export function buildBalanceScaleWrittenMidi(settings: BalanceScaleRoutineSettin
   return Array.from({ length: settings.repetitions }, () => notes).flat()
 }
 
+/**
+ * Turn a written-pitch list into scored targets. Sky Trail levels and the
+ * daily challenge hand their notes straight to this rather than round-tripping
+ * through a saved custom routine.
+ */
+export function buildBalanceTargetsFromWritten(
+  written: readonly number[],
+  instrument: BalanceInstrument,
+): BalanceTarget[] {
+  return written.map((writtenMidi, sequenceIndex) => {
+    const concertMidi = writtenMidiToConcertMidi(writtenMidi, instrument.transposition)
+    return {
+      id: `${sequenceIndex}-${writtenMidi}`,
+      sequenceIndex,
+      instrumentId: instrument.id,
+      writtenMidi,
+      concertMidi,
+      writtenLabel: midiToBalanceNoteName(writtenMidi),
+      concertLabel: midiToBalanceNoteName(concertMidi),
+    }
+  })
+}
+
 export function buildBalanceTargets(
   settings: BalanceSettings,
   customRoutines: readonly BalanceCustomRoutine[],
@@ -132,18 +155,7 @@ export function buildBalanceTargets(
       customRoutines.find((routine) => routine.id === settings.selectedCustomRoutineId)?.notes.map((note) => note.writtenMidi) ?? []
   }
 
-  return written.map((writtenMidi, sequenceIndex) => {
-    const concertMidi = writtenMidiToConcertMidi(writtenMidi, instrument.transposition)
-    return {
-      id: `${sequenceIndex}-${writtenMidi}`,
-      sequenceIndex,
-      instrumentId: instrument.id,
-      writtenMidi,
-      concertMidi,
-      writtenLabel: midiToBalanceNoteName(writtenMidi),
-      concertLabel: midiToBalanceNoteName(concertMidi),
-    }
-  })
+  return buildBalanceTargetsFromWritten(written, instrument)
 }
 
 export function clampWrittenMidi(midi: number, instrument: BalanceInstrument): number {

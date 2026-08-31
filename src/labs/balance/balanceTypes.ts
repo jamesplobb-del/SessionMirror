@@ -36,6 +36,12 @@ export interface BalanceInstrument {
   clef: 'treble' | 'alto' | 'bass'
   minWrittenMidi: number
   maxWrittenMidi: number
+  /**
+   * The note a method book starts this instrument on. Sky Trail levels are
+   * written as semitone offsets from here, so one ladder fits every player
+   * instead of hard-coding a pitch a tuba could never reach.
+   */
+  homeWrittenMidi: number
 }
 
 export interface BalanceRoutineNote {
@@ -81,7 +87,9 @@ export interface BalanceSettings {
   scale: BalanceScaleRoutineSettings
   selectedCustomRoutineId: string | null
   goalMode: BalanceGoalMode
-  goalSeconds: 5 | 8 | 10 | 15
+  /** Seconds of centered time that completes one note. Levels use values off
+   * the setup slider's own list, so this is a plain number. */
+  goalSeconds: number
   tolerancePreset: BalanceTolerancePreset
   customToleranceCents: number
   soundRest: BalanceSoundRestSettings
@@ -157,6 +165,40 @@ export interface BalanceState {
   bestBalancedMs: number
 }
 
+export type BalanceLaunchKind = 'quick' | 'level' | 'daily'
+
+/**
+ * What a single run is: the quick-play settings, one Sky Trail level, or the
+ * day's challenge. Everything the run needs that is *not* a player preference
+ * travels here, so the persisted settings are never overwritten by a level.
+ */
+export interface BalanceLaunch {
+  kind: BalanceLaunchKind
+  /** Level id, or the daily's YYYY-MM-DD key. Null for quick play. */
+  id: string | null
+  title: string
+  subtitle: string
+  /** Written pitches for the run. Null means "build from settings". */
+  writtenMidi: number[] | null
+  goalSeconds: number | null
+  toleranceCents: number | null
+}
+
+export interface BalanceLevelProgress {
+  stars: number
+  bestCenteredPercent: number
+  bestBalancedMs: number
+  clearedAt: number
+}
+
+export interface BalanceDailyProgress {
+  /** YYYY-MM-DD of the most recently completed challenge. */
+  lastCompletedDate: string | null
+  streak: number
+  longestStreak: number
+  totalCompleted: number
+}
+
 export interface BalanceStoredPersonalBest {
   key: string
   balancedMs: number
@@ -177,12 +219,18 @@ export interface BalanceStoredTrophy {
   unlockedAt: number
 }
 
-export interface BalanceStoredDataV2 {
-  version: 2
+export interface BalanceStoredDataV3 {
+  version: 3
   settings: BalanceSettings
   customRoutines: BalanceCustomRoutine[]
   personalBests: Record<string, BalanceStoredPersonalBest>
   routineSummaries: BalanceRoutineResult[]
   trophies: Partial<Record<BalanceTrophyId, BalanceStoredTrophy>>
   unlockedCharacterIds: BalanceCharacterId[]
+  /** Star record per Sky Trail level id. */
+  levels: Record<string, BalanceLevelProgress>
+  daily: BalanceDailyProgress
 }
+
+/** @deprecated kept as the migration source name. */
+export type BalanceStoredDataV2 = BalanceStoredDataV3

@@ -2,9 +2,10 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
+  useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
   type RefObject,
@@ -41,6 +42,56 @@ const IDLE_RECORDING_WAVEFORM_PEAKS = [
 ]
 const MIN_VISIBLE_WAVEFORM_PEAK = 0.035
 
+interface RibbonPoint {
+  x: number
+  y: number
+}
+
+function smoothPath(points: RibbonPoint[]): string {
+  if (points.length === 0) return ''
+  if (points.length === 1) return `M ${points[0].x},${points[0].y}`
+  let path = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const current = points[index]
+    const next = points[index + 1]
+    const midpointX = (current.x + next.x) / 2
+    const midpointY = (current.y + next.y) / 2
+    path += ` Q ${current.x.toFixed(1)},${current.y.toFixed(1)} ${midpointX.toFixed(1)},${midpointY.toFixed(1)}`
+  }
+  const last = points[points.length - 1]
+  path += ` T ${last.x.toFixed(1)},${last.y.toFixed(1)}`
+  return path
+}
+
+function createRibbonPath(peaks: number[], phase = 0): string {
+  if (peaks.length === 0) return ''
+  const width = 1000
+  const centerY = 90
+  const maxAmplitude = 38
+  const smoothedPeaks = peaks.map((peak, index) => {
+    const previous = peaks[Math.max(0, index - 1)]
+    const next = peaks[Math.min(peaks.length - 1, index + 1)]
+    return previous * 0.24 + peak * 0.52 + next * 0.24
+  })
+  const sampledPeaks = smoothedPeaks.filter((_, index) => index % 3 === 0)
+  if ((smoothedPeaks.length - 1) % 3 !== 0) sampledPeaks.push(smoothedPeaks.at(-1) ?? 0)
+
+  const points = sampledPeaks.map((peak, index) => {
+    const progress = index / Math.max(1, sampledPeaks.length - 1)
+    const taper = 0.28 + Math.pow(Math.sin(progress * Math.PI), 0.8) * 0.72
+    const direction =
+      Math.sin(index * 1.37 + progress * Math.PI * 0.7 + phase + 0.4) * 0.66 +
+      Math.sin(index * 0.58 - phase * 0.52 + 1.2) * 0.34
+    return {
+      x: 22 + progress * (width - 44),
+      y:
+        centerY +
+        direction * (2.5 + Math.max(MIN_VISIBLE_WAVEFORM_PEAK, peak) * maxAmplitude) * taper,
+    }
+  })
+  return smoothPath(points)
+}
+
 function formatDuration(seconds?: number): string {
   if (!seconds || !Number.isFinite(seconds)) return '00:00'
   const rounded = Math.max(0, Math.round(seconds))
@@ -66,47 +117,93 @@ type ScrubPhase = 'start' | 'move' | 'end'
 
 function AudioRecordingWaveform({
   isRecording,
+  ready,
   streamRef,
   streamGeneration,
 }: {
   isRecording: boolean
+  ready: boolean
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
 }) {
   const livePeaks = useLiveRecordingWaveform({
-    active: isRecording,
+    active: ready || isRecording,
     streamRef,
     streamGeneration,
   })
-  const displayedPeaks = isRecording
-    ? [...livePeaks, ...LIVE_WAVEFORM_FUTURE_PEAKS]
-    : IDLE_RECORDING_WAVEFORM_PEAKS
+  const [motionPhase, setMotionPhase] = useState(0)
+  const displayedPeaks = useMemo(() => {
+    const reactivePeaks = livePeaks.map((peak, index) =>
+      Math.max(peak, IDLE_RECORDING_WAVEFORM_PEAKS[index % IDLE_RECORDING_WAVEFORM_PEAKS.length] * 0.34),
+    )
+    return isRecording ? [...reactivePeaks, ...LIVE_WAVEFORM_FUTURE_PEAKS] : reactivePeaks
+  }, [isRecording, livePeaks])
+  const gradientId = useId().replace(/:/g, '')
+  const ribbonPath = useMemo(
+    () => createRibbonPath(displayedPeaks, motionPhase),
+    [displayedPeaks, motionPhase],
+  )
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let animationFrame = 0
+    let lastUpdate = 0
+    const startTime = performance.now()
+    const animate = (timestamp: number) => {
+      if (timestamp - lastUpdate >= 48) {
+        const duration = isRecording ? 820 : 1750
+        setMotionPhase((timestamp - startTime) / duration)
+        lastUpdate = timestamp
+      }
+      animationFrame = window.requestAnimationFrame(animate)
+    }
+    animationFrame = window.requestAnimationFrame(animate)
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [isRecording])
 
   return (
     <div
-      className={`audio-recording-waveform ${
+      className={`audio-recording-waveform audio-breathing-ribbon ${
         isRecording
-          ? 'audio-recording-waveform--recording'
-          : 'audio-recording-waveform--idle'
+          ? 'audio-recording-waveform--recording audio-breathing-ribbon--recording'
+          : 'audio-recording-waveform--idle audio-breathing-ribbon--idle'
       }`}
       aria-hidden
     >
-      {displayedPeaks.map((peak, index) => {
-        const isFuture = isRecording && index >= livePeaks.length
-        const isCurrent = isRecording && index === livePeaks.length - 1
-        return (
-          <span
-            key={index}
-            className={`audio-recording-waveform__bar ${
-              isFuture ? 'audio-recording-waveform__bar--future' : ''
-            } ${isCurrent ? 'audio-recording-waveform__bar--current' : ''}`}
-            style={{
-              '--audio-recording-peak': Math.max(MIN_VISIBLE_WAVEFORM_PEAK, peak),
-            } as CSSProperties}
-          />
-        )
-      })}
-      {isRecording && <span className="audio-recording-waveform__live-edge" />}
+      <svg
+        className="audio-breathing-ribbon__canvas"
+        viewBox="0 0 1000 180"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--audio-gold)" />
+            <stop offset="42%" stopColor="var(--audio-blue)" />
+            <stop offset="100%" stopColor="var(--audio-blue)" />
+          </linearGradient>
+        </defs>
+        <path
+          className="audio-breathing-ribbon__glow"
+          d={ribbonPath}
+          fill="none"
+          stroke={`url(#${gradientId})`}
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          className="audio-breathing-ribbon__reflection"
+          d={ribbonPath}
+          fill="none"
+          stroke={`url(#${gradientId})`}
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          className="audio-breathing-ribbon__body"
+          d={ribbonPath}
+          fill="none"
+          stroke={`url(#${gradientId})`}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
     </div>
   )
 }
@@ -475,7 +572,9 @@ function AudioModeHome({
   hapticFeedback = true,
 }: AudioModeHomeProps) {
   const status = isRecording ? 'Recording' : ready ? 'Ready' : 'Preparing'
-  const hint = isRecording ? 'Recording audio… tap stop when finished' : 'Tap the mic to start recording'
+  const hint = isRecording
+    ? 'Recording audio… tap stop when finished'
+    : 'Tap the center control to start recording'
 
   return (
     <section className="audio-mode-home pointer-events-auto">
@@ -494,11 +593,12 @@ function AudioModeHome({
         >
           <span className="audio-mode-status-pill__dot" aria-hidden />
           <strong>{status}</strong>
-          <span className="audio-mode-status-pill__divider" aria-hidden />
+          <span className="audio-mode-status-pill__divider" aria-hidden>·</span>
           <time>{formatDuration(isRecording ? elapsed : 0)}</time>
         </div>
         <AudioRecordingWaveform
           isRecording={isRecording}
+          ready={ready}
           streamRef={streamRef}
           streamGeneration={streamGeneration}
         />

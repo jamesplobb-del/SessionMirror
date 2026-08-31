@@ -1,12 +1,17 @@
 import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
 import { isBalanceCharacterId } from './balanceCharacters'
 import { awardBalanceTrophies, isBalanceTrophyId } from './balanceTrophies'
+import { balanceStarsForRun, getBalanceLevel } from './balanceLevels'
+import { balanceCompleteDaily } from './balanceDaily'
 import type {
   BalanceCustomRoutine,
+  BalanceDailyProgress,
+  BalanceLaunch,
+  BalanceLevelProgress,
   BalanceNoteResult,
   BalanceRoutineResult,
   BalanceSettings,
-  BalanceStoredDataV2,
+  BalanceStoredDataV3,
   BalanceStoredPersonalBest,
   BalanceStoredTrophy,
 } from './balanceTypes'
@@ -47,15 +52,56 @@ export function createDefaultBalanceSettings(instrumentId: string): BalanceSetti
   }
 }
 
-function createEmptyData(instrumentId: string): BalanceStoredDataV2 {
+const EMPTY_DAILY: BalanceDailyProgress = {
+  lastCompletedDate: null,
+  streak: 0,
+  longestStreak: 0,
+  totalCompleted: 0,
+}
+
+function createEmptyData(instrumentId: string): BalanceStoredDataV3 {
   return {
-    version: 2,
+    version: 3,
     settings: createDefaultBalanceSettings(instrumentId),
     customRoutines: [],
     personalBests: {},
     routineSummaries: [],
     trophies: {},
     unlockedCharacterIds: ['balancer', 'trumpeter'],
+    levels: {},
+    daily: { ...EMPTY_DAILY },
+  }
+}
+
+function normalizeLevels(value: unknown): Record<string, BalanceLevelProgress> {
+  if (!value || typeof value !== 'object') return {}
+  return Object.entries(value).reduce<Record<string, BalanceLevelProgress>>((result, [id, item]) => {
+    if (!getBalanceLevel(id) || !item || typeof item !== 'object') return result
+    const source = item as Partial<BalanceLevelProgress>
+    const stars = Math.max(0, Math.min(3, Math.round(finiteNumber(source.stars, 0))))
+    if (stars === 0) return result
+    result[id] = {
+      stars,
+      bestCenteredPercent: Math.max(0, Math.min(100, finiteNumber(source.bestCenteredPercent, 0))),
+      bestBalancedMs: Math.max(0, finiteNumber(source.bestBalancedMs, 0)),
+      clearedAt: finiteNumber(source.clearedAt, Date.now()),
+    }
+    return result
+  }, {})
+}
+
+function normalizeDaily(value: unknown): BalanceDailyProgress {
+  if (!value || typeof value !== 'object') return { ...EMPTY_DAILY }
+  const source = value as Partial<BalanceDailyProgress>
+  const streak = Math.max(0, Math.round(finiteNumber(source.streak, 0)))
+  return {
+    lastCompletedDate:
+      typeof source.lastCompletedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.lastCompletedDate)
+        ? source.lastCompletedDate
+        : null,
+    streak,
+    longestStreak: Math.max(streak, Math.round(finiteNumber(source.longestStreak, streak))),
+    totalCompleted: Math.max(0, Math.round(finiteNumber(source.totalCompleted, 0))),
   }
 }
 
@@ -73,9 +119,7 @@ function normalizeSettings(value: unknown, instrumentId: string): BalanceSetting
   const single = source.single ?? defaults.single
   const scale = source.scale ?? defaults.scale
   const soundRest = source.soundRest ?? defaults.soundRest
-  const goalSeconds = [5, 8, 10, 15].includes(Number(source.goalSeconds))
-    ? (Number(source.goalSeconds) as 5 | 8 | 10 | 15)
-    : defaults.goalSeconds
+  const goalSeconds = Math.max(3, Math.min(60, Math.round(finiteNumber(source.goalSeconds, defaults.goalSeconds))))
   const restDuration =
     soundRest.restDuration === 'matchGoal' ||
     soundRest.restDuration === 'manual' ||
@@ -186,9 +230,9 @@ function normalizePersonalBests(value: unknown): Record<string, BalanceStoredPer
   }, {})
 }
 
-function normalizeTrophies(value: unknown): BalanceStoredDataV2['trophies'] {
+function normalizeTrophies(value: unknown): BalanceStoredDataV3['trophies'] {
   if (!value || typeof value !== 'object') return {}
-  return Object.entries(value).reduce<BalanceStoredDataV2['trophies']>((result, [key, item]) => {
+  return Object.entries(value).reduce<BalanceStoredDataV3['trophies']>((result, [key, item]) => {
     if (!isBalanceTrophyId(key) || !item || typeof item !== 'object') return result
     const source = item as Partial<BalanceStoredTrophy>
     result[key] = { id: key, unlockedAt: finiteNumber(source.unlockedAt, Date.now()) }
@@ -196,14 +240,14 @@ function normalizeTrophies(value: unknown): BalanceStoredDataV2['trophies'] {
   }, {})
 }
 
-export function loadBalanceData(instrumentId: string): BalanceStoredDataV2 {
+export function loadBalanceData(instrumentId: string): BalanceStoredDataV3 {
   const fallback = createEmptyData(instrumentId)
   if (typeof localStorage === 'undefined') return fallback
   try {
     const raw = localStorage.getItem(BALANCE_STORAGE_KEY)
     if (!raw) return fallback
     const parsed = JSON.parse(raw) as Record<string, unknown>
-    if (parsed.version !== 1 && parsed.version !== 2) return fallback
+    if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3) return fallback
     const settings = normalizeSettings(parsed.settings, instrumentId)
     const summaries: BalanceRoutineResult[] = Array.isArray(parsed.routineSummaries)
       ? (parsed.routineSummaries as BalanceRoutineResult[]).slice(0, MAX_ROUTINE_SUMMARIES).map((summary): BalanceRoutineResult => ({
@@ -225,8 +269,8 @@ export function loadBalanceData(instrumentId: string): BalanceStoredDataV2 {
       ...persistedUnlocked,
       ...(parsed.version === 1 ? [settings.characterId] : []),
     ])
-    const base: BalanceStoredDataV2 = {
-      version: 2,
+    const base: BalanceStoredDataV3 = {
+      version: 3,
       settings,
       customRoutines: Array.isArray(parsed.customRoutines)
         ? parsed.customRoutines.map(normalizeCustomRoutine).filter((item): item is BalanceCustomRoutine => item !== null)
@@ -235,6 +279,8 @@ export function loadBalanceData(instrumentId: string): BalanceStoredDataV2 {
       routineSummaries: summaries,
       trophies: normalizeTrophies(parsed.trophies),
       unlockedCharacterIds: [...unlockedCharacterIds],
+      levels: normalizeLevels(parsed.levels),
+      daily: normalizeDaily(parsed.daily),
     }
     return awardBalanceTrophies(base).data
   } catch {
@@ -242,10 +288,10 @@ export function loadBalanceData(instrumentId: string): BalanceStoredDataV2 {
   }
 }
 
-export function saveBalanceData(data: BalanceStoredDataV2): void {
+export function saveBalanceData(data: BalanceStoredDataV3): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(BALANCE_STORAGE_KEY, JSON.stringify({ ...data, version: 2 }))
+    localStorage.setItem(BALANCE_STORAGE_KEY, JSON.stringify({ ...data, version: 3 }))
   } catch {
     /* Private browsing and quota errors must never block play. */
   }
@@ -262,10 +308,56 @@ export function personalBestKey(result: Pick<BalanceNoteResult, 'target' | 'tole
   return `${result.target.instrumentId}:${result.target.writtenMidi}:${result.target.concertMidi}:${result.toleranceCents}`
 }
 
-export function recordBalanceResult(
-  data: BalanceStoredDataV2,
+/**
+ * Fold a finished run into the trail: stars for a level, a tick for the day's
+ * challenge. Stars only ever go up — replaying a level for a better score can
+ * never take away the three you already earned.
+ */
+export function recordBalanceLaunch(
+  data: BalanceStoredDataV3,
+  launch: BalanceLaunch,
   result: BalanceRoutineResult,
-): BalanceStoredDataV2 {
+): { data: BalanceStoredDataV3; earnedStars: number; previousStars: number } {
+  if (launch.kind === 'level' && launch.id) {
+    const level = getBalanceLevel(launch.id)
+    if (!level) return { data, earnedStars: 0, previousStars: 0 }
+    const earnedStars = balanceStarsForRun(level, result.completed, result.centeredPercent)
+    const previous = data.levels[launch.id]
+    const previousStars = previous?.stars ?? 0
+    if (earnedStars === 0) return { data, earnedStars, previousStars }
+    return {
+      data: {
+        ...data,
+        levels: {
+          ...data.levels,
+          [launch.id]: {
+            stars: Math.max(previousStars, earnedStars),
+            bestCenteredPercent: Math.max(previous?.bestCenteredPercent ?? 0, result.centeredPercent),
+            bestBalancedMs: Math.max(previous?.bestBalancedMs ?? 0, result.totalBalancedMs),
+            clearedAt: previous?.clearedAt ?? Date.now(),
+          },
+        },
+      },
+      earnedStars,
+      previousStars,
+    }
+  }
+
+  if (launch.kind === 'daily' && launch.id && result.completed) {
+    return {
+      data: { ...data, daily: balanceCompleteDaily(data.daily, launch.id) },
+      earnedStars: 0,
+      previousStars: 0,
+    }
+  }
+
+  return { data, earnedStars: 0, previousStars: 0 }
+}
+
+export function recordBalanceResult(
+  data: BalanceStoredDataV3,
+  result: BalanceRoutineResult,
+): BalanceStoredDataV3 {
   const personalBests = { ...data.personalBests }
   for (const noteResult of result.noteResults) {
     if (noteResult.balancedMs <= 0) continue
@@ -275,7 +367,7 @@ export function recordBalanceResult(
       personalBests[key] = { key, balancedMs: noteResult.balancedMs, updatedAt: Date.now() }
     }
   }
-  const next: BalanceStoredDataV2 = {
+  const next: BalanceStoredDataV3 = {
     ...data,
     personalBests,
     routineSummaries: [result, ...data.routineSummaries].slice(0, MAX_ROUTINE_SUMMARIES),
@@ -283,7 +375,7 @@ export function recordBalanceResult(
   return awardBalanceTrophies(next).data
 }
 
-export function getBalanceBestMs(data: BalanceStoredDataV2): number {
+export function getBalanceBestMs(data: BalanceStoredDataV3): number {
   return Math.max(0, ...Object.values(data.personalBests).map((best) => best.balancedMs))
 }
 
