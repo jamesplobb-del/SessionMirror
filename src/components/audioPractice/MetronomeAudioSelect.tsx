@@ -1,6 +1,8 @@
 import { Check, ChevronDown } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useId, useRef, useState } from 'react'
 import { triggerLightHaptic } from '../../utils/haptics'
+import { iosEaseOut, motionGpuLayer } from '../../utils/motionPresets'
 
 export interface MetronomeAudioSelectOption<T extends string> {
   value: T
@@ -74,49 +76,65 @@ export default function MetronomeAudioSelect<T extends string>({
             />
           </span>
         </button>
-        {open && (
-          <div
-            id={listboxId}
-            className="metronome-audio-select__menu"
-            role="listbox"
-            aria-label={ariaLabel}
-          >
-            {options.map((option) => {
-              if (option.disabled) {
-                return (
-                  <div
-                    key={option.value}
-                    className="metronome-audio-select__option metronome-audio-select__option--header"
-                    role="presentation"
-                  >
-                    {option.label}
-                  </div>
-                )
-              }
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              id={listboxId}
+              className="metronome-audio-select__menu"
+              role="listbox"
+              aria-label={ariaLabel}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={iosEaseOut}
+              style={motionGpuLayer}
+            >
+              <motion.div
+                className="metronome-audio-select__menu-content"
+                initial={{ y: -7, scale: 0.975 }}
+                animate={{ y: 0, scale: 1 }}
+                exit={{ y: -5, scale: 0.985 }}
+                transition={iosEaseOut}
+                style={motionGpuLayer}
+              >
+                {options.map((option) => {
+                  if (option.disabled) {
+                    return (
+                      <div
+                        key={option.value}
+                        className="metronome-audio-select__option metronome-audio-select__option--header"
+                        role="presentation"
+                      >
+                        {option.label}
+                      </div>
+                    )
+                  }
 
-              const selected = option.value === value
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`metronome-audio-select__option ${selected ? 'metronome-audio-select__option--selected' : ''}`}
-                  role="option"
-                  aria-selected={selected}
-                  onClick={() => {
-                    if (!selected) {
-                      triggerLightHaptic()
-                      onChange(option.value)
-                    }
-                    setOpen(false)
-                  }}
-                >
-                  <span>{option.label}</span>
-                  {selected && <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />}
-                </button>
-              )
-            })}
-          </div>
-        )}
+                  const selected = option.value === value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`metronome-audio-select__option ${selected ? 'metronome-audio-select__option--selected' : ''}`}
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => {
+                        if (!selected) {
+                          triggerLightHaptic()
+                          onChange(option.value)
+                        }
+                        setOpen(false)
+                      }}
+                    >
+                      <span>{option.label}</span>
+                      {selected && <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />}
+                    </button>
+                  )
+                })}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

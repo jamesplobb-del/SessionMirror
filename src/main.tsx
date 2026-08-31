@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { MotionConfig } from 'framer-motion'
 import './index.css'
 import './styles/drone-keyboard.css'
 import './styles/drone-sound-wheel.css'
@@ -10,6 +11,9 @@ import './styles/pitch-insights.css'
 // Keep adaptive iPad overrides last so feature-specific styles cannot restore
 // phone-sized width caps after the tablet layout has been applied.
 import './styles/tablet.css'
+// Interaction and appearance polish is intentionally last: it only supplies
+// shared state transitions and theme contrast, never structural layout.
+import './styles/interaction-polish.css'
 import RootRouter from './RootRouter.tsx'
 import AppErrorBoundary from './components/ui/AppErrorBoundary.tsx'
 import { primeWebStatusBarChrome } from './utils/nativeStatusBar'
@@ -36,7 +40,9 @@ async function bootstrap() {
   createRoot(rootEl).render(
     <StrictMode>
       <AppErrorBoundary>
-        <RootRouter />
+        <MotionConfig reducedMotion="user">
+          <RootRouter />
+        </MotionConfig>
       </AppErrorBoundary>
     </StrictMode>,
   )

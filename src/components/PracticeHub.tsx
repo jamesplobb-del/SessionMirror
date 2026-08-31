@@ -3,10 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronLeft,
-  ChevronRight,
   Plus,
-  Star,
-  Target,
   X,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
@@ -51,6 +48,7 @@ interface PracticeHubProps {
 }
 
 type HubPage = 'home' | 'focused-setup'
+type PracticeLaunchMode = 'regular' | 'focus'
 
 export default function PracticeHub({
   isOpen,
@@ -66,15 +64,14 @@ export default function PracticeHub({
   onClose,
   onOpenQuickPractice,
   onStartFocusedPractice,
-  onResumeFocusedPractice,
   onCreatePracticeItem,
-  onOpenGames,
   onOpenVault,
   onOpenTuner,
   onOpenMetronome,
 }: PracticeHubProps) {
   const dialogRef = useRef<HTMLElement>(null)
   const [page, setPage] = useState<HubPage>('home')
+  const [launchMode, setLaunchMode] = useState<PracticeLaunchMode>('regular')
   const [selectedProjectId, setSelectedProjectId] = useState(
     focusedPractice?.projectId ?? activeProject?.id ?? '',
   )
@@ -86,6 +83,7 @@ export default function PracticeHub({
   useEffect(() => {
     if (!isOpen) return
     setPage('home')
+    setLaunchMode('regular')
     setMetronomePrefs(loadMetronomePrefs())
     const resumeProjectId = focusedPractice?.projectId ?? practiceItemStates[0]?.projectId
     setSelectedProjectId(resumeProjectId ?? activeProject?.id ?? '')
@@ -124,33 +122,15 @@ export default function PracticeHub({
   const focusedProjectName = focusedPractice
     ? projects.find((project) => project.id === focusedPractice.projectId)?.name
     : null
-  const mostRecentPractice = practiceItemStates[0] ?? null
-  const mostRecentProject = mostRecentPractice
-    ? projects.find((project) => project.id === mostRecentPractice.projectId) ?? null
-    : null
   const takeCountLabel = `${takes.length} ${takes.length === 1 ? 'take' : 'takes'}`
 
-  /** Orientation for "pick up where you left off" — real data only, no
-   * fabricated streaks. Last-opened date always exists; the best take only
-   * shows once one's been marked in this session. */
-  const mostRecentBest = mostRecentProject
-    ? bestTakeHistory.find(
-        (entry) => entry.projectId === mostRecentProject.id && entry.isCurrentBest,
-      ) ?? null
-    : null
-  const resumeRecapLabel = mostRecentPractice
-    ? [
-        mostRecentPractice.lastOpenedAt
-          ? `last worked ${new Date(mostRecentPractice.lastOpenedAt).toLocaleDateString([], {
-              month: 'short',
-              day: 'numeric',
-            })}`
-          : null,
-        mostRecentBest ? `best: ${mostRecentBest.takeName || 'untitled take'}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : ''
+  const launchSelectedMode = () => {
+    if (launchMode === 'focus') {
+      setPage('focused-setup')
+      return
+    }
+    onOpenQuickPractice()
+  }
 
   const startFocusedPractice = async () => {
     if (!selectedProjectId || startingFocusedPractice) return
@@ -194,7 +174,7 @@ export default function PracticeHub({
 
           <motion.section
             ref={dialogRef}
-            className="practice-menu-card"
+            className={`practice-menu-card ${page === 'home' ? 'practice-menu-card--home' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="practice-menu-title"
@@ -220,9 +200,7 @@ export default function PracticeHub({
                     <ChevronLeft aria-hidden />
                   </Pressable>
                 ) : (
-                  <span className="practice-menu-brand-mark" aria-hidden>
-                    <Target />
-                  </span>
+                  <span aria-hidden />
                 )}
               </div>
 
@@ -231,13 +209,7 @@ export default function PracticeHub({
                 <h2 id="practice-menu-title">
                   {page === 'focused-setup' ? 'Focused Practice' : 'Practice'}
                 </h2>
-                <p>
-                  {page === 'focused-setup'
-                    ? 'Set the context once, then record freely'
-                    : activeProject
-                      ? `${takeCountLabel} • ${activeProject.name}`
-                      : 'Choose how you want to work'}
-                </p>
+                {page === 'focused-setup' && <p>Set the context once, then record freely</p>}
               </div>
 
               <div className="practice-menu-header-slot practice-menu-header-slot--end">
@@ -333,104 +305,60 @@ export default function PracticeHub({
                     exit={{ opacity: 0, x: -8 }}
                     transition={iosFade}
                   >
-                    {mostRecentPractice && mostRecentProject && (
-                      <section className="practice-menu-section">
+                    <section className="practice-menu-focus-flow">
+                      <span className="practice-menu-eyebrow">Today’s focus</span>
+                      <div className="practice-menu-mode-switch" role="group" aria-label="Practice mode">
                         <Pressable
                           type="button"
                           intensity="soft"
                           haptic="light"
                           hapticFeedback={hapticFeedback}
-                          className="practice-menu-hero"
-                          onClick={() => void onResumeFocusedPractice(mostRecentProject.id)}
+                          aria-pressed={launchMode === 'regular'}
+                          onClick={() => setLaunchMode('regular')}
                         >
-                          <span className="practice-menu-hero-ring" aria-hidden />
-                          <span className="practice-menu-hero-content">
-                            {mostRecentBest && (
-                              <span className="practice-menu-hero-badge">
-                                <Star aria-hidden />
-                                Personal best &middot; {mostRecentBest.takeName || 'latest take'}
-                              </span>
-                            )}
-                            <strong className="practice-menu-hero-title">
-                              Continue {mostRecentProject.name}
-                            </strong>
-                            {resumeRecapLabel && (
-                              <small className="practice-menu-hero-recap">{resumeRecapLabel}</small>
-                            )}
-                            <span className="practice-menu-hero-cta">
-                              Resume
-                              <ChevronRight aria-hidden />
-                            </span>
-                          </span>
+                          Regular
+                          <small>Just record</small>
                         </Pressable>
-                      </section>
-                    )}
-
-                    <section className="practice-menu-section">
-                      <h3>Choose a direction</h3>
-                      <div className="practice-menu-list">
                         <Pressable
                           type="button"
                           intensity="soft"
                           haptic="light"
                           hapticFeedback={hapticFeedback}
-                          className="practice-menu-row"
-                          onClick={onOpenQuickPractice}
+                          aria-pressed={launchMode === 'focus'}
+                          onClick={() => setLaunchMode('focus')}
                         >
-                          <span className="practice-menu-spine" aria-hidden />
-                          <span className="practice-menu-row-copy">
-                            <strong>Quick Practice</strong>
-                            <small>Open the recorder with no setup.</small>
-                          </span>
-                          <span className="practice-menu-tag">Standard</span>
-                        </Pressable>
-
-                        <Pressable
-                          type="button"
-                          intensity="soft"
-                          haptic="light"
-                          hapticFeedback={hapticFeedback}
-                          className="practice-menu-row"
-                          onClick={() => setPage('focused-setup')}
-                        >
-                          <span
-                            className={`practice-menu-spine ${
-                              focusedPractice ? 'practice-menu-spine--active' : ''
-                            }`}
-                            aria-hidden
-                          />
-                          <span className="practice-menu-row-copy">
-                            <strong>Focused Practice</strong>
-                            <small>
-                              {focusedPractice && focusedProjectName
-                                ? focusedProjectName
-                                : 'Pick or start the session for one specific thing.'}
-                            </small>
-                          </span>
-                          <ChevronRight aria-hidden className="practice-menu-chevron" />
-                        </Pressable>
-
-                        <Pressable
-                          type="button"
-                          intensity="soft"
-                          haptic="light"
-                          hapticFeedback={hapticFeedback}
-                          className="practice-menu-row"
-                          onClick={onOpenGames}
-                        >
-                          <span className="practice-menu-spine" aria-hidden />
-                          <span className="practice-menu-row-copy">
-                            <strong>Practice Games</strong>
-                            <small>Train pitch, rhythm, and listening.</small>
-                          </span>
-                          <ChevronRight aria-hidden className="practice-menu-chevron" />
+                          Focus
+                          <small>Choose a goal</small>
                         </Pressable>
                       </div>
-                    </section>
+                      <Pressable
+                        type="button"
+                        intensity="soft"
+                        haptic="light"
+                        hapticFeedback={hapticFeedback}
+                        className="practice-menu-focus-card"
+                        onClick={launchSelectedMode}
+                      >
+                        <span className="practice-menu-focus-wave" aria-hidden>
+                          {Array.from({ length: 15 }, (_, index) => (
+                            <i key={index} />
+                          ))}
+                        </span>
+                        <small>
+                          {launchMode === 'focus'
+                            ? focusedProjectName ?? 'Focused practice'
+                            : activeProject?.name ?? 'My Session'}
+                        </small>
+                        <strong>Record. Compare. Improve.</strong>
+                        <em>
+                          {takeCountLabel} · {takes.length === 0 ? 'ready to begin' : 'ready for another'}
+                        </em>
+                        <span className="practice-menu-focus-action">
+                          {launchMode === 'focus' ? 'Choose a focus' : 'Start a take'}
+                        </span>
+                      </Pressable>
 
-                    <section className="practice-menu-section">
-                      <h3>Shortcuts</h3>
-                      <div className="practice-menu-shortcuts">
+                      <div className="practice-menu-focus-tools">
                         <Pressable
                           type="button"
                           intensity="soft"
@@ -461,6 +389,29 @@ export default function PracticeHub({
                           haptic="light"
                           hapticFeedback={hapticFeedback}
                           className="practice-menu-shortcut"
+                          onClick={onOpenMetronome}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.9}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M12 2.5 19.5 20.5H4.5Z" />
+                            <path d="M12 20.5 15.2 8.4" />
+                          </svg>
+                          <strong>Metronome</strong>
+                          <small>{metronomePrefs ? `${metronomePrefs.bpm} BPM` : 'Saved'}</small>
+                        </Pressable>
+                        <Pressable
+                          type="button"
+                          intensity="soft"
+                          haptic="light"
+                          hapticFeedback={hapticFeedback}
+                          className="practice-menu-shortcut"
                           onClick={onOpenTuner}
                         >
                           <svg
@@ -477,29 +428,6 @@ export default function PracticeHub({
                           </svg>
                           <strong>Tuner</strong>
                           <small>{tunerProfile?.label ?? tunerKey.label}</small>
-                        </Pressable>
-                        <Pressable
-                          type="button"
-                          intensity="soft"
-                          haptic="light"
-                          hapticFeedback={hapticFeedback}
-                          className="practice-menu-shortcut"
-                          onClick={onOpenMetronome}
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={1.9}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden
-                          >
-                            <path d="M12 2.5 19.5 20.5H4.5Z" />
-                            <path d="M12 20.5 15.2 8.4" />
-                          </svg>
-                          <strong>Metronome</strong>
-                          <small>{metronomePrefs ? `${metronomePrefs.bpm} BPM` : 'Saved tempo'}</small>
                         </Pressable>
                       </div>
                     </section>

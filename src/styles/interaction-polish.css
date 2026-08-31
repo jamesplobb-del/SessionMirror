@@ -1,0 +1,220 @@
+/**
+ * Shared interaction and dark-appearance polish.
+ *
+ * This file intentionally loads after feature styles. It fills the gaps for
+ * raw controls while keeping component-owned Framer Motion animations intact.
+ */
+
+:root {
+  --sm-motion-fast: 150ms;
+  --sm-motion-standard: 220ms;
+  --sm-motion-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+button,
+[role='button'],
+[role='tab'],
+[role='menuitem'],
+[role='menuitemcheckbox'],
+select,
+label[for] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, filter,
+    transform;
+  transition-duration: var(--sm-motion-standard);
+  transition-timing-function: var(--sm-motion-ease);
+}
+
+button:not(:disabled):not(.tutorial-sheet-backdrop):not(.native-sheet-backdrop):not(
+    .action-sheet-backdrop
+  ):active,
+[role='button']:not([aria-disabled='true']):active,
+[role='tab']:not([aria-disabled='true']):active,
+[role='menuitem']:not([aria-disabled='true']):active,
+[role='menuitemcheckbox']:not([aria-disabled='true']):active {
+  filter: brightness(0.97);
+}
+
+button:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+[role='menuitem']:focus-visible,
+[role='menuitemcheckbox']:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--audio-blue, #1598ff) 78%, white 22%);
+  outline-offset: 2px;
+}
+
+.metronome-audio-select__menu-content {
+  min-height: 100%;
+  transform-origin: top center;
+}
+
+/* Dark mode uses distinct elevation steps instead of near-identical blacks. */
+html.app-dark-mode.app-audio-mode,
+html.app-dark-mode .app-ui-overlay--audio-mode {
+  --audio-bg-top: #182337;
+  --audio-bg-mid: #131e30;
+  --audio-bg-base: #0f1929;
+  --audio-bg-bottom: #0a111e;
+  --audio-text-primary: #f8fafc;
+  --audio-text-secondary: #c0c9d7;
+  --audio-surface: #19263a;
+  --audio-divider: rgba(226, 232, 240, 0.2);
+  --audio-shadow-segment: 0 14px 34px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --audio-shadow-card: 0 18px 44px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.085);
+  --audio-shadow-fab: 0 11px 28px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light {
+  border-color: rgba(226, 232, 240, 0.18);
+  background: var(--audio-bg-base, #0f1929);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-handle,
+html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-header,
+html.app-dark-mode .native-bottom-sheet--audio-light .settings-drawer-scroll,
+html.app-dark-mode .native-bottom-sheet--audio-light .vault-drawer-scroll {
+  background: var(--audio-bg-base, #0f1929);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .settings-group-row,
+html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-close,
+html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-action-pill {
+  border-color: rgba(226, 232, 240, 0.17);
+  background: var(--audio-surface, #19263a);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .text-stone-950,
+html.app-dark-mode .native-bottom-sheet--audio-light .text-stone-900,
+html.app-dark-mode .native-bottom-sheet--audio-light .text-stone-800,
+html.app-dark-mode .native-bottom-sheet--audio-light .text-stone-700 {
+  color: var(--audio-text-primary, #f8fafc) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .text-stone-600,
+html.app-dark-mode .native-bottom-sheet--audio-light .text-stone-500,
+html.app-dark-mode .native-bottom-sheet--audio-light .text-stone-400 {
+  color: var(--audio-text-secondary, #c0c9d7) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .border-white\/70,
+html.app-dark-mode .native-bottom-sheet--audio-light .border-white\/60,
+html.app-dark-mode .native-bottom-sheet--audio-light .border-stone-100,
+html.app-dark-mode .native-bottom-sheet--audio-light .border-stone-200 {
+  border-color: rgba(226, 232, 240, 0.17) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light .bg-white,
+html.app-dark-mode .native-bottom-sheet--audio-light .bg-white\/70,
+html.app-dark-mode .native-bottom-sheet--audio-light .bg-white\/72,
+html.app-dark-mode .native-bottom-sheet--audio-light .bg-stone-50,
+html.app-dark-mode .native-bottom-sheet--audio-light .bg-stone-100,
+html.app-dark-mode .native-bottom-sheet--audio-light [role='tablist'] {
+  background: rgba(28, 41, 61, 0.96) !important;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light [role='tab'][aria-selected='true'] > span:first-child {
+  border-color: rgba(125, 211, 252, 0.24) !important;
+  background: #2a3a52 !important;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light input,
+html.app-dark-mode .native-bottom-sheet--audio-light textarea,
+html.app-dark-mode .native-bottom-sheet--audio-light select {
+  color: var(--audio-text-primary, #f8fafc);
+  accent-color: #38bdf8;
+}
+
+html.app-dark-mode .native-bottom-sheet--audio-light input::placeholder,
+html.app-dark-mode .native-bottom-sheet--audio-light textarea::placeholder {
+  color: rgba(192, 201, 215, 0.68);
+}
+
+/* The Practice home previously forced a light card inside dark mode. */
+html.app-dark-mode .practice-menu-card--home {
+  --practice-menu-surface: linear-gradient(180deg, #1b2739 0%, #141f30 56%, #101927 100%);
+  --practice-menu-group: rgba(31, 45, 65, 0.94);
+  --practice-menu-control: rgba(38, 53, 75, 0.94);
+  --practice-menu-text: #f8fafc;
+  --practice-menu-secondary: #bdc7d5;
+  --practice-menu-divider: rgba(226, 232, 240, 0.17);
+  border-color: rgba(226, 232, 240, 0.18);
+  color: var(--practice-menu-text);
+  background: var(--practice-menu-surface);
+  box-shadow: 0 30px 76px rgba(0, 0, 0, 0.54), 0 8px 22px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+html.app-dark-mode .practice-menu-card--home .practice-menu-mode-switch {
+  border-color: rgba(226, 232, 240, 0.14);
+  background: rgba(7, 13, 23, 0.58);
+}
+
+html.app-dark-mode .practice-menu-card--home .practice-menu-mode-switch button[aria-pressed='true'] {
+  color: #f8fafc;
+  background: #2b3b53;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+html.app-dark-mode .practice-menu-card--home .practice-menu-focus-card {
+  border: 1px solid rgba(226, 232, 240, 0.14);
+  background: radial-gradient(circle at 18% 18%, rgba(247, 166, 0, 0.16), transparent 35%),
+    radial-gradient(circle at 82% 20%, rgba(21, 152, 255, 0.18), transparent 38%),
+    linear-gradient(180deg, #1f2d42 0%, #172338 100%);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+html.app-dark-mode .practice-menu-card--home .practice-menu-icon-button,
+html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools {
+  border-color: rgba(226, 232, 240, 0.16);
+  background: var(--practice-menu-group);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+html.app-dark-mode .action-sheet-backdrop {
+  background: rgba(2, 6, 15, 0.68) !important;
+}
+
+html.app-dark-mode .action-sheet-panel,
+html.app-dark-mode .action-sheet-cancel {
+  border: 1px solid rgba(226, 232, 240, 0.17);
+  background: rgba(24, 36, 54, 0.98) !important;
+  color: #f8fafc;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+html.app-dark-mode .action-sheet-copy,
+html.app-dark-mode .action-sheet-action {
+  border-color: rgba(226, 232, 240, 0.16) !important;
+}
+
+html.app-dark-mode .action-sheet-copy p:first-child {
+  color: #f8fafc !important;
+}
+
+html.app-dark-mode .action-sheet-copy p:last-child {
+  color: #c0c9d7 !important;
+}
+
+html.app-dark-mode .action-sheet-action:active,
+html.app-dark-mode .action-sheet-cancel:active {
+  background: rgba(51, 65, 85, 0.98) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='menuitemcheckbox'],
+  select,
+  label[for] {
+    transition-duration: 1ms !important;
+  }
+}

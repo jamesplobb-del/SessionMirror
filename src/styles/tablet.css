@@ -1138,7 +1138,7 @@
   }
 
   .labs-overlay .arcade-game-card {
-    min-height: clamp(13rem, 24vh, 17rem);
+    min-height: 0;
   }
 }
 
@@ -1795,12 +1795,13 @@
   }
 
   .labs-overlay .arcade-game-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    gap: 1rem;
   }
 
   .labs-overlay .arcade-game-card {
-    min-height: clamp(19rem, 25vh, 22rem);
+    min-height: 0;
     padding: clamp(1.25rem, 2.5vw, 2rem);
     border-radius: 1.75rem;
   }
@@ -1886,7 +1887,7 @@
   }
 
   .labs-overlay .arcade-game-card {
-    min-height: clamp(17rem, 29vh, 20rem);
+    min-height: 0;
   }
 
   .labs-overlay :is(.sj-screen, .balance-screen--setup) {

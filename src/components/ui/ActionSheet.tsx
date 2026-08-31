@@ -99,8 +99,8 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
               <div className="h-1 w-10 rounded-full bg-stone-300/70" />
             </div>
 
-            <div className="overflow-hidden rounded-2xl bg-white/95 shadow-2xl backdrop-blur-xl">
-              <div className="border-b border-stone-200/80 px-4 py-4 text-center">
+            <div className="action-sheet-panel overflow-hidden rounded-2xl bg-white/95 shadow-2xl backdrop-blur-xl">
+              <div className="action-sheet-copy border-b border-stone-200/80 px-4 py-4 text-center">
                 {request.title && (
                   <p className="text-sm font-semibold text-stone-900">{request.title}</p>
                 )}
@@ -118,7 +118,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
                 <button
                   type="button"
                   onClick={onConfirm}
-                  className={`w-full border-b border-stone-200/80 py-3.5 text-[17px] font-semibold active:bg-stone-100 ${
+                  className={`action-sheet-action w-full border-b border-stone-200/80 py-3.5 text-[17px] font-semibold active:bg-stone-100 ${
                     request.destructive ? 'text-red-600' : 'text-sky-600'
                   }`}
                 >
@@ -130,7 +130,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
                 <button
                   type="button"
                   onClick={onConfirm}
-                  className={`w-full py-3.5 text-[17px] font-semibold active:bg-stone-100 ${
+                  className={`action-sheet-action w-full py-3.5 text-[17px] font-semibold active:bg-stone-100 ${
                     request.tone === 'error'
                       ? 'text-red-600'
                       : request.tone === 'success'
@@ -147,7 +147,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
               <button
                 type="button"
                 onClick={onCancel}
-                className="mt-2 w-full rounded-2xl bg-white/95 py-3.5 text-[17px] font-semibold text-sky-600 shadow-2xl backdrop-blur-xl active:bg-stone-100"
+                className="action-sheet-cancel mt-2 w-full rounded-2xl bg-white/95 py-3.5 text-[17px] font-semibold text-sky-600 shadow-2xl backdrop-blur-xl active:bg-stone-100"
               >
                 Cancel
               </button>

@@ -2976,6 +2976,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     settings.hapticFeedback,
   ])
 
+  const handleOpenFullPracticeTool = useCallback(
+    (tab: 'metronome' | 'tuner') => {
+      triggerLightHaptic(settings.hapticFeedback)
+      dismissPracticeHub()
+      setIsSettingsOpen(false)
+      setIsVaultOpen(false)
+      setQuickSettingsOpen(false)
+      setShowPitch(false)
+      setLabsRoute(null)
+      handleRecordingModeChange('audio')
+      handleAudioPracticeTabChange(tab)
+      deferHudMediaPause()
+    },
+    [
+      deferHudMediaPause,
+      dismissPracticeHub,
+      handleAudioPracticeTabChange,
+      handleRecordingModeChange,
+      settings.hapticFeedback,
+    ],
+  )
+
+  const handleOpenFullTunerFromPracticeHub = useCallback(() => {
+    handleOpenFullPracticeTool('tuner')
+  }, [handleOpenFullPracticeTool])
+
+  const handleOpenFullMetronomeFromPracticeHub = useCallback(() => {
+    handleOpenFullPracticeTool('metronome')
+  }, [handleOpenFullPracticeTool])
+
   const handleOpenVaultFromPracticeHub = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setIsPracticeHubOpen(false)
@@ -4545,8 +4575,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onCreatePracticeItem={handleCreateProject}
                 onOpenGames={handleOpenPracticeGames}
                 onOpenVault={handleOpenVaultFromPracticeHub}
-                onOpenTuner={handleOpenQuickTunerFromSettings}
-                onOpenMetronome={handleOpenQuickMetronomeFromSettings}
+                onOpenTuner={handleOpenFullTunerFromPracticeHub}
+                onOpenMetronome={handleOpenFullMetronomeFromPracticeHub}
               />
 
               {focusedPractice &&
@@ -5190,11 +5220,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         </motion.div>
                       )}
 
-                    {!(
-                      isAudioPracticeTimelineTab &&
-                      !practiceSessionActive &&
-                      !quickSettingsOpen
-                    ) && (
+                    {!isAudioPracticeMetronomeTab &&
+                      !(
+                        isAudioPracticeTimelineTab &&
+                        !practiceSessionActive &&
+                        !quickSettingsOpen
+                      ) && (
                       <ControlDeck
                         isRecording={isRecording}
                         isStopping={isStopping}

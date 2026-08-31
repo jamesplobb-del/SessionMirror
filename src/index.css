@@ -8246,3 +8246,80 @@ html.app-dark-mode
     width: min(100%, 34rem);
   }
 }
+
+/*
+ * The metronome owns its bottom transport. Its recording deck is intentionally
+ * absent, so the visual can use that reclaimed vertical space and the transport
+ * can sit at the screen edge without competing with a second row of controls.
+ * Scope every override to this tab so the tuner keeps its existing layout.
+ */
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__visual--large {
+  min-height: clamp(18rem, 51dvh, 31rem);
+  padding-block: clamp(1.35rem, 3.4dvh, 2.75rem);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--spacious {
+  --runway-node-width: clamp(4.6rem, 18vw, 6.15rem);
+  --runway-node-height: clamp(14rem, 40dvh, 21rem);
+  max-width: 38rem;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-pendulum {
+  min-height: clamp(16rem, 44dvh, 24rem);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-pendulum__scale,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-pendulum__arm {
+  height: clamp(12.5rem, 36dvh, 19rem);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-orbit {
+  min-height: clamp(18rem, 50dvh, 28rem);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-orbit__ring {
+  --orbit-size: min(86vw, clamp(17rem, 46dvh, 26rem));
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__controls {
+  padding-bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-height: 740px) {
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .audio-practice-metronome__visual--large {
+    min-height: clamp(14.5rem, 42dvh, 19rem);
+    padding-block: 0.75rem;
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .audio-practice-metronome__visual--large
+    .audio-practice-metronome__beat-row--spacious {
+    --runway-node-height: clamp(11.5rem, 33dvh, 16.5rem);
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-pendulum {
+    min-height: clamp(13rem, 37dvh, 17rem);
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .metronome-pendulum__scale,
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .metronome-pendulum__arm {
+    height: clamp(10rem, 29dvh, 13.5rem);
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-orbit {
+    min-height: clamp(14.5rem, 41dvh, 19rem);
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-orbit__ring {
+    --orbit-size: min(78vw, clamp(13.5rem, 36dvh, 18rem));
+  }
+}
