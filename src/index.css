@@ -8255,16 +8255,24 @@ html.app-dark-mode
  */
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__visual--large {
-  min-height: clamp(18rem, 51dvh, 31rem);
-  padding-block: clamp(1.35rem, 3.4dvh, 2.75rem);
+  min-height: clamp(19rem, 61dvh, 34rem);
+  padding-block: clamp(1.35rem, 3dvh, 1.85rem);
 }
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__visual--large
   .audio-practice-metronome__beat-row--spacious {
-  --runway-node-width: clamp(4.6rem, 18vw, 6.15rem);
-  --runway-node-height: clamp(14rem, 40dvh, 21rem);
+  --runway-node-width: clamp(5rem, 22vw, 5.85rem);
+  --runway-node-height: clamp(14rem, 44dvh, 23rem);
   max-width: 38rem;
+}
+
+/* Widen the four-bar runway to ~93% of the phone so the enlarged bars sit side
+   by side with a hairline gap instead of overflowing their grid cells. */
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__visual--large
+  .audio-practice-metronome__beat-row--single-line {
+  width: min(100%, calc(var(--beat-columns) * clamp(5.3rem, 23vw, 6.25rem)));
 }
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-pendulum {
@@ -8288,7 +8296,7 @@ html.app-dark-mode
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__controls {
-  padding-bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) + 0.15rem));
 }
 
 @media (max-height: 740px) {
